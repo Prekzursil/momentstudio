@@ -49,7 +49,7 @@ Below is a structured checklist you can turn into issues.
 - [ ] Merge guest cart into user cart on login.
 
 ## Backend - Orders, Payment, Addresses
-- [ ] Address model + migration; CRUD /me/addresses.
+- [x] Address model + migration; CRUD /me/addresses.
 - [ ] Order + OrderItem models + migrations.
 - [ ] Service to build order from cart (price snapshot).
 - [ ] Stripe integration: PaymentIntent create, return client secret.
