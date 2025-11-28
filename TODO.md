@@ -36,10 +36,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin soft-delete product.
 - [x] Admin product image upload/delete.
 - [x] Image storage service (local first, S3-ready).
-- [ ] Seed example products/categories for dev.
+- [x] Seed example products/categories for dev.
 
 ## Backend - Cart & Checkout
-- [ ] Cart + CartItem models + migrations.
+- [x] Cart + CartItem models + migrations.
 - [ ] Guest cart support (session_id).
 - [ ] GET /cart (guest or user).
 - [ ] POST /cart/items add.
