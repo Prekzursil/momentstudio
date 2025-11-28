@@ -111,21 +111,36 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     assert order["status"] == "pending"
     assert order["reference_code"]
     assert float(order["shipping_amount"]) >= 0
+    order_id = order["id"]
+    item_id = order["items"][0]["id"]
+
+    retry = client.post(f"/api/v1/orders/admin/{order_id}/retry-payment", headers=auth_headers(admin_token))
+    assert retry.status_code == 200
+    assert retry.json()["payment_retry_count"] == 1
+    assert any(evt["event"] == "payment_retry" for evt in retry.json()["events"])
 
     admin_list = client.get("/api/v1/orders/admin", headers=auth_headers(admin_token))
     assert admin_list.status_code == 200
     assert len(admin_list.json()) >= 1
 
+    fulfill = client.post(
+        f"/api/v1/orders/admin/{order_id}/items/{item_id}/fulfill",
+        params={"shipped_quantity": 1},
+        headers=auth_headers(admin_token),
+    )
+    assert fulfill.status_code == 200
+    assert fulfill.json()["items"][0]["shipped_quantity"] == 1
+
     # invalid transition pending -> shipped
     bad = client.patch(
-        f"/api/v1/orders/admin/{order['id']}",
+        f"/api/v1/orders/admin/{order_id}",
         json={"status": "shipped"},
         headers=auth_headers(admin_token),
     )
     assert bad.status_code == 400
 
     ok = client.patch(
-        f"/api/v1/orders/admin/{order['id']}",
+        f"/api/v1/orders/admin/{order_id}",
         json={"status": "paid", "tracking_number": "TRACK123"},
         headers=auth_headers(admin_token),
     )
@@ -134,9 +149,27 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     assert ok.json()["tracking_number"] == "TRACK123"
 
     final = client.patch(
-        f"/api/v1/orders/admin/{order['id']}",
+        f"/api/v1/orders/admin/{order_id}",
         json={"status": "shipped"},
         headers=auth_headers(admin_token),
     )
     assert final.status_code == 200
     assert final.json()["status"] == "shipped"
+
+    refund = client.post(
+        f"/api/v1/orders/admin/{order_id}/refund",
+        params={"note": "Customer requested refund"},
+        headers=auth_headers(admin_token),
+    )
+    assert refund.status_code == 200
+    assert refund.json()["status"] == "refunded"
+    assert any(evt["event"] == "refund_requested" for evt in refund.json()["events"])
+
+    events = client.get(f"/api/v1/orders/admin/{order_id}/events", headers=auth_headers(admin_token))
+    assert events.status_code == 200
+    assert len(events.json()) >= 4
+
+    packing = client.get(f"/api/v1/orders/admin/{order_id}/packing-slip", headers=auth_headers(admin_token))
+    assert packing.status_code == 200
+    assert "Packing slip for order" in packing.text
+    assert "Items:" in packing.text

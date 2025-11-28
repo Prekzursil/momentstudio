@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -10,7 +11,7 @@ from app.db.session import get_session
 from app.models.address import Address
 from app.models.cart import Cart
 from app.models.order import OrderStatus
-from app.schemas.order import OrderRead, OrderCreate, OrderUpdate, ShippingMethodCreate, ShippingMethodRead
+from app.schemas.order import OrderRead, OrderCreate, OrderUpdate, ShippingMethodCreate, ShippingMethodRead, OrderEventRead
 from app.services import order as order_service
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -84,6 +85,70 @@ async def admin_update_order(
         if not shipping_method:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
     return await order_service.update_order(session, order, payload, shipping_method=shipping_method)
+
+
+@router.post("/admin/{order_id}/retry-payment", response_model=OrderRead)
+async def admin_retry_payment(
+    order_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+):
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    return await order_service.retry_payment(session, order)
+
+
+@router.post("/admin/{order_id}/refund", response_model=OrderRead)
+async def admin_refund_order(
+    order_id: UUID,
+    note: str | None = None,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+):
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    return await order_service.refund_order(session, order, note=note)
+
+
+@router.post("/admin/{order_id}/items/{item_id}/fulfill", response_model=OrderRead)
+async def admin_fulfill_item(
+    order_id: UUID,
+    item_id: UUID,
+    shipped_quantity: int = 0,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+):
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    return await order_service.update_fulfillment(session, order, item_id, shipped_quantity)
+
+
+@router.get("/admin/{order_id}/events", response_model=list[OrderEventRead])
+async def admin_order_events(
+    order_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+):
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    return order.events
+
+
+@router.get("/admin/{order_id}/packing-slip")
+async def admin_packing_slip(
+    order_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+):
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    content = f"Packing slip for order {order.reference_code or order.id}\nItems: {len(order.items)}"
+    return PlainTextResponse(content, media_type="application/pdf")
 
 
 @router.post("/shipping-methods", response_model=ShippingMethodRead, status_code=status.HTTP_201_CREATED)

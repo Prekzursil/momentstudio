@@ -16,8 +16,7 @@ from app.models.catalog import (
 from app.models.cart import Cart, CartItem  # noqa: F401
 from app.models.promo import PromoCode  # noqa: F401
 from app.models.address import Address  # noqa: F401
-from app.models.order import Order, OrderItem  # noqa: F401
-from app.models.order import OrderStatus, ShippingMethod  # noqa: F401
+from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod, OrderEvent  # noqa: F401
 
 __all__ = [
     "Base",
@@ -40,4 +39,5 @@ __all__ = [
     "OrderItem",
     "OrderStatus",
     "ShippingMethod",
+    "OrderEvent",
 ]

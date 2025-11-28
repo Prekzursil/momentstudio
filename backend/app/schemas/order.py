@@ -30,6 +30,7 @@ class OrderItemRead(BaseModel):
     product_id: UUID
     variant_id: UUID | None = None
     quantity: int
+    shipped_quantity: int
     unit_price: float
     subtotal: float
 
@@ -41,6 +42,7 @@ class OrderRead(BaseModel):
     user_id: UUID
     reference_code: str | None = None
     status: OrderStatus
+    payment_retry_count: int
     total_amount: float
     tax_amount: float
     shipping_amount: float
@@ -49,9 +51,10 @@ class OrderRead(BaseModel):
     shipping_method: ShippingMethodRead | None = None
     shipping_address_id: UUID | None = None
     billing_address_id: UUID | None = None
-    items: list[OrderItemRead] = []
+    items: list[OrderItemRead] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
+    events: list["OrderEventRead"] = Field(default_factory=list)
 
 
 class OrderCreate(BaseModel):
@@ -64,3 +67,16 @@ class OrderUpdate(BaseModel):
     status: OrderStatus | None = None
     tracking_number: str | None = Field(default=None, max_length=50)
     shipping_method_id: UUID | None = None
+    shipped_quantity: int | None = Field(default=None, ge=0)
+
+
+class OrderEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    event: str
+    note: str | None = None
+    created_at: datetime
+
+
+OrderRead.model_rebuild()

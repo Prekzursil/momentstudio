@@ -94,11 +94,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Order reference code generator.
 - [x] Shipping method model (flat-rate, weight-based).
 - [x] Tax calculation strategy (basic rules).
-- [ ] Payment failure retry flow.
-- [ ] Refund endpoint stub (manual).
-- [ ] Order timeline/audit log (status changes, notes).
-- [ ] Packing slip/invoice PDF stub.
-- [ ] Order item fulfillment tracking (shipped qty).
+- [x] Payment failure retry flow.
+- [x] Refund endpoint stub (manual).
+- [x] Order timeline/audit log (status changes, notes).
+- [x] Packing slip/invoice PDF stub.
+- [x] Order item fulfillment tracking (shipped qty).
 - [ ] Capture/void support for Stripe intents.
 - [ ] Admin order export CSV.
 - [ ] Reorder endpoint (copy past order to cart).

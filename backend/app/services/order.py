@@ -10,7 +10,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.models.cart import Cart
-from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod
+from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod, OrderEvent
 from app.schemas.order import OrderUpdate, ShippingMethodCreate, OrderCreate
 
 
@@ -59,7 +59,10 @@ async def build_order_from_cart(
     )
     session.add(order)
     await session.commit()
-    await session.refresh(order, attribute_names=["items", "shipping_method"])
+    await session.refresh(order)
+    await _log_event(session, order.id, "created", f"Reference {order.reference_code}")
+    await session.refresh(order)
+    await session.refresh(order, attribute_names=["items", "events", "shipping_method"])
     return order
 
 
@@ -67,7 +70,7 @@ async def get_orders_for_user(session: AsyncSession, user_id: UUID) -> Sequence[
     result = await session.execute(
         select(Order)
         .where(Order.user_id == user_id)
-        .options(selectinload(Order.items), selectinload(Order.shipping_method))
+        .options(selectinload(Order.items), selectinload(Order.shipping_method), selectinload(Order.events))
         .order_by(Order.created_at.desc())
     )
     return result.scalars().all()
@@ -76,14 +79,18 @@ async def get_orders_for_user(session: AsyncSession, user_id: UUID) -> Sequence[
 async def get_order(session: AsyncSession, user_id: UUID, order_id: UUID) -> Order | None:
     result = await session.execute(
         select(Order)
-            .where(Order.user_id == user_id, Order.id == order_id)
-            .options(selectinload(Order.items), selectinload(Order.shipping_method))
+        .where(Order.user_id == user_id, Order.id == order_id)
+        .options(selectinload(Order.items), selectinload(Order.shipping_method), selectinload(Order.events))
     )
     return result.scalar_one_or_none()
 
 
 async def list_orders(session: AsyncSession, status: OrderStatus | None = None, user_id: UUID | None = None) -> list[Order]:
-    query = select(Order).options(selectinload(Order.items), selectinload(Order.shipping_method)).order_by(Order.created_at.desc())
+    query = (
+        select(Order)
+        .options(selectinload(Order.items), selectinload(Order.shipping_method), selectinload(Order.events))
+        .order_by(Order.created_at.desc())
+    )
     if status:
         query = query.where(Order.status == status)
     if user_id:
@@ -112,6 +119,7 @@ async def update_order(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
         order.status = next_status
         data.pop("status")
+        await _log_event(session, order.id, "status_change", f"{current_status.value} -> {next_status.value}")
 
     if shipping_method:
         order.shipping_method_id = shipping_method.id
@@ -125,6 +133,7 @@ async def update_order(
     session.add(order)
     await session.commit()
     await session.refresh(order)
+    await session.refresh(order, attribute_names=["items", "shipping_method", "events"])
     return order
 
 
@@ -168,6 +177,55 @@ async def list_shipping_methods(session: AsyncSession) -> list[ShippingMethod]:
 
 async def get_order_by_id(session: AsyncSession, order_id: UUID) -> Order | None:
     result = await session.execute(
-        select(Order).options(selectinload(Order.items), selectinload(Order.shipping_method)).where(Order.id == order_id)
+        select(Order)
+        .options(selectinload(Order.items), selectinload(Order.shipping_method), selectinload(Order.events))
+        .where(Order.id == order_id)
     )
     return result.scalar_one_or_none()
+
+
+async def update_fulfillment(session: AsyncSession, order: Order, item_id: UUID, shipped_quantity: int) -> Order:
+    item = next((i for i in order.items if i.id == item_id), None)
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order item not found")
+    if shipped_quantity > item.quantity:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Shipped quantity exceeds ordered")
+    item.shipped_quantity = shipped_quantity
+    session.add(item)
+    await session.commit()
+    await session.refresh(order, attribute_names=["items"])
+    await _log_event(session, order.id, "fulfillment_update", f"Item {item_id} shipped {shipped_quantity}")
+    await session.refresh(order)
+    await session.refresh(order, attribute_names=["events"])
+    return order
+
+
+async def retry_payment(session: AsyncSession, order: Order) -> Order:
+    if order.status != OrderStatus.pending:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Retry only allowed for pending orders")
+    order.payment_retry_count += 1
+    await _log_event(session, order.id, "payment_retry", f"Attempt {order.payment_retry_count}")
+    session.add(order)
+    await session.commit()
+    await session.refresh(order)
+    await session.refresh(order, attribute_names=["events", "items", "shipping_method"])
+    return order
+
+
+async def refund_order(session: AsyncSession, order: Order, note: str | None = None) -> Order:
+    if order.status not in {OrderStatus.paid, OrderStatus.shipped}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Refund allowed only for paid or shipped orders")
+    previous = order.status
+    order.status = OrderStatus.refunded
+    await _log_event(session, order.id, "refund_requested", note or f"Manual refund requested from {previous.value}")
+    session.add(order)
+    await session.commit()
+    await session.refresh(order)
+    await session.refresh(order, attribute_names=["events", "items", "shipping_method"])
+    return order
+
+
+async def _log_event(session: AsyncSession, order_id: UUID, event: str, note: str | None = None) -> None:
+    evt = OrderEvent(order_id=order_id, event=event, note=note)
+    session.add(evt)
+    await session.commit()
