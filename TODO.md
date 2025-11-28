@@ -33,9 +33,9 @@ Below is a structured checklist you can turn into issues.
 - [x] GET /products with pagination, search, category, price filters.
 - [x] GET /products/{slug} detail.
 - [x] Admin create/update product endpoints.
-- [ ] Admin soft-delete product.
-- [ ] Admin product image upload/delete.
-- [ ] Image storage service (local first, S3-ready).
+- [x] Admin soft-delete product.
+- [x] Admin product image upload/delete.
+- [x] Image storage service (local first, S3-ready).
 - [ ] Seed example products/categories for dev.
 
 ## Backend - Cart & Checkout

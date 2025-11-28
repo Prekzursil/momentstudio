@@ -12,6 +12,7 @@ from app.schemas.catalog import (
     ProductUpdate,
     ProductVariantCreate,
 )
+from app.services.storage import delete_file
 
 
 async def get_category_by_slug(session: AsyncSession, slug: str) -> Category | None:
@@ -82,3 +83,28 @@ async def add_product_image(session: AsyncSession, product: Product, payload: Pr
     await session.commit()
     await session.refresh(image)
     return image
+
+
+async def add_product_image_from_path(
+    session: AsyncSession, product: Product, url: str, alt_text: str | None, sort_order: int
+) -> ProductImage:
+    image = ProductImage(product=product, url=url, alt_text=alt_text, sort_order=sort_order)
+    session.add(image)
+    await session.commit()
+    await session.refresh(image)
+    return image
+
+
+async def delete_product_image(session: AsyncSession, product: Product, image_id: str) -> None:
+    image = next((img for img in product.images if str(img.id) == str(image_id)), None)
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    delete_file(image.url)
+    await session.delete(image)
+    await session.commit()
+
+
+async def soft_delete_product(session: AsyncSession, product: Product) -> None:
+    product.is_deleted = True
+    session.add(product)
+    await session.commit()

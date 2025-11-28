@@ -11,6 +11,7 @@ from app.db.session import get_session
 from app.models.user import UserRole
 from app.services.auth import create_user
 from app.schemas.user import UserCreate
+from app.core.config import settings
 
 
 @pytest.fixture
@@ -136,3 +137,60 @@ def test_catalog_admin_and_public_flows(test_app: Dict[str, object]) -> None:
 
     res = client.get("/api/v1/catalog/products", params={"limit": 1, "offset": 1})
     assert len(res.json()) == 1
+
+    # Soft delete hides product
+    res = client.delete("/api/v1/catalog/products/white-cup", headers=auth_headers(admin_token))
+    assert res.status_code == 204
+    res = client.get("/api/v1/catalog/products/white-cup")
+    assert res.status_code == 404
+    res = client.get("/api/v1/catalog/products")
+    assert all(p["slug"] != "white-cup" for p in res.json())
+
+
+def test_product_image_upload_and_delete(tmp_path, test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal, email="imgadmin@example.com")
+
+    # point media root to temp
+    original_media = settings.media_root
+    settings.media_root = str(tmp_path)
+
+    res = client.post(
+        "/api/v1/catalog/categories",
+        json={"slug": "plates", "name": "Plates"},
+        headers=auth_headers(admin_token),
+    )
+    category_id = res.json()["id"]
+
+    res = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": category_id,
+            "slug": "plate",
+            "name": "Plate",
+            "base_price": 12,
+            "currency": "USD",
+            "stock_quantity": 2,
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert res.status_code == 201
+
+    upload_res = client.post(
+        "/api/v1/catalog/products/plate/images",
+        files={"file": ("pic.jpg", b"fakeimagecontent", "image/jpeg")},
+        headers=auth_headers(admin_token),
+    )
+    assert upload_res.status_code == 200
+    assert upload_res.json()["images"][0]["url"]
+
+    image_id = upload_res.json()["images"][0]["id"]
+    delete_res = client.delete(
+        f"/api/v1/catalog/products/plate/images/{image_id}",
+        headers=auth_headers(admin_token),
+    )
+    assert delete_res.status_code == 200
+    assert delete_res.json()["images"] == []
+
+    settings.media_root = original_media
