@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime
+import enum
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import DateTime, ForeignKey, Numeric, String, func, Enum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -11,12 +12,25 @@ from app.models.catalog import Product, ProductVariant
 from app.models.user import User
 
 
+class OrderStatus(str, enum.Enum):
+    pending = "pending"
+    paid = "paid"
+    shipped = "shipped"
+    cancelled = "cancelled"
+    refunded = "refunded"
+
+
 class Order(Base):
     __tablename__ = "orders"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    status: Mapped[str] = mapped_column(String(30), nullable=False, default="pending")
+    status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), nullable=False, default=OrderStatus.pending)
+    reference_code: Mapped[str | None] = mapped_column(String(20), unique=True, nullable=True)
+    shipping_method_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("shipping_methods.id"), nullable=True)
+    tracking_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    tax_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    shipping_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     total_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="USD")
     stripe_payment_intent_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -37,6 +51,7 @@ class Order(Base):
     shipping_address: Mapped[Address | None] = relationship("Address", foreign_keys=[shipping_address_id])
     billing_address: Mapped[Address | None] = relationship("Address", foreign_keys=[billing_address_id])
     items: Mapped[list["OrderItem"]] = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+    shipping_method: Mapped["ShippingMethod | None"] = relationship("ShippingMethod")
 
 
 class OrderItem(Base):
@@ -56,3 +71,13 @@ class OrderItem(Base):
     order: Mapped[Order] = relationship("Order", back_populates="items")
     product: Mapped[Product] = relationship("Product")
     variant: Mapped[ProductVariant | None] = relationship("ProductVariant")
+
+
+class ShippingMethod(Base):
+    __tablename__ = "shipping_methods"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    rate_flat: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    rate_per_kg: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
