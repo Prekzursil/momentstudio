@@ -89,16 +89,16 @@ Below is a structured checklist you can turn into issues.
 - [x] Stripe integration: PaymentIntent create, return client secret.
 - [x] Stripe webhook for payment succeeded/failed; update status.
 - [x] GET /me/orders and /me/orders/{id}.
-- [ ] Admin order list/filter + status/tracking update.
-- [ ] Order status enums and transitions (pending/paid/shipped/cancelled/refunded).
-- [ ] Order reference code generator.
-- [ ] Shipping method model (flat-rate, weight-based).
-- [ ] Tax calculation strategy (basic rules).
-- [ ] Payment failure retry flow.
-- [ ] Refund endpoint stub (manual).
-- [ ] Order timeline/audit log (status changes, notes).
-- [ ] Packing slip/invoice PDF stub.
-- [ ] Order item fulfillment tracking (shipped qty).
+- [x] Admin order list/filter + status/tracking update.
+- [x] Order status enums and transitions (pending/paid/shipped/cancelled/refunded).
+- [x] Order reference code generator.
+- [x] Shipping method model (flat-rate, weight-based).
+- [x] Tax calculation strategy (basic rules).
+- [x] Payment failure retry flow.
+- [x] Refund endpoint stub (manual).
+- [x] Order timeline/audit log (status changes, notes).
+- [x] Packing slip/invoice PDF stub.
+- [x] Order item fulfillment tracking (shipped qty).
 - [ ] Capture/void support for Stripe intents.
 - [ ] Admin order export CSV.
 - [ ] Reorder endpoint (copy past order to cart).
