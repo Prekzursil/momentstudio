@@ -19,10 +19,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Settings via `pydantic-settings`.
 - [x] SQLAlchemy engine/session for Postgres.
 - [x] User model + Alembic migration.
-- [ ] Password hashing/verification.
-- [ ] Auth endpoints: register, login (access+refresh), refresh, logout.
-- [ ] JWT guard dependency + role guard for admin.
-- [ ] Tests for auth flows (register/login/refresh/invalid creds).
+- [x] Password hashing/verification.
+- [x] Auth endpoints: register, login (access+refresh), refresh, logout.
+- [x] JWT guard dependency + role guard for admin.
+- [x] Tests for auth flows (register/login/refresh/invalid creds).
 
 ## Backend - Catalog & Products
 - [ ] Category model + migration.

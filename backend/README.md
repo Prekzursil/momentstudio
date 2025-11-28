@@ -13,6 +13,11 @@ cp .env.example .env  # update DATABASE_URL, SECRET_KEY, STRIPE_SECRET_KEY, SMTP
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+Key env vars:
+- `SECRET_KEY`, `JWT_ALGORITHM`, `ACCESS_TOKEN_EXP_MINUTES`, `REFRESH_TOKEN_EXP_DAYS`
+- `DATABASE_URL` (async driver, e.g., `postgresql+asyncpg://...`)
+- `SMTP_*`, `FRONTEND_ORIGIN`
+
 ## Database and migrations
 
 - Default `DATABASE_URL` uses async Postgres via `postgresql+asyncpg://...`.
