@@ -25,9 +25,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Tests for auth flows (register/login/refresh/invalid creds).
 
 ## Backend - Catalog & Products
-- [ ] Category model + migration.
-- [ ] Product model + migration.
-- [ ] ProductImage model + migration.
+- [x] Category model + migration.
+- [x] Product model + migration.
+- [x] ProductImage model + migration.
 - [ ] (Optional) ProductVariant model + migration.
 - [ ] GET /categories (public).
 - [ ] GET /products with pagination, search, category, price filters.
