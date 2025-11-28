@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     environment: str = "local"
 
-    database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/adrianaart"
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/adrianaart"
     secret_key: str = "dev-secret-key"
     stripe_secret_key: str = "sk_test_placeholder"
 

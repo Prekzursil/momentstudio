@@ -17,8 +17,8 @@ Below is a structured checklist you can turn into issues.
 ## Backend - Core & Auth
 - [x] Scaffold FastAPI app with versioned `/api/v1` router.
 - [x] Settings via `pydantic-settings`.
-- [ ] SQLAlchemy engine/session for Postgres.
-- [ ] User model + Alembic migration.
+- [x] SQLAlchemy engine/session for Postgres.
+- [x] User model + Alembic migration.
 - [ ] Password hashing/verification.
 - [ ] Auth endpoints: register, login (access+refresh), refresh, logout.
 - [ ] JWT guard dependency + role guard for admin.

@@ -13,6 +13,16 @@ cp .env.example .env  # update DATABASE_URL, SECRET_KEY, STRIPE_SECRET_KEY, SMTP
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+## Database and migrations
+
+- Default `DATABASE_URL` uses async Postgres via `postgresql+asyncpg://...`.
+- Alembic is configured for async migrations:
+
+```bash
+alembic upgrade head
+alembic revision --autogenerate -m "describe change"  # after models exist
+```
+
 ## Tests
 
 ```bash
