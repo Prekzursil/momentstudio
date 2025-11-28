@@ -14,7 +14,7 @@ Below is a structured checklist you can turn into issues. Nothing is marked done
 - [x] ARCHITECTURE.md with high-level design and data flow.
 - [ ] CI: add deployment/release job (e.g., container build + push) once runtime code lands.
 
-## Backend – Core & Auth
+## Backend - Core & Auth
 - [ ] Scaffold FastAPI app with versioned `/api/v1` router.
 - [ ] Settings via `pydantic-settings`.
 - [ ] SQLAlchemy engine/session for Postgres.
@@ -24,7 +24,7 @@ Below is a structured checklist you can turn into issues. Nothing is marked done
 - [ ] JWT guard dependency + role guard for admin.
 - [ ] Tests for auth flows (register/login/refresh/invalid creds).
 
-## Backend – Catalog & Products
+## Backend - Catalog & Products
 - [ ] Category model + migration.
 - [ ] Product model + migration.
 - [ ] ProductImage model + migration.
@@ -38,7 +38,7 @@ Below is a structured checklist you can turn into issues. Nothing is marked done
 - [ ] Image storage service (local first, S3-ready).
 - [ ] Seed example products/categories for dev.
 
-## Backend – Cart & Checkout
+## Backend - Cart & Checkout
 - [ ] Cart + CartItem models + migrations.
 - [ ] Guest cart support (session_id).
 - [ ] GET /cart (guest or user).
@@ -48,7 +48,7 @@ Below is a structured checklist you can turn into issues. Nothing is marked done
 - [ ] Stock validation in cart endpoints.
 - [ ] Merge guest cart into user cart on login.
 
-## Backend – Orders, Payment, Addresses
+## Backend - Orders, Payment, Addresses
 - [ ] Address model + migration; CRUD /me/addresses.
 - [ ] Order + OrderItem models + migrations.
 - [ ] Service to build order from cart (price snapshot).
@@ -57,13 +57,13 @@ Below is a structured checklist you can turn into issues. Nothing is marked done
 - [ ] GET /me/orders and /me/orders/{id}.
 - [ ] Admin order list/filter + status/tracking update.
 
-## Backend – CMS & Content
+## Backend - CMS & Content
 - [ ] ContentBlock model + migration.
 - [ ] Seed default blocks (home hero, about, FAQ, shipping/returns, care).
 - [ ] GET /content/{key} public.
 - [ ] Admin edit content blocks; validate markdown/HTML safety.
 
-## Backend – Email & Notifications
+## Backend - Email & Notifications
 - [ ] Email settings (SMTP).
 - [ ] Generic email service (text + HTML).
 - [ ] Order confirmation email.
@@ -71,7 +71,7 @@ Below is a structured checklist you can turn into issues. Nothing is marked done
 - [ ] Logging/error handling around email sending.
 - [ ] Background task for sending emails.
 
-## Backend – Security, Observability, Testing
+## Backend - Security, Observability, Testing
 - [ ] CORS config for dev/prod.
 - [ ] Rate limiting on login/register/password reset.
 - [ ] Validate file types/sizes for uploads.
@@ -81,7 +81,7 @@ Below is a structured checklist you can turn into issues. Nothing is marked done
 - [ ] Integration tests against temp Postgres.
 - [ ] mypy type-checking and fixes.
 
-## Frontend – Shell & Shared
+## Frontend - Shell & Shared
 - [ ] Scaffold Angular app with routing + strict TS.
 - [ ] Tailwind CSS and design tokens.
 - [ ] Main layout (header/footer/responsive nav).
@@ -89,8 +89,8 @@ Below is a structured checklist you can turn into issues. Nothing is marked done
 - [ ] Global error handling / boundary route.
 - [ ] API service layer + interceptors.
 
-## Frontend – Storefront
-- [ ] Homepage hero with “Shop now” CTA.
+## Frontend - Storefront
+- [ ] Homepage hero with "Shop now" CTA.
 - [ ] Featured products grid on homepage.
 - [ ] Category listing with grid + pagination.
 - [ ] Filter sidebar (category, price range, tags).
@@ -99,20 +99,20 @@ Below is a structured checklist you can turn into issues. Nothing is marked done
 - [ ] Product detail page with gallery, variants, quantity/add-to-cart.
 - [ ] Handmade uniqueness note.
 
-## Frontend – Cart & Checkout
+## Frontend - Cart & Checkout
 - [ ] Cart page/drawer with quantities and totals.
 - [ ] Update quantity/remove items; stock error messaging.
 - [ ] Checkout stepper: login/guest, shipping address, payment (Stripe).
 - [ ] Order summary during checkout.
 - [ ] Success page with order summary + continue shopping.
 
-## Frontend – Auth & Account
+## Frontend - Auth & Account
 - [ ] Login page with validation.
 - [ ] Registration page.
 - [ ] Password reset request + reset form.
 - [ ] Account dashboard (profile, address book, order history, order detail).
 
-## Frontend – Admin Dashboard
+## Frontend - Admin Dashboard
 - [ ] /admin layout with sidebar + guard.
 - [ ] Product list table (sort/search).
 - [ ] Product create/edit form (slug, category, price, stock, description, images, variants).
