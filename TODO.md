@@ -58,10 +58,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Per-product shipping dimensions/weight fields.
 - [x] Per-product metadata for SEO (meta title/description).
 - [x] Rich text/markdown validation for product descriptions.
-- [ ] Admin audit log for product mutations.
-- [ ] Price and currency validation helpers.
-- [ ] Product feed (JSON/CSV) for marketing channels.
-- [ ] Featured collection endpoints.
+- [x] Admin audit log for product mutations.
+- [x] Price and currency validation helpers.
+- [x] Product feed (JSON/CSV) for marketing channels.
+- [x] Featured collection endpoints.
 
 ## Backend - Cart & Checkout
 - [x] Cart + CartItem models + migrations.

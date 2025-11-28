@@ -10,6 +10,8 @@ from app.models.catalog import (
     ProductReview,
     ProductSlugHistory,
     RecentlyViewedProduct,
+    ProductAuditLog,
+    FeaturedCollection,
 )  # noqa: F401
 from app.models.cart import Cart, CartItem  # noqa: F401
 from app.models.address import Address  # noqa: F401
@@ -26,6 +28,8 @@ __all__ = [
     "ProductReview",
     "ProductSlugHistory",
     "RecentlyViewedProduct",
+    "ProductAuditLog",
+    "FeaturedCollection",
     "Tag",
     "Cart",
     "CartItem",

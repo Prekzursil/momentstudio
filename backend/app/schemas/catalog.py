@@ -114,6 +114,30 @@ class TagRead(BaseModel):
     slug: str
 
 
+class FeaturedCollectionBase(BaseModel):
+    slug: str = Field(min_length=1, max_length=120)
+    name: str = Field(min_length=1, max_length=160)
+    description: str | None = None
+
+
+class FeaturedCollectionCreate(FeaturedCollectionBase):
+    product_ids: list[UUID] = []
+
+
+class FeaturedCollectionUpdate(BaseModel):
+    name: str | None = Field(default=None, max_length=160)
+    description: str | None = None
+    product_ids: list[UUID] | None = None
+
+
+class FeaturedCollectionRead(FeaturedCollectionBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    created_at: datetime
+    products: list["ProductReadBrief"] = []
+
+
 class ProductReviewCreate(BaseModel):
     author_name: str
     rating: int = Field(ge=1, le=5)
@@ -201,6 +225,30 @@ class ProductRead(ProductBase):
     options: list[ProductOptionRead] = []
     tags: list[TagRead] = []
     reviews: list[ProductReviewRead] = []
+    featured_collections: list[FeaturedCollectionBase] = []
+
+
+class ProductReadBrief(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    slug: str
+    name: str
+    base_price: float
+    currency: str
+    is_featured: bool
+    status: ProductStatus
+    tags: list[TagRead] = []
+
+
+class ProductFeedItem(BaseModel):
+    slug: str
+    name: str
+    price: float
+    currency: str
+    description: str | None = None
+    category_slug: str | None = None
+    tags: list[str] = []
 
 
 class ProductListResponse(BaseModel):

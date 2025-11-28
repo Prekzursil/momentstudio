@@ -21,6 +21,10 @@ from app.schemas.catalog import (
     BulkProductUpdateItem,
     ProductListResponse,
     ImportResult,
+    FeaturedCollectionCreate,
+    FeaturedCollectionRead,
+    FeaturedCollectionUpdate,
+    ProductFeedItem,
 )
 from app.services import catalog as catalog_service
 from app.services import storage
@@ -63,6 +67,18 @@ async def list_products(
     )
 
 
+@router.get("/products/feed", response_model=list[ProductFeedItem])
+async def product_feed(session: AsyncSession = Depends(get_session)) -> list[ProductFeedItem]:
+    return await catalog_service.get_product_feed(session)
+
+
+@router.get("/products/feed.csv", response_class=StreamingResponse)
+async def product_feed_csv(session: AsyncSession = Depends(get_session)):
+    content = await catalog_service.get_product_feed_csv(session)
+    headers = {"Content-Disposition": 'attachment; filename="product_feed.csv"'}
+    return StreamingResponse(iter([content]), media_type="text/csv", headers=headers)
+
+
 # Admin endpoints
 
 
@@ -92,9 +108,9 @@ async def update_category(
 async def create_product(
     payload: ProductCreate,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    current_user=Depends(require_admin),
 ) -> Product:
-    return await catalog_service.create_product(session, payload)
+    return await catalog_service.create_product(session, payload, user_id=current_user.id)
 
 
 @router.patch("/products/{slug}", response_model=ProductRead)
@@ -102,24 +118,24 @@ async def update_product(
     slug: str,
     payload: ProductUpdate,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    current_user=Depends(require_admin),
 ) -> Product:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    return await catalog_service.update_product(session, product, payload)
+    return await catalog_service.update_product(session, product, payload, user_id=current_user.id)
 
 
 @router.delete("/products/{slug}", status_code=status.HTTP_204_NO_CONTENT)
 async def soft_delete_product(
     slug: str,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    current_user=Depends(require_admin),
 ) -> None:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    await catalog_service.soft_delete_product(session, product)
+    await catalog_service.soft_delete_product(session, product, user_id=current_user.id)
     return None
 
 
@@ -152,10 +168,38 @@ async def upload_product_image(
 async def bulk_update_products(
     payload: list[BulkProductUpdateItem],
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    current_user=Depends(require_admin),
 ) -> list[Product]:
-    updated = await catalog_service.bulk_update_products(session, payload)
+    updated = await catalog_service.bulk_update_products(session, payload, user_id=current_user.id)
     return updated
+
+
+@router.get("/collections/featured", response_model=list[FeaturedCollectionRead])
+async def list_featured_collections(session: AsyncSession = Depends(get_session)) -> list[FeaturedCollectionRead]:
+    collections = await catalog_service.list_featured_collections(session)
+    return collections
+
+
+@router.post("/collections/featured", response_model=FeaturedCollectionRead, status_code=status.HTTP_201_CREATED)
+async def create_featured_collection(
+    payload: FeaturedCollectionCreate,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> FeaturedCollectionRead:
+    return await catalog_service.create_featured_collection(session, payload)
+
+
+@router.patch("/collections/featured/{slug}", response_model=FeaturedCollectionRead)
+async def update_featured_collection(
+    slug: str,
+    payload: FeaturedCollectionUpdate,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> FeaturedCollectionRead:
+    collection = await catalog_service.get_featured_collection_by_slug(session, slug)
+    if not collection:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
+    return await catalog_service.update_featured_collection(session, collection, payload)
 
 
 @router.post("/products/{slug}/duplicate", response_model=ProductRead, status_code=status.HTTP_201_CREATED)

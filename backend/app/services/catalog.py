@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 import csv
 import io
-import math
+import json
 import random
 import string
 import uuid
@@ -22,6 +22,8 @@ from app.models.catalog import (
     ProductReview,
     ProductSlugHistory,
     RecentlyViewedProduct,
+    ProductAuditLog,
+    FeaturedCollection,
 )
 from app.schemas.catalog import (
     CategoryCreate,
@@ -33,6 +35,10 @@ from app.schemas.catalog import (
     BulkProductUpdateItem,
     ProductOptionCreate,
     ProductReviewCreate,
+    FeaturedCollectionCreate,
+    FeaturedCollectionUpdate,
+    FeaturedCollectionRead,
+    ProductFeedItem,
 )
 from app.services.storage import delete_file
 
@@ -98,6 +104,26 @@ async def _generate_unique_sku(session: AsyncSession, base: str) -> str:
             return candidate
 
 
+def _validate_price_currency(base_price: float, currency: str) -> None:
+    if base_price is not None and base_price < 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Base price must be non-negative")
+    if currency and len(currency.strip()) != 3:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Currency must be a 3-letter code")
+
+
+async def _log_product_action(
+    session: AsyncSession, product_id: uuid.UUID, action: str, user_id: uuid.UUID | None, payload: dict | None
+) -> None:
+    audit = ProductAuditLog(
+        product_id=product_id,
+        user_id=user_id,
+        action=action,
+        payload=json.dumps(payload, default=str) if payload else None,
+    )
+    session.add(audit)
+    await session.commit()
+
+
 async def create_category(session: AsyncSession, payload: CategoryCreate) -> Category:
     existing = await get_category_by_slug(session, payload.slug)
     if existing:
@@ -118,15 +144,19 @@ async def update_category(session: AsyncSession, category: Category, payload: Ca
     return category
 
 
-async def create_product(session: AsyncSession, payload: ProductCreate, commit: bool = True) -> Product:
+async def create_product(
+    session: AsyncSession, payload: ProductCreate, commit: bool = True, user_id: uuid.UUID | None = None
+) -> Product:
     await _ensure_slug_unique(session, payload.slug)
     sku = payload.sku or await _generate_unique_sku(session, payload.slug)
     await _ensure_sku_unique(session, sku)
+    _validate_price_currency(payload.base_price, payload.currency)
 
     images_payload = payload.images or []
     variants_payload: list[ProductVariantCreate] = getattr(payload, "variants", []) or []
     product_data = payload.model_dump(exclude={"images", "variants", "tags", "options"})
     product_data["sku"] = sku
+    product_data["currency"] = payload.currency.upper()
     product = Product(**product_data)
     _set_publish_timestamp(product, payload.status)
     product.images = [ProductImage(**img.model_dump()) for img in images_payload]
@@ -139,13 +169,18 @@ async def create_product(session: AsyncSession, payload: ProductCreate, commit: 
     if commit:
         await session.commit()
         await session.refresh(product)
+        await _log_product_action(session, product.id, "create", user_id, {"slug": product.slug})
     else:
         await session.flush()
     return product
 
 
-async def update_product(session: AsyncSession, product: Product, payload: ProductUpdate, commit: bool = True) -> Product:
+async def update_product(
+    session: AsyncSession, product: Product, payload: ProductUpdate, commit: bool = True, user_id: uuid.UUID | None = None
+) -> Product:
     data = payload.model_dump(exclude_unset=True)
+    if "base_price" in data or "currency" in data:
+        _validate_price_currency(data.get("base_price", product.base_price), data.get("currency", product.currency))
     if "slug" in data:
         await _ensure_slug_unique(session, data["slug"], exclude_id=product.id)
         if data["slug"] and data["slug"] != product.slug:
@@ -157,12 +192,16 @@ async def update_product(session: AsyncSession, product: Product, payload: Produ
     if "options" in data and data["options"] is not None:
         product.options = [ProductOption(**opt.model_dump()) for opt in data["options"]]
     for field, value in data.items():
-        setattr(product, field, value)
+        if field == "currency" and value:
+            setattr(product, field, value.upper())
+        else:
+            setattr(product, field, value)
     _set_publish_timestamp(product, data.get("status"))
     session.add(product)
     if commit:
         await session.commit()
         await session.refresh(product)
+        await _log_product_action(session, product.id, "update", user_id, data)
     else:
         await session.flush()
     return product
@@ -195,13 +234,16 @@ async def delete_product_image(session: AsyncSession, product: Product, image_id
     await session.commit()
 
 
-async def soft_delete_product(session: AsyncSession, product: Product) -> None:
+async def soft_delete_product(session: AsyncSession, product: Product, user_id: uuid.UUID | None = None) -> None:
     product.is_deleted = True
     session.add(product)
     await session.commit()
+    await _log_product_action(session, product.id, "soft_delete", user_id, {"slug": product.slug})
 
 
-async def bulk_update_products(session: AsyncSession, updates: list[BulkProductUpdateItem]) -> list[Product]:
+async def bulk_update_products(
+    session: AsyncSession, updates: list[BulkProductUpdateItem], user_id: uuid.UUID | None = None
+) -> list[Product]:
     product_ids = [item.product_id for item in updates]
     result = await session.execute(select(Product).where(Product.id.in_(product_ids)))
     products = {p.id: p for p in result.scalars()}
@@ -222,7 +264,110 @@ async def bulk_update_products(session: AsyncSession, updates: list[BulkProductU
     await session.commit()
     for product in updated:
         await session.refresh(product)
+        await _log_product_action(
+            session,
+            product.id,
+            "bulk_update",
+            user_id,
+            {"base_price": product.base_price, "stock_quantity": product.stock_quantity, "status": str(product.status)},
+        )
     return updated
+
+
+async def get_featured_collection_by_slug(session: AsyncSession, slug: str) -> FeaturedCollection | None:
+    result = await session.execute(
+        select(FeaturedCollection).options(selectinload(FeaturedCollection.products)).where(FeaturedCollection.slug == slug)
+    )
+    return result.scalar_one_or_none()
+
+
+async def list_featured_collections(session: AsyncSession) -> list[FeaturedCollection]:
+    result = await session.execute(
+        select(FeaturedCollection).options(selectinload(FeaturedCollection.products)).order_by(FeaturedCollection.created_at.desc())
+    )
+    return list(result.scalars().unique())
+
+
+async def _load_products_by_ids(session: AsyncSession, product_ids: list[uuid.UUID]) -> list[Product]:
+    if not product_ids:
+        return []
+    result = await session.execute(select(Product).where(Product.id.in_(product_ids), Product.is_deleted.is_(False)))
+    products = list(result.scalars().unique())
+    if len(products) != len(set(product_ids)):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="One or more products not found")
+    return products
+
+
+async def create_featured_collection(session: AsyncSession, payload: FeaturedCollectionCreate) -> FeaturedCollection:
+    existing = await get_featured_collection_by_slug(session, payload.slug)
+    if existing:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Featured collection slug already exists")
+    products = await _load_products_by_ids(session, payload.product_ids)
+    collection = FeaturedCollection(slug=payload.slug, name=payload.name, description=payload.description)
+    collection.products = products
+    session.add(collection)
+    await session.commit()
+    await session.refresh(collection)
+    return collection
+
+
+async def update_featured_collection(
+    session: AsyncSession, collection: FeaturedCollection, payload: FeaturedCollectionUpdate
+) -> FeaturedCollection:
+    data = payload.model_dump(exclude_unset=True)
+    if "product_ids" in data and data["product_ids"] is not None:
+        collection.products = await _load_products_by_ids(session, data.pop("product_ids"))
+    for field, value in data.items():
+        setattr(collection, field, value)
+    session.add(collection)
+    await session.commit()
+    await session.refresh(collection)
+    return collection
+
+
+async def get_product_feed(session: AsyncSession) -> list[ProductFeedItem]:
+    result = await session.execute(
+        select(Product)
+        .options(selectinload(Product.category), selectinload(Product.tags))
+        .where(Product.is_deleted.is_(False), Product.status == ProductStatus.published)
+        .order_by(Product.created_at.desc())
+    )
+    products = result.scalars().unique().all()
+    feed: list[ProductFeedItem] = []
+    for p in products:
+        feed.append(
+            ProductFeedItem(
+                slug=p.slug,
+                name=p.name,
+                price=float(p.base_price),
+                currency=p.currency,
+                description=p.short_description or p.long_description,
+                category_slug=p.category.slug if p.category else None,
+                tags=[tag.slug for tag in p.tags],
+            )
+        )
+    return feed
+
+
+async def get_product_feed_csv(session: AsyncSession) -> str:
+    feed = await get_product_feed(session)
+    buf = io.StringIO()
+    fieldnames = ["slug", "name", "price", "currency", "description", "category_slug", "tags"]
+    writer = csv.DictWriter(buf, fieldnames=fieldnames)
+    writer.writeheader()
+    for item in feed:
+        writer.writerow(
+            {
+                "slug": item.slug,
+                "name": item.name,
+                "price": item.price,
+                "currency": item.currency,
+                "description": item.description or "",
+                "category_slug": item.category_slug or "",
+                "tags": ",".join(item.tags),
+            }
+        )
+    return buf.getvalue()
 
 
 def slugify(value: str) -> str:

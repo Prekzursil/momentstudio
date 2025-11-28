@@ -42,6 +42,14 @@ product_tags = Table(
     Column("tag_id", UUID(as_uuid=True), ForeignKey("tags.id"), primary_key=True),
 )
 
+featured_collection_products = Table(
+    "featured_collection_products",
+    Base.metadata,
+    Column("collection_id", UUID(as_uuid=True), ForeignKey("featured_collections.id"), primary_key=True),
+    Column("product_id", UUID(as_uuid=True), ForeignKey("products.id"), primary_key=True),
+    Column("sort_order", Numeric(5, 2), nullable=False, default=0),
+)
+
 
 class Product(Base):
     __tablename__ = "products"
@@ -105,6 +113,15 @@ class Product(Base):
     )
     recent_views: Mapped[list["RecentlyViewedProduct"]] = relationship(
         "RecentlyViewedProduct", back_populates="product", cascade="all, delete-orphan", lazy="selectin"
+    )
+    audit_logs: Mapped[list["ProductAuditLog"]] = relationship(
+        "ProductAuditLog", back_populates="product", cascade="all, delete-orphan", lazy="selectin"
+    )
+    featured_collections: Mapped[list["FeaturedCollection"]] = relationship(
+        "FeaturedCollection",
+        secondary=featured_collection_products,
+        back_populates="products",
+        lazy="selectin",
     )
 
 
@@ -205,3 +222,34 @@ class RecentlyViewedProduct(Base):
     )
 
     product: Mapped[Product] = relationship("Product", lazy="joined")
+
+
+class ProductAuditLog(Base):
+    __tablename__ = "product_audit_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=False)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    payload: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    product: Mapped[Product] = relationship("Product", back_populates="audit_logs")
+
+
+class FeaturedCollection(Base):
+    __tablename__ = "featured_collections"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    slug: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    products: Mapped[list[Product]] = relationship(
+        "Product", secondary=featured_collection_products, back_populates="featured_collections", lazy="selectin"
+    )

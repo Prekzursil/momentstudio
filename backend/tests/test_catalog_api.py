@@ -4,12 +4,14 @@ from typing import Dict
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.main import app
 from app.db.base import Base
 from app.db.session import get_session
 from app.models.user import UserRole
+from app.models.catalog import ProductAuditLog
 from app.services.auth import create_user
 from app.schemas.user import UserCreate
 from app.core.config import settings
@@ -455,3 +457,64 @@ def test_preorder_shipping_meta_and_sort(test_app: Dict[str, object]) -> None:
         headers=auth_headers(admin_token),
     )
     assert bad_res.status_code == 422
+
+
+def test_featured_collections_feed_and_audit(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal, email="feedadmin@example.com")
+
+    # category
+    res = client.post(
+        "/api/v1/catalog/categories",
+        json={"slug": "feed-cat", "name": "Feed Cat"},
+        headers=auth_headers(admin_token),
+    )
+    cat_id = res.json()["id"]
+
+    pub = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": cat_id,
+            "slug": "feed-slug",
+            "name": "Feed Name",
+            "base_price": 11.5,
+            "currency": "USD",
+            "stock_quantity": 1,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    ).json()
+
+    # feed includes published
+    feed = client.get("/api/v1/catalog/products/feed")
+    assert feed.status_code == 200
+    assert any(item["slug"] == "feed-slug" for item in feed.json())
+
+    # featured collection create and update
+    coll = client.post(
+        "/api/v1/catalog/collections/featured",
+        json={"slug": "featured-a", "name": "Featured A", "product_ids": [pub["id"]]},
+        headers=auth_headers(admin_token),
+    )
+    assert coll.status_code == 201
+    list_coll = client.get("/api/v1/catalog/collections/featured")
+    assert list_coll.status_code == 200
+    assert list_coll.json()[0]["slug"] == "featured-a"
+
+    upd = client.patch(
+        "/api/v1/catalog/collections/featured/featured-a",
+        json={"name": "Featured A Updated"},
+        headers=auth_headers(admin_token),
+    )
+    assert upd.status_code == 200
+    assert upd.json()["name"] == "Featured A Updated"
+
+    # audit log created for product actions
+    async def audit_count() -> int:
+        async with SessionLocal() as session:
+            result = await session.execute(select(ProductAuditLog))
+            return len(result.scalars().all())
+
+    count = asyncio.get_event_loop().run_until_complete(audit_count())
+    assert count >= 1
