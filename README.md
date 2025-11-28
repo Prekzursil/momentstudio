@@ -260,18 +260,23 @@ ateliercraft/
   infra/
     docker-compose.yml
     nginx.conf (optional)
-6. Local Development
-Prerequisites
-Python 3.11+
-Node.js 20 LTS
-Docker & docker‑compose
-PostgreSQL (or use Docker service)
-Backend
-bash
-Copy code
+```
+
+## 6. Local Development
+
+### Prerequisites
+
+- Python 3.11+
+- Node.js 20 LTS
+- Docker & docker-compose
+- PostgreSQL (or use Docker service)
+
+### Backend
+
+```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate       # Windows: .venv\Scripts\activate
+source .venv/bin/activate       # Windows: .venv\\Scripts\\activate
 pip install -r requirements.txt
 
 cp .env.example .env            # or .topsecret -> .env pattern
@@ -279,21 +284,25 @@ cp .env.example .env            # or .topsecret -> .env pattern
 
 alembic upgrade head
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-Backend available at: http://localhost:8000
-Docs: http://localhost:8000/docs
-Frontend
-bash
-Copy code
+# Backend available at: http://localhost:8000
+# API docs: http://localhost:8000/docs
+```
+
+### Frontend
+
+```bash
 cd frontend
 npm install
 cp .env.example .env            # or .env.local if you prefer
 # set API_BASE_URL, STRIPE_PUBLISHABLE_KEY, etc.
 
 npm start
-Frontend available at: http://localhost:4200
-Docker (optional, all‑in‑one)
-bash
-Copy code
+# Frontend available at: http://localhost:4200
+```
+
+### Docker (optional, all-in-one)
+
+```bash
 cd infra
 docker compose up --build
-
+```
