@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     refresh_token_exp_days: int = 7
 
     media_root: str = "uploads"
+    cors_origins: list[str] = ["http://localhost:4200"]
+    cors_allow_credentials: bool = True
+    cors_allow_methods: list[str] = ["*"]
+    cors_allow_headers: list[str] = ["*"]
 
     smtp_host: str = "localhost"
     smtp_port: int = 1025

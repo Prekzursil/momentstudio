@@ -72,11 +72,11 @@ Below is a structured checklist you can turn into issues.
 - [ ] Background task for sending emails.
 
 ## Backend - Security, Observability, Testing
-- [ ] CORS config for dev/prod.
+- [x] CORS config for dev/prod.
 - [ ] Rate limiting on login/register/password reset.
 - [ ] Validate file types/sizes for uploads.
 - [ ] Structured logging with request ID.
-- [ ] Health/readiness endpoints.
+- [x] Health/readiness endpoints.
 - [ ] Pytest suite for services (auth, catalog, cart, checkout).
 - [ ] Integration tests against temp Postgres.
 - [ ] mypy type-checking and fixes.

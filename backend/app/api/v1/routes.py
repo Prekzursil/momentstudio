@@ -18,3 +18,8 @@ api_router.include_router(orders.router)
 @api_router.get("/health", tags=["health"])
 def healthcheck() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@api_router.get("/health/ready", tags=["health"])
+def readiness() -> dict[str, str]:
+    return {"status": "ready"}
