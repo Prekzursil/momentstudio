@@ -6,6 +6,7 @@ from app.db.base import Base
 from app.models.user import User, UserRole
 from app.models.catalog import Category, Product, ProductImage, ProductVariant
 from app.models.cart import Cart, CartItem
+from app.models.order import Order, OrderItem
 
 
 @pytest.fixture
@@ -92,3 +93,36 @@ async def test_cart_models_sqlite_memory() -> None:
         fetched = result.scalar_one()
         assert fetched.quantity == 2
         assert float(fetched.unit_price_at_add) == 20.0
+
+
+@pytest.mark.anyio("asyncio")
+async def test_order_models_sqlite_memory() -> None:
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", future=True)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+    async with SessionLocal() as session:
+        user = User(email="order@example.com", hashed_password="x")
+        category = Category(slug="order-cups", name="Cups")
+        product = Product(
+            category=category,
+            slug="order-cup",
+            name="Order Cup",
+            base_price=15,
+            currency="USD",
+            stock_quantity=2,
+        )
+        session.add_all([user, category, product])
+        await session.commit()
+        await session.refresh(user)
+        await session.refresh(product)
+
+        order = Order(user_id=user.id, total_amount=15, currency="USD")
+        item = OrderItem(order=order, product_id=product.id, quantity=1, unit_price=15, subtotal=15)
+        session.add(order)
+        await session.commit()
+
+        result = await session.execute(select(OrderItem).where(OrderItem.order == order))
+        fetched = result.scalar_one()
+        assert fetched.subtotal == 15

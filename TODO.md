@@ -50,7 +50,7 @@ Below is a structured checklist you can turn into issues.
 
 ## Backend - Orders, Payment, Addresses
 - [x] Address model + migration; CRUD /me/addresses.
-- [ ] Order + OrderItem models + migrations.
+- [x] Order + OrderItem models + migrations.
 - [ ] Service to build order from cart (price snapshot).
 - [ ] Stripe integration: PaymentIntent create, return client secret.
 - [ ] Stripe webhook for payment succeeded/failed; update status.
