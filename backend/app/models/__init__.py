@@ -3,6 +3,7 @@ from app.models.user import User  # noqa: F401
 from app.models.catalog import Category, Product, ProductImage, ProductVariant  # noqa: F401
 from app.models.cart import Cart, CartItem  # noqa: F401
 from app.models.address import Address  # noqa: F401
+from app.models.order import Order, OrderItem  # noqa: F401
 
 __all__ = [
     "Base",
@@ -14,4 +15,6 @@ __all__ = [
     "Cart",
     "CartItem",
     "Address",
+    "Order",
+    "OrderItem",
 ]
