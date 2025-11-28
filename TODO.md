@@ -37,6 +37,31 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin product image upload/delete.
 - [x] Image storage service (local first, S3-ready).
 - [x] Seed example products/categories for dev.
+- [ ] SKU generation and uniqueness enforcement.
+- [ ] Slug collision handling and validator.
+- [ ] Product status enums (draft/published/archived).
+- [ ] Track publish date and last_modified.
+- [ ] Bulk price/stock update endpoint for admins.
+- [ ] Product labels/tags schema and filters.
+- [ ] Product option schema (color/size) without variants.
+- [ ] Admin product duplication/cloning.
+- [ ] Product reviews model + moderation queue.
+- [ ] Average rating + review count on product list/detail.
+- [ ] Related products/recommendations service (rule-based).
+- [ ] Recently viewed products service (per session).
+- [ ] Admin export products CSV.
+- [ ] Admin import products CSV with dry-run validation.
+- [ ] Product slug history/redirects on slug change.
+- [ ] Server-side pagination metadata (total pages/items).
+- [ ] Sort options: newest, price asc/desc, name asc/desc.
+- [ ] Backorder/preorder flag + estimated restock date.
+- [ ] Per-product shipping dimensions/weight fields.
+- [ ] Per-product metadata for SEO (meta title/description).
+- [ ] Rich text/markdown validation for product descriptions.
+- [ ] Admin audit log for product mutations.
+- [ ] Price and currency validation helpers.
+- [ ] Product feed (JSON/CSV) for marketing channels.
+- [ ] Featured collection endpoints.
 
 ## Backend - Cart & Checkout
 - [x] Cart + CartItem models + migrations.
@@ -47,6 +72,15 @@ Below is a structured checklist you can turn into issues.
 - [x] DELETE /cart/items/{id} remove.
 - [x] Stock validation in cart endpoints.
 - [x] Merge guest cart into user cart on login.
+- [ ] Max quantity per item enforcement.
+- [ ] Reserve stock on checkout start (optional).
+- [ ] Cart subtotal/tax/shipping calculation helper.
+- [ ] Promo code model + validation hook.
+- [ ] Abandoned cart job (email reminder) scaffold.
+- [ ] Cart item note (gift message) support.
+- [ ] Cart cleanup job for stale guest carts.
+- [ ] Variant selection validation (options match product).
+- [ ] Cart analytics events (add/remove/update).
 
 ## Backend - Orders, Payment, Addresses
 - [x] Address model + migration; CRUD /me/addresses.
@@ -56,12 +90,33 @@ Below is a structured checklist you can turn into issues.
 - [ ] Stripe webhook for payment succeeded/failed; update status.
 - [x] GET /me/orders and /me/orders/{id}.
 - [ ] Admin order list/filter + status/tracking update.
+- [ ] Order status enums and transitions (pending/paid/shipped/cancelled/refunded).
+- [ ] Order reference code generator.
+- [ ] Shipping method model (flat-rate, weight-based).
+- [ ] Tax calculation strategy (basic rules).
+- [ ] Payment failure retry flow.
+- [ ] Refund endpoint stub (manual).
+- [ ] Order timeline/audit log (status changes, notes).
+- [ ] Packing slip/invoice PDF stub.
+- [ ] Order item fulfillment tracking (shipped qty).
+- [ ] Capture/void support for Stripe intents.
+- [ ] Admin order export CSV.
+- [ ] Reorder endpoint (copy past order to cart).
+- [ ] Address validation hook (country/postal rules).
 
 ## Backend - CMS & Content
 - [ ] ContentBlock model + migration.
 - [ ] Seed default blocks (home hero, about, FAQ, shipping/returns, care).
 - [ ] GET /content/{key} public.
 - [ ] Admin edit content blocks; validate markdown/HTML safety.
+- [ ] Content versioning with draft/publish states.
+- [ ] Image uploads for content blocks.
+- [ ] Rich text sanitization rules.
+- [ ] Homepage layout blocks (hero, grid, testimonials).
+- [ ] FAQ ordering/priorities.
+- [ ] Admin preview endpoint with token.
+- [ ] Content change audit log.
+- [ ] Static page slugs for SEO (about/faq/shipping/returns/care).
 
 ## Backend - Email & Notifications
 - [ ] Email settings (SMTP).
@@ -70,6 +125,15 @@ Below is a structured checklist you can turn into issues.
 - [ ] Password reset email + one-time token flow.
 - [ ] Logging/error handling around email sending.
 - [ ] Background task for sending emails.
+- [ ] Shipping update email (with tracking link).
+- [ ] Delivery confirmation email.
+- [ ] Cart abandonment email template.
+- [ ] Product back-in-stock notification flow.
+- [ ] Admin alert on low stock thresholds.
+- [ ] Error alerting to Slack/email (critical exceptions).
+- [ ] Template system for emails with variables.
+- [ ] Email preview endpoint (dev-only).
+- [ ] Rate limiting for email sends per user/session.
 
 ## Backend - Security, Observability, Testing
 - [x] CORS config for dev/prod.
@@ -80,6 +144,29 @@ Below is a structured checklist you can turn into issues.
 - [ ] Pytest suite for services (auth, catalog, cart, checkout).
 - [ ] Integration tests against temp Postgres.
 - [ ] mypy type-checking and fixes.
+- [ ] CI smoke test hitting health/readiness.
+- [ ] DRF-style schema docs via OpenAPI tweaks.
+- [ ] API rate limit tests.
+- [ ] Structured logging format (JSON) toggle.
+- [ ] Request ID propagation to logs.
+- [ ] DB connection pool monitoring.
+- [ ] Cache layer placeholder (e.g., Redis) for rate limits.
+- [ ] Secure password reset tokens (expiry, blacklist).
+- [ ] JWT rotation and blacklist on logout.
+- [ ] Content Security Policy headers.
+- [ ] HTTPS/secure cookies config for production.
+- [ ] Audit log middleware (user + IP).
+- [ ] Request/response logging with PII redaction.
+- [ ] Slow query logging and performance metrics.
+- [ ] OpenTelemetry traces/spans for API routes.
+- [ ] Lint/type-check jobs extended (mypy, ruff).
+- [ ] Load testing plan (k6/locust) and scripts.
+- [ ] SQL injection and XSS validation tests.
+- [ ] Sentry (or similar) error reporting integration.
+- [ ] File upload antivirus scan hook (optional).
+- [ ] Dependency vulnerability scanning (pip/npm).
+- [ ] Backpressure handling (429) for expensive endpoints.
+- [ ] Maintenance mode toggle.
 
 ## Frontend - Shell & Shared
 - [ ] Scaffold Angular app with routing + strict TS.
@@ -88,6 +175,18 @@ Below is a structured checklist you can turn into issues.
 - [ ] Shared components: button, input, card, modal, toast.
 - [ ] Global error handling / boundary route.
 - [ ] API service layer + interceptors.
+- [ ] Theme tokens (spacing, typography, colors).
+- [ ] Dark/light mode toggle.
+- [ ] Form validation utilities (error messages, async validation).
+- [ ] Toast/snackbar service and global overlay.
+- [ ] Loading spinner/skeleton components.
+- [ ] Page-level breadcrumb component.
+- [ ] Accessible modal focus trapping.
+- [ ] IntersectionObserver-based lazy image component.
+- [ ] Global HTTP error handler (401/403/500).
+- [ ] Responsive nav drawer with keyboard navigation.
+- [ ] Route guards for auth/admin.
+- [ ] ESLint/Prettier strict config.
 
 ## Frontend - Storefront
 - [ ] Homepage hero with "Shop now" CTA.
@@ -98,6 +197,17 @@ Below is a structured checklist you can turn into issues.
 - [ ] Product card component (image, name, price, stock badge).
 - [ ] Product detail page with gallery, variants, quantity/add-to-cart.
 - [ ] Handmade uniqueness note.
+- [ ] Sort controls (price/name/newest).
+- [ ] Price range slider.
+- [ ] Tag/label pills (featured/new/limited).
+- [ ] Product gallery zoom/lightbox.
+- [ ] Persist filters in query params.
+- [ ] Empty state for product lists.
+- [ ] Error state/retry for product lists.
+- [ ] Breadcrumbs for category/product pages.
+- [ ] Recently viewed carousel.
+- [ ] Localized currency display.
+- [ ] SEO meta tags per product/category.
 
 ## Frontend - Cart & Checkout
 - [ ] Cart page/drawer with quantities and totals.
@@ -105,12 +215,30 @@ Below is a structured checklist you can turn into issues.
 - [ ] Checkout stepper: login/guest, shipping address, payment (Stripe).
 - [ ] Order summary during checkout.
 - [ ] Success page with order summary + continue shopping.
+- [ ] Guest cart persistence in localStorage.
+- [ ] Apply promo code UI.
+- [ ] Shipping method selection UI.
+- [ ] Address form with validation and country selector.
+- [ ] Payment form with Stripe elements.
+- [ ] Checkout error states and retry.
+- [ ] Save address checkbox for checkout.
+- [ ] Order confirmation page with next steps.
+- [ ] Cart mini-icon badge with item count.
+- [ ] Edge cases: out-of-stock and price changes during checkout.
 
 ## Frontend - Auth & Account
 - [ ] Login page with validation.
 - [ ] Registration page.
 - [ ] Password reset request + reset form.
 - [ ] Account dashboard (profile, address book, order history, order detail).
+- [ ] Change password form.
+- [ ] Email verification flow UI.
+- [ ] Address book CRUD UI.
+- [ ] Order history pagination + filters.
+- [ ] Saved payment method placeholder.
+- [ ] Profile avatar upload (optional).
+- [ ] Session timeout/logout messaging.
+- [ ] 2FA toggle (placeholder).
 
 ## Frontend - Admin Dashboard
 - [ ] /admin layout with sidebar + guard.
@@ -119,6 +247,16 @@ Below is a structured checklist you can turn into issues.
 - [ ] Admin orders list with filters + order detail/status update.
 - [ ] Content editor for hero and static pages.
 - [ ] Basic user list (view customers, promote/demote admins).
+- [ ] Bulk product actions (activate/deactivate, delete).
+- [ ] Product image reorder UI.
+- [ ] Category CRUD UI with drag-and-drop ordering.
+- [ ] Order status update with timeline view.
+- [ ] Coupon/promo management UI.
+- [ ] Content preview/publish controls.
+- [ ] Admin activity audit view.
+- [ ] Admin login session management (force logout).
+- [ ] Inventory low-stock dashboard.
+- [ ] Sales analytics dashboard (GMV, AOV).
 
 ## UX, Performance, SEO & Accessibility
 - [ ] Mobile-first responsive design across pages.
@@ -128,3 +266,13 @@ Below is a structured checklist you can turn into issues.
 - [ ] SEO meta tags per page; Open Graph; sitemap/robots.
 - [ ] Lighthouse perf + accessibility fixes.
 - [ ] Keyboard navigation, contrast, accessible labels.
+- [ ] Prefetch critical API calls on navigation.
+- [ ] Asset compression and caching headers guidance.
+- [ ] ARIA labels for form controls and buttons.
+- [ ] Focus styles consistent across components.
+- [ ] Skip-to-content link.
+- [ ] Motion-reduced animations option.
+- [ ] 404/500 error pages with helpful actions.
+- [ ] Structured data (JSON-LD) for products.
+- [ ] Breadcrumb structured data for SEO.
+- [ ] Perf budget and bundle analysis (Angular).
