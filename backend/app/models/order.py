@@ -50,8 +50,10 @@ class Order(Base):
     user: Mapped[User] = relationship("User")
     shipping_address: Mapped[Address | None] = relationship("Address", foreign_keys=[shipping_address_id])
     billing_address: Mapped[Address | None] = relationship("Address", foreign_keys=[billing_address_id])
-    items: Mapped[list["OrderItem"]] = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
-    shipping_method: Mapped["ShippingMethod | None"] = relationship("ShippingMethod")
+    items: Mapped[list["OrderItem"]] = relationship(
+        "OrderItem", back_populates="order", cascade="all, delete-orphan", lazy="selectin"
+    )
+    shipping_method: Mapped["ShippingMethod | None"] = relationship("ShippingMethod", lazy="selectin")
 
 
 class OrderItem(Base):

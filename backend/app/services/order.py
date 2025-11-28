@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.cart import Cart
 from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod
-from app.schemas.order import OrderUpdate, ShippingMethodCreate
+from app.schemas.order import OrderUpdate, ShippingMethodCreate, OrderCreate
 
 
 async def build_order_from_cart(
@@ -20,6 +20,7 @@ async def build_order_from_cart(
     cart: Cart,
     shipping_address_id: UUID | None,
     billing_address_id: UUID | None,
+    shipping_method: ShippingMethod | None = None,
 ) -> Order:
     if not cart.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
@@ -41,7 +42,7 @@ async def build_order_from_cart(
 
     ref = await _generate_reference_code(session)
     tax = _calculate_tax(subtotal)
-    shipping_amount = _calculate_shipping(subtotal, None)
+    shipping_amount = _calculate_shipping(subtotal, shipping_method)
     total = subtotal + tax + shipping_amount
 
     order = Order(
@@ -54,10 +55,11 @@ async def build_order_from_cart(
         shipping_address_id=shipping_address_id,
         billing_address_id=billing_address_id,
         items=items,
+        shipping_method_id=shipping_method.id if shipping_method else None,
     )
     session.add(order)
     await session.commit()
-    await session.refresh(order)
+    await session.refresh(order, attribute_names=["items", "shipping_method"])
     return order
 
 
@@ -65,7 +67,7 @@ async def get_orders_for_user(session: AsyncSession, user_id: UUID) -> Sequence[
     result = await session.execute(
         select(Order)
         .where(Order.user_id == user_id)
-        .options(selectinload(Order.items))
+        .options(selectinload(Order.items), selectinload(Order.shipping_method))
         .order_by(Order.created_at.desc())
     )
     return result.scalars().all()
@@ -75,13 +77,13 @@ async def get_order(session: AsyncSession, user_id: UUID, order_id: UUID) -> Ord
     result = await session.execute(
         select(Order)
             .where(Order.user_id == user_id, Order.id == order_id)
-            .options(selectinload(Order.items))
+            .options(selectinload(Order.items), selectinload(Order.shipping_method))
     )
     return result.scalar_one_or_none()
 
 
 async def list_orders(session: AsyncSession, status: OrderStatus | None = None, user_id: UUID | None = None) -> list[Order]:
-    query = select(Order).options(selectinload(Order.items)).order_by(Order.created_at.desc())
+    query = select(Order).options(selectinload(Order.items), selectinload(Order.shipping_method)).order_by(Order.created_at.desc())
     if status:
         query = query.where(Order.status == status)
     if user_id:
@@ -90,8 +92,34 @@ async def list_orders(session: AsyncSession, status: OrderStatus | None = None, 
     return list(result.scalars().unique())
 
 
-async def update_order(session: AsyncSession, order: Order, payload: OrderUpdate) -> Order:
+ALLOWED_TRANSITIONS = {
+    OrderStatus.pending: {OrderStatus.paid, OrderStatus.cancelled},
+    OrderStatus.paid: {OrderStatus.shipped, OrderStatus.refunded},
+    OrderStatus.shipped: {OrderStatus.refunded},
+    OrderStatus.cancelled: set(),
+    OrderStatus.refunded: set(),
+}
+
+
+async def update_order(
+    session: AsyncSession, order: Order, payload: OrderUpdate, shipping_method: ShippingMethod | None = None
+) -> Order:
     data = payload.model_dump(exclude_unset=True)
+    if "status" in data and data["status"]:
+        current_status = OrderStatus(order.status)
+        next_status = OrderStatus(data["status"])
+        if next_status not in ALLOWED_TRANSITIONS.get(current_status, set()):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
+        order.status = next_status
+        data.pop("status")
+
+    if shipping_method:
+        order.shipping_method_id = shipping_method.id
+        subtotal = sum(Decimal(item.subtotal) for item in order.items)
+        order.shipping_amount = _calculate_shipping(subtotal, shipping_method)
+        order.tax_amount = _calculate_tax(subtotal)
+        order.total_amount = subtotal + order.tax_amount + order.shipping_amount
+
     for field, value in data.items():
         setattr(order, field, value)
     session.add(order)
@@ -131,3 +159,15 @@ async def create_shipping_method(session: AsyncSession, payload: ShippingMethodC
 
 async def get_shipping_method(session: AsyncSession, method_id: UUID) -> ShippingMethod | None:
     return await session.get(ShippingMethod, method_id)
+
+
+async def list_shipping_methods(session: AsyncSession) -> list[ShippingMethod]:
+    result = await session.execute(select(ShippingMethod).order_by(ShippingMethod.created_at.desc()))
+    return list(result.scalars().unique())
+
+
+async def get_order_by_id(session: AsyncSession, order_id: UUID) -> Order | None:
+    result = await session.execute(
+        select(Order).options(selectinload(Order.items), selectinload(Order.shipping_method)).where(Order.id == order_id)
+    )
+    return result.scalar_one_or_none()
