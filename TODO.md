@@ -10,8 +10,8 @@ Below is a structured checklist you can turn into issues. Nothing is marked done
 - [x] Add `.gitignore` for Python, Node, env files, build artifacts.
 - [x] GitHub Actions for backend (lint, tests, type-checks).
 - [x] GitHub Actions for frontend (lint, tests, build).
-- [ ] CONTRIBUTING.md with branching, commit style, runbook.
-- [ ] ARCHITECTURE.md with high-level design and data flow.
+- [x] CONTRIBUTING.md with branching, commit style, runbook.
+- [x] ARCHITECTURE.md with high-level design and data flow.
 - [ ] CI: add deployment/release job (e.g., container build + push) once runtime code lands.
 
 ## Backend – Core & Auth
