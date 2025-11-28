@@ -76,15 +76,13 @@ async def serialize_cart(cart: Cart) -> CartRead:
                 variant_id=item.variant_id,
                 quantity=item.quantity,
                 max_quantity=item.max_quantity,
+                note=item.note,
                 unit_price_at_add=item.unit_price_at_add,
             )
             for item in cart.items
         ],
         totals=totals,
     )
-    max_allowed = variant.stock_quantity if variant else product.stock_quantity
-    if max_allowed and quantity > max_allowed:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Quantity exceeds allowed maximum")
 
 
 async def add_item(
@@ -115,12 +113,14 @@ async def add_item(
         product_id=product.id,
         variant_id=variant.id if variant else None,
         quantity=payload.quantity,
+        note=payload.note,
         unit_price_at_add=unit_price,
         max_quantity=payload.max_quantity,
     )
     session.add(item)
     await session.commit()
     await session.refresh(item)
+    record_cart_event("add_item", {"cart_id": str(cart.id), "product_id": str(product.id), "quantity": payload.quantity})
     return item
 
 
@@ -136,9 +136,11 @@ async def update_item(session: AsyncSession, cart: Cart, item_id: UUID, payload:
     _enforce_max_quantity(payload.quantity, item.max_quantity)
 
     item.quantity = payload.quantity
+    item.note = payload.note
     session.add(item)
     await session.commit()
     await session.refresh(item)
+    record_cart_event("update_item", {"cart_id": str(cart.id), "item_id": str(item.id), "quantity": payload.quantity})
     return item
 
 
@@ -149,6 +151,7 @@ async def delete_item(session: AsyncSession, cart: Cart, item_id: UUID) -> None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cart item not found")
     await session.delete(item)
     await session.commit()
+    record_cart_event("delete_item", {"cart_id": str(cart.id), "item_id": str(item_id)})
 
 
 async def merge_guest_cart(session: AsyncSession, user_cart: Cart, guest_session_id: str | None) -> Cart:
@@ -191,6 +194,19 @@ async def merge_guest_cart(session: AsyncSession, user_cart: Cart, guest_session
     return user_cart
 
 
+async def cleanup_stale_guest_carts(session: AsyncSession, max_age_hours: int = 72) -> int:
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    result = await session.execute(select(Cart).where(Cart.user_id.is_(None), Cart.updated_at < cutoff))
+    stale = result.scalars().all()
+    deleted = 0
+    for cart in stale:
+        await session.delete(cart)
+        deleted += 1
+    if deleted:
+        await session.commit()
+    return deleted
+
+
 async def create_promo(session: AsyncSession, payload: PromoCodeCreate) -> PromoCode:
     code = payload.code.strip().upper()
     result = await session.execute(select(PromoCode).where(PromoCode.code == code))
@@ -228,8 +244,9 @@ async def reserve_stock_for_checkout(session: AsyncSession, cart: Cart) -> bool:
 
 async def run_abandoned_cart_job(session: AsyncSession, max_age_hours: int = 24) -> int:
     # Placeholder for future job to email users about abandoned carts
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
-    result = await session.execute(select(Cart).where(Cart.updated_at < cutoff))
-    abandoned = result.scalars().all()
-    # In real implementation, send emails / enqueue notifications
-    return len(abandoned)
+    return await cleanup_stale_guest_carts(session, max_age_hours)
+
+
+def record_cart_event(event: str, payload: dict | None = None) -> None:
+    # Placeholder for analytics hook; integrate with telemetry pipeline later
+    return None

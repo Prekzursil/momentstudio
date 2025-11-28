@@ -77,10 +77,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Cart subtotal/tax/shipping calculation helper.
 - [x] Promo code model + validation hook.
 - [x] Abandoned cart job (email reminder) scaffold.
-- [ ] Cart item note (gift message) support.
-- [ ] Cart cleanup job for stale guest carts.
-- [ ] Variant selection validation (options match product).
-- [ ] Cart analytics events (add/remove/update).
+- [x] Cart item note (gift message) support.
+- [x] Cart cleanup job for stale guest carts.
+- [x] Variant selection validation (options match product).
+- [x] Cart analytics events (add/remove/update).
 
 ## Backend - Orders, Payment, Addresses
 - [x] Address model + migration; CRUD /me/addresses.
