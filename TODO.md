@@ -8,10 +8,11 @@ Below is a structured checklist you can turn into issues. Nothing is marked done
 - [x] Add backend `.env.example` (DATABASE_URL, SECRET_KEY, STRIPE_SECRET_KEY, SMTP_*, FRONTEND_ORIGIN).
 - [x] Add frontend `.env.example` (API_BASE_URL, STRIPE_PUBLISHABLE_KEY, APP_ENV).
 - [x] Add `.gitignore` for Python, Node, env files, build artifacts.
-- [ ] GitHub Actions for backend (lint, tests, type-checks).
-- [ ] GitHub Actions for frontend (lint, tests, build).
+- [x] GitHub Actions for backend (lint, tests, type-checks).
+- [x] GitHub Actions for frontend (lint, tests, build).
 - [ ] CONTRIBUTING.md with branching, commit style, runbook.
 - [ ] ARCHITECTURE.md with high-level design and data flow.
+- [ ] CI: add deployment/release job (e.g., container build + push) once runtime code lands.
 
 ## Backend – Core & Auth
 - [ ] Scaffold FastAPI app with versioned `/api/v1` router.
