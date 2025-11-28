@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     access_token_exp_minutes: int = 30
     refresh_token_exp_days: int = 7
 
+    media_root: str = "uploads"
+
     smtp_host: str = "localhost"
     smtp_port: int = 1025
     smtp_username: str | None = None

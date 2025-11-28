@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -15,6 +17,7 @@ from app.schemas.catalog import (
     ProductUpdate,
 )
 from app.services import catalog as catalog_service
+from app.services import storage
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
 
@@ -37,6 +40,7 @@ async def list_products(
     offset: int = Query(default=0, ge=0),
 ) -> list[Product]:
     query = select(Product).options(selectinload(Product.images), selectinload(Product.category))
+    query = query.where(Product.is_deleted.is_(False))
     if category_slug:
         query = query.join(Category).where(Category.slug == category_slug)
     if is_featured is not None:
@@ -59,7 +63,7 @@ async def get_product(slug: str, session: AsyncSession = Depends(get_session)) -
     product = await catalog_service.get_product_by_slug(
         session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
     )
-    if not product:
+    if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     return product
 
@@ -109,3 +113,55 @@ async def update_product(
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     return await catalog_service.update_product(session, product, payload)
+
+
+@router.delete("/products/{slug}", status_code=status.HTTP_204_NO_CONTENT)
+async def soft_delete_product(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> None:
+    product = await catalog_service.get_product_by_slug(session, slug)
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    await catalog_service.soft_delete_product(session, product)
+    return None
+
+
+@router.post("/products/{slug}/images", response_model=ProductRead)
+async def upload_product_image(
+    slug: str,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> Product:
+    product = await catalog_service.get_product_by_slug(
+        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+    )
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    path, filename = storage.save_upload(file)
+    await catalog_service.add_product_image_from_path(
+        session, product, url=path, alt_text=filename, sort_order=len(product.images) + 1
+    )
+    await session.refresh(product)
+    return product
+
+
+@router.delete("/products/{slug}/images/{image_id}", response_model=ProductRead)
+async def delete_product_image(
+    slug: str,
+    image_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> Product:
+    product = await catalog_service.get_product_by_slug(
+        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+    )
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    await catalog_service.delete_product_image(session, product, image_id)
+    await session.refresh(product)
+    return product
