@@ -205,7 +205,6 @@ def test_bulk_update_and_publish(test_app: Dict[str, object]) -> None:
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
     admin_token = create_admin_token(SessionLocal, email="bulkadmin@example.com")
 
-    # seed
     res = client.post(
         "/api/v1/catalog/categories",
         json={"slug": "bulk-cat", "name": "Bulk"},
@@ -244,3 +243,68 @@ def test_bulk_update_and_publish(test_app: Dict[str, object]) -> None:
     assert updated[prods[0]["id"]]["stock_quantity"] == 5
     assert updated[prods[0]["id"]]["status"] == "published"
     assert updated[prods[0]["id"]]["publish_at"] is not None
+
+
+def test_product_reviews_and_related(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal, email="reviewadmin@example.com")
+
+    res = client.post(
+        "/api/v1/catalog/categories",
+        json={"slug": "pots", "name": "Pots"},
+        headers=auth_headers(admin_token),
+    )
+    category_id = res.json()["id"]
+
+    res = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": category_id,
+            "slug": "teapot",
+            "name": "Teapot",
+            "base_price": 40,
+            "currency": "USD",
+            "stock_quantity": 2,
+            "tags": ["ceramic", "teaware"],
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert res.status_code == 201
+
+    res = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": category_id,
+            "slug": "teapot-2",
+            "name": "Teapot 2",
+            "base_price": 45,
+            "currency": "USD",
+            "stock_quantity": 2,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert res.status_code == 201
+
+    review_res = client.post(
+        "/api/v1/catalog/products/teapot/reviews",
+        json={"author_name": "Alice", "rating": 5, "title": "Great", "body": "Loved it"},
+    )
+    assert review_res.status_code == 201
+    review_id = review_res.json()["id"]
+
+    approve = client.post(
+        f"/api/v1/catalog/products/teapot/reviews/{review_id}/approve",
+        headers=auth_headers(admin_token),
+    )
+    assert approve.status_code == 200
+
+    detail = client.get("/api/v1/catalog/products/teapot")
+    assert float(detail.json()["rating_average"]) == 5.0
+    assert detail.json()["rating_count"] == 1
+
+    related = client.get("/api/v1/catalog/products/teapot/related")
+    assert related.status_code == 200
+    assert len(related.json()) >= 1

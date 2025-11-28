@@ -42,12 +42,12 @@ Below is a structured checklist you can turn into issues.
 - [x] Product status enums (draft/published/archived).
 - [x] Track publish date and last_modified.
 - [x] Bulk price/stock update endpoint for admins.
-- [ ] Product labels/tags schema and filters.
-- [ ] Product option schema (color/size) without variants.
-- [ ] Admin product duplication/cloning.
-- [ ] Product reviews model + moderation queue.
-- [ ] Average rating + review count on product list/detail.
-- [ ] Related products/recommendations service (rule-based).
+- [x] Product labels/tags schema and filters.
+- [x] Product option schema (color/size) without variants.
+- [x] Admin product duplication/cloning.
+- [x] Product reviews model + moderation queue.
+- [x] Average rating + review count on product list/detail.
+- [x] Related products/recommendations service (rule-based).
 - [ ] Recently viewed products service (per session).
 - [ ] Admin export products CSV.
 - [ ] Admin import products CSV with dry-run validation.

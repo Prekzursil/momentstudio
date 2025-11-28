@@ -1,8 +1,8 @@
+import enum
 import uuid
 from datetime import datetime, timezone
-import enum
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, Text, func, Enum
+from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Numeric, String, Table, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -35,6 +35,14 @@ class ProductStatus(str, enum.Enum):
     archived = "archived"
 
 
+product_tags = Table(
+    "product_tags",
+    Base.metadata,
+    Column("product_id", UUID(as_uuid=True), ForeignKey("products.id"), primary_key=True),
+    Column("tag_id", UUID(as_uuid=True), ForeignKey("tags.id"), primary_key=True),
+)
+
+
 class Product(Base):
     __tablename__ = "products"
 
@@ -55,6 +63,8 @@ class Product(Base):
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     status: Mapped[ProductStatus] = mapped_column(Enum(ProductStatus), nullable=False, default=ProductStatus.draft)
     publish_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    rating_average: Mapped[float] = mapped_column(Numeric(3, 2), nullable=False, default=0)
+    rating_count: Mapped[int] = mapped_column(nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -74,6 +84,13 @@ class Product(Base):
     )
     variants: Mapped[list["ProductVariant"]] = relationship(
         "ProductVariant", back_populates="product", cascade="all, delete-orphan", lazy="selectin"
+    )
+    tags: Mapped[list["Tag"]] = relationship("Tag", secondary=product_tags, back_populates="products", lazy="selectin")
+    options: Mapped[list["ProductOption"]] = relationship(
+        "ProductOption", back_populates="product", cascade="all, delete-orphan", lazy="selectin"
+    )
+    reviews: Mapped[list["ProductReview"]] = relationship(
+        "ProductReview", back_populates="product", cascade="all, delete-orphan", lazy="selectin"
     )
 
 
@@ -105,3 +122,45 @@ class ProductVariant(Base):
     )
 
     product: Mapped[Product] = relationship("Product", back_populates="variants")
+
+
+class ProductOption(Base):
+    __tablename__ = "product_options"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=False)
+    option_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    option_value: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    product: Mapped[Product] = relationship("Product", back_populates="options")
+
+
+class Tag(Base):
+    __tablename__ = "tags"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    slug: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
+
+    products: Mapped[list[Product]] = relationship("Product", secondary=product_tags, back_populates="tags")
+
+
+class ProductReview(Base):
+    __tablename__ = "product_reviews"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=False)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    author_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    rating: Mapped[int] = mapped_column(nullable=False)
+    title: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_approved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    product: Mapped[Product] = relationship("Product", back_populates="reviews")
