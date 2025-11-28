@@ -3,11 +3,11 @@
 Below is a structured checklist you can turn into issues. Nothing is marked done yet.
 
 ## Project & Infra
-- [ ] Initialize monorepo with `backend/`, `frontend/`, `infra/`.
-- [ ] Add `docker-compose.yml` for API, frontend, Postgres.
-- [ ] Add backend `.env.example` (DATABASE_URL, SECRET_KEY, STRIPE_SECRET_KEY, SMTP_*, FRONTEND_ORIGIN).
-- [ ] Add frontend `.env.example` (API_BASE_URL, STRIPE_PUBLISHABLE_KEY, APP_ENV).
-- [ ] Add `.gitignore` for Python, Node, env files, build artifacts.
+- [x] Initialize monorepo with `backend/`, `frontend/`, `infra/`.
+- [x] Add `docker-compose.yml` for API, frontend, Postgres.
+- [x] Add backend `.env.example` (DATABASE_URL, SECRET_KEY, STRIPE_SECRET_KEY, SMTP_*, FRONTEND_ORIGIN).
+- [x] Add frontend `.env.example` (API_BASE_URL, STRIPE_PUBLISHABLE_KEY, APP_ENV).
+- [x] Add `.gitignore` for Python, Node, env files, build artifacts.
 - [ ] GitHub Actions for backend (lint, tests, type-checks).
 - [ ] GitHub Actions for frontend (lint, tests, build).
 - [ ] CONTRIBUTING.md with branching, commit style, runbook.
