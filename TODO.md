@@ -32,7 +32,7 @@ Below is a structured checklist you can turn into issues.
 - [ ] GET /categories (public).
 - [ ] GET /products with pagination, search, category, price filters.
 - [ ] GET /products/{slug} detail.
-- [ ] Admin create/update product endpoints.
+- [x] Admin create/update product endpoints.
 - [ ] Admin soft-delete product.
 - [ ] Admin product image upload/delete.
 - [ ] Image storage service (local first, S3-ready).

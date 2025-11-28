@@ -52,9 +52,12 @@ class Product(Base):
         nullable=False,
     )
 
-    category: Mapped[Category] = relationship("Category", back_populates="products")
+    category: Mapped[Category] = relationship("Category", back_populates="products", lazy="joined")
     images: Mapped[list["ProductImage"]] = relationship(
-        "ProductImage", back_populates="product", cascade="all, delete-orphan"
+        "ProductImage",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
 
 
