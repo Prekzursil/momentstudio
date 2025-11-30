@@ -60,6 +60,7 @@ def _enforce_max_quantity(quantity: int, limit: int | None) -> None:
 
 async def _calculate_totals(cart: Cart) -> Totals:
     subtotal = sum(Decimal(item.unit_price_at_add) * item.quantity for item in cart.items)
+    subtotal = Decimal(subtotal)
     tax = subtotal * Decimal("0.1")
     shipping = Decimal("5.00") if subtotal > 0 else Decimal("0.00")
     total = subtotal + tax + shipping
