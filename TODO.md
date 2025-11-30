@@ -246,10 +246,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Order status update with timeline view.
 - [x] Coupon/promo management UI.
 - [x] Content preview/publish controls.
-- [ ] Admin activity audit view.
-- [ ] Admin login session management (force logout).
-- [ ] Inventory low-stock dashboard.
-- [ ] Sales analytics dashboard (GMV, AOV).
+- [x] Admin activity audit view.
+- [x] Admin login session management (force logout).
+- [x] Inventory low-stock dashboard.
+- [x] Sales analytics dashboard (GMV, AOV).
 
 ## UX, Performance, SEO & Accessibility
 - [ ] Mobile-first responsive design across pages.
