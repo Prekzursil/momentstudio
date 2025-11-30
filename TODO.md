@@ -168,11 +168,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Main layout (header/footer/responsive nav).
 - [x] Shared components: button, input, card, modal, toast.
 - [x] Global error handling / boundary route.
-- [ ] API service layer + interceptors.
-- [ ] Theme tokens (spacing, typography, colors).
-- [ ] Dark/light mode toggle.
-- [ ] Form validation utilities (error messages, async validation).
-- [ ] Toast/snackbar service and global overlay.
+- [x] API service layer + interceptors.
+- [x] Theme tokens (spacing, typography, colors).
+- [x] Dark/light mode toggle.
+- [x] Form validation utilities (error messages, async validation).
+- [x] Toast/snackbar service and global overlay.
 - [ ] Loading spinner/skeleton components.
 - [ ] Page-level breadcrumb component.
 - [ ] Accessible modal focus trapping.

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, EventEmitter, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ButtonComponent } from '../shared/button.component';
 
@@ -22,10 +22,12 @@ import { ButtonComponent } from '../shared/button.component';
           <button type="button" class="text-sm font-medium text-slate-700 hover:text-slate-900 hidden sm:inline">
             Sign in
           </button>
-          <app-button label="Get started" size="sm"></app-button>
+          <app-button label="Toggle theme" size="sm" variant="ghost" (action)="toggleTheme.emit()"></app-button>
         </div>
       </div>
     </header>
   `
 })
-export class HeaderComponent {}
+export class HeaderComponent {
+  @Output() toggleTheme = new EventEmitter<void>();
+}
