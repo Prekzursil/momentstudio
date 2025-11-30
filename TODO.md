@@ -105,11 +105,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Address validation hook (country/postal rules).
 
 ## Backend - CMS & Content
-- [ ] ContentBlock model + migration.
-- [ ] Seed default blocks (home hero, about, FAQ, shipping/returns, care).
-- [ ] GET /content/{key} public.
-- [ ] Admin edit content blocks; validate markdown/HTML safety.
-- [ ] Content versioning with draft/publish states.
+- [x] ContentBlock model + migration.
+- [x] Seed default blocks (home hero, about, FAQ, shipping/returns, care).
+- [x] GET /content/{key} public.
+- [x] Admin edit content blocks; validate markdown/HTML safety.
+- [x] Content versioning with draft/publish states.
 - [ ] Image uploads for content blocks.
 - [ ] Rich text sanitization rules.
 - [ ] Homepage layout blocks (hero, grid, testimonials).
