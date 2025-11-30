@@ -2,7 +2,7 @@ import csv
 import io
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -24,6 +24,7 @@ router = APIRouter(prefix="/orders", tags=["orders"])
 
 @router.post("", response_model=OrderRead, status_code=status.HTTP_201_CREATED)
 async def create_order(
+    background_tasks: BackgroundTasks,
     payload: OrderCreate,
     session: AsyncSession = Depends(get_session),
     current_user=Depends(get_current_user),
@@ -55,7 +56,7 @@ async def create_order(
         payload.billing_address_id,
         shipping_method,
     )
-    await email_service.send_order_confirmation(current_user.email, order, order.items)
+    background_tasks.add_task(email_service.send_order_confirmation, current_user.email, order, order.items)
     return order
 
 
@@ -77,20 +78,27 @@ async def admin_list_orders(
 
 @router.patch("/admin/{order_id}", response_model=OrderRead)
 async def admin_update_order(
+    background_tasks: BackgroundTasks,
     order_id: UUID,
     payload: OrderUpdate,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    admin=Depends(require_admin),
 ):
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    previous_status = order.status
     shipping_method = None
     if payload.shipping_method_id:
         shipping_method = await order_service.get_shipping_method(session, payload.shipping_method_id)
         if not shipping_method:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
-    return await order_service.update_order(session, order, payload, shipping_method=shipping_method)
+    updated = await order_service.update_order(session, order, payload, shipping_method=shipping_method)
+    if previous_status != updated.status and updated.status == OrderStatus.shipped and updated.user and updated.user.email:
+        background_tasks.add_task(
+            email_service.send_shipping_update, updated.user.email, updated, updated.tracking_number
+        )
+    return updated
 
 
 @router.post("/admin/{order_id}/retry-payment", response_model=OrderRead)
@@ -116,6 +124,21 @@ async def admin_refund_order(
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
     return await order_service.refund_order(session, order, note=note)
+
+
+@router.post("/admin/{order_id}/delivery-email", response_model=OrderRead)
+async def admin_send_delivery_email(
+    order_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> OrderRead:
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    if not order.user or not order.user.email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order user email missing")
+    await email_service.send_delivery_confirmation(order.user.email, order)
+    return order
 
 
 @router.post("/admin/{order_id}/items/{item_id}/fulfill", response_model=OrderRead)

@@ -101,3 +101,30 @@ def test_admin_guard(test_app: Dict[str, object]) -> None:
     res = client.get("/api/v1/auth/admin/ping", headers={"Authorization": f"Bearer {admin_access}"})
     assert res.status_code == 200
     assert res.json()["status"] == "admin-ok"
+
+
+def test_password_reset_flow(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    sent = {"token": None}
+
+    async def fake_send(email: str, token: str):
+        sent["token"] = token
+        return True
+
+    monkeypatch.setattr("app.services.email.send_password_reset", fake_send)
+
+    res = client.post("/api/v1/auth/register", json={"email": "reset@example.com", "password": "resetpass"})
+    assert res.status_code == 201
+
+    req = client.post("/api/v1/auth/password-reset/request", json={"email": "reset@example.com"})
+    assert req.status_code == 202
+    assert sent["token"]
+
+    confirm = client.post(
+        "/api/v1/auth/password-reset/confirm",
+        json={"token": sent["token"], "new_password": "newsecret"},
+    )
+    assert confirm.status_code == 200
+
+    login = client.post("/api/v1/auth/login", json={"email": "reset@example.com", "password": "newsecret"})
+    assert login.status_code == 200

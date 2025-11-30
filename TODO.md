@@ -122,11 +122,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Email settings (SMTP).
 - [x] Generic email service (text + HTML).
 - [x] Order confirmation email.
-- [ ] Password reset email + one-time token flow.
-- [ ] Logging/error handling around email sending.
-- [ ] Background task for sending emails.
-- [ ] Shipping update email (with tracking link).
-- [ ] Delivery confirmation email.
+- [x] Password reset email + one-time token flow.
+- [x] Logging/error handling around email sending.
+- [x] Background task for sending emails.
+- [x] Shipping update email (with tracking link).
+- [x] Delivery confirmation email.
 - [ ] Cart abandonment email template.
 - [ ] Product back-in-stock notification flow.
 - [ ] Admin alert on low stock thresholds.

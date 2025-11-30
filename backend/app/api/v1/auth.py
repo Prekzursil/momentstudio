@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from uuid import UUID
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -6,9 +8,17 @@ from app.core.dependencies import get_current_user, require_admin
 from app.core.security import decode_token
 from app.db.session import get_session
 from app.models.user import User
-from app.schemas.auth import AuthResponse, RefreshRequest, TokenPair, UserResponse
+from app.schemas.auth import (
+    AuthResponse,
+    PasswordResetConfirm,
+    PasswordResetRequest,
+    RefreshRequest,
+    TokenPair,
+    UserResponse,
+)
 from app.schemas.user import UserCreate
 from app.services import auth as auth_service
+from app.services import email as email_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -39,8 +49,6 @@ async def refresh_tokens(
     if not payload or payload.get("type") != "refresh":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
-    from uuid import UUID
-
     try:
         user_id = UUID(str(payload.get("sub")))
     except Exception:
@@ -69,3 +77,23 @@ async def read_me(current_user: User = Depends(get_current_user)) -> UserRespons
 @router.get("/admin/ping", response_model=dict[str, str])
 async def admin_ping(admin_user: User = Depends(require_admin)) -> dict[str, str]:
     return {"status": "admin-ok", "user": str(admin_user.id)}
+
+
+@router.post("/password-reset/request", status_code=status.HTTP_202_ACCEPTED)
+async def request_password_reset(
+    payload: PasswordResetRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    reset = await auth_service.create_reset_token(session, payload.email)
+    background_tasks.add_task(email_service.send_password_reset, payload.email, reset.token)
+    return {"status": "sent"}
+
+
+@router.post("/password-reset/confirm", status_code=status.HTTP_200_OK)
+async def confirm_password_reset(
+    payload: PasswordResetConfirm,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    await auth_service.confirm_reset_token(session, payload.token, payload.new_password)
+    return {"status": "updated"}

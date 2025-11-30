@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 from app.models.user import UserRole
 
@@ -36,3 +36,12 @@ class UserResponse(BaseModel):
 class AuthResponse(BaseModel):
     user: UserResponse
     tokens: TokenPair
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str

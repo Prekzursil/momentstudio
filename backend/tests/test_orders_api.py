@@ -104,13 +104,23 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
 
     shipping_method_id = asyncio.run(seed_shipping())
 
-    sent = {"count": 0}
+    sent = {"count": 0, "shipped": 0, "delivered": 0}
 
     async def fake_send_order_confirmation(to_email, order, items=None):
         sent["count"] += 1
         return True
 
+    async def fake_send_shipping_update(to_email, order, tracking=None):
+        sent["shipped"] += 1
+        return True
+
+    async def fake_send_delivery_confirmation(to_email, order):
+        sent["delivered"] += 1
+        return True
+
     email_service.send_order_confirmation = fake_send_order_confirmation  # type: ignore[assignment]
+    email_service.send_shipping_update = fake_send_shipping_update  # type: ignore[assignment]
+    email_service.send_delivery_confirmation = fake_send_delivery_confirmation  # type: ignore[assignment]
 
     res = client.post(
         "/api/v1/orders",
@@ -185,6 +195,11 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     assert packing.status_code == 200
     assert "Packing slip for order" in packing.text
     assert "Items:" in packing.text
+    assert sent["shipped"] == 1
+
+    delivery = client.post(f"/api/v1/orders/admin/{order_id}/delivery-email", headers=auth_headers(admin_token))
+    assert delivery.status_code == 200
+    assert sent["delivered"] == 1
 
 
 def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:

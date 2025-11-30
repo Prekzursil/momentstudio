@@ -71,7 +71,12 @@ async def get_orders_for_user(session: AsyncSession, user_id: UUID) -> Sequence[
     result = await session.execute(
         select(Order)
         .where(Order.user_id == user_id)
-        .options(selectinload(Order.items), selectinload(Order.shipping_method), selectinload(Order.events))
+        .options(
+            selectinload(Order.items),
+            selectinload(Order.shipping_method),
+            selectinload(Order.events),
+            selectinload(Order.user),
+        )
         .order_by(Order.created_at.desc())
     )
     return result.scalars().all()
@@ -81,7 +86,12 @@ async def get_order(session: AsyncSession, user_id: UUID, order_id: UUID) -> Ord
     result = await session.execute(
         select(Order)
         .where(Order.user_id == user_id, Order.id == order_id)
-        .options(selectinload(Order.items), selectinload(Order.shipping_method), selectinload(Order.events))
+        .options(
+            selectinload(Order.items),
+            selectinload(Order.shipping_method),
+            selectinload(Order.events),
+            selectinload(Order.user),
+        )
     )
     return result.scalar_one_or_none()
 
@@ -89,7 +99,12 @@ async def get_order(session: AsyncSession, user_id: UUID, order_id: UUID) -> Ord
 async def list_orders(session: AsyncSession, status: OrderStatus | None = None, user_id: UUID | None = None) -> list[Order]:
     query = (
         select(Order)
-        .options(selectinload(Order.items), selectinload(Order.shipping_method), selectinload(Order.events))
+        .options(
+            selectinload(Order.items),
+            selectinload(Order.shipping_method),
+            selectinload(Order.events),
+            selectinload(Order.user),
+        )
         .order_by(Order.created_at.desc())
     )
     if status:
@@ -179,7 +194,12 @@ async def list_shipping_methods(session: AsyncSession) -> list[ShippingMethod]:
 async def get_order_by_id(session: AsyncSession, order_id: UUID) -> Order | None:
     result = await session.execute(
         select(Order)
-        .options(selectinload(Order.items), selectinload(Order.shipping_method), selectinload(Order.events))
+        .options(
+            selectinload(Order.items),
+            selectinload(Order.shipping_method),
+            selectinload(Order.events),
+            selectinload(Order.user),
+        )
         .where(Order.id == order_id)
     )
     return result.scalar_one_or_none()
