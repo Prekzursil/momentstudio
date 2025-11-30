@@ -209,11 +209,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Checkout stepper: login/guest, shipping address, payment (Stripe).
 - [x] Order summary during checkout.
 - [x] Success page with order summary + continue shopping.
-- [ ] Guest cart persistence in localStorage.
-- [ ] Apply promo code UI.
-- [ ] Shipping method selection UI.
-- [ ] Address form with validation and country selector.
-- [ ] Payment form with Stripe elements.
+- [x] Guest cart persistence in localStorage.
+- [x] Apply promo code UI.
+- [x] Shipping method selection UI.
+- [x] Address form with validation and country selector.
+- [x] Payment form with Stripe elements.
 - [ ] Checkout error states and retry.
 - [ ] Save address checkbox for checkout.
 - [ ] Order confirmation page with next steps.
