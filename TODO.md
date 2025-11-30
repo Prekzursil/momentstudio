@@ -110,6 +110,11 @@ Below is a structured checklist you can turn into issues.
 - [x] GET /content/{key} public.
 - [x] Admin edit content blocks; validate markdown/HTML safety.
 - [x] Content versioning with draft/publish states.
+- [x] Image uploads for content blocks.
+- [x] Rich text sanitization rules.
+- [x] Homepage layout blocks (hero, grid, testimonials).
+- [x] FAQ ordering/priorities.
+- [x] Admin preview endpoint with token
 - [ ] Image uploads for content blocks.
 - [ ] Rich text sanitization rules.
 - [ ] Homepage layout blocks (hero, grid, testimonials).

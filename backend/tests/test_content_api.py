@@ -67,6 +67,7 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     public = client.get("/api/v1/content/home.hero")
     assert public.status_code == 200
     assert public.json()["title"] == "Hero"
+    assert public.json()["meta"] is None
 
     # Update increments version
     update = client.patch(
@@ -77,6 +78,7 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert update.status_code == 200
     assert update.json()["version"] == 2
     assert update.json()["body_markdown"] == "Updated body"
+    assert update.json()["meta"] is None
 
     # Validation rejects script
     bad = client.patch(
@@ -94,3 +96,21 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     )
     missing = client.get("/api/v1/content/page.about")
     assert missing.status_code == 404
+
+    # Preview token works for draft
+    preview = client.get("/api/v1/content/admin/page.about/preview", params={"token": "preview-token"})
+    assert preview.status_code == 200
+
+    # Image upload
+    client.post(
+        "/api/v1/content/admin/home.hero",
+        json={"title": "Hero Img", "body_markdown": "img hero", "status": "published"},
+        headers=auth_headers(admin_token),
+    )
+    img_resp = client.post(
+        "/api/v1/content/admin/home.hero/images",
+        files={"file": ("hero.jpg", b"fakeimg", "image/jpeg")},
+        headers=auth_headers(admin_token),
+    )
+    assert img_resp.status_code == 200
+    assert len(img_resp.json()["images"]) == 1

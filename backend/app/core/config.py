@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     smtp_password: str | None = None
 
     frontend_origin: str = "http://localhost:4200"
+    content_preview_token: str = "preview-token"
 
 
 @lru_cache

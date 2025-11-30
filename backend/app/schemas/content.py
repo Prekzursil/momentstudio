@@ -1,4 +1,6 @@
 from datetime import datetime
+from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -9,6 +11,8 @@ class ContentBlockBase(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     body_markdown: str = Field(min_length=1)
     status: ContentStatus = ContentStatus.draft
+    meta: dict[str, Any] | None = None
+    sort_order: int = 0
 
     @field_validator("body_markdown")
     @classmethod
@@ -43,6 +47,21 @@ class ContentBlockRead(BaseModel):
     body_markdown: str
     status: ContentStatus
     version: int
+    meta: dict[str, Any] | None = None
+    sort_order: int
     published_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
+    images: list["ContentImageRead"] = Field(default_factory=list)
+
+
+class ContentImageRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str | UUID
+    url: str
+    alt_text: str | None = None
+    sort_order: int
+
+
+ContentBlockRead.model_rebuild()
