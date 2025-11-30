@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -30,6 +30,27 @@ reset_request_rate_limit = limiter("auth:reset_request", settings.auth_rate_limi
 reset_confirm_rate_limit = limiter("auth:reset_confirm", settings.auth_rate_limit_reset_confirm, 60)
 
 
+def set_refresh_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        "refresh_token",
+        token,
+        httponly=True,
+        secure=settings.secure_cookies,
+        samesite=settings.cookie_samesite.lower(),
+        max_age=settings.refresh_token_exp_days * 24 * 60 * 60,
+        path="/",
+    )
+
+
+def clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(
+        "refresh_token",
+        path="/",
+        secure=settings.secure_cookies,
+        samesite=settings.cookie_samesite.lower(),
+    )
+
+
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=AuthResponse)
 async def register(
     user_in: UserCreate,
@@ -46,9 +67,12 @@ async def login(
     user_in: UserCreate,  # reuse for email/password fields
     session: AsyncSession = Depends(get_session),
     _: None = Depends(login_rate_limit),
+    response: Response = None,
 ) -> AuthResponse:
     user = await auth_service.authenticate_user(session, user_in.email, user_in.password)
     tokens = await auth_service.issue_tokens_for_user(session, user)
+    if response:
+        set_refresh_cookie(response, tokens["refresh_token"])
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 
@@ -57,6 +81,7 @@ async def refresh_tokens(
     refresh_request: RefreshRequest,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(refresh_rate_limit),
+    response: Response = None,
 ) -> TokenPair:
     stored = await auth_service.validate_refresh_token(session, refresh_request.refresh_token)
     user = await session.get(User, stored.user_id)
@@ -68,6 +93,8 @@ async def refresh_tokens(
     session.add(stored)
     await session.flush()
     tokens = await auth_service.issue_tokens_for_user(session, user)
+    if response:
+        set_refresh_cookie(response, tokens["refresh_token"])
     return TokenPair(**tokens)
 
 
@@ -76,10 +103,13 @@ async def logout(
     payload: RefreshRequest,
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
+    response: Response = None,
 ) -> None:
     payload_data = decode_token(payload.refresh_token)
     if payload_data and payload_data.get("jti"):
         await auth_service.revoke_refresh_token(session, payload_data["jti"], reason="logout")
+    if response:
+        clear_refresh_cookie(response)
     return None
 
 

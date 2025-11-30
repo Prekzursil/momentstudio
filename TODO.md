@@ -23,6 +23,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Auth endpoints: register, login (access+refresh), refresh, logout.
 - [x] JWT guard dependency + role guard for admin.
 - [x] Tests for auth flows (register/login/refresh/invalid creds).
+- [x] HTTP-only refresh token cookie issued on login/refresh and cleared on logout.
 
 ## Backend - Catalog & Products
 - [x] Category model + migration.
