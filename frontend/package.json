@@ -25,9 +25,12 @@
     "@angular/cli": "^18.0.0",
     "@angular/compiler-cli": "^18.0.0",
     "@types/node": "^20.11.30",
-    "typescript": "^5.4.5",
-    "tailwindcss": "^3.4.4",
+    "autoprefixer": "^10.4.19",
+    "chokidar": "^3.6.0",
+    "glob-parent": "^5.1.2",
     "postcss": "^8.4.38",
-    "autoprefixer": "^10.4.19"
+    "readdirp": "^3.6.0",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5.4.5"
   }
 }
