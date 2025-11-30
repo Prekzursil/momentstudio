@@ -9,6 +9,7 @@ import { InputComponent } from '../../shared/input.component';
 import { ProductCardComponent } from '../../shared/product-card.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
 import { ToastService } from '../../core/toast.service';
+import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 
 @Component({
   selector: 'app-shop',
@@ -21,10 +22,12 @@ import { ToastService } from '../../core/toast.service';
     ButtonComponent,
     InputComponent,
     ProductCardComponent,
-    SkeletonComponent
+    SkeletonComponent,
+    BreadcrumbComponent
   ],
   template: `
-    <app-container classes="py-10">
+    <app-container classes="py-10 grid gap-6">
+      <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
       <div class="grid gap-8 lg:grid-cols-[280px_1fr]">
         <aside class="border border-slate-200 rounded-2xl p-4 bg-white h-fit space-y-6">
           <div class="space-y-3">
@@ -127,7 +130,22 @@ import { ToastService } from '../../core/toast.service';
             <app-skeleton *ngFor="let i of placeholders" height="260px"></app-skeleton>
           </div>
 
-          <div *ngIf="!loading() && products.length === 0" class="border border-dashed border-slate-200 rounded-2xl p-10 text-center grid gap-2">
+          <div
+            *ngIf="hasError()"
+            class="border border-amber-200 bg-amber-50 rounded-2xl p-6 text-center grid gap-3"
+          >
+            <p class="text-lg font-semibold text-amber-900">We hit a snag loading products.</p>
+            <p class="text-sm text-amber-800">Check your connection or retry in a moment.</p>
+            <div class="flex justify-center gap-3">
+              <app-button label="Retry" size="sm" (action)="loadProducts()"></app-button>
+              <app-button label="Reset filters" size="sm" variant="ghost" (action)="resetFilters()"></app-button>
+            </div>
+          </div>
+
+          <div
+            *ngIf="!loading() && !hasError() && products.length === 0"
+            class="border border-dashed border-slate-200 rounded-2xl p-10 text-center grid gap-2"
+          >
             <p class="text-lg font-semibold text-slate-900">No products found</p>
             <p class="text-sm text-slate-600">Try adjusting filters or search terms.</p>
             <div class="flex justify-center gap-3">
@@ -168,7 +186,12 @@ export class ShopComponent implements OnInit {
   meta: PaginationMeta | null = null;
   allTags = new Set<string>();
   loading = signal<boolean>(true);
+  hasError = signal<boolean>(false);
   placeholders = Array.from({ length: 6 });
+  crumbs = [
+    { label: 'Home', url: '/' },
+    { label: 'Shop' }
+  ];
 
   filters: {
     search: string;
@@ -219,6 +242,7 @@ export class ShopComponent implements OnInit {
 
   loadProducts(pushQuery = true): void {
     this.loading.set(true);
+    this.hasError.set(false);
     if (pushQuery) {
       this.updateQueryParams();
     }
@@ -237,16 +261,31 @@ export class ShopComponent implements OnInit {
         next: (response) => {
           this.products = response.items;
           this.meta = response.meta;
+          if (this.filters.category_slug) {
+            const cat = this.categories.find((c) => c.slug === this.filters.category_slug);
+            this.crumbs = [
+              { label: 'Home', url: '/' },
+              { label: 'Shop', url: '/shop' },
+              { label: cat?.name ?? this.filters.category_slug }
+            ];
+          } else {
+            this.crumbs = [
+              { label: 'Home', url: '/' },
+              { label: 'Shop' }
+            ];
+          }
           this.allTags = new Set(
             response.items
               .flatMap((p) => p.tags ?? [])
               .map((t) => ('name' in t ? t.name : String(t)))
           );
           this.loading.set(false);
+          this.hasError.set(false);
         },
         error: () => {
           this.loading.set(false);
           this.products = [];
+          this.hasError.set(true);
           this.toast.error('Could not load products', 'Please try again.');
         }
       });
