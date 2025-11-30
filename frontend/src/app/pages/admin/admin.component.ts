@@ -147,7 +147,13 @@ import { ToastService } from '../../core/toast.service';
               <div class="rounded-lg border border-slate-200 p-4 text-sm text-slate-700" *ngIf="activeOrder">
                 <div class="flex items-center justify-between">
                   <h3 class="font-semibold text-slate-900">Order #{{ activeOrder.id }}</h3>
-                  <span class="text-xs rounded-full bg-slate-100 px-2 py-1">{{ activeOrder.status }}</span>
+                  <select class="rounded-lg border border-slate-200 px-2 py-1 text-sm" [ngModel]="activeOrder.status" (ngModelChange)="changeOrderStatus($event)">
+                    <option value="pending">Pending</option>
+                    <option value="paid">Paid</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="refunded">Refunded</option>
+                  </select>
                 </div>
                 <p class="text-xs text-slate-500">Customer: {{ activeOrder.customer }}</p>
                 <p class="text-xs text-slate-500">Placed: {{ activeOrder.created_at | date: 'medium' }}</p>
@@ -357,7 +363,17 @@ export class AdminComponent implements OnInit {
   }
 
   bulkUpdateStatus(): void {
-    this.toast.info('Bulk update not wired to backend yet.');
+    if (!this.selectedIds.size) return;
+    const payload = Array.from(this.selectedIds).map((slug) => ({ slug, status: 'active' }));
+    this.admin.bulkUpdateProducts(payload).subscribe({
+      next: (updated) => {
+        this.toast.success(`Updated ${updated.length} products`);
+        this.products = updated;
+        this.selectedIds.clear();
+        this.computeAllSelected();
+      },
+      error: () => this.toast.error('Failed to update products')
+    });
   }
 
   selectOrder(order: AdminOrder): void {
@@ -369,6 +385,18 @@ export class AdminComponent implements OnInit {
     this.admin.revokeSessions(this.selectedUserId).subscribe({
       next: () => this.toast.success('Sessions revoked'),
       error: () => this.toast.error('Failed to revoke sessions')
+    });
+  }
+
+  changeOrderStatus(status: string): void {
+    if (!this.activeOrder) return;
+    this.admin.updateOrderStatus(this.activeOrder.id, status).subscribe({
+      next: (order) => {
+        this.toast.success('Order status updated');
+        this.activeOrder = order;
+        this.orders = this.orders.map((o) => (o.id === order.id ? order : o));
+      },
+      error: () => this.toast.error('Failed to update order status')
     });
   }
 }

@@ -121,4 +121,12 @@ export class AdminService {
   lowStock(): Observable<LowStockItem[]> {
     return this.api.get<LowStockItem[]>('/admin/dashboard/low-stock');
   }
+
+  updateOrderStatus(orderId: string, status: string): Observable<AdminOrder> {
+    return this.api.patch<AdminOrder>(`/orders/admin/${orderId}`, { status });
+  }
+
+  bulkUpdateProducts(payload: { slug: string; status?: string }[]): Observable<AdminProduct[]> {
+    return this.api.post<AdminProduct[]>('/catalog/products/bulk-update', payload);
+  }
 }
