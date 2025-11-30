@@ -232,7 +232,6 @@ Below is a structured checklist you can turn into issues.
 - [ ] Saved payment method placeholder.
 - [ ] Profile avatar upload (optional).
 - [ ] Session timeout/logout messaging.
-- [ ] 2FA toggle (placeholder).
 
 ## Frontend - Admin Dashboard
 - [ ] /admin layout with sidebar + guard.
