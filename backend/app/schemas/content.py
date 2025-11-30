@@ -30,6 +30,8 @@ class ContentBlockUpdate(BaseModel):
     title: str | None = Field(default=None, max_length=200)
     body_markdown: str | None = Field(default=None)
     status: ContentStatus | None = None
+    meta: dict[str, Any] | None = None
+    sort_order: int | None = None
 
     @field_validator("body_markdown")
     @classmethod
@@ -53,15 +55,26 @@ class ContentBlockRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     images: list["ContentImageRead"] = Field(default_factory=list)
+    audits: list["ContentAuditRead"] = Field(default_factory=list)
 
 
 class ContentImageRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str | UUID
+    id: UUID
     url: str
     alt_text: str | None = None
     sort_order: int
+
+
+class ContentAuditRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    action: str
+    version: int
+    user_id: UUID | None = None
+    created_at: datetime
 
 
 ContentBlockRead.model_rebuild()

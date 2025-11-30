@@ -58,27 +58,28 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     # Create
     create = client.post(
         "/api/v1/content/admin/home.hero",
-        json={"title": "Hero", "body_markdown": "Welcome!", "status": "published"},
+        json={"title": "Hero", "body_markdown": "Welcome!", "status": "published", "meta": {"headline": "Hero"}},
         headers=auth_headers(admin_token),
     )
     assert create.status_code == 201, create.text
     assert create.json()["version"] == 1
+    assert create.json()["meta"]["headline"] == "Hero"
 
     public = client.get("/api/v1/content/home.hero")
     assert public.status_code == 200
     assert public.json()["title"] == "Hero"
-    assert public.json()["meta"] is None
+    assert public.json()["meta"]["headline"] == "Hero"
 
     # Update increments version
     update = client.patch(
         "/api/v1/content/admin/home.hero",
-        json={"body_markdown": "Updated body", "status": "published"},
+        json={"body_markdown": "Updated body", "status": "published", "sort_order": 5},
         headers=auth_headers(admin_token),
     )
     assert update.status_code == 200
     assert update.json()["version"] == 2
     assert update.json()["body_markdown"] == "Updated body"
-    assert update.json()["meta"] is None
+    assert update.json()["sort_order"] == 5
 
     # Validation rejects script
     bad = client.patch(
@@ -87,6 +88,17 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
         headers=auth_headers(admin_token),
     )
     assert bad.status_code == 422
+
+    # Static page slug
+    client.post(
+        "/api/v1/content/admin/page.faq",
+        json={"title": "FAQ", "body_markdown": "FAQ body", "status": "published", "meta": {"priority": 1}},
+        headers=auth_headers(admin_token),
+    )
+    page = client.get("/api/v1/content/pages/faq")
+    assert page.status_code == 200
+    assert page.json()["title"] == "FAQ"
+    assert page.json()["meta"]["priority"] == 1
 
     # Draft not visible publicly
     client.patch(
@@ -102,11 +114,6 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert preview.status_code == 200
 
     # Image upload
-    client.post(
-        "/api/v1/content/admin/home.hero",
-        json={"title": "Hero Img", "body_markdown": "img hero", "status": "published"},
-        headers=auth_headers(admin_token),
-    )
     img_resp = client.post(
         "/api/v1/content/admin/home.hero/images",
         files={"file": ("hero.jpg", b"fakeimg", "image/jpeg")},
@@ -114,3 +121,8 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     )
     assert img_resp.status_code == 200
     assert len(img_resp.json()["images"]) == 1
+
+    # Audit log
+    audit = client.get("/api/v1/content/admin/home.hero/audit", headers=auth_headers(admin_token))
+    assert audit.status_code == 200
+    assert len(audit.json()) >= 2

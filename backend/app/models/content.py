@@ -2,10 +2,9 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, func
+from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, func, JSON, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import JSON, Integer
 
 from app.db.base import Base
 
@@ -24,9 +23,9 @@ class ContentBlock(Base):
     body_markdown: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[ContentStatus] = mapped_column(Enum(ContentStatus), nullable=False, default=ContentStatus.draft)
     version: Mapped[int] = mapped_column(nullable=False, default=1)
-    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
@@ -36,7 +35,18 @@ class ContentBlock(Base):
         "ContentBlockVersion", back_populates="block", cascade="all, delete-orphan", lazy="selectin"
     )
     images: Mapped[list["ContentImage"]] = relationship(
-        "ContentImage", back_populates="block", cascade="all, delete-orphan", lazy="selectin", order_by="ContentImage.sort_order"
+        "ContentImage",
+        back_populates="block",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="ContentImage.sort_order",
+    )
+    audits: Mapped[list["ContentAuditLog"]] = relationship(
+        "ContentAuditLog",
+        back_populates="block",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="ContentAuditLog.created_at",
     )
 
 
@@ -65,3 +75,16 @@ class ContentImage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     block: Mapped[ContentBlock] = relationship("ContentBlock", back_populates="images")
+
+
+class ContentAuditLog(Base):
+    __tablename__ = "content_audit_log"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    content_block_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("content_blocks.id"), nullable=False)
+    action: Mapped[str] = mapped_column(String(120), nullable=False)
+    version: Mapped[int] = mapped_column(nullable=False)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    block: Mapped[ContentBlock] = relationship("ContentBlock", back_populates="audits")

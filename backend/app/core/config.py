@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     smtp_port: int = 1025
     smtp_username: str | None = None
     smtp_password: str | None = None
+    smtp_enabled: bool = False
+    smtp_use_tls: bool = False
+    smtp_from_email: str | None = None
 
     frontend_origin: str = "http://localhost:4200"
     content_preview_token: str = "preview-token"

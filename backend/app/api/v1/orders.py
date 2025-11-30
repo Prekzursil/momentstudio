@@ -17,6 +17,7 @@ from app.schemas.cart import CartRead
 from app.schemas.order import OrderRead, OrderCreate, OrderUpdate, ShippingMethodCreate, ShippingMethodRead, OrderEventRead
 from app.services import cart as cart_service
 from app.services import order as order_service
+from app.services import email as email_service
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -54,6 +55,7 @@ async def create_order(
         payload.billing_address_id,
         shipping_method,
     )
+    await email_service.send_order_confirmation(current_user.email, order, order.items)
     return order
 
 

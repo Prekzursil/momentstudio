@@ -114,19 +114,14 @@ Below is a structured checklist you can turn into issues.
 - [x] Rich text sanitization rules.
 - [x] Homepage layout blocks (hero, grid, testimonials).
 - [x] FAQ ordering/priorities.
-- [x] Admin preview endpoint with token
-- [ ] Image uploads for content blocks.
-- [ ] Rich text sanitization rules.
-- [ ] Homepage layout blocks (hero, grid, testimonials).
-- [ ] FAQ ordering/priorities.
-- [ ] Admin preview endpoint with token.
-- [ ] Content change audit log.
-- [ ] Static page slugs for SEO (about/faq/shipping/returns/care).
+- [x] Admin preview endpoint with token.
+- [x] Content change audit log.
+- [x] Static page slugs for SEO (about/faq/shipping/returns/care).
 
 ## Backend - Email & Notifications
-- [ ] Email settings (SMTP).
-- [ ] Generic email service (text + HTML).
-- [ ] Order confirmation email.
+- [x] Email settings (SMTP).
+- [x] Generic email service (text + HTML).
+- [x] Order confirmation email.
 - [ ] Password reset email + one-time token flow.
 - [ ] Logging/error handling around email sending.
 - [ ] Background task for sending emails.

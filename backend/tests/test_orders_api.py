@@ -19,6 +19,7 @@ from app.services.auth import create_user, issue_tokens_for_user
 from app.schemas.user import UserCreate
 from app.services import order as order_service
 from app.services import payments as payments_service
+from app.services import email as email_service
 from app.schemas.order import ShippingMethodCreate
 
 
@@ -103,6 +104,14 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
 
     shipping_method_id = asyncio.run(seed_shipping())
 
+    sent = {"count": 0}
+
+    async def fake_send_order_confirmation(to_email, order, items=None):
+        sent["count"] += 1
+        return True
+
+    email_service.send_order_confirmation = fake_send_order_confirmation  # type: ignore[assignment]
+
     res = client.post(
         "/api/v1/orders",
         json={"shipping_method_id": str(shipping_method_id)},
@@ -115,6 +124,7 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     assert float(order["shipping_amount"]) >= 0
     order_id = order["id"]
     item_id = order["items"][0]["id"]
+    assert sent["count"] == 1
 
     retry = client.post(f"/api/v1/orders/admin/{order_id}/retry-payment", headers=auth_headers(admin_token))
     assert retry.status_code == 200
@@ -193,6 +203,11 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
             return method.id
 
     shipping_method_id = asyncio.run(seed_shipping())
+
+    async def fake_email(to_email, order, items=None):
+        return True
+
+    monkeypatch.setattr(email_service, "send_order_confirmation", fake_email)
 
     res = client.post(
         "/api/v1/orders",
