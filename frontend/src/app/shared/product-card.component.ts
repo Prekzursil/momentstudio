@@ -1,13 +1,14 @@
-import { CommonModule, CurrencyPipe, NgOptimizedImage } from '@angular/common';
+import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, Input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Product } from '../core/catalog.service';
 import { ButtonComponent } from './button.component';
+import { LocalizedCurrencyPipe } from './localized-currency.pipe';
 
 @Component({
   selector: 'app-product-card',
   standalone: true,
-  imports: [CommonModule, RouterLink, NgOptimizedImage, CurrencyPipe, ButtonComponent],
+  imports: [CommonModule, RouterLink, NgOptimizedImage, LocalizedCurrencyPipe, ButtonComponent],
   template: `
     <article class="group grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm hover:-translate-y-1 hover:shadow-md transition">
       <a [routerLink]="['/products', product.slug]" class="block overflow-hidden rounded-xl bg-slate-50 relative">
@@ -19,10 +20,10 @@ import { ButtonComponent } from './button.component';
           height="640"
         />
         <span
-          *ngIf="stockBadge"
+          *ngIf="badge"
           class="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 shadow"
         >
-          {{ stockBadge }}
+          {{ badge }}
         </span>
       </a>
       <div class="grid gap-1">
@@ -32,7 +33,7 @@ import { ButtonComponent } from './button.component';
           </a>
           <span class="text-sm text-slate-500">{{ product.currency }}</span>
         </div>
-        <p class="text-lg font-semibold text-slate-900">{{ product.base_price | currency : product.currency }}</p>
+        <p class="text-lg font-semibold text-slate-900">{{ product.base_price | localizedCurrency : product.currency }}</p>
         <p *ngIf="product.short_description" class="text-sm text-slate-600 line-clamp-2">
           {{ product.short_description }}
         </p>
@@ -46,6 +47,14 @@ import { ButtonComponent } from './button.component';
 })
 export class ProductCardComponent {
   @Input({ required: true }) product!: Product;
+  @Input() tag?: string | null;
+
+  get badge(): string | null {
+    if (this.tag) return this.tag;
+    const tagName = this.product.tags?.[0]?.name;
+    if (tagName) return tagName;
+    return this.stockBadge;
+  }
 
   get primaryImage(): string {
     return this.product.images?.[0]?.url ?? 'https://via.placeholder.com/640x640?text=Product';

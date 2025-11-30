@@ -1,13 +1,15 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { CatalogService, Category, PaginationMeta, Product, SortOption } from '../../core/catalog.service';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { InputComponent } from '../../shared/input.component';
 import { ProductCardComponent } from '../../shared/product-card.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
+import { ToastService } from '../../core/toast.service';
+import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 
 @Component({
   selector: 'app-shop',
@@ -20,10 +22,12 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
     ButtonComponent,
     InputComponent,
     ProductCardComponent,
-    SkeletonComponent
+    SkeletonComponent,
+    BreadcrumbComponent
   ],
   template: `
-    <app-container classes="py-10">
+    <app-container classes="py-10 grid gap-6">
+      <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
       <div class="grid gap-8 lg:grid-cols-[280px_1fr]">
         <aside class="border border-slate-200 rounded-2xl p-4 bg-white h-fit space-y-6">
           <div class="space-y-3">
@@ -68,11 +72,18 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
 
           <div class="space-y-3">
             <p class="text-sm font-semibold text-slate-800">Price range</p>
-            <div class="grid grid-cols-2 gap-3">
-              <app-input label="Min" type="number" [(value)]="filters.min_price" (ngModelChange)="applyFilters()">
-              </app-input>
-              <app-input label="Max" type="number" [(value)]="filters.max_price" (ngModelChange)="applyFilters()">
-              </app-input>
+            <div class="grid gap-3">
+              <div class="flex items-center gap-3">
+                <input type="range" min="0" max="500" step="5" [(ngModel)]="filters.min_price" (change)="applyFilters()" />
+                <input type="range" min="0" max="500" step="5" [(ngModel)]="filters.max_price" (change)="applyFilters()" />
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <app-input label="Min" type="number" [(value)]="filters.min_price" (ngModelChange)="applyFilters()">
+                </app-input>
+                <app-input label="Max" type="number" [(value)]="filters.max_price" (ngModelChange)="applyFilters()">
+                </app-input>
+              </div>
+              <p class="text-xs text-slate-500">Adjust sliders or inputs to refine results.</p>
             </div>
           </div>
 
@@ -119,9 +130,28 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
             <app-skeleton *ngFor="let i of placeholders" height="260px"></app-skeleton>
           </div>
 
-          <div *ngIf="!loading() && products.length === 0" class="border border-dashed border-slate-200 rounded-2xl p-10 text-center">
+          <div
+            *ngIf="hasError()"
+            class="border border-amber-200 bg-amber-50 rounded-2xl p-6 text-center grid gap-3"
+          >
+            <p class="text-lg font-semibold text-amber-900">We hit a snag loading products.</p>
+            <p class="text-sm text-amber-800">Check your connection or retry in a moment.</p>
+            <div class="flex justify-center gap-3">
+              <app-button label="Retry" size="sm" (action)="loadProducts()"></app-button>
+              <app-button label="Reset filters" size="sm" variant="ghost" (action)="resetFilters()"></app-button>
+            </div>
+          </div>
+
+          <div
+            *ngIf="!loading() && !hasError() && products.length === 0"
+            class="border border-dashed border-slate-200 rounded-2xl p-10 text-center grid gap-2"
+          >
             <p class="text-lg font-semibold text-slate-900">No products found</p>
             <p class="text-sm text-slate-600">Try adjusting filters or search terms.</p>
+            <div class="flex justify-center gap-3">
+              <app-button label="Reset filters" size="sm" variant="ghost" (action)="resetFilters()"></app-button>
+              <app-button label="Back to home" size="sm" variant="ghost" routerLink="/"></app-button>
+            </div>
           </div>
 
           <div *ngIf="!loading() && products.length" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -156,7 +186,12 @@ export class ShopComponent implements OnInit {
   meta: PaginationMeta | null = null;
   allTags = new Set<string>();
   loading = signal<boolean>(true);
+  hasError = signal<boolean>(false);
   placeholders = Array.from({ length: 6 });
+  crumbs = [
+    { label: 'Home', url: '/' },
+    { label: 'Shop' }
+  ];
 
   filters: {
     search: string;
@@ -184,11 +219,19 @@ export class ShopComponent implements OnInit {
     { label: 'Name: Z → A', value: 'name_desc' }
   ];
 
-  constructor(private catalog: CatalogService) {}
+  constructor(
+    private catalog: CatalogService,
+    private route: ActivatedRoute,
+    private router: Router,
+    private toast: ToastService
+  ) {}
 
   ngOnInit(): void {
     this.fetchCategories();
-    this.loadProducts();
+    this.route.queryParams.subscribe((params) => {
+      this.syncFiltersFromQuery(params);
+      this.loadProducts(false);
+    });
   }
 
   fetchCategories(): void {
@@ -197,8 +240,12 @@ export class ShopComponent implements OnInit {
     });
   }
 
-  loadProducts(): void {
+  loadProducts(pushQuery = true): void {
     this.loading.set(true);
+    this.hasError.set(false);
+    if (pushQuery) {
+      this.updateQueryParams();
+    }
     this.catalog
       .listProducts({
         search: this.filters.search || undefined,
@@ -214,16 +261,32 @@ export class ShopComponent implements OnInit {
         next: (response) => {
           this.products = response.items;
           this.meta = response.meta;
+          if (this.filters.category_slug) {
+            const cat = this.categories.find((c) => c.slug === this.filters.category_slug);
+            this.crumbs = [
+              { label: 'Home', url: '/' },
+              { label: 'Shop', url: '/shop' },
+              { label: cat?.name ?? this.filters.category_slug }
+            ];
+          } else {
+            this.crumbs = [
+              { label: 'Home', url: '/' },
+              { label: 'Shop' }
+            ];
+          }
           this.allTags = new Set(
             response.items
               .flatMap((p) => p.tags ?? [])
               .map((t) => ('name' in t ? t.name : String(t)))
           );
           this.loading.set(false);
+          this.hasError.set(false);
         },
         error: () => {
           this.loading.set(false);
           this.products = [];
+          this.hasError.set(true);
+          this.toast.error('Could not load products', 'Please try again.');
         }
       });
   }
@@ -263,5 +326,31 @@ export class ShopComponent implements OnInit {
     this.filters.sort = 'newest';
     this.filters.page = 1;
     this.loadProducts();
+  }
+
+  private updateQueryParams(): void {
+    const params: Params = {
+      q: this.filters.search || undefined,
+      cat: this.filters.category_slug || undefined,
+      min: this.filters.min_price || undefined,
+      max: this.filters.max_price || undefined,
+      sort: this.filters.sort !== 'newest' ? this.filters.sort : undefined,
+      page: this.filters.page !== 1 ? this.filters.page : undefined,
+      tags: this.filters.tags.size ? Array.from(this.filters.tags).join(',') : undefined
+    };
+    this.router.navigate([], { relativeTo: this.route, queryParams: params, queryParamsHandling: 'merge' });
+  }
+
+  private syncFiltersFromQuery(params: Params): void {
+    this.filters.search = params['q'] ?? '';
+    this.filters.category_slug = params['cat'] ?? '';
+    this.filters.min_price = params['min'] ?? undefined;
+    this.filters.max_price = params['max'] ?? undefined;
+    this.filters.sort = (params['sort'] as SortOption) ?? 'newest';
+    this.filters.page = params['page'] ? Number(params['page']) : 1;
+    const tagParam = params['tags'];
+    this.filters.tags = new Set<string>(
+      typeof tagParam === 'string' && tagParam.length ? tagParam.split(',') : []
+    );
   }
 }

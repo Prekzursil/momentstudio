@@ -192,23 +192,23 @@ Below is a structured checklist you can turn into issues.
 - [x] Product detail page with gallery, variants, quantity/add-to-cart.
 - [x] Handmade uniqueness note.
 - [x] Sort controls (price/name/newest).
-- [ ] Price range slider.
-- [ ] Tag/label pills (featured/new/limited).
-- [ ] Product gallery zoom/lightbox.
-- [ ] Persist filters in query params.
-- [ ] Empty state for product lists.
-- [ ] Error state/retry for product lists.
-- [ ] Breadcrumbs for category/product pages.
-- [ ] Recently viewed carousel.
-- [ ] Localized currency display.
-- [ ] SEO meta tags per product/category.
+- [x] Price range slider.
+- [x] Tag/label pills (featured/new/limited).
+- [x] Product gallery zoom/lightbox.
+- [x] Persist filters in query params.
+- [x] Empty state for product lists.
+- [x] Error state/retry for product lists.
+- [x] Breadcrumbs for category/product pages.
+- [x] Recently viewed carousel.
+- [x] Localized currency display.
+- [x] SEO meta tags per product/category.
 
 ## Frontend - Cart & Checkout
-- [ ] Cart page/drawer with quantities and totals.
-- [ ] Update quantity/remove items; stock error messaging.
-- [ ] Checkout stepper: login/guest, shipping address, payment (Stripe).
-- [ ] Order summary during checkout.
-- [ ] Success page with order summary + continue shopping.
+- [x] Cart page/drawer with quantities and totals.
+- [x] Update quantity/remove items; stock error messaging.
+- [x] Checkout stepper: login/guest, shipping address, payment (Stripe).
+- [x] Order summary during checkout.
+- [x] Success page with order summary + continue shopping.
 - [ ] Guest cart persistence in localStorage.
 - [ ] Apply promo code UI.
 - [ ] Shipping method selection UI.
