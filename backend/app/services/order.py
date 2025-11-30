@@ -140,9 +140,11 @@ async def update_order(
     if shipping_method:
         order.shipping_method_id = shipping_method.id
         subtotal = sum(Decimal(item.subtotal) for item in order.items)
-        order.shipping_amount = _calculate_shipping(subtotal, shipping_method)
-        order.tax_amount = _calculate_tax(subtotal)
-        order.total_amount = subtotal + order.tax_amount + order.shipping_amount
+        shipping_amount = _calculate_shipping(subtotal, shipping_method)
+        tax_amount = _calculate_tax(subtotal)
+        order.shipping_amount = shipping_amount
+        order.tax_amount = tax_amount
+        order.total_amount = subtotal + tax_amount + shipping_amount
 
     for field, value in data.items():
         setattr(order, field, value)

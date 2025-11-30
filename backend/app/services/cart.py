@@ -288,11 +288,11 @@ async def reorder_from_order(session: AsyncSession, user_id: UUID, order_id: UUI
         await session.delete(item)
     await session.flush()
 
-    for item in order.items:
+    for order_item in order.items:
         payload = CartItemCreate(
-            product_id=item.product_id,
-            variant_id=item.variant_id,
-            quantity=item.quantity,
+            product_id=order_item.product_id,
+            variant_id=order_item.variant_id,
+            quantity=order_item.quantity,
         )
         await add_item(session, cart, payload)
     await session.refresh(cart)
