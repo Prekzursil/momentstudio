@@ -13,6 +13,8 @@ from app.schemas.cart import CartItemCreate, CartItemUpdate, CartRead, CartItemR
 from app.schemas.promo import PromoCodeRead, PromoCodeCreate
 from app.models.promo import PromoCode
 from app.models.order import Order
+from app.models.user import User
+from app.services import email as email_service
 
 
 async def _get_or_create_cart(session: AsyncSession, user_id: UUID | None, session_id: str | None) -> Cart:
@@ -244,8 +246,21 @@ async def reserve_stock_for_checkout(session: AsyncSession, cart: Cart) -> bool:
 
 
 async def run_abandoned_cart_job(session: AsyncSession, max_age_hours: int = 24) -> int:
-    # Placeholder for future job to email users about abandoned carts
-    return await cleanup_stale_guest_carts(session, max_age_hours)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    result = await session.execute(
+        select(Cart).options(selectinload(Cart.items)).where(Cart.user_id.isnot(None), Cart.updated_at < cutoff)
+    )
+    carts = result.scalars().all()
+    sent = 0
+    for cart in carts:
+        if cart.items and cart.user_id:
+            user_result = await session.execute(select(User).where(User.id == cart.user_id))
+            user = user_result.scalar_one_or_none()
+            if user and user.email:
+                await email_service.send_cart_abandonment(user.email)
+                sent += 1
+    await cleanup_stale_guest_carts(session, max_age_hours)
+    return sent
 
 
 def record_cart_event(event: str, payload: dict | None = None) -> None:

@@ -41,6 +41,8 @@ from app.schemas.catalog import (
     ProductFeedItem,
 )
 from app.services.storage import delete_file
+from app.services import email as email_service
+from app.core.config import settings
 
 
 async def get_category_by_slug(session: AsyncSession, slug: str) -> Category | None:
@@ -202,6 +204,7 @@ async def update_product(
         await session.commit()
         await session.refresh(product)
         await _log_product_action(session, product.id, "update", user_id, data)
+        await _maybe_alert_low_stock(product)
     else:
         await session.flush()
     return product
@@ -750,3 +753,16 @@ async def _record_slug_history(session: AsyncSession, product: Product, old_slug
     history = ProductSlugHistory(product_id=product.id, slug=old_slug)
     session.add(history)
     await session.flush()
+
+
+async def notify_back_in_stock(emails: list[str], product_name: str) -> int:
+    sent = 0
+    for email in emails:
+        if await email_service.send_back_in_stock(email, product_name):
+            sent += 1
+    return sent
+
+
+async def _maybe_alert_low_stock(product: Product, threshold: int = 2) -> None:
+    if product.stock_quantity is not None and product.stock_quantity <= threshold and settings.admin_alert_email:
+        await email_service.send_low_stock_alert(settings.admin_alert_email, product.name, product.stock_quantity)

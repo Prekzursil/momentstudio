@@ -4,14 +4,25 @@ from email.message import EmailMessage
 from pathlib import Path
 from typing import Sequence
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+try:
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+except ImportError:
+    Environment = None  # type: ignore
+    FileSystemLoader = None  # type: ignore
+    select_autoescape = None  # type: ignore
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 TEMPLATE_PATH = Path(__file__).parent.parent / "templates" / "emails"
-env = Environment(loader=FileSystemLoader(TEMPLATE_PATH), autoescape=select_autoescape(["html", "xml"]))
+env = (
+    Environment(loader=FileSystemLoader(TEMPLATE_PATH), autoescape=select_autoescape(["html", "xml"]))
+    if Environment
+    else None
+)
+_rate_global: list[float] = []
+_rate_per_recipient: dict[str, list[float]] = {}
 
 
 def _build_message(to_email: str, subject: str, text_body: str, html_body: str | None = None) -> EmailMessage:
@@ -28,6 +39,11 @@ def _build_message(to_email: str, subject: str, text_body: str, html_body: str |
 async def send_email(to_email: str, subject: str, text_body: str, html_body: str | None = None) -> bool:
     if not settings.smtp_enabled:
         return False
+    now = __import__("time").time()
+    _prune(now)
+    if not _allow_send(now, to_email):
+        logger.warning("Email rate limit reached for %s", to_email)
+        return False
     msg = _build_message(to_email, subject, text_body, html_body)
     try:
         with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as smtp:
@@ -36,6 +52,7 @@ async def send_email(to_email: str, subject: str, text_body: str, html_body: str
             if settings.smtp_username and settings.smtp_password:
                 smtp.login(settings.smtp_username, settings.smtp_password)
             smtp.send_message(msg)
+        _record_send(now, to_email)
         return True
     except Exception as exc:
         logger.warning("Email send failed: %s", exc)
@@ -99,6 +116,9 @@ async def send_error_alert(to_email: str, message: str) -> bool:
 
 
 def render_template(template_name: str, context: dict) -> tuple[str, str]:
+    if env is None:
+        body = str(context)
+        return body, f"<p>{body}</p>"
     base_text = env.get_template("base.txt.j2")
     base_html = env.get_template("base.html.j2")
     body_text = env.get_template(template_name).render(**context)
@@ -109,3 +129,37 @@ def render_template(template_name: str, context: dict) -> tuple[str, str]:
 async def preview_email(template_name: str, context: dict) -> dict[str, str]:
     text_body, html_body = render_template(template_name, context)
     return {"text": text_body, "html": html_body}
+
+
+async def notify_critical_error(message: str) -> bool:
+    if settings.error_alert_email:
+        return await send_error_alert(settings.error_alert_email, message)
+    logger.error("Critical error (no alert email configured): %s", message)
+    return False
+
+
+def _prune(now: float) -> None:
+    window = 60.0
+    global_limit = settings.email_rate_limit_per_minute
+    _rate_global[:] = [ts for ts in _rate_global if now - ts < window]
+    for key in list(_rate_per_recipient.keys()):
+        _rate_per_recipient[key] = [ts for ts in _rate_per_recipient[key] if now - ts < window]
+        if not _rate_per_recipient[key]:
+            _rate_per_recipient.pop(key, None)
+
+
+def _allow_send(now: float, recipient: str) -> bool:
+    window = 60.0
+    global_limit = settings.email_rate_limit_per_minute
+    recipient_limit = settings.email_rate_limit_per_recipient_per_minute
+    if global_limit and len([ts for ts in _rate_global if now - ts < window]) >= global_limit:
+        return False
+    rec_list = _rate_per_recipient.get(recipient, [])
+    if recipient_limit and len([ts for ts in rec_list if now - ts < window]) >= recipient_limit:
+        return False
+    return True
+
+
+def _record_send(now: float, recipient: str) -> None:
+    _rate_global.append(now)
+    _rate_per_recipient.setdefault(recipient, []).append(now)

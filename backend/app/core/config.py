@@ -33,9 +33,13 @@ class Settings(BaseSettings):
     smtp_enabled: bool = False
     smtp_use_tls: bool = False
     smtp_from_email: str | None = None
+    email_rate_limit_per_minute: int = 60
+    email_rate_limit_per_recipient_per_minute: int = 10
 
     frontend_origin: str = "http://localhost:4200"
     content_preview_token: str = "preview-token"
+    error_alert_email: str | None = None
+    admin_alert_email: str | None = None
 
 
 @lru_cache
