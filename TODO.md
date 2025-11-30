@@ -178,14 +178,14 @@ Below is a structured checklist you can turn into issues.
 - [x] Accessible modal focus trapping.
 - [x] IntersectionObserver-based lazy image component.
 - [x] Global HTTP error handler (401/403/500).
-- [ ] Responsive nav drawer with keyboard navigation.
-- [ ] Route guards for auth/admin.
-- [ ] ESLint/Prettier strict config.
+- [x] Responsive nav drawer with keyboard navigation.
+- [x] Route guards for auth/admin.
+- [x] ESLint/Prettier strict config.
 
 ## Frontend - Storefront
-- [ ] Homepage hero with "Shop now" CTA.
-- [ ] Featured products grid on homepage.
-- [ ] Category listing with grid + pagination.
+- [x] Homepage hero with "Shop now" CTA.
+- [x] Featured products grid on homepage.
+- [x] Category listing with grid + pagination.
 - [ ] Filter sidebar (category, price range, tags).
 - [ ] Search bar hitting /products.
 - [ ] Product card component (image, name, price, stock badge).

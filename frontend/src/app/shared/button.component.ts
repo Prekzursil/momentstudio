@@ -1,5 +1,6 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { NgClass } from '@angular/common';
+import { RouterLink } from '@angular/router';
 
 type ButtonVariant = 'primary' | 'ghost';
 type ButtonSize = 'md' | 'sm';
@@ -7,23 +8,36 @@ type ButtonSize = 'md' | 'sm';
 @Component({
   selector: 'app-button',
   standalone: true,
-  imports: [NgClass],
+  imports: [NgClass, RouterLink],
   template: `
-    <button
-      type="button"
-      [ngClass]="classes"
-      class="inline-flex items-center justify-center rounded-full font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-      (click)="action.emit()"
-    >
-      <ng-content></ng-content>
-      <span *ngIf="label">{{ label }}</span>
-    </button>
+    <ng-container *ngIf="routerLink; else buttonTpl">
+      <a
+        [routerLink]="routerLink"
+        [ngClass]="classes"
+        class="inline-flex items-center justify-center rounded-full font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+      >
+        <ng-content></ng-content>
+        <span *ngIf="label">{{ label }}</span>
+      </a>
+    </ng-container>
+    <ng-template #buttonTpl>
+      <button
+        type="button"
+        [ngClass]="classes"
+        class="inline-flex items-center justify-center rounded-full font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+        (click)="action.emit()"
+      >
+        <ng-content></ng-content>
+        <span *ngIf="label">{{ label }}</span>
+      </button>
+    </ng-template>
   `
 })
 export class ButtonComponent {
   @Input() label = '';
   @Input() variant: ButtonVariant = 'primary';
   @Input() size: ButtonSize = 'md';
+  @Input() routerLink?: string | any[];
   @Output() action = new EventEmitter<void>();
 
   get classes(): string {
