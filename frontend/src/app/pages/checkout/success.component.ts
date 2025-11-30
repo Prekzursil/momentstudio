@@ -18,6 +18,11 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
         <p class="text-sm uppercase tracking-[0.3em] font-semibold">Order confirmed</p>
         <h1 class="text-2xl font-semibold text-emerald-900">Thank you for your purchase!</h1>
         <p class="text-sm text-emerald-800">We emailed you a confirmation. You can continue shopping or view your orders.</p>
+        <ul class="text-sm text-emerald-800 list-disc list-inside grid gap-1">
+          <li>Track your order from your account once it's available.</li>
+          <li>Save your address to speed up next checkout.</li>
+          <li>Need help? Reply to the confirmation email.</li>
+        </ul>
         <div class="flex gap-3">
           <app-button routerLink="/shop" label="Continue shopping"></app-button>
           <app-button routerLink="/" variant="ghost" label="Back home"></app-button>

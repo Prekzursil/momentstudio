@@ -20,6 +20,13 @@ type ShippingMethod = { id: string; label: string; amount: number; eta: string }
       <div class="grid lg:grid-cols-[2fr_1fr] gap-6 items-start">
         <section class="grid gap-4">
           <h1 class="text-2xl font-semibold text-slate-900">Checkout</h1>
+          <div
+            *ngIf="errorMessage"
+            class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex items-start justify-between gap-3"
+          >
+            <span>{{ errorMessage }}</span>
+            <app-button size="sm" variant="ghost" label="Retry" (action)="retryValidation()"></app-button>
+          </div>
           <form #checkoutForm="ngForm" class="grid gap-4" (ngSubmit)="placeOrder(checkoutForm)">
             <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
               <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">Step 1 · Who's checking out?</p>
@@ -62,6 +69,10 @@ type ShippingMethod = { id: string; label: string; amount: number; eta: string }
                   </select>
                 </label>
               </div>
+              <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" [(ngModel)]="saveAddress" name="saveAddress" />
+                Save this address for next time
+              </label>
               <p *ngIf="addressError" class="text-sm text-amber-700">{{ addressError }}</p>
             </div>
 
@@ -168,6 +179,9 @@ export class CheckoutComponent {
   ];
   countries = ['United States', 'United Kingdom', 'Romania', 'Germany', 'France', 'Canada'];
   addressError = '';
+  errorMessage = '';
+  pricesRefreshed = false;
+  saveAddress = true;
   address = {
     name: '',
     email: '',
@@ -178,7 +192,12 @@ export class CheckoutComponent {
   };
   discount = 0;
 
-  constructor(private cart: CartStore, private router: Router) {}
+  constructor(private cart: CartStore, private router: Router) {
+    const saved = this.loadSavedAddress();
+    if (saved) {
+      this.address = saved;
+    }
+  }
 
   items = this.cart.items;
   subtotal = this.cart.subtotal;
@@ -209,6 +228,59 @@ export class CheckoutComponent {
       return;
     }
     this.addressError = '';
+    const validation = this.validateCart();
+    if (validation) {
+      this.errorMessage = validation;
+      return;
+    }
+    if (this.saveAddress) {
+      this.persistAddress();
+    }
+    this.errorMessage = '';
     this.router.navigate(['/checkout/success']);
+  }
+
+  retryValidation(): void {
+    this.errorMessage = '';
+    this.validateCart(true);
+  }
+
+  private validateCart(forceRefresh = false): string | null {
+    const items = this.items();
+    const stockIssue = items.find((i) => i.quantity > i.stock);
+    if (stockIssue) {
+      return `Only ${stockIssue.stock} left of ${stockIssue.name}. Please reduce quantity.`;
+    }
+    if (!this.pricesRefreshed || forceRefresh) {
+      const updated = items.map((item, idx) => (idx === 0 ? { ...item, price: item.price + 1 } : item));
+      this.cart.seed(updated);
+      this.pricesRefreshed = true;
+      return 'Prices have changed. Totals refreshed; please review and submit again.';
+    }
+    return null;
+  }
+
+  private persistAddress(): void {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem('checkout_address', JSON.stringify(this.address));
+  }
+
+  private loadSavedAddress():
+    | {
+        name: string;
+        email: string;
+        line1: string;
+        city: string;
+        postal: string;
+        country: string;
+      }
+    | null {
+    if (typeof localStorage === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem('checkout_address');
+      return raw ? (JSON.parse(raw) as typeof this.address) : null;
+    } catch {
+      return null;
+    }
   }
 }

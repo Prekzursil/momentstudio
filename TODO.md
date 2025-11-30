@@ -214,11 +214,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Shipping method selection UI.
 - [x] Address form with validation and country selector.
 - [x] Payment form with Stripe elements.
-- [ ] Checkout error states and retry.
-- [ ] Save address checkbox for checkout.
-- [ ] Order confirmation page with next steps.
-- [ ] Cart mini-icon badge with item count.
-- [ ] Edge cases: out-of-stock and price changes during checkout.
+- [x] Checkout error states and retry.
+- [x] Save address checkbox for checkout.
+- [x] Order confirmation page with next steps.
+- [x] Cart mini-icon badge with item count.
+- [x] Edge cases: out-of-stock and price changes during checkout.
 
 ## Frontend - Auth & Account
 - [ ] Login page with validation.
@@ -232,7 +232,6 @@ Below is a structured checklist you can turn into issues.
 - [ ] Saved payment method placeholder.
 - [ ] Profile avatar upload (optional).
 - [ ] Session timeout/logout messaging.
-- [ ] 2FA toggle (placeholder).
 
 ## Frontend - Admin Dashboard
 - [ ] /admin layout with sidebar + guard.

@@ -21,6 +21,9 @@ export class CartStore {
   readonly subtotal = computed(() =>
     this.itemsSignal().reduce((sum, item) => sum + item.price * item.quantity, 0)
   );
+  readonly count = computed(() =>
+    this.itemsSignal().reduce((sum, item) => sum + item.quantity, 0)
+  );
 
   updateQuantity(id: string, quantity: number): { error?: string } {
     const items = this.itemsSignal();
@@ -46,6 +49,11 @@ export class CartStore {
   clear(): void {
     this.itemsSignal.set([]);
     this.persist([]);
+  }
+
+  seed(items: CartItem[]): void {
+    this.itemsSignal.set(items);
+    this.persist(items);
   }
 
   private persist(next?: CartItem[]): void {

@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { ButtonComponent } from '../shared/button.component';
 import { NavDrawerComponent, NavLink } from '../shared/nav-drawer.component';
 import { NgIf } from '@angular/common';
+import { CartStore } from '../core/cart.store';
 
 @Component({
   selector: 'app-header',
@@ -29,6 +30,15 @@ import { NgIf } from '@angular/common';
           >
             ☰
           </button>
+          <a routerLink="/cart" class="relative inline-flex items-center justify-center h-10 w-10 rounded-full bg-slate-100 text-slate-800">
+            🛒
+            <span
+              *ngIf="cartCount() > 0"
+              class="absolute -top-1 -right-1 min-w-[20px] rounded-full bg-slate-900 px-1 text-[11px] font-semibold text-white text-center"
+            >
+              {{ cartCount() }}
+            </span>
+          </a>
           <button type="button" class="text-sm font-medium text-slate-700 hover:text-slate-900 hidden sm:inline">
             Sign in
           </button>
@@ -48,4 +58,8 @@ export class HeaderComponent {
     { label: 'About', path: '/about' },
     { label: 'Admin', path: '/admin' }
   ];
+
+  constructor(private cart: CartStore) {}
+
+  cartCount = this.cart.count;
 }
