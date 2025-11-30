@@ -197,11 +197,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Product gallery zoom/lightbox.
 - [x] Persist filters in query params.
 - [x] Empty state for product lists.
-- [ ] Error state/retry for product lists.
-- [ ] Breadcrumbs for category/product pages.
-- [ ] Recently viewed carousel.
-- [ ] Localized currency display.
-- [ ] SEO meta tags per product/category.
+- [x] Error state/retry for product lists.
+- [x] Breadcrumbs for category/product pages.
+- [x] Recently viewed carousel.
+- [x] Localized currency display.
+- [x] SEO meta tags per product/category.
 
 ## Frontend - Cart & Checkout
 - [x] Cart page/drawer with quantities and totals.
