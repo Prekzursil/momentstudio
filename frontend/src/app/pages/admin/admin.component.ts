@@ -151,6 +151,47 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
             <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-900">Product images</h2>
+              <app-button size="sm" variant="ghost" label="Add image" (action)="addImage()"></app-button>
+            </div>
+            <div class="grid gap-2 text-sm text-slate-700">
+              <div *ngFor="let img of productImages()" class="flex items-center gap-3 rounded-lg border border-slate-200 p-2">
+                <img [src]="img.url" [alt]="img.alt" class="h-12 w-12 rounded object-cover" />
+                <div class="flex-1">
+                  <p class="font-semibold text-slate-900">{{ img.alt }}</p>
+                  <p class="text-xs text-slate-500">Order: {{ img.order }}</p>
+                </div>
+                <div class="flex gap-2">
+                  <app-button size="sm" variant="ghost" label="↑" (action)="moveImage(img.id, -1)"></app-button>
+                  <app-button size="sm" variant="ghost" label="↓" (action)="moveImage(img.id, 1)"></app-button>
+                  <app-button size="sm" variant="ghost" label="Delete" (action)="deleteImage(img.id)"></app-button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-900">Categories</h2>
+              <app-button size="sm" variant="ghost" label="Add category" (action)="addCategory()"></app-button>
+            </div>
+            <div class="grid gap-2 text-sm text-slate-700">
+              <div *ngFor="let cat of categories()" class="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+                <div>
+                  <p class="font-semibold text-slate-900">{{ cat.name }}</p>
+                  <p class="text-xs text-slate-500">Slug: {{ cat.slug }} · Order: {{ cat.order }}</p>
+                </div>
+                <div class="flex gap-2">
+                  <app-button size="sm" variant="ghost" label="↑" (action)="moveCategory(cat.slug, -1)"></app-button>
+                  <app-button size="sm" variant="ghost" label="↓" (action)="moveCategory(cat.slug, 1)"></app-button>
+                  <app-button size="sm" variant="ghost" label="Delete" (action)="deleteCategory(cat.slug)"></app-button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900">Orders</h2>
               <label class="text-sm text-slate-700">
                 Status
@@ -184,6 +225,19 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
                 <p class="text-xs text-slate-500">Customer: {{ activeOrder.customer }}</p>
                 <p class="text-xs text-slate-500">Placed: {{ activeOrder.date }}</p>
                 <p class="font-semibold text-slate-900 mt-2">{{ activeOrder.total | localizedCurrency : 'USD' }}</p>
+                <div class="grid gap-1 mt-3">
+                  <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Timeline</p>
+                  <ol class="grid gap-2">
+                    <li *ngFor="let step of activeOrder.timeline" class="flex items-center gap-2">
+                      <span
+                        class="h-2 w-2 rounded-full"
+                        [ngClass]="step.done ? 'bg-emerald-500' : 'bg-slate-300'"
+                      ></span>
+                      <span class="text-xs text-slate-700">{{ step.label }}</span>
+                      <span class="text-[11px] text-slate-500" *ngIf="step.when">({{ step.when }})</span>
+                    </li>
+                  </ol>
+                </div>
                 <div class="flex gap-2 mt-3">
                   <app-button size="sm" label="Update status" (action)="updateOrderStatus()"></app-button>
                   <app-button size="sm" variant="ghost" label="Refund" (action)="refundOrder()"></app-button>
@@ -240,6 +294,25 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
               </div>
             </div>
           </section>
+
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-900">Coupons</h2>
+              <app-button size="sm" variant="ghost" label="Add coupon" (action)="addCoupon()"></app-button>
+            </div>
+            <div class="grid gap-2 text-sm text-slate-700">
+              <div *ngFor="let coupon of coupons()" class="rounded-lg border border-slate-200 p-3 flex items-center justify-between">
+                <div>
+                  <p class="font-semibold text-slate-900">{{ coupon.code }} ({{ coupon.discount }}% off)</p>
+                  <p class="text-xs text-slate-500">Active: {{ coupon.active ? 'Yes' : 'No' }}</p>
+                </div>
+                <div class="flex gap-2">
+                  <app-button size="sm" variant="ghost" label="Toggle" (action)="toggleCoupon(coupon.code)"></app-button>
+                  <app-button size="sm" variant="ghost" label="Delete" (action)="deleteCoupon(coupon.code)"></app-button>
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </app-container>
@@ -273,6 +346,23 @@ export class AdminComponent {
     { email: 'admin@adrianaart.com', role: 'admin' },
     { email: 'staff@adrianaart.com', role: 'staff' }
   ];
+  coupons = signal([
+    { code: 'SAVE10', discount: 10, active: true },
+    { code: 'VIP20', discount: 20, active: false }
+  ]);
+  newCouponCode = '';
+  newCouponDiscount = 5;
+
+  productImages = signal([
+    { id: 'img1', url: 'https://picsum.photos/seed/img1/120', alt: 'Front', order: 1 },
+    { id: 'img2', url: 'https://picsum.photos/seed/img2/120', alt: 'Side', order: 2 }
+  ]);
+
+  categories = signal([
+    { slug: 'cups', name: 'Cups', order: 1 },
+    { slug: 'mugs', name: 'Mugs', order: 2 },
+    { slug: 'bowls', name: 'Bowls', order: 3 }
+  ]);
 
   editingId: string | null = null;
   form = {
@@ -320,6 +410,67 @@ export class AdminComponent {
     this.activeOrder.status = 'refunded';
     this.updateOrderStatus();
     this.formMessage = `Order #${this.activeOrder.id} refunded (mock).`;
+  }
+
+  moveImage(id: string, delta: number): void {
+    const imgs = [...this.productImages()];
+    const idx = imgs.findIndex((i) => i.id === id);
+    if (idx === -1) return;
+    const swapIdx = idx + delta;
+    if (swapIdx < 0 || swapIdx >= imgs.length) return;
+    [imgs[idx], imgs[swapIdx]] = [imgs[swapIdx], imgs[idx]];
+    imgs.forEach((img, i) => (img.order = i + 1));
+    this.productImages.set(imgs);
+  }
+
+  deleteImage(id: string): void {
+    this.productImages.update((imgs) => imgs.filter((i) => i.id !== id));
+  }
+
+  addImage(): void {
+    const next = {
+      id: crypto.randomUUID(),
+      url: `https://picsum.photos/seed/${Date.now()}/120`,
+      alt: 'New image',
+      order: this.productImages().length + 1
+    };
+    this.productImages.update((imgs) => [...imgs, next]);
+  }
+
+  moveCategory(slug: string, delta: number): void {
+    const cats = [...this.categories()];
+    const idx = cats.findIndex((c) => c.slug === slug);
+    if (idx === -1) return;
+    const swapIdx = idx + delta;
+    if (swapIdx < 0 || swapIdx >= cats.length) return;
+    [cats[idx], cats[swapIdx]] = [cats[swapIdx], cats[idx]];
+    cats.forEach((c, i) => (c.order = i + 1));
+    this.categories.set(cats);
+  }
+
+  addCategory(): void {
+    const slug = `cat-${Date.now()}`;
+    const next = { slug, name: 'New category', order: this.categories().length + 1 };
+    this.categories.update((cats) => [...cats, next]);
+  }
+
+  deleteCategory(slug: string): void {
+    this.categories.update((cats) => cats.filter((c) => c.slug !== slug));
+  }
+
+  addCoupon(): void {
+    if (!this.newCouponCode.trim()) return;
+    this.coupons.update((cs) => [...cs, { code: this.newCouponCode.toUpperCase(), discount: this.newCouponDiscount, active: true }]);
+    this.newCouponCode = '';
+    this.newCouponDiscount = 5;
+  }
+
+  toggleCoupon(code: string): void {
+    this.coupons.update((cs) => cs.map((c) => (c.code === code ? { ...c, active: !c.active } : c)));
+  }
+
+  deleteCoupon(code: string): void {
+    this.coupons.update((cs) => cs.filter((c) => c.code !== code));
   }
 
   toggleSelect(slug: string, event: Event): void {

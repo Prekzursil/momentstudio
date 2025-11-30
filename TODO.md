@@ -241,11 +241,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Content editor for hero and static pages.
 - [x] Basic user list (view customers, promote/demote admins).
 - [x] Bulk product actions (activate/deactivate, delete).
-- [ ] Product image reorder UI.
-- [ ] Category CRUD UI with drag-and-drop ordering.
-- [ ] Order status update with timeline view.
-- [ ] Coupon/promo management UI.
-- [ ] Content preview/publish controls.
+- [x] Product image reorder UI.
+- [x] Category CRUD UI with drag-and-drop ordering.
+- [x] Order status update with timeline view.
+- [x] Coupon/promo management UI.
+- [x] Content preview/publish controls.
 - [ ] Admin activity audit view.
 - [ ] Admin login session management (force logout).
 - [ ] Inventory low-stock dashboard.
