@@ -6,6 +6,7 @@ import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ToastService } from '../../core/toast.service';
+import { AuthService } from '../../core/auth.service';
 
 @Component({
   selector: 'app-password-reset-request',
@@ -33,11 +34,22 @@ export class PasswordResetRequestComponent {
     { label: 'Password reset' }
   ];
   email = '';
+  loading = false;
 
-  constructor(private toast: ToastService) {}
+  constructor(private toast: ToastService, private auth: AuthService) {}
 
   onSubmit(form: NgForm): void {
     if (!form.valid) return;
-    this.toast.success('Reset link sent (mock)', `Check ${this.email}`);
+    this.loading = true;
+    this.auth.requestPasswordReset(this.email).subscribe({
+      next: () => this.toast.success('Reset link sent', `Check ${this.email}`),
+      error: (err) => {
+        const message = err?.error?.detail || 'Unable to send reset email.';
+        this.toast.error(message);
+      },
+      complete: () => {
+        this.loading = false;
+      }
+    });
   }
 }

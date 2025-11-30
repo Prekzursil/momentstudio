@@ -1,11 +1,12 @@
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ToastService } from '../../core/toast.service';
+import { AuthService } from '../../core/auth.service';
 
 @Component({
   selector: 'app-register',
@@ -65,8 +66,9 @@ export class RegisterComponent {
   password = '';
   confirmPassword = '';
   error = '';
+  loading = false;
 
-  constructor(private toast: ToastService) {}
+  constructor(private toast: ToastService, private auth: AuthService, private router: Router) {}
 
   onSubmit(form: NgForm): void {
     if (!form.valid) {
@@ -78,6 +80,19 @@ export class RegisterComponent {
       return;
     }
     this.error = '';
-    this.toast.success('Account created (mock)', `Welcome, ${this.name || 'customer'}`);
+    this.loading = true;
+    this.auth.register(this.name, this.email, this.password).subscribe({
+      next: (res) => {
+        this.toast.success('Account created', `Welcome, ${res.user.email}`);
+        this.router.navigateByUrl('/account');
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Unable to register right now.';
+        this.toast.error(message);
+      },
+      complete: () => {
+        this.loading = false;
+      }
+    });
   }
 }

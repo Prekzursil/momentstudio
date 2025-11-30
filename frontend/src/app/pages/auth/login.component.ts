@@ -1,11 +1,12 @@
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ToastService } from '../../core/toast.service';
+import { AuthService } from '../../core/auth.service';
 
 @Component({
   selector: 'app-login',
@@ -53,11 +54,25 @@ export class LoginComponent {
   ];
   email = '';
   password = '';
+  loading = false;
 
-  constructor(private toast: ToastService) {}
+  constructor(private toast: ToastService, private auth: AuthService, private router: Router) {}
 
   onSubmit(form: NgForm): void {
     if (!form.valid) return;
-    this.toast.success('Logged in (mock)', `Welcome back, ${this.email || 'customer'}`);
+    this.loading = true;
+    this.auth.login(this.email, this.password).subscribe({
+      next: (res) => {
+        this.toast.success('Welcome back', res.user.email);
+        this.router.navigateByUrl('/account');
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Unable to login. Please try again.';
+        this.toast.error(message);
+      },
+      complete: () => {
+        this.loading = false;
+      }
+    });
   }
 }

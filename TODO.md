@@ -232,8 +232,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Saved payment method placeholder.
 - [x] Profile avatar upload (optional).
 - [x] Session timeout/logout messaging.
-- [ ] Wire login/register/password reset flows to backend auth endpoints (replace mocks).
-- [ ] Fetch real profile, addresses, and order history from backend; replace account dashboard mock data.
+- [x] Wire login/register/password reset flows to backend auth endpoints (replace mocks).
+- [x] Fetch real profile, addresses, and order history from backend; replace account dashboard mock data.
 - [ ] Implement avatar upload wired to storage backend.
 
 ## Frontend - Admin Dashboard

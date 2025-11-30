@@ -1,12 +1,15 @@
 import { CommonModule } from '@angular/common';
-import { Component, signal } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { ToastService } from '../../core/toast.service';
+import { AuthService } from '../../core/auth.service';
+import { AccountService, Address, Order } from '../../core/account.service';
+import { forkJoin } from 'rxjs';
 
 @Component({
   selector: 'app-account',
@@ -23,7 +26,11 @@ import { ToastService } from '../../core/toast.service';
   template: `
     <app-container classes="py-10 grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-      <div class="grid gap-6">
+      <ng-container *ngIf="!loading(); else loadingTpl">
+        <div *ngIf="error()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm">
+          {{ error() }}
+        </div>
+        <div class="grid gap-6" *ngIf="!error()">
         <div
           *ngIf="!emailVerified()"
           class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 text-sm flex items-start justify-between gap-3"
@@ -34,7 +41,7 @@ import { ToastService } from '../../core/toast.service';
         <header class="flex items-center justify-between">
           <div>
             <p class="text-sm text-slate-500">Signed in as</p>
-            <h1 class="text-2xl font-semibold text-slate-900">customer&#64;example.com</h1>
+            <h1 class="text-2xl font-semibold text-slate-900">{{ profile()?.email || '...' }}</h1>
           </div>
           <app-button routerLink="/account/password" variant="ghost" label="Change password"></app-button>
         </header>
@@ -51,8 +58,8 @@ import { ToastService } from '../../core/toast.service';
               <input type="file" class="hidden" accept="image/*" (change)="onAvatarChange($event)" />
             </label>
           </div>
-          <p class="text-sm text-slate-700">Name: Jane Doe</p>
-          <p class="text-sm text-slate-700">Email: customer&#64;example.com</p>
+          <p class="text-sm text-slate-700">Name: {{ profile()?.name || 'Not set' }}</p>
+          <p class="text-sm text-slate-700">Email: {{ profile()?.email || '...' }}</p>
           <p class="text-sm text-slate-600">Session timeout: 30m. <a class="text-indigo-600" (click)="signOut()">Sign out</a></p>
         </section>
 
@@ -64,14 +71,18 @@ import { ToastService } from '../../core/toast.service';
           <div *ngIf="addresses().length === 0" class="text-sm text-slate-700">No addresses yet.</div>
           <div *ngFor="let addr of addresses()" class="rounded-lg border border-slate-200 p-3 grid gap-1 text-sm text-slate-700">
             <div class="flex items-center justify-between">
-              <span class="font-semibold text-slate-900">{{ addr.name }}</span>
+              <span class="font-semibold text-slate-900">{{ addr.label || 'Address' }}</span>
+              <div class="flex items-center gap-2 text-xs">
+                <span *ngIf="addr.is_default_shipping" class="rounded-full bg-slate-100 px-2 py-0.5">Default shipping</span>
+                <span *ngIf="addr.is_default_billing" class="rounded-full bg-slate-100 px-2 py-0.5">Default billing</span>
+              </div>
               <div class="flex gap-2">
                 <app-button size="sm" variant="ghost" label="Edit" (action)="editAddress(addr.id)"></app-button>
                 <app-button size="sm" variant="ghost" label="Remove" (action)="removeAddress(addr.id)"></app-button>
               </div>
             </div>
-            <span>{{ addr.line1 }}</span>
-            <span>{{ addr.city }}, {{ addr.postal }}</span>
+            <span>{{ addr.line1 }}<ng-container *ngIf="addr.line2">, {{ addr.line2 }}</ng-container></span>
+            <span>{{ addr.city }}<ng-container *ngIf="addr.region">, {{ addr.region }}</ng-container>, {{ addr.postal_code }}</span>
             <span>{{ addr.country }}</span>
           </div>
         </section>
@@ -86,8 +97,11 @@ import { ToastService } from '../../core/toast.service';
               Status
               <select class="rounded-lg border border-slate-200 px-2 py-1" [(ngModel)]="orderFilter" (change)="filterOrders()">
                 <option value="">All</option>
-                <option value="processing">Processing</option>
+                <option value="pending">Pending</option>
+                <option value="paid">Paid</option>
                 <option value="shipped">Shipped</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="refunded">Refunded</option>
               </select>
             </label>
           </div>
@@ -96,11 +110,11 @@ import { ToastService } from '../../core/toast.service';
           </div>
           <div *ngFor="let order of pagedOrders()" class="rounded-lg border border-slate-200 p-3 grid gap-1 text-sm text-slate-700">
             <div class="flex items-center justify-between">
-              <span class="font-semibold text-slate-900">Order #{{ order.id }}</span>
+              <span class="font-semibold text-slate-900">Order #{{ order.reference_code || order.id }}</span>
               <span class="text-xs rounded-full bg-slate-100 px-2 py-1">{{ order.status }}</span>
             </div>
-            <span>{{ order.date }}</span>
-            <span class="font-semibold text-slate-900">{{ order.total | localizedCurrency : 'USD' }}</span>
+            <span>{{ order.created_at | date: 'mediumDate' }}</span>
+            <span class="font-semibold text-slate-900">{{ order.total_amount | localizedCurrency : order.currency || 'USD' }}</span>
           </div>
           <div class="flex items-center justify-between text-sm" *ngIf="pagedOrders().length">
             <span>Page {{ page }} / {{ totalPages }}</span>
@@ -135,33 +149,64 @@ import { ToastService } from '../../core/toast.service';
           </div>
         </section>
       </div>
+      </ng-container>
+      <ng-template #loadingTpl>
+        <div class="text-sm text-slate-600">Loading your account...</div>
+      </ng-template>
     </app-container>
   `
 })
-export class AccountComponent {
+export class AccountComponent implements OnInit {
   crumbs = [
     { label: 'Home', url: '/' },
     { label: 'Account' }
   ];
 
   emailVerified = signal<boolean>(false);
-  addresses = signal([
-    { id: '1', name: 'Home', line1: '123 Artisan Way', city: 'Cluj', postal: '400000', country: 'RO' }
-  ]);
+  addresses = signal<Address[]>([]);
   avatar: string | null = null;
   placeholderAvatar = 'https://via.placeholder.com/120?text=Avatar';
 
-  orders = signal([
-    { id: '1001', status: 'processing', total: 120, date: '2025-11-01' },
-    { id: '1000', status: 'shipped', total: 85, date: '2025-10-15' }
-  ]);
+  profile = signal<{ email: string; name?: string | null } | null>(null);
+  orders = signal<Order[]>([]);
   orderFilter = '';
   page = 1;
   pageSize = 5;
   totalPages = 1;
+  loading = signal<boolean>(true);
+  error = signal<string | null>(null);
 
-  constructor(private toast: ToastService) {
+  constructor(
+    private toast: ToastService,
+    private auth: AuthService,
+    private account: AccountService,
+    private router: Router
+  ) {
     this.computeTotalPages();
+  }
+
+  ngOnInit(): void {
+    this.loadData();
+  }
+
+  private loadData(): void {
+    this.loading.set(true);
+    forkJoin({
+      profile: this.account.getProfile(),
+      addresses: this.account.getAddresses(),
+      orders: this.account.getOrders()
+    }).subscribe({
+      next: ({ profile, addresses, orders }) => {
+        this.profile.set(profile);
+        this.addresses.set(addresses);
+        this.orders.set(orders);
+        this.computeTotalPages();
+      },
+      error: () => {
+        this.error.set('Unable to load account details right now.');
+      },
+      complete: () => this.loading.set(false)
+    });
   }
 
   private filteredOrders() {
@@ -189,21 +234,15 @@ export class AccountComponent {
   }
 
   addAddress(): void {
-    const next = [
-      ...this.addresses(),
-      { id: crypto.randomUUID(), name: 'New address', line1: 'Street 1', city: 'City', postal: '000000', country: 'RO' }
-    ];
-    this.addresses.set(next);
-    this.toast.success('Address added (mock)');
+    this.toast.info('Address management coming soon.', 'Use backend API to add new addresses.');
   }
 
   editAddress(id: string): void {
-    this.toast.success('Edit address (mock)', id);
+    this.toast.info('Edit address not yet wired in UI', id);
   }
 
   removeAddress(id: string): void {
-    this.addresses.update((addrs) => addrs.filter((a) => a.id !== id));
-    this.toast.success('Address removed (mock)');
+    this.toast.info('Address removal will be handled via API soon.', id);
   }
 
   addCard(): void {
@@ -227,11 +266,23 @@ export class AccountComponent {
   }
 
   refreshSession(): void {
-    this.toast.success('Session refreshed');
+    this.auth.refresh().subscribe({
+      next: (tokens) => {
+        if (tokens) {
+          this.toast.success('Session refreshed');
+        } else {
+          this.toast.error('No refresh token available');
+        }
+      },
+      error: () => this.toast.error('Could not refresh session.')
+    });
   }
 
   signOut(): void {
-    this.toast.success('Signed out (mock)');
+    this.auth.logout().subscribe(() => {
+      this.toast.success('Signed out');
+      this.router.navigateByUrl('/');
+    });
   }
 
   private computeTotalPages(total?: number): void {

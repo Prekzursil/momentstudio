@@ -6,6 +6,7 @@ import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ToastService } from '../../core/toast.service';
+import { AuthService } from '../../core/auth.service';
 
 @Component({
   selector: 'app-password-reset',
@@ -57,8 +58,9 @@ export class PasswordResetComponent {
   password = '';
   confirmPassword = '';
   error = '';
+  loading = false;
 
-  constructor(private toast: ToastService) {}
+  constructor(private toast: ToastService, private auth: AuthService) {}
 
   onSubmit(form: NgForm): void {
     if (!form.valid) {
@@ -70,6 +72,18 @@ export class PasswordResetComponent {
       return;
     }
     this.error = '';
-    this.toast.success('Password updated (mock)', 'You can now log in with your new password.');
+    this.loading = true;
+    this.auth.confirmPasswordReset(this.token, this.password).subscribe({
+      next: () => {
+        this.toast.success('Password updated', 'You can now log in with your new password.');
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Unable to update password.';
+        this.toast.error(message);
+      },
+      complete: () => {
+        this.loading = false;
+      }
+    });
   }
 }
