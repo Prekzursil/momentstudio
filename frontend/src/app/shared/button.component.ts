@@ -25,7 +25,8 @@ type ButtonSize = 'md' | 'sm';
         type="button"
         [ngClass]="classes"
         class="inline-flex items-center justify-center rounded-full font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-        (click)="action.emit()"
+        [disabled]="disabled"
+        (click)="!disabled && action.emit()"
       >
         <ng-content></ng-content>
         <span *ngIf="label">{{ label }}</span>

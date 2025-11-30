@@ -1,12 +1,14 @@
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { FormsModule, NgForm } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { CartStore } from '../../core/cart.store';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
+
+type ShippingMethod = { id: string; label: string; amount: number; eta: string };
 
 @Component({
   selector: 'app-checkout',
@@ -18,60 +20,104 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
       <div class="grid lg:grid-cols-[2fr_1fr] gap-6 items-start">
         <section class="grid gap-4">
           <h1 class="text-2xl font-semibold text-slate-900">Checkout</h1>
-          <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-            <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">Step 1 · Who's checking out?</p>
-            <label class="flex items-center gap-2 text-sm">
-              <input type="radio" name="checkoutMode" value="guest" [(ngModel)]="mode" /> Checkout as guest
-            </label>
-            <label class="flex items-center gap-2 text-sm">
-              <input type="radio" name="checkoutMode" value="login" [(ngModel)]="mode" /> Login to continue
-            </label>
-          </div>
-
-          <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-            <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">Step 2 · Shipping address</p>
-            <div class="grid sm:grid-cols-2 gap-3">
-              <label class="text-sm grid gap-1">
-                Full name
-                <input class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="address.name" />
+          <form #checkoutForm="ngForm" class="grid gap-4" (ngSubmit)="placeOrder(checkoutForm)">
+            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">Step 1 · Who's checking out?</p>
+              <label class="flex items-center gap-2 text-sm">
+                <input type="radio" name="checkoutMode" value="guest" [(ngModel)]="mode" required /> Checkout as guest
               </label>
-              <label class="text-sm grid gap-1">
-                Email
-                <input class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="address.email" type="email" />
-              </label>
-              <label class="text-sm grid gap-1">
-                Address line
-                <input class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="address.line1" />
-              </label>
-              <label class="text-sm grid gap-1">
-                City
-                <input class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="address.city" />
-              </label>
-              <label class="text-sm grid gap-1">
-                Postal code
-                <input class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="address.postal" />
-              </label>
-              <label class="text-sm grid gap-1">
-                Country
-                <input class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="address.country" />
+              <label class="flex items-center gap-2 text-sm">
+                <input type="radio" name="checkoutMode" value="login" [(ngModel)]="mode" required /> Login to continue
               </label>
             </div>
-          </div>
 
-          <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-            <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">Step 3 · Payment</p>
-            <label class="flex items-center gap-2 text-sm">
-              <input type="radio" name="payment" value="card" [(ngModel)]="payment" /> Card via Stripe
-            </label>
-            <label class="flex items-center gap-2 text-sm">
-              <input type="radio" name="payment" value="cod" [(ngModel)]="payment" /> Cash on delivery (placeholder)
-            </label>
-          </div>
+            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">Step 2 · Shipping address</p>
+              <div class="grid sm:grid-cols-2 gap-3">
+                <label class="text-sm grid gap-1">
+                  Full name
+                  <input class="rounded-lg border border-slate-200 px-3 py-2" name="name" [(ngModel)]="address.name" required />
+                </label>
+                <label class="text-sm grid gap-1">
+                  Email
+                  <input class="rounded-lg border border-slate-200 px-3 py-2" name="email" [(ngModel)]="address.email" type="email" required />
+                </label>
+                <label class="text-sm grid gap-1 sm:col-span-2">
+                  Address line
+                  <input class="rounded-lg border border-slate-200 px-3 py-2" name="line1" [(ngModel)]="address.line1" required />
+                </label>
+                <label class="text-sm grid gap-1">
+                  City
+                  <input class="rounded-lg border border-slate-200 px-3 py-2" name="city" [(ngModel)]="address.city" required />
+                </label>
+                <label class="text-sm grid gap-1">
+                  Postal code
+                  <input class="rounded-lg border border-slate-200 px-3 py-2" name="postal" [(ngModel)]="address.postal" required />
+                </label>
+                <label class="text-sm grid gap-1 sm:col-span-2">
+                  Country
+                  <select class="rounded-lg border border-slate-200 px-3 py-2" name="country" [(ngModel)]="address.country" required>
+                    <option value="">Select a country</option>
+                    <option *ngFor="let c of countries" [value]="c">{{ c }}</option>
+                  </select>
+                </label>
+              </div>
+              <p *ngIf="addressError" class="text-sm text-amber-700">{{ addressError }}</p>
+            </div>
 
-          <div class="flex gap-3">
-            <app-button label="Place order" (action)="placeOrder()"></app-button>
-            <app-button variant="ghost" label="Back to cart" routerLink="/cart"></app-button>
-          </div>
+            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">Step 3 · Shipping method</p>
+              <label
+                *ngFor="let method of shippingMethods"
+                class="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
+                [class.border-slate-900]="shipping === method.id"
+              >
+                <span class="flex flex-col">
+                  <span class="font-semibold text-slate-900">{{ method.label }}</span>
+                  <span class="text-slate-500">{{ method.eta }}</span>
+                </span>
+                <span class="flex items-center gap-3">
+                  <span class="font-semibold text-slate-900">{{ method.amount | localizedCurrency : currency }}</span>
+                  <input type="radio" name="shipping" [value]="method.id" [(ngModel)]="shipping" required />
+                </span>
+              </label>
+            </div>
+
+            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">Step 4 · Promo code</p>
+              <div class="flex gap-3">
+                <input class="rounded-lg border border-slate-200 px-3 py-2 flex-1" [(ngModel)]="promo" name="promo" placeholder="Enter code" />
+                <app-button size="sm" label="Apply" (action)="applyPromo()"></app-button>
+              </div>
+              <p class="text-sm" [class.text-emerald-700]="promoMessage.startsWith('Applied')" [class.text-amber-700]="promoMessage.startsWith('Invalid')" *ngIf="promoMessage">
+                {{ promoMessage }}
+              </p>
+            </div>
+
+            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">Step 5 · Payment (Stripe placeholder)</p>
+              <label class="text-sm grid gap-1">
+                Card number
+                <input class="rounded-lg border border-slate-200 px-3 py-2" placeholder="4242 4242 4242 4242" required />
+              </label>
+              <div class="grid grid-cols-2 gap-3">
+                <label class="text-sm grid gap-1">
+                  Expiry
+                  <input class="rounded-lg border border-slate-200 px-3 py-2" placeholder="MM/YY" required />
+                </label>
+                <label class="text-sm grid gap-1">
+                  CVC
+                  <input class="rounded-lg border border-slate-200 px-3 py-2" placeholder="CVC" required />
+                </label>
+              </div>
+              <p class="text-xs text-slate-500">Replace with real Stripe Elements integration in production.</p>
+            </div>
+
+            <div class="flex gap-3">
+              <app-button label="Place order" type="submit"></app-button>
+              <app-button variant="ghost" label="Back to cart" routerLink="/cart"></app-button>
+            </div>
+          </form>
         </section>
 
         <aside class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4">
@@ -91,15 +137,15 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
           </div>
           <div class="flex items-center justify-between text-sm text-slate-700">
             <span>Shipping</span>
-            <span class="text-slate-500">$8 (placeholder)</span>
+            <span>{{ shippingAmount | localizedCurrency : currency }}</span>
           </div>
           <div class="flex items-center justify-between text-sm text-slate-700">
-            <span>Tax</span>
-            <span class="text-slate-500">$0 (placeholder)</span>
+            <span>Promo</span>
+            <span class="text-emerald-700">-{{ discount | localizedCurrency : currency }}</span>
           </div>
           <div class="border-t border-slate-200 pt-3 flex items-center justify-between text-base font-semibold text-slate-900">
             <span>Estimated total</span>
-            <span>{{ (subtotal() + 8) | localizedCurrency : currency }}</span>
+            <span>{{ total | localizedCurrency : currency }}</span>
           </div>
         </aside>
       </div>
@@ -113,7 +159,15 @@ export class CheckoutComponent {
     { label: 'Checkout' }
   ];
   mode: 'guest' | 'login' = 'guest';
-  payment: 'card' | 'cod' = 'card';
+  shipping: string = 'standard';
+  promo = '';
+  promoMessage = '';
+  shippingMethods: ShippingMethod[] = [
+    { id: 'standard', label: 'Standard', amount: 8, eta: '3-5 business days' },
+    { id: 'express', label: 'Express', amount: 15, eta: '1-2 business days' }
+  ];
+  countries = ['United States', 'United Kingdom', 'Romania', 'Germany', 'France', 'Canada'];
+  addressError = '';
   address = {
     name: '',
     email: '',
@@ -122,14 +176,39 @@ export class CheckoutComponent {
     postal: '',
     country: ''
   };
+  discount = 0;
 
-  constructor(private cart: CartStore) {}
+  constructor(private cart: CartStore, private router: Router) {}
 
   items = this.cart.items;
   subtotal = this.cart.subtotal;
   currency = 'USD';
 
-  placeOrder(): void {
-    // Placeholder: in a real app, call backend checkout.
+  get shippingAmount(): number {
+    const found = this.shippingMethods.find((m) => m.id === this.shipping);
+    return found ? found.amount : 0;
+  }
+
+  get total(): number {
+    return this.subtotal() + this.shippingAmount - this.discount;
+  }
+
+  applyPromo(): void {
+    if (this.promo.trim().toUpperCase() === 'SAVE10') {
+      this.discount = Math.min(this.subtotal() * 0.1, 50);
+      this.promoMessage = `Applied SAVE10: -${this.discount.toFixed(2)}`;
+    } else {
+      this.discount = 0;
+      this.promoMessage = 'Invalid code';
+    }
+  }
+
+  placeOrder(form: NgForm): void {
+    if (!form.valid) {
+      this.addressError = 'Please complete all required fields.';
+      return;
+    }
+    this.addressError = '';
+    this.router.navigate(['/checkout/success']);
   }
 }
