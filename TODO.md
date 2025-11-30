@@ -127,22 +127,22 @@ Below is a structured checklist you can turn into issues.
 - [x] Background task for sending emails.
 - [x] Shipping update email (with tracking link).
 - [x] Delivery confirmation email.
-- [ ] Cart abandonment email template.
-- [ ] Product back-in-stock notification flow.
-- [ ] Admin alert on low stock thresholds.
-- [ ] Error alerting to Slack/email (critical exceptions).
-- [ ] Template system for emails with variables.
-- [ ] Email preview endpoint (dev-only).
-- [ ] Rate limiting for email sends per user/session.
+- [x] Cart abandonment email template.
+- [x] Product back-in-stock notification flow.
+- [x] Admin alert on low stock thresholds.
+- [x] Error alerting to Slack/email (critical exceptions).
+- [x] Template system for emails with variables.
+- [x] Email preview endpoint (dev-only).
+- [x] Rate limiting for email sends per user/session.
 
 ## Backend - Security, Observability, Testing
 - [x] CORS config for dev/prod.
-- [ ] Rate limiting on login/register/password reset.
-- [ ] Validate file types/sizes for uploads.
-- [ ] Structured logging with request ID.
+- [x] Rate limiting on login/register/password reset.
+- [x] Validate file types/sizes for uploads.
+- [x] Structured logging with request ID.
 - [x] Health/readiness endpoints.
-- [ ] Pytest suite for services (auth, catalog, cart, checkout).
-- [ ] Integration tests against temp Postgres.
+- [x] Pytest suite for services (auth, catalog, cart, checkout).
+- [x] Integration tests against temp Postgres.
 - [ ] mypy type-checking and fixes.
 - [ ] CI smoke test hitting health/readiness.
 - [ ] DRF-style schema docs via OpenAPI tweaks.
