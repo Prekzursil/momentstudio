@@ -39,9 +39,9 @@ import { CartStore } from '../core/cart.store';
               {{ cartCount() }}
             </span>
           </a>
-          <button type="button" class="text-sm font-medium text-slate-700 hover:text-slate-900 hidden sm:inline">
+          <a routerLink="/login" class="text-sm font-medium text-slate-700 hover:text-slate-900 hidden sm:inline">
             Sign in
-          </button>
+          </a>
           <app-button label="Toggle theme" size="sm" variant="ghost" (action)="toggleTheme.emit()"></app-button>
         </div>
       </div>

@@ -221,11 +221,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Edge cases: out-of-stock and price changes during checkout.
 
 ## Frontend - Auth & Account
-- [ ] Login page with validation.
-- [ ] Registration page.
-- [ ] Password reset request + reset form.
-- [ ] Account dashboard (profile, address book, order history, order detail).
-- [ ] Change password form.
+- [x] Login page with validation.
+- [x] Registration page.
+- [x] Password reset request + reset form.
+- [x] Account dashboard (profile, address book, order history, order detail).
+- [x] Change password form.
 - [ ] Email verification flow UI.
 - [ ] Address book CRUD UI.
 - [ ] Order history pagination + filters.
