@@ -278,6 +278,70 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
             <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-900">Low stock</h2>
+              <p class="text-xs text-slate-500">Threshold: ≤3</p>
+            </div>
+            <div class="grid gap-2 text-sm text-slate-700">
+              <div *ngIf="lowStock().length === 0" class="text-slate-600">No low-stock products.</div>
+              <div *ngFor="let item of lowStock()" class="rounded-lg border border-slate-200 p-3 flex items-center justify-between">
+                <div>
+                  <p class="font-semibold text-slate-900">{{ item.name }}</p>
+                  <p class="text-xs text-slate-500">Stock: {{ item.stock }}</p>
+                </div>
+                <app-button size="sm" variant="ghost" label="Restock"></app-button>
+              </div>
+            </div>
+          </section>
+
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-900">Sales analytics</h2>
+              <span class="text-xs text-slate-500">Last 30 days</span>
+            </div>
+            <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div *ngFor="let metric of salesMetrics()" class="rounded-xl border border-slate-200 p-3">
+                <p class="text-xs uppercase tracking-[0.2em] text-slate-500">{{ metric.label }}</p>
+                <p class="text-lg font-semibold text-slate-900">
+                  <ng-container *ngIf="metric.label.includes('GMV') || metric.label === 'AOV'; else plain">
+                    {{ metric.value | localizedCurrency : 'USD' }}
+                  </ng-container>
+                  <ng-template #plain>{{ metric.value }}</ng-template>
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-900">Sessions</h2>
+              <app-button size="sm" variant="ghost" label="Force logout all" (action)="forceLogoutAll()"></app-button>
+            </div>
+            <div class="grid gap-2 text-sm text-slate-700">
+              <div *ngFor="let sess of sessions()" class="rounded-lg border border-slate-200 p-3 flex items-center justify-between">
+                <div>
+                  <p class="font-semibold text-slate-900">{{ sess.user }}</p>
+                  <p class="text-xs text-slate-500">{{ sess.device }} · {{ sess.lastActive }}</p>
+                </div>
+                <app-button size="sm" variant="ghost" label="Force logout" (action)="forceLogout(sess.id)"></app-button>
+              </div>
+            </div>
+          </section>
+
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-900">Activity log</h2>
+              <app-button size="sm" variant="ghost" label="Refresh" (action)="refreshAudit()"></app-button>
+            </div>
+            <div class="grid gap-2 text-sm text-slate-700">
+              <div *ngFor="let log of auditLogs()" class="rounded-lg border border-slate-200 p-3">
+                <p class="font-semibold text-slate-900">{{ log.action }}</p>
+                <p class="text-xs text-slate-500">{{ log.user }} · {{ log.at }}</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900">Users</h2>
               <app-button size="sm" variant="ghost" label="Add admin"></app-button>
             </div>
@@ -363,6 +427,22 @@ export class AdminComponent {
     { slug: 'mugs', name: 'Mugs', order: 2 },
     { slug: 'bowls', name: 'Bowls', order: 3 }
   ]);
+  auditLogs = signal([
+    { user: 'admin@adrianaart.com', action: 'Updated product Ocean glaze cup', at: '2025-11-30 10:15' },
+    { user: 'staff@adrianaart.com', action: 'Archived product Speckled mug', at: '2025-11-29 16:42' },
+    { user: 'admin@adrianaart.com', action: 'Refunded order #1001', at: '2025-11-29 12:05' }
+  ]);
+  sessions = signal([
+    { id: 'sess1', user: 'admin@adrianaart.com', device: 'Chrome · Mac', lastActive: '5m ago' },
+    { id: 'sess2', user: 'admin@adrianaart.com', device: 'Safari · iPhone', lastActive: '2h ago' },
+    { id: 'sess3', user: 'staff@adrianaart.com', device: 'Edge · Windows', lastActive: '1d ago' }
+  ]);
+  salesMetrics = signal([
+    { label: 'GMV (30d)', value: 12450 },
+    { label: 'AOV', value: 78 },
+    { label: 'Orders (30d)', value: 160 },
+    { label: 'Refunds (30d)', value: 3 }
+  ]);
 
   editingId: string | null = null;
   form = {
@@ -380,6 +460,7 @@ export class AdminComponent {
   contentMessage = '';
   selectedIds = new Set<string>();
   allSelected = false;
+  lowStock = () => this.products().filter((p) => (p.stock ?? 0) <= 3);
 
   filteredProducts() {
     const term = this.productSearch.toLowerCase();
@@ -471,6 +552,21 @@ export class AdminComponent {
 
   deleteCoupon(code: string): void {
     this.coupons.update((cs) => cs.filter((c) => c.code !== code));
+  }
+
+  forceLogout(id: string): void {
+    this.sessions.update((sess) => sess.filter((s) => s.id !== id));
+  }
+
+  forceLogoutAll(): void {
+    this.sessions.set([]);
+  }
+
+  refreshAudit(): void {
+    this.auditLogs.update((logs) => [
+      ...logs,
+      { user: 'system', action: 'Audit refreshed', at: new Date().toISOString() }
+    ]);
   }
 
   toggleSelect(slug: string, event: Event): void {
