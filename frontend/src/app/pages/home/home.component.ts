@@ -20,7 +20,7 @@ import { ContainerComponent } from '../../layout/container.component';
             for product, cart, and content flows.
           </p>
           <div class="flex flex-wrap gap-3">
-            <app-button label="Shop collection" [routerLink]="['/shop']"></app-button>
+            <app-button label="Shop now" [routerLink]="['/shop']"></app-button>
             <app-button label="View admin" variant="ghost" [routerLink]="['/admin']"></app-button>
           </div>
         </div>

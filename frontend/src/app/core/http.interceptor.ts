@@ -2,17 +2,17 @@ import { inject } from '@angular/core';
 import { HttpInterceptorFn } from '@angular/common/http';
 import { catchError } from 'rxjs/operators';
 import { throwError } from 'rxjs';
-import { ToastService } from './toast.service';
+import { ErrorHandlerService } from '../shared/error-handler.service';
 
 export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
-  const toast = inject(ToastService);
+  const handler = inject(ErrorHandlerService);
   const authReq = req.clone({
     withCredentials: true
   });
 
   return next(authReq).pipe(
     catchError((err) => {
-      toast.error('Request failed', err?.message ?? 'Unknown error');
+      handler.handle(err);
       return throwError(() => err);
     })
   );
