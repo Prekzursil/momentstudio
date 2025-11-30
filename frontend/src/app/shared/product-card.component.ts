@@ -1,13 +1,14 @@
-import { CommonModule, CurrencyPipe, NgOptimizedImage } from '@angular/common';
+import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, Input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Product } from '../core/catalog.service';
 import { ButtonComponent } from './button.component';
+import { LocalizedCurrencyPipe } from './localized-currency.pipe';
 
 @Component({
   selector: 'app-product-card',
   standalone: true,
-  imports: [CommonModule, RouterLink, NgOptimizedImage, CurrencyPipe, ButtonComponent],
+  imports: [CommonModule, RouterLink, NgOptimizedImage, LocalizedCurrencyPipe, ButtonComponent],
   template: `
     <article class="group grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm hover:-translate-y-1 hover:shadow-md transition">
       <a [routerLink]="['/products', product.slug]" class="block overflow-hidden rounded-xl bg-slate-50 relative">
@@ -32,7 +33,7 @@ import { ButtonComponent } from './button.component';
           </a>
           <span class="text-sm text-slate-500">{{ product.currency }}</span>
         </div>
-        <p class="text-lg font-semibold text-slate-900">{{ product.base_price | currency : product.currency }}</p>
+        <p class="text-lg font-semibold text-slate-900">{{ product.base_price | localizedCurrency : product.currency }}</p>
         <p *ngIf="product.short_description" class="text-sm text-slate-600 line-clamp-2">
           {{ product.short_description }}
         </p>

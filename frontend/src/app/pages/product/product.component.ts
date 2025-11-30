@@ -1,4 +1,4 @@
-import { CommonModule, CurrencyPipe, NgOptimizedImage } from '@angular/common';
+import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -7,6 +7,9 @@ import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
 import { ToastService } from '../../core/toast.service';
+import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
+import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
+import { Title, Meta } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-product-detail',
@@ -19,7 +22,8 @@ import { ToastService } from '../../core/toast.service';
     ContainerComponent,
     ButtonComponent,
     SkeletonComponent,
-    CurrencyPipe
+    LocalizedCurrencyPipe,
+    BreadcrumbComponent
   ],
   template: `
     <app-container classes="py-10">
@@ -36,6 +40,7 @@ import { ToastService } from '../../core/toast.service';
 
       <ng-template #content>
         <ng-container *ngIf="product; else missing">
+          <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
           <div class="grid gap-10 lg:grid-cols-2">
             <div class="space-y-4">
               <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white cursor-zoom-in" (click)="openPreview()">
@@ -64,8 +69,8 @@ import { ToastService } from '../../core/toast.service';
               <div class="space-y-2">
                 <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Handmade collection</p>
                 <h1 class="text-3xl font-semibold text-slate-900">{{ product.name }}</h1>
-                <p class="text-lg font-semibold text-slate-900">
-                  {{ product.base_price | currency : product.currency }}
+              <p class="text-lg font-semibold text-slate-900">
+                  {{ product.base_price | localizedCurrency : product.currency }}
                 </p>
                 <div class="flex items-center gap-2 text-sm text-amber-700" *ngIf="product.rating_count">
                   ★ {{ product.rating_average?.toFixed(1) ?? '0.0' }} · {{ product.rating_count }} review(s)
@@ -123,6 +128,37 @@ import { ToastService } from '../../core/toast.service';
         </ng-container>
       </ng-template>
 
+      <div *ngIf="recentlyViewed.length" class="mt-12 grid gap-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold text-slate-900">Recently viewed</h3>
+          <a routerLink="/shop" class="text-sm font-medium text-indigo-600">Back to shop</a>
+        </div>
+        <div class="flex gap-4 overflow-x-auto pb-2">
+          <app-button
+            *ngFor="let item of recentlyViewed"
+            class="min-w-[220px]"
+            variant="ghost"
+            [routerLink]="['/products', item.slug]"
+          >
+            <div class="flex items-center gap-3 text-left">
+              <img
+                [ngSrc]="item.images?.[0]?.url ?? 'https://via.placeholder.com/96'"
+                [alt]="item.name"
+                class="h-14 w-14 rounded-xl object-cover"
+                width="96"
+                height="96"
+              />
+              <div class="grid gap-1">
+                <p class="text-sm font-semibold text-slate-900">{{ item.name }}</p>
+                <p class="text-sm text-slate-600">
+                  {{ item.base_price | localizedCurrency : item.currency }}
+                </p>
+              </div>
+            </div>
+          </app-button>
+        </div>
+      </div>
+
       <div
         *ngIf="previewOpen"
         class="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm flex items-center justify-center p-6"
@@ -162,11 +198,18 @@ export class ProductComponent implements OnInit {
   quantity = 1;
   activeImageIndex = 0;
   previewOpen = false;
+  recentlyViewed: Product[] = [];
+  crumbs = [
+    { label: 'Home', url: '/' },
+    { label: 'Shop', url: '/shop' }
+  ];
 
   constructor(
     private route: ActivatedRoute,
     private catalog: CatalogService,
-    private toast: ToastService
+    private toast: ToastService,
+    private title: Title,
+    private meta: Meta
   ) {}
 
   ngOnInit(): void {
@@ -177,6 +220,14 @@ export class ProductComponent implements OnInit {
           this.product = product;
           this.selectedVariantId = product.variants?.[0]?.id ?? null;
           this.loading = false;
+          this.crumbs = [
+            { label: 'Home', url: '/' },
+            { label: 'Shop', url: '/shop' },
+            { label: product.name, url: `/products/${product.slug}` }
+          ];
+          this.updateMeta(product);
+          this.saveRecentlyViewed(product);
+          this.recentlyViewed = this.getRecentlyViewed().filter((p) => p.slug !== product.slug).slice(0, 8);
         },
         error: () => {
           this.product = null;
@@ -210,5 +261,46 @@ export class ProductComponent implements OnInit {
   addToCart(): void {
     const name = this.product?.name ?? 'item';
     this.toast.success('Added to cart', `${this.quantity} × ${name}`);
+  }
+
+  private updateMeta(product: Product): void {
+    const title = `${product.name} | AdrianaArt`;
+    this.title.setTitle(title);
+    this.meta.updateTag({ name: 'description', content: product.short_description ?? 'Handmade product detail' });
+    this.meta.updateTag({ property: 'og:title', content: title });
+    this.meta.updateTag({
+      property: 'og:description',
+      content: product.short_description ?? 'Discover handmade product from AdrianaArt'
+    });
+    if (product.images?.[0]?.url) {
+      this.meta.updateTag({ property: 'og:image', content: product.images[0].url });
+    }
+  }
+
+  private saveRecentlyViewed(product: Product): void {
+    if (typeof localStorage === 'undefined') return;
+    const key = 'recently_viewed';
+    const existing: Product[] = this.getRecentlyViewed();
+    const filtered = existing.filter((p) => p.slug !== product.slug);
+    filtered.unshift({
+      id: product.id,
+      slug: product.slug,
+      name: product.name,
+      base_price: product.base_price,
+      currency: product.currency,
+      images: product.images
+    });
+    localStorage.setItem(key, JSON.stringify(filtered.slice(0, 12)));
+  }
+
+  private getRecentlyViewed(): Product[] {
+    if (typeof localStorage === 'undefined') return [];
+    const key = 'recently_viewed';
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? (JSON.parse(raw) as Product[]) : [];
+    } catch {
+      return [];
+    }
   }
 }
