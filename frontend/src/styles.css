@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --aa-bg: #0f172a;
+  --aa-ink: #0f172a;
+  --aa-accent: #111827;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.shadow-soft {
+  box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08);
+}

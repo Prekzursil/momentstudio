@@ -163,11 +163,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Maintenance mode toggle.
 
 ## Frontend - Shell & Shared
-- [ ] Scaffold Angular app with routing + strict TS.
-- [ ] Tailwind CSS and design tokens.
-- [ ] Main layout (header/footer/responsive nav).
-- [ ] Shared components: button, input, card, modal, toast.
-- [ ] Global error handling / boundary route.
+- [x] Scaffold Angular app with routing + strict TS.
+- [x] Tailwind CSS and design tokens.
+- [x] Main layout (header/footer/responsive nav).
+- [x] Shared components: button, input, card, modal, toast.
+- [x] Global error handling / boundary route.
 - [ ] API service layer + interceptors.
 - [ ] Theme tokens (spacing, typography, colors).
 - [ ] Dark/light mode toggle.
