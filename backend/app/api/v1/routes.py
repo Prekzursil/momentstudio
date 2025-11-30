@@ -7,6 +7,7 @@ from app.api.v1 import addresses
 from app.api.v1 import orders
 from app.api.v1 import payments
 from app.api.v1 import content
+from app.api.v1 import email_preview
 
 api_router = APIRouter()
 
@@ -17,6 +18,7 @@ api_router.include_router(addresses.router)
 api_router.include_router(orders.router)
 api_router.include_router(payments.router)
 api_router.include_router(content.router)
+api_router.include_router(email_preview.router)
 
 
 @api_router.get("/health", tags=["health"])

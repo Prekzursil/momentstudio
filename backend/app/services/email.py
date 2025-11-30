@@ -1,11 +1,17 @@
 import logging
 import smtplib
 from email.message import EmailMessage
+from pathlib import Path
 from typing import Sequence
+
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+TEMPLATE_PATH = Path(__file__).parent.parent / "templates" / "emails"
+env = Environment(loader=FileSystemLoader(TEMPLATE_PATH), autoescape=select_autoescape(["html", "xml"]))
 
 
 def _build_message(to_email: str, subject: str, text_body: str, html_body: str | None = None) -> EmailMessage:
@@ -66,3 +72,40 @@ async def send_delivery_confirmation(to_email: str, order) -> bool:
     subject = f"Delivery confirmation for order {order.reference_code or order.id}"
     text_body = f"Order {order.reference_code or order.id} has been delivered."
     return await send_email(to_email, subject, text_body)
+
+
+async def send_cart_abandonment(to_email: str) -> bool:
+    subject = "Still thinking it over?"
+    text_body, html_body = render_template("cart_abandonment.txt.j2", {})
+    return await send_email(to_email, subject, text_body, html_body)
+
+
+async def send_back_in_stock(to_email: str, product_name: str) -> bool:
+    subject = f"{product_name} is back in stock"
+    text_body, html_body = render_template("back_in_stock.txt.j2", {"product_name": product_name})
+    return await send_email(to_email, subject, text_body, html_body)
+
+
+async def send_low_stock_alert(to_email: str, product_name: str, stock: int) -> bool:
+    subject = f"Low stock alert: {product_name}"
+    text_body, html_body = render_template("low_stock_alert.txt.j2", {"product_name": product_name, "stock": stock})
+    return await send_email(to_email, subject, text_body, html_body)
+
+
+async def send_error_alert(to_email: str, message: str) -> bool:
+    subject = "Critical error alert"
+    text_body = message
+    return await send_email(to_email, subject, text_body)
+
+
+def render_template(template_name: str, context: dict) -> tuple[str, str]:
+    base_text = env.get_template("base.txt.j2")
+    base_html = env.get_template("base.html.j2")
+    body_text = env.get_template(template_name).render(**context)
+    body_html = env.get_template(template_name.replace(".txt.j2", ".html.j2")).render(**context)
+    return base_text.render(body=body_text), base_html.render(body=body_html)
+
+
+async def preview_email(template_name: str, context: dict) -> dict[str, str]:
+    text_body, html_body = render_template(template_name, context)
+    return {"text": text_body, "html": html_body}
