@@ -204,11 +204,11 @@ Below is a structured checklist you can turn into issues.
 - [ ] SEO meta tags per product/category.
 
 ## Frontend - Cart & Checkout
-- [ ] Cart page/drawer with quantities and totals.
-- [ ] Update quantity/remove items; stock error messaging.
-- [ ] Checkout stepper: login/guest, shipping address, payment (Stripe).
-- [ ] Order summary during checkout.
-- [ ] Success page with order summary + continue shopping.
+- [x] Cart page/drawer with quantities and totals.
+- [x] Update quantity/remove items; stock error messaging.
+- [x] Checkout stepper: login/guest, shipping address, payment (Stripe).
+- [x] Order summary during checkout.
+- [x] Success page with order summary + continue shopping.
 - [ ] Guest cart persistence in localStorage.
 - [ ] Apply promo code UI.
 - [ ] Shipping method selection UI.

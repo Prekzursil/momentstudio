@@ -6,11 +6,17 @@ import { ShopComponent } from './pages/shop/shop.component';
 import { ProductComponent } from './pages/product/product.component';
 import { AdminComponent } from './pages/admin/admin.component';
 import { authGuard, adminGuard } from './core/auth.guard';
+import { CartComponent } from './pages/cart/cart.component';
+import { CheckoutComponent } from './pages/checkout/checkout.component';
+import { SuccessComponent } from './pages/checkout/success.component';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent, title: 'AdrianaArt' },
   { path: 'shop', component: ShopComponent, title: 'Shop | AdrianaArt' },
   { path: 'products/:slug', component: ProductComponent, title: 'Product | AdrianaArt' },
+  { path: 'cart', component: CartComponent, title: 'Cart | AdrianaArt' },
+  { path: 'checkout', component: CheckoutComponent, title: 'Checkout | AdrianaArt' },
+  { path: 'checkout/success', component: SuccessComponent, title: 'Order placed | AdrianaArt' },
   { path: 'admin', component: AdminComponent, canActivate: [adminGuard], title: 'Admin' },
   { path: 'account', canActivate: [authGuard], component: HomeComponent, title: 'Account' },
   { path: 'error', component: ErrorComponent, title: 'Something went wrong' },
