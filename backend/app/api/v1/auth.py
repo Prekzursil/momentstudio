@@ -1,4 +1,6 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from pathlib import Path
+
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -18,6 +20,7 @@ from app.schemas.auth import (
 from app.schemas.user import UserCreate
 from app.services import auth as auth_service
 from app.services import email as email_service
+from app.services import storage
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -85,6 +88,28 @@ async def logout(
 
 @router.get("/me", response_model=UserResponse)
 async def read_me(current_user: User = Depends(get_current_user)) -> UserResponse:
+    return UserResponse.model_validate(current_user)
+
+
+@router.post("/me/avatar", response_model=UserResponse)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    avatars_root = Path(settings.media_root) / "avatars"
+    extension = Path(file.filename or "").suffix.lower() or ".png"
+    filename = f"avatar-{current_user.id}{extension}"
+    path, saved_name = storage.save_upload(
+        file,
+        root=avatars_root,
+        filename=filename,
+        allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif"),
+        max_bytes=5 * 1024 * 1024,
+    )
+    current_user.avatar_url = f"/media/avatars/{saved_name}"
+    session.add(current_user)
+    await session.flush()
     return UserResponse.model_validate(current_user)
 
 

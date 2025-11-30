@@ -7,6 +7,7 @@ import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { ToastService } from '../../core/toast.service';
+import { ApiService } from '../../core/api.service';
 
 @Component({
   selector: 'app-account',
@@ -160,7 +161,7 @@ export class AccountComponent {
   pageSize = 5;
   totalPages = 1;
 
-  constructor(private toast: ToastService) {
+  constructor(private toast: ToastService, private api: ApiService) {
     this.computeTotalPages();
   }
 
@@ -218,12 +219,18 @@ export class AccountComponent {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      this.avatar = reader.result as string;
-      this.toast.success('Avatar updated');
-    };
-    reader.readAsDataURL(file);
+    const formData = new FormData();
+    formData.append('file', file);
+    this.api.post<{ avatar_url?: string }>('/auth/me/avatar', formData).subscribe({
+      next: (res) => {
+        this.avatar = res.avatar_url || null;
+        this.toast.success('Avatar updated');
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Could not upload avatar.';
+        this.toast.error(message);
+      }
+    });
   }
 
   refreshSession(): void {

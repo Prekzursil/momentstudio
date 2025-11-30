@@ -28,6 +28,7 @@ class UserResponse(BaseModel):
     id: UUID
     email: str
     name: str | None = None
+    avatar_url: str | None = None
     role: UserRole
     created_at: datetime
     updated_at: datetime

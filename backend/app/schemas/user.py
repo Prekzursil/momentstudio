@@ -19,6 +19,7 @@ class UserRead(UserBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    avatar_url: str | None = None
     role: UserRole
     created_at: datetime
     updated_at: datetime

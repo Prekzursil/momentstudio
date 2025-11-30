@@ -15,6 +15,7 @@ def ensure_media_root(root: str | Path | None = None) -> Path:
 def save_upload(
     file: UploadFile,
     root: str | Path | None = None,
+    filename: str | None = None,
     allowed_content_types: tuple[str, ...] | None = ("image/png", "image/jpeg", "image/webp", "image/gif"),
     max_bytes: int | None = 5 * 1024 * 1024,
 ) -> Tuple[str, str]:
@@ -22,8 +23,8 @@ def save_upload(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
 
     media_root = ensure_media_root(root)
-    filename = file.filename or "upload"
-    destination = media_root / filename
+    dest_name = filename or file.filename or "upload"
+    destination = media_root / dest_name
     content = file.file.read()
     if max_bytes and len(content) > max_bytes:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
