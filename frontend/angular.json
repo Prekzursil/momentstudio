@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
   "version": 1,
+  "newProjectRoot": "projects",
   "defaultProject": "app",
   "projects": {
     "app": {
@@ -39,14 +40,11 @@
             "styles": ["src/styles.css"],
             "scripts": []
           }
-        },
-        "lint": {
-          "builder": "@angular-devkit/build-angular:tslint",
-          "options": {
-            "tsConfig": ["tsconfig.app.json", "tsconfig.spec.json"]
-          }
         }
       }
     }
+  },
+  "cli": {
+    "analytics": false
   }
 }
