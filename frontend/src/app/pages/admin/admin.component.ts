@@ -52,7 +52,7 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900">Products</h2>
               <div class="flex gap-2">
-                <app-button size="sm" variant="ghost" label="New product"></app-button>
+                <app-button size="sm" variant="ghost" label="New product" (action)="startNewProduct()"></app-button>
               </div>
             </div>
             <div class="flex flex-wrap gap-3 items-center text-sm">
@@ -72,6 +72,7 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
                     <th class="py-2">Name</th>
                     <th>Price</th>
                     <th>Status</th>
+                    <th>Category</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -80,14 +81,48 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
                     <td class="py-2 font-semibold text-slate-900">{{ product.name }}</td>
                     <td>{{ product.price | localizedCurrency : 'USD' }}</td>
                     <td><span class="text-xs rounded-full bg-slate-100 px-2 py-1">{{ product.status }}</span></td>
+                    <td>{{ product.category }}</td>
                     <td class="flex gap-2 py-2">
-                      <app-button size="sm" variant="ghost" label="Edit"></app-button>
+                      <app-button size="sm" variant="ghost" label="Edit" (action)="editProduct(product)"></app-button>
                       <app-button size="sm" variant="ghost" label="Delete"></app-button>
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
+          </section>
+
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-900">{{ editingId ? 'Edit product' : 'Create product' }}</h2>
+              <app-button size="sm" variant="ghost" label="Reset" (action)="startNewProduct()"></app-button>
+            </div>
+            <div class="grid md:grid-cols-2 gap-3 text-sm">
+              <app-input label="Name" [(value)]="form.name"></app-input>
+              <app-input label="Slug" [(value)]="form.slug"></app-input>
+              <app-input label="Category" [(value)]="form.category"></app-input>
+              <app-input label="Price" type="number" [(value)]="form.price"></app-input>
+              <app-input label="Stock" type="number" [(value)]="form.stock"></app-input>
+              <label class="grid gap-1 text-sm font-medium text-slate-700">
+                Status
+                <select class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="form.status">
+                  <option value="active">Active</option>
+                  <option value="draft">Draft</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </label>
+              <app-input label="Image URL" [(value)]="form.image"></app-input>
+              <app-input label="Variants (comma separated)" [(value)]="form.variants"></app-input>
+            </div>
+            <label class="grid gap-1 text-sm font-medium text-slate-700">
+              Description
+              <textarea rows="3" class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="form.description"></textarea>
+            </label>
+            <div class="flex gap-3">
+              <app-button label="Save product" (action)="saveProduct()"></app-button>
+              <app-button variant="ghost" label="Preview" (action)="previewProduct()"></app-button>
+            </div>
+            <p *ngIf="formMessage" class="text-sm text-emerald-700">{{ formMessage }}</p>
           </section>
 
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
@@ -161,9 +196,9 @@ export class AdminComponent {
   productSearch = '';
   productSort: 'name' | 'price' = 'name';
   products = signal([
-    { name: 'Ocean glaze cup', price: 28, status: 'active' },
-    { name: 'Speckled mug', price: 24, status: 'draft' },
-    { name: 'Matte bowl', price: 32, status: 'active' }
+    { name: 'Ocean glaze cup', price: 28, status: 'active', category: 'Cups', slug: 'ocean-glaze-cup', stock: 5, description: 'Handmade cup', variants: ['Ivory'] },
+    { name: 'Speckled mug', price: 24, status: 'draft', category: 'Mugs', slug: 'speckled-mug', stock: 3, description: 'Speckled mug', variants: ['Blue'] },
+    { name: 'Matte bowl', price: 32, status: 'active', category: 'Bowls', slug: 'matte-bowl', stock: 8, description: 'Matte bowl', variants: ['Large'] }
   ]);
 
   orderFilter = '';
@@ -180,6 +215,20 @@ export class AdminComponent {
     { email: 'staff@adrianaart.com', role: 'staff' }
   ];
 
+  editingId: string | null = null;
+  form = {
+    name: '',
+    slug: '',
+    category: '',
+    price: 0,
+    stock: 0,
+    status: 'draft',
+    image: '',
+    variants: '',
+    description: ''
+  };
+  formMessage = '';
+
   filteredProducts() {
     const term = this.productSearch.toLowerCase();
     return this.products()
@@ -190,5 +239,73 @@ export class AdminComponent {
   filteredOrders() {
     const f = this.orderFilter;
     return this.orders().filter((o) => (f ? o.status === f : true));
+  }
+
+  startNewProduct(): void {
+    this.editingId = null;
+    this.form = {
+      name: '',
+      slug: '',
+      category: '',
+      price: 0,
+      stock: 0,
+      status: 'draft',
+      image: '',
+      variants: '',
+      description: ''
+    };
+    this.formMessage = '';
+  }
+
+  editProduct(product: any): void {
+    this.editingId = product.slug;
+    this.form = {
+      name: product.name,
+      slug: product.slug,
+      category: product.category ?? '',
+      price: product.price,
+      stock: product.stock ?? 0,
+      status: product.status,
+      image: product.image ?? '',
+      variants: product.variants?.join(',') ?? '',
+      description: product.description ?? ''
+    };
+    this.formMessage = `Editing ${product.name}`;
+  }
+
+  saveProduct(): void {
+    if (!this.form.name || !this.form.slug || !this.form.category) {
+      this.formMessage = 'Name, slug, and category are required.';
+      return;
+    }
+    const variants = this.form.variants
+      ? this.form.variants.split(',').map((v) => v.trim()).filter(Boolean)
+      : [];
+    if (this.editingId) {
+      this.products.update((items) =>
+        items.map((p) =>
+          p.slug === this.editingId
+            ? { ...p, ...this.form, variants, price: Number(this.form.price), stock: Number(this.form.stock) }
+            : p
+        )
+      );
+      this.formMessage = 'Product updated (mock).';
+    } else {
+      this.products.update((items) => [
+        ...items,
+        {
+          ...this.form,
+          price: Number(this.form.price),
+          stock: Number(this.form.stock),
+          variants
+        }
+      ]);
+      this.formMessage = 'Product created (mock).';
+    }
+    this.editingId = this.form.slug;
+  }
+
+  previewProduct(): void {
+    this.formMessage = 'Preview not implemented (placeholder).';
   }
 }

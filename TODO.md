@@ -234,9 +234,9 @@ Below is a structured checklist you can turn into issues.
 - [ ] Session timeout/logout messaging.
 
 ## Frontend - Admin Dashboard
-- [ ] /admin layout with sidebar + guard.
-- [ ] Product list table (sort/search).
-- [ ] Product create/edit form (slug, category, price, stock, description, images, variants).
+- [x] /admin layout with sidebar + guard.
+- [x] Product list table (sort/search).
+- [x] Product create/edit form (slug, category, price, stock, description, images, variants).
 - [ ] Admin orders list with filters + order detail/status update.
 - [ ] Content editor for hero and static pages.
 - [ ] Basic user list (view customers, promote/demote admins).
