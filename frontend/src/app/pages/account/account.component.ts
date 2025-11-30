@@ -10,6 +10,7 @@ import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
 import { AccountService, Address, Order } from '../../core/account.service';
 import { forkJoin } from 'rxjs';
+import { ApiService } from '../../core/api.service';
 
 @Component({
   selector: 'app-account',
@@ -180,7 +181,8 @@ export class AccountComponent implements OnInit {
     private toast: ToastService,
     private auth: AuthService,
     private account: AccountService,
-    private router: Router
+    private router: Router,
+    private api: ApiService
   ) {
     this.computeTotalPages();
   }
@@ -257,12 +259,18 @@ export class AccountComponent implements OnInit {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      this.avatar = reader.result as string;
-      this.toast.success('Avatar updated');
-    };
-    reader.readAsDataURL(file);
+    const formData = new FormData();
+    formData.append('file', file);
+    this.api.post<{ avatar_url?: string }>('/auth/me/avatar', formData).subscribe({
+      next: (res) => {
+        this.avatar = res.avatar_url || null;
+        this.toast.success('Avatar updated');
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Could not upload avatar.';
+        this.toast.error(message);
+      }
+    });
   }
 
   refreshSession(): void {

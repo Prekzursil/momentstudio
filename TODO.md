@@ -235,7 +235,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Session timeout/logout messaging.
 - [x] Wire login/register/password reset flows to backend auth endpoints (replace mocks).
 - [x] Fetch real profile, addresses, and order history from backend; replace account dashboard mock data.
-- [ ] Implement avatar upload wired to storage backend.
+- [x] Implement avatar upload wired to storage backend.
 
 ## Frontend - Admin Dashboard
 - [x] /admin layout with sidebar + guard.
