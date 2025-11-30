@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, signal } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ContainerComponent } from '../../layout/container.component';
@@ -9,6 +9,18 @@ import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
 import { InputComponent } from '../../shared/input.component';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
+import {
+  AdminService,
+  AdminSummary,
+  AdminProduct,
+  AdminOrder,
+  AdminUser,
+  AdminContent,
+  AdminCoupon,
+  AdminAudit,
+  LowStockItem
+} from '../../core/admin.service';
+import { ToastService } from '../../core/toast.service';
 
 @Component({
   selector: 'app-admin',
@@ -28,6 +40,9 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
   template: `
     <app-container classes="py-8 grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
+      <div *ngIf="error()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm">
+        {{ error() }}
+      </div>
       <div class="grid lg:grid-cols-[260px_1fr] gap-6">
         <aside class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-2 text-sm text-slate-700">
           <a class="font-semibold text-slate-900">Dashboard</a>
@@ -37,14 +52,19 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
           <a class="hover:text-slate-900 text-slate-700">Content</a>
         </aside>
 
-        <div class="grid gap-6">
+        <div class="grid gap-6" *ngIf="!loading(); else loadingTpl">
           <section class="grid gap-3">
             <h1 class="text-2xl font-semibold text-slate-900">Admin dashboard</h1>
             <p class="text-sm text-slate-600">Protected route guarded by adminGuard.</p>
             <div class="grid md:grid-cols-3 gap-4">
-              <app-card title="Products" subtitle="128 live"></app-card>
-              <app-card title="Orders" subtitle="5 processing"></app-card>
-              <app-card title="Users" subtitle="248 customers"></app-card>
+              <app-card title="Products" [subtitle]="summary()?.products + ' total'"></app-card>
+              <app-card title="Orders" [subtitle]="summary()?.orders + ' total'"></app-card>
+              <app-card title="Users" [subtitle]="summary()?.users + ' total'"></app-card>
+            </div>
+            <div class="grid md:grid-cols-3 gap-4">
+              <app-card title="Low stock" [subtitle]="summary()?.low_stock + ' items'"></app-card>
+              <app-card title="Sales (30d)" [subtitle]="(summary()?.sales_30d || 0) | localizedCurrency : 'USD'"></app-card>
+              <app-card title="Orders (30d)" [subtitle]="summary()?.orders_30d + ' orders'"></app-card>
             </div>
           </section>
 
@@ -52,21 +72,8 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900">Products</h2>
               <div class="flex gap-2">
-                <app-button size="sm" variant="ghost" label="New product" (action)="startNewProduct()"></app-button>
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  label="Activate"
-                  [disabled]="!selectedIds.size"
-                  (action)="bulkUpdateStatus('active')"
-                ></app-button>
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  label="Archive"
-                  [disabled]="!selectedIds.size"
-                  (action)="bulkUpdateStatus('archived')"
-                ></app-button>
+                <app-button size="sm" variant="ghost" label="Activate" [disabled]="!selectedIds.size" (action)="bulkUpdateStatus()"></app-button>
+                <app-button size="sm" variant="ghost" label="Archive" [disabled]="!selectedIds.size" (action)="bulkUpdateStatus()"></app-button>
               </div>
             </div>
             <div class="flex flex-wrap gap-3 items-center text-sm">
@@ -90,7 +97,7 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
                     <th>Price</th>
                     <th>Status</th>
                     <th>Category</th>
-                    <th></th>
+                    <th>Stock</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -103,90 +110,13 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
                       />
                     </td>
                     <td class="py-2 font-semibold text-slate-900">{{ product.name }}</td>
-                    <td>{{ product.price | localizedCurrency : 'USD' }}</td>
+                    <td>{{ product.price | localizedCurrency : product.currency || 'USD' }}</td>
                     <td><span class="text-xs rounded-full bg-slate-100 px-2 py-1">{{ product.status }}</span></td>
                     <td>{{ product.category }}</td>
-                    <td class="flex gap-2 py-2">
-                      <app-button size="sm" variant="ghost" label="Edit" (action)="editProduct(product)"></app-button>
-                      <app-button size="sm" variant="ghost" label="Delete"></app-button>
-                    </td>
+                    <td>{{ product.stock_quantity }}</td>
                   </tr>
                 </tbody>
               </table>
-            </div>
-          </section>
-
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">{{ editingId ? 'Edit product' : 'Create product' }}</h2>
-              <app-button size="sm" variant="ghost" label="Reset" (action)="startNewProduct()"></app-button>
-            </div>
-            <div class="grid md:grid-cols-2 gap-3 text-sm">
-              <app-input label="Name" [(value)]="form.name"></app-input>
-              <app-input label="Slug" [(value)]="form.slug"></app-input>
-              <app-input label="Category" [(value)]="form.category"></app-input>
-              <app-input label="Price" type="number" [(value)]="form.price"></app-input>
-              <app-input label="Stock" type="number" [(value)]="form.stock"></app-input>
-              <label class="grid gap-1 text-sm font-medium text-slate-700">
-                Status
-                <select class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="form.status">
-                  <option value="active">Active</option>
-                  <option value="draft">Draft</option>
-                  <option value="archived">Archived</option>
-                </select>
-              </label>
-              <app-input label="Image URL" [(value)]="form.image"></app-input>
-              <app-input label="Variants (comma separated)" [(value)]="form.variants"></app-input>
-            </div>
-            <label class="grid gap-1 text-sm font-medium text-slate-700">
-              Description
-              <textarea rows="3" class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="form.description"></textarea>
-            </label>
-            <div class="flex gap-3">
-              <app-button label="Save product" (action)="saveProduct()"></app-button>
-              <app-button variant="ghost" label="Preview" (action)="previewProduct()"></app-button>
-            </div>
-            <p *ngIf="formMessage" class="text-sm text-emerald-700">{{ formMessage }}</p>
-          </section>
-
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Product images</h2>
-              <app-button size="sm" variant="ghost" label="Add image" (action)="addImage()"></app-button>
-            </div>
-            <div class="grid gap-2 text-sm text-slate-700">
-              <div *ngFor="let img of productImages()" class="flex items-center gap-3 rounded-lg border border-slate-200 p-2">
-                <img [src]="img.url" [alt]="img.alt" class="h-12 w-12 rounded object-cover" />
-                <div class="flex-1">
-                  <p class="font-semibold text-slate-900">{{ img.alt }}</p>
-                  <p class="text-xs text-slate-500">Order: {{ img.order }}</p>
-                </div>
-                <div class="flex gap-2">
-                  <app-button size="sm" variant="ghost" label="↑" (action)="moveImage(img.id, -1)"></app-button>
-                  <app-button size="sm" variant="ghost" label="↓" (action)="moveImage(img.id, 1)"></app-button>
-                  <app-button size="sm" variant="ghost" label="Delete" (action)="deleteImage(img.id)"></app-button>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Categories</h2>
-              <app-button size="sm" variant="ghost" label="Add category" (action)="addCategory()"></app-button>
-            </div>
-            <div class="grid gap-2 text-sm text-slate-700">
-              <div *ngFor="let cat of categories()" class="flex items-center justify-between rounded-lg border border-slate-200 p-3">
-                <div>
-                  <p class="font-semibold text-slate-900">{{ cat.name }}</p>
-                  <p class="text-xs text-slate-500">Slug: {{ cat.slug }} · Order: {{ cat.order }}</p>
-                </div>
-                <div class="flex gap-2">
-                  <app-button size="sm" variant="ghost" label="↑" (action)="moveCategory(cat.slug, -1)"></app-button>
-                  <app-button size="sm" variant="ghost" label="↓" (action)="moveCategory(cat.slug, 1)"></app-button>
-                  <app-button size="sm" variant="ghost" label="Delete" (action)="deleteCategory(cat.slug)"></app-button>
-                </div>
-              </div>
             </div>
           </section>
 
@@ -197,7 +127,8 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
                 Status
                 <select class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="orderFilter">
                   <option value="">All</option>
-                  <option value="processing">Processing</option>
+                  <option value="pending">Pending</option>
+                  <option value="paid">Paid</option>
                   <option value="shipped">Shipped</option>
                   <option value="refunded">Refunded</option>
                 </select>
@@ -210,132 +141,17 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
                     <span class="font-semibold text-slate-900">Order #{{ order.id }}</span>
                     <span class="text-xs rounded-full bg-slate-100 px-2 py-1">{{ order.status }}</span>
                   </div>
-                  <p>{{ order.customer }} — {{ order.total | localizedCurrency : 'USD' }}</p>
+                  <p>{{ order.customer }} — {{ order.total_amount | localizedCurrency : order.currency || 'USD' }}</p>
                 </div>
               </div>
               <div class="rounded-lg border border-slate-200 p-4 text-sm text-slate-700" *ngIf="activeOrder">
                 <div class="flex items-center justify-between">
                   <h3 class="font-semibold text-slate-900">Order #{{ activeOrder.id }}</h3>
-                  <select class="rounded-lg border border-slate-200 px-2 py-1 text-sm" [(ngModel)]="activeOrder.status">
-                    <option value="processing">Processing</option>
-                    <option value="shipped">Shipped</option>
-                    <option value="refunded">Refunded</option>
-                  </select>
+                  <span class="text-xs rounded-full bg-slate-100 px-2 py-1">{{ activeOrder.status }}</span>
                 </div>
                 <p class="text-xs text-slate-500">Customer: {{ activeOrder.customer }}</p>
-                <p class="text-xs text-slate-500">Placed: {{ activeOrder.date }}</p>
-                <p class="font-semibold text-slate-900 mt-2">{{ activeOrder.total | localizedCurrency : 'USD' }}</p>
-                <div class="grid gap-1 mt-3">
-                  <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Timeline</p>
-                  <ol class="grid gap-2">
-                    <li *ngFor="let step of activeOrder.timeline" class="flex items-center gap-2">
-                      <span
-                        class="h-2 w-2 rounded-full"
-                        [ngClass]="step.done ? 'bg-emerald-500' : 'bg-slate-300'"
-                      ></span>
-                      <span class="text-xs text-slate-700">{{ step.label }}</span>
-                      <span class="text-[11px] text-slate-500" *ngIf="step.when">({{ step.when }})</span>
-                    </li>
-                  </ol>
-                </div>
-                <div class="flex gap-2 mt-3">
-                  <app-button size="sm" label="Update status" (action)="updateOrderStatus()"></app-button>
-                  <app-button size="sm" variant="ghost" label="Refund" (action)="refundOrder()"></app-button>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Content editor</h2>
-              <app-button size="sm" variant="ghost" label="Save" (action)="saveContent()"></app-button>
-            </div>
-            <label class="grid gap-1 text-sm font-medium text-slate-700">
-              Homepage hero headline
-              <input class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="homeHero.headline" />
-            </label>
-            <label class="grid gap-1 text-sm font-medium text-slate-700">
-              Hero subtext
-              <textarea rows="2" class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="homeHero.subtext"></textarea>
-            </label>
-            <label class="grid gap-1 text-sm font-medium text-slate-700">
-              Hero image URL
-              <input class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="homeHero.image" />
-            </label>
-            <label class="grid gap-1 text-sm font-medium text-slate-700">
-              Static page content
-              <textarea rows="3" class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="aboutContent"></textarea>
-            </label>
-            <div class="rounded-lg border border-dashed border-slate-200 p-3 bg-slate-50">
-              <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Preview</p>
-              <h3 class="text-lg font-semibold text-slate-900">{{ homeHero.headline }}</h3>
-              <p class="text-sm text-slate-700">{{ homeHero.subtext }}</p>
-              <p class="text-xs text-slate-500">Image: {{ homeHero.image || 'not set' }}</p>
-            </div>
-            <p *ngIf="contentMessage" class="text-sm text-emerald-700">{{ contentMessage }}</p>
-          </section>
-
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Low stock</h2>
-              <p class="text-xs text-slate-500">Threshold: ≤3</p>
-            </div>
-            <div class="grid gap-2 text-sm text-slate-700">
-              <div *ngIf="lowStock().length === 0" class="text-slate-600">No low-stock products.</div>
-              <div *ngFor="let item of lowStock()" class="rounded-lg border border-slate-200 p-3 flex items-center justify-between">
-                <div>
-                  <p class="font-semibold text-slate-900">{{ item.name }}</p>
-                  <p class="text-xs text-slate-500">Stock: {{ item.stock }}</p>
-                </div>
-                <app-button size="sm" variant="ghost" label="Restock"></app-button>
-              </div>
-            </div>
-          </section>
-
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Sales analytics</h2>
-              <span class="text-xs text-slate-500">Last 30 days</span>
-            </div>
-            <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div *ngFor="let metric of salesMetrics()" class="rounded-xl border border-slate-200 p-3">
-                <p class="text-xs uppercase tracking-[0.2em] text-slate-500">{{ metric.label }}</p>
-                <p class="text-lg font-semibold text-slate-900">
-                  <ng-container *ngIf="metric.label.includes('GMV') || metric.label === 'AOV'; else plain">
-                    {{ metric.value | localizedCurrency : 'USD' }}
-                  </ng-container>
-                  <ng-template #plain>{{ metric.value }}</ng-template>
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Sessions</h2>
-              <app-button size="sm" variant="ghost" label="Force logout all" (action)="forceLogoutAll()"></app-button>
-            </div>
-            <div class="grid gap-2 text-sm text-slate-700">
-              <div *ngFor="let sess of sessions()" class="rounded-lg border border-slate-200 p-3 flex items-center justify-between">
-                <div>
-                  <p class="font-semibold text-slate-900">{{ sess.user }}</p>
-                  <p class="text-xs text-slate-500">{{ sess.device }} · {{ sess.lastActive }}</p>
-                </div>
-                <app-button size="sm" variant="ghost" label="Force logout" (action)="forceLogout(sess.id)"></app-button>
-              </div>
-            </div>
-          </section>
-
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Activity log</h2>
-              <app-button size="sm" variant="ghost" label="Refresh" (action)="refreshAudit()"></app-button>
-            </div>
-            <div class="grid gap-2 text-sm text-slate-700">
-              <div *ngFor="let log of auditLogs()" class="rounded-lg border border-slate-200 p-3">
-                <p class="font-semibold text-slate-900">{{ log.action }}</p>
-                <p class="text-xs text-slate-500">{{ log.user }} · {{ log.at }}</p>
+                <p class="text-xs text-slate-500">Placed: {{ activeOrder.created_at | date: 'medium' }}</p>
+                <p class="font-semibold text-slate-900 mt-2">{{ activeOrder.total_amount | localizedCurrency : activeOrder.currency || 'USD' }}</p>
               </div>
             </div>
           </section>
@@ -343,18 +159,32 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900">Users</h2>
-              <app-button size="sm" variant="ghost" label="Add admin"></app-button>
+              <app-button size="sm" variant="ghost" label="Force logout selected" [disabled]="!selectedUserId" (action)="forceLogout()"></app-button>
             </div>
             <div class="grid gap-2 text-sm text-slate-700">
-              <div *ngFor="let user of users" class="rounded-lg border border-slate-200 p-3 flex items-center justify-between">
+              <div *ngFor="let user of users" class="flex items-center justify-between rounded-lg border border-slate-200 p-3">
                 <div>
-                  <p class="font-semibold text-slate-900">{{ user.email }}</p>
-                  <p class="text-xs text-slate-500">{{ user.role }}</p>
+                  <p class="font-semibold text-slate-900">{{ user.name || user.email }}</p>
+                  <p class="text-xs text-slate-500">{{ user.email }}</p>
                 </div>
-                <div class="flex gap-2">
-                  <app-button size="sm" variant="ghost" label="Promote"></app-button>
-                  <app-button size="sm" variant="ghost" label="Demote"></app-button>
+                <label class="flex items-center gap-2 text-xs">
+                  <input type="radio" name="userSelect" [value]="user.id" [(ngModel)]="selectedUserId" /> Select
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-900">Content</h2>
+            </div>
+            <div class="grid gap-2 text-sm text-slate-700">
+              <div *ngFor="let c of contentBlocks" class="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+                <div>
+                  <p class="font-semibold text-slate-900">{{ c.title }}</p>
+                  <p class="text-xs text-slate-500">{{ c.key }}</p>
                 </div>
+                <span class="text-xs text-slate-500">v{{ c.version }}</span>
               </div>
             </div>
           </section>
@@ -362,304 +192,183 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900">Coupons</h2>
-              <app-button size="sm" variant="ghost" label="Add coupon" (action)="addCoupon()"></app-button>
             </div>
             <div class="grid gap-2 text-sm text-slate-700">
-              <div *ngFor="let coupon of coupons()" class="rounded-lg border border-slate-200 p-3 flex items-center justify-between">
+              <div *ngFor="let coupon of coupons" class="flex items-center justify-between rounded-lg border border-slate-200 p-3">
                 <div>
-                  <p class="font-semibold text-slate-900">{{ coupon.code }} ({{ coupon.discount }}% off)</p>
-                  <p class="text-xs text-slate-500">Active: {{ coupon.active ? 'Yes' : 'No' }}</p>
+                  <p class="font-semibold text-slate-900">{{ coupon.code }}</p>
+                  <p class="text-xs text-slate-500">
+                    <ng-container *ngIf="coupon.percentage_off">-{{ coupon.percentage_off }}%</ng-container>
+                    <ng-container *ngIf="coupon.amount_off">-{{ coupon.amount_off | localizedCurrency : coupon.currency || 'USD' }}</ng-container>
+                    <ng-container *ngIf="!coupon.percentage_off && !coupon.amount_off">No discount set</ng-container>
+                  </p>
                 </div>
-                <div class="flex gap-2">
-                  <app-button size="sm" variant="ghost" label="Toggle" (action)="toggleCoupon(coupon.code)"></app-button>
-                  <app-button size="sm" variant="ghost" label="Delete" (action)="deleteCoupon(coupon.code)"></app-button>
+                <span class="text-xs rounded-full px-2 py-1" [ngClass]="coupon.active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'">
+                  {{ coupon.active ? 'Active' : 'Inactive' }}
+                </span>
+              </div>
+            </div>
+          </section>
+
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-900">Audit log</h2>
+              <app-button size="sm" variant="ghost" label="Refresh" (action)="loadAudit()"></app-button>
+            </div>
+            <div class="grid md:grid-cols-2 gap-4 text-sm text-slate-700">
+              <div class="grid gap-2">
+                <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Product changes</p>
+                <div *ngFor="let log of productAudit" class="rounded-lg border border-slate-200 p-3">
+                  <p class="font-semibold text-slate-900">{{ log.action }}</p>
+                  <p class="text-xs text-slate-500">Product ID: {{ log.product_id }}</p>
+                  <p class="text-xs text-slate-500">At: {{ log.created_at | date: 'short' }}</p>
+                </div>
+              </div>
+              <div class="grid gap-2">
+                <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Content changes</p>
+                <div *ngFor="let log of contentAudit" class="rounded-lg border border-slate-200 p-3">
+                  <p class="font-semibold text-slate-900">{{ log.action }}</p>
+                  <p class="text-xs text-slate-500">Block ID: {{ log.block_id }}</p>
+                  <p class="text-xs text-slate-500">At: {{ log.created_at | date: 'short' }}</p>
                 </div>
               </div>
             </div>
           </section>
+
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-900">Low stock</h2>
+              <span class="text-xs text-slate-500">Below 5 units</span>
+            </div>
+            <div class="grid gap-2 text-sm text-slate-700">
+              <div *ngFor="let item of lowStock" class="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+                <div>
+                  <p class="font-semibold text-slate-900">{{ item.name }}</p>
+                  <p class="text-xs text-slate-500">{{ item.sku }} — {{ item.slug }}</p>
+                </div>
+                <span class="text-xs rounded-full bg-amber-100 px-2 py-1 text-amber-900">Stock: {{ item.stock_quantity }}</span>
+              </div>
+            </div>
+          </section>
         </div>
+        <ng-template #loadingTpl>
+          <div class="rounded-2xl border border-slate-200 bg-white p-4">
+            <app-skeleton [rows]="6"></app-skeleton>
+          </div>
+        </ng-template>
       </div>
     </app-container>
   `
 })
-export class AdminComponent {
+export class AdminComponent implements OnInit {
   crumbs = [
     { label: 'Home', url: '/' },
     { label: 'Admin' }
   ];
 
-  productSearch = '';
-  productSort: 'name' | 'price' = 'name';
-  products = signal([
-    { name: 'Ocean glaze cup', price: 28, status: 'active', category: 'Cups', slug: 'ocean-glaze-cup', stock: 5, description: 'Handmade cup', variants: ['Ivory'] },
-    { name: 'Speckled mug', price: 24, status: 'draft', category: 'Mugs', slug: 'speckled-mug', stock: 3, description: 'Speckled mug', variants: ['Blue'] },
-    { name: 'Matte bowl', price: 32, status: 'active', category: 'Bowls', slug: 'matte-bowl', stock: 8, description: 'Matte bowl', variants: ['Large'] }
-  ]);
-
-  orderFilter = '';
-  orders = signal([
-    { id: '1001', customer: 'Jane', total: 120, status: 'processing', date: '2025-11-01' },
-    { id: '1000', customer: 'Alex', total: 85, status: 'shipped', date: '2025-10-15' }
-  ]);
-  activeOrder: any = null;
-
-  homeHero = { headline: 'Welcome to AdrianaArt!', subtext: 'Handmade collections updated weekly.', image: '' };
-  aboutContent = 'Handmade ceramics for your home.';
-
-  users = [
-    { email: 'admin@adrianaart.com', role: 'admin' },
-    { email: 'staff@adrianaart.com', role: 'staff' }
-  ];
-  coupons = signal([
-    { code: 'SAVE10', discount: 10, active: true },
-    { code: 'VIP20', discount: 20, active: false }
-  ]);
-  newCouponCode = '';
-  newCouponDiscount = 5;
-
-  productImages = signal([
-    { id: 'img1', url: 'https://picsum.photos/seed/img1/120', alt: 'Front', order: 1 },
-    { id: 'img2', url: 'https://picsum.photos/seed/img2/120', alt: 'Side', order: 2 }
-  ]);
-
-  categories = signal([
-    { slug: 'cups', name: 'Cups', order: 1 },
-    { slug: 'mugs', name: 'Mugs', order: 2 },
-    { slug: 'bowls', name: 'Bowls', order: 3 }
-  ]);
-  auditLogs = signal([
-    { user: 'admin@adrianaart.com', action: 'Updated product Ocean glaze cup', at: '2025-11-30 10:15' },
-    { user: 'staff@adrianaart.com', action: 'Archived product Speckled mug', at: '2025-11-29 16:42' },
-    { user: 'admin@adrianaart.com', action: 'Refunded order #1001', at: '2025-11-29 12:05' }
-  ]);
-  sessions = signal([
-    { id: 'sess1', user: 'admin@adrianaart.com', device: 'Chrome · Mac', lastActive: '5m ago' },
-    { id: 'sess2', user: 'admin@adrianaart.com', device: 'Safari · iPhone', lastActive: '2h ago' },
-    { id: 'sess3', user: 'staff@adrianaart.com', device: 'Edge · Windows', lastActive: '1d ago' }
-  ]);
-  salesMetrics = signal([
-    { label: 'GMV (30d)', value: 12450 },
-    { label: 'AOV', value: 78 },
-    { label: 'Orders (30d)', value: 160 },
-    { label: 'Refunds (30d)', value: 3 }
-  ]);
-
-  editingId: string | null = null;
-  form = {
-    name: '',
-    slug: '',
-    category: '',
-    price: 0,
-    stock: 0,
-    status: 'draft',
-    image: '',
-    variants: '',
-    description: ''
-  };
-  formMessage = '';
-  contentMessage = '';
-  selectedIds = new Set<string>();
   allSelected = false;
-  lowStock = () => this.products().filter((p) => (p.stock ?? 0) <= 3);
+  productSearch = '';
+  productSort = 'name';
+  selectedIds = new Set<string>();
+  products: AdminProduct[] = [];
+  orders: AdminOrder[] = [];
+  activeOrder: AdminOrder | null = null;
+  orderFilter = '';
+  users: AdminUser[] = [];
+  selectedUserId: string | null = null;
+  contentBlocks: AdminContent[] = [];
+  coupons: AdminCoupon[] = [];
+  productAudit: AdminAudit['products'] = [];
+  contentAudit: AdminAudit['content'] = [];
+  lowStock: LowStockItem[] = [];
+  summary = signal<AdminSummary | null>(null);
+  loading = signal<boolean>(true);
+  error = signal<string | null>(null);
 
-  filteredProducts() {
-    const term = this.productSearch.toLowerCase();
-    return this.products()
-      .filter((p) => (term ? p.name.toLowerCase().includes(term) : true))
-      .sort((a, b) => (this.productSort === 'name' ? a.name.localeCompare(b.name) : a.price - b.price));
+  constructor(private admin: AdminService, private toast: ToastService) {
+    this.computeAllSelected();
   }
 
-  filteredOrders() {
-    const f = this.orderFilter;
-    return this.orders().filter((o) => (f ? o.status === f : true));
+  ngOnInit(): void {
+    this.loadAll();
   }
 
-  selectOrder(order: any): void {
-    this.activeOrder = { ...order };
+  loadAll(): void {
+    this.loading.set(true);
+    this.error.set(null);
+    this.admin.summary().subscribe({ next: (s) => this.summary.set(s) });
+    this.admin.products().subscribe({ next: (p) => (this.products = p) });
+    this.admin.orders().subscribe({
+      next: (o) => {
+        this.orders = o;
+        this.activeOrder = o[0] || null;
+      }
+    });
+    this.admin.users().subscribe({ next: (u) => (this.users = u) });
+    this.admin.content().subscribe({ next: (c) => (this.contentBlocks = c) });
+    this.admin.coupons().subscribe({ next: (c) => (this.coupons = c) });
+    this.loadAudit();
+    this.admin.lowStock().subscribe({ next: (items) => (this.lowStock = items) });
+    this.loading.set(false);
   }
 
-  updateOrderStatus(): void {
-    if (!this.activeOrder) return;
-    this.orders.update((orders) =>
-      orders.map((o) => (o.id === this.activeOrder.id ? { ...o, status: this.activeOrder.status } : o))
-    );
-    this.formMessage = `Order #${this.activeOrder.id} status updated (mock).`;
+  loadAudit(): void {
+    this.admin.audit().subscribe({
+      next: (logs) => {
+        this.productAudit = logs.products;
+        this.contentAudit = logs.content;
+      },
+      error: () => this.toast.error('Unable to load audit log right now.')
+    });
   }
 
-  refundOrder(): void {
-    if (!this.activeOrder) return;
-    this.activeOrder.status = 'refunded';
-    this.updateOrderStatus();
-    this.formMessage = `Order #${this.activeOrder.id} refunded (mock).`;
+  filteredProducts(): AdminProduct[] {
+    const q = this.productSearch.toLowerCase();
+    let list = this.products;
+    if (q) list = list.filter((p) => p.name.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q));
+    if (this.productSort === 'price') {
+      list = [...list].sort((a, b) => a.price - b.price);
+    } else {
+      list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return list;
   }
 
-  moveImage(id: string, delta: number): void {
-    const imgs = [...this.productImages()];
-    const idx = imgs.findIndex((i) => i.id === id);
-    if (idx === -1) return;
-    const swapIdx = idx + delta;
-    if (swapIdx < 0 || swapIdx >= imgs.length) return;
-    [imgs[idx], imgs[swapIdx]] = [imgs[swapIdx], imgs[idx]];
-    imgs.forEach((img, i) => (img.order = i + 1));
-    this.productImages.set(imgs);
+  filteredOrders(): AdminOrder[] {
+    return this.orders.filter((o) => (this.orderFilter ? o.status === this.orderFilter : true));
   }
 
-  deleteImage(id: string): void {
-    this.productImages.update((imgs) => imgs.filter((i) => i.id !== id));
-  }
-
-  addImage(): void {
-    const next = {
-      id: crypto.randomUUID(),
-      url: `https://picsum.photos/seed/${Date.now()}/120`,
-      alt: 'New image',
-      order: this.productImages().length + 1
-    };
-    this.productImages.update((imgs) => [...imgs, next]);
-  }
-
-  moveCategory(slug: string, delta: number): void {
-    const cats = [...this.categories()];
-    const idx = cats.findIndex((c) => c.slug === slug);
-    if (idx === -1) return;
-    const swapIdx = idx + delta;
-    if (swapIdx < 0 || swapIdx >= cats.length) return;
-    [cats[idx], cats[swapIdx]] = [cats[swapIdx], cats[idx]];
-    cats.forEach((c, i) => (c.order = i + 1));
-    this.categories.set(cats);
-  }
-
-  addCategory(): void {
-    const slug = `cat-${Date.now()}`;
-    const next = { slug, name: 'New category', order: this.categories().length + 1 };
-    this.categories.update((cats) => [...cats, next]);
-  }
-
-  deleteCategory(slug: string): void {
-    this.categories.update((cats) => cats.filter((c) => c.slug !== slug));
-  }
-
-  addCoupon(): void {
-    if (!this.newCouponCode.trim()) return;
-    this.coupons.update((cs) => [...cs, { code: this.newCouponCode.toUpperCase(), discount: this.newCouponDiscount, active: true }]);
-    this.newCouponCode = '';
-    this.newCouponDiscount = 5;
-  }
-
-  toggleCoupon(code: string): void {
-    this.coupons.update((cs) => cs.map((c) => (c.code === code ? { ...c, active: !c.active } : c)));
-  }
-
-  deleteCoupon(code: string): void {
-    this.coupons.update((cs) => cs.filter((c) => c.code !== code));
-  }
-
-  forceLogout(id: string): void {
-    this.sessions.update((sess) => sess.filter((s) => s.id !== id));
-  }
-
-  forceLogoutAll(): void {
-    this.sessions.set([]);
-  }
-
-  refreshAudit(): void {
-    this.auditLogs.update((logs) => [
-      ...logs,
-      { user: 'system', action: 'Audit refreshed', at: new Date().toISOString() }
-    ]);
+  toggleAll(event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+    this.allSelected = checked;
+    if (checked) this.selectedIds = new Set(this.products.map((p) => p.slug));
+    else this.selectedIds.clear();
   }
 
   toggleSelect(slug: string, event: Event): void {
     const checked = (event.target as HTMLInputElement).checked;
     if (checked) this.selectedIds.add(slug);
     else this.selectedIds.delete(slug);
-    this.allSelected = this.selectedIds.size === this.products().length;
+    this.computeAllSelected();
   }
 
-  toggleAll(event: Event): void {
-    const checked = (event.target as HTMLInputElement).checked;
-    this.allSelected = checked;
-    this.selectedIds = checked ? new Set(this.products().map((p) => p.slug)) : new Set<string>();
+  computeAllSelected(): void {
+    this.allSelected = this.selectedIds.size > 0 && this.selectedIds.size === this.products.length;
   }
 
-  bulkUpdateStatus(status: string): void {
-    this.products.update((items) =>
-      items.map((p) => (this.selectedIds.has(p.slug) ? { ...p, status } : p))
-    );
-    this.selectedIds.clear();
-    this.allSelected = false;
-    this.formMessage = `Updated ${status} for selected products (mock).`;
+  bulkUpdateStatus(): void {
+    this.toast.info('Bulk update not wired to backend yet.');
   }
 
-  startNewProduct(): void {
-    this.editingId = null;
-    this.form = {
-      name: '',
-      slug: '',
-      category: '',
-      price: 0,
-      stock: 0,
-      status: 'draft',
-      image: '',
-      variants: '',
-      description: ''
-    };
-    this.formMessage = '';
+  selectOrder(order: AdminOrder): void {
+    this.activeOrder = { ...order };
   }
 
-  editProduct(product: any): void {
-    this.editingId = product.slug;
-    this.form = {
-      name: product.name,
-      slug: product.slug,
-      category: product.category ?? '',
-      price: product.price,
-      stock: product.stock ?? 0,
-      status: product.status,
-      image: product.image ?? '',
-      variants: product.variants?.join(',') ?? '',
-      description: product.description ?? ''
-    };
-    this.formMessage = `Editing ${product.name}`;
-  }
-
-  saveProduct(): void {
-    if (!this.form.name || !this.form.slug || !this.form.category) {
-      this.formMessage = 'Name, slug, and category are required.';
-      return;
-    }
-    const variants = this.form.variants
-      ? this.form.variants.split(',').map((v) => v.trim()).filter(Boolean)
-      : [];
-    if (this.editingId) {
-      this.products.update((items) =>
-        items.map((p) =>
-          p.slug === this.editingId
-            ? { ...p, ...this.form, variants, price: Number(this.form.price), stock: Number(this.form.stock) }
-            : p
-        )
-      );
-      this.formMessage = 'Product updated (mock).';
-    } else {
-      this.products.update((items) => [
-        ...items,
-        {
-          ...this.form,
-          price: Number(this.form.price),
-          stock: Number(this.form.stock),
-          variants
-        }
-      ]);
-      this.formMessage = 'Product created (mock).';
-    }
-    this.editingId = this.form.slug;
-  }
-
-  previewProduct(): void {
-    this.formMessage = 'Preview not implemented (placeholder).';
-  }
-
-  saveContent(): void {
-    this.contentMessage = 'Content saved (mock).';
+  forceLogout(): void {
+    if (!this.selectedUserId) return;
+    this.admin.revokeSessions(this.selectedUserId).subscribe({
+      next: () => this.toast.success('Sessions revoked'),
+      error: () => this.toast.error('Failed to revoke sessions')
+    });
   }
 }

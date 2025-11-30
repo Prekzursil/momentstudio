@@ -254,10 +254,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin login session management (force logout).
 - [x] Inventory low-stock dashboard.
 - [x] Sales analytics dashboard (GMV, AOV).
-- [ ] Wire admin dashboard widgets to backend (products/orders/users/content/coupons) and remove mock data.
-- [ ] Connect admin audit log to backend audit endpoints.
-- [ ] Connect admin session force-logout to backend session management.
-- [ ] Calculate low-stock and sales analytics from real backend metrics instead of mock data.
+- [x] Wire admin dashboard widgets to backend (products/orders/users/content/coupons) and remove mock data.
+- [x] Connect admin audit log to backend audit endpoints.
+- [x] Connect admin session force-logout to backend session management.
+- [x] Calculate low-stock and sales analytics from real backend metrics instead of mock data.
 
 ## UX, Performance, SEO & Accessibility
 - [ ] Mobile-first responsive design across pages.
