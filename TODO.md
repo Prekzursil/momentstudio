@@ -232,6 +232,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Saved payment method placeholder.
 - [x] Profile avatar upload (optional).
 - [x] Session timeout/logout messaging.
+- [ ] Wire login/register/password reset flows to backend auth endpoints (replace mocks).
+- [ ] Fetch real profile, addresses, and order history from backend; replace account dashboard mock data.
+- [ ] Implement avatar upload wired to storage backend.
 
 ## Frontend - Admin Dashboard
 - [x] /admin layout with sidebar + guard.
@@ -250,6 +253,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin login session management (force logout).
 - [x] Inventory low-stock dashboard.
 - [x] Sales analytics dashboard (GMV, AOV).
+- [ ] Wire admin dashboard widgets to backend (products/orders/users/content/coupons) and remove mock data.
+- [ ] Connect admin audit log to backend audit endpoints.
+- [ ] Connect admin session force-logout to backend session management.
+- [ ] Calculate low-stock and sales analytics from real backend metrics instead of mock data.
 
 ## UX, Performance, SEO & Accessibility
 - [ ] Mobile-first responsive design across pages.
