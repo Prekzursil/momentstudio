@@ -148,6 +148,67 @@ async def admin_coupons(session: AsyncSession = Depends(get_session), _: str = D
     ]
 
 
+@router.post("/coupons", status_code=status.HTTP_201_CREATED)
+async def admin_create_coupon(
+    payload: dict,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    code = payload.get("code")
+    if not code:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="code required")
+    promo = PromoCode(
+        code=code,
+        percentage_off=payload.get("percentage_off"),
+        amount_off=payload.get("amount_off"),
+        currency=payload.get("currency"),
+        expires_at=payload.get("expires_at"),
+        max_uses=payload.get("max_uses"),
+        active=payload.get("active", True),
+    )
+    session.add(promo)
+    await session.flush()
+    return {
+        "id": str(promo.id),
+        "code": promo.code,
+        "percentage_off": float(promo.percentage_off) if promo.percentage_off is not None else None,
+        "amount_off": float(promo.amount_off) if promo.amount_off is not None else None,
+        "currency": promo.currency,
+        "expires_at": promo.expires_at,
+        "active": promo.active,
+        "times_used": promo.times_used,
+        "max_uses": promo.max_uses,
+    }
+
+
+@router.patch("/coupons/{coupon_id}")
+async def admin_update_coupon(
+    coupon_id: UUID,
+    payload: dict,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    promo = await session.get(PromoCode, coupon_id)
+    if not promo:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+    for field in ["percentage_off", "amount_off", "currency", "expires_at", "max_uses", "active", "code"]:
+        if field in payload:
+            setattr(promo, field, payload[field])
+    session.add(promo)
+    await session.flush()
+    return {
+        "id": str(promo.id),
+        "code": promo.code,
+        "percentage_off": float(promo.percentage_off) if promo.percentage_off is not None else None,
+        "amount_off": float(promo.amount_off) if promo.amount_off is not None else None,
+        "currency": promo.currency,
+        "expires_at": promo.expires_at,
+        "active": promo.active,
+        "times_used": promo.times_used,
+        "max_uses": promo.max_uses,
+    }
+
+
 @router.get("/audit")
 async def admin_audit(session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)) -> dict:
     product_audit_stmt = (

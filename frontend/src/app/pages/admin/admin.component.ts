@@ -200,6 +200,11 @@ import { ToastService } from '../../core/toast.service';
               <h2 class="text-lg font-semibold text-slate-900">Coupons</h2>
             </div>
             <div class="grid gap-2 text-sm text-slate-700">
+              <div class="grid md:grid-cols-3 gap-2 items-end">
+                <app-input label="Code" [(value)]="newCoupon.code"></app-input>
+                <app-input label="% off" type="number" [(value)]="newCoupon.percentage_off"></app-input>
+                <app-button size="sm" label="Add coupon" (action)="createCoupon()"></app-button>
+              </div>
               <div *ngFor="let coupon of coupons" class="flex items-center justify-between rounded-lg border border-slate-200 p-3">
                 <div>
                   <p class="font-semibold text-slate-900">{{ coupon.code }}</p>
@@ -209,9 +214,15 @@ import { ToastService } from '../../core/toast.service';
                     <ng-container *ngIf="!coupon.percentage_off && !coupon.amount_off">No discount set</ng-container>
                   </p>
                 </div>
-                <span class="text-xs rounded-full px-2 py-1" [ngClass]="coupon.active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'">
+                <button
+                  type="button"
+                  class="text-xs rounded-full px-2 py-1 border"
+                  [class.bg-emerald-100]="coupon.active"
+                  [class.text-emerald-800]="coupon.active"
+                  (click)="toggleCoupon(coupon)"
+                >
                   {{ coupon.active ? 'Active' : 'Inactive' }}
-                </span>
+                </button>
               </div>
             </div>
           </section>
@@ -284,6 +295,7 @@ export class AdminComponent implements OnInit {
   selectedUserId: string | null = null;
   contentBlocks: AdminContent[] = [];
   coupons: AdminCoupon[] = [];
+  newCoupon: Partial<AdminCoupon> = { code: '', percentage_off: 0, active: true, currency: 'USD' };
   productAudit: AdminAudit['products'] = [];
   contentAudit: AdminAudit['content'] = [];
   lowStock: LowStockItem[] = [];
@@ -397,6 +409,30 @@ export class AdminComponent implements OnInit {
         this.orders = this.orders.map((o) => (o.id === order.id ? order : o));
       },
       error: () => this.toast.error('Failed to update order status')
+    });
+  }
+
+  createCoupon(): void {
+    if (!this.newCoupon.code) {
+      this.toast.error('Coupon code is required');
+      return;
+    }
+    this.admin.createCoupon(this.newCoupon).subscribe({
+      next: (c) => {
+        this.coupons = [c, ...this.coupons];
+        this.toast.success('Coupon created');
+      },
+      error: () => this.toast.error('Failed to create coupon')
+    });
+  }
+
+  toggleCoupon(coupon: AdminCoupon): void {
+    this.admin.updateCoupon(coupon.id, { active: !coupon.active }).subscribe({
+      next: (c) => {
+        this.coupons = this.coupons.map((x) => (x.id === c.id ? c : x));
+        this.toast.success('Coupon updated');
+      },
+      error: () => this.toast.error('Failed to update coupon')
     });
   }
 }

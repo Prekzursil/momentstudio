@@ -59,6 +59,20 @@ export interface AdminCoupon {
   max_uses?: number | null;
 }
 
+export interface AdminCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+}
+
+export interface AdminProductDetail extends AdminProduct {
+  short_description?: string | null;
+  long_description?: string | null;
+  category_id?: string | null;
+  stock_quantity: number;
+}
+
 export interface AdminAudit {
   products: AdminAuditItem[];
   content: AdminAuditItem[];
@@ -128,5 +142,33 @@ export class AdminService {
 
   bulkUpdateProducts(payload: { slug: string; status?: string }[]): Observable<AdminProduct[]> {
     return this.api.post<AdminProduct[]>('/catalog/products/bulk-update', payload);
+  }
+
+  getCategories(): Observable<AdminCategory[]> {
+    return this.api.get<AdminCategory[]>('/catalog/categories');
+  }
+
+  getProduct(slug: string): Observable<AdminProductDetail> {
+    return this.api.get<AdminProductDetail>(`/catalog/products/${slug}`);
+  }
+
+  createProduct(payload: Partial<AdminProductDetail>): Observable<AdminProductDetail> {
+    return this.api.post<AdminProductDetail>('/catalog/products', payload);
+  }
+
+  updateProduct(slug: string, payload: Partial<AdminProductDetail>): Observable<AdminProductDetail> {
+    return this.api.patch<AdminProductDetail>(`/catalog/products/${slug}`, payload);
+  }
+
+  deleteProduct(slug: string): Observable<void> {
+    return this.api.delete<void>(`/catalog/products/${slug}`);
+  }
+
+  createCoupon(payload: Partial<AdminCoupon>): Observable<AdminCoupon> {
+    return this.api.post<AdminCoupon>('/admin/dashboard/coupons', payload);
+  }
+
+  updateCoupon(id: string, payload: Partial<AdminCoupon>): Observable<AdminCoupon> {
+    return this.api.patch<AdminCoupon>(`/admin/dashboard/coupons/${id}`, payload);
   }
 }
