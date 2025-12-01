@@ -13,6 +13,7 @@ from app.schemas.catalog import (
     CategoryCreate,
     CategoryRead,
     CategoryUpdate,
+    CategoryReorderItem,
     ProductCreate,
     ProductRead,
     ProductUpdate,
@@ -34,7 +35,7 @@ router = APIRouter(prefix="/catalog", tags=["catalog"])
 
 @router.get("/categories", response_model=list[CategoryRead])
 async def list_categories(session: AsyncSession = Depends(get_session)) -> list[Category]:
-    result = await session.execute(select(Category).order_by(Category.name))
+    result = await session.execute(select(Category).order_by(Category.sort_order, Category.name))
     return list(result.scalars())
 
 
@@ -111,6 +112,15 @@ async def delete_category(
     await session.delete(category)
     await session.commit()
     return category
+
+
+@router.post("/categories/reorder", response_model=list[CategoryRead])
+async def reorder_categories(
+    payload: list[CategoryReorderItem],
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> list[Category]:
+    return await catalog_service.reorder_categories(session, payload)
 
 
 @router.post("/products", response_model=ProductRead, status_code=status.HTTP_201_CREATED)

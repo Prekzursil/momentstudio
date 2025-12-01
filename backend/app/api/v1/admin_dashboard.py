@@ -290,6 +290,18 @@ async def update_user_role(
     }
 
 
+@router.get("/maintenance")
+async def get_maintenance(_: str = Depends(require_admin)) -> dict:
+    return {"enabled": settings.maintenance_mode}
+
+
+@router.post("/maintenance")
+async def set_maintenance(payload: dict, _: str = Depends(require_admin)) -> dict:
+    enabled = bool(payload.get("enabled", False))
+    settings.maintenance_mode = enabled
+    return {"enabled": settings.maintenance_mode}
+
+
 @router.get("/low-stock")
 async def low_stock_products(session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)) -> list[dict]:
     stmt = (

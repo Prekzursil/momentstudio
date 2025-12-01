@@ -9,6 +9,12 @@ from app.api.v1 import payments
 from app.api.v1 import content
 from app.api.v1 import email_preview
 from app.api.v1 import admin_dashboard
+from app.models.catalog import Product, Category
+from fastapi import Response, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from app.db.session import get_session
+from app.core.config import settings
 
 api_router = APIRouter()
 
@@ -31,3 +37,38 @@ def healthcheck() -> dict[str, str]:
 @api_router.get("/health/ready", tags=["health"])
 def readiness() -> dict[str, str]:
     return {"status": "ready"}
+
+
+@api_router.get("/sitemap.xml", tags=["sitemap"])
+async def sitemap(session: AsyncSession = Depends(get_session)) -> Response:
+    products = (await session.execute(select(Product.slug))).scalars().all()
+    categories = (await session.execute(select(Category.slug))).scalars().all()
+    urls = []
+    base = settings.frontend_origin.rstrip("/")
+    urls.append(f"<url><loc>{base}/</loc></url>")
+    for slug in categories:
+        urls.append(f"<url><loc>{base}/shop?category={slug}</loc></url>")
+    for slug in products:
+        urls.append(f"<url><loc>{base}/products/{slug}</loc></url>")
+    body = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">" + "".join(urls) + "</urlset>"
+    return Response(content=body, media_type="application/xml")
+
+
+@api_router.get("/robots.txt", tags=["sitemap"])
+def robots() -> Response:
+    lines = [
+        "User-agent: *",
+        "Allow: /",
+        f"Sitemap: {settings.frontend_origin.rstrip('/')}/api/v1/sitemap.xml",
+    ]
+    return Response(content="\n".join(lines), media_type="text/plain")
+
+
+@api_router.get("/feeds/products.json", tags=["sitemap"])
+async def product_feed(session: AsyncSession = Depends(get_session)) -> list[dict]:
+    result = await session.execute(select(Product.slug, Product.name, Product.base_price, Product.currency))
+    rows = result.all()
+    return [
+        {"slug": slug, "name": name, "price": float(price), "currency": currency}
+        for slug, name, price, currency in rows
+    ]

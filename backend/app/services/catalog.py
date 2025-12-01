@@ -28,6 +28,7 @@ from app.models.catalog import (
 from app.schemas.catalog import (
     CategoryCreate,
     CategoryUpdate,
+    CategoryReorderItem,
     ProductCreate,
     ProductImageCreate,
     ProductUpdate,
@@ -142,6 +143,26 @@ async def update_category(session: AsyncSession, category: Category, payload: Ca
     await session.commit()
     await session.refresh(category)
     return category
+
+
+async def reorder_categories(session: AsyncSession, payload: list[CategoryReorderItem]) -> list[Category]:
+    slugs = [item.slug for item in payload]
+    if not slugs:
+        return []
+    result = await session.execute(select(Category).where(Category.slug.in_(slugs)))
+    categories = {c.slug: c for c in result.scalars()}
+    updated: list[Category] = []
+    for item in payload:
+        if not item.slug or item.slug not in categories:
+            continue
+        cat = categories[item.slug]
+        if item.sort_order is not None:
+            cat.sort_order = item.sort_order
+            updated.append(cat)
+    if updated:
+        session.add_all(updated)
+        await session.commit()
+    return updated
 
 
 async def create_product(
