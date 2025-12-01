@@ -203,9 +203,10 @@ export class AdminService {
   }
 
   reorderProductImage(slug: string, imageId: string, sortOrder: number): Observable<AdminProductDetail> {
-    return this.api.patch<AdminProductDetail>(`/catalog/products/${slug}/images/${imageId}/sort`, null, {
-      sort_order: sortOrder
-    } as any);
+    return this.api.patch<AdminProductDetail>(
+      `/catalog/products/${slug}/images/${imageId}/sort?sort_order=${sortOrder}`,
+      {}
+    );
   }
 
   updateUserRole(userId: string, role: string): Observable<AdminUser> {

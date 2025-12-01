@@ -481,8 +481,19 @@ export class AdminComponent implements OnInit {
         this.contentAudit = logs.content;
       }
     });
-    this.admin.getCategories().subscribe({ next: (cats) => (this.categories = cats) });
-    this.admin.getMaintenance().subscribe({ next: (m) => this.maintenanceEnabled.set(m.enabled) });
+    this.admin.getCategories().subscribe({
+      next: (cats) => {
+        this.categories = cats
+          .map((c) => ({ ...c, sort_order: c.sort_order ?? 0 }))
+          .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+      }
+    });
+    this.admin.getMaintenance().subscribe({
+      next: (m) => {
+        this.maintenanceEnabled.set(m.enabled);
+        this.maintenanceEnabledValue = m.enabled;
+      }
+    });
     this.loading.set(false);
   }
 
@@ -683,18 +694,20 @@ export class AdminComponent implements OnInit {
   }
 
   moveCategory(cat: AdminCategory, delta: number): void {
-    const sorted = [...this.categories].sort((a, b) => a.sort_order - b.sort_order);
+    const sorted = [...this.categories].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
     const index = sorted.findIndex((c) => c.slug === cat.slug);
     const swapIndex = index + delta;
     if (index < 0 || swapIndex < 0 || swapIndex >= sorted.length) return;
-    const tmp = sorted[index].sort_order;
-    sorted[index].sort_order = sorted[swapIndex].sort_order;
+    const tmp = sorted[index].sort_order ?? 0;
+    sorted[index].sort_order = sorted[swapIndex].sort_order ?? 0;
     sorted[swapIndex].sort_order = tmp;
     this.admin
-      .reorderCategories(sorted.map((c) => ({ slug: c.slug, sort_order: c.sort_order })))
+      .reorderCategories(sorted.map((c) => ({ slug: c.slug, sort_order: c.sort_order ?? 0 })))
       .subscribe({
         next: (cats) => {
-          this.categories = cats.sort((a, b) => a.sort_order - b.sort_order);
+          this.categories = cats
+            .map((c) => ({ ...c, sort_order: c.sort_order ?? 0 }))
+            .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
           this.toast.success('Category order saved');
         },
         error: () => this.toast.error('Failed to reorder categories')
@@ -714,7 +727,7 @@ export class AdminComponent implements OnInit {
       this.draggingSlug = null;
       return;
     }
-    const sorted = [...this.categories].sort((a, b) => a.sort_order - b.sort_order);
+    const sorted = [...this.categories].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
     const fromIdx = sorted.findIndex((c) => c.slug === this.draggingSlug);
     const toIdx = sorted.findIndex((c) => c.slug === targetSlug);
     if (fromIdx === -1 || toIdx === -1) {
@@ -725,10 +738,12 @@ export class AdminComponent implements OnInit {
     sorted.splice(toIdx, 0, moved);
     sorted.forEach((c, idx) => (c.sort_order = idx));
     this.admin
-      .reorderCategories(sorted.map((c) => ({ slug: c.slug, sort_order: c.sort_order })))
+      .reorderCategories(sorted.map((c) => ({ slug: c.slug, sort_order: c.sort_order ?? 0 })))
       .subscribe({
         next: (cats) => {
-          this.categories = cats.sort((a, b) => a.sort_order - b.sort_order);
+          this.categories = cats
+            .map((c) => ({ ...c, sort_order: c.sort_order ?? 0 }))
+            .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
           this.toast.success('Category order saved');
         },
         error: () => this.toast.error('Failed to reorder categories'),
