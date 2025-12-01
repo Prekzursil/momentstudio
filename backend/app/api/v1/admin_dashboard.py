@@ -262,7 +262,7 @@ async def revoke_sessions(
         s.revoked_reason = "admin-forced"
     if sessions:
         session.add_all(sessions)
-        await session.flush()
+        await session.commit()
     return None
 
 

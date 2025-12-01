@@ -162,6 +162,8 @@ async def reorder_categories(session: AsyncSession, payload: list[CategoryReorde
     if updated:
         session.add_all(updated)
         await session.commit()
+        for cat in updated:
+            await session.refresh(cat)
     return updated
 
 
