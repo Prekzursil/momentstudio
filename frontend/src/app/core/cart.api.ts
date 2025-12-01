@@ -39,6 +39,12 @@ export interface CartItemResponse {
   image_url?: string | null;
   currency?: string | null;
 }
+export interface CartItemAddRequest {
+  product_id: string;
+  variant_id?: string | null;
+  quantity: number;
+  note?: string | null;
+}
 
 const SESSION_KEY = 'cart_session_id';
 
@@ -72,5 +78,13 @@ export class CartApi {
 
   paymentIntent(): Observable<{ client_secret: string; intent_id: string }> {
     return this.api.post<{ client_secret: string; intent_id: string }>('/payments/intent', {}, this.headers());
+  }
+
+  addItem(body: CartItemAddRequest): Observable<CartItemResponse> {
+    return this.api.post<CartItemResponse>('/cart/items', body, this.headers());
+  }
+
+  deleteItem(itemId: string): Observable<void> {
+    return this.api.delete<void>(`/cart/items/${itemId}`, this.headers());
   }
 }

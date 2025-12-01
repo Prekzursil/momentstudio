@@ -3,6 +3,7 @@ import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CatalogService, Product } from '../../core/catalog.service';
+import { CartStore } from '../../core/cart.store';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
@@ -209,7 +210,8 @@ export class ProductComponent implements OnInit {
     private catalog: CatalogService,
     private toast: ToastService,
     private title: Title,
-    private meta: Meta
+    private meta: Meta,
+    private cartStore: CartStore
   ) {}
 
   ngOnInit(): void {
@@ -259,8 +261,19 @@ export class ProductComponent implements OnInit {
   }
 
   addToCart(): void {
-    const name = this.product?.name ?? 'item';
-    this.toast.success('Added to cart', `${this.quantity} × ${name}`);
+    if (!this.product) return;
+    this.cartStore.addFromProduct({
+      product_id: this.product.id,
+      variant_id: null,
+      quantity: this.quantity,
+      name: this.product.name,
+      slug: this.product.slug,
+      image: this.product.images?.[0]?.url,
+      price: Number(this.product.base_price),
+      currency: this.product.currency,
+      stock: this.product.stock_quantity ?? 99
+    });
+    this.toast.success('Added to cart', `${this.quantity} × ${this.product.name}`);
   }
 
   private updateMeta(product: Product): void {

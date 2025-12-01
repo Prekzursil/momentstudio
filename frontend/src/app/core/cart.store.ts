@@ -44,6 +44,60 @@ export class CartStore {
     });
   }
 
+  addFromProduct(payload: {
+    product_id: string;
+    variant_id?: string | null;
+    quantity: number;
+    name?: string;
+    slug?: string;
+    image?: string;
+    price?: number;
+    currency?: string;
+    stock?: number;
+  }): void {
+    this.api
+      .addItem({
+        product_id: payload.product_id,
+        variant_id: payload.variant_id,
+        quantity: payload.quantity
+      })
+      .pipe(
+        map((res) => ({
+          id: res.id,
+          product_id: res.product_id,
+          variant_id: res.variant_id,
+          name: res.name ?? payload.name ?? '',
+          slug: res.slug ?? payload.slug ?? '',
+          price: Number(res.unit_price_at_add ?? payload.price ?? 0),
+          currency: res.currency ?? payload.currency ?? 'USD',
+          quantity: res.quantity,
+          stock: res.max_quantity ?? payload.stock ?? 99,
+          image: res.image_url ?? payload.image ?? ''
+        }))
+      )
+      .subscribe({
+        next: (item) => {
+          const current = this.itemsSignal();
+          const idx = current.findIndex(
+            (i) => i.product_id === item.product_id && i.variant_id === item.variant_id
+          );
+          let next = [];
+          if (idx >= 0) {
+            const mergedQty = current[idx].quantity + item.quantity;
+            current[idx] = { ...current[idx], quantity: mergedQty };
+            next = [...current];
+          } else {
+            next = [...current, item];
+          }
+          this.itemsSignal.set(next);
+          this.persist(next);
+        },
+        error: () => {
+          // if backend add fails, keep local state unchanged
+        }
+      });
+  }
+
   syncBackend(): void {
     const payload: CartApiItem[] = this.itemsSignal().map((i) => ({
       product_id: i.product_id,
@@ -78,11 +132,19 @@ export class CartStore {
   }
 
   remove(id: string): void {
-    this.itemsSignal.update((items) => {
-      const next = items.filter((i) => i.id !== id);
-      this.persist(next);
-      this.syncBackend();
-      return next;
+    const item = this.itemsSignal().find((i) => i.id === id);
+    if (!item) return;
+    this.api.deleteItem(id).subscribe({
+      next: () => {
+        this.itemsSignal.update((items) => {
+          const next = items.filter((i) => i.id !== id);
+          this.persist(next);
+          return next;
+        });
+      },
+      error: () => {
+        // keep local state unchanged on failure
+      }
     });
   }
 
