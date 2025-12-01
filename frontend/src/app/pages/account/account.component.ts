@@ -8,7 +8,7 @@ import { ButtonComponent } from '../../shared/button.component';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
-import { AccountService, Address, Order } from '../../core/account.service';
+import { AccountService, Address, Order, AddressCreateRequest } from '../../core/account.service';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 
@@ -236,15 +236,39 @@ export class AccountComponent implements OnInit {
   }
 
   addAddress(): void {
-    this.toast.info('Address management coming soon.', 'Use backend API to add new addresses.');
+    const payload = this.promptAddress();
+    if (!payload) return;
+    this.account.createAddress(payload).subscribe({
+      next: (addr) => {
+        this.toast.success('Address added');
+        this.addresses.set([...this.addresses(), addr]);
+      },
+      error: (err) => this.toast.error(err?.error?.detail || 'Could not add address.')
+    });
   }
 
   editAddress(id: string): void {
-    this.toast.info('Edit address not yet wired in UI', id);
+    const current = this.addresses().find((a) => a.id === id);
+    const payload = this.promptAddress(current);
+    if (!payload) return;
+    this.account.updateAddress(id, payload).subscribe({
+      next: (addr) => {
+        this.toast.success('Address updated');
+        this.addresses.set(this.addresses().map((a) => (a.id === id ? addr : a)));
+      },
+      error: (err) => this.toast.error(err?.error?.detail || 'Could not update address.')
+    });
   }
 
   removeAddress(id: string): void {
-    this.toast.info('Address removal will be handled via API soon.', id);
+    if (!confirm('Remove this address?')) return;
+    this.account.deleteAddress(id).subscribe({
+      next: () => {
+        this.toast.success('Address removed');
+        this.addresses.set(this.addresses().filter((a) => a.id !== id));
+      },
+      error: () => this.toast.error('Could not remove address.')
+    });
   }
 
   addCard(): void {
@@ -296,5 +320,30 @@ export class AccountComponent implements OnInit {
   private computeTotalPages(total?: number): void {
     const count = total ?? this.filteredOrders().length;
     this.totalPages = Math.max(1, Math.ceil(count / this.pageSize));
+  }
+
+  private promptAddress(existing?: Address): AddressCreateRequest | null {
+    const line1 = prompt('Address line 1', existing?.line1 || '');
+    if (!line1) return null;
+    const city = prompt('City', existing?.city || '');
+    if (!city) return null;
+    const country = prompt('Country code (e.g., US, RO)', existing?.country || 'US');
+    if (!country) return null;
+    const label = prompt('Label', existing?.label || 'Home') || undefined;
+    const postal = prompt('Postal code', existing?.postal_code || '');
+    if (!postal) return null;
+    const region = prompt('Region/State', existing?.region || '') || undefined;
+    const line2 = prompt('Address line 2', existing?.line2 || '') || undefined;
+    return {
+      label,
+      line1,
+      line2,
+      city,
+      region,
+      postal_code: postal,
+      country,
+      is_default_shipping: existing?.is_default_shipping,
+      is_default_billing: existing?.is_default_billing
+    };
   }
 }

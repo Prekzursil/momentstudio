@@ -6,6 +6,7 @@ import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ToastService } from '../../core/toast.service';
+import { AuthService } from '../../core/auth.service';
 
 @Component({
   selector: 'app-change-password',
@@ -66,7 +67,7 @@ export class ChangePasswordComponent {
   confirm = '';
   error = '';
 
-  constructor(private toast: ToastService) {}
+  constructor(private toast: ToastService, private auth: AuthService) {}
 
   onSubmit(form: NgForm): void {
     if (!form.valid) {
@@ -78,6 +79,18 @@ export class ChangePasswordComponent {
       return;
     }
     this.error = '';
-    this.toast.success('Password updated (mock)', 'Your password has been changed.');
+    this.auth.changePassword(this.current, this.password).subscribe({
+      next: () => {
+        this.toast.success('Password updated', 'Your password has been changed.');
+        this.current = '';
+        this.password = '';
+        this.confirm = '';
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Could not update password.';
+        this.error = message;
+        this.toast.error(message);
+      }
+    });
   }
 }
