@@ -29,6 +29,7 @@ from app.schemas.catalog import (
     CategoryCreate,
     CategoryUpdate,
     CategoryReorderItem,
+    CategoryRead,
     ProductCreate,
     ProductImageCreate,
     ProductUpdate,
@@ -145,7 +146,7 @@ async def update_category(session: AsyncSession, category: Category, payload: Ca
     return category
 
 
-async def reorder_categories(session: AsyncSession, payload: list[CategoryReorderItem]) -> list[Category]:
+async def reorder_categories(session: AsyncSession, payload: list[CategoryReorderItem]) -> list[CategoryRead]:
     slugs = [item.slug for item in payload]
     if not slugs:
         return []
@@ -158,13 +159,24 @@ async def reorder_categories(session: AsyncSession, payload: list[CategoryReorde
         cat = categories[item.slug]
         if item.sort_order is not None:
             cat.sort_order = item.sort_order
+            cat.updated_at = datetime.now(timezone.utc)
             updated.append(cat)
-    if updated:
-        session.add_all(updated)
-        await session.commit()
-        for cat in updated:
-            await session.refresh(cat)
-    return updated
+    if not updated:
+        return []
+    session.add_all(updated)
+    await session.commit()
+    return [
+        CategoryRead(
+            id=cat.id,
+            slug=cat.slug,
+            name=cat.name,
+            description=cat.description,
+            sort_order=cat.sort_order,
+            created_at=cat.created_at,
+            updated_at=cat.updated_at,
+        )
+        for cat in updated
+    ]
 
 
 async def create_product(

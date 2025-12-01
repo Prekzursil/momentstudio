@@ -260,7 +260,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Calculate low-stock and sales analytics from real backend metrics instead of mock data.
 - [x] Backend tests: admin dashboard endpoints (summary, lists, audit, maintenance, category reorder, sitemap/robots/feed, session revoke, user role, image reorder).
 - [x] Frontend tests: AdminService/admin component for order status, coupon add/toggle, category reorder drag/drop, maintenance toggle (mock HTTP).
-- [ ] E2E smoke: admin login → dashboard → change order status → toggle maintenance → reorder category → upload/delete product image.
+- [x] E2E smoke: admin login → dashboard → change order status → toggle maintenance → reorder category → upload/delete product image.
 
 ## UX, Performance, SEO & Accessibility
 - [ ] Mobile-first responsive design across pages.

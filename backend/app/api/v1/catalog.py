@@ -119,8 +119,9 @@ async def reorder_categories(
     payload: list[CategoryReorderItem],
     session: AsyncSession = Depends(get_session),
     _: str = Depends(require_admin),
-) -> list[Category]:
-    return await catalog_service.reorder_categories(session, payload)
+) -> list[CategoryRead]:
+    updated = await catalog_service.reorder_categories(session, payload)
+    return updated
 
 
 @router.post("/products", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
