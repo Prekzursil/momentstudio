@@ -10,6 +10,7 @@ from app.db.session import get_session
 from app.schemas.cart import CartItemCreate, CartItemRead, CartItemUpdate, CartRead
 from app.schemas.promo import PromoCodeRead, PromoCodeCreate
 from app.services import cart as cart_service
+from app.schemas.cart_sync import CartSyncRequest
 
 router = APIRouter(prefix="/cart", tags=["cart"])
 
@@ -108,3 +109,17 @@ async def validate_promo(
     session: AsyncSession = Depends(get_session),
 ):
     return await cart_service.validate_promo(session, payload.code, payload.currency)
+
+
+@router.post("/sync", response_model=CartRead)
+async def sync_cart(
+    payload: CartSyncRequest,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user_optional),
+    session_id: str | None = Depends(session_header),
+):
+    if not current_user and not session_id:
+        session_id = f"guest-{uuid.uuid4()}"
+    cart = await cart_service.get_cart(session, getattr(current_user, "id", None) if current_user else None, session_id)
+    await cart_service.sync_cart(session, cart, payload.items)
+    return await cart_service.serialize_cart(cart)

@@ -1,12 +1,14 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, AfterViewInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
-import { ButtonComponent } from '../../shared/button.component';
+import { ButtonComponent } from '../../shared.button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
-import { CartStore } from '../../core/cart.store';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
+import { CartStore } from '../../core/cart.store';
+import { CartApi } from '../../core/cart.api';
+import { loadStripe, Stripe, StripeElements, StripeCardElement, StripeCardElementChangeEvent } from '@stripe/stripe-js';
 
 type ShippingMethod = { id: string; label: string; amount: number; eta: string };
 
@@ -34,7 +36,7 @@ type ShippingMethod = { id: string; label: string; amount: number; eta: string }
                 <input type="radio" name="checkoutMode" value="guest" [(ngModel)]="mode" required /> Checkout as guest
               </label>
               <label class="flex items-center gap-2 text-sm">
-                <input type="radio" name="checkoutMode" value="login" [(ngModel)]="mode" required /> Login to continue
+                <input type="radio" name="checkoutMode" value="create" [(ngModel)]="mode" required /> Create account during checkout
               </label>
             </div>
 
@@ -106,22 +108,11 @@ type ShippingMethod = { id: string; label: string; amount: number; eta: string }
             </div>
 
             <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">Step 5 · Payment (Stripe placeholder)</p>
-              <label class="text-sm grid gap-1">
-                Card number
-                <input class="rounded-lg border border-slate-200 px-3 py-2" placeholder="4242 4242 4242 4242" required />
-              </label>
-              <div class="grid grid-cols-2 gap-3">
-                <label class="text-sm grid gap-1">
-                  Expiry
-                  <input class="rounded-lg border border-slate-200 px-3 py-2" placeholder="MM/YY" required />
-                </label>
-                <label class="text-sm grid gap-1">
-                  CVC
-                  <input class="rounded-lg border border-slate-200 px-3 py-2" placeholder="CVC" required />
-                </label>
+              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">Step 5 · Payment</p>
+              <div class="border border-dashed border-slate-200 rounded-lg p-3 text-sm">
+                <div #cardHost class="min-h-[48px]"></div>
+                <p *ngIf="cardError" class="text-rose-700 text-xs mt-2">{{ cardError }}</p>
               </div>
-              <p class="text-xs text-slate-500">Replace with real Stripe Elements integration in production.</p>
             </div>
 
             <div class="flex gap-3">
@@ -163,7 +154,7 @@ type ShippingMethod = { id: string; label: string; amount: number; eta: string }
     </app-container>
   `
 })
-export class CheckoutComponent {
+export class CheckoutComponent implements AfterViewInit, OnDestroy {
   crumbs = [
     { label: 'Home', url: '/' },
     { label: 'Cart', url: '/cart' },
@@ -192,7 +183,16 @@ export class CheckoutComponent {
   };
   discount = 0;
 
-  constructor(private cart: CartStore, private router: Router) {
+  @ViewChild('cardHost') cardHost?: ElementRef<HTMLDivElement>;
+  cardError: string | null = null;
+  private stripe: Stripe | null = null;
+  private elements?: StripeElements;
+  private card?: StripeCardElement;
+  private clientSecret: string | null = null;
+  syncing = false;
+  placing = false;
+
+  constructor(private cart: CartStore, private router: Router, private cartApi: CartApi) {
     const saved = this.loadSavedAddress();
     if (saved) {
       this.address = saved;
@@ -213,12 +213,11 @@ export class CheckoutComponent {
   }
 
   applyPromo(): void {
-    if (this.promo.trim().toUpperCase() === 'SAVE10') {
-      this.discount = Math.min(this.subtotal() * 0.1, 50);
-      this.promoMessage = `Applied SAVE10: -${this.discount.toFixed(2)}`;
+    // promo validated backend-side during checkout; keep simple client message
+    if (this.promo.trim()) {
+      this.promoMessage = `Promo ${this.promo.trim().toUpperCase()} will be validated at checkout.`;
     } else {
-      this.discount = 0;
-      this.promoMessage = 'Invalid code';
+      this.promoMessage = '';
     }
   }
 
@@ -233,11 +232,24 @@ export class CheckoutComponent {
       this.errorMessage = validation;
       return;
     }
-    if (this.saveAddress) {
-      this.persistAddress();
+    if (!this.clientSecret) {
+      this.errorMessage = 'Payment not initialized yet. Please wait.';
+      return;
     }
     this.errorMessage = '';
-    this.router.navigate(['/checkout/success']);
+    this.placing = true;
+    this.confirmPayment()
+      .then((paymentOk) => {
+        if (!paymentOk) {
+          this.placing = false;
+          return;
+        }
+        this.submitCheckout();
+      })
+      .catch(() => {
+        this.errorMessage = 'Payment failed.';
+        this.placing = false;
+      });
   }
 
   retryValidation(): void {
@@ -252,10 +264,9 @@ export class CheckoutComponent {
       return `Only ${stockIssue.stock} left of ${stockIssue.name}. Please reduce quantity.`;
     }
     if (!this.pricesRefreshed || forceRefresh) {
-      const updated = items.map((item, idx) => (idx === 0 ? { ...item, price: item.price + 1 } : item));
-      this.cart.seed(updated);
+      this.syncBackendCart(items);
       this.pricesRefreshed = true;
-      return 'Prices have changed. Totals refreshed; please review and submit again.';
+      return null;
     }
     return null;
   }
@@ -282,5 +293,122 @@ export class CheckoutComponent {
     } catch {
       return null;
     }
+  }
+
+  async ngAfterViewInit(): Promise<void> {
+    await this.setupStripe();
+    await this.syncBackendCart(this.items());
+    await this.loadPaymentIntent();
+  }
+
+  ngOnDestroy(): void {
+    if (this.card) this.card.destroy();
+  }
+
+  private async setupStripe(): Promise<void> {
+    const publishableKey = this.getStripePublishableKey();
+    if (!publishableKey) {
+      this.cardError = 'Stripe publishable key not set.';
+      return;
+    }
+    this.stripe = await loadStripe(publishableKey);
+    if (!this.stripe) {
+      this.cardError = 'Could not init Stripe';
+      return;
+    }
+    this.elements = this.stripe.elements();
+    this.card = this.elements.create('card');
+    if (this.cardHost) {
+      this.card.mount(this.cardHost.nativeElement);
+      this.card.on('change', (event: StripeCardElementChangeEvent) => {
+        this.cardError = event.error ? event.error.message ?? 'Card error' : null;
+      });
+    }
+  }
+
+  private getStripePublishableKey(): string | null {
+    const meta = document.querySelector('meta[name="stripe-publishable-key"]');
+    return meta?.getAttribute('content') || null;
+  }
+
+  private async loadPaymentIntent(): Promise<void> {
+    this.cartApi.paymentIntent().subscribe({
+      next: (res) => {
+        this.clientSecret = res.client_secret;
+      },
+      error: () => {
+        this.errorMessage = 'Could not start payment';
+      }
+    });
+  }
+
+  private async confirmPayment(): Promise<boolean> {
+    if (!this.stripe || !this.card || !this.clientSecret) {
+      this.cardError = 'Payment form not ready';
+      return false;
+    }
+    const result = await this.stripe.confirmCardPayment(this.clientSecret, {
+      payment_method: { card: this.card, billing_details: { name: this.address.name, email: this.address.email } }
+    });
+    if (result.error) {
+      this.cardError = result.error.message ?? 'Payment failed';
+      return false;
+    }
+    return true;
+  }
+
+  private syncBackendCart(items): void {
+    this.syncing = true;
+    this.cartApi
+      .sync(
+        items.map((i) => ({
+          product_id: i.id,
+          variant_id: i.variant_id,
+          quantity: i.quantity,
+          note: undefined,
+          max_quantity: undefined
+        }))
+      )
+      .subscribe({
+        next: () => (this.syncing = false),
+        error: () => {
+          this.syncing = false;
+          this.errorMessage = 'Could not sync cart with server';
+        }
+      });
+  }
+
+  private submitCheckout(): void {
+    const body = {
+      name: this.address.name,
+      email: this.address.email,
+      password: this.mode === 'create' ? this.address.password || undefined : undefined,
+      create_account: this.mode === 'create',
+      line1: this.address.line1,
+      line2: this.address.line2,
+      city: this.address.city,
+      region: this.address.region,
+      postal_code: this.address.postal,
+      country: this.address.country || 'US',
+      shipping_method_id: null,
+      promo_code: this.promo || null,
+      save_address: this.saveAddress
+    };
+    this.api
+      .post<{ order_id: string; reference_code?: string; client_secret: string }>(
+        '/orders/guest-checkout',
+        body,
+        this.cartApi.headers()
+      )
+      .subscribe({
+        next: () => {
+          if (this.saveAddress) this.persistAddress();
+          this.router.navigate(['/checkout/success']);
+        },
+        error: (err) => {
+          this.errorMessage = err?.error?.detail || 'Checkout failed';
+          this.placing = false;
+        }
+      });
   }
 }

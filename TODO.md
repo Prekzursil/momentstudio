@@ -220,6 +220,12 @@ Below is a structured checklist you can turn into issues.
 - [x] Order confirmation page with next steps.
 - [x] Cart mini-icon badge with item count.
 - [x] Edge cases: out-of-stock and price changes during checkout.
+- [ ] Wire cart state to backend cart APIs (load/add/update/remove) instead of local-only.
+- [ ] Replace checkout payment placeholder with Stripe Elements + PaymentIntent from backend.
+- [ ] Submit checkout to backend to create order, validate stock/pricing, and handle failures.
+- [ ] Use backend shipping methods and promo validation instead of hardcoded values.
+- [ ] Persist/save checkout address via backend (guest or user) and reuse on account.
+- [ ] Add guest checkout API (session-based cart, guest address capture, optional account creation).
 
 ## Frontend - Auth & Account
 - [x] Login page with validation.

@@ -8,21 +8,21 @@ export class ApiService {
 
   constructor(private http: HttpClient) {}
 
-  get<T>(path: string, params?: Record<string, string | number | boolean | string[] | number[] | undefined>): Observable<T> {
+  get<T>(path: string, params?: Record<string, string | number | boolean | string[] | number[] | undefined>, headers?: Record<string, string>): Observable<T> {
     const httpParams = this.buildParams(params);
-    return this.http.get<T>(`${this.baseUrl}${path}`, { params: httpParams });
+    return this.http.get<T>(`${this.baseUrl}${path}`, { params: httpParams, headers });
   }
 
-  post<T>(path: string, body: unknown): Observable<T> {
-    return this.http.post<T>(`${this.baseUrl}${path}`, body);
+  post<T>(path: string, body: unknown, headers?: Record<string, string>): Observable<T> {
+    return this.http.post<T>(`${this.baseUrl}${path}`, body, { headers });
   }
 
-  patch<T>(path: string, body: unknown): Observable<T> {
-    return this.http.patch<T>(`${this.baseUrl}${path}`, body);
+  patch<T>(path: string, body: unknown, headers?: Record<string, string>): Observable<T> {
+    return this.http.patch<T>(`${this.baseUrl}${path}`, body, { headers });
   }
 
-  delete<T>(path: string): Observable<T> {
-    return this.http.delete<T>(`${this.baseUrl}${path}`);
+  delete<T>(path: string, headers?: Record<string, string>): Observable<T> {
+    return this.http.delete<T>(`${this.baseUrl}${path}`, { headers });
   }
 
   private buildParams(params?: Record<string, string | number | boolean | string[] | number[] | undefined>): HttpParams {

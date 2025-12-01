@@ -17,7 +17,7 @@ def init_stripe() -> None:
     stripe.api_key = settings.stripe_secret_key
 
 
-async def create_payment_intent(session: AsyncSession, cart: Cart) -> str:
+async def create_payment_intent(session: AsyncSession, cart: Cart) -> dict:
     if not settings.stripe_secret_key:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
     if not cart.items:
@@ -35,9 +35,10 @@ async def create_payment_intent(session: AsyncSession, cart: Cart) -> str:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
     client_secret = getattr(intent, "client_secret", None)
-    if not client_secret:
+    intent_id = getattr(intent, "id", None)
+    if not client_secret or not intent_id:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Stripe client secret missing")
-    return str(client_secret)
+    return {"client_secret": str(client_secret), "intent_id": str(intent_id)}
 
 
 async def handle_webhook_event(payload: bytes, sig_header: str | None) -> dict:

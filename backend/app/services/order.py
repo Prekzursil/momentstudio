@@ -13,6 +13,7 @@ from app.models.cart import Cart
 from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod, OrderEvent
 from app.schemas.order import OrderUpdate, ShippingMethodCreate
 from app.services import payments
+from app.schemas.checkout import GuestCheckoutRequest  # type: ignore
 
 
 async def build_order_from_cart(
@@ -22,6 +23,7 @@ async def build_order_from_cart(
     shipping_address_id: UUID | None,
     billing_address_id: UUID | None,
     shipping_method: ShippingMethod | None = None,
+    payment_intent_id: str | None = None,
 ) -> Order:
     if not cart.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
@@ -57,6 +59,7 @@ async def build_order_from_cart(
         billing_address_id=billing_address_id,
         items=items,
         shipping_method_id=shipping_method.id if shipping_method else None,
+        stripe_payment_intent_id=payment_intent_id,
     )
     session.add(order)
     await session.commit()

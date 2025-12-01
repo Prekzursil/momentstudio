@@ -18,6 +18,14 @@ from app.schemas.order import OrderRead, OrderCreate, OrderUpdate, ShippingMetho
 from app.services import cart as cart_service
 from app.services import order as order_service
 from app.services import email as email_service
+from app.schemas.checkout import GuestCheckoutRequest, GuestCheckoutResponse
+from app.schemas.user import UserCreate
+from app.schemas.address import AddressCreate
+from app.services import auth as auth_service
+from app.services import payments
+from app.services import address as address_service
+import secrets
+from app.api.v1 import cart as cart_api
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -74,6 +82,67 @@ async def admin_list_orders(
     _: str = Depends(require_admin),
 ):
     return await order_service.list_orders(session, status=status, user_id=user_id)
+
+
+@router.post("/guest-checkout", response_model=GuestCheckoutResponse, status_code=status.HTTP_201_CREATED)
+async def guest_checkout(
+    payload: GuestCheckoutRequest,
+    session: AsyncSession = Depends(get_session),
+    session_id: str | None = Depends(cart_api.session_header),
+):
+    # ensure cart exists
+    guest_cart = await cart_service.get_cart(session, None, session_id)
+    if not guest_cart.items:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
+
+    # require new email
+    existing_user = await auth_service.get_user_by_email(session, payload.email)
+    if existing_user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered; please log in")
+
+    password = payload.password or secrets.token_urlsafe(12)
+    user = await auth_service.create_user(session, UserCreate(email=payload.email, password=password, name=payload.name))
+
+    # merge guest cart into user cart
+    user_cart = await cart_service.get_cart(session, user.id, None)
+    user_cart = await cart_service.merge_guest_cart(session, user_cart, guest_cart.session_id)
+
+    # create shipping address
+    shipping_addr = await address_service.create_address(
+        session,
+        user.id,
+        AddressCreate(
+            label="Shipping",
+            line1=payload.line1,
+            line2=payload.line2,
+            city=payload.city,
+            region=payload.region,
+            postal_code=payload.postal_code,
+            country=payload.country,
+            is_default_shipping=True,
+            is_default_billing=True,
+        ),
+    )
+
+    shipping_method = None
+    if payload.shipping_method_id:
+        shipping_method = await order_service.get_shipping_method(session, payload.shipping_method_id)
+        if not shipping_method:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
+
+    # Payment intent
+    # Payment intent
+    intent = await payments.create_payment_intent(session, user_cart)
+    order = await order_service.build_order_from_cart(
+        session,
+        user.id,
+        user_cart,
+        shipping_addr.id,
+        shipping_addr.id,
+        shipping_method=shipping_method,
+        payment_intent_id=intent["intent_id"],
+    )
+    return GuestCheckoutResponse(order_id=order.id, reference_code=order.reference_code, client_secret=intent["client_secret"])
 
 
 @router.patch("/admin/{order_id}", response_model=OrderRead)

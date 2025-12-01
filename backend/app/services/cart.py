@@ -11,6 +11,7 @@ from app.models.cart import Cart, CartItem
 from app.models.catalog import Product, ProductVariant
 from app.schemas.cart import CartItemCreate, CartItemUpdate, CartRead, CartItemRead, Totals
 from app.schemas.promo import PromoCodeRead, PromoCodeCreate
+from app.schemas.cart_sync import CartSyncItem
 from app.models.promo import PromoCode
 from app.models.order import Order
 from app.models.user import User
@@ -158,6 +159,26 @@ async def delete_item(session: AsyncSession, cart: Cart, item_id: UUID) -> None:
     await session.delete(item)
     await session.commit()
     record_cart_event("delete_item", {"cart_id": str(cart.id), "item_id": str(item_id)})
+
+
+async def sync_cart(session: AsyncSession, cart: Cart, items: list[CartSyncItem]) -> None:
+    # clear existing items
+    for existing in list(cart.items):
+        await session.delete(existing)
+    await session.flush()
+    for item in items:
+        await add_item(
+            session,
+            cart,
+            CartItemCreate(
+                product_id=item.product_id,
+                variant_id=item.variant_id,
+                quantity=item.quantity,
+                note=item.note,
+                max_quantity=item.max_quantity,
+            ),
+        )
+    await session.refresh(cart)
 
 
 async def merge_guest_cart(session: AsyncSession, user_cart: Cart, guest_session_id: str | None) -> Cart:

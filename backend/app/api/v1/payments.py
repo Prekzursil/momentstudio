@@ -3,10 +3,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, get_current_user_optional
 from app.db.session import get_session
 from app.models.cart import Cart
 from app.services import payments
+from app.api.v1 import cart as cart_api
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -14,16 +15,20 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 @router.post("/intent", status_code=status.HTTP_200_OK)
 async def create_payment_intent(
     session: AsyncSession = Depends(get_session),
-    current_user=Depends(get_current_user),
+    current_user=Depends(get_current_user_optional),
+    session_id: str | None = Depends(cart_api.session_header),
 ):
-    result = await session.execute(
-        select(Cart).options(selectinload(Cart.items)).where(Cart.user_id == current_user.id)
-    )
-    cart = result.scalar_one_or_none()
+    user_id = getattr(current_user, "id", None) if current_user else None
+    query = select(Cart).options(selectinload(Cart.items))
+    if user_id:
+        query = query.where(Cart.user_id == user_id)
+    elif session_id:
+        query = query.where(Cart.session_id == session_id)
+    cart = (await session.execute(query)).scalar_one_or_none()
     if not cart:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart not found")
-    client_secret = await payments.create_payment_intent(session, cart)
-    return {"client_secret": client_secret}
+    data = await payments.create_payment_intent(session, cart)
+    return data
 
 
 @router.post("/webhook", status_code=status.HTTP_200_OK)
