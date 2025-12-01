@@ -235,8 +235,8 @@ Below is a structured checklist you can turn into issues.
  - [x] Tests: payment intent amount derived from backend totals (seeded cart).
  - [x] Frontend test: Checkout component calls /cart/sync, /payments/intent, /orders/guest-checkout with shipping_method_id/promo/create_account and handles errors/retry.
  - [x] Frontend test: CartStore add/remove via backend merges quantities and is resilient to errors.
- - [ ] Frontend test: ProductComponent “Add to cart” posts to backend and shows toast (mock CartStore).
- - [ ] E2E: guest checkout (add cart → sync → apply promo/shipping → mock pay → confirm order) with CHROME_BIN headless and --no-sandbox.
+ - [x] Frontend test: ProductComponent “Add to cart” posts to backend and shows toast (mock CartStore).
+ - [x] E2E: guest checkout (add cart → sync → apply promo/shipping → mock pay → confirm order) with CHROME_BIN headless and --no-sandbox.
 
 ## Frontend - Auth & Account
 - [x] Login page with validation.
