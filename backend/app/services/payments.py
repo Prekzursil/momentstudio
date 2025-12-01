@@ -79,7 +79,8 @@ async def ensure_customer(session: AsyncSession, user: User) -> str:
     init_stripe()
     if user.stripe_customer_id:
         return user.stripe_customer_id
-    customer = stripe.Customer.create(email=user.email, name=user.name or None)
+    # Stripe expects a string; fallback to empty when name is None
+    customer = stripe.Customer.create(email=user.email, name=user.name or "")
     user.stripe_customer_id = customer["id"]
     session.add(user)
     await session.flush()
@@ -96,7 +97,6 @@ async def attach_payment_method(session: AsyncSession, user: User, payment_metho
     customer_id = await ensure_customer(session, user)
     init_stripe()
     pm = stripe.PaymentMethod.attach(payment_method_id, customer=customer_id)
-    stripe.PaymentMethod.modify(payment_method_id, customer=customer_id)
     brand = pm.get("card", {}).get("brand") if pm.get("card") else None
     last4 = pm.get("card", {}).get("last4") if pm.get("card") else None
     exp_month = pm.get("card", {}).get("exp_month") if pm.get("card") else None
@@ -117,7 +117,7 @@ async def attach_payment_method(session: AsyncSession, user: User, payment_metho
 
 async def list_payment_methods(session: AsyncSession, user: User) -> list[PaymentMethod]:
     result = await session.execute(select(PaymentMethod).where(PaymentMethod.user_id == user.id))
-    return result.scalars().all()
+    return list(result.scalars().all())
 
 
 async def remove_payment_method(session: AsyncSession, user: User, payment_method_id: str) -> None:
