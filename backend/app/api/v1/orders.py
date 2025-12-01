@@ -87,6 +87,7 @@ async def admin_list_orders(
 @router.post("/guest-checkout", response_model=GuestCheckoutResponse, status_code=status.HTTP_201_CREATED)
 async def guest_checkout(
     payload: GuestCheckoutRequest,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     session_id: str | None = Depends(cart_api.session_header),
 ):
@@ -130,9 +131,13 @@ async def guest_checkout(
         if not shipping_method:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
 
-    # Payment intent
-    # Payment intent
-    intent = await payments.create_payment_intent(session, user_cart)
+    promo = None
+    if payload.promo_code:
+        promo = await cart_service.validate_promo(session, payload.promo_code, currency=None)
+
+    totals, discount_val = cart_service.calculate_totals(user_cart, shipping_method=shipping_method, promo=promo)
+
+    intent = await payments.create_payment_intent(session, user_cart, amount_cents=int(totals.total * 100))
     order = await order_service.build_order_from_cart(
         session,
         user.id,
@@ -141,7 +146,11 @@ async def guest_checkout(
         shipping_addr.id,
         shipping_method=shipping_method,
         payment_intent_id=intent["intent_id"],
+        discount=discount_val,
     )
+    if not payload.create_account:
+        reset_token = await auth_service.create_reset_token(session, payload.email)
+        background_tasks.add_task(email_service.send_password_reset, payload.email, reset_token.token)
     return GuestCheckoutResponse(order_id=order.id, reference_code=order.reference_code, client_secret=intent["client_secret"])
 
 

@@ -23,6 +23,7 @@ async def build_order_from_cart(
     billing_address_id: UUID | None,
     shipping_method: ShippingMethod | None = None,
     payment_intent_id: str | None = None,
+    discount: Decimal | None = None,
 ) -> Order:
     if not cart.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
@@ -43,9 +44,13 @@ async def build_order_from_cart(
         )
 
     ref = await _generate_reference_code(session)
-    tax = _calculate_tax(subtotal)
+    discount_val = discount or Decimal("0")
+    taxable = subtotal - discount_val
+    if taxable < 0:
+        taxable = Decimal("0")
+    tax = _calculate_tax(taxable)
     shipping_amount = _calculate_shipping(subtotal, shipping_method)
-    total = subtotal + tax + shipping_amount
+    total = taxable + tax + shipping_amount
 
     order = Order(
         user_id=user_id,

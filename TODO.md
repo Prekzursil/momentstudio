@@ -220,10 +220,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Order confirmation page with next steps.
 - [x] Cart mini-icon badge with item count.
 - [x] Edge cases: out-of-stock and price changes during checkout.
-- [ ] Checkout totals driven by backend shipping/promo validation (no hardcoded amounts).
-- [ ] Send set-password email flow for guest checkouts that create an account.
-- [ ] Frontend cart/checkout tests (unit + e2e) against backend cart/payment intent APIs.
-- [ ] Ensure frontend CI runs with Angular toolchain/Chrome to cover cart/checkout flows.
+- [x] Checkout totals driven by backend shipping/promo validation (no hardcoded amounts).
+- [x] Send set-password email flow for guest checkouts that create an account.
+- [x] Frontend cart/checkout tests (unit + e2e) against backend cart/payment intent APIs.
+- [x] Ensure frontend CI runs with Angular toolchain/Chrome to cover cart/checkout flows.
 - [ ] Wire cart state to backend cart APIs (load/add/update/remove) instead of local-only.
 - [ ] Replace checkout payment placeholder with Stripe Elements + PaymentIntent from backend.
 - [ ] Submit checkout to backend to create order, validate stock/pricing, and handle failures.
