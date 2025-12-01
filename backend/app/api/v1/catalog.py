@@ -13,6 +13,7 @@ from app.schemas.catalog import (
     CategoryCreate,
     CategoryRead,
     CategoryUpdate,
+    CategoryReorderItem,
     ProductCreate,
     ProductRead,
     ProductUpdate,
@@ -34,7 +35,7 @@ router = APIRouter(prefix="/catalog", tags=["catalog"])
 
 @router.get("/categories", response_model=list[CategoryRead])
 async def list_categories(session: AsyncSession = Depends(get_session)) -> list[Category]:
-    result = await session.execute(select(Category).order_by(Category.name))
+    result = await session.execute(select(Category).order_by(Category.sort_order, Category.name))
     return list(result.scalars())
 
 
@@ -97,6 +98,29 @@ async def update_category(
     if not category:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
     return await catalog_service.update_category(session, category, payload)
+
+
+@router.delete("/categories/{slug}", response_model=CategoryRead)
+async def delete_category(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> Category:
+    category = await catalog_service.get_category_by_slug(session, slug)
+    if not category:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+    await session.delete(category)
+    await session.commit()
+    return category
+
+
+@router.post("/categories/reorder", response_model=list[CategoryRead])
+async def reorder_categories(
+    payload: list[CategoryReorderItem],
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> list[Category]:
+    return await catalog_service.reorder_categories(session, payload)
 
 
 @router.post("/products", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
@@ -290,6 +314,23 @@ async def delete_product_image(
     await catalog_service.delete_product_image(session, product, str(image_id))
     await session.refresh(product)
     return product
+
+
+@router.patch("/products/{slug}/images/{image_id}/sort", response_model=ProductRead)
+async def reorder_product_image(
+    slug: str,
+    image_id: UUID,
+    sort_order: int = Query(..., ge=0),
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> Product:
+    product = await catalog_service.get_product_by_slug(
+        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+    )
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    updated = await catalog_service.update_product_image_sort(session, product, str(image_id), sort_order)
+    return updated
 
 
 @router.post("/products/{slug}/reviews", response_model=ProductReviewRead, status_code=status.HTTP_201_CREATED)

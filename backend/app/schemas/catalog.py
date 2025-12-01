@@ -11,6 +11,7 @@ class CategoryBase(BaseModel):
     slug: str = Field(min_length=1, max_length=120)
     name: str = Field(min_length=1, max_length=120)
     description: str | None = None
+    sort_order: int = 0
 
 
 class CategoryCreate(CategoryBase):
@@ -20,6 +21,12 @@ class CategoryCreate(CategoryBase):
 class CategoryUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=120)
     description: str | None = None
+    sort_order: int | None = None
+
+
+class CategoryReorderItem(BaseModel):
+    slug: str
+    sort_order: int
 
 
 class CategoryRead(CategoryBase):
@@ -28,6 +35,7 @@ class CategoryRead(CategoryBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
+    sort_order: int
 
 
 class ProductBase(BaseModel):

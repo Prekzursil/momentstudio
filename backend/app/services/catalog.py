@@ -28,6 +28,7 @@ from app.models.catalog import (
 from app.schemas.catalog import (
     CategoryCreate,
     CategoryUpdate,
+    CategoryReorderItem,
     ProductCreate,
     ProductImageCreate,
     ProductUpdate,
@@ -144,6 +145,26 @@ async def update_category(session: AsyncSession, category: Category, payload: Ca
     return category
 
 
+async def reorder_categories(session: AsyncSession, payload: list[CategoryReorderItem]) -> list[Category]:
+    slugs = [item.slug for item in payload]
+    if not slugs:
+        return []
+    result = await session.execute(select(Category).where(Category.slug.in_(slugs)))
+    categories = {c.slug: c for c in result.scalars()}
+    updated: list[Category] = []
+    for item in payload:
+        if not item.slug or item.slug not in categories:
+            continue
+        cat = categories[item.slug]
+        if item.sort_order is not None:
+            cat.sort_order = item.sort_order
+            updated.append(cat)
+    if updated:
+        session.add_all(updated)
+        await session.commit()
+    return updated
+
+
 async def create_product(
     session: AsyncSession, payload: ProductCreate, commit: bool = True, user_id: uuid.UUID | None = None
 ) -> Product:
@@ -233,6 +254,17 @@ async def delete_product_image(session: AsyncSession, product: Product, image_id
     delete_file(image.url)
     await session.delete(image)
     await session.commit()
+
+
+async def update_product_image_sort(session: AsyncSession, product: Product, image_id: str, sort_order: int) -> Product:
+    image = next((img for img in product.images if str(img.id) == str(image_id)), None)
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    image.sort_order = sort_order
+    session.add(image)
+    await session.commit()
+    await session.refresh(product, attribute_names=["images"])
+    return product
 
 
 async def soft_delete_product(session: AsyncSession, product: Product, user_id: uuid.UUID | None = None) -> None:

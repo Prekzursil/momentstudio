@@ -10,7 +10,7 @@ from app.db.session import get_session
 from app.models.catalog import Product, ProductAuditLog, Category
 from app.models.content import ContentBlock, ContentAuditLog
 from app.models.order import Order
-from app.models.user import User, RefreshSession
+from app.models.user import User, RefreshSession, UserRole
 from app.models.promo import PromoCode
 
 router = APIRouter(prefix="/admin/dashboard", tags=["admin"])
@@ -263,6 +263,43 @@ async def revoke_sessions(
         session.add_all(sessions)
         await session.flush()
     return None
+
+
+@router.patch("/users/{user_id}/role")
+async def update_user_role(
+    user_id: UUID,
+    payload: dict,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    user = await session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    role = payload.get("role")
+    if role not in (UserRole.admin.value, UserRole.customer.value):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role")
+    user.role = UserRole(role)
+    session.add(user)
+    await session.flush()
+    return {
+        "id": str(user.id),
+        "email": user.email,
+        "name": user.name,
+        "role": user.role,
+        "created_at": user.created_at,
+    }
+
+
+@router.get("/maintenance")
+async def get_maintenance(_: str = Depends(require_admin)) -> dict:
+    return {"enabled": settings.maintenance_mode}
+
+
+@router.post("/maintenance")
+async def set_maintenance(payload: dict, _: str = Depends(require_admin)) -> dict:
+    enabled = bool(payload.get("enabled", False))
+    settings.maintenance_mode = enabled
+    return {"enabled": settings.maintenance_mode}
 
 
 @router.get("/low-stock")

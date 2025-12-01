@@ -45,6 +45,8 @@ export interface AdminContent {
   title: string;
   updated_at: string;
   version: number;
+  body_markdown?: string;
+  status?: string;
 }
 
 export interface AdminCoupon {
@@ -64,6 +66,7 @@ export interface AdminCategory {
   name: string;
   slug: string;
   description?: string | null;
+  sort_order?: number;
 }
 
 export interface AdminProductDetail extends AdminProduct {
@@ -71,6 +74,7 @@ export interface AdminProductDetail extends AdminProduct {
   long_description?: string | null;
   category_id?: string | null;
   stock_quantity: number;
+  images?: { id: string; url: string; alt_text?: string | null }[];
 }
 
 export interface AdminAudit {
@@ -120,6 +124,10 @@ export class AdminService {
     return this.api.get<AdminContent[]>('/admin/dashboard/content');
   }
 
+  updateContent(key: string, payload: Partial<AdminContent>): Observable<AdminContent> {
+    return this.api.patch<AdminContent>(`/content/admin/${key}`, payload);
+  }
+
   coupons(): Observable<AdminCoupon[]> {
     return this.api.get<AdminCoupon[]>('/admin/dashboard/coupons');
   }
@@ -148,6 +156,18 @@ export class AdminService {
     return this.api.get<AdminCategory[]>('/catalog/categories');
   }
 
+  createCategory(payload: Partial<AdminCategory>): Observable<AdminCategory> {
+    return this.api.post<AdminCategory>('/catalog/categories', payload);
+  }
+
+  deleteCategory(slug: string): Observable<AdminCategory> {
+    return this.api.delete<AdminCategory>(`/catalog/categories/${slug}`);
+  }
+
+  reorderCategories(items: { slug: string; sort_order: number }[]): Observable<AdminCategory[]> {
+    return this.api.post<AdminCategory[]>('/catalog/categories/reorder', items);
+  }
+
   getProduct(slug: string): Observable<AdminProductDetail> {
     return this.api.get<AdminProductDetail>(`/catalog/products/${slug}`);
   }
@@ -170,5 +190,33 @@ export class AdminService {
 
   updateCoupon(id: string, payload: Partial<AdminCoupon>): Observable<AdminCoupon> {
     return this.api.patch<AdminCoupon>(`/admin/dashboard/coupons/${id}`, payload);
+  }
+
+  uploadProductImage(slug: string, file: File): Observable<AdminProductDetail> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.api.post<AdminProductDetail>(`/catalog/products/${slug}/images`, form);
+  }
+
+  deleteProductImage(slug: string, imageId: string): Observable<AdminProductDetail> {
+    return this.api.delete<AdminProductDetail>(`/catalog/products/${slug}/images/${imageId}`);
+  }
+
+  reorderProductImage(slug: string, imageId: string, sortOrder: number): Observable<AdminProductDetail> {
+    return this.api.patch<AdminProductDetail>(`/catalog/products/${slug}/images/${imageId}/sort`, null, {
+      sort_order: sortOrder
+    } as any);
+  }
+
+  updateUserRole(userId: string, role: string): Observable<AdminUser> {
+    return this.api.patch<AdminUser>(`/admin/dashboard/users/${userId}/role`, { role });
+  }
+
+  getMaintenance(): Observable<{ enabled: boolean }> {
+    return this.api.get<{ enabled: boolean }>('/admin/dashboard/maintenance');
+  }
+
+  setMaintenance(enabled: boolean): Observable<{ enabled: boolean }> {
+    return this.api.post<{ enabled: boolean }>('/admin/dashboard/maintenance', { enabled });
   }
 }
