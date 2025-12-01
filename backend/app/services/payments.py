@@ -2,10 +2,13 @@ from typing import Any, cast
 
 import stripe
 from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+import uuid
 
 from app.core.config import settings
 from app.models.cart import Cart
+from app.models.user import PaymentMethod, User
 
 stripe = cast(Any, stripe)
 
@@ -68,3 +71,70 @@ async def void_payment_intent(intent_id: str) -> dict:
         return stripe.PaymentIntent.cancel(intent_id)
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+async def ensure_customer(session: AsyncSession, user: User) -> str:
+    if not settings.stripe_secret_key:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
+    init_stripe()
+    if user.stripe_customer_id:
+        return user.stripe_customer_id
+    customer = stripe.Customer.create(email=user.email, name=user.name or None)
+    user.stripe_customer_id = customer["id"]
+    session.add(user)
+    await session.flush()
+    return user.stripe_customer_id
+
+
+async def create_setup_intent(session: AsyncSession, user: User) -> dict:
+    customer_id = await ensure_customer(session, user)
+    intent = stripe.SetupIntent.create(customer=customer_id, usage="off_session")
+    return {"client_secret": intent["client_secret"], "customer_id": customer_id}
+
+
+async def attach_payment_method(session: AsyncSession, user: User, payment_method_id: str) -> PaymentMethod:
+    customer_id = await ensure_customer(session, user)
+    init_stripe()
+    pm = stripe.PaymentMethod.attach(payment_method_id, customer=customer_id)
+    stripe.PaymentMethod.modify(payment_method_id, customer=customer_id)
+    brand = pm.get("card", {}).get("brand") if pm.get("card") else None
+    last4 = pm.get("card", {}).get("last4") if pm.get("card") else None
+    exp_month = pm.get("card", {}).get("exp_month") if pm.get("card") else None
+    exp_year = pm.get("card", {}).get("exp_year") if pm.get("card") else None
+    record = PaymentMethod(
+        user_id=user.id,
+        stripe_payment_method_id=payment_method_id,
+        brand=brand,
+        last4=last4,
+        exp_month=exp_month,
+        exp_year=exp_year,
+    )
+    session.add(record)
+    await session.commit()
+    await session.refresh(record)
+    return record
+
+
+async def list_payment_methods(session: AsyncSession, user: User) -> list[PaymentMethod]:
+    result = await session.execute(select(PaymentMethod).where(PaymentMethod.user_id == user.id))
+    return result.scalars().all()
+
+
+async def remove_payment_method(session: AsyncSession, user: User, payment_method_id: str) -> None:
+    try:
+        pm_uuid = uuid.UUID(payment_method_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payment method id")
+    result = await session.execute(
+        select(PaymentMethod).where(PaymentMethod.user_id == user.id, PaymentMethod.id == pm_uuid)
+    )
+    record = result.scalar_one_or_none()
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment method not found")
+    init_stripe()
+    try:
+        stripe.PaymentMethod.detach(record.stripe_payment_method_id)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    await session.delete(record)
+    await session.commit()

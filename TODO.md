@@ -236,6 +236,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Wire login/register/password reset flows to backend auth endpoints (replace mocks).
 - [x] Fetch real profile, addresses, and order history from backend; replace account dashboard mock data.
 - [x] Implement avatar upload wired to storage backend.
+- [x] Add backend email verification tokens/endpoints + frontend resend/confirm wiring.
+- [x] Implement saved payment methods (Stripe setup intents) and wire UI add/remove card.
 
 ## Frontend - Admin Dashboard
 - [x] /admin layout with sidebar + guard.

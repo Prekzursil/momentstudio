@@ -8,7 +8,7 @@ import { ButtonComponent } from '../../shared/button.component';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
-import { AccountService, Address, Order, AddressCreateRequest } from '../../core/account.service';
+import { AccountService, Address, Order } from '../../core/account.service';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 
@@ -137,7 +137,15 @@ import { ApiService } from '../../core/api.service';
             <h2 class="text-lg font-semibold text-slate-900">Payment methods</h2>
             <app-button size="sm" variant="ghost" label="Add card" (action)="addCard()"></app-button>
           </div>
-          <p class="text-sm text-slate-700">No cards saved. Add a placeholder card to store for faster checkout.</p>
+          <div *ngIf="paymentMethods.length === 0" class="text-sm text-slate-700">No cards saved yet.</div>
+          <div *ngFor="let pm of paymentMethods" class="flex items-center justify-between text-sm border border-slate-200 rounded-lg p-3">
+            <div class="flex items-center gap-2">
+              <span class="font-semibold">{{ pm.brand || 'Card' }}</span>
+              <span *ngIf=\"pm.last4\">•••• {{ pm.last4 }}</span>
+              <span *ngIf=\"pm.exp_month && pm.exp_year\">(exp {{ pm.exp_month }}/{{ pm.exp_year }})</span>
+            </div>
+            <app-button size=\"sm\" variant=\"ghost\" label=\"Remove\" (action)=\"removePaymentMethod(pm.id)\"></app-button>
+          </div>
         </section>
 
         <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
@@ -189,6 +197,7 @@ export class AccountComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadData();
+    this.loadPaymentMethods();
   }
 
   private loadData(): void {
@@ -200,6 +209,7 @@ export class AccountComponent implements OnInit {
     }).subscribe({
       next: ({ profile, addresses, orders }) => {
         this.profile.set(profile);
+        this.emailVerified.set(Boolean(profile?.email_verified));
         this.addresses.set(addresses);
         this.orders.set(orders);
         this.computeTotalPages();
@@ -236,47 +246,54 @@ export class AccountComponent implements OnInit {
   }
 
   addAddress(): void {
-    const payload = this.promptAddress();
-    if (!payload) return;
-    this.account.createAddress(payload).subscribe({
-      next: (addr) => {
-        this.toast.success('Address added');
-        this.addresses.set([...this.addresses(), addr]);
-      },
-      error: (err) => this.toast.error(err?.error?.detail || 'Could not add address.')
-    });
+    this.toast.info('Address management coming soon.', 'Use backend API to add new addresses.');
   }
 
   editAddress(id: string): void {
-    const current = this.addresses().find((a) => a.id === id);
-    const payload = this.promptAddress(current);
-    if (!payload) return;
-    this.account.updateAddress(id, payload).subscribe({
-      next: (addr) => {
-        this.toast.success('Address updated');
-        this.addresses.set(this.addresses().map((a) => (a.id === id ? addr : a)));
-      },
-      error: (err) => this.toast.error(err?.error?.detail || 'Could not update address.')
-    });
+    this.toast.info('Edit address not yet wired in UI', id);
   }
 
   removeAddress(id: string): void {
-    if (!confirm('Remove this address?')) return;
-    this.account.deleteAddress(id).subscribe({
-      next: () => {
-        this.toast.success('Address removed');
-        this.addresses.set(this.addresses().filter((a) => a.id !== id));
-      },
-      error: () => this.toast.error('Could not remove address.')
-    });
+    this.toast.info('Address removal will be handled via API soon.', id);
   }
 
   addCard(): void {
-    this.toast.success('Card saved (placeholder)');
+    this.api.post<{ client_secret: string; customer_id: string }>('/payment-methods/setup-intent', {}).subscribe({
+      next: (res) => {
+        const pmId = prompt(
+          `Enter payment_method id after confirming setup intent client secret:\n${res.client_secret}`,
+          ''
+        );
+        if (!pmId) return;
+        this.api.post('/payment-methods/attach', { payment_method_id: pmId }).subscribe({
+          next: () => {
+            this.toast.success('Card saved');
+            this.loadPaymentMethods();
+          },
+          error: () => this.toast.error('Could not attach payment method')
+        });
+      },
+      error: () => this.toast.error('Could not start card setup')
+    });
   }
 
   resendVerification(): void {
-    this.toast.success('Verification email sent');
+    this.auth.requestEmailVerification().subscribe({
+      next: () => {
+        this.toast.success('Verification email sent');
+        const token = prompt('Enter verification token from email to confirm');
+        if (token) {
+          this.auth.confirmEmailVerification(token).subscribe({
+            next: (res) => {
+              this.emailVerified.set(res.email_verified);
+              this.toast.success('Email verified');
+            },
+            error: () => this.toast.error('Invalid or expired verification token')
+          });
+        }
+      },
+      error: () => this.toast.error('Could not send verification email')
+    });
   }
 
   onAvatarChange(event: Event): void {
@@ -322,28 +339,23 @@ export class AccountComponent implements OnInit {
     this.totalPages = Math.max(1, Math.ceil(count / this.pageSize));
   }
 
-  private promptAddress(existing?: Address): AddressCreateRequest | null {
-    const line1 = prompt('Address line 1', existing?.line1 || '');
-    if (!line1) return null;
-    const city = prompt('City', existing?.city || '');
-    if (!city) return null;
-    const country = prompt('Country code (e.g., US, RO)', existing?.country || 'US');
-    if (!country) return null;
-    const label = prompt('Label', existing?.label || 'Home') || undefined;
-    const postal = prompt('Postal code', existing?.postal_code || '');
-    if (!postal) return null;
-    const region = prompt('Region/State', existing?.region || '') || undefined;
-    const line2 = prompt('Address line 2', existing?.line2 || '') || undefined;
-    return {
-      label,
-      line1,
-      line2,
-      city,
-      region,
-      postal_code: postal,
-      country,
-      is_default_shipping: existing?.is_default_shipping,
-      is_default_billing: existing?.is_default_billing
-    };
+  paymentMethods: any[] = [];
+
+  private loadPaymentMethods(): void {
+    this.api.get<any[]>('/payment-methods').subscribe({
+      next: (methods) => (this.paymentMethods = methods),
+      error: () => (this.paymentMethods = [])
+    });
+  }
+
+  removePaymentMethod(id: string): void {
+    if (!confirm('Remove this payment method?')) return;
+    this.api.delete(`/payment-methods/${id}`).subscribe({
+      next: () => {
+        this.toast.success('Payment method removed');
+        this.paymentMethods = this.paymentMethods.filter((pm) => pm.id !== id);
+      },
+      error: () => this.toast.error('Could not remove payment method')
+    });
   }
 }

@@ -13,6 +13,7 @@ export interface AuthUser {
   id: string;
   email: string;
   name?: string | null;
+  email_verified?: boolean;
   role: string;
   created_at?: string;
   updated_at?: string;
@@ -61,6 +62,14 @@ export class AuthService {
       current_password: current,
       new_password: newPassword
     });
+  }
+
+  requestEmailVerification(): Observable<{ detail: string }> {
+    return this.api.post<{ detail: string }>('/auth/verify/request', {});
+  }
+
+  confirmEmailVerification(token: string): Observable<{ detail: string; email_verified: boolean }> {
+    return this.api.post<{ detail: string; email_verified: boolean }>('/auth/verify/confirm', { token });
   }
 
   refresh(): Observable<AuthTokens | null> {

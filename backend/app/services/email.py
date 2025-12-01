@@ -77,6 +77,12 @@ async def send_password_reset(to_email: str, token: str) -> bool:
     return await send_email(to_email, subject, text_body)
 
 
+async def send_verification_email(to_email: str, token: str) -> bool:
+    subject = "Verify your email"
+    text_body = f"Use this token to verify your email: {token}"
+    return await send_email(to_email, subject, text_body)
+
+
 async def send_shipping_update(to_email: str, order, tracking_number: str | None = None) -> bool:
     subject = f"Your order {order.reference_code or order.id} has shipped"
     text_body = f"Order {order.reference_code or order.id} is on the way."

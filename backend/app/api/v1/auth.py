@@ -1,7 +1,7 @@
 from pathlib import Path
-from pydantic import BaseModel, Field
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Response, UploadFile, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -13,6 +13,7 @@ from app.models.user import User
 from app.core import security
 from app.schemas.auth import (
     AuthResponse,
+    EmailVerificationConfirm,
     PasswordResetConfirm,
     PasswordResetRequest,
     RefreshRequest,
@@ -57,8 +58,8 @@ def clear_refresh_cookie(response: Response) -> None:
 
 
 class ChangePasswordRequest(BaseModel):
-    current_password: str = Field(min_length=6)
-    new_password: str = Field(min_length=8)
+    current_password: str
+    new_password: str
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=AuthResponse)
@@ -135,6 +136,26 @@ async def change_password(
     session.add(current_user)
     await session.flush()
     return {"detail": "Password updated"}
+
+
+@router.post("/verify/request", status_code=status.HTTP_202_ACCEPTED)
+async def request_email_verification(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    record = await auth_service.create_email_verification(session, current_user)
+    background_tasks.add_task(email_service.send_verification_email, current_user.email, record.token)
+    return {"detail": "Verification email sent"}
+
+
+@router.post("/verify/confirm", status_code=status.HTTP_200_OK)
+async def confirm_email_verification(
+    payload: EmailVerificationConfirm,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    user = await auth_service.confirm_email_verification(session, payload.token)
+    return {"detail": "Email verified", "email_verified": user.email_verified}
 
 
 @router.get("/me", response_model=UserResponse)

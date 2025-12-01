@@ -29,6 +29,7 @@ class UserResponse(BaseModel):
     email: str
     name: str | None = None
     avatar_url: str | None = None
+    email_verified: bool = False
     role: UserRole
     created_at: datetime
     updated_at: datetime
@@ -46,3 +47,7 @@ class PasswordResetRequest(BaseModel):
 class PasswordResetConfirm(BaseModel):
     token: str
     new_password: str
+
+
+class EmailVerificationConfirm(BaseModel):
+    token: str
