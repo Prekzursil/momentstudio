@@ -103,12 +103,6 @@ def test_payment_methods_flow(test_app: Dict[str, object]) -> None:
     assert delete.status_code == 204
 
     # ensure removed in DB
-    async def count_methods():
-        async with SessionLocal() as session:
-            return await session.scalar(
-                select(PaymentMethod).where(PaymentMethod.user_id == None).count()  # type: ignore
-            )
-
     async def count_methods_simple():
         async with SessionLocal() as session:
             result = await session.execute(select(PaymentMethod))
