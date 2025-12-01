@@ -8,7 +8,7 @@ from sqlalchemy.future import select
 
 from app.core import security
 from app.core.config import settings
-from app.models.user import PasswordResetToken, RefreshSession, User
+from app.models.user import EmailVerificationToken, PasswordResetToken, RefreshSession, User
 from app.schemas.user import UserCreate
 
 
@@ -103,6 +103,50 @@ async def issue_tokens_for_user(session: AsyncSession, user: User) -> dict[str, 
     refresh = security.create_refresh_token(str(user.id), refresh_session.jti, refresh_session.expires_at)
     await session.commit()
     return {"access_token": access, "refresh_token": refresh}
+
+
+async def _revoke_other_verification_tokens(session: AsyncSession, user_id: uuid.UUID) -> None:
+    result = await session.execute(
+        select(EmailVerificationToken).where(EmailVerificationToken.user_id == user_id, EmailVerificationToken.used.is_(False))
+    )
+    tokens = result.scalars().all()
+    for tok in tokens:
+        tok.used = True
+    if tokens:
+        session.add_all(tokens)
+        await session.flush()
+
+
+async def create_email_verification(session: AsyncSession, user: User, expires_minutes: int = 60) -> EmailVerificationToken:
+    await _revoke_other_verification_tokens(session, user.id)
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+    record = EmailVerificationToken(user_id=user.id, token=token, expires_at=expires_at, used=False)
+    session.add(record)
+    await session.commit()
+    await session.refresh(record)
+    return record
+
+
+async def confirm_email_verification(session: AsyncSession, token: str) -> User:
+    result = await session.execute(
+        select(EmailVerificationToken).where(EmailVerificationToken.token == token, EmailVerificationToken.used.is_(False))
+    )
+    record = result.scalar_one_or_none()
+    expires_at = record.expires_at if record else None
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if not record or not expires_at or expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
+    user = await session.get(User, record.user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    user.email_verified = True
+    record.used = True
+    session.add_all([user, record])
+    await session.commit()
+    await session.refresh(user)
+    return user
 
 
 async def revoke_refresh_token(session: AsyncSession, jti: str, reason: str = "revoked") -> None:
