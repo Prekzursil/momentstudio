@@ -15,6 +15,8 @@ from app.schemas.cart_sync import CartSyncItem
 from app.models.promo import PromoCode
 from app.models.order import Order
 from app.models.user import User
+from app.models.order import ShippingMethod
+from app.schemas.promo import PromoCodeRead
 from app.services import email as email_service
 
 
@@ -78,22 +80,63 @@ def _get_first_image(product: Product | None) -> str | None:
     return first[0].url if first else None
 
 
-async def _calculate_totals(
-    cart: Cart, shipping_amount: Decimal | None = None, discount: Decimal | None = None, currency: str | None = "USD"
+def _calculate_shipping_amount(subtotal: Decimal, shipping_method: ShippingMethod | None) -> Decimal:
+    if not shipping_method:
+        return Decimal("0")
+    base = Decimal(shipping_method.rate_flat or 0)
+    per = Decimal(shipping_method.rate_per_kg or 0)
+    return base + per * subtotal
+
+
+def _compute_discount(subtotal: Decimal, promo: PromoCodeRead | None) -> Decimal:
+    if not promo:
+        return Decimal("0")
+    if promo.amount_off:
+        discount_val = Decimal(promo.amount_off)
+    elif promo.percentage_off:
+        discount_val = subtotal * Decimal(promo.percentage_off) / Decimal(100)
+    else:
+        discount_val = Decimal("0")
+    if discount_val > subtotal:
+        discount_val = subtotal
+    return discount_val
+
+
+def _calculate_totals(
+    cart: Cart,
+    shipping_method: ShippingMethod | None = None,
+    promo: PromoCodeRead | None = None,
+    currency: str | None = "USD",
 ) -> Totals:
     subtotal = sum(Decimal(item.unit_price_at_add) * item.quantity for item in cart.items)
     subtotal = Decimal(subtotal)
-    tax = subtotal * Decimal("0.1")
-    shipping = shipping_amount if shipping_amount is not None else (Decimal("5.00") if subtotal > 0 else Decimal("0.00"))
-    discount_val = discount if discount is not None else Decimal("0.00")
-    total = subtotal + tax + shipping - discount_val
+    discount_val = _compute_discount(subtotal, promo)
+    taxable = subtotal - discount_val
+    if taxable < 0:
+        taxable = Decimal("0")
+    tax = taxable * Decimal("0.1")
+    shipping = _calculate_shipping_amount(subtotal, shipping_method)
+    total = taxable + tax + shipping
     if total < 0:
         total = Decimal("0.00")
     return Totals(subtotal=subtotal, tax=tax, shipping=shipping, total=total, currency=currency)
 
 
+def calculate_totals(cart: Cart, shipping_method: ShippingMethod | None = None, promo: PromoCodeRead | None = None) -> tuple[Totals, Decimal]:
+    subtotal = sum(Decimal(item.unit_price_at_add) * item.quantity for item in cart.items)
+    discount_val = _compute_discount(subtotal, promo)
+    currency = next(
+        (getattr(item.product, "currency", None) for item in cart.items if getattr(item, "product", None)), "USD"
+    ) or "USD"
+    totals = _calculate_totals(cart, shipping_method=shipping_method, promo=promo, currency=currency)
+    return totals, discount_val
+
+
 async def serialize_cart(
-    session: AsyncSession, cart: Cart, shipping_amount: Decimal | None = None, discount: Decimal | None = None
+    session: AsyncSession,
+    cart: Cart,
+    shipping_method: ShippingMethod | None = None,
+    promo: PromoCodeRead | None = None,
 ) -> CartRead:
     result = await session.execute(
         select(Cart)
@@ -108,7 +151,7 @@ async def serialize_cart(
     currency = next(
         (getattr(item.product, "currency", None) for item in hydrated.items if getattr(item, "product", None)), "USD"
     ) or "USD"
-    totals = await _calculate_totals(hydrated, shipping_amount=shipping_amount, discount=discount, currency=currency)
+    totals = _calculate_totals(hydrated, shipping_method=shipping_method, promo=promo, currency=currency)
     return CartRead(
         id=hydrated.id,
         user_id=hydrated.user_id,

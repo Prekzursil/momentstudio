@@ -2,7 +2,7 @@ from uuid import UUID
 from decimal import Decimal
 
 import uuid
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user_optional
@@ -10,6 +10,7 @@ from app.db.session import get_session
 from app.schemas.cart import CartItemCreate, CartItemRead, CartItemUpdate, CartRead
 from app.schemas.promo import PromoCodeRead, PromoCodeCreate
 from app.services import cart as cart_service
+from app.services import order as order_service
 from app.schemas.cart_sync import CartSyncRequest
 
 router = APIRouter(prefix="/cart", tags=["cart"])
@@ -24,6 +25,8 @@ async def get_cart(
     session: AsyncSession = Depends(get_session),
     current_user=Depends(get_current_user_optional),
     session_id: str | None = Depends(session_header),
+    shipping_method_id: UUID | None = Query(default=None),
+    promo_code: str | None = Query(default=None),
 ):
     if not current_user and not session_id:
         session_id = f"guest-{uuid.uuid4()}"
@@ -34,7 +37,15 @@ async def get_cart(
         session.add(cart)
         await session.commit()
         await session.refresh(cart)
-    return await cart_service.serialize_cart(session, cart)
+    shipping_method = None
+    if shipping_method_id:
+        shipping_method = await order_service.get_shipping_method(session, shipping_method_id)
+        if not shipping_method:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
+    promo = None
+    if promo_code:
+        promo = await cart_service.validate_promo(session, promo_code, currency=None)
+    return await cart_service.serialize_cart(session, cart, shipping_method=shipping_method, promo=promo)
 
 
 @router.post("/items", response_model=CartItemRead, status_code=status.HTTP_201_CREATED)

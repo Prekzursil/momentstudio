@@ -17,14 +17,16 @@ def init_stripe() -> None:
     stripe.api_key = settings.stripe_secret_key
 
 
-async def create_payment_intent(session: AsyncSession, cart: Cart) -> dict:
+async def create_payment_intent(session: AsyncSession, cart: Cart, amount_cents: int | None = None) -> dict:
     if not settings.stripe_secret_key:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
     if not cart.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
 
     init_stripe()
-    amount_cents = int(sum(float(item.unit_price_at_add) * item.quantity for item in cart.items) * 100)
+    computed_amount = int(sum(float(item.unit_price_at_add) * item.quantity for item in cart.items) * 100)
+    if amount_cents is None:
+        amount_cents = computed_amount
     try:
         intent = stripe.PaymentIntent.create(
             amount=amount_cents,
