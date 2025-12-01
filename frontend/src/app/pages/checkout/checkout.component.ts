@@ -394,7 +394,7 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
       region: this.address.region,
       postal_code: this.address.postal,
       country: this.address.country || 'US',
-      shipping_method_id: null,
+      shipping_method_id: this.shipping || null,
       promo_code: this.promo || null,
       save_address: this.saveAddress
     };
