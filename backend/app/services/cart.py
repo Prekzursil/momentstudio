@@ -8,7 +8,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.models.cart import Cart, CartItem
-from app.models.catalog import Product, ProductVariant
+from app.models.catalog import Product, ProductVariant, ProductImage
 from app.schemas.cart import CartItemCreate, CartItemUpdate, CartRead, CartItemRead, Totals
 from app.schemas.promo import PromoCodeRead, PromoCodeCreate
 from app.schemas.cart_sync import CartSyncItem
@@ -21,14 +21,26 @@ from app.services import email as email_service
 async def _get_or_create_cart(session: AsyncSession, user_id: UUID | None, session_id: str | None) -> Cart:
     if user_id:
         result = await session.execute(
-            select(Cart).options(selectinload(Cart.items)).where(Cart.user_id == user_id)
+            select(Cart)
+            .options(
+                selectinload(Cart.items)
+                .selectinload(CartItem.product)
+                .selectinload(Product.images)
+            )
+            .where(Cart.user_id == user_id)
         )
         cart = result.scalar_one_or_none()
         if cart:
             return cart
     if session_id:
         result = await session.execute(
-            select(Cart).options(selectinload(Cart.items)).where(Cart.session_id == session_id)
+            select(Cart)
+            .options(
+                selectinload(Cart.items)
+                .selectinload(CartItem.product)
+                .selectinload(Product.images)
+            )
+            .where(Cart.session_id == session_id)
         )
         cart = result.scalar_one_or_none()
         if cart:
@@ -59,32 +71,63 @@ def _enforce_max_quantity(quantity: int, limit: int | None) -> None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Quantity exceeds allowed maximum")
 
 
-async def _calculate_totals(cart: Cart) -> Totals:
+def _get_first_image(product: Product | None) -> str | None:
+    if not product or not product.images:
+        return None
+    first = sorted(product.images, key=lambda img: img.sort_order or 0)
+    return first[0].url if first else None
+
+
+async def _calculate_totals(
+    cart: Cart, shipping_amount: Decimal | None = None, discount: Decimal | None = None, currency: str | None = "USD"
+) -> Totals:
     subtotal = sum(Decimal(item.unit_price_at_add) * item.quantity for item in cart.items)
     subtotal = Decimal(subtotal)
     tax = subtotal * Decimal("0.1")
-    shipping = Decimal("5.00") if subtotal > 0 else Decimal("0.00")
-    total = subtotal + tax + shipping
-    return Totals(subtotal=subtotal, tax=tax, shipping=shipping, total=total)
+    shipping = shipping_amount if shipping_amount is not None else (Decimal("5.00") if subtotal > 0 else Decimal("0.00"))
+    discount_val = discount if discount is not None else Decimal("0.00")
+    total = subtotal + tax + shipping - discount_val
+    if total < 0:
+        total = Decimal("0.00")
+    return Totals(subtotal=subtotal, tax=tax, shipping=shipping, total=total, currency=currency)
 
 
-async def serialize_cart(cart: Cart) -> CartRead:
-    totals = await _calculate_totals(cart)
+async def serialize_cart(
+    session: AsyncSession, cart: Cart, shipping_amount: Decimal | None = None, discount: Decimal | None = None
+) -> CartRead:
+    result = await session.execute(
+        select(Cart)
+            .options(
+                selectinload(Cart.items)
+                .selectinload(CartItem.product)
+                .selectinload(Product.images)
+            )
+            .where(Cart.id == cart.id)
+    )
+    hydrated = result.scalar_one()
+    currency = next(
+        (getattr(item.product, "currency", None) for item in hydrated.items if getattr(item, "product", None)), "USD"
+    ) or "USD"
+    totals = await _calculate_totals(hydrated, shipping_amount=shipping_amount, discount=discount, currency=currency)
     return CartRead(
-        id=cart.id,
-        user_id=cart.user_id,
-        session_id=cart.session_id,
+        id=hydrated.id,
+        user_id=hydrated.user_id,
+        session_id=hydrated.session_id,
         items=[
             CartItemRead(
                 id=item.id,
                 product_id=item.product_id,
                 variant_id=item.variant_id,
                 quantity=item.quantity,
-                max_quantity=item.max_quantity,
+                max_quantity=item.max_quantity or (item.product.stock_quantity if item.product else None),
                 note=item.note,
                 unit_price_at_add=Decimal(item.unit_price_at_add),
+                name=item.product.name if item.product else None,
+                slug=item.product.slug if item.product else None,
+                image_url=_get_first_image(item.product),
+                currency=getattr(item.product, "currency", None) or "USD",
             )
-            for item in cart.items
+            for item in hydrated.items
         ],
         totals=totals,
     )

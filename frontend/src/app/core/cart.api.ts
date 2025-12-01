@@ -15,6 +15,7 @@ export interface CartTotals {
   tax: string;
   shipping: string;
   total: string;
+  currency?: string;
 }
 
 export interface CartResponse {
@@ -33,6 +34,10 @@ export interface CartItemResponse {
   max_quantity?: number | null;
   unit_price_at_add: string;
   note?: string | null;
+  name?: string | null;
+  slug?: string | null;
+  image_url?: string | null;
+  currency?: string | null;
 }
 
 const SESSION_KEY = 'cart_session_id';

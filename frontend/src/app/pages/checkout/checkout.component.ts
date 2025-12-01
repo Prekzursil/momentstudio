@@ -3,12 +3,13 @@ import { Component, AfterViewInit, OnDestroy, ViewChild, ElementRef } from '@ang
 import { FormsModule, NgForm } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
-import { ButtonComponent } from '../../shared.button.component';
+import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
-import { CartStore } from '../../core/cart.store';
+import { CartStore, CartItem } from '../../core/cart.store';
 import { CartApi } from '../../core/cart.api';
 import { loadStripe, Stripe, StripeElements, StripeCardElement, StripeCardElementChangeEvent } from '@stripe/stripe-js';
+import { ApiService } from '../../core/api.service';
 
 type ShippingMethod = { id: string; label: string; amount: number; eta: string };
 
@@ -160,7 +161,7 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
     { label: 'Cart', url: '/cart' },
     { label: 'Checkout' }
   ];
-  mode: 'guest' | 'login' = 'guest';
+  mode: 'guest' | 'create' = 'guest';
   shipping: string = 'standard';
   promo = '';
   promoMessage = '';
@@ -168,18 +169,21 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
     { id: 'standard', label: 'Standard', amount: 8, eta: '3-5 business days' },
     { id: 'express', label: 'Express', amount: 15, eta: '1-2 business days' }
   ];
-  countries = ['United States', 'United Kingdom', 'Romania', 'Germany', 'France', 'Canada'];
+  countries = ['US', 'GB', 'RO', 'DE', 'FR', 'CA'];
   addressError = '';
   errorMessage = '';
   pricesRefreshed = false;
   saveAddress = true;
-  address = {
+  address: { name: string; email: string; line1: string; line2?: string; city: string; region?: string; postal: string; country: string; password?: string } = {
     name: '',
     email: '',
     line1: '',
+    line2: '',
     city: '',
+    region: '',
     postal: '',
-    country: ''
+    country: '',
+    password: ''
   };
   discount = 0;
 
@@ -192,7 +196,7 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
   syncing = false;
   placing = false;
 
-  constructor(private cart: CartStore, private router: Router, private cartApi: CartApi) {
+  constructor(private cart: CartStore, private router: Router, private cartApi: CartApi, private api: ApiService) {
     const saved = this.loadSavedAddress();
     if (saved) {
       this.address = saved;
@@ -357,12 +361,12 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
     return true;
   }
 
-  private syncBackendCart(items): void {
+  private syncBackendCart(items: CartItem[]): void {
     this.syncing = true;
     this.cartApi
       .sync(
         items.map((i) => ({
-          product_id: i.id,
+          product_id: i.product_id,
           variant_id: i.variant_id,
           quantity: i.quantity,
           note: undefined,
@@ -371,11 +375,11 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
       )
       .subscribe({
         next: () => (this.syncing = false),
-        error: () => {
-          this.syncing = false;
-          this.errorMessage = 'Could not sync cart with server';
-        }
-      });
+      error: () => {
+        this.syncing = false;
+        this.errorMessage = 'Could not sync cart with server';
+      }
+    });
   }
 
   private submitCheckout(): void {

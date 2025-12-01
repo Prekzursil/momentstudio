@@ -9,6 +9,7 @@ class Totals(BaseModel):
     tax: Decimal
     shipping: Decimal
     total: Decimal
+    currency: str | None = "USD"
 
 
 class CartItemCreate(BaseModel):
@@ -34,6 +35,10 @@ class CartItemRead(BaseModel):
     max_quantity: int | None = None
     note: str | None = None
     unit_price_at_add: Decimal
+    name: str | None = None
+    slug: str | None = None
+    image_url: str | None = None
+    currency: str | None = "USD"
 
 
 class CartRead(BaseModel):

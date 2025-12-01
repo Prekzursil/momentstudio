@@ -6,6 +6,7 @@ import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { CartStore } from '../../core/cart.store';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
+import { OnInit } from '@angular/core';
 
 @Component({
   selector: 'app-cart',
@@ -98,7 +99,7 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
     </app-container>
   `
 })
-export class CartComponent {
+export class CartComponent implements OnInit {
   crumbs = [
     { label: 'Home', url: '/' },
     { label: 'Cart' }
@@ -106,6 +107,10 @@ export class CartComponent {
   errorMsg = '';
 
   constructor(private cart: CartStore) {}
+
+  ngOnInit(): void {
+    this.cart.loadFromBackend();
+  }
 
   items = this.cart.items;
   subtotal = this.cart.subtotal;
