@@ -9,11 +9,13 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.main import app
 from app.db.base import Base
 from app.db.session import get_session
-from app.models.catalog import Category, Product
+from app.models.catalog import Category, Product, ProductImage
 from app.services.auth import create_user
 from app.schemas.user import UserCreate
 from app.services import cart as cart_service
 from app.schemas.promo import PromoCodeCreate
+from app.services import order as order_service
+from app.schemas.order import ShippingMethodCreate
 
 
 @pytest.fixture
@@ -66,6 +68,7 @@ def seed_product(session_factory) -> UUID:
                 base_price=10,
                 currency="USD",
                 stock_quantity=5,
+                images=[ProductImage(url="/media/cup.png", alt_text="cup")],
             )
             session.add_all([category, product])
             await session.commit()
@@ -178,3 +181,49 @@ def test_max_quantity_promo_and_abandoned_job(test_app: Dict[str, object]) -> No
             return await cart_service.run_abandoned_cart_job(session, max_age_hours=0)
     count = asyncio.run(run_job())
     assert count >= 0
+
+
+def test_cart_sync_metadata_and_totals(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    product_id = seed_product(SessionLocal)
+    session_id = "guest-meta-1"
+
+    async def seed_shipping_and_promo():
+        async with SessionLocal() as session:
+            shipping = await order_service.create_shipping_method(
+                session, ShippingMethodCreate(name="Fast", rate_flat=5.0, rate_per_kg=0)
+            )
+            await cart_service.create_promo(
+                session,
+                PromoCodeCreate(code="SAVE5", percentage_off=5, currency="USD"),
+            )
+            return shipping.id
+
+    shipping_method_id = asyncio.run(seed_shipping_and_promo())
+
+    sync = client.post(
+        "/api/v1/cart/sync",
+        json={"items": [{"product_id": str(product_id), "quantity": 2}]},
+        headers={"X-Session-Id": session_id},
+    )
+    assert sync.status_code == 200
+
+    res = client.get(
+        "/api/v1/cart",
+        params={"shipping_method_id": str(shipping_method_id), "promo_code": "SAVE5"},
+        headers={"X-Session-Id": session_id},
+    )
+    assert res.status_code == 200
+    body = res.json()
+    item = body["items"][0]
+    assert item["name"]
+    assert item["slug"]
+    assert item["image_url"]
+    assert item["currency"] == "USD"
+
+    totals = body["totals"]
+    # subtotal 10*2=20, discount 5% =>1, taxable 19, tax 1.9, shipping 5 => total 25.9
+    assert float(totals["subtotal"]) == pytest.approx(20.0)
+    assert float(totals["total"]) == pytest.approx(25.9, rel=1e-2)

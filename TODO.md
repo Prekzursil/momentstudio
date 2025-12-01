@@ -226,10 +226,17 @@ Below is a structured checklist you can turn into issues.
 - [x] Ensure frontend CI runs with Angular toolchain/Chrome to cover cart/checkout flows.
  - [x] Wire cart state to backend cart APIs (load/add/update/remove) instead of local-only.
  - [x] Replace checkout payment placeholder with Stripe Elements + PaymentIntent from backend.
- - [x] Submit checkout to backend to create order, validate stock/pricing, and handle failures.
- - [x] Use backend shipping methods and promo validation instead of hardcoded values.
- - [x] Persist/save checkout address via backend (guest or user) and reuse on account.
- - [x] Add guest checkout API (session-based cart, guest address capture, optional account creation).
+- [x] Submit checkout to backend to create order, validate stock/pricing, and handle failures.
+- [x] Use backend shipping methods and promo validation instead of hardcoded values.
+- [x] Persist/save checkout address via backend (guest or user) and reuse on account.
+- [x] Add guest checkout API (session-based cart, guest address capture, optional account creation).
+ - [x] Tests: guest checkout with promo + shipping validates PaymentIntent amount and queues set-password email.
+ - [x] Tests: cart sync returns product metadata (name/slug/image/currency) and totals reflect shipping/promo.
+ - [x] Tests: payment intent amount derived from backend totals (seeded cart).
+ - [x] Frontend test: Checkout component calls /cart/sync, /payments/intent, /orders/guest-checkout with shipping_method_id/promo/create_account and handles errors/retry.
+ - [x] Frontend test: CartStore add/remove via backend merges quantities and is resilient to errors.
+ - [x] Frontend test: ProductComponent “Add to cart” posts to backend and shows toast (mock CartStore).
+ - [x] E2E: guest checkout (add cart → sync → apply promo/shipping → mock pay → confirm order) with CHROME_BIN headless and --no-sandbox.
 
 ## Frontend - Auth & Account
 - [x] Login page with validation.
