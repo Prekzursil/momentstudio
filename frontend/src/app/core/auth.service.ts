@@ -56,6 +56,13 @@ export class AuthService {
     return this.api.post<AuthResponse>('/auth/register', { name, email, password }).pipe(tap((res) => this.persist(res)));
   }
 
+  changePassword(current: string, newPassword: string): Observable<{ detail: string }> {
+    return this.api.post<{ detail: string }>('/auth/password/change', {
+      current_password: current,
+      new_password: newPassword
+    });
+  }
+
   refresh(): Observable<AuthTokens | null> {
     const refreshToken = this.getRefreshToken();
     if (!refreshToken) return of(null);

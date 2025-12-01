@@ -1,4 +1,5 @@
 from pathlib import Path
+from pydantic import BaseModel, Field
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +10,7 @@ from app.core.rate_limit import limiter, per_identifier_limiter
 from app.core.security import decode_token
 from app.db.session import get_session
 from app.models.user import User
+from app.core import security
 from app.schemas.auth import (
     AuthResponse,
     PasswordResetConfirm,
@@ -52,6 +54,11 @@ def clear_refresh_cookie(response: Response) -> None:
         secure=settings.secure_cookies,
         samesite=settings.cookie_samesite.lower(),
     )
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=6)
+    new_password: str = Field(min_length=8)
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=AuthResponse)
@@ -114,6 +121,20 @@ async def logout(
     if response:
         clear_refresh_cookie(response)
     return None
+
+
+@router.post("/password/change", status_code=status.HTTP_200_OK)
+async def change_password(
+    payload: ChangePasswordRequest,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    if not security.verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+    current_user.hashed_password = security.hash_password(payload.new_password)
+    session.add(current_user)
+    await session.flush()
+    return {"detail": "Password updated"}
 
 
 @router.get("/me", response_model=UserResponse)

@@ -35,6 +35,18 @@ export interface Order {
   items: OrderItem[];
 }
 
+export interface AddressCreateRequest {
+  label?: string | null;
+  line1: string;
+  line2?: string | null;
+  city: string;
+  region?: string | null;
+  postal_code: string;
+  country: string;
+  is_default_shipping?: boolean;
+  is_default_billing?: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AccountService {
   constructor(private api: ApiService) {}
@@ -49,5 +61,17 @@ export class AccountService {
 
   getOrders(): Observable<Order[]> {
     return this.api.get<Order[]>('/orders');
+  }
+
+  createAddress(payload: AddressCreateRequest): Observable<Address> {
+    return this.api.post<Address>('/me/addresses', payload);
+  }
+
+  updateAddress(id: string, payload: Partial<AddressCreateRequest>): Observable<Address> {
+    return this.api.patch<Address>(`/me/addresses/${id}`, payload);
+  }
+
+  deleteAddress(id: string): Observable<void> {
+    return this.api.delete<void>(`/me/addresses/${id}`);
   }
 }
