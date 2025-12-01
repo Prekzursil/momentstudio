@@ -1,5 +1,6 @@
 import asyncio
 import io
+import uuid
 from typing import Dict
 from uuid import uuid4
 
@@ -17,8 +18,10 @@ from app.models.address import Address
 from app.models.cart import Cart, CartItem
 from app.models.catalog import Category, Product, ProductImage, ProductStatus
 from app.models.order import Order, OrderItem, OrderStatus
+from app.models.promo import PromoCode
 from app.models.user import User, UserRole
 from app.services import storage
+from sqlalchemy import select
 
 
 @pytest.fixture(scope="module")
@@ -190,3 +193,37 @@ def test_admin_e2e_smoke(test_app: Dict[str, object], monkeypatch) -> None:
     # Feed still reachable
     feed = client.get("/api/v1/feeds/products.json")
     assert feed.status_code == 200
+
+
+def test_admin_coupon_usage_reflected(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    asyncio.run(seed_data(session_factory))
+    headers = auth_headers(client)
+
+    created = client.post(
+        "/api/v1/admin/dashboard/coupons",
+        json={"code": "SAVE20", "active": True, "currency": "USD"},
+        headers=headers,
+    )
+    assert created.status_code == 201
+    coupon_id = uuid.UUID(created.json()["id"])
+
+    async def _increment_usage():
+        async with session_factory() as session:
+            result = await session.execute(select(PromoCode).where(PromoCode.id == coupon_id))
+            coupon = result.scalar_one_or_none()
+            assert coupon is not None
+            coupon.times_used = (coupon.times_used or 0) + 1
+            await session.commit()
+
+    asyncio.run(_increment_usage())
+
+    coupons = client.get("/api/v1/admin/dashboard/coupons", headers=headers)
+    assert coupons.status_code == 200
+    body = coupons.json()
+    match = next((c for c in body if c["code"] == "SAVE20"), None)
+    assert match is not None
+    assert match["times_used"] >= 1

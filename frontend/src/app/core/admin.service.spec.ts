@@ -105,4 +105,22 @@ describe('AdminService', () => {
     expect(revokeReq.request.method).toBe('POST');
     revokeReq.flush(null);
   });
+
+  it('should fetch maintenance state', () => {
+    service.getMaintenance().subscribe((res) => {
+      expect(res.enabled).toBeFalse();
+    });
+    const req = httpMock.expectOne('/api/v1/admin/dashboard/maintenance');
+    expect(req.request.method).toBe('GET');
+    req.flush({ enabled: false });
+  });
+
+  it('should list coupons', () => {
+    service.coupons().subscribe((res) => {
+      expect(res[0].code).toBe('SAVE10');
+    });
+    const req = httpMock.expectOne('/api/v1/admin/dashboard/coupons');
+    expect(req.request.method).toBe('GET');
+    req.flush([{ id: 'c1', code: 'SAVE10', active: true }]);
+  });
 });

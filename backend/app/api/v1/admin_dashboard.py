@@ -197,6 +197,7 @@ async def admin_update_coupon(
             setattr(promo, field, payload[field])
     session.add(promo)
     await session.flush()
+    await session.commit()
     return {
         "id": str(promo.id),
         "code": promo.code,

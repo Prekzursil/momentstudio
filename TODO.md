@@ -261,9 +261,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Backend tests: admin dashboard endpoints (summary, lists, audit, maintenance, category reorder, sitemap/robots/feed, session revoke, user role, image reorder).
 - [x] Frontend tests: AdminService/admin component for order status, coupon add/toggle, category reorder drag/drop, maintenance toggle (mock HTTP).
 - [x] E2E smoke: admin login → dashboard → change order status → toggle maintenance → reorder category → upload/delete product image.
-- [ ] Backend tests: admin filters/coupons/audit/image reorder/low-stock with sqlite override.
-- [ ] Frontend tests: AdminService + admin component flows (sessions revoke, role update, low-stock, coupons, maintenance get/set, category reorder drag-drop).
-- [ ] E2E: admin flow create coupon → apply to order (mock payment) + verify dashboard reflects coupon usage.
+- [x] Backend tests: admin filters/coupons/audit/image reorder/low-stock with sqlite override.
+- [x] Frontend tests: AdminService + admin component flows (sessions revoke, role update, low-stock, coupons, maintenance get/set, category reorder drag-drop).
+- [x] E2E: admin flow create coupon → apply to order (mock payment) + verify dashboard reflects coupon usage.
 
 ## UX, Performance, SEO & Accessibility
 - [ ] Mobile-first responsive design across pages.
