@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, AfterViewInit, signal, ViewChild, ElementRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
@@ -10,6 +10,7 @@ import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
 import { AccountService, Address, Order } from '../../core/account.service';
 import { forkJoin } from 'rxjs';
+import { loadStripe, Stripe, StripeElements, StripeCardElement } from '@stripe/stripe-js';
 import { ApiService } from '../../core/api.service';
 
 @Component({
@@ -32,12 +33,23 @@ import { ApiService } from '../../core/api.service';
           {{ error() }}
         </div>
         <div class="grid gap-6" *ngIf="!error()">
-        <div
-          *ngIf="!emailVerified()"
-          class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 text-sm flex items-start justify-between gap-3"
-        >
-          <span>Verify your email to secure your account and receive updates.</span>
-          <app-button size="sm" variant="ghost" label="Resend link" (action)="resendVerification()"></app-button>
+        <div *ngIf="!emailVerified()" class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 text-sm grid gap-3">
+          <div class="flex items-start justify-between gap-3">
+            <span>Verify your email to secure your account and receive updates.</span>
+            <app-button size="sm" variant="ghost" label="Resend link" (action)="resendVerification()"></app-button>
+          </div>
+          <form class="flex gap-2 items-center" (ngSubmit)="submitVerification()">
+            <input
+              [(ngModel)]="verificationToken"
+              name="verificationToken"
+              type="text"
+              placeholder="Enter verification token"
+              class="border border-amber-300 rounded-lg px-3 py-2 text-sm flex-1"
+              required
+            />
+            <app-button size="sm" label="Confirm" type="submit"></app-button>
+          </form>
+          <p *ngIf="verificationStatus" class="text-xs text-amber-800">{{ verificationStatus }}</p>
         </div>
         <header class="flex items-center justify-between">
           <div>
@@ -135,9 +147,17 @@ import { ApiService } from '../../core/api.service';
         <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
           <div class="flex items-center justify-between">
             <h2 class="text-lg font-semibold text-slate-900">Payment methods</h2>
-            <app-button size="sm" variant="ghost" label="Add card" (action)="addCard()"></app-button>
+            <div class="flex gap-2 items-center">
+              <app-button size="sm" variant="ghost" label="Add card" (action)="startAddCard()"></app-button>
+              <app-button size="sm" label="Save card" (action)="confirmCard()" [disabled]="!cardReady || savingCard"></app-button>
+            </div>
           </div>
           <div *ngIf="paymentMethods.length === 0" class="text-sm text-slate-700">No cards saved yet.</div>
+          <div class="border border-dashed border-slate-200 rounded-lg p-3 text-sm" *ngIf="cardElementVisible">
+            <p class="text-slate-600 mb-2">Enter card details:</p>
+            <div #cardHost id="card-element" class="min-h-[48px]"></div>
+            <p *ngIf="cardError" class="text-rose-700 text-xs mt-2">{{ cardError }}</p>
+          </div>
           <div *ngFor="let pm of paymentMethods" class="flex items-center justify-between text-sm border border-slate-200 rounded-lg p-3">
             <div class="flex items-center gap-2">
               <span class="font-semibold">{{ pm.brand || 'Card' }}</span>
@@ -165,7 +185,7 @@ import { ApiService } from '../../core/api.service';
     </app-container>
   `
 })
-export class AccountComponent implements OnInit {
+export class AccountComponent implements OnInit, AfterViewInit {
   crumbs = [
     { label: 'Home', url: '/' },
     { label: 'Account' }
@@ -175,6 +195,8 @@ export class AccountComponent implements OnInit {
   addresses = signal<Address[]>([]);
   avatar: string | null = null;
   placeholderAvatar = 'https://via.placeholder.com/120?text=Avatar';
+  verificationToken = '';
+  verificationStatus: string | null = null;
 
   profile = signal<{ email: string; name?: string | null } | null>(null);
   orders = signal<Order[]>([]);
@@ -184,6 +206,17 @@ export class AccountComponent implements OnInit {
   totalPages = 1;
   loading = signal<boolean>(true);
   error = signal<string | null>(null);
+
+  paymentMethods: any[] = [];
+  cardElementVisible = false;
+  savingCard = false;
+  cardReady = false;
+  cardError: string | null = null;
+  private stripe?: Stripe;
+  private elements?: StripeElements;
+  private card?: StripeCardElement;
+  private clientSecret: string | null = null;
+  @ViewChild('cardHost') cardElementRef?: ElementRef<HTMLDivElement>;
 
   constructor(
     private toast: ToastService,
@@ -198,6 +231,10 @@ export class AccountComponent implements OnInit {
   ngOnInit(): void {
     this.loadData();
     this.loadPaymentMethods();
+  }
+
+  async ngAfterViewInit(): Promise<void> {
+    await this.setupStripe();
   }
 
   private loadData(): void {
@@ -258,41 +295,40 @@ export class AccountComponent implements OnInit {
   }
 
   addCard(): void {
-    this.api.post<{ client_secret: string; customer_id: string }>('/payment-methods/setup-intent', {}).subscribe({
-      next: (res) => {
-        const pmId = prompt(
-          `Enter payment_method id after confirming setup intent client secret:\n${res.client_secret}`,
-          ''
-        );
-        if (!pmId) return;
-        this.api.post('/payment-methods/attach', { payment_method_id: pmId }).subscribe({
-          next: () => {
-            this.toast.success('Card saved');
-            this.loadPaymentMethods();
-          },
-          error: () => this.toast.error('Could not attach payment method')
-        });
-      },
-      error: () => this.toast.error('Could not start card setup')
-    });
+  startAddCard(): void {
+    this.cardError = null;
+    this.savingCard = false;
+    this.cardElementVisible = true;
+    this.createSetupIntent();
+    setTimeout(() => this.mountCardElement(), 0);
   }
 
   resendVerification(): void {
     this.auth.requestEmailVerification().subscribe({
       next: () => {
+        this.verificationStatus = 'Verification email sent. Enter the token you received.';
         this.toast.success('Verification email sent');
-        const token = prompt('Enter verification token from email to confirm');
-        if (token) {
-          this.auth.confirmEmailVerification(token).subscribe({
-            next: (res) => {
-              this.emailVerified.set(res.email_verified);
-              this.toast.success('Email verified');
-            },
-            error: () => this.toast.error('Invalid or expired verification token')
-          });
-        }
       },
       error: () => this.toast.error('Could not send verification email')
+    });
+  }
+
+  submitVerification(): void {
+    if (!this.verificationToken) {
+      this.verificationStatus = 'Enter a verification token.';
+      return;
+    }
+    this.auth.confirmEmailVerification(this.verificationToken).subscribe({
+      next: (res) => {
+        this.emailVerified.set(res.email_verified);
+        this.verificationStatus = 'Email verified';
+        this.toast.success('Email verified');
+        this.verificationToken = '';
+      },
+      error: () => {
+        this.verificationStatus = 'Invalid or expired token';
+        this.toast.error('Invalid or expired token');
+      }
     });
   }
 
@@ -337,6 +373,84 @@ export class AccountComponent implements OnInit {
   private computeTotalPages(total?: number): void {
     const count = total ?? this.filteredOrders().length;
     this.totalPages = Math.max(1, Math.ceil(count / this.pageSize));
+  }
+
+  private async setupStripe(): Promise<void> {
+    if (this.stripe) return;
+    const publishableKey = this.getStripePublishableKey();
+    if (!publishableKey) {
+      this.cardError = 'Stripe publishable key is not configured';
+      return;
+    }
+    this.stripe = await loadStripe(publishableKey);
+    if (!this.stripe) {
+      this.cardError = 'Could not initialize Stripe.';
+      return;
+    }
+    this.elements = this.stripe.elements();
+    this.card = this.elements.create('card');
+    this.mountCardElement();
+  }
+
+  private getStripePublishableKey(): string | null {
+    const meta = document.querySelector('meta[name=\"stripe-publishable-key\"]');
+    return meta?.getAttribute('content') || null;
+  }
+
+  private createSetupIntent(): void {
+    this.api.post<{ client_secret: string; customer_id: string }>('/payment-methods/setup-intent', {}).subscribe({
+      next: (res) => {
+        this.clientSecret = res.client_secret;
+      },
+      error: () => {
+        this.cardError = 'Could not start card setup';
+        this.toast.error('Could not start card setup');
+      }
+    });
+  }
+
+  private mountCardElement(): void {
+    if (!this.card || !this.cardElementRef) return;
+    this.card.mount(this.cardElementRef.nativeElement);
+    this.cardReady = true;
+    this.card.on('change', (event) => {
+      this.cardError = event.error ? event.error.message ?? 'Card error' : null;
+    });
+  }
+
+  async confirmCard(): Promise<void> {
+    if (!this.stripe || !this.card || !this.clientSecret) {
+      this.cardError = 'Card form is not ready.';
+      return;
+    }
+    this.savingCard = true;
+    const result = await this.stripe.confirmCardSetup(this.clientSecret, {
+      payment_method: { card: this.card }
+    });
+    if (result.error) {
+      this.cardError = result.error.message ?? 'Could not save card';
+      this.savingCard = false;
+      return;
+    }
+    const pmId = result.setupIntent?.payment_method;
+    if (!pmId) {
+      this.cardError = 'Payment method missing from setup intent.';
+      this.savingCard = false;
+      return;
+    }
+    this.api.post('/payment-methods/attach', { payment_method_id: pmId }).subscribe({
+      next: () => {
+        this.toast.success('Card saved');
+        this.loadPaymentMethods();
+        this.cardError = null;
+        this.clientSecret = null;
+        this.savingCard = false;
+      },
+      error: () => {
+        this.cardError = 'Could not attach payment method';
+        this.savingCard = false;
+      }
+    });
   }
 
   paymentMethods: any[] = [];

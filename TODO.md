@@ -240,7 +240,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Implement saved payment methods (Stripe setup intents) and wire UI add/remove card.
 - [ ] Client/session idle-timeout handling (auto logout + messaging).
 - [ ] Replace address prompt UX with form/modal wired to address CRUD APIs.
-- [ ] Integrate Stripe Elements card entry UI instead of manual payment_method prompts.
+- [x] Integrate Stripe Elements card entry UI instead of manual payment_method prompts.
 - [ ] Run full frontend unit/e2e tests after payment + verification changes.
 - [ ] Run full backend test suite post-payment changes (beyond targeted tests).
 - [ ] Ensure STRIPE_SECRET_KEY/STRIPE_WEBHOOK_SECRET provided in CI and envs.
