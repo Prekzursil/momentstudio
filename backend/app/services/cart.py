@@ -16,7 +16,6 @@ from app.models.promo import PromoCode
 from app.models.order import Order
 from app.models.user import User
 from app.models.order import ShippingMethod
-from app.schemas.promo import PromoCodeRead
 from app.services import email as email_service
 
 
@@ -122,9 +121,11 @@ def _calculate_totals(
     return Totals(subtotal=subtotal, tax=tax, shipping=shipping, total=total, currency=currency)
 
 
-def calculate_totals(cart: Cart, shipping_method: ShippingMethod | None = None, promo: PromoCodeRead | None = None) -> tuple[Totals, Decimal]:
+def calculate_totals(
+    cart: Cart, shipping_method: ShippingMethod | None = None, promo: PromoCodeRead | None = None
+) -> tuple[Totals, Decimal]:
     subtotal = sum(Decimal(item.unit_price_at_add) * item.quantity for item in cart.items)
-    discount_val = _compute_discount(subtotal, promo)
+    discount_val = _compute_discount(Decimal(subtotal), promo)
     currency = next(
         (getattr(item.product, "currency", None) for item in cart.items if getattr(item, "product", None)), "USD"
     ) or "USD"

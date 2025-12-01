@@ -28,12 +28,10 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install Chromium for Karma
+      - name: Set up Chrome
         if: steps.detect.outputs.missing != 'true'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y chromium-browser || sudo apt-get install -y chromium
-          echo "CHROME_BIN=$(which chromium-browser || which chromium || which google-chrome-stable)" >> $GITHUB_ENV
+        id: chrome
+        uses: browser-actions/setup-chrome@v1
 
       - name: Install dependencies
         if: steps.detect.outputs.missing != 'true'
@@ -45,7 +43,7 @@ jobs:
         if: steps.detect.outputs.missing != 'true'
         run: |
           cd frontend
-          export CHROME_BIN=${CHROME_BIN:-$(which chromium-browser || which chromium || which google-chrome-stable)}
+          export CHROME_BIN="${{ steps.chrome.outputs.chrome-path }}"
           npm test -- --watch=false --browsers=ChromeHeadless || npm test -- --watch=false
 
       - name: Build
