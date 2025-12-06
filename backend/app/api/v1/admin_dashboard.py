@@ -10,6 +10,7 @@ from app.core.dependencies import require_admin
 from app.db.session import get_session
 from app.models.catalog import Product, ProductAuditLog, Category
 from app.models.content import ContentBlock, ContentAuditLog
+from app.services import exporter as exporter_service
 from app.models.order import Order
 from app.models.user import User, RefreshSession, UserRole
 from app.models.promo import PromoCode
@@ -302,6 +303,11 @@ async def set_maintenance(payload: dict, _: str = Depends(require_admin)) -> dic
     enabled = bool(payload.get("enabled", False))
     settings.maintenance_mode = enabled
     return {"enabled": settings.maintenance_mode}
+
+
+@router.get("/export")
+async def export_data(session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)) -> dict:
+    return await exporter_service.export_json(session)
 
 
 @router.get("/low-stock")

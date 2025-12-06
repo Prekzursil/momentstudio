@@ -361,13 +361,13 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin audit log page listing important events (login, product changes, content updates, Google linking).
 
 ## Data Portability & Backups (Extended)
-- [ ] CLI command `python -m app.cli export-data` exporting users (no passwords), products, categories, orders, addresses to JSON.
-- [ ] CLI command `import-data` to bootstrap a new DB from JSON exports with idempotent upserts.
-- [ ] Infra helper script to archive DB dump + JSON exports + media into timestamped `.tar.gz`.
-- [ ] Document “Move to a new server” flow in README (restore DB/media, run migrations, import as needed).
-- [ ] Example cron/systemd timer config for scheduled backups in production.
-- [ ] `check-backup` script to restore latest backup into disposable Docker container and hit `/api/v1/health`.
-- [ ] Admin-triggered “Download my data” export endpoint with auth/logging.
+- [x] CLI command `python -m app.cli export-data` exporting users (no passwords), products, categories, orders, addresses to JSON.
+- [x] CLI command `import-data` to bootstrap a new DB from JSON exports with idempotent upserts.
+- [x] Infra helper script to archive DB dump + JSON exports + media into timestamped `.tar.gz`.
+- [x] Document “Move to a new server” flow in README (restore DB/media, run migrations, import as needed).
+- [x] Example cron/systemd timer config for scheduled backups in production.
+- [x] `check-backup` script to restore latest backup into disposable Docker container and hit `/api/v1/health`.
+- [x] Admin-triggered “Download my data” export endpoint with auth/logging.
 
 ## Media & File Handling Improvements
 - [ ] `storage.save_upload` generates unique filenames (UUID + extension) to avoid collisions/traversal.

@@ -1,0 +1,300 @@
+import argparse
+import asyncio
+import json
+from pathlib import Path
+from typing import Any, Dict
+
+from sqlalchemy import select
+
+from app.db.session import SessionLocal
+from app.models.user import User, UserRole
+from app.models.address import Address
+from app.models.catalog import Category, Product, ProductImage, ProductOption, ProductVariant, Tag
+from app.models.order import Order, OrderItem, ShippingMethod
+
+
+async def export_data(output: Path) -> None:
+    data: Dict[str, Any] = {}
+    async with SessionLocal() as session:
+        users = (await session.execute(select(User))).scalars().all()
+        data["users"] = [
+            {
+                "id": str(u.id),
+                "email": u.email,
+                "name": u.name,
+                "avatar_url": u.avatar_url,
+                "preferred_language": u.preferred_language,
+                "email_verified": u.email_verified,
+                "role": u.role.value,
+                "created_at": u.created_at.isoformat(),
+            }
+            for u in users
+        ]
+        categories = (await session.execute(select(Category))).scalars().all()
+        data["categories"] = [
+            {
+                "id": str(c.id),
+                "slug": c.slug,
+                "name": c.name,
+                "description": c.description,
+                "sort_order": c.sort_order,
+                "created_at": c.created_at.isoformat(),
+            }
+            for c in categories
+        ]
+        products = (await session.execute(select(Product))).scalars().all()
+        data["products"] = []
+        for p in products:
+            data["products"].append(
+                {
+                    "id": str(p.id),
+                    "category_id": str(p.category_id),
+                    "sku": p.sku,
+                    "slug": p.slug,
+                    "name": p.name,
+                    "short_description": p.short_description,
+                    "long_description": p.long_description,
+                    "base_price": float(p.base_price),
+                    "currency": p.currency,
+                    "is_featured": p.is_featured,
+                    "stock_quantity": p.stock_quantity,
+                    "status": p.status.value,
+                    "publish_at": p.publish_at.isoformat() if p.publish_at else None,
+                    "meta_title": p.meta_title,
+                    "meta_description": p.meta_description,
+                    "tags": [t.slug for t in p.tags],
+                    "images": [
+                        {"id": str(img.id), "url": img.url, "alt_text": img.alt_text, "sort_order": img.sort_order}
+                        for img in p.images
+                    ],
+                    "options": [
+                        {"id": str(opt.id), "name": opt.option_name, "value": opt.option_value} for opt in p.options
+                    ],
+                    "variants": [
+                        {
+                            "id": str(v.id),
+                            "name": v.name,
+                            "price_delta": float(v.additional_price_delta),
+                            "stock_quantity": v.stock_quantity,
+                        }
+                        for v in p.variants
+                    ],
+                }
+            )
+        addresses = (await session.execute(select(Address))).scalars().all()
+        data["addresses"] = [
+            {
+                "id": str(a.id),
+                "user_id": str(a.user_id) if a.user_id else None,
+                "line1": a.line1,
+                "line2": a.line2,
+                "city": a.city,
+                "region": a.region,
+                "postal_code": a.postal_code,
+                "country": a.country,
+            }
+            for a in addresses
+        ]
+        orders = (await session.execute(select(Order))).scalars().all()
+        data["orders"] = []
+        for o in orders:
+            data["orders"].append(
+                {
+                    "id": str(o.id),
+                    "user_id": str(o.user_id) if o.user_id else None,
+                    "status": o.status.value,
+                    "total_amount": float(o.total_amount),
+                    "currency": o.currency,
+                    "reference_code": o.reference_code,
+                    "shipping_address_id": str(o.shipping_address_id) if o.shipping_address_id else None,
+                    "billing_address_id": str(o.billing_address_id) if o.billing_address_id else None,
+                    "items": [
+                        {
+                            "id": str(oi.id),
+                            "product_id": str(oi.product_id) if oi.product_id else None,
+                            "quantity": oi.quantity,
+                            "unit_price": float(oi.unit_price),
+                            "subtotal": float(oi.subtotal),
+                        }
+                        for oi in o.items
+                    ],
+                }
+            )
+    output.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    print(f"Exported data to {output}")
+
+
+async def import_data(input_path: Path) -> None:
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    async with SessionLocal() as session:
+        # users
+        for u in payload.get("users", []):
+            user_obj: User | None = await session.get(User, u["id"])
+            if not user_obj:
+                user_obj = User(id=u["id"], email=u["email"], hashed_password="placeholder", role=UserRole.customer)
+            user_obj.name = u.get("name")
+            user_obj.avatar_url = u.get("avatar_url")
+            user_obj.preferred_language = u.get("preferred_language")
+            user_obj.email_verified = u.get("email_verified", False)
+            role = u.get("role")
+            if role and role in UserRole._value2member_map_:
+                user_obj.role = UserRole(role)
+            session.add(user_obj)
+        # categories
+        for c in payload.get("categories", []):
+            category_obj: Category | None = await session.get(Category, c["id"])
+            if not category_obj:
+                category_obj = Category(id=c["id"], slug=c["slug"], name=c["name"])
+            category_obj.slug = c["slug"]
+            category_obj.name = c["name"]
+            category_obj.description = c.get("description")
+            category_obj.sort_order = c.get("sort_order", 0)
+            session.add(category_obj)
+        # tags
+        tag_cache: Dict[str, Tag] = {}
+        for p in payload.get("products", []):
+            for slug in p.get("tags", []) or []:
+                if slug in tag_cache:
+                    continue
+                existing: Tag | None = (await session.execute(select(Tag).where(Tag.slug == slug))).scalar_one_or_none()
+                if existing:
+                    tag_cache[slug] = existing
+                else:
+                    tag = Tag(slug=slug, name=slug.capitalize())
+                    session.add(tag)
+                    tag_cache[slug] = tag
+        await session.flush()
+        # products
+        for p in payload.get("products", []):
+            product_obj: Product | None = await session.get(Product, p["id"])
+            if not product_obj:
+                product_obj = Product(
+                    id=p["id"], category_id=p["category_id"], sku=p["sku"], slug=p["slug"], name=p["name"]
+                )
+            product_obj.category_id = p["category_id"]
+            product_obj.sku = p["sku"]
+            product_obj.slug = p["slug"]
+            product_obj.name = p["name"]
+            product_obj.short_description = p.get("short_description")
+            product_obj.long_description = p.get("long_description")
+            product_obj.base_price = p.get("base_price", 0)
+            product_obj.currency = p.get("currency", "USD")
+            product_obj.is_featured = p.get("is_featured", False)
+            product_obj.stock_quantity = p.get("stock_quantity", 0)
+            if "status" in p and p["status"]:
+                product_obj.status = p["status"]
+            product_obj.publish_at = p.get("publish_at")
+            product_obj.meta_title = p.get("meta_title")
+            product_obj.meta_description = p.get("meta_description")
+            product_obj.tags = [tag_cache[slug] for slug in p.get("tags", []) or []]
+            session.add(product_obj)
+            # images
+            if p.get("images"):
+                product_obj.images.clear()
+                for img in p["images"]:
+                    product_obj.images.append(
+                        ProductImage(
+                            id=img.get("id"),
+                            url=img.get("url"),
+                            alt_text=img.get("alt_text"),
+                            sort_order=img.get("sort_order") or 0,
+                        )
+                    )
+            # options
+            if p.get("options"):
+                product_obj.options.clear()
+                for opt in p["options"]:
+                    name = opt.get("name") or opt.get("option_name")
+                    value = opt.get("value") or opt.get("option_value") or (opt.get("values") or [None])[0]
+                    product_obj.options.append(
+                        ProductOption(id=opt.get("id"), option_name=name or "", option_value=value or "")
+                    )
+            # variants
+            if p.get("variants"):
+                product_obj.variants.clear()
+                for v in p["variants"]:
+                    product_obj.variants.append(
+                        ProductVariant(
+                            id=v.get("id"),
+                            name=v.get("name") or v.get("sku") or "Variant",
+                            additional_price_delta=v.get("price_delta", v.get("price", 0)),
+                            stock_quantity=v.get("stock_quantity", 0),
+                        )
+                    )
+        # addresses
+        for a in payload.get("addresses", []):
+            address_obj: Address | None = await session.get(Address, a["id"])
+            if not address_obj:
+                address_obj = Address(id=a["id"], user_id=a.get("user_id"))
+            address_obj.user_id = a.get("user_id")
+            address_obj.line1 = a.get("line1")
+            address_obj.line2 = a.get("line2")
+            address_obj.city = a.get("city")
+            address_obj.region = a.get("region") or a.get("state")
+            address_obj.postal_code = a.get("postal_code")
+            address_obj.country = a.get("country")
+            session.add(address_obj)
+        # shipping methods
+        sm_lookup: Dict[str, ShippingMethod] = {}
+        for o in payload.get("orders", []):
+            sid = o.get("shipping_method_id")
+            if sid and sid not in sm_lookup:
+                sm_existing: ShippingMethod | None = await session.get(ShippingMethod, sid)
+                if sm_existing:
+                    sm_lookup[sid] = sm_existing
+                else:
+                    sm = ShippingMethod(id=sid, name="Imported", rate_flat=0, rate_per_kg=0)
+                    session.add(sm)
+                    sm_lookup[sid] = sm
+        await session.flush()
+        # orders
+        for o in payload.get("orders", []):
+            order_obj: Order | None = await session.get(Order, o["id"])
+            if not order_obj:
+                order_obj = Order(id=o["id"], user_id=o.get("user_id"), status=o.get("status"))
+            order_obj.user_id = o.get("user_id")
+            if o.get("status"):
+                order_obj.status = o["status"]
+            order_obj.total_amount = o.get("total_amount", 0)
+            order_obj.currency = o.get("currency", "USD")
+            order_obj.reference_code = o.get("reference_code")
+            order_obj.shipping_address_id = o.get("shipping_address_id")
+            order_obj.billing_address_id = o.get("billing_address_id")
+            if o.get("shipping_method_id"):
+                order_obj.shipping_method_id = o.get("shipping_method_id")
+            order_obj.items.clear()
+            for item in o.get("items", []):
+                order_obj.items.append(
+                    OrderItem(
+                        id=item.get("id"),
+                        product_id=item.get("product_id"),
+                        variant_id=item.get("variant_id"),
+                        quantity=item.get("quantity", 1),
+                        unit_price=item.get("unit_price", 0),
+                        subtotal=item.get("subtotal", 0),
+                    )
+                )
+            session.add(order_obj)
+        await session.commit()
+    print("Import completed")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Data portability utilities")
+    sub = parser.add_subparsers(dest="command")
+    exp = sub.add_parser("export-data", help="Export data to JSON")
+    exp.add_argument("--output", default="export.json", help="Output JSON path")
+    imp = sub.add_parser("import-data", help="Import data from JSON")
+    imp.add_argument("--input", required=True, help="Input JSON path")
+    args = parser.parse_args()
+
+    if args.command == "export-data":
+        asyncio.run(export_data(Path(args.output)))
+    elif args.command == "import-data":
+        asyncio.run(import_data(Path(args.input)))
+    else:
+        parser.print_help()
+
+
+if __name__ == "__main__":
+    main()
