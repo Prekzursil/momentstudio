@@ -18,6 +18,9 @@ import { LocalizedCurrencyPipe } from './localized-currency.pipe';
           class="aspect-square w-full object-cover transition duration-300 group-hover:scale-[1.03]"
           width="640"
           height="640"
+          loading="lazy"
+          decoding="async"
+          sizes="(min-width: 1024px) 320px, (min-width: 768px) 33vw, 50vw"
         />
         <span
           *ngIf="badge"

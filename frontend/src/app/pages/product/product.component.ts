@@ -51,6 +51,9 @@ import { Title, Meta } from '@angular/platform-browser';
                   class="w-full object-cover"
                   width="960"
                   height="960"
+                  loading="lazy"
+                  decoding="async"
+                  sizes="(min-width: 1024px) 480px, 100vw"
                 />
               </div>
               <div class="flex gap-3">
@@ -61,7 +64,15 @@ import { Title, Meta } from '@angular/platform-browser';
                   type="button"
                   (click)="setActiveImage(idx)"
                 >
-                  <img [ngSrc]="image.url" [alt]="image.alt_text ?? product.name" class="h-full w-full object-cover" />
+                  <img
+                    [ngSrc]="image.url"
+                    [alt]="image.alt_text ?? product.name"
+                    class="h-full w-full object-cover"
+                    width="96"
+                    height="96"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </button>
               </div>
             </div>
@@ -148,6 +159,8 @@ import { Title, Meta } from '@angular/platform-browser';
                 class="h-14 w-14 rounded-xl object-cover"
                 width="96"
                 height="96"
+                loading="lazy"
+                decoding="async"
               />
               <div class="grid gap-1">
                 <p class="text-sm font-semibold text-slate-900">{{ item.name }}</p>
@@ -179,6 +192,9 @@ import { Title, Meta } from '@angular/platform-browser';
             class="w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl"
             width="1600"
             height="1200"
+            loading="lazy"
+            decoding="async"
+            sizes="(min-width: 1024px) 960px, 100vw"
           />
         </div>
       </div>
