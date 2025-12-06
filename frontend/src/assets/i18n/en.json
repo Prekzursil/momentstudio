@@ -1,0 +1,74 @@
+{
+  "app": {
+    "name": "AdrianaArt",
+    "tagline": "Handcrafted ceramic art"
+  },
+  "nav": {
+    "home": "Home",
+    "shop": "Shop",
+    "about": "About",
+    "admin": "Admin",
+    "cart": "Cart",
+    "signIn": "Sign in",
+    "menu": "Menu"
+  },
+  "footer": {
+    "tagline": "Handcrafted ceramics · Since 2024",
+    "instagram": "Instagram",
+    "pinterest": "Pinterest",
+    "contact": "Contact"
+  },
+  "home": {
+    "headline": "Build the AdrianaArt storefront experience.",
+    "subhead": "A crisp Angular starter with Tailwind design tokens, shared components, and a responsive shell ready for product, cart, and content flows.",
+    "ctaShop": "Shop now",
+    "ctaAdmin": "View admin",
+    "featured": "Featured pieces",
+    "viewAll": "View all",
+    "noFeatured": "No featured products right now.",
+    "featuredError": {
+      "title": "Could not load featured products.",
+      "copy": "Check your connection and retry."
+    },
+    "why": "Why this starter",
+    "cards": {
+      "strictTitle": "Strict TS",
+      "strict": "Angular standalone setup with strict TypeScript and routing baked in.",
+      "tokensTitle": "Tailwind design tokens",
+      "tokens": "Utility-first styling with a small token palette to keep UI consistent.",
+      "primitivesTitle": "Shared primitives",
+      "primitives": "Buttons, inputs, cards, modals, and toast scaffolding ready to wire.",
+      "shellTitle": "Resilient shell",
+      "shell": "Global error route, responsive header/footer, and space for store pages."
+    }
+  },
+  "shop": {
+    "title": "Shop",
+    "filters": "Filters",
+    "reset": "Reset",
+    "searchPlaceholder": "Search products",
+    "search": "Search",
+    "categories": "Categories",
+    "allCategories": "All categories",
+    "priceRange": "Price range",
+    "min": "Min",
+    "max": "Max",
+    "priceHint": "Adjust sliders or inputs to refine results.",
+    "tags": "Tags",
+    "sort": "Sort",
+    "sortNew": "Newest",
+    "sortPriceAsc": "Price: Low to High",
+    "sortPriceDesc": "Price: High to Low",
+    "sortNameAsc": "Name: A → Z",
+    "sortNameDesc": "Name: Z → A",
+    "noResults": "No products found",
+    "tryAdjust": "Try adjusting filters or search terms.",
+    "retry": "Retry",
+    "backHome": "Back to home",
+    "errorTitle": "We hit a snag loading products.",
+    "errorCopy": "Check your connection or retry in a moment.",
+    "pageMeta": "Page {{page}} of {{totalPages}} · {{totalItems}} items",
+    "metaTitle": "Shop handcrafted ceramics | AdrianaArt",
+    "metaDescription": "Browse handcrafted ceramic pieces by AdrianaArt. Filter by category, price, and tags."
+  }
+}

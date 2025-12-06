@@ -1,6 +1,7 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { NgClass, NgForOf } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { TranslateModule } from '@ngx-translate/core';
 
 export interface NavLink {
   label: string;
@@ -10,7 +11,7 @@ export interface NavLink {
 @Component({
   selector: 'app-nav-drawer',
   standalone: true,
-  imports: [NgForOf, NgClass, RouterLink],
+  imports: [NgForOf, NgClass, RouterLink, TranslateModule],
   template: `
     <div
       class="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm transition-opacity dark:bg-black/60"
@@ -24,7 +25,7 @@ export interface NavLink {
       aria-modal="true"
     >
       <div class="p-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
-        <span class="font-semibold text-slate-900 dark:text-slate-50">Menu</span>
+        <span class="font-semibold text-slate-900 dark:text-slate-50">{{ 'nav.menu' | translate }}</span>
         <button
           class="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
           (click)="onClose()"
@@ -40,7 +41,7 @@ export interface NavLink {
           (click)="onClose()"
           class="text-slate-800 hover:text-slate-900 font-medium dark:text-slate-200 dark:hover:text-white"
         >
-          {{ link.label }}
+          {{ link.label | translate }}
         </a>
       </nav>
     </aside>

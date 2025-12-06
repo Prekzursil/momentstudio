@@ -10,8 +10,8 @@ import { ProductCardComponent } from '../../shared/product-card.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
 import { ToastService } from '../../core/toast.service';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Meta, Title } from '@angular/platform-browser';
-import { ActivatedRouteSnapshot } from '@angular/router';
 
 @Component({
   selector: 'app-shop',
@@ -25,7 +25,8 @@ import { ActivatedRouteSnapshot } from '@angular/router';
     InputComponent,
     ProductCardComponent,
     SkeletonComponent,
-    BreadcrumbComponent
+    BreadcrumbComponent,
+    TranslateModule
   ],
   template: `
     <app-container classes="py-10 grid gap-6">
@@ -34,15 +35,22 @@ import { ActivatedRouteSnapshot } from '@angular/router';
         <aside class="border border-slate-200 rounded-2xl p-4 bg-white h-fit space-y-6">
           <div class="space-y-3">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Filters</h2>
-              <button class="text-sm text-indigo-600 font-medium" type="button" (click)="resetFilters()">Reset</button>
+              <h2 class="text-lg font-semibold text-slate-900">{{ 'shop.filters' | translate }}</h2>
+              <button class="text-sm text-indigo-600 font-medium" type="button" (click)="resetFilters()">
+                {{ 'shop.reset' | translate }}
+              </button>
             </div>
-            <app-input label="Search" placeholder="Search products" [(value)]="filters.search" (ngModelChange)="onSearch()">
+            <app-input
+              [label]="'shop.search' | translate"
+              [placeholder]="'shop.searchPlaceholder' | translate"
+              [(value)]="filters.search"
+              (ngModelChange)="onSearch()"
+            >
             </app-input>
           </div>
 
           <div class="space-y-3">
-            <p class="text-sm font-semibold text-slate-800">Categories</p>
+            <p class="text-sm font-semibold text-slate-800">{{ 'shop.categories' | translate }}</p>
             <div class="space-y-2 max-h-48 overflow-auto pr-1">
               <label
                 *ngFor="let category of categories"
@@ -67,30 +75,30 @@ import { ActivatedRouteSnapshot } from '@angular/router';
                   [(ngModel)]="filters.category_slug"
                   (change)="applyFilters()"
                 />
-                <span>All categories</span>
+                <span>{{ 'shop.allCategories' | translate }}</span>
               </label>
             </div>
           </div>
 
           <div class="space-y-3">
-            <p class="text-sm font-semibold text-slate-800">Price range</p>
+            <p class="text-sm font-semibold text-slate-800">{{ 'shop.priceRange' | translate }}</p>
             <div class="grid gap-3">
               <div class="flex items-center gap-3">
                 <input type="range" min="0" max="500" step="5" [(ngModel)]="filters.min_price" (change)="applyFilters()" aria-label="Minimum price" />
                 <input type="range" min="0" max="500" step="5" [(ngModel)]="filters.max_price" (change)="applyFilters()" aria-label="Maximum price" />
               </div>
               <div class="grid grid-cols-2 gap-3">
-                <app-input label="Min" type="number" [(value)]="filters.min_price" (ngModelChange)="applyFilters()">
+                <app-input [label]="'shop.min' | translate" type="number" [(value)]="filters.min_price" (ngModelChange)="applyFilters()">
                 </app-input>
-                <app-input label="Max" type="number" [(value)]="filters.max_price" (ngModelChange)="applyFilters()">
+                <app-input [label]="'shop.max' | translate" type="number" [(value)]="filters.max_price" (ngModelChange)="applyFilters()">
                 </app-input>
               </div>
-              <p class="text-xs text-slate-500">Adjust sliders or inputs to refine results.</p>
+              <p class="text-xs text-slate-500">{{ 'shop.priceHint' | translate }}</p>
             </div>
           </div>
 
           <div class="space-y-3" *ngIf="allTags.size">
-            <p class="text-sm font-semibold text-slate-800">Tags</p>
+            <p class="text-sm font-semibold text-slate-800">{{ 'shop.tags' | translate }}</p>
             <div class="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -110,20 +118,20 @@ import { ActivatedRouteSnapshot } from '@angular/router';
             <div class="flex items-center gap-3">
               <input
                 class="w-64 max-w-full rounded-lg border border-slate-200 px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none"
-                placeholder="Search products..."
+                [placeholder]="'shop.searchPlaceholder' | translate"
                 [(ngModel)]="filters.search"
                 (keyup.enter)="onSearch()"
               />
-              <app-button label="Search" size="sm" (action)="onSearch()"></app-button>
+              <app-button [label]="'shop.search' | translate" size="sm" (action)="onSearch()"></app-button>
             </div>
             <label class="flex items-center gap-2 text-sm text-slate-700">
-              <span>Sort</span>
+              <span>{{ 'shop.sort' | translate }}</span>
               <select
                 class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                 [(ngModel)]="filters.sort"
                 (change)="applyFilters()"
               >
-                <option *ngFor="let option of sortOptions" [value]="option.value">{{ option.label }}</option>
+                <option *ngFor="let option of sortOptions" [value]="option.value">{{ option.label | translate }}</option>
               </select>
             </label>
           </div>
@@ -132,27 +140,21 @@ import { ActivatedRouteSnapshot } from '@angular/router';
             <app-skeleton *ngFor="let i of placeholders" height="260px"></app-skeleton>
           </div>
 
-          <div
-            *ngIf="hasError()"
-            class="border border-amber-200 bg-amber-50 rounded-2xl p-6 text-center grid gap-3"
-          >
-            <p class="text-lg font-semibold text-amber-900">We hit a snag loading products.</p>
-            <p class="text-sm text-amber-800">Check your connection or retry in a moment.</p>
+          <div *ngIf="hasError()" class="border border-amber-200 bg-amber-50 rounded-2xl p-6 text-center grid gap-3">
+            <p class="text-lg font-semibold text-amber-900">{{ 'shop.errorTitle' | translate }}</p>
+            <p class="text-sm text-amber-800">{{ 'shop.errorCopy' | translate }}</p>
             <div class="flex justify-center gap-3">
-              <app-button label="Retry" size="sm" (action)="loadProducts()"></app-button>
-              <app-button label="Reset filters" size="sm" variant="ghost" (action)="resetFilters()"></app-button>
+              <app-button [label]="'shop.retry' | translate" size="sm" (action)="loadProducts()"></app-button>
+              <app-button [label]="'shop.reset' | translate" size="sm" variant="ghost" (action)="resetFilters()"></app-button>
             </div>
           </div>
 
-          <div
-            *ngIf="!loading() && !hasError() && products.length === 0"
-            class="border border-dashed border-slate-200 rounded-2xl p-10 text-center grid gap-2"
-          >
-            <p class="text-lg font-semibold text-slate-900">No products found</p>
-            <p class="text-sm text-slate-600">Try adjusting filters or search terms.</p>
+          <div *ngIf="!loading() && !hasError() && products.length === 0" class="border border-dashed border-slate-200 rounded-2xl p-10 text-center grid gap-2">
+            <p class="text-lg font-semibold text-slate-900">{{ 'shop.noResults' | translate }}</p>
+            <p class="text-sm text-slate-600">{{ 'shop.tryAdjust' | translate }}</p>
             <div class="flex justify-center gap-3">
-              <app-button label="Reset filters" size="sm" variant="ghost" (action)="resetFilters()"></app-button>
-              <app-button label="Back to home" size="sm" variant="ghost" routerLink="/"></app-button>
+              <app-button [label]="'shop.reset' | translate" size="sm" variant="ghost" (action)="resetFilters()"></app-button>
+              <app-button [label]="'shop.backHome' | translate" size="sm" variant="ghost" routerLink="/"></app-button>
             </div>
           </div>
 
@@ -160,18 +162,18 @@ import { ActivatedRouteSnapshot } from '@angular/router';
             <app-product-card *ngFor="let product of products" [product]="product"></app-product-card>
           </div>
 
-          <div *ngIf="meta" class="flex items-center justify-between text-sm text-slate-700">
+          <div *ngIf="pageMeta" class="flex items-center justify-between text-sm text-slate-700">
             <div>
-              Page {{ meta.page }} of {{ meta.total_pages }} · {{ meta.total_items }} items
+              {{ 'shop.pageMeta' | translate : { page: pageMeta.page, totalPages: pageMeta.total_pages, totalItems: pageMeta.total_items } }}
             </div>
             <div class="flex gap-2">
-              <app-button label="Prev" size="sm" variant="ghost" [disabled]="meta.page <= 1" (action)="changePage(-1)">
+              <app-button label="Prev" size="sm" variant="ghost" [disabled]="pageMeta.page <= 1" (action)="changePage(-1)">
               </app-button>
               <app-button
                 label="Next"
                 size="sm"
                 variant="ghost"
-                [disabled]="meta.page >= meta.total_pages"
+                [disabled]="pageMeta.page >= pageMeta.total_pages"
                 (action)="changePage(1)"
               >
               </app-button>
@@ -185,14 +187,14 @@ import { ActivatedRouteSnapshot } from '@angular/router';
 export class ShopComponent implements OnInit {
   products: Product[] = [];
   categories: Category[] = [];
-  meta: PaginationMeta | null = null;
+  pageMeta: PaginationMeta | null = null;
   allTags = new Set<string>();
   loading = signal<boolean>(true);
   hasError = signal<boolean>(false);
   placeholders = Array.from({ length: 6 });
   crumbs = [
-    { label: 'Home', url: '/' },
-    { label: 'Shop' }
+    { label: 'nav.home', url: '/' },
+    { label: 'nav.shop' }
   ];
 
   filters: {
@@ -214,11 +216,11 @@ export class ShopComponent implements OnInit {
   };
 
   sortOptions: { label: string; value: SortOption }[] = [
-    { label: 'Newest', value: 'newest' },
-    { label: 'Price: Low to High', value: 'price_asc' },
-    { label: 'Price: High to Low', value: 'price_desc' },
-    { label: 'Name: A → Z', value: 'name_asc' },
-    { label: 'Name: Z → A', value: 'name_desc' }
+    { label: 'shop.sortNew', value: 'newest' },
+    { label: 'shop.sortPriceAsc', value: 'price_asc' },
+    { label: 'shop.sortPriceDesc', value: 'price_desc' },
+    { label: 'shop.sortNameAsc', value: 'name_asc' },
+    { label: 'shop.sortNameDesc', value: 'name_desc' }
   ];
 
   constructor(
@@ -226,18 +228,19 @@ export class ShopComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private toast: ToastService,
+    private translate: TranslateService,
     private title: Title,
-    private metaService: Meta
+    private meta: Meta
   ) {}
 
   ngOnInit(): void {
     this.title.setTitle('Shop | AdrianaArt');
-    this.metaService.updateTag({
+    this.meta.updateTag({
       name: 'description',
       content: 'Browse categories, filter by price and tags, and find handcrafted ceramics on AdrianaArt.'
     });
-    this.metaService.updateTag({ property: 'og:title', content: 'Shop handcrafted ceramics | AdrianaArt' });
-    this.metaService.updateTag({
+    this.meta.updateTag({ property: 'og:title', content: 'Shop handcrafted ceramics | AdrianaArt' });
+    this.meta.updateTag({
       property: 'og:description',
       content: 'Search and filter handcrafted ceramics by category, price, and tags.'
     });
@@ -279,18 +282,18 @@ export class ShopComponent implements OnInit {
       .subscribe({
         next: (response) => {
           this.products = response.items;
-          this.meta = response.meta;
+          this.pageMeta = response.meta;
           if (this.filters.category_slug) {
             const cat = this.categories.find((c) => c.slug === this.filters.category_slug);
             this.crumbs = [
-              { label: 'Home', url: '/' },
-              { label: 'Shop', url: '/shop' },
+              { label: 'nav.home', url: '/' },
+              { label: 'nav.shop', url: '/shop' },
               { label: cat?.name ?? this.filters.category_slug }
             ];
           } else {
             this.crumbs = [
-              { label: 'Home', url: '/' },
-              { label: 'Shop' }
+              { label: 'nav.home', url: '/' },
+              { label: 'nav.shop' }
             ];
           }
           this.allTags = new Set(
@@ -298,6 +301,7 @@ export class ShopComponent implements OnInit {
               .flatMap((p) => p.tags ?? [])
               .map((t) => ('name' in t ? t.name : String(t)))
           );
+          this.setMetaTags();
           this.loading.set(false);
           this.hasError.set(false);
         },
@@ -305,7 +309,7 @@ export class ShopComponent implements OnInit {
           this.loading.set(false);
           this.products = [];
           this.hasError.set(true);
-          this.toast.error('Could not load products', 'Please try again.');
+          this.toast.error(this.translate.instant('shop.errorTitle'), this.translate.instant('shop.errorCopy'));
         }
       });
   }
@@ -320,9 +324,9 @@ export class ShopComponent implements OnInit {
   }
 
   changePage(delta: number): void {
-    if (!this.meta) return;
-    const nextPage = this.meta.page + delta;
-    if (nextPage < 1 || nextPage > this.meta.total_pages) return;
+    if (!this.pageMeta) return;
+    const nextPage = this.pageMeta.page + delta;
+    if (nextPage < 1 || nextPage > this.pageMeta.total_pages) return;
     this.filters.page = nextPage;
     this.loadProducts();
   }
@@ -345,6 +349,14 @@ export class ShopComponent implements OnInit {
     this.filters.sort = 'newest';
     this.filters.page = 1;
     this.loadProducts();
+  }
+
+  private setMetaTags(): void {
+    const title = this.translate.instant('shop.metaTitle');
+    const description = this.translate.instant('shop.metaDescription');
+    this.meta.updateTag({ name: 'og:title', content: title });
+    this.meta.updateTag({ name: 'og:description', content: description });
+    this.meta.updateTag({ name: 'description', content: description });
   }
 
   private updateQueryParams(): void {

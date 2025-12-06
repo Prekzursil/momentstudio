@@ -6,6 +6,7 @@ import { ContainerComponent } from './layout/container.component';
 import { ToastComponent } from './shared/toast.component';
 import { ToastService } from './core/toast.service';
 import { ThemeService, ThemePreference } from './core/theme.service';
+import { TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-root',
@@ -16,7 +17,9 @@ import { ThemeService, ThemePreference } from './core/theme.service';
     <div class="min-h-screen flex flex-col bg-gradient-to-b from-slate-50 to-white text-slate-900 dark:from-slate-950 dark:to-slate-900 dark:text-slate-50 transition-colors">
       <app-header
         [themePreference]="preference()"
+        [language]="language"
         (themeChange)="onThemeChange($event)"
+        (languageChange)="onLanguageChange($event)"
       ></app-header>
       <app-container id="main-content" class="flex-1 py-8">
         <router-outlet></router-outlet>
@@ -29,12 +32,25 @@ import { ThemeService, ThemePreference } from './core/theme.service';
 export class AppComponent {
   toasts = this.toast.messages();
   preference = this.theme.preference();
+  language = 'en';
 
-  constructor(private toast: ToastService, private theme: ThemeService) {}
+  constructor(private toast: ToastService, private theme: ThemeService, private translate: TranslateService) {
+    const savedLang = typeof localStorage !== 'undefined' ? localStorage.getItem('lang') : null;
+    this.language = savedLang || (translate.getBrowserLang() === 'ro' ? 'ro' : 'en');
+    this.translate.use(this.language);
+  }
 
   onThemeChange(pref: ThemePreference): void {
     this.theme.setPreference(pref);
     const mode = this.theme.mode()().toUpperCase();
     this.toast.success('Theme switched', `Theme is now ${mode}`);
+  }
+
+  onLanguageChange(lang: string): void {
+    this.language = lang;
+    this.translate.use(lang);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('lang', lang);
+    }
   }
 }

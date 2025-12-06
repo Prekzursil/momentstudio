@@ -1,0 +1,74 @@
+{
+  "app": {
+    "name": "AdrianaArt",
+    "tagline": "Artă ceramică realizată manual"
+  },
+  "nav": {
+    "home": "Acasă",
+    "shop": "Magazin",
+    "about": "Despre",
+    "admin": "Admin",
+    "cart": "Coș",
+    "signIn": "Autentificare",
+    "menu": "Meniu"
+  },
+  "footer": {
+    "tagline": "Ceramică realizată manual · Din 2024",
+    "instagram": "Instagram",
+    "pinterest": "Pinterest",
+    "contact": "Contact"
+  },
+  "home": {
+    "headline": "Construiește experiența magazinului AdrianaArt.",
+    "subhead": "Un starter Angular curat cu token-uri Tailwind, componente comune și un shell responsiv pregătit pentru produse, coș și conținut.",
+    "ctaShop": "Cumpără acum",
+    "ctaAdmin": "Vezi admin",
+    "featured": "Produse recomandate",
+    "viewAll": "Vezi toate",
+    "noFeatured": "Nu există produse recomandate acum.",
+    "featuredError": {
+      "title": "Nu am putut încărca produsele recomandate.",
+      "copy": "Verifică conexiunea și încearcă din nou."
+    },
+    "why": "De ce acest starter",
+    "cards": {
+      "strictTitle": "TS strict",
+      "strict": "Setare Angular standalone cu TypeScript strict și rutare inclusă.",
+      "tokensTitle": "Token-uri de design Tailwind",
+      "tokens": "Stilizare utility-first cu o paletă mică de token-uri pentru consistență.",
+      "primitivesTitle": "Primitive comune",
+      "primitives": "Buton, input, card, modal și toast gata de conectat.",
+      "shellTitle": "Shell rezilient",
+      "shell": "Rută de eroare globală, header/footer responsive și spațiu pentru pagini."
+    }
+  },
+  "shop": {
+    "title": "Magazin",
+    "filters": "Filtre",
+    "reset": "Resetare",
+    "searchPlaceholder": "Caută produse",
+    "search": "Căutare",
+    "categories": "Categorii",
+    "allCategories": "Toate categoriile",
+    "priceRange": "Interval de preț",
+    "min": "Minim",
+    "max": "Maxim",
+    "priceHint": "Ajustează slider-ele sau câmpurile pentru a rafina rezultatele.",
+    "tags": "Etichete",
+    "sort": "Sortare",
+    "sortNew": "Cele mai noi",
+    "sortPriceAsc": "Preț: crescător",
+    "sortPriceDesc": "Preț: descrescător",
+    "sortNameAsc": "Nume: A → Z",
+    "sortNameDesc": "Nume: Z → A",
+    "noResults": "Nu am găsit produse",
+    "tryAdjust": "Încearcă să ajustezi filtrele sau termenii de căutare.",
+    "retry": "Reîncearcă",
+    "backHome": "Înapoi la acasă",
+    "errorTitle": "A apărut o problemă la încărcarea produselor.",
+    "errorCopy": "Verifică conexiunea sau încearcă din nou.",
+    "pageMeta": "Pagina {{page}} din {{totalPages}} · {{totalItems}} produse",
+    "metaTitle": "Magazin ceramică lucrată manual | AdrianaArt",
+    "metaDescription": "Descoperă piesele ceramice AdrianaArt. Filtrează după categorie, preț și etichete."
+  }
+}

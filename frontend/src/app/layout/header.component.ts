@@ -6,22 +6,23 @@ import { NgIf, NgForOf } from '@angular/common';
 import { CartStore } from '../core/cart.store';
 import { ThemePreference } from '../core/theme.service';
 import { FormsModule } from '@angular/forms';
+import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-header',
   standalone: true,
-  imports: [RouterLink, ButtonComponent, NavDrawerComponent, NgIf, NgForOf, FormsModule],
+  imports: [RouterLink, ButtonComponent, NavDrawerComponent, NgIf, NgForOf, FormsModule, TranslateModule],
   template: `
     <header class="border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
       <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-6">
         <a routerLink="/" class="flex items-center gap-2 text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-50">
           <span class="h-10 w-10 rounded-full bg-slate-900 text-white grid place-items-center font-bold dark:bg-slate-50 dark:text-slate-900">AA</span>
-          <span>AdrianaArt</span>
+          <span>{{ 'app.name' | translate }}</span>
         </a>
         <nav class="hidden md:flex items-center gap-6 text-sm font-medium text-slate-700 dark:text-slate-200">
-          <a routerLink="/" class="hover:text-slate-900 dark:hover:text-white">Home</a>
-          <a routerLink="/shop" class="hover:text-slate-900 dark:hover:text-white">Shop</a>
-          <a routerLink="/about" class="hover:text-slate-900 dark:hover:text-white">About</a>
+          <a routerLink="/" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.home' | translate }}</a>
+          <a routerLink="/shop" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.shop' | translate }}</a>
+          <a routerLink="/about" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.about' | translate }}</a>
         </nav>
         <div class="flex items-center gap-3">
           <button
@@ -47,7 +48,7 @@ import { FormsModule } from '@angular/forms';
             </span>
           </a>
           <a routerLink="/login" class="text-sm font-medium text-slate-700 hover:text-slate-900 hidden sm:inline dark:text-slate-200 dark:hover:text-white">
-            Sign in
+            {{ 'nav.signIn' | translate }}
           </a>
           <label class="hidden sm:flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
             <span class="sr-only">Theme</span>
@@ -62,6 +63,17 @@ import { FormsModule } from '@angular/forms';
             </select>
           </label>
           <app-button label="Theme" size="sm" variant="ghost" class="sm:hidden" (action)="cycleTheme()"></app-button>
+          <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+            <span class="sr-only">Language</span>
+            <select
+              class="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              [ngModel]="language"
+              (ngModelChange)="onLanguageChange($event)"
+            >
+              <option value="en">EN</option>
+              <option value="ro">RO</option>
+            </select>
+          </label>
         </div>
       </div>
     </header>
@@ -71,12 +83,14 @@ import { FormsModule } from '@angular/forms';
 export class HeaderComponent {
   @Input() themePreference: ThemePreference = 'system';
   @Output() themeChange = new EventEmitter<ThemePreference>();
+  @Input() language = 'en';
+  @Output() languageChange = new EventEmitter<string>();
   drawerOpen = false;
   navLinks: NavLink[] = [
-    { label: 'Home', path: '/' },
-    { label: 'Shop', path: '/shop' },
-    { label: 'About', path: '/about' },
-    { label: 'Admin', path: '/admin' }
+    { label: 'nav.home', path: '/' },
+    { label: 'nav.shop', path: '/shop' },
+    { label: 'nav.about', path: '/about' },
+    { label: 'nav.admin', path: '/admin' }
   ];
 
   constructor(private cart: CartStore) {}
@@ -95,5 +109,9 @@ export class HeaderComponent {
 
   toggleDrawer(): void {
     this.drawerOpen = !this.drawerOpen;
+  }
+
+  onLanguageChange(lang: string): void {
+    this.languageChange.emit(lang);
   }
 }
