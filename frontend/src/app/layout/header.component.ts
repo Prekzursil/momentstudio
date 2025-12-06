@@ -32,7 +32,11 @@ import { FormsModule } from '@angular/forms';
           >
             ☰
           </button>
-          <a routerLink="/cart" class="relative inline-flex items-center justify-center h-10 w-10 rounded-full bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100">
+          <a
+            routerLink="/cart"
+            class="relative inline-flex items-center justify-center h-10 w-10 rounded-full bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
+            [attr.aria-label]="'Cart with ' + cartCount() + ' items'"
+          >
             🛒
             <span
               *ngIf="cartCount() > 0"

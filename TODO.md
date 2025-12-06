@@ -293,18 +293,18 @@ Below is a structured checklist you can turn into issues.
 
 ## UX, Performance, SEO & Accessibility
 - [ ] Mobile-first responsive design across pages.
-- [ ] Loading skeletons/spinners for lists and details.
-- [ ] Toast notifications for key actions.
-- [ ] Image optimization (srcset/lazy loading/modern formats).
+- [x] Loading skeletons/spinners for lists and details.
+- [x] Toast notifications for key actions.
+- [x] Image optimization (srcset/lazy loading/modern formats).
 - [ ] SEO meta tags per page; Open Graph; sitemap/robots.
 - [ ] Lighthouse perf + accessibility fixes.
 - [ ] Keyboard navigation, contrast, accessible labels.
 - [ ] Prefetch critical API calls on navigation.
 - [ ] Asset compression and caching headers guidance.
 - [ ] ARIA labels for form controls and buttons.
-- [ ] Focus styles consistent across components.
-- [ ] Skip-to-content link.
-- [ ] Motion-reduced animations option.
+- [x] Focus styles consistent across components.
+- [x] Skip-to-content link.
+- [x] Motion-reduced animations option.
 - [ ] 404/500 error pages with helpful actions.
 - [ ] Structured data (JSON-LD) for products.
 - [ ] Breadcrumb structured data for SEO.
