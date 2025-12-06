@@ -14,8 +14,6 @@ from sqlalchemy.orm import selectinload
 from app.models.catalog import (
     Category,
     Product,
-    CategoryTranslation,
-    ProductTranslation,
     ProductImage,
     ProductOption,
     ProductVariant,
