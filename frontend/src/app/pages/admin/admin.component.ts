@@ -20,7 +20,8 @@ import {
   AdminAudit,
   LowStockItem,
   AdminCategory,
-  AdminProductDetail
+  AdminProductDetail,
+  FeaturedCollection
 } from '../../core/admin.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -68,6 +69,98 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
               <app-card [title]="'adminUi.cards.lowStock' | translate" [subtitle]="summary()?.low_stock + ' items'"></app-card>
               <app-card [title]="'adminUi.cards.sales30' | translate" [subtitle]="(summary()?.sales_30d || 0) | localizedCurrency : 'USD'"></app-card>
               <app-card [title]="'adminUi.cards.orders30' | translate" [subtitle]="summary()?.orders_30d + ' orders'"></app-card>
+            </div>
+          </section>
+
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-900">Homepage hero (per language)</h2>
+              <div class="flex gap-2 text-sm">
+                <button
+                  class="px-3 py-1 rounded border"
+                  [class.bg-slate-900]="heroLang === 'en'"
+                  [class.text-white]="heroLang === 'en'"
+                  (click)="selectHeroLang('en')"
+                >
+                  EN
+                </button>
+                <button
+                  class="px-3 py-1 rounded border"
+                  [class.bg-slate-900]="heroLang === 'ro'"
+                  [class.text-white]="heroLang === 'ro'"
+                  (click)="selectHeroLang('ro')"
+                >
+                  RO
+                </button>
+              </div>
+            </div>
+            <div class="grid md:grid-cols-2 gap-3 text-sm">
+              <app-input label="Headline" [(value)]="heroForm.title"></app-input>
+              <app-input label="Subtitle" [(value)]="heroForm.subtitle"></app-input>
+              <app-input label="CTA label" [(value)]="heroForm.cta_label"></app-input>
+              <app-input label="CTA URL" [(value)]="heroForm.cta_url"></app-input>
+              <app-input label="Hero image URL" [(value)]="heroForm.image"></app-input>
+            </div>
+            <div class="flex gap-2">
+              <app-button label="Save hero" (action)="saveHero()"></app-button>
+              <span class="text-xs text-emerald-700" *ngIf="heroMessage()">{{ heroMessage() }}</span>
+              <span class="text-xs text-rose-700" *ngIf="heroError()">{{ heroError() }}</span>
+            </div>
+          </section>
+
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-900">Homepage sections order</h2>
+              <app-button size="sm" variant="ghost" label="Save order" (action)="saveSections()"></app-button>
+            </div>
+            <p class="text-sm text-slate-600">Drag to reorder hero / collections / bestsellers / new arrivals.</p>
+            <div class="grid gap-2">
+              <div
+                *ngFor="let section of sectionOrder"
+                class="flex items-center justify-between rounded-lg border border-dashed border-slate-300 p-3 text-sm bg-slate-50"
+                draggable="true"
+                (dragstart)="onSectionDragStart(section)"
+                (dragover)="onSectionDragOver($event)"
+                (drop)="onSectionDrop(section)"
+              >
+                <span class="font-semibold text-slate-900 capitalize">{{ section.replace('_', ' ') }}</span>
+                <span class="text-xs text-slate-500">drag</span>
+              </div>
+            </div>
+            <span class="text-xs text-emerald-700" *ngIf="sectionsMessage">{{ sectionsMessage }}</span>
+          </section>
+
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-900">Featured collections</h2>
+              <app-button size="sm" variant="ghost" label="Reset" (action)="resetCollectionForm()"></app-button>
+            </div>
+            <div class="grid md:grid-cols-2 gap-3 text-sm">
+              <app-input label="Slug" [(value)]="collectionForm.slug"></app-input>
+              <app-input label="Name" [(value)]="collectionForm.name"></app-input>
+              <label class="grid text-sm font-medium text-slate-700 md:col-span-2">
+                Description
+                <textarea class="rounded-lg border border-slate-200 px-3 py-2" rows="2" [(ngModel)]="collectionForm.description"></textarea>
+              </label>
+              <label class="grid text-sm font-medium text-slate-700 md:col-span-2">
+                Products (hold Ctrl/Cmd to multi-select)
+                <select multiple class="rounded-lg border border-slate-200 px-3 py-2 min-h-[120px]" [(ngModel)]="collectionForm.product_ids">
+                  <option *ngFor="let p of products" [value]="p.id">{{ p.name }} ({{ p.slug }})</option>
+                </select>
+              </label>
+            </div>
+            <div class="flex gap-2">
+              <app-button [label]="editingCollection ? 'Update collection' : 'Create collection'" (action)="saveCollection()"></app-button>
+              <span class="text-xs text-emerald-700" *ngIf="collectionMessage">{{ collectionMessage }}</span>
+            </div>
+            <div class="grid gap-2 text-sm text-slate-700">
+              <div *ngFor="let col of featuredCollections" class="rounded-lg border border-slate-200 p-3 flex items-center justify-between">
+                <div>
+                  <p class="font-semibold text-slate-900">{{ col.name }}</p>
+                  <p class="text-xs text-slate-500">{{ col.slug }} · {{ col.description }}</p>
+                </div>
+                <app-button size="sm" variant="ghost" label="Edit" (action)="editCollection(col)"></app-button>
+              </div>
             </div>
           </section>
 
@@ -437,6 +530,30 @@ export class AdminComponent implements OnInit {
   draggingSlug: string | null = null;
   selectedIds = new Set<string>();
   allSelected = false;
+  sectionOrder: string[] = ['hero', 'collections', 'bestsellers', 'new_arrivals'];
+  draggingSection: string | null = null;
+  sectionsMessage = '';
+
+  heroLang = 'en';
+  heroForm = {
+    title: '',
+    subtitle: '',
+    cta_label: '',
+    cta_url: '',
+    image: ''
+  };
+  heroMessage = signal<string | null>(null);
+  heroError = signal<string | null>(null);
+
+  featuredCollections: FeaturedCollection[] = [];
+  collectionForm: { slug: string; name: string; description?: string | null; product_ids: string[] } = {
+    slug: '',
+    name: '',
+    description: '',
+    product_ids: []
+  };
+  editingCollection: string | null = null;
+  collectionMessage = '';
 
   formMessage = '';
   editingId: string | null = null;
@@ -514,6 +631,9 @@ export class AdminComponent implements OnInit {
           .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
       }
     });
+    this.loadHero(this.heroLang);
+    this.loadSections();
+    this.loadCollections();
     this.admin.getMaintenance().subscribe({
       next: (m) => {
         this.maintenanceEnabled.set(m.enabled);
@@ -830,6 +950,187 @@ export class AdminComponent implements OnInit {
 
   cancelContent(): void {
     this.selectedContent = null;
+  }
+
+  // Homepage hero
+  selectHeroLang(lang: string): void {
+    if (this.heroLang === lang) return;
+    this.heroLang = lang;
+    this.loadHero(lang);
+  }
+
+  loadHero(lang: string): void {
+    this.heroMessage.set(null);
+    this.heroError.set(null);
+    this.admin.getContent('home.hero', lang).subscribe({
+      next: (block) => {
+        const meta = block.meta || {};
+        this.heroForm = {
+          title: block.title,
+          subtitle: block.body_markdown,
+          cta_label: meta['cta_label'] || '',
+          cta_url: meta['cta_url'] || '',
+          image: meta['image'] || ''
+        };
+      },
+      error: (err) => {
+        if (err?.status === 404) {
+          this.heroForm = { title: '', subtitle: '', cta_label: '', cta_url: '', image: '' };
+          return;
+        }
+        this.heroError.set('Could not load hero content');
+      }
+    });
+  }
+
+  saveHero(): void {
+    const payload = {
+      title: this.heroForm.title || 'Homepage hero',
+      body_markdown: this.heroForm.subtitle || this.heroForm.title || 'Hero copy',
+      status: 'published',
+      meta: {
+        cta_label: this.heroForm.cta_label,
+        cta_url: this.heroForm.cta_url,
+        image: this.heroForm.image
+      },
+      lang: this.heroLang
+    };
+    const handleError = () => {
+      this.heroError.set('Could not save hero content');
+      this.heroMessage.set(null);
+    };
+    this.admin.updateContent('home.hero', payload).subscribe({
+      next: () => {
+        this.heroMessage.set('Hero saved');
+        this.heroError.set(null);
+      },
+      error: (err) => {
+        if (err?.status === 404) {
+          this.admin.createContent('home.hero', payload).subscribe({
+            next: () => {
+              this.heroMessage.set('Hero created');
+              this.heroError.set(null);
+            },
+            error: handleError
+          });
+          return;
+        }
+        handleError();
+      }
+    });
+  }
+
+  // Sections ordering
+  loadSections(): void {
+    this.admin.getContent('home.sections').subscribe({
+      next: (block) => {
+        const order = block.meta?.['order'];
+        if (Array.isArray(order) && order.length) {
+          this.sectionOrder = order;
+        }
+      },
+      error: () => {
+        this.sectionOrder = ['hero', 'collections', 'bestsellers', 'new_arrivals'];
+      }
+    });
+  }
+
+  onSectionDragStart(section: string): void {
+    this.draggingSection = section;
+  }
+
+  onSectionDragOver(event: DragEvent): void {
+    event.preventDefault();
+  }
+
+  onSectionDrop(section: string): void {
+    if (!this.draggingSection || this.draggingSection === section) return;
+    const current = [...this.sectionOrder];
+    const from = current.indexOf(this.draggingSection);
+    const to = current.indexOf(section);
+    if (from === -1 || to === -1) {
+      this.draggingSection = null;
+      return;
+    }
+    current.splice(from, 1);
+    current.splice(to, 0, this.draggingSection);
+    this.sectionOrder = current;
+    this.draggingSection = null;
+  }
+
+  saveSections(): void {
+    const payload = {
+      title: 'Home sections',
+      body_markdown: 'Home layout order',
+      meta: { order: this.sectionOrder },
+      status: 'published'
+    };
+    this.admin.updateContent('home.sections', payload).subscribe({
+      next: () => (this.sectionsMessage = 'Sections order saved'),
+      error: (err) => {
+        if (err?.status === 404) {
+          this.admin.createContent('home.sections', payload).subscribe({
+            next: () => (this.sectionsMessage = 'Sections order saved'),
+            error: () => (this.sectionsMessage = 'Could not save sections order')
+          });
+        } else {
+          this.sectionsMessage = 'Could not save sections order';
+        }
+      }
+    });
+  }
+
+  // Featured collections
+  loadCollections(): void {
+    this.admin.listFeaturedCollections().subscribe({
+      next: (cols) => (this.featuredCollections = cols),
+      error: () => (this.featuredCollections = [])
+    });
+  }
+
+  resetCollectionForm(): void {
+    this.editingCollection = null;
+    this.collectionForm = { slug: '', name: '', description: '', product_ids: [] };
+    this.collectionMessage = '';
+  }
+
+  editCollection(col: FeaturedCollection): void {
+    this.editingCollection = col.slug;
+    this.collectionForm = {
+      slug: col.slug,
+      name: col.name,
+      description: col.description || '',
+      product_ids: col.product_ids || []
+    };
+  }
+
+  saveCollection(): void {
+    if (!this.collectionForm.slug || !this.collectionForm.name) {
+      this.toast.error('Slug and name are required');
+      return;
+    }
+    const payload = {
+      slug: this.collectionForm.slug,
+      name: this.collectionForm.name,
+      description: this.collectionForm.description,
+      product_ids: this.collectionForm.product_ids
+    };
+    const obs = this.editingCollection
+      ? this.admin.updateFeaturedCollection(this.editingCollection, payload)
+      : this.admin.createFeaturedCollection(payload);
+    obs.subscribe({
+      next: (col) => {
+        const existing = this.featuredCollections.find((c) => c.slug === col.slug);
+        if (existing) {
+          this.featuredCollections = this.featuredCollections.map((c) => (c.slug === col.slug ? col : c));
+        } else {
+          this.featuredCollections = [col, ...this.featuredCollections];
+        }
+        this.collectionMessage = 'Saved';
+        this.editingCollection = null;
+      },
+      error: () => this.toast.error('Could not save collection')
+    });
   }
 
   saveMaintenance(): void {

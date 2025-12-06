@@ -100,6 +100,25 @@ export interface LowStockItem {
   slug: string;
 }
 
+export interface FeaturedCollection {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string | null;
+  created_at: string;
+  product_ids?: string[];
+}
+
+export interface ContentBlock {
+  key: string;
+  title: string;
+  body_markdown: string;
+  status: string;
+  meta?: Record<string, any> | null;
+  lang?: string | null;
+  sort_order?: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdminService {
   constructor(private api: ApiService) {}
@@ -219,5 +238,28 @@ export class AdminService {
 
   setMaintenance(enabled: boolean): Observable<{ enabled: boolean }> {
     return this.api.post<{ enabled: boolean }>('/admin/dashboard/maintenance', { enabled });
+  }
+
+  // Featured collections
+  listFeaturedCollections(): Observable<FeaturedCollection[]> {
+    return this.api.get<FeaturedCollection[]>('/catalog/collections/featured');
+  }
+
+  createFeaturedCollection(payload: Partial<FeaturedCollection> & { product_ids?: string[] }): Observable<FeaturedCollection> {
+    return this.api.post<FeaturedCollection>('/catalog/collections/featured', payload);
+  }
+
+  updateFeaturedCollection(slug: string, payload: Partial<FeaturedCollection> & { product_ids?: string[] }): Observable<FeaturedCollection> {
+    return this.api.patch<FeaturedCollection>(`/catalog/collections/featured/${slug}`, payload);
+  }
+
+  // Content blocks (admin)
+  getContent(key: string, lang?: string): Observable<ContentBlock> {
+    const suffix = lang ? `?lang=${lang}` : '';
+    return this.api.get<ContentBlock>(`/content/admin/${key}${suffix}`);
+  }
+
+  createContent(key: string, payload: Partial<ContentBlock>): Observable<ContentBlock> {
+    return this.api.post<ContentBlock>(`/content/admin/${key}`, payload);
   }
 }

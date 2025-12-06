@@ -344,9 +344,9 @@ Below is a structured checklist you can turn into issues.
 - [x] README docs for Google OAuth setup/testing (console steps, redirect URLs).
 
 ## Admin Dashboard – CMS & UX Enhancements
-- [ ] Admin UI for editing homepage hero per language (headline, subtitle, CTA, hero image).
-- [ ] Admin UI for managing Collections (named groups of products to feature).
-- [ ] Drag-and-drop ordering for homepage sections (hero, collections, bestsellers, new arrivals).
+- [x] Admin UI for editing homepage hero per language (headline, subtitle, CTA, hero image).
+- [x] Admin UI for managing Collections (named groups of products to feature).
+- [x] Drag-and-drop ordering for homepage sections (hero, collections, bestsellers, new arrivals).
 - [ ] Admin UI for global assets (logo, favicon, social preview image).
 - [ ] SEO settings in admin to set meta title/description per page per language.
 - [ ] WYSIWYG/markdown editor for About/FAQ/Shipping content with RO/EN tabs.
