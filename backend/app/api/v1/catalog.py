@@ -34,9 +34,18 @@ router = APIRouter(prefix="/catalog", tags=["catalog"])
 
 
 @router.get("/categories", response_model=list[CategoryRead])
-async def list_categories(session: AsyncSession = Depends(get_session)) -> list[Category]:
-    result = await session.execute(select(Category).order_by(Category.sort_order, Category.name))
-    return list(result.scalars())
+async def list_categories(
+    session: AsyncSession = Depends(get_session), lang: str | None = Query(default=None, pattern="^(en|ro)$")
+) -> list[Category]:
+    query = select(Category).order_by(Category.sort_order, Category.name)
+    if lang:
+        query = query.options(selectinload(Category.translations))
+    result = await session.execute(query)
+    categories = list(result.scalars())
+    if lang:
+        for cat in categories:
+            catalog_service.apply_category_translation(cat, lang)
+    return categories
 
 
 @router.get("/products", response_model=ProductListResponse)
@@ -51,10 +60,11 @@ async def list_products(
     sort: str | None = Query(default=None, description="newest|price_asc|price_desc|name_asc|name_desc"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
 ) -> ProductListResponse:
     offset = (page - 1) * limit
     items, total_items = await catalog_service.list_products_with_filters(
-        session, category_slug, is_featured, search, min_price, max_price, tags, sort, limit, offset
+        session, category_slug, is_featured, search, min_price, max_price, tags, sort, limit, offset, lang=lang
     )
     total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
     return ProductListResponse(
@@ -64,13 +74,19 @@ async def list_products(
 
 
 @router.get("/products/feed", response_model=list[ProductFeedItem])
-async def product_feed(session: AsyncSession = Depends(get_session)) -> list[ProductFeedItem]:
-    return await catalog_service.get_product_feed(session)
+async def product_feed(
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+) -> list[ProductFeedItem]:
+    return await catalog_service.get_product_feed(session, lang=lang)
 
 
 @router.get("/products/feed.csv", response_class=StreamingResponse)
-async def product_feed_csv(session: AsyncSession = Depends(get_session)):
-    content = await catalog_service.get_product_feed_csv(session)
+async def product_feed_csv(
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+):
+    content = await catalog_service.get_product_feed_csv(session, lang=lang)
     headers = {"Content-Disposition": 'attachment; filename="product_feed.csv"'}
     return StreamingResponse(iter([content]), media_type="text/csv", headers=headers)
 
@@ -244,11 +260,15 @@ async def recently_viewed_products(
     session: AsyncSession = Depends(get_session),
     session_id: str | None = Query(default=None, description="Client session identifier for guests"),
     limit: int = Query(default=5, ge=1, le=20),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
     current_user=Depends(get_current_user_optional),
 ) -> list[Product]:
     products = await catalog_service.get_recently_viewed(
         session, getattr(current_user, "id", None) if current_user else None, session_id, limit
     )
+    if lang:
+        for p in products:
+            catalog_service.apply_product_translation(p, lang)
     return products
 
 
@@ -285,10 +305,17 @@ async def get_product(
     slug: str,
     session: AsyncSession = Depends(get_session),
     session_id: str | None = Query(default=None, description="Client session identifier for recently viewed tracking"),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
     current_user=Depends(get_current_user_optional),
 ) -> Product:
+    product_options = [selectinload(Product.images)]
+    if lang:
+        product_options.append(selectinload(Product.translations))
+        product_options.append(selectinload(Product.category).selectinload(Category.translations))
+    else:
+        product_options.append(selectinload(Product.category))
     product = await catalog_service.get_product_by_slug(
-        session, slug, options=[selectinload(Product.images), selectinload(Product.category)], follow_history=True
+        session, slug, options=product_options, follow_history=True, lang=lang
     )
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")

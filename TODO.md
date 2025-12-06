@@ -319,8 +319,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Internationalize storefront shell text for home + shop pages (partial storefront i18n).
 - [x] RO/EN translations for validation/error messages in forms (login, register, checkout, admin).
 - [x] Internationalize admin dashboard labels/messages.
-- [ ] `product_translations` (or JSONB) for localized product name/short/long description per language.
-- [ ] `category_translations` (or JSONB) for localized category name/description per language.
+- [x] `product_translations` (or JSONB) for localized product name/short/long description per language.
+- [x] `category_translations` (or JSONB) for localized category name/description per language.
 - [ ] Localized content blocks for static pages (About, FAQ, Shipping, etc.).
 - [ ] Content API supports `lang` query param with sensible fallbacks and `Accept-Language` defaults.
 - [ ] Localize email templates (order confirmation, password reset) into RO/EN based on user preference.

@@ -14,6 +14,8 @@ from sqlalchemy.orm import selectinload
 from app.models.catalog import (
     Category,
     Product,
+    CategoryTranslation,
+    ProductTranslation,
     ProductImage,
     ProductOption,
     ProductVariant,
@@ -50,21 +52,53 @@ async def get_category_by_slug(session: AsyncSession, slug: str) -> Category | N
     return result.scalar_one_or_none()
 
 
+def apply_category_translation(category: Category, lang: str | None) -> None:
+    if not category or not lang or not getattr(category, "translations", None):
+        return
+    match = next((t for t in category.translations if t.lang == lang), None)
+    if match:
+        category.name = match.name
+        category.description = match.description
+
+
+def apply_product_translation(product: Product, lang: str | None) -> None:
+    if not product or not lang:
+        return
+    if getattr(product, "translations", None):
+        match = next((t for t in product.translations if t.lang == lang), None)
+        if match:
+            product.name = match.name
+            product.short_description = match.short_description
+            product.long_description = match.long_description
+            product.meta_title = match.meta_title or product.meta_title
+            product.meta_description = match.meta_description or product.meta_description
+    if product.category:
+        apply_category_translation(product.category, lang)
+
+
 async def get_product_by_slug(
-    session: AsyncSession, slug: str, options: list | None = None, follow_history: bool = True
+    session: AsyncSession, slug: str, options: list | None = None, follow_history: bool = True, lang: str | None = None
 ) -> Product | None:
     query = select(Product)
-    if options:
-        for opt in options:
+    final_options = options[:] if options else []
+    if lang:
+        final_options.append(selectinload(Product.translations))
+        final_options.append(selectinload(Product.category).selectinload(Category.translations))
+    if final_options:
+        for opt in final_options:
             query = query.options(opt)
     result = await session.execute(query.where(Product.slug == slug))
     product = result.scalar_one_or_none()
     if product or not follow_history:
+        if product:
+            apply_product_translation(product, lang)
         return product
     hist_result = await session.execute(select(ProductSlugHistory).where(ProductSlugHistory.slug == slug))
     history = hist_result.scalar_one_or_none()
     if history:
         product = await session.get(Product, history.product_id)
+        if product:
+            apply_product_translation(product, lang)
     return product
 
 
@@ -372,16 +406,21 @@ async def update_featured_collection(
     return collection
 
 
-async def get_product_feed(session: AsyncSession) -> list[ProductFeedItem]:
+async def get_product_feed(session: AsyncSession, lang: str | None = None) -> list[ProductFeedItem]:
     result = await session.execute(
         select(Product)
-        .options(selectinload(Product.category), selectinload(Product.tags))
+        .options(
+            selectinload(Product.tags),
+            selectinload(Product.translations) if lang else selectinload(Product.category),
+            selectinload(Product.category).selectinload(Category.translations) if lang else selectinload(Product.category),
+        )
         .where(Product.is_deleted.is_(False), Product.status == ProductStatus.published)
         .order_by(Product.created_at.desc())
     )
     products = result.scalars().unique().all()
     feed: list[ProductFeedItem] = []
     for p in products:
+        apply_product_translation(p, lang)
         feed.append(
             ProductFeedItem(
                 slug=p.slug,
@@ -396,8 +435,8 @@ async def get_product_feed(session: AsyncSession) -> list[ProductFeedItem]:
     return feed
 
 
-async def get_product_feed_csv(session: AsyncSession) -> str:
-    feed = await get_product_feed(session)
+async def get_product_feed_csv(session: AsyncSession, lang: str | None = None) -> str:
+    feed = await get_product_feed(session, lang=lang)
     buf = io.StringIO()
     fieldnames = ["slug", "name", "price", "currency", "description", "category_slug", "tags"]
     writer = csv.DictWriter(buf, fieldnames=fieldnames)
@@ -433,12 +472,18 @@ async def list_products_with_filters(
     sort: str | None,
     limit: int,
     offset: int,
+    lang: str | None = None,
 ):
-    base_query = select(Product).options(
+    options = [
         selectinload(Product.images),
-        selectinload(Product.category),
         selectinload(Product.tags),
-    ).where(Product.is_deleted.is_(False))
+    ]
+    if lang:
+        options.append(selectinload(Product.translations))
+        options.append(selectinload(Product.category).selectinload(Category.translations))
+    else:
+        options.append(selectinload(Product.category))
+    base_query = select(Product).options(*options).where(Product.is_deleted.is_(False))
     if category_slug:
         base_query = base_query.join(Category).where(Category.slug == category_slug)
     if is_featured is not None:
@@ -472,6 +517,9 @@ async def list_products_with_filters(
 
     result = await session.execute(base_query.limit(limit).offset(offset))
     items = list(result.scalars().unique())
+    if lang:
+        for item in items:
+            apply_product_translation(item, lang)
     return items, total_items
 
 

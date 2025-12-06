@@ -28,6 +28,9 @@ class Category(Base):
     )
 
     products: Mapped[list["Product"]] = relationship("Product", back_populates="category")
+    translations: Mapped[list["CategoryTranslation"]] = relationship(
+        "CategoryTranslation", back_populates="category", cascade="all, delete-orphan", lazy="selectin"
+    )
 
 
 class ProductStatus(str, enum.Enum):
@@ -124,6 +127,36 @@ class Product(Base):
         back_populates="products",
         lazy="selectin",
     )
+    translations: Mapped[list["ProductTranslation"]] = relationship(
+        "ProductTranslation", back_populates="product", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class CategoryTranslation(Base):
+    __tablename__ = "category_translations"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    category_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("categories.id", ondelete="CASCADE"))
+    lang: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    category: Mapped[Category] = relationship("Category", back_populates="translations")
+
+
+class ProductTranslation(Base):
+    __tablename__ = "product_translations"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"))
+    lang: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    short_description: Mapped[str | None] = mapped_column(String(280), nullable=True)
+    long_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    meta_title: Mapped[str | None] = mapped_column(String(180), nullable=True)
+    meta_description: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+    product: Mapped[Product] = relationship("Product", back_populates="translations")
 
 
 class ProductImage(Base):

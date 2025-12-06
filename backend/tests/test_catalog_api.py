@@ -11,7 +11,7 @@ from app.main import app
 from app.db.base import Base
 from app.db.session import get_session
 from app.models.user import UserRole
-from app.models.catalog import ProductAuditLog
+from app.models.catalog import ProductAuditLog, Category, Product, CategoryTranslation, ProductTranslation
 from app.services.auth import create_user
 from app.schemas.user import UserCreate
 from app.core.config import settings
@@ -117,6 +117,31 @@ def test_catalog_admin_and_public_flows(test_app: Dict[str, object]) -> None:
     assert len(body["items"]) == 2
     assert body["items"][0]["slug"] == "blue-cup"
     assert body["items"][1]["slug"] == "white-cup"
+
+    # Add translations directly
+    async def add_translations():
+        async with SessionLocal() as session:
+            category = (await session.execute(select(Category).where(Category.slug == "cups"))).scalar_one()
+            product = (await session.execute(select(Product).where(Product.slug == "blue-cup"))).scalar_one()
+            session.add(CategoryTranslation(category_id=category.id, lang="ro", name="Căni", description="Colecție de căni"))
+            session.add(
+                ProductTranslation(
+                    product_id=product.id,
+                    lang="ro",
+                    name="Cană Albastră",
+                    short_description="Albastru intens",
+                    long_description="Cană ceramică albastră",
+                )
+            )
+            await session.commit()
+
+    asyncio.run(add_translations())
+
+    ro_list = client.get("/api/v1/catalog/products?lang=ro&sort=name_asc")
+    assert ro_list.status_code == 200
+    ro_items = ro_list.json()["items"]
+    assert ro_items[0]["name"] == "Cană Albastră"
+    assert ro_items[0]["category"]["name"] == "Căni"
 
     # Public detail
     res = client.get("/api/v1/catalog/products/white-cup")
