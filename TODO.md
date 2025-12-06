@@ -384,9 +384,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Structured logging around cart/checkout (cart id, user id, request id).
 - [x] Rate limiting on `/auth/login`, `/auth/register`, `/auth/google/*` with consistent 429 response.
 - [x] Wishlist/save-for-later feature per user.
-- [ ] Recently viewed products widget using cookie/localStorage list (storefront).
-- [ ] Integration test covering register → login → add to cart → checkout (mock payment) → see order.
-- [ ] Smoke test for Google OAuth using mocked Google endpoint.
+- [x] Recently viewed products widget using cookie/localStorage list (storefront).
+- [x] Integration test covering register → login → add to cart → checkout (mock payment) → see order.
+- [x] Smoke test for Google OAuth using mocked Google endpoint.
 - [ ] Metrics counters for signups, logins, failed logins, orders created, payment failures.
 - [ ] robots.txt and sitemap.xml generation (with i18n URLs).
 - [ ] Per-language canonical URLs for product pages.
