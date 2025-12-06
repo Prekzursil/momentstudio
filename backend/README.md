@@ -21,9 +21,11 @@ Key env vars:
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_ALLOWED_DOMAINS` (optional list) for Google OAuth
 
 ### Google OAuth quick notes
-- Configure a Google OAuth client (Web) with authorized redirect URI matching `GOOGLE_REDIRECT_URI`.
-- Set env vars above; allowed domains is optional for restricting enterprise domains.
-- Flows: `/auth/google/start` for login, `/auth/google/callback` to exchange code; `/auth/google/link` and `/auth/google/unlink` for authenticated users (link requires password confirmation).
+- Configure a Google OAuth client (Web) with authorized redirect URI matching `GOOGLE_REDIRECT_URI` (e.g., `http://localhost:4200/auth/google/callback` in dev).
+- Set env vars above; `GOOGLE_ALLOWED_DOMAINS` is optional for restricting enterprise domains.
+- Frontend calls `/auth/google/start` and then posts the returned `code`/`state` to `/auth/google/callback` to exchange for tokens.
+- Authenticated users can link/unlink via `/auth/google/link/start` → `/auth/google/link` (requires password) and `/auth/google/unlink`.
+- Update the frontend `.env`/config to point `GOOGLE_REDIRECT_URI` at the Angular callback route when testing locally.
 
 ## Database and migrations
 

@@ -168,7 +168,23 @@
     "successReset": "Parolă actualizată",
     "errorLogin": "Autentificare eșuată. Încearcă din nou.",
     "errorRegister": "Nu am putut crea contul. Încearcă din nou.",
-    "errorReset": "Nu am putut reseta parola. Încearcă din nou."
+    "errorReset": "Nu am putut reseta parola. Încearcă din nou.",
+    "orContinue": "Sau continuă cu",
+    "googleContinue": "Continuă cu Google",
+    "googleError": "Autentificarea cu Google a eșuat. Încearcă din nou.",
+    "googleFinishing": "Finalizăm autentificarea cu Google...",
+    "googleSigningIn": "Te conectăm cu Google...",
+    "googleLoginSuccess": "Conectat cu Google",
+    "googleLinking": "Asociem contul Google...",
+    "googleLinkSuccess": "Contul Google a fost asociat",
+    "googleMissingCode": "Lipsește codul de autorizare Google.",
+    "googleLinkPasswordMissing": "Este necesară parola pentru a asocia contul Google.",
+    "languageNotSaved": "Limbajul nu a fost salvat",
+    "languageNotSavedDetail": "Nu am putut actualiza limba preferată. Încearcă din nou."
+  },
+  "theme": {
+    "switched": "Tema a fost schimbată",
+    "now": "Tema este acum {{mode}}"
   },
   "validation": {
     "required": "Acest câmp este obligatoriu.",

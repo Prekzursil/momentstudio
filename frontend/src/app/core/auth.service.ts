@@ -14,6 +14,9 @@ export interface AuthUser {
   email: string;
   name?: string | null;
   email_verified?: boolean;
+  google_sub?: string | null;
+  google_email?: string | null;
+  google_picture_url?: string | null;
   preferred_language?: string | null;
   role: string;
   created_at?: string;
@@ -65,9 +68,31 @@ export class AuthService {
     });
   }
 
+  startGoogleLogin(): Observable<string> {
+    return this.api.get<{ auth_url: string }>('/auth/google/start').pipe(map((res) => res.auth_url));
+  }
+
+  completeGoogleLogin(code: string, state: string): Observable<AuthResponse> {
+    return this.api.post<AuthResponse>('/auth/google/callback', { code, state }).pipe(tap((res) => this.persist(res)));
+  }
+
+  startGoogleLink(): Observable<string> {
+    return this.api.get<{ auth_url: string }>('/auth/google/link/start').pipe(map((res) => res.auth_url));
+  }
+
+  completeGoogleLink(code: string, state: string, password: string): Observable<AuthUser> {
+    return this.api.post<AuthUser>('/auth/google/link', { code, state, password }).pipe(
+      tap((user) => this.setUser(user))
+    );
+  }
+
+  unlinkGoogle(password: string): Observable<AuthUser> {
+    return this.api.post<AuthUser>('/auth/google/unlink', { password }).pipe(tap((user) => this.setUser(user)));
+  }
+
   updatePreferredLanguage(lang: string): Observable<AuthUser> {
     if (!this.isAuthenticated()) {
-      return of(this.userSignal() as AuthUser);
+      return of({} as AuthUser);
     }
     return this.api.patch<AuthUser>('/auth/me/language', { preferred_language: lang }).pipe(
       tap((user) => {

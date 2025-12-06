@@ -168,7 +168,23 @@
     "successReset": "Password updated",
     "errorLogin": "Unable to login. Please try again.",
     "errorRegister": "Unable to register. Please try again.",
-    "errorReset": "Unable to reset password. Please try again."
+    "errorReset": "Unable to reset password. Please try again.",
+    "orContinue": "Or continue with",
+    "googleContinue": "Continue with Google",
+    "googleError": "Google sign-in failed. Please try again.",
+    "googleFinishing": "Finishing Google sign-in...",
+    "googleSigningIn": "Signing you in with Google...",
+    "googleLoginSuccess": "Signed in with Google",
+    "googleLinking": "Linking your Google account...",
+    "googleLinkSuccess": "Google account linked",
+    "googleMissingCode": "Missing Google authorization code.",
+    "googleLinkPasswordMissing": "Password required to link Google account.",
+    "languageNotSaved": "Language not saved",
+    "languageNotSavedDetail": "Could not update your preferred language. Please try again."
+  },
+  "theme": {
+    "switched": "Theme updated",
+    "now": "Theme is now {{mode}}"
   },
   "validation": {
     "required": "This field is required.",

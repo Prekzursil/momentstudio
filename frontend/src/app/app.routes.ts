@@ -11,6 +11,7 @@ import { CheckoutComponent } from './pages/checkout/checkout.component';
 import { SuccessComponent } from './pages/checkout/success.component';
 import { LoginComponent } from './pages/auth/login.component';
 import { RegisterComponent } from './pages/auth/register.component';
+import { GoogleCallbackComponent } from './pages/auth/google-callback.component';
 import { PasswordResetRequestComponent } from './pages/auth/password-reset-request.component';
 import { PasswordResetComponent } from './pages/auth/password-reset.component';
 import { AccountComponent } from './pages/account/account.component';
@@ -26,6 +27,7 @@ export const routes: Routes = [
   { path: 'checkout/success', component: SuccessComponent, title: 'Order placed | AdrianaArt' },
   { path: 'login', component: LoginComponent, title: 'Login | AdrianaArt' },
   { path: 'register', component: RegisterComponent, title: 'Register | AdrianaArt' },
+  { path: 'auth/google/callback', component: GoogleCallbackComponent, title: 'Google sign-in | AdrianaArt' },
   { path: 'password-reset', component: PasswordResetRequestComponent, title: 'Password reset | AdrianaArt' },
   { path: 'password-reset/confirm', component: PasswordResetComponent, title: 'Set new password | AdrianaArt' },
   { path: 'account', canActivate: [authGuard], component: AccountComponent, title: 'Account | AdrianaArt' },

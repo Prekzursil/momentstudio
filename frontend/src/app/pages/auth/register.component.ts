@@ -49,6 +49,10 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
         </label>
         <p *ngIf="error" class="text-sm text-amber-700">{{ error }}</p>
         <app-button [label]="'auth.register' | translate" type="submit"></app-button>
+        <div class="border-t border-slate-200 pt-4 grid gap-2">
+          <p class="text-sm text-slate-600 text-center">{{ 'auth.orContinue' | translate }}</p>
+          <app-button variant="ghost" [label]="'auth.googleContinue' | translate" (action)="startGoogle()"></app-button>
+        </div>
         <p class="text-sm text-slate-600">
           {{ 'auth.haveAccount' | translate }}
           <a routerLink="/login" class="text-indigo-600 font-medium">{{ 'auth.login' | translate }}</a>
@@ -75,6 +79,17 @@ export class RegisterComponent {
     private router: Router,
     private translate: TranslateService
   ) {}
+
+  startGoogle(): void {
+    localStorage.setItem('google_flow', 'login');
+    this.auth.startGoogleLogin().subscribe({
+      next: (url) => (window.location.href = url),
+      error: (err) => {
+        const message = err?.error?.detail || this.translate.instant('auth.googleError');
+        this.toast.error(message);
+      }
+    });
+  }
 
   onSubmit(form: NgForm): void {
     if (!form.valid) {

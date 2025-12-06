@@ -43,14 +43,15 @@ export class AppComponent {
   ) {
     const savedLang = typeof localStorage !== 'undefined' ? localStorage.getItem('lang') : null;
     const userLang = this.auth.user()?.preferred_language;
-    this.language = savedLang || userLang || (translate.getBrowserLang() === 'ro' ? 'ro' : 'en');
+    const browserLang = this.translate.getBrowserLang() ?? 'en';
+    this.language = userLang || savedLang || (browserLang === 'ro' ? 'ro' : 'en');
     this.translate.use(this.language);
   }
 
   onThemeChange(pref: ThemePreference): void {
     this.theme.setPreference(pref);
     const mode = this.theme.mode()().toUpperCase();
-    this.toast.success('Theme switched', `Theme is now ${mode}`);
+    this.toast.success(this.translate.instant('theme.switched'), this.translate.instant('theme.now', { mode }));
   }
 
   onLanguageChange(lang: string): void {
@@ -60,7 +61,13 @@ export class AppComponent {
       localStorage.setItem('lang', lang);
     }
     if (this.auth.isAuthenticated()) {
-      this.auth.updatePreferredLanguage(lang).subscribe();
+      this.auth.updatePreferredLanguage(lang).subscribe({
+        error: () =>
+          this.toast.error(
+            this.translate.instant('auth.languageNotSaved'),
+            this.translate.instant('auth.languageNotSavedDetail')
+          )
+      });
     }
   }
 }

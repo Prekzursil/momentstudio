@@ -72,10 +72,38 @@ import { ApiService } from '../../core/api.service';
               Upload avatar
               <input type="file" class="hidden" accept="image/*" (change)="onAvatarChange($event)" />
             </label>
+        </div>
+        <p class="text-sm text-slate-700">Name: {{ profile()?.name || 'Not set' }}</p>
+        <p class="text-sm text-slate-700">Email: {{ profile()?.email || '...' }}</p>
+        <p class="text-sm text-slate-600">Session timeout: 30m. <a class="text-indigo-600" (click)="signOut()">Sign out</a></p>
+        </section>
+
+        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-slate-900">Connected accounts</h2>
+            <span
+              class="text-xs rounded-full px-2 py-1"
+              [ngClass]="googleEmail() ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'"
+            >
+              {{ googleEmail() ? 'Google linked' : 'Not linked' }}
+            </span>
           </div>
-          <p class="text-sm text-slate-700">Name: {{ profile()?.name || 'Not set' }}</p>
-          <p class="text-sm text-slate-700">Email: {{ profile()?.email || '...' }}</p>
-          <p class="text-sm text-slate-600">Session timeout: 30m. <a class="text-indigo-600" (click)="signOut()">Sign out</a></p>
+          <div class="flex items-center gap-3 text-sm">
+            <img
+              *ngIf="googlePicture()"
+              [src]="googlePicture()"
+              alt="Google profile"
+              class="h-10 w-10 rounded-full border object-cover"
+            />
+            <div>
+              <p class="font-semibold text-slate-900">Google</p>
+              <p class="text-slate-600">{{ googleEmail() || 'No Google account linked' }}</p>
+            </div>
+            <div class="flex gap-2 ml-auto">
+              <app-button size="sm" variant="ghost" label="Link Google" *ngIf="!googleEmail()" (action)="linkGoogle()"></app-button>
+              <app-button size="sm" variant="ghost" label="Unlink" *ngIf="googleEmail()" (action)="unlinkGoogle()"></app-button>
+            </div>
+          </div>
         </section>
 
         <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
@@ -208,6 +236,8 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   verificationStatus: string | null = null;
 
   profile = signal<{ email: string; name?: string | null } | null>(null);
+  googleEmail = signal<string | null>(null);
+  googlePicture = signal<string | null>(null);
   orders = signal<Order[]>([]);
   orderFilter = '';
   page = 1;
@@ -268,6 +298,8 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     }).subscribe({
       next: ({ profile, addresses, orders }) => {
         this.profile.set(profile);
+        this.googleEmail.set(profile.google_email ?? null);
+        this.googlePicture.set(profile.google_picture_url ?? null);
         this.emailVerified.set(Boolean(profile?.email_verified));
         this.addresses.set(addresses);
         this.orders.set(orders);
@@ -558,6 +590,40 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
         this.paymentMethods = this.paymentMethods.filter((pm) => pm.id !== id);
       },
       error: () => this.toast.error('Could not remove payment method')
+    });
+  }
+
+  linkGoogle(): void {
+    const password = prompt('Confirm your password to link Google');
+    if (!password) return;
+    sessionStorage.setItem('google_link_password', password);
+    localStorage.setItem('google_flow', 'link');
+    this.auth.startGoogleLink().subscribe({
+      next: (url) => {
+        window.location.href = url;
+      },
+      error: (err) => {
+        sessionStorage.removeItem('google_link_password');
+        const message = err?.error?.detail || 'Could not start Google link flow.';
+        this.toast.error(message);
+      }
+    });
+  }
+
+  unlinkGoogle(): void {
+    const password = prompt('Enter your password to unlink Google');
+    if (!password) return;
+    this.auth.unlinkGoogle(password).subscribe({
+      next: (user) => {
+        this.googleEmail.set(user.google_email ?? null);
+        this.googlePicture.set(user.google_picture_url ?? null);
+        this.profile.set({ ...this.profile(), email: user.email, name: user.name });
+        this.toast.success('Google account disconnected');
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Could not unlink Google account.';
+        this.toast.error(message);
+      }
     });
   }
 }

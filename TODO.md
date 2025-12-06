@@ -337,11 +337,11 @@ Below is a structured checklist you can turn into issues.
 - [x] `/auth/google/link` for logged-in users to link Google (password confirmation).
 - [x] `/auth/google/unlink` to disconnect Google profile (must retain password).
 - [x] Validation to prevent linking a Google account already linked elsewhere.
-- [ ] Frontend login/register “Continue with Google” flow and callback handling.
-- [ ] Account settings “Connected accounts” section with link/unlink actions.
+- [x] Frontend login/register “Continue with Google” flow and callback handling.
+- [x] Account settings “Connected accounts” section with link/unlink actions.
 - [x] Log security events for linking/unlinking and first-time Google logins.
 - [x] Unit tests for Google OAuth flows (happy path, link existing, conflicting emails, unlink).
-- [ ] README docs for Google OAuth setup/testing (console steps, redirect URLs).
+- [x] README docs for Google OAuth setup/testing (console steps, redirect URLs).
 
 ## Admin Dashboard – CMS & UX Enhancements
 - [ ] Admin UI for editing homepage hero per language (headline, subtitle, CTA, hero image).
