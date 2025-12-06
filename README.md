@@ -92,6 +92,23 @@ You can swap pieces later, but the initial design assumes:
   0 3 * * * cd /opt/adrianaart/infra/backup && DATABASE_URL=... ./export_all.sh >> /var/log/adrianaart-backup.log 2>&1
   ```
 
+## 3.2 Running locally vs. prod-like
+
+- **Local-only dev (quick start)**:  
+  - Use SQLite by setting `DATABASE_URL=sqlite+aiosqlite:///./local.db` in `backend/.env` (already handled by pydantic settings).  
+  - Media goes to the local `uploads/` directory; no S3 keys required.  
+  - Use Stripe test keys (`STRIPE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY`) and the built-in email console logger (no SMTP).  
+  - Start API: `cd backend && poetry install` (or `pip install -r requirements.txt`) then `uvicorn app.main:app --reload`.  
+  - Start frontend: `cd frontend && npm install && npm start` with `API_BASE_URL=http://localhost:8000/api/v1`.
+
+- **Prod-like mode**:  
+  - Set `DATABASE_URL` to Postgres (`postgresql+asyncpg://...`).  
+  - Configure S3-compatible storage in `backend/.env` (bucket, region, access keys) and point `MEDIA_ROOT` to the mounted volume or S3 base path.  
+  - SMTP settings (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`) for real email delivery.  
+  - Stripe live keys in `.env` (and webhook secret) plus HTTPS/TLS in the reverse proxy.  
+  - Run migrations: `cd backend && alembic upgrade head`.  
+  - Build frontend: `cd frontend && npm install && npm run build` and serve the `dist/` output via your web server or CDN.
+
 ---
 
 ## 3. Features Overview

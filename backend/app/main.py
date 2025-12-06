@@ -63,7 +63,7 @@ def get_application() -> FastAPI:
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
         errors = jsonable_encoder(exc.errors())
         payload = ErrorResponse(detail=errors, code="validation_error")
-        return JSONResponse(status_code=422, content=payload.model_dump())
+        return JSONResponse(status_code=422, content=jsonable_encoder(payload.model_dump()))
 
     return app
 

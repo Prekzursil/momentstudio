@@ -71,6 +71,13 @@ async def build_order_from_cart(
     await _log_event(session, order.id, "created", f"Reference {order.reference_code}")
     await session.refresh(order)
     await session.refresh(order, attribute_names=["items", "events", "shipping_method"])
+    try:
+        from app.core import metrics
+
+        metrics.record_order_created()
+    except Exception:
+        # metrics should never break order creation
+        pass
     return order
 
 

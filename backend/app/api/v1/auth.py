@@ -30,6 +30,7 @@ from app.schemas.user import UserCreate
 from app.services import auth as auth_service
 from app.services import email as email_service
 from app.services import storage
+from app.core import metrics
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
@@ -109,6 +110,7 @@ async def register(
     _: None = Depends(register_rate_limit),
 ) -> AuthResponse:
     user = await auth_service.create_user(session, user_in)
+    metrics.record_signup()
     tokens = await auth_service.issue_tokens_for_user(session, user)
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
@@ -120,7 +122,12 @@ async def login(
     _: None = Depends(login_rate_limit),
     response: Response = None,
 ) -> AuthResponse:
-    user = await auth_service.authenticate_user(session, user_in.email, user_in.password)
+    try:
+        user = await auth_service.authenticate_user(session, user_in.email, user_in.password)
+    except HTTPException:
+        metrics.record_login_failure()
+        raise
+    metrics.record_login_success()
     tokens = await auth_service.issue_tokens_for_user(session, user)
     if response:
         set_refresh_cookie(response, tokens["refresh_token"])

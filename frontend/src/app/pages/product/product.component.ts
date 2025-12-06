@@ -1,5 +1,5 @@
-import { CommonModule, NgOptimizedImage } from '@angular/common';
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { CommonModule, NgOptimizedImage, DOCUMENT } from '@angular/common';
+import { Component, OnDestroy, OnInit, Inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CatalogService, Product } from '../../core/catalog.service';
@@ -221,6 +221,7 @@ export class ProductComponent implements OnInit, OnDestroy {
   recentlyViewed: Product[] = [];
   private ldScript?: HTMLScriptElement;
   private langSub?: Subscription;
+  private canonicalEl?: HTMLLinkElement;
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'nav.shop', url: '/shop' }
@@ -233,7 +234,8 @@ export class ProductComponent implements OnInit, OnDestroy {
     private title: Title,
     private meta: Meta,
     private cartStore: CartStore,
-    private translate: TranslateService
+    private translate: TranslateService,
+    @Inject(DOCUMENT) private document: Document
   ) {}
 
   ngOnDestroy(): void {
@@ -329,6 +331,7 @@ export class ProductComponent implements OnInit, OnDestroy {
       this.meta.updateTag({ property: 'og:image', content: product.images[0].url });
     }
     this.meta.updateTag({ property: 'og:type', content: 'product' });
+    this.setCanonical(product);
   }
 
   private updateStructuredData(product: Product): void {
@@ -374,6 +377,20 @@ export class ProductComponent implements OnInit, OnDestroy {
     script.text = JSON.stringify([productLd, breadcrumbLd]);
     document.head.appendChild(script);
     this.ldScript = script;
+  }
+
+  private setCanonical(product: Product): void {
+    if (typeof window === 'undefined' || !this.document) return;
+    const lang = this.translate.currentLang || this.translate.getDefaultLang() || 'en';
+    const href = `${window.location.origin}/products/${product.slug}?lang=${lang}`;
+    let link: HTMLLinkElement | null = this.document.querySelector('link[rel=\"canonical\"]');
+    if (!link) {
+      link = this.document.createElement('link');
+      link.setAttribute('rel', 'canonical');
+      this.document.head.appendChild(link);
+    }
+    link.setAttribute('href', href);
+    this.canonicalEl = link;
   }
 
   private saveRecentlyViewed(product: Product): void {

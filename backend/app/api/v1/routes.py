@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db.session import get_session
 from app.core.config import settings
+from app.core.metrics import snapshot as metrics_snapshot
 
 api_router = APIRouter()
 
@@ -43,17 +44,26 @@ def readiness() -> dict[str, str]:
     return {"status": "ready"}
 
 
+@api_router.get("/metrics", tags=["metrics"])
+def metrics() -> dict:
+    return metrics_snapshot()
+
+
 @api_router.get("/sitemap.xml", tags=["sitemap"])
 async def sitemap(session: AsyncSession = Depends(get_session)) -> Response:
     products = (await session.execute(select(Product.slug))).scalars().all()
     categories = (await session.execute(select(Category.slug))).scalars().all()
     urls = []
     base = settings.frontend_origin.rstrip("/")
-    urls.append(f"<url><loc>{base}/</loc></url>")
+    langs = ["en", "ro"]
+    for lang in langs:
+        urls.append(f"<url><loc>{base}/?lang={lang}</loc></url>")
     for slug in categories:
-        urls.append(f"<url><loc>{base}/shop?category={slug}</loc></url>")
+        for lang in langs:
+            urls.append(f"<url><loc>{base}/shop?category={slug}&lang={lang}</loc></url>")
     for slug in products:
-        urls.append(f"<url><loc>{base}/products/{slug}</loc></url>")
+        for lang in langs:
+            urls.append(f"<url><loc>{base}/products/{slug}?lang={lang}</loc></url>")
     body = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">" + "".join(urls) + "</urlset>"
     return Response(content=body, media_type="application/xml")
 

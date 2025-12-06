@@ -9,6 +9,7 @@ import uuid
 from app.core.config import settings
 from app.models.cart import Cart
 from app.models.user import PaymentMethod, User
+from app.core import metrics
 
 stripe = cast(Any, stripe)
 
@@ -19,6 +20,7 @@ def init_stripe() -> None:
 
 async def create_payment_intent(session: AsyncSession, cart: Cart, amount_cents: int | None = None) -> dict:
     if not settings.stripe_secret_key:
+        metrics.record_payment_failure()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
     if not cart.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
@@ -34,6 +36,7 @@ async def create_payment_intent(session: AsyncSession, cart: Cart, amount_cents:
             metadata={"cart_id": str(cart.id), "user_id": str(cart.user_id) if cart.user_id else ""},
         )
     except Exception as exc:
+        metrics.record_payment_failure()
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
     client_secret = getattr(intent, "client_secret", None)
