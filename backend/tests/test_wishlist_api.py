@@ -10,7 +10,6 @@ from app.main import app
 from app.db.base import Base
 from app.db.session import get_session
 from app.models.catalog import Category, Product, ProductStatus
-from app.models.wishlist import WishlistItem
 from app.services.auth import create_user, issue_tokens_for_user
 from app.schemas.user import UserCreate
 

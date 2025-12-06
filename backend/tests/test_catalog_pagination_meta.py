@@ -1,5 +1,4 @@
-from app.schemas.catalog import ProductListResponse, ProductRead
-from app.schemas.catalog import PaginationMeta
+from app.schemas.catalog import ProductListResponse, PaginationMeta
 
 
 def test_product_list_response_meta_keys():
