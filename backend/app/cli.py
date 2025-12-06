@@ -239,9 +239,9 @@ async def import_data(input_path: Path) -> None:
         for o in payload.get("orders", []):
             sid = o.get("shipping_method_id")
             if sid and sid not in sm_lookup:
-                existing: ShippingMethod | None = await session.get(ShippingMethod, sid)
-                if existing:
-                    sm_lookup[sid] = existing
+                sm_existing: ShippingMethod | None = await session.get(ShippingMethod, sid)
+                if sm_existing:
+                    sm_lookup[sid] = sm_existing
                 else:
                     sm = ShippingMethod(id=sid, name="Imported", rate_flat=0, rate_per_kg=0)
                     session.add(sm)
