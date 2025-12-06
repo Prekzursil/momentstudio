@@ -220,14 +220,14 @@ async def upload_avatar(
     avatars_root = Path(settings.media_root) / "avatars"
     extension = Path(file.filename or "").suffix.lower() or ".png"
     filename = f"avatar-{current_user.id}{extension}"
-    path, saved_name = storage.save_upload(
+    url_path, saved_name = storage.save_upload(
         file,
         root=avatars_root,
         filename=filename,
         allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif"),
         max_bytes=5 * 1024 * 1024,
     )
-    current_user.avatar_url = f"/media/avatars/{saved_name}"
+    current_user.avatar_url = url_path
     session.add(current_user)
     await session.flush()
     return UserResponse.model_validate(current_user)

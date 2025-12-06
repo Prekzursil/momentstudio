@@ -26,21 +26,19 @@ def save_upload(
     max_bytes: int | None = 5 * 1024 * 1024,
     generate_thumbnails: bool = False,
 ) -> Tuple[str, str]:
-    # Decide base directory (inside MEDIA_ROOT by default)
     base_root = Path(settings.media_root).resolve()
     dest_root = Path(root or base_root).resolve()
     dest_root.mkdir(parents=True, exist_ok=True)
-    if not dest_root.is_relative_to(base_root):
-        # Prevent writing outside media root
+    try:
+        dest_root.relative_to(base_root)
+    except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
 
-    # Read (bounded) content
-    bytes_to_read = max_bytes + 1 if max_bytes is not None else -1
-    content = file.file.read(bytes_to_read)
+    read_len = max_bytes + 1 if max_bytes is not None else -1
+    content = file.file.read(read_len)
     if max_bytes is not None and len(content) > max_bytes:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
 
-    # Validate MIME and sniff basic type
     if allowed_content_types:
         if not file.content_type or file.content_type not in allowed_content_types:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
@@ -50,7 +48,6 @@ def save_upload(
             if sniff_mime not in allowed_content_types:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
 
-    # Build unique, safe filename
     original_suffix = Path(file.filename or "").suffix.lower()
     safe_name = Path(filename or "").name if filename else ""
     if not safe_name:
@@ -61,13 +58,8 @@ def save_upload(
     if generate_thumbnails and allowed_content_types:
         _generate_thumbnails(destination)
 
-    # Web-accessible relative URL under /media
-    try:
-        rel_path = destination.relative_to(base_root).as_posix()
-    except ValueError:
-        rel_path = destination.name
-    url_path = f"/media/{rel_path}"
-    return url_path, destination.name
+    rel_path = destination.relative_to(base_root).as_posix()
+    return f"/media/{rel_path}", destination.name
 
 
 def delete_file(filepath: str) -> None:
@@ -78,7 +70,6 @@ def delete_file(filepath: str) -> None:
         path = Path(filepath)
     if path.exists():
         path.unlink()
-        # Remove generated thumbnails if present
         for suffix in ("-sm", "-md", "-lg"):
             sibling = path.with_name(f"{path.stem}{suffix}{path.suffix}")
             if sibling.exists():
@@ -86,7 +77,6 @@ def delete_file(filepath: str) -> None:
 
 
 def _generate_thumbnails(path: Path) -> None:
-    """Generate small/medium/large thumbnails next to the original file."""
     try:
         with Image.open(path) as img:
             sizes = {"sm": (320, 320), "md": (640, 640), "lg": (1024, 1024)}
@@ -95,5 +85,5 @@ def _generate_thumbnails(path: Path) -> None:
                 thumb.thumbnail(size)
                 thumb_path = path.with_name(f"{path.stem}-{suffix}{path.suffix}")
                 thumb.save(thumb_path, optimize=True)
-    except Exception as exc:  # pragma: no cover - best effort
+    except Exception as exc:  # pragma: no cover
         logger.warning("thumbnail_generation_failed", extra={"path": str(path), "error": str(exc)})

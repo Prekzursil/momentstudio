@@ -332,7 +332,7 @@ async def delete_product_image(
     slug: str,
     image_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    current_user=Depends(require_admin),
 ) -> Product:
     product = await catalog_service.get_product_by_slug(
         session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
@@ -340,7 +340,7 @@ async def delete_product_image(
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
-    await catalog_service.delete_product_image(session, product, str(image_id))
+    await catalog_service.delete_product_image(session, product, str(image_id), user_id=current_user.id)
     await session.refresh(product)
     return product
 
