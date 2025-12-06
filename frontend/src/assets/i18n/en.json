@@ -21,6 +21,8 @@
   "home": {
     "headline": "Build the AdrianaArt storefront experience.",
     "subhead": "A crisp Angular starter with Tailwind design tokens, shared components, and a responsive shell ready for product, cart, and content flows.",
+    "metaTitle": "AdrianaArt | Handcrafted ceramics storefront",
+    "metaDescription": "Discover handcrafted ceramics with curated collections, rich product detail, and smooth checkout.",
     "ctaShop": "Shop now",
     "ctaAdmin": "View admin",
     "featured": "Featured pieces",
@@ -86,6 +88,7 @@
     "notFound": "Product not found",
     "addedTitle": "Added to cart",
     "addedBody": "{{qty}} × {{name}} added to cart",
+    "metaTitle": "{{name}} | AdrianaArt",
     "metaDescriptionFallback": "Discover {{name}} — a handcrafted piece from AdrianaArt."
   },
   "cart": {

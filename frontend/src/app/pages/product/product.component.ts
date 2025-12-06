@@ -12,6 +12,7 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { Title, Meta } from '@angular/platform-browser';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-product-detail',
@@ -219,6 +220,7 @@ export class ProductComponent implements OnInit, OnDestroy {
   previewOpen = false;
   recentlyViewed: Product[] = [];
   private ldScript?: HTMLScriptElement;
+  private langSub?: Subscription;
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'nav.shop', url: '/shop' }
@@ -238,10 +240,16 @@ export class ProductComponent implements OnInit, OnDestroy {
     if (this.ldScript && typeof document !== 'undefined') {
       this.ldScript.remove();
     }
+    this.langSub?.unsubscribe();
   }
 
   ngOnInit(): void {
     const slug = this.route.snapshot.paramMap.get('slug');
+    this.langSub = this.translate.onLangChange.subscribe(() => {
+      if (this.product) {
+        this.updateMeta(this.product);
+      }
+    });
     if (slug) {
       this.catalog.getProduct(slug).subscribe({
         next: (product) => {
@@ -307,7 +315,7 @@ export class ProductComponent implements OnInit, OnDestroy {
   }
 
   private updateMeta(product: Product): void {
-    const title = `${product.name} | AdrianaArt`;
+    const title = this.translate.instant('product.metaTitle', { name: product.name });
     const description =
       product.short_description ?? this.translate.instant('product.metaDescriptionFallback', { name: product.name });
     this.title.setTitle(title);

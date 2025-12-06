@@ -21,6 +21,8 @@
   "home": {
     "headline": "Construiește experiența magazinului AdrianaArt.",
     "subhead": "Un starter Angular curat cu token-uri Tailwind, componente comune și un shell responsiv pregătit pentru produse, coș și conținut.",
+    "metaTitle": "AdrianaArt | Magazin de ceramică artizanală",
+    "metaDescription": "Descoperă ceramică lucrată manual cu colecții curate, detalii bogate și checkout fluent.",
     "ctaShop": "Cumpără acum",
     "ctaAdmin": "Vezi admin",
     "featured": "Produse recomandate",
@@ -86,6 +88,7 @@
     "notFound": "Produsul nu a fost găsit",
     "addedTitle": "Adăugat în coș",
     "addedBody": "{{qty}} × {{name}} au fost adăugate în coș",
+    "metaTitle": "{{name}} | AdrianaArt",
     "metaDescriptionFallback": "Descoperă {{name}} — o piesă lucrată manual de AdrianaArt."
   },
   "cart": {

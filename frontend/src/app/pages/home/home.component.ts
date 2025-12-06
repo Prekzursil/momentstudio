@@ -1,12 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { ButtonComponent } from '../../shared/button.component';
 import { CardComponent } from '../../shared/card.component';
 import { ContainerComponent } from '../../layout/container.component';
 import { CatalogService, Product } from '../../core/catalog.service';
 import { ProductCardComponent } from '../../shared/product-card.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Meta, Title } from '@angular/platform-browser';
 
 @Component({
@@ -84,26 +85,29 @@ import { Meta, Title } from '@angular/platform-browser';
     </section>
   `
 })
-export class HomeComponent implements OnInit {
+export class HomeComponent implements OnInit, OnDestroy {
   featured: Product[] = [];
   featuredLoading = signal<boolean>(true);
   featuredError = signal<boolean>(false);
   skeletons = Array.from({ length: 3 });
 
-  constructor(private catalog: CatalogService, private title: Title, private meta: Meta) {}
+  private langSub?: Subscription;
+
+  constructor(
+    private catalog: CatalogService,
+    private title: Title,
+    private meta: Meta,
+    private translate: TranslateService
+  ) {}
 
   ngOnInit(): void {
-    this.title.setTitle('AdrianaArt | Handcrafted ceramics storefront');
-    this.meta.updateTag({
-      name: 'description',
-      content: 'Discover handcrafted ceramics with curated collections, rich product detail, and smooth checkout.'
-    });
-    this.meta.updateTag({ property: 'og:title', content: 'AdrianaArt | Handcrafted ceramics storefront' });
-    this.meta.updateTag({
-      property: 'og:description',
-      content: 'Shop curated ceramics with rich detail pages, responsive design, and secure checkout.'
-    });
+    this.setMetaTags();
+    this.langSub = this.translate.onLangChange.subscribe(() => this.setMetaTags());
     this.loadFeatured();
+  }
+
+  ngOnDestroy(): void {
+    this.langSub?.unsubscribe();
   }
 
   loadFeatured(): void {
@@ -127,5 +131,14 @@ export class HomeComponent implements OnInit {
           this.featuredError.set(true);
         }
       });
+  }
+
+  private setMetaTags(): void {
+    const title = this.translate.instant('home.metaTitle');
+    const description = this.translate.instant('home.metaDescription');
+    this.title.setTitle(title);
+    this.meta.updateTag({ name: 'description', content: description });
+    this.meta.updateTag({ property: 'og:title', content: title });
+    this.meta.updateTag({ property: 'og:description', content: description });
   }
 }
