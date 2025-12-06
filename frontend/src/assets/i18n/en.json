@@ -70,5 +70,11 @@
     "pageMeta": "Page {{page}} of {{totalPages}} · {{totalItems}} items",
     "metaTitle": "Shop handcrafted ceramics | AdrianaArt",
     "metaDescription": "Browse handcrafted ceramic pieces by AdrianaArt. Filter by category, price, and tags."
+  },
+  "product": {
+    "viewDetails": "View details",
+    "reviews": "{{count}} review(s)",
+    "soldOut": "Sold out",
+    "lowStock": "Low stock"
   }
 }

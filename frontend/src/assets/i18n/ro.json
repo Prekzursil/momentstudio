@@ -70,5 +70,11 @@
     "pageMeta": "Pagina {{page}} din {{totalPages}} · {{totalItems}} produse",
     "metaTitle": "Magazin ceramică lucrată manual | AdrianaArt",
     "metaDescription": "Descoperă piesele ceramice AdrianaArt. Filtrează după categorie, preț și etichete."
+  },
+  "product": {
+    "viewDetails": "Vezi detalii",
+    "reviews": "{{count}} review-uri",
+    "soldOut": "Stoc epuizat",
+    "lowStock": "Stoc redus"
   }
 }

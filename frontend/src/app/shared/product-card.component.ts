@@ -4,11 +4,12 @@ import { RouterLink } from '@angular/router';
 import { Product } from '../core/catalog.service';
 import { ButtonComponent } from './button.component';
 import { LocalizedCurrencyPipe } from './localized-currency.pipe';
+import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-product-card',
   standalone: true,
-  imports: [CommonModule, RouterLink, NgOptimizedImage, LocalizedCurrencyPipe, ButtonComponent],
+  imports: [CommonModule, RouterLink, NgOptimizedImage, LocalizedCurrencyPipe, ButtonComponent, TranslateModule],
   template: `
     <article class="group grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm hover:-translate-y-1 hover:shadow-md transition dark:bg-slate-900 dark:border-slate-800 dark:shadow-none">
       <a [routerLink]="['/products', product.slug]" class="block overflow-hidden rounded-xl bg-slate-50 relative dark:bg-slate-800">
@@ -41,10 +42,11 @@ import { LocalizedCurrencyPipe } from './localized-currency.pipe';
           {{ product.short_description }}
         </p>
         <div class="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400" *ngIf="product.rating_count">
-          ★ {{ product.rating_average?.toFixed(1) ?? '0.0' }} · {{ product.rating_count }} review(s)
+          ★ {{ product.rating_average?.toFixed(1) ?? '0.0' }} ·
+          {{ 'product.reviews' | translate : { count: product.rating_count } }}
         </div>
       </div>
-      <app-button label="View details" size="sm" variant="ghost" [routerLink]="['/products', product.slug]"></app-button>
+      <app-button [label]="'product.viewDetails' | translate" size="sm" variant="ghost" [routerLink]="['/products', product.slug]"></app-button>
     </article>
   `
 })
@@ -64,8 +66,8 @@ export class ProductCardComponent {
   }
 
   get stockBadge(): string | null {
-    if (this.product.stock_quantity === 0) return 'Sold out';
-    if ((this.product.stock_quantity ?? 0) < 5) return 'Low stock';
+    if (this.product.stock_quantity === 0) return $localize`:@@product.soldOut:Sold out`;
+    if ((this.product.stock_quantity ?? 0) < 5) return $localize`:@@product.lowStock:Low stock`;
     return null;
   }
 }
