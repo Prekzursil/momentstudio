@@ -41,6 +41,11 @@ login_rate_limit = limiter("auth:login", settings.auth_rate_limit_login, 60)
 refresh_rate_limit = limiter("auth:refresh", settings.auth_rate_limit_refresh, 60)
 reset_request_rate_limit = limiter("auth:reset_request", settings.auth_rate_limit_reset_request, 60)
 reset_confirm_rate_limit = limiter("auth:reset_confirm", settings.auth_rate_limit_reset_confirm, 60)
+google_rate_limit = per_identifier_limiter(
+    lambda r: r.client.host if r.client else "anon",
+    settings.auth_rate_limit_google,
+    60,
+)
 
 
 def _build_google_state(kind: str, user_id: str | None = None) -> str:
@@ -261,7 +266,7 @@ async def confirm_password_reset(
 
 
 @router.get("/google/start", response_model=dict)
-async def google_start() -> dict:
+async def google_start(_: None = Depends(google_rate_limit)) -> dict:
     if not settings.google_client_id or not settings.google_redirect_uri:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google OAuth not configured")
     state = _build_google_state("google_state")
@@ -283,6 +288,7 @@ async def google_callback(
     payload: GoogleCallback,
     session: AsyncSession = Depends(get_session),
     response: Response = None,
+    _: None = Depends(google_rate_limit),
 ) -> AuthResponse:
     _validate_google_state(payload.state, "google_state")
     profile = await auth_service.exchange_google_code(payload.code)
@@ -334,7 +340,7 @@ async def google_callback(
 
 
 @router.get("/google/link/start", response_model=dict)
-async def google_link_start(current_user: User = Depends(get_current_user)) -> dict:
+async def google_link_start(current_user: User = Depends(get_current_user), _: None = Depends(google_rate_limit)) -> dict:
     if not settings.google_client_id or not settings.google_redirect_uri:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google OAuth not configured")
     state = _build_google_state("google_link", str(current_user.id))
@@ -362,6 +368,7 @@ async def google_link(
     payload: GoogleLinkCallback,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
+    _: None = Depends(google_rate_limit),
 ) -> UserResponse:
     _validate_google_state(payload.state, "google_link", str(current_user.id))
     if not security.verify_password(payload.password, current_user.hashed_password):
@@ -401,6 +408,7 @@ async def google_unlink(
     payload: UnlinkRequest,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
+    _: None = Depends(google_rate_limit),
 ) -> UserResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")

@@ -10,6 +10,7 @@ from app.api.v1 import content
 from app.api.v1 import email_preview
 from app.api.v1 import admin_dashboard
 from app.api.v1 import payment_methods
+from app.api.v1 import wishlist
 from app.models.catalog import Product, Category
 from fastapi import Response, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,6 +30,7 @@ api_router.include_router(payment_methods.router)
 api_router.include_router(content.router)
 api_router.include_router(email_preview.router)
 api_router.include_router(admin_dashboard.router)
+api_router.include_router(wishlist.router)
 
 
 @api_router.get("/health", tags=["health"])
