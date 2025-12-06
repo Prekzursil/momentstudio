@@ -4,7 +4,7 @@ import { RouterLink } from '@angular/router';
 import { Product } from '../core/catalog.service';
 import { ButtonComponent } from './button.component';
 import { LocalizedCurrencyPipe } from './localized-currency.pipe';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-product-card',
@@ -53,6 +53,7 @@ import { TranslateModule } from '@ngx-translate/core';
 export class ProductCardComponent {
   @Input({ required: true }) product!: Product;
   @Input() tag?: string | null;
+  constructor(private translate: TranslateService) {}
 
   get badge(): string | null {
     if (this.tag) return this.tag;
@@ -66,8 +67,8 @@ export class ProductCardComponent {
   }
 
   get stockBadge(): string | null {
-    if (this.product.stock_quantity === 0) return $localize`:@@product.soldOut:Sold out`;
-    if ((this.product.stock_quantity ?? 0) < 5) return $localize`:@@product.lowStock:Low stock`;
+    if (this.product.stock_quantity === 0) return this.translate.instant('product.soldOut');
+    if ((this.product.stock_quantity ?? 0) < 5) return this.translate.instant('product.lowStock');
     return null;
   }
 }
