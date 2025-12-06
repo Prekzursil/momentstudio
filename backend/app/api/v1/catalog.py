@@ -192,6 +192,7 @@ async def upload_product_image(
         file,
         allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif"),
         max_bytes=5 * 1024 * 1024,
+        generate_thumbnails=True,
     )
     await catalog_service.add_product_image_from_path(
         session, product, url=path, alt_text=filename, sort_order=len(product.images) + 1
@@ -331,7 +332,7 @@ async def delete_product_image(
     slug: str,
     image_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    current_user=Depends(require_admin),
 ) -> Product:
     product = await catalog_service.get_product_by_slug(
         session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
@@ -339,7 +340,7 @@ async def delete_product_image(
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
-    await catalog_service.delete_product_image(session, product, str(image_id))
+    await catalog_service.delete_product_image(session, product, str(image_id), user_id=current_user.id)
     await session.refresh(product)
     return product
 

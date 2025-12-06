@@ -293,13 +293,14 @@ async def add_product_image_from_path(
     return image
 
 
-async def delete_product_image(session: AsyncSession, product: Product, image_id: str) -> None:
+async def delete_product_image(session: AsyncSession, product: Product, image_id: str, user_id: uuid.UUID | None = None) -> None:
     image = next((img for img in product.images if str(img.id) == str(image_id)), None)
     if not image:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
     delete_file(image.url)
     await session.delete(image)
     await session.commit()
+    await _log_product_action(session, product.id, "image_deleted", user_id, {"image_id": image_id, "url": image.url})
 
 
 async def update_product_image_sort(session: AsyncSession, product: Product, image_id: str, sort_order: int) -> Product:
