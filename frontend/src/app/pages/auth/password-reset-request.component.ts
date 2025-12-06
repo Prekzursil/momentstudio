@@ -7,44 +7,45 @@ import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-password-reset-request',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent],
+  imports: [CommonModule, FormsModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent, TranslateModule],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-      <h1 class="text-2xl font-semibold text-slate-900">Reset your password</h1>
-      <p class="text-sm text-slate-600">Enter your email and we'll send a reset link.</p>
+      <h1 class="text-2xl font-semibold text-slate-900">{{ 'auth.resetRequestTitle' | translate }}</h1>
+      <p class="text-sm text-slate-600">{{ 'auth.resetRequestCopy' | translate }}</p>
       <form #resetForm="ngForm" class="grid gap-4" (ngSubmit)="onSubmit(resetForm)">
         <label class="grid gap-1 text-sm font-medium text-slate-700">
-          Email
+          {{ 'auth.email' | translate }}
           <input name="email" type="email" class="rounded-lg border border-slate-200 px-3 py-2" required [(ngModel)]="email" />
         </label>
-        <app-button label="Send reset link" type="submit"></app-button>
-        <a routerLink="/login" class="text-sm text-indigo-600 font-medium">Back to login</a>
+        <app-button [label]="'auth.resetLink' | translate" type="submit"></app-button>
+        <a routerLink="/login" class="text-sm text-indigo-600 font-medium">{{ 'auth.backToLogin' | translate }}</a>
       </form>
     </app-container>
   `
 })
 export class PasswordResetRequestComponent {
   crumbs = [
-    { label: 'Home', url: '/' },
-    { label: 'Password reset' }
+    { label: 'nav.home', url: '/' },
+    { label: 'auth.resetRequestTitle' }
   ];
   email = '';
   loading = false;
 
-  constructor(private toast: ToastService, private auth: AuthService) {}
+  constructor(private toast: ToastService, private auth: AuthService, private translate: TranslateService) {}
 
   onSubmit(form: NgForm): void {
     if (!form.valid) return;
     this.loading = true;
     this.auth.requestPasswordReset(this.email).subscribe({
-      next: () => this.toast.success('Reset link sent', `Check ${this.email}`),
+      next: () => this.toast.success(this.translate.instant('auth.resetLinkSent'), `Check ${this.email}`),
       error: (err) => {
-        const message = err?.error?.detail || 'Unable to send reset email.';
+        const message = err?.error?.detail || this.translate.instant('auth.errorReset');
         this.toast.error(message);
       },
       complete: () => {

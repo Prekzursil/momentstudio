@@ -7,22 +7,23 @@ import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-password-reset',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent],
+  imports: [CommonModule, FormsModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent, TranslateModule],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-      <h1 class="text-2xl font-semibold text-slate-900">Choose a new password</h1>
+      <h1 class="text-2xl font-semibold text-slate-900">{{ 'auth.resetTitle' | translate }}</h1>
       <form #resetForm="ngForm" class="grid gap-4" (ngSubmit)="onSubmit(resetForm)">
         <label class="grid gap-1 text-sm font-medium text-slate-700">
-          Reset code
+          {{ 'auth.resetCode' | translate }}
           <input name="token" class="rounded-lg border border-slate-200 px-3 py-2" required [(ngModel)]="token" />
         </label>
         <label class="grid gap-1 text-sm font-medium text-slate-700">
-          New password
+          {{ 'auth.password' | translate }}
           <input
             name="password"
             type="password"
@@ -33,7 +34,7 @@ import { AuthService } from '../../core/auth.service';
           />
         </label>
         <label class="grid gap-1 text-sm font-medium text-slate-700">
-          Confirm new password
+          {{ 'auth.confirmPassword' | translate }}
           <input
             name="confirm"
             type="password"
@@ -43,16 +44,16 @@ import { AuthService } from '../../core/auth.service';
           />
         </label>
         <p *ngIf="error" class="text-sm text-amber-700">{{ error }}</p>
-        <app-button label="Update password" type="submit"></app-button>
-        <a routerLink="/login" class="text-sm text-indigo-600 font-medium">Back to login</a>
+        <app-button [label]="'auth.setPassword' | translate" type="submit"></app-button>
+        <a routerLink="/login" class="text-sm text-indigo-600 font-medium">{{ 'auth.backToLogin' | translate }}</a>
       </form>
     </app-container>
   `
 })
 export class PasswordResetComponent {
   crumbs = [
-    { label: 'Home', url: '/' },
-    { label: 'Reset password' }
+    { label: 'nav.home', url: '/' },
+    { label: 'auth.resetTitle' }
   ];
   token = '';
   password = '';
@@ -60,25 +61,25 @@ export class PasswordResetComponent {
   error = '';
   loading = false;
 
-  constructor(private toast: ToastService, private auth: AuthService) {}
+  constructor(private toast: ToastService, private auth: AuthService, private translate: TranslateService) {}
 
   onSubmit(form: NgForm): void {
     if (!form.valid) {
-      this.error = 'Please fill all fields.';
+      this.error = this.translate.instant('validation.required');
       return;
     }
     if (this.password !== this.confirmPassword) {
-      this.error = 'Passwords do not match.';
+      this.error = this.translate.instant('validation.passwordMismatch');
       return;
     }
     this.error = '';
     this.loading = true;
     this.auth.confirmPasswordReset(this.token, this.password).subscribe({
       next: () => {
-        this.toast.success('Password updated', 'You can now log in with your new password.');
+        this.toast.success(this.translate.instant('auth.successReset'), this.translate.instant('auth.backToLogin'));
       },
       error: (err) => {
-        const message = err?.error?.detail || 'Unable to update password.';
+        const message = err?.error?.detail || this.translate.instant('auth.errorReset');
         this.toast.error(message);
       },
       complete: () => {

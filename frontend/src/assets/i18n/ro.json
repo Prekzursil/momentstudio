@@ -108,6 +108,10 @@
   "checkout": {
     "title": "Checkout",
     "retry": "Reîncearcă",
+    "addressRequired": "Te rugăm să completezi toate câmpurile obligatorii.",
+    "paymentNotReady": "Plata nu este încă inițializată. Așteaptă puțin.",
+    "paymentFailed": "Plata a eșuat.",
+    "paymentConfirmError": "Confirmarea plății a eșuat. Încearcă din nou.",
     "step1": "Pasul 1 · Cine plasează comanda?",
     "guest": "Continuă ca invitat",
     "createAccount": "Creează cont în timpul checkout-ului",
@@ -132,5 +136,222 @@
     "shipping": "Livrare",
     "promo": "Promo",
     "estimatedTotal": "Total estimat"
+  },
+  "auth": {
+    "loginTitle": "Autentificare",
+    "registerTitle": "Creează cont",
+    "resetRequestTitle": "Resetare parolă",
+    "resetRequestCopy": "Introdu emailul și îți trimitem un link de resetare.",
+    "resetTitle": "Setează parolă nouă",
+    "resetCode": "Cod de resetare",
+    "changePasswordTitle": "Schimbă parola",
+    "email": "Email",
+    "password": "Parolă",
+    "name": "Nume",
+    "confirmPassword": "Confirmă parola",
+    "forgot": "Ai uitat parola?",
+    "createAccount": "Creează cont",
+    "login": "Autentifică-te",
+    "logout": "Delogare",
+    "register": "Înregistrare",
+    "resetLink": "Trimite link-ul de resetare",
+    "resetLinkSent": "Link de resetare trimis",
+    "setPassword": "Setează parola",
+    "backToLogin": "Înapoi la autentificare",
+    "remembered": "Ți-ai amintit parola?",
+    "haveAccount": "Ai deja un cont?",
+    "successLogin": "Bine ai revenit",
+    "successRegister": "Cont creat",
+    "successReset": "Parolă actualizată",
+    "errorLogin": "Autentificare eșuată. Încearcă din nou.",
+    "errorRegister": "Nu am putut crea contul. Încearcă din nou.",
+    "errorReset": "Nu am putut reseta parola. Încearcă din nou."
+  },
+  "validation": {
+    "required": "Acest câmp este obligatoriu.",
+    "invalidEmail": "Introdu o adresă de email validă.",
+    "passwordMin": "Parola trebuie să aibă cel puțin 6 caractere.",
+    "passwordMismatch": "Parolele nu coincid."
+  },
+  "adminUi": {
+    "nav": {
+      "dashboard": "Panou",
+      "products": "Produse",
+      "orders": "Comenzi",
+      "users": "Utilizatori",
+      "content": "Conținut"
+    },
+    "dashboardTitle": "Panou administrare",
+    "cards": {
+      "products": "Produse",
+      "orders": "Comenzi",
+      "users": "Utilizatori",
+      "lowStock": "Stoc redus",
+      "sales30": "Vânzări (30z)",
+      "orders30": "Comenzi (30z)"
+    },
+    "actions": {
+      "reset": "Resetează",
+      "delete": "Șterge",
+      "save": "Salvează",
+      "edit": "Editează",
+      "refresh": "Reîncarcă"
+    },
+    "status": {
+      "draft": "Ciornă",
+      "published": "Publicat",
+      "archived": "Arhivat"
+    },
+    "products": {
+      "title": "Produse",
+      "new": "Nou",
+      "delete": "Șterge",
+      "edit": "Editează produs",
+      "create": "Creează produs",
+      "table": {
+        "name": "Nume",
+        "price": "Preț",
+        "status": "Status",
+        "category": "Categorie",
+        "stock": "Stoc"
+      },
+      "form": {
+        "slug": "Slug",
+        "sku": "SKU",
+        "imageUrl": "URL imagine",
+        "description": "Descriere",
+        "save": "Salvează produsul",
+        "upload": "Încarcă imagine",
+        "images": "Imagini",
+        "image": "Imagine"
+      },
+      "success": {
+        "save": "Produs salvat",
+        "delete": "Produs șters",
+        "imageUpload": "Imagine încărcată",
+        "imageDelete": "Imagine ștearsă"
+      },
+      "errors": {
+        "load": "Nu am putut încărca produsul",
+        "save": "Nu am putut salva produsul",
+        "delete": "Nu am putut șterge produsul",
+        "required": "Numele și slug-ul categoriei sunt obligatorii",
+        "image": "Încărcarea imaginii a eșuat",
+        "deleteImage": "Nu am putut șterge imaginea",
+        "saveFirst": "Salvează produsul înainte de a încărca imagini"
+      },
+      "actions": {
+        "create": "Creează",
+        "update": "Actualizează",
+        "cancel": "Anulează",
+        "upload": "Încarcă"
+      }
+    },
+    "categories": {
+      "title": "Categorii",
+      "add": "Adaugă categorie",
+      "slug": "Slug",
+      "success": {
+        "add": "Categorie adăugată",
+        "delete": "Categorie ștearsă",
+        "reorder": "Ordinea categoriilor a fost salvată"
+      },
+      "errors": {
+        "add": "Nu am putut adăuga categoria",
+        "delete": "Nu am putut șterge categoria",
+        "reorder": "Nu am putut reordona categoriile"
+      }
+    },
+    "orders": {
+      "title": "Comenzi",
+      "statusFilter": "Status",
+      "all": "Toate",
+      "pending": "În așteptare",
+      "paid": "Plătită",
+      "shipped": "Expediată",
+      "cancelled": "Anulată",
+      "refunded": "Rambursată",
+      "success": {
+        "status": "Statusul comenzii a fost actualizat"
+      },
+      "errors": {
+        "status": "Nu am putut actualiza statusul comenzii"
+      }
+    },
+    "users": {
+      "title": "Utilizatori",
+      "setRole": "Setează rol",
+      "forceLogout": "Deconectează selectatul",
+      "roles": {
+        "customer": "Client",
+        "admin": "Administrator"
+      },
+      "success": {
+        "revoke": "Sesiuni revocate",
+        "role": "Rol actualizat"
+      },
+      "errors": {
+        "revoke": "Nu am putut revoca sesiunile",
+        "role": "Nu am putut actualiza rolul"
+      }
+    },
+    "content": {
+      "title": "Conținut",
+      "editing": "Se editează",
+      "titleLabel": "Titlu",
+      "status": "Status",
+      "body": "Conținut",
+      "save": "Salvează conținutul",
+      "errors": {
+        "update": "Nu am putut actualiza conținutul"
+      },
+      "success": {
+        "update": "Conținut actualizat"
+      }
+    },
+    "coupons": {
+      "title": "Cupoane",
+      "code": "Cod",
+      "percentOff": "% reducere",
+      "add": "Adaugă cupon",
+      "none": "Fără reducere setată",
+      "active": "Activ",
+      "inactive": "Inactiv",
+      "success": {
+        "create": "Cupon creat",
+        "update": "Cupon actualizat"
+      },
+      "errors": {
+        "required": "Codul cuponului este obligatoriu",
+        "create": "Nu am putut crea cuponul",
+        "update": "Nu am putut actualiza cuponul"
+      }
+    },
+    "audit": {
+      "title": "Jurnal audit",
+      "products": "Modificări produse",
+      "content": "Modificări conținut",
+      "productId": "ID produs:",
+      "blockId": "ID bloc:",
+      "at": "La:"
+    },
+    "maintenance": {
+      "title": "Mentenanță & feed-uri",
+      "mode": "Mod mentenanță",
+      "sitemap": "Sitemap",
+      "robots": "Robots.txt",
+      "feed": "Feed produse",
+      "success": {
+        "update": "Modul de mentenanță a fost actualizat"
+      },
+      "errors": {
+        "update": "Nu am putut actualiza modul de mentenanță"
+      }
+    },
+    "lowStock": {
+      "title": "Stoc scăzut",
+      "hint": "Sub 5 unități",
+      "stock": "Stoc: {{count}}"
+    }
   }
 }

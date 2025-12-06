@@ -241,7 +241,7 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
 
   placeOrder(form: NgForm): void {
     if (!form.valid) {
-      this.addressError = 'Please complete all required fields.';
+      this.addressError = this.translate.instant('checkout.addressRequired');
       return;
     }
     this.addressError = '';
@@ -251,7 +251,7 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
       return;
     }
     if (!this.clientSecret) {
-      this.errorMessage = 'Payment not initialized yet. Please wait.';
+      this.errorMessage = this.translate.instant('checkout.paymentNotReady');
       return;
     }
     this.errorMessage = '';
@@ -265,7 +265,7 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
         this.submitCheckout();
       })
       .catch(() => {
-        this.errorMessage = 'Payment failed.';
+        this.errorMessage = this.translate.instant('checkout.paymentFailed');
         this.placing = false;
       });
   }

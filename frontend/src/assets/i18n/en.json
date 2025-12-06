@@ -108,6 +108,10 @@
   "checkout": {
     "title": "Checkout",
     "retry": "Retry",
+    "addressRequired": "Please complete all required fields.",
+    "paymentNotReady": "Payment not initialized yet. Please wait.",
+    "paymentFailed": "Payment failed.",
+    "paymentConfirmError": "Payment confirmation failed. Please try again.",
     "step1": "Step 1 · Who's checking out?",
     "guest": "Checkout as guest",
     "createAccount": "Create account during checkout",
@@ -132,5 +136,222 @@
     "shipping": "Shipping",
     "promo": "Promo",
     "estimatedTotal": "Estimated total"
+  },
+  "auth": {
+    "loginTitle": "Login",
+    "registerTitle": "Create account",
+    "resetRequestTitle": "Reset password",
+    "resetRequestCopy": "Enter your email and we'll send a reset link.",
+    "resetTitle": "Set new password",
+    "resetCode": "Reset code",
+    "changePasswordTitle": "Change password",
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "confirmPassword": "Confirm password",
+    "forgot": "Forgot password?",
+    "createAccount": "Create account",
+    "login": "Login",
+    "logout": "Logout",
+    "register": "Register",
+    "resetLink": "Send reset link",
+    "resetLinkSent": "Reset link sent",
+    "setPassword": "Set password",
+    "backToLogin": "Back to login",
+    "remembered": "Remembered it?",
+    "haveAccount": "Already have an account?",
+    "successLogin": "Welcome back",
+    "successRegister": "Account created",
+    "successReset": "Password updated",
+    "errorLogin": "Unable to login. Please try again.",
+    "errorRegister": "Unable to register. Please try again.",
+    "errorReset": "Unable to reset password. Please try again."
+  },
+  "validation": {
+    "required": "This field is required.",
+    "invalidEmail": "Enter a valid email address.",
+    "passwordMin": "Password must be at least 6 characters.",
+    "passwordMismatch": "Passwords do not match."
+  },
+  "adminUi": {
+    "nav": {
+      "dashboard": "Dashboard",
+      "products": "Products",
+      "orders": "Orders",
+      "users": "Users",
+      "content": "Content"
+    },
+    "dashboardTitle": "Admin dashboard",
+    "cards": {
+      "products": "Products",
+      "orders": "Orders",
+      "users": "Users",
+      "lowStock": "Low stock",
+      "sales30": "Sales (30d)",
+      "orders30": "Orders (30d)"
+    },
+    "actions": {
+      "reset": "Reset",
+      "delete": "Delete",
+      "save": "Save",
+      "edit": "Edit",
+      "refresh": "Refresh"
+    },
+    "status": {
+      "draft": "Draft",
+      "published": "Published",
+      "archived": "Archived"
+    },
+    "products": {
+      "title": "Products",
+      "new": "New",
+      "delete": "Delete",
+      "edit": "Edit product",
+      "create": "Create product",
+      "table": {
+        "name": "Name",
+        "price": "Price",
+        "status": "Status",
+        "category": "Category",
+        "stock": "Stock"
+      },
+      "form": {
+        "slug": "Slug",
+        "sku": "SKU",
+        "imageUrl": "Image URL",
+        "description": "Description",
+        "save": "Save product",
+        "upload": "Upload image",
+        "images": "Images",
+        "image": "Image"
+      },
+      "success": {
+        "save": "Product saved",
+        "delete": "Product deleted",
+        "imageUpload": "Image uploaded",
+        "imageDelete": "Image deleted"
+      },
+      "errors": {
+        "load": "Unable to load product",
+        "save": "Failed to save product",
+        "delete": "Failed to delete product",
+        "required": "Category name and slug are required",
+        "image": "Image upload failed",
+        "deleteImage": "Failed to delete image",
+        "saveFirst": "Save product before uploading images"
+      },
+      "actions": {
+        "create": "Create",
+        "update": "Update",
+        "cancel": "Cancel",
+        "upload": "Upload"
+      }
+    },
+    "categories": {
+      "title": "Categories",
+      "add": "Add category",
+      "slug": "Slug",
+      "success": {
+        "add": "Category added",
+        "delete": "Category deleted",
+        "reorder": "Category order saved"
+      },
+      "errors": {
+        "add": "Failed to add category",
+        "delete": "Failed to delete category",
+        "reorder": "Failed to reorder categories"
+      }
+    },
+    "orders": {
+      "title": "Orders",
+      "statusFilter": "Status",
+      "all": "All",
+      "pending": "Pending",
+      "paid": "Paid",
+      "shipped": "Shipped",
+      "cancelled": "Cancelled",
+      "refunded": "Refunded",
+      "success": {
+        "status": "Order status updated"
+      },
+      "errors": {
+        "status": "Failed to update order status"
+      }
+    },
+    "users": {
+      "title": "Users",
+      "setRole": "Set role",
+      "forceLogout": "Force logout selected",
+      "roles": {
+        "customer": "Customer",
+        "admin": "Admin"
+      },
+      "success": {
+        "revoke": "Sessions revoked",
+        "role": "Role updated"
+      },
+      "errors": {
+        "revoke": "Failed to revoke sessions",
+        "role": "Failed to update role"
+      }
+    },
+    "content": {
+      "title": "Content",
+      "editing": "Editing",
+      "titleLabel": "Title",
+      "status": "Status",
+      "body": "Body",
+      "save": "Save content",
+      "errors": {
+        "update": "Failed to update content"
+      },
+      "success": {
+        "update": "Content updated"
+      }
+    },
+    "coupons": {
+      "title": "Coupons",
+      "code": "Code",
+      "percentOff": "% off",
+      "add": "Add coupon",
+      "none": "No discount set",
+      "active": "Active",
+      "inactive": "Inactive",
+      "success": {
+        "create": "Coupon created",
+        "update": "Coupon updated"
+      },
+      "errors": {
+        "required": "Coupon code is required",
+        "create": "Failed to create coupon",
+        "update": "Failed to update coupon"
+      }
+    },
+    "audit": {
+      "title": "Audit log",
+      "products": "Product changes",
+      "content": "Content changes",
+      "productId": "Product ID:",
+      "blockId": "Block ID:",
+      "at": "At:"
+    },
+    "maintenance": {
+      "title": "Maintenance & feeds",
+      "mode": "Maintenance mode",
+      "sitemap": "Sitemap",
+      "robots": "Robots.txt",
+      "feed": "Product feed",
+      "success": {
+        "update": "Maintenance mode updated"
+      },
+      "errors": {
+        "update": "Failed to update maintenance mode"
+      }
+    },
+    "lowStock": {
+      "title": "Low stock",
+      "hint": "Below 5 units",
+      "stock": "Stock: {{count}}"
+    }
   }
 }

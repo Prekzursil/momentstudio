@@ -7,18 +7,19 @@ import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent],
+  imports: [CommonModule, FormsModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent, TranslateModule],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-      <h1 class="text-2xl font-semibold text-slate-900">Login</h1>
+      <h1 class="text-2xl font-semibold text-slate-900">{{ 'auth.loginTitle' | translate }}</h1>
       <form #loginForm="ngForm" class="grid gap-4" (ngSubmit)="onSubmit(loginForm)">
         <label class="grid gap-1 text-sm font-medium text-slate-700">
-          Email
+          {{ 'auth.email' | translate }}
           <input
             name="email"
             type="email"
@@ -28,7 +29,7 @@ import { AuthService } from '../../core/auth.service';
           />
         </label>
         <label class="grid gap-1 text-sm font-medium text-slate-700">
-          Password
+          {{ 'auth.password' | translate }}
           <input
             name="password"
             type="password"
@@ -39,35 +40,35 @@ import { AuthService } from '../../core/auth.service';
           />
         </label>
         <div class="flex items-center justify-between text-sm">
-          <a routerLink="/password-reset" class="text-indigo-600 font-medium">Forgot password?</a>
-          <a routerLink="/register" class="text-slate-600 hover:text-slate-900">Create account</a>
+          <a routerLink="/password-reset" class="text-indigo-600 font-medium">{{ 'auth.forgot' | translate }}</a>
+          <a routerLink="/register" class="text-slate-600 hover:text-slate-900">{{ 'auth.createAccount' | translate }}</a>
         </div>
-        <app-button label="Login" type="submit"></app-button>
+        <app-button [label]="'auth.login' | translate" type="submit"></app-button>
       </form>
     </app-container>
   `
 })
 export class LoginComponent {
   crumbs = [
-    { label: 'Home', url: '/' },
-    { label: 'Login' }
+    { label: 'nav.home', url: '/' },
+    { label: 'auth.loginTitle' }
   ];
   email = '';
   password = '';
   loading = false;
 
-  constructor(private toast: ToastService, private auth: AuthService, private router: Router) {}
+  constructor(private toast: ToastService, private auth: AuthService, private router: Router, private translate: TranslateService) {}
 
   onSubmit(form: NgForm): void {
     if (!form.valid) return;
     this.loading = true;
     this.auth.login(this.email, this.password).subscribe({
       next: (res) => {
-        this.toast.success('Welcome back', res.user.email);
+        this.toast.success(this.translate.instant('auth.successLogin'), res.user.email);
         this.router.navigateByUrl('/account');
       },
       error: (err) => {
-        const message = err?.error?.detail || 'Unable to login. Please try again.';
+        const message = err?.error?.detail || this.translate.instant('auth.errorLogin');
         this.toast.error(message);
       },
       complete: () => {

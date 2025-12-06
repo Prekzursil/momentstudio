@@ -317,8 +317,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Store preferred language on user profile and default to it after login.
 - [x] Internationalize storefront text (home, shop, product detail, cart, checkout, account) – frontend strings wired to i18n.
 - [x] Internationalize storefront shell text for home + shop pages (partial storefront i18n).
-- [ ] RO/EN translations for validation/error messages in forms (login, register, checkout, admin).
-- [ ] Internationalize admin dashboard labels/messages.
+- [x] RO/EN translations for validation/error messages in forms (login, register, checkout, admin).
+- [x] Internationalize admin dashboard labels/messages.
 - [ ] `product_translations` (or JSONB) for localized product name/short/long description per language.
 - [ ] `category_translations` (or JSONB) for localized category name/description per language.
 - [ ] Localized content blocks for static pages (About, FAQ, Shipping, etc.).

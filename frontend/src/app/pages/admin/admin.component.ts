@@ -23,6 +23,7 @@ import {
   AdminProductDetail
 } from '../../core/admin.service';
 import { ToastService } from '../../core/toast.service';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-admin',
@@ -37,7 +38,8 @@ import { ToastService } from '../../core/toast.service';
     ButtonComponent,
     InputComponent,
     LocalizedCurrencyPipe,
-    SkeletonComponent
+    SkeletonComponent,
+    TranslateModule
   ],
   template: `
     <app-container classes="py-8 grid gap-6">
@@ -47,34 +49,40 @@ import { ToastService } from '../../core/toast.service';
       </div>
       <div class="grid lg:grid-cols-[260px_1fr] gap-6">
         <aside class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-2 text-sm text-slate-700">
-          <a class="font-semibold text-slate-900">Dashboard</a>
-          <a class="hover:text-slate-900 text-slate-700">Products</a>
-          <a class="hover:text-slate-900 text-slate-700">Orders</a>
-          <a class="hover:text-slate-900 text-slate-700">Users</a>
-          <a class="hover:text-slate-900 text-slate-700">Content</a>
+          <a class="font-semibold text-slate-900">{{ 'adminUi.nav.dashboard' | translate }}</a>
+          <a class="hover:text-slate-900 text-slate-700">{{ 'adminUi.nav.products' | translate }}</a>
+          <a class="hover:text-slate-900 text-slate-700">{{ 'adminUi.nav.orders' | translate }}</a>
+          <a class="hover:text-slate-900 text-slate-700">{{ 'adminUi.nav.users' | translate }}</a>
+          <a class="hover:text-slate-900 text-slate-700">{{ 'adminUi.nav.content' | translate }}</a>
         </aside>
 
         <div class="grid gap-6" *ngIf="!loading(); else loadingTpl">
           <section class="grid gap-3">
-            <h1 class="text-2xl font-semibold text-slate-900">Admin dashboard</h1>
+            <h1 class="text-2xl font-semibold text-slate-900">{{ 'adminUi.dashboardTitle' | translate }}</h1>
             <div class="grid md:grid-cols-3 gap-4">
-              <app-card title="Products" [subtitle]="summary()?.products + ' total'"></app-card>
-              <app-card title="Orders" [subtitle]="summary()?.orders + ' total'"></app-card>
-              <app-card title="Users" [subtitle]="summary()?.users + ' total'"></app-card>
+              <app-card [title]="'adminUi.cards.products' | translate" [subtitle]="summary()?.products + ' total'"></app-card>
+              <app-card [title]="'adminUi.cards.orders' | translate" [subtitle]="summary()?.orders + ' total'"></app-card>
+              <app-card [title]="'adminUi.cards.users' | translate" [subtitle]="summary()?.users + ' total'"></app-card>
             </div>
             <div class="grid md:grid-cols-3 gap-4">
-              <app-card title="Low stock" [subtitle]="summary()?.low_stock + ' items'"></app-card>
-              <app-card title="Sales (30d)" [subtitle]="(summary()?.sales_30d || 0) | localizedCurrency : 'USD'"></app-card>
-              <app-card title="Orders (30d)" [subtitle]="summary()?.orders_30d + ' orders'"></app-card>
+              <app-card [title]="'adminUi.cards.lowStock' | translate" [subtitle]="summary()?.low_stock + ' items'"></app-card>
+              <app-card [title]="'adminUi.cards.sales30' | translate" [subtitle]="(summary()?.sales_30d || 0) | localizedCurrency : 'USD'"></app-card>
+              <app-card [title]="'adminUi.cards.orders30' | translate" [subtitle]="summary()?.orders_30d + ' orders'"></app-card>
             </div>
           </section>
 
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Products</h2>
+              <h2 class="text-lg font-semibold text-slate-900">{{ 'adminUi.products.title' | translate }}</h2>
               <div class="flex gap-2">
-                <app-button size="sm" label="New" (action)="startNewProduct()"></app-button>
-                <app-button size="sm" variant="ghost" label="Delete" [disabled]="!selectedIds.size" (action)="deleteSelected()"></app-button>
+                <app-button size="sm" [label]="'adminUi.products.new' | translate" (action)="startNewProduct()"></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.products.delete' | translate"
+                  [disabled]="!selectedIds.size"
+                  (action)="deleteSelected()"
+                ></app-button>
               </div>
             </div>
             <div class="overflow-auto">
@@ -84,11 +92,11 @@ import { ToastService } from '../../core/toast.service';
                     <th class="py-2">
                       <input type="checkbox" [checked]="allSelected" (change)="toggleAll($event)" />
                     </th>
-                    <th class="py-2">Name</th>
-                    <th>Price</th>
-                    <th>Status</th>
-                    <th>Category</th>
-                    <th>Stock</th>
+                    <th class="py-2">{{ 'adminUi.products.table.name' | translate }}</th>
+                    <th>{{ 'adminUi.products.table.price' | translate }}</th>
+                    <th>{{ 'adminUi.products.table.status' | translate }}</th>
+                    <th>{{ 'adminUi.products.table.category' | translate }}</th>
+                    <th>{{ 'adminUi.products.table.stock' | translate }}</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -107,7 +115,7 @@ import { ToastService } from '../../core/toast.service';
                     <td>{{ product.category }}</td>
                     <td>{{ product.stock_quantity }}</td>
                     <td class="flex gap-2 py-2">
-                      <app-button size="sm" variant="ghost" label="Edit" (action)="loadProduct(product.slug)"></app-button>
+                      <app-button size="sm" variant="ghost" [label]="'adminUi.products.actions.update' | translate" (action)="loadProduct(product.slug)"></app-button>
                     </td>
                   </tr>
                 </tbody>
@@ -117,50 +125,52 @@ import { ToastService } from '../../core/toast.service';
 
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">{{ editingId ? 'Edit product' : 'Create product' }}</h2>
-              <app-button size="sm" variant="ghost" label="Reset" (action)="startNewProduct()"></app-button>
+              <h2 class="text-lg font-semibold text-slate-900">
+                {{ editingId ? ('adminUi.products.edit' | translate) : ('adminUi.products.create' | translate) }}
+              </h2>
+              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.reset' | translate" (action)="startNewProduct()"></app-button>
             </div>
             <div class="grid md:grid-cols-2 gap-3 text-sm">
-              <app-input label="Name" [(value)]="form.name"></app-input>
-              <app-input label="Slug" [(value)]="form.slug"></app-input>
+              <app-input [label]="'adminUi.products.table.name' | translate" [(value)]="form.name"></app-input>
+              <app-input [label]="'adminUi.products.form.slug' | translate" [(value)]="form.slug"></app-input>
               <label class="grid text-sm font-medium text-slate-700">
-                Category
+                {{ 'adminUi.products.table.category' | translate }}
                 <select class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="form.category_id">
                   <option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</option>
                 </select>
               </label>
-              <app-input label="Price" type="number" [(value)]="form.price"></app-input>
-              <app-input label="Stock" type="number" [(value)]="form.stock"></app-input>
+              <app-input [label]="'adminUi.products.table.price' | translate" type="number" [(value)]="form.price"></app-input>
+              <app-input [label]="'adminUi.products.table.stock' | translate" type="number" [(value)]="form.stock"></app-input>
               <label class="grid text-sm font-medium text-slate-700">
-                Status
+                {{ 'adminUi.products.table.status' | translate }}
                 <select class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="form.status">
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                  <option value="archived">Archived</option>
+                  <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+                  <option value="published">{{ 'adminUi.status.published' | translate }}</option>
+                  <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
                 </select>
               </label>
-              <app-input label="SKU" [(value)]="form.sku"></app-input>
-              <app-input label="Image URL" [(value)]="form.image"></app-input>
+              <app-input [label]="'adminUi.products.form.sku' | translate" [(value)]="form.sku"></app-input>
+              <app-input [label]="'adminUi.products.form.imageUrl' | translate" [(value)]="form.image"></app-input>
             </div>
             <label class="grid gap-1 text-sm font-medium text-slate-700">
-              Description
+              {{ 'adminUi.products.form.description' | translate }}
               <textarea rows="3" class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="form.description"></textarea>
             </label>
             <div class="flex gap-3">
-              <app-button label="Save product" (action)="saveProduct()"></app-button>
+              <app-button [label]="'adminUi.products.form.save' | translate" (action)="saveProduct()"></app-button>
               <label class="text-sm text-indigo-600 font-medium cursor-pointer">
-                Upload image
+                {{ 'adminUi.products.form.upload' | translate }}
                 <input type="file" class="hidden" accept="image/*" (change)="onImageUpload($event)" />
               </label>
             </div>
             <div class="grid gap-2" *ngIf="productImages().length">
-              <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Images</p>
+              <p class="text-xs uppercase tracking-[0.2em] text-slate-500">{{ 'adminUi.products.form.images' | translate }}</p>
               <div *ngFor="let img of productImages()" class="flex items-center gap-3 rounded-lg border border-slate-200 p-2">
                 <img [src]="img.url" [alt]="img.alt_text || 'image'" class="h-12 w-12 rounded object-cover" />
                 <div class="flex-1">
-                  <p class="font-semibold text-slate-900">{{ img.alt_text || 'Image' }}</p>
+                  <p class="font-semibold text-slate-900">{{ img.alt_text || ('adminUi.products.form.image' | translate) }}</p>
                 </div>
-                <app-button size="sm" variant="ghost" label="Delete" (action)="deleteImage(img.id)"></app-button>
+                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.delete' | translate" (action)="deleteImage(img.id)"></app-button>
               </div>
             </div>
             <p *ngIf="formMessage" class="text-sm text-emerald-700">{{ formMessage }}</p>
@@ -168,12 +178,12 @@ import { ToastService } from '../../core/toast.service';
 
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Categories</h2>
+              <h2 class="text-lg font-semibold text-slate-900">{{ 'adminUi.categories.title' | translate }}</h2>
             </div>
             <div class="grid md:grid-cols-3 gap-2 items-end text-sm">
-              <app-input label="Name" [(value)]="categoryName"></app-input>
-              <app-input label="Slug" [(value)]="categorySlug"></app-input>
-              <app-button size="sm" label="Add category" (action)="addCategory()"></app-button>
+              <app-input [label]="'adminUi.products.table.name' | translate" [(value)]="categoryName"></app-input>
+              <app-input [label]="'adminUi.categories.slug' | translate" [(value)]="categorySlug"></app-input>
+              <app-button size="sm" [label]="'adminUi.categories.add' | translate" (action)="addCategory()"></app-button>
             </div>
             <div class="grid gap-2 text-sm text-slate-700">
               <div
@@ -191,7 +201,7 @@ import { ToastService } from '../../core/toast.service';
                 <div class="flex gap-2">
                   <app-button size="sm" variant="ghost" label="↑" (action)="moveCategory(cat, -1)"></app-button>
                   <app-button size="sm" variant="ghost" label="↓" (action)="moveCategory(cat, 1)"></app-button>
-                  <app-button size="sm" variant="ghost" label="Delete" (action)="deleteCategory(cat.slug)"></app-button>
+                  <app-button size="sm" variant="ghost" [label]="'adminUi.actions.delete' | translate" (action)="deleteCategory(cat.slug)"></app-button>
                 </div>
               </div>
             </div>
@@ -199,15 +209,15 @@ import { ToastService } from '../../core/toast.service';
 
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Orders</h2>
+              <h2 class="text-lg font-semibold text-slate-900">{{ 'adminUi.orders.title' | translate }}</h2>
               <label class="text-sm text-slate-700">
-                Status
+                {{ 'adminUi.orders.statusFilter' | translate }}
                 <select class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="orderFilter">
-                  <option value="">All</option>
-                  <option value="pending">Pending</option>
-                  <option value="paid">Paid</option>
-                  <option value="shipped">Shipped</option>
-                  <option value="refunded">Refunded</option>
+                  <option value="">{{ 'adminUi.orders.all' | translate }}</option>
+                  <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
+                  <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
+                  <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
+                  <option value="refunded">{{ 'adminUi.orders.refunded' | translate }}</option>
                 </select>
               </label>
             </div>
@@ -225,11 +235,11 @@ import { ToastService } from '../../core/toast.service';
                 <div class="flex items-center justify-between">
                   <h3 class="font-semibold text-slate-900">Order #{{ activeOrder.id }}</h3>
                   <select class="rounded-lg border border-slate-200 px-2 py-1 text-sm" [ngModel]="activeOrder.status" (ngModelChange)="changeOrderStatus($event)">
-                    <option value="pending">Pending</option>
-                    <option value="paid">Paid</option>
-                    <option value="shipped">Shipped</option>
-                    <option value="cancelled">Cancelled</option>
-                    <option value="refunded">Refunded</option>
+                    <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
+                    <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
+                    <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
+                    <option value="cancelled">{{ 'adminUi.orders.cancelled' | translate }}</option>
+                    <option value="refunded">{{ 'adminUi.orders.refunded' | translate }}</option>
                   </select>
                 </div>
                 <p class="text-xs text-slate-500">Customer: {{ activeOrder.customer }}</p>
@@ -241,10 +251,22 @@ import { ToastService } from '../../core/toast.service';
 
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Users</h2>
+              <h2 class="text-lg font-semibold text-slate-900">{{ 'adminUi.users.title' | translate }}</h2>
               <div class="flex gap-2">
-                <app-button size="sm" variant="ghost" label="Set role" [disabled]="!selectedUserId || !selectedUserRole" (action)="updateRole()"></app-button>
-                <app-button size="sm" variant="ghost" label="Force logout selected" [disabled]="!selectedUserId" (action)="forceLogout()"></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.users.setRole' | translate"
+                  [disabled]="!selectedUserId || !selectedUserRole"
+                  (action)="updateRole()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.users.forceLogout' | translate"
+                  [disabled]="!selectedUserId"
+                  (action)="forceLogout()"
+                ></app-button>
               </div>
             </div>
             <div class="grid gap-2 text-sm text-slate-700">
@@ -256,8 +278,8 @@ import { ToastService } from '../../core/toast.service';
                 <div class="flex items-center gap-2 text-xs">
                   <input type="radio" name="userSelect" [value]="user.id" [(ngModel)]="selectedUserId" />
                   <select class="rounded border border-slate-200 px-2 py-1" [ngModel]="user.role" (ngModelChange)="selectUser(user.id, $event)">
-                    <option value="customer">Customer</option>
-                    <option value="admin">Admin</option>
+                    <option value="customer">{{ 'adminUi.users.roles.customer' | translate }}</option>
+                    <option value="admin">{{ 'adminUi.users.roles.admin' | translate }}</option>
                   </select>
                 </div>
               </div>
@@ -266,7 +288,7 @@ import { ToastService } from '../../core/toast.service';
 
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Content</h2>
+              <h2 class="text-lg font-semibold text-slate-900">{{ 'adminUi.content.title' | translate }}</h2>
             </div>
             <div class="grid gap-2 text-sm text-slate-700">
               <div *ngFor="let c of contentBlocks" class="flex items-center justify-between rounded-lg border border-slate-200 p-3">
@@ -275,39 +297,39 @@ import { ToastService } from '../../core/toast.service';
                   <p class="text-xs text-slate-500">{{ c.key }}</p>
                 </div>
                 <span class="text-xs text-slate-500">v{{ c.version }}</span>
-                <app-button size="sm" variant="ghost" label="Edit" (action)="selectContent(c)"></app-button>
+                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.edit' | translate" (action)="selectContent(c)"></app-button>
               </div>
             </div>
             <div *ngIf="selectedContent" class="grid gap-2 pt-3 border-t border-slate-200">
-              <p class="text-sm font-semibold text-slate-900">Editing: {{ selectedContent.key }}</p>
-              <app-input label="Title" [(value)]="contentForm.title"></app-input>
+              <p class="text-sm font-semibold text-slate-900">{{ 'adminUi.content.editing' | translate }}: {{ selectedContent.key }}</p>
+              <app-input [label]="'adminUi.content.titleLabel' | translate" [(value)]="contentForm.title"></app-input>
               <label class="grid text-sm font-medium text-slate-700">
-                Status
+                {{ 'adminUi.content.status' | translate }}
                 <select class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="contentForm.status">
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
+                  <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+                  <option value="published">{{ 'adminUi.status.published' | translate }}</option>
                 </select>
               </label>
               <label class="grid gap-1 text-sm font-medium text-slate-700">
-                Body
+                {{ 'adminUi.content.body' | translate }}
                 <textarea rows="4" class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="contentForm.body_markdown"></textarea>
               </label>
               <div class="flex gap-2">
-                <app-button size="sm" label="Save content" (action)="saveContent()"></app-button>
-                <app-button size="sm" variant="ghost" label="Cancel" (action)="cancelContent()"></app-button>
+                <app-button size="sm" [label]="'adminUi.content.save' | translate" (action)="saveContent()"></app-button>
+                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.cancel' | translate" (action)="cancelContent()"></app-button>
               </div>
             </div>
           </section>
 
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Coupons</h2>
+              <h2 class="text-lg font-semibold text-slate-900">{{ 'adminUi.coupons.title' | translate }}</h2>
             </div>
             <div class="grid gap-2 text-sm text-slate-700">
               <div class="grid md:grid-cols-3 gap-2 items-end">
-                <app-input label="Code" [(value)]="newCoupon.code"></app-input>
-                <app-input label="% off" type="number" [(value)]="newCoupon.percentage_off"></app-input>
-                <app-button size="sm" label="Add coupon" (action)="createCoupon()"></app-button>
+                <app-input [label]="'adminUi.coupons.code' | translate" [(value)]="newCoupon.code"></app-input>
+                <app-input [label]="'adminUi.coupons.percentOff' | translate" type="number" [(value)]="newCoupon.percentage_off"></app-input>
+                <app-button size="sm" [label]="'adminUi.coupons.add' | translate" (action)="createCoupon()"></app-button>
               </div>
               <div *ngFor="let coupon of coupons" class="flex items-center justify-between rounded-lg border border-slate-200 p-3">
                 <div>
@@ -315,7 +337,7 @@ import { ToastService } from '../../core/toast.service';
                   <p class="text-xs text-slate-500">
                     <ng-container *ngIf="coupon.percentage_off">-{{ coupon.percentage_off }}%</ng-container>
                     <ng-container *ngIf="coupon.amount_off">-{{ coupon.amount_off | localizedCurrency : coupon.currency || 'USD' }}</ng-container>
-                    <ng-container *ngIf="!coupon.percentage_off && !coupon.amount_off">No discount set</ng-container>
+                    <ng-container *ngIf="!coupon.percentage_off && !coupon.amount_off">{{ 'adminUi.coupons.none' | translate }}</ng-container>
                   </p>
                 </div>
                 <button
@@ -325,7 +347,7 @@ import { ToastService } from '../../core/toast.service';
                   [class.text-emerald-800]="coupon.active"
                   (click)="toggleCoupon(coupon)"
                 >
-                  {{ coupon.active ? 'Active' : 'Inactive' }}
+                  {{ coupon.active ? ('adminUi.coupons.active' | translate) : ('adminUi.coupons.inactive' | translate) }}
                 </button>
               </div>
             </div>
@@ -333,24 +355,24 @@ import { ToastService } from '../../core/toast.service';
 
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Audit log</h2>
-              <app-button size="sm" variant="ghost" label="Refresh" (action)="loadAudit()"></app-button>
+              <h2 class="text-lg font-semibold text-slate-900">{{ 'adminUi.audit.title' | translate }}</h2>
+              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadAudit()"></app-button>
             </div>
             <div class="grid md:grid-cols-2 gap-4 text-sm text-slate-700">
               <div class="grid gap-2">
-                <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Product changes</p>
+                <p class="text-xs uppercase tracking-[0.2em] text-slate-500">{{ 'adminUi.audit.products' | translate }}</p>
                 <div *ngFor="let log of productAudit" class="rounded-lg border border-slate-200 p-3">
                   <p class="font-semibold text-slate-900">{{ log.action }}</p>
-                  <p class="text-xs text-slate-500">Product ID: {{ log.product_id }}</p>
-                  <p class="text-xs text-slate-500">At: {{ log.created_at | date: 'short' }}</p>
+                  <p class="text-xs text-slate-500">{{ 'adminUi.audit.productId' | translate }} {{ log.product_id }}</p>
+                  <p class="text-xs text-slate-500">{{ 'adminUi.audit.at' | translate }} {{ log.created_at | date: 'short' }}</p>
                 </div>
               </div>
               <div class="grid gap-2">
-                <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Content changes</p>
+                <p class="text-xs uppercase tracking-[0.2em] text-slate-500">{{ 'adminUi.audit.content' | translate }}</p>
                 <div *ngFor="let log of contentAudit" class="rounded-lg border border-slate-200 p-3">
                   <p class="font-semibold text-slate-900">{{ log.action }}</p>
-                  <p class="text-xs text-slate-500">Block ID: {{ log.block_id }}</p>
-                  <p class="text-xs text-slate-500">At: {{ log.created_at | date: 'short' }}</p>
+                  <p class="text-xs text-slate-500">{{ 'adminUi.audit.blockId' | translate }} {{ log.block_id }}</p>
+                  <p class="text-xs text-slate-500">{{ 'adminUi.audit.at' | translate }} {{ log.created_at | date: 'short' }}</p>
                 </div>
               </div>
             </div>
@@ -358,23 +380,23 @@ import { ToastService } from '../../core/toast.service';
 
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Maintenance & feeds</h2>
-              <app-button size="sm" label="Save" (action)="saveMaintenance()"></app-button>
+              <h2 class="text-lg font-semibold text-slate-900">{{ 'adminUi.maintenance.title' | translate }}</h2>
+              <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="saveMaintenance()"></app-button>
             </div>
             <div class="flex items-center gap-3 text-sm">
               <label class="flex items-center gap-2">
-                <input type="checkbox" [(ngModel)]="maintenanceEnabledValue" /> Maintenance mode
+                <input type="checkbox" [(ngModel)]="maintenanceEnabledValue" /> {{ 'adminUi.maintenance.mode' | translate }}
               </label>
-              <a class="text-indigo-600" href="/api/v1/sitemap.xml" target="_blank" rel="noopener">Sitemap</a>
-              <a class="text-indigo-600" href="/api/v1/robots.txt" target="_blank" rel="noopener">Robots.txt</a>
-              <a class="text-indigo-600" href="/api/v1/feeds/products.json" target="_blank" rel="noopener">Product feed</a>
+              <a class="text-indigo-600" href="/api/v1/sitemap.xml" target="_blank" rel="noopener">{{ 'adminUi.maintenance.sitemap' | translate }}</a>
+              <a class="text-indigo-600" href="/api/v1/robots.txt" target="_blank" rel="noopener">{{ 'adminUi.maintenance.robots' | translate }}</a>
+              <a class="text-indigo-600" href="/api/v1/feeds/products.json" target="_blank" rel="noopener">{{ 'adminUi.maintenance.feed' | translate }}</a>
             </div>
           </section>
 
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Low stock</h2>
-              <span class="text-xs text-slate-500">Below 5 units</span>
+              <h2 class="text-lg font-semibold text-slate-900">{{ 'adminUi.lowStock.title' | translate }}</h2>
+              <span class="text-xs text-slate-500">{{ 'adminUi.lowStock.hint' | translate }}</span>
             </div>
             <div class="grid gap-2 text-sm text-slate-700">
               <div *ngFor="let item of lowStock" class="flex items-center justify-between rounded-lg border border-slate-200 p-3">
@@ -382,7 +404,7 @@ import { ToastService } from '../../core/toast.service';
                   <p class="font-semibold text-slate-900">{{ item.name }}</p>
                   <p class="text-xs text-slate-500">{{ item.sku }} — {{ item.slug }}</p>
                 </div>
-                <span class="text-xs rounded-full bg-amber-100 px-2 py-1 text-amber-900">Stock: {{ item.stock_quantity }}</span>
+                <span class="text-xs rounded-full bg-amber-100 px-2 py-1 text-amber-900">{{ 'adminUi.lowStock.stock' | translate:{count: item.stock_quantity} }}</span>
               </div>
             </div>
           </section>
@@ -398,8 +420,8 @@ import { ToastService } from '../../core/toast.service';
 })
 export class AdminComponent implements OnInit {
   crumbs = [
-    { label: 'Home', url: '/' },
-    { label: 'Admin' }
+    { label: 'nav.home', url: '/' },
+    { label: 'nav.admin' }
   ];
 
   summary = signal<AdminSummary | null>(null);
@@ -454,7 +476,11 @@ export class AdminComponent implements OnInit {
   contentAudit: AdminAudit['content'] = [];
   lowStock: LowStockItem[] = [];
 
-  constructor(private admin: AdminService, private toast: ToastService) {}
+  constructor(private admin: AdminService, private toast: ToastService, private translate: TranslateService) {}
+
+  private t(key: string, params?: Record<string, unknown>): string {
+    return this.translate.instant(key, params);
+  }
 
   ngOnInit(): void {
     this.loadAll();
@@ -532,7 +558,7 @@ export class AdminComponent implements OnInit {
         };
         this.productImages.set((prod as any).images || []);
       },
-      error: () => this.toast.error('Unable to load product')
+      error: () => this.toast.error(this.t('adminUi.products.errors.load'))
     });
   }
 
@@ -553,11 +579,11 @@ export class AdminComponent implements OnInit {
       : this.admin.createProduct(payload);
     op.subscribe({
       next: () => {
-        this.toast.success('Product saved');
+        this.toast.success(this.t('adminUi.products.success.save'));
         this.loadAll();
         this.startNewProduct();
       },
-      error: () => this.toast.error('Failed to save product')
+      error: () => this.toast.error(this.t('adminUi.products.errors.save'))
     });
   }
 
@@ -568,18 +594,18 @@ export class AdminComponent implements OnInit {
     if (!target) return;
     this.admin.deleteProduct(target.slug).subscribe({
       next: () => {
-        this.toast.success('Product deleted');
+        this.toast.success(this.t('adminUi.products.success.delete'));
         this.products = this.products.filter((p) => !this.selectedIds.has(p.id));
         this.selectedIds.clear();
         this.computeAllSelected();
       },
-      error: () => this.toast.error('Failed to delete product')
+      error: () => this.toast.error(this.t('adminUi.products.errors.delete'))
     });
   }
 
   addCategory(): void {
     if (!this.categoryName || !this.categorySlug) {
-      this.toast.error('Category name and slug are required');
+      this.toast.error(this.t('adminUi.products.errors.required'));
       return;
     }
     this.admin.createCategory({ name: this.categoryName, slug: this.categorySlug }).subscribe({
@@ -587,9 +613,9 @@ export class AdminComponent implements OnInit {
         this.categories = [cat, ...this.categories];
         this.categoryName = '';
         this.categorySlug = '';
-        this.toast.success('Category added');
+        this.toast.success(this.t('adminUi.categories.success.add'));
       },
-      error: () => this.toast.error('Failed to add category')
+      error: () => this.toast.error(this.t('adminUi.categories.errors.add'))
     });
   }
 
@@ -597,15 +623,15 @@ export class AdminComponent implements OnInit {
     this.admin.deleteCategory(slug).subscribe({
       next: () => {
         this.categories = this.categories.filter((c) => c.slug !== slug);
-        this.toast.success('Category deleted');
+        this.toast.success(this.t('adminUi.categories.success.delete'));
       },
-      error: () => this.toast.error('Failed to delete category')
+      error: () => this.toast.error(this.t('adminUi.categories.errors.delete'))
     });
   }
 
   onImageUpload(event: Event): void {
     if (!this.editingId) {
-      this.toast.error('Save product before uploading images');
+      this.toast.error(this.t('adminUi.products.errors.saveFirst'));
       return;
     }
     const input = event.target as HTMLInputElement;
@@ -614,9 +640,9 @@ export class AdminComponent implements OnInit {
     this.admin.uploadProductImage(this.editingId, file).subscribe({
       next: (prod) => {
         this.productImages.set((prod as any).images || []);
-        this.toast.success('Image uploaded');
+        this.toast.success(this.t('adminUi.products.success.imageUpload'));
       },
-      error: () => this.toast.error('Image upload failed')
+      error: () => this.toast.error(this.t('adminUi.products.errors.image'))
     });
   }
 
@@ -625,9 +651,9 @@ export class AdminComponent implements OnInit {
     this.admin.deleteProductImage(this.editingId, id).subscribe({
       next: (prod) => {
         this.productImages.set((prod as any).images || []);
-        this.toast.success('Image deleted');
+        this.toast.success(this.t('adminUi.products.success.imageDelete'));
       },
-      error: () => this.toast.error('Failed to delete image')
+      error: () => this.toast.error(this.t('adminUi.products.errors.deleteImage'))
     });
   }
 
@@ -661,19 +687,19 @@ export class AdminComponent implements OnInit {
     if (!this.activeOrder) return;
     this.admin.updateOrderStatus(this.activeOrder.id, status).subscribe({
       next: (order) => {
-        this.toast.success('Order status updated');
+        this.toast.success(this.t('adminUi.orders.success.status'));
         this.activeOrder = order;
         this.orders = this.orders.map((o) => (o.id === order.id ? order : o));
       },
-      error: () => this.toast.error('Failed to update order status')
+      error: () => this.toast.error(this.t('adminUi.orders.errors.status'))
     });
   }
 
   forceLogout(): void {
     if (!this.selectedUserId) return;
     this.admin.revokeSessions(this.selectedUserId).subscribe({
-      next: () => this.toast.success('Sessions revoked'),
-      error: () => this.toast.error('Failed to revoke sessions')
+      next: () => this.toast.success(this.t('adminUi.users.success.revoke')),
+      error: () => this.toast.error(this.t('adminUi.users.errors.revoke'))
     });
   }
 
@@ -687,9 +713,9 @@ export class AdminComponent implements OnInit {
     this.admin.updateUserRole(this.selectedUserId, this.selectedUserRole).subscribe({
       next: (updated) => {
         this.users = this.users.map((u) => (u.id === updated.id ? updated : u));
-        this.toast.success('Role updated');
+        this.toast.success(this.t('adminUi.users.success.role'));
       },
-      error: () => this.toast.error('Failed to update role')
+      error: () => this.toast.error(this.t('adminUi.users.errors.role'))
     });
   }
 
@@ -708,9 +734,9 @@ export class AdminComponent implements OnInit {
           this.categories = cats
             .map((c) => ({ ...c, sort_order: c.sort_order ?? 0 }))
             .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-          this.toast.success('Category order saved');
+          this.toast.success(this.t('adminUi.categories.success.reorder'));
         },
-        error: () => this.toast.error('Failed to reorder categories')
+        error: () => this.toast.error(this.t('adminUi.categories.errors.reorder'))
       });
   }
 
@@ -744,24 +770,24 @@ export class AdminComponent implements OnInit {
           this.categories = cats
             .map((c) => ({ ...c, sort_order: c.sort_order ?? 0 }))
             .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-          this.toast.success('Category order saved');
+          this.toast.success(this.t('adminUi.categories.success.reorder'));
         },
-        error: () => this.toast.error('Failed to reorder categories'),
+        error: () => this.toast.error(this.t('adminUi.categories.errors.reorder')),
         complete: () => (this.draggingSlug = null)
       });
   }
 
   createCoupon(): void {
     if (!this.newCoupon.code) {
-      this.toast.error('Coupon code is required');
+      this.toast.error(this.t('adminUi.coupons.errors.required'));
       return;
     }
     this.admin.createCoupon(this.newCoupon).subscribe({
       next: (c) => {
         this.coupons = [c, ...this.coupons];
-        this.toast.success('Coupon created');
+        this.toast.success(this.t('adminUi.coupons.success.create'));
       },
-      error: () => this.toast.error('Failed to create coupon')
+      error: () => this.toast.error(this.t('adminUi.coupons.errors.create'))
     });
   }
 
@@ -769,9 +795,9 @@ export class AdminComponent implements OnInit {
     this.admin.updateCoupon(coupon.id, { active: !coupon.active }).subscribe({
       next: (c) => {
         this.coupons = this.coupons.map((x) => (x.id === c.id ? c : x));
-        this.toast.success('Coupon updated');
+        this.toast.success(this.t('adminUi.coupons.success.update'));
       },
-      error: () => this.toast.error('Failed to update coupon')
+      error: () => this.toast.error(this.t('adminUi.coupons.errors.update'))
     });
   }
 
@@ -795,10 +821,10 @@ export class AdminComponent implements OnInit {
       .subscribe({
         next: (updated) => {
           this.contentBlocks = this.contentBlocks.map((c) => (c.key === updated.key ? updated : c));
-          this.toast.success('Content updated');
+          this.toast.success(this.t('adminUi.content.success.update'));
           this.selectedContent = null;
         },
-        error: () => this.toast.error('Failed to update content')
+        error: () => this.toast.error(this.t('adminUi.content.errors.update'))
       });
   }
 
@@ -811,9 +837,9 @@ export class AdminComponent implements OnInit {
       next: (res) => {
         this.maintenanceEnabled.set(res.enabled);
         this.maintenanceEnabledValue = res.enabled;
-        this.toast.success('Maintenance mode updated');
+        this.toast.success(this.t('adminUi.maintenance.success.update'));
       },
-      error: () => this.toast.error('Failed to update maintenance mode')
+      error: () => this.toast.error(this.t('adminUi.maintenance.errors.update'))
     });
   }
 }
