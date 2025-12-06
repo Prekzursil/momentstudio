@@ -13,26 +13,32 @@ export interface NavLink {
   imports: [NgForOf, NgClass, RouterLink],
   template: `
     <div
-      class="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm transition-opacity"
+      class="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm transition-opacity dark:bg-black/60"
       [ngClass]="{ 'opacity-0 pointer-events-none': !open }"
       (click)="onClose()"
     ></div>
     <aside
-      class="fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-xl border-r border-slate-200 transform transition-transform"
+      class="fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-xl border-r border-slate-200 transform transition-transform dark:bg-slate-900 dark:border-slate-700"
       [ngClass]="{ '-translate-x-full': !open, 'translate-x-0': open }"
       role="dialog"
       aria-modal="true"
     >
-      <div class="p-4 flex items-center justify-between border-b border-slate-200">
-        <span class="font-semibold text-slate-900">Menu</span>
-        <button class="text-slate-600 hover:text-slate-900" (click)="onClose()" aria-label="Close menu">✕</button>
+      <div class="p-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
+        <span class="font-semibold text-slate-900 dark:text-slate-50">Menu</span>
+        <button
+          class="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+          (click)="onClose()"
+          aria-label="Close menu"
+        >
+          ✕
+        </button>
       </div>
       <nav class="p-4 grid gap-3">
         <a
           *ngFor="let link of links"
           [routerLink]="link.path"
           (click)="onClose()"
-          class="text-slate-800 hover:text-slate-900 font-medium"
+          class="text-slate-800 hover:text-slate-900 font-medium dark:text-slate-200 dark:hover:text-white"
         >
           {{ link.label }}
         </a>

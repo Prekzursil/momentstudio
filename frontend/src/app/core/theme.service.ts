@@ -1,38 +1,71 @@
 import { Injectable, signal } from '@angular/core';
 
-export type Theme = 'light' | 'dark';
+export type ThemePreference = 'light' | 'dark' | 'system';
+export type ThemeMode = 'light' | 'dark';
 
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
-  private readonly themeSignal = signal<Theme>('light');
+  private readonly preferenceSignal = signal<ThemePreference>('system');
+  private readonly modeSignal = signal<ThemeMode>('light');
+  private mediaQuery: MediaQueryList | null = null;
 
   constructor() {
-    const saved = typeof localStorage !== 'undefined' ? (localStorage.getItem('theme') as Theme) : null;
-    if (saved === 'dark' || saved === 'light') {
-      this.themeSignal.set(saved);
-      this.applyTheme(saved);
+    if (typeof window !== 'undefined' && 'matchMedia' in window) {
+      this.mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      this.mediaQuery.addEventListener?.('change', (event) => {
+        if (this.preferenceSignal() === 'system') {
+          this.applyMode(event.matches ? 'dark' : 'light');
+        }
+      });
     }
+    const saved = this.getSavedPreference();
+    this.setPreference(saved, false);
   }
 
-  theme() {
-    return this.themeSignal.asReadonly();
+  preference() {
+    return this.preferenceSignal.asReadonly();
+  }
+
+  mode() {
+    return this.modeSignal.asReadonly();
   }
 
   toggle(): void {
-    const next = this.themeSignal() === 'light' ? 'dark' : 'light';
-    this.setTheme(next);
+    const order: ThemePreference[] = ['system', 'light', 'dark'];
+    const next = order[(order.indexOf(this.preferenceSignal()) + 1) % order.length];
+    this.setPreference(next);
   }
 
-  setTheme(theme: Theme): void {
-    this.themeSignal.set(theme);
-    this.applyTheme(theme);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('theme', theme);
+  setPreference(pref: ThemePreference, persist = true): void {
+    this.preferenceSignal.set(pref);
+    const resolved = this.resolveMode(pref);
+    this.applyMode(resolved);
+    if (persist && typeof localStorage !== 'undefined') {
+      localStorage.setItem('theme', pref);
     }
   }
 
-  private applyTheme(theme: Theme): void {
-    if (typeof document === 'undefined') return;
-    document.documentElement.classList.toggle('dark', theme === 'dark');
+  private resolveMode(pref: ThemePreference): ThemeMode {
+    if (pref === 'system') {
+      const prefersDark = this.mediaQuery?.matches;
+      return prefersDark ? 'dark' : 'light';
+    }
+    return pref;
+  }
+
+  private applyMode(mode: ThemeMode): void {
+    this.modeSignal.set(mode);
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.toggle('dark', mode === 'dark');
+    }
+  }
+
+  private getSavedPreference(): ThemePreference {
+    if (typeof localStorage === 'undefined') return 'system';
+    const saved = localStorage.getItem('theme') as ThemePreference | null;
+    if (saved === 'light' || saved === 'dark' || saved === 'system') {
+      return saved;
+    }
+    return 'system';
   }
 }

@@ -172,6 +172,10 @@ Below is a structured checklist you can turn into issues.
 - [x] API service layer + interceptors.
 - [x] Theme tokens (spacing, typography, colors).
 - [x] Dark/light mode toggle.
+- [x] Respect system `prefers-color-scheme` by default and keep theme state in localStorage (light/dark/system).
+- [x] Add header theme switcher (light/dark/system) that updates the document root class and tokens in real time.
+- [x] Audit shared components/layout for dark-mode contrast (backgrounds, borders, text, cards, inputs, modals, toasts) and fix any hardcoded light colors.
+- [x] Add unit/e2e checks for theme switching (default follows system; toggle persists across reloads).
 - [x] Form validation utilities (error messages, async validation).
 - [x] Toast/snackbar service and global overlay.
 - [x] Loading spinner/skeleton components.

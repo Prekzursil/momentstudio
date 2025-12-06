@@ -7,15 +7,15 @@ import { FormsModule } from '@angular/forms';
   standalone: true,
   imports: [FormsModule, NgClass],
   template: `
-    <label class="grid gap-1 text-sm font-medium text-slate-700">
+    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
       <span *ngIf="label">{{ label }}</span>
       <input
-        class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none"
+        class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
         [placeholder]="placeholder"
         [(ngModel)]="value"
         [type]="type"
       />
-      <span *ngIf="hint" class="text-xs text-slate-500">{{ hint }}</span>
+      <span *ngIf="hint" class="text-xs text-slate-500 dark:text-slate-400">{{ hint }}</span>
     </label>
   `
 })

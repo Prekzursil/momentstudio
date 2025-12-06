@@ -5,15 +5,18 @@ import { FooterComponent } from './layout/footer.component';
 import { ContainerComponent } from './layout/container.component';
 import { ToastComponent } from './shared/toast.component';
 import { ToastService } from './core/toast.service';
-import { ThemeService } from './core/theme.service';
+import { ThemeService, ThemePreference } from './core/theme.service';
 
 @Component({
   selector: 'app-root',
   standalone: true,
   imports: [RouterOutlet, HeaderComponent, FooterComponent, ContainerComponent, ToastComponent],
   template: `
-    <div class="min-h-screen flex flex-col bg-gradient-to-b from-slate-50 to-white text-slate-900 dark:from-slate-950 dark:to-slate-900 dark:text-slate-50">
-      <app-header (toggleTheme)="onToggleTheme()"></app-header>
+    <div class="min-h-screen flex flex-col bg-gradient-to-b from-slate-50 to-white text-slate-900 dark:from-slate-950 dark:to-slate-900 dark:text-slate-50 transition-colors">
+      <app-header
+        [themePreference]="preference()"
+        (themeChange)="onThemeChange($event)"
+      ></app-header>
       <app-container class="flex-1 py-8">
         <router-outlet></router-outlet>
       </app-container>
@@ -24,11 +27,13 @@ import { ThemeService } from './core/theme.service';
 })
 export class AppComponent {
   toasts = this.toast.messages();
+  preference = this.theme.preference();
 
   constructor(private toast: ToastService, private theme: ThemeService) {}
 
-  onToggleTheme(): void {
-    this.theme.toggle();
-    this.toast.success('Theme switched', `Theme is now ${this.theme.theme()().toUpperCase()}`);
+  onThemeChange(pref: ThemePreference): void {
+    this.theme.setPreference(pref);
+    const mode = this.theme.mode()().toUpperCase();
+    this.toast.success('Theme switched', `Theme is now ${mode}`);
   }
 }

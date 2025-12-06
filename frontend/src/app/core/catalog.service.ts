@@ -53,6 +53,7 @@ export interface ProductFilterParams {
   search?: string;
   min_price?: number;
   max_price?: number;
+  is_featured?: boolean;
   tags?: string[];
   sort?: SortOption;
   page?: number;
@@ -73,6 +74,7 @@ export class CatalogService {
       search: params.search,
       min_price: params.min_price,
       max_price: params.max_price,
+      is_featured: params.is_featured,
       tags: params.tags?.join(','),
       sort: params.sort,
       page: params.page ?? 1,
