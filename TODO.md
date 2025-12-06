@@ -378,9 +378,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Ensure product/image deletes remove files from disk/S3 and log the operation.
 
 ## Bugs / Technical Debt / Misc Features
-- [ ] Config option to enforce Decimal end-to-end for prices; tests for exact totals.
-- [ ] Pagination metadata (total items/pages) in product list API responses.
-- [ ] Standardize error response format across APIs.
+- [x] Config option to enforce Decimal end-to-end for prices; tests for exact totals.
+- [x] Pagination metadata (total items/pages) in product list API responses.
+- [x] Standardize error response format across APIs.
 - [ ] Structured logging around cart/checkout (cart id, user id, request id).
 - [ ] Rate limiting on `/auth/login`, `/auth/register`, `/auth/google/*` with consistent 429 response.
 - [ ] Wishlist/save-for-later feature per user.

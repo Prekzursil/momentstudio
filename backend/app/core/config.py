@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     maintenance_mode: bool = False
     maintenance_bypass_token: str = "bypass-token"
     max_concurrent_requests: int = 100
+    enforce_decimal_prices: bool = True
 
     media_root: str = "uploads"
     cors_origins: list[str] = ["http://localhost:4200"]

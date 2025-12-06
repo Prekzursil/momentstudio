@@ -1,8 +1,11 @@
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1 import api_router
 from app.core.config import settings
@@ -14,6 +17,7 @@ from app.middleware import (
     RequestLoggingMiddleware,
     SecurityHeadersMiddleware,
 )
+from app.schemas.error import ErrorResponse
 
 
 def get_application() -> FastAPI:
@@ -48,6 +52,17 @@ def get_application() -> FastAPI:
     media_root.mkdir(parents=True, exist_ok=True)
     app.include_router(api_router, prefix="/api/v1")
     app.mount("/media", StaticFiles(directory=media_root), name="media")
+
+    @app.exception_handler(StarletteHTTPException)
+    async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+        payload = ErrorResponse(detail=exc.detail, code=None)
+        return JSONResponse(status_code=exc.status_code, content=payload.model_dump())
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        payload = ErrorResponse(detail=exc.errors(), code="validation_error")
+        return JSONResponse(status_code=422, content=payload.model_dump())
+
     return app
 
 
