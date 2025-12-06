@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { CatalogService, Category, PaginationMeta, Product, SortOption } from '../../core/catalog.service';
@@ -11,6 +11,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
 import { ToastService } from '../../core/toast.service';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { Subscription } from 'rxjs';
 import { Meta, Title } from '@angular/platform-browser';
 
 @Component({
@@ -184,7 +185,7 @@ import { Meta, Title } from '@angular/platform-browser';
     </app-container>
   `
 })
-export class ShopComponent implements OnInit {
+export class ShopComponent implements OnInit, OnDestroy {
   products: Product[] = [];
   categories: Category[] = [];
   pageMeta: PaginationMeta | null = null;
@@ -223,6 +224,8 @@ export class ShopComponent implements OnInit {
     { label: 'shop.sortNameDesc', value: 'name_desc' }
   ];
 
+  private langSub?: Subscription;
+
   constructor(
     private catalog: CatalogService,
     private route: ActivatedRoute,
@@ -230,20 +233,12 @@ export class ShopComponent implements OnInit {
     private toast: ToastService,
     private translate: TranslateService,
     private title: Title,
-    private meta: Meta
+    private metaService: Meta
   ) {}
 
   ngOnInit(): void {
-    this.title.setTitle('Shop | AdrianaArt');
-    this.meta.updateTag({
-      name: 'description',
-      content: 'Browse categories, filter by price and tags, and find handcrafted ceramics on AdrianaArt.'
-    });
-    this.meta.updateTag({ property: 'og:title', content: 'Shop handcrafted ceramics | AdrianaArt' });
-    this.meta.updateTag({
-      property: 'og:description',
-      content: 'Search and filter handcrafted ceramics by category, price, and tags.'
-    });
+    this.setMetaTags();
+    this.langSub = this.translate.onLangChange.subscribe(() => this.setMetaTags());
     const dataCategories = (this.route.snapshot.data['categories'] as Category[]) ?? [];
     if (dataCategories.length) {
       this.categories = dataCategories;
@@ -254,6 +249,10 @@ export class ShopComponent implements OnInit {
       this.syncFiltersFromQuery(params);
       this.loadProducts(false);
     });
+  }
+
+  ngOnDestroy(): void {
+    this.langSub?.unsubscribe();
   }
 
   fetchCategories(): void {
@@ -351,12 +350,13 @@ export class ShopComponent implements OnInit {
     this.loadProducts();
   }
 
-  private setMetaTags(): void {
+  setMetaTags(): void {
     const title = this.translate.instant('shop.metaTitle');
     const description = this.translate.instant('shop.metaDescription');
-    this.meta.updateTag({ name: 'og:title', content: title });
-    this.meta.updateTag({ name: 'og:description', content: description });
-    this.meta.updateTag({ name: 'description', content: description });
+    this.title.setTitle(title);
+    this.metaService.updateTag({ name: 'og:title', content: title });
+    this.metaService.updateTag({ name: 'og:description', content: description });
+    this.metaService.updateTag({ name: 'description', content: description });
   }
 
   private updateQueryParams(): void {

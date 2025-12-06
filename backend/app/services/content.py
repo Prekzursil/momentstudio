@@ -11,6 +11,7 @@ from app.models.content import (
     ContentAuditLog,
     ContentBlock,
     ContentBlockVersion,
+    ContentBlockTranslation,
     ContentImage,
     ContentStatus,
 )
@@ -18,22 +19,43 @@ from app.schemas.content import ContentBlockCreate, ContentBlockUpdate
 from app.services import storage
 
 
-async def get_published_by_key(session: AsyncSession, key: str) -> ContentBlock | None:
-    result = await session.execute(
-        select(ContentBlock)
-        .options(selectinload(ContentBlock.images), selectinload(ContentBlock.audits))
-        .where(ContentBlock.key == key, ContentBlock.status == ContentStatus.published)
-    )
-    return result.scalar_one_or_none()
+def _apply_content_translation(block: ContentBlock, lang: str | None) -> None:
+    if not lang or not getattr(block, "translations", None):
+        return
+    match = next((t for t in block.translations if t.lang == lang), None)
+    if match:
+        block.title = match.title
+        block.body_markdown = match.body_markdown
 
 
-async def get_block_by_key(session: AsyncSession, key: str) -> ContentBlock | None:
+async def get_published_by_key(session: AsyncSession, key: str, lang: str | None = None) -> ContentBlock | None:
+    options = [
+        selectinload(ContentBlock.images),
+        selectinload(ContentBlock.audits),
+    ]
+    if lang:
+        options.append(selectinload(ContentBlock.translations))
     result = await session.execute(
-        select(ContentBlock)
-        .options(selectinload(ContentBlock.images), selectinload(ContentBlock.audits))
-        .where(ContentBlock.key == key)
+        select(ContentBlock).options(*options).where(ContentBlock.key == key, ContentBlock.status == ContentStatus.published)
     )
-    return result.scalar_one_or_none()
+    block = result.scalar_one_or_none()
+    if block:
+        _apply_content_translation(block, lang)
+    return block
+
+
+async def get_block_by_key(session: AsyncSession, key: str, lang: str | None = None) -> ContentBlock | None:
+    options = [
+        selectinload(ContentBlock.images),
+        selectinload(ContentBlock.audits),
+    ]
+    if lang:
+        options.append(selectinload(ContentBlock.translations))
+    result = await session.execute(select(ContentBlock).options(*options).where(ContentBlock.key == key))
+    block = result.scalar_one_or_none()
+    if block:
+        _apply_content_translation(block, lang)
+    return block
 
 
 async def upsert_block(
@@ -44,6 +66,7 @@ async def upsert_block(
     data = payload.model_dump(exclude_unset=True)
     if "body_markdown" in data and data["body_markdown"] is not None:
         _sanitize_markdown(data["body_markdown"])
+    lang = data.get("lang")
     if not block:
         block = ContentBlock(
             key=key,
@@ -54,6 +77,7 @@ async def upsert_block(
             published_at=now if data.get("status") == ContentStatus.published else None,
             meta=data.get("meta"),
             sort_order=data.get("sort_order", 0),
+            lang=lang,
         )
         session.add(block)
         await session.flush()
@@ -72,6 +96,30 @@ async def upsert_block(
 
     if not data:
         return block
+    # If lang is provided, upsert translation instead of touching the base content
+    if lang:
+        await session.refresh(block, attribute_names=["translations"])
+        translation = next((t for t in block.translations if t.lang == lang), None)
+        if translation:
+            if "title" in data and data["title"] is not None:
+                translation.title = data["title"]
+            if "body_markdown" in data and data["body_markdown"] is not None:
+                translation.body_markdown = data["body_markdown"]
+        else:
+            translation = ContentBlockTranslation(
+                content_block_id=block.id,
+                lang=lang,
+                title=data.get("title") or block.title,
+                body_markdown=data.get("body_markdown") or block.body_markdown,
+            )
+            session.add(translation)
+        audit = ContentAuditLog(content_block_id=block.id, action=f"translated:{lang}", version=block.version, user_id=actor_id)
+        session.add(audit)
+        await session.commit()
+        await session.refresh(block)
+        _apply_content_translation(block, lang)
+        return block
+
     block.version += 1
     if "title" in data:
         block.title = data["title"] or block.title
@@ -85,6 +133,8 @@ async def upsert_block(
         block.meta = data["meta"]
     if "sort_order" in data and data["sort_order"] is not None:
         block.sort_order = data["sort_order"]
+    if "lang" in data and data["lang"] is not None:
+        block.lang = data["lang"]
     session.add(block)
     version_row = ContentBlockVersion(
         content_block_id=block.id,
