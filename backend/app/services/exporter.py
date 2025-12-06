@@ -1,13 +1,12 @@
-import json
 from typing import Any, Dict
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.address import Address
-from app.models.catalog import Category, Product, ProductImage, ProductOption, ProductVariant, Tag
-from app.models.order import Order, OrderItem
-from app.models.user import User, UserRole
+from app.models.catalog import Category, Product
+from app.models.order import Order
+from app.models.user import User
 
 
 async def export_json(session: AsyncSession) -> Dict[str, Any]:
