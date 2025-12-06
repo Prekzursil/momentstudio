@@ -381,9 +381,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Config option to enforce Decimal end-to-end for prices; tests for exact totals.
 - [x] Pagination metadata (total items/pages) in product list API responses.
 - [x] Standardize error response format across APIs.
-- [ ] Structured logging around cart/checkout (cart id, user id, request id).
-- [ ] Rate limiting on `/auth/login`, `/auth/register`, `/auth/google/*` with consistent 429 response.
-- [ ] Wishlist/save-for-later feature per user.
+- [x] Structured logging around cart/checkout (cart id, user id, request id).
+- [x] Rate limiting on `/auth/login`, `/auth/register`, `/auth/google/*` with consistent 429 response.
+- [x] Wishlist/save-for-later feature per user.
 - [ ] Recently viewed products widget using cookie/localStorage list (storefront).
 - [ ] Integration test covering register → login → add to cart → checkout (mock payment) → see order.
 - [ ] Smoke test for Google OAuth using mocked Google endpoint.

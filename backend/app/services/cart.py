@@ -1,6 +1,7 @@
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
+import logging
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +19,22 @@ from app.models.user import User
 from app.models.order import ShippingMethod
 from app.services import email as email_service
 from app.core.config import settings
+from app.core.logging_config import request_id_ctx_var
+
+
+cart_logger = logging.getLogger("app.cart")
+
+
+def _log_cart(event: str, cart: Cart, user_id: UUID | None = None) -> None:
+    cart_id = getattr(cart, "id", None)
+    cart_logger.info(
+        event,
+        extra={
+            "request_id": request_id_ctx_var.get(),
+            "cart_id": str(cart_id) if cart_id else None,
+            "user_id": str(user_id) if user_id else None,
+        },
+    )
 
 
 async def _get_or_create_cart(session: AsyncSession, user_id: UUID | None, session_id: str | None) -> Cart:
@@ -207,9 +224,9 @@ async def add_item(
     limit = payload.max_quantity or (variant.stock_quantity if variant else product.stock_quantity)
     _enforce_max_quantity(payload.quantity, limit)
 
-    unit_price = Decimal(product.base_price)
+    unit_price = _to_decimal(product.base_price)
     if variant:
-        unit_price += Decimal(variant.additional_price_delta)
+        unit_price += _to_decimal(variant.additional_price_delta)
 
     item = CartItem(
         cart=cart,
@@ -223,7 +240,9 @@ async def add_item(
     session.add(item)
     await session.commit()
     await session.refresh(item)
-    record_cart_event("add_item", {"cart_id": str(cart.id), "product_id": str(product.id), "quantity": payload.quantity})
+    record_cart_event(
+        "add_item", {"cart_id": str(cart.id), "product_id": str(product.id), "quantity": payload.quantity}
+    )
     return item
 
 
@@ -245,7 +264,9 @@ async def update_item(session: AsyncSession, cart: Cart, item_id: UUID, payload:
     session.add(item)
     await session.commit()
     await session.refresh(item)
-    record_cart_event("update_item", {"cart_id": str(cart.id), "item_id": str(item.id), "quantity": payload.quantity})
+    record_cart_event(
+        "update_item", {"cart_id": str(cart.id), "item_id": str(item.id), "quantity": payload.quantity}
+    )
     return item
 
 
@@ -388,8 +409,9 @@ async def run_abandoned_cart_job(session: AsyncSession, max_age_hours: int = 24)
 
 
 def record_cart_event(event: str, payload: dict | None = None) -> None:
-    # Placeholder for analytics hook; integrate with telemetry pipeline later
-    return None
+    extra = payload.copy() if payload else {}
+    extra["request_id"] = request_id_ctx_var.get()
+    cart_logger.info(event, extra=extra)
 
 
 async def reorder_from_order(session: AsyncSession, user_id: UUID, order_id: UUID) -> Cart:

@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     auth_rate_limit_refresh: int = 60
     auth_rate_limit_reset_request: int = 30
     auth_rate_limit_reset_confirm: int = 60
+    auth_rate_limit_google: int = 20
 
     frontend_origin: str = "http://localhost:4200"
     content_preview_token: str = "preview-token"

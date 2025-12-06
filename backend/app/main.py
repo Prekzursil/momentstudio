@@ -10,6 +10,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.logging_config import configure_logging
+from fastapi.encoders import jsonable_encoder
 from app.middleware import (
     AuditMiddleware,
     BackpressureMiddleware,
@@ -56,11 +57,12 @@ def get_application() -> FastAPI:
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         payload = ErrorResponse(detail=exc.detail, code=None)
-        return JSONResponse(status_code=exc.status_code, content=payload.model_dump())
+        return JSONResponse(status_code=exc.status_code, content=jsonable_encoder(payload.model_dump()))
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
-        payload = ErrorResponse(detail=exc.errors(), code="validation_error")
+        errors = jsonable_encoder(exc.errors())
+        payload = ErrorResponse(detail=errors, code="validation_error")
         return JSONResponse(status_code=422, content=payload.model_dump())
 
     return app
