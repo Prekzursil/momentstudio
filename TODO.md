@@ -354,11 +354,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Version metadata (“last updated by/at”) for content blocks.
 - [x] Admin dashboard overview with key metrics (open orders, recent orders, low-stock, sales last 30d).
 - [x] Admin tools for inline/bulk stock editing in product table.
-- [ ] Duplicate product action in admin (clone with images, mark draft).
-- [ ] Admin controls for bestseller/highlight badges on storefront cards.
-- [ ] Scheduling for product publish/unpublish; show upcoming scheduled products.
-- [ ] Admin maintenance mode toggle (customer-facing maintenance page, admin bypass).
-- [ ] Admin audit log page listing important events (login, product changes, content updates, Google linking).
+- [x] Duplicate product action in admin (clone with images, mark draft).
+- [x] Admin controls for bestseller/highlight badges on storefront cards.
+- [x] Scheduling for product publish/unpublish; show upcoming scheduled products.
+- [x] Admin maintenance mode toggle (customer-facing maintenance page, admin bypass).
+- [x] Admin audit log page listing important events (login, product changes, content updates, Google linking).
 
 ## Data Portability & Backups (Extended)
 - [ ] CLI command `python -m app.cli export-data` exporting users (no passwords), products, categories, orders, addresses to JSON.

@@ -20,6 +20,8 @@ export interface AdminProduct {
   status: string;
   category: string;
   stock_quantity: number;
+  publish_at?: string | null;
+  tags?: string[];
 }
 
 export interface AdminOrder {
@@ -78,6 +80,7 @@ export interface AdminProductDetail extends AdminProduct {
   category_id?: string | null;
   stock_quantity: number;
   images?: { id: string; url: string; alt_text?: string | null }[];
+  tags?: string[];
 }
 
 export interface AdminAudit {
@@ -213,6 +216,10 @@ export class AdminService {
 
   updateProduct(slug: string, payload: Partial<AdminProductDetail>): Observable<AdminProductDetail> {
     return this.api.patch<AdminProductDetail>(`/catalog/products/${slug}`, payload);
+  }
+
+  duplicateProduct(slug: string): Observable<AdminProductDetail> {
+    return this.api.post<AdminProductDetail>(`/catalog/products/${slug}/duplicate`, {});
   }
 
   deleteProduct(slug: string): Observable<void> {

@@ -292,6 +292,7 @@ import { firstValueFrom } from 'rxjs';
                     <th>{{ 'adminUi.products.table.status' | translate }}</th>
                     <th>{{ 'adminUi.products.table.category' | translate }}</th>
                     <th>{{ 'adminUi.products.table.stock' | translate }}</th>
+                    <th>Publish at</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -304,7 +305,11 @@ import { firstValueFrom } from 'rxjs';
                         (change)="toggleSelect(product.id, $event)"
                       />
                     </td>
-                    <td class="py-2 font-semibold text-slate-900">{{ product.name }}</td>
+                    <td class="py-2 font-semibold text-slate-900">
+                      {{ product.name }}
+                      <span *ngIf=\"product.tags?.includes('bestseller')\" class=\"ml-2 text-[10px] uppercase bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full\">Bestseller</span>
+                      <span *ngIf=\"product.tags?.includes('highlight')\" class=\"ml-1 text-[10px] uppercase bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full\">Highlight</span>
+                    </td>
                     <td>{{ product.price | localizedCurrency : product.currency || 'USD' }}</td>
                     <td><span class="text-xs rounded-full bg-slate-100 px-2 py-1">{{ product.status }}</span></td>
                     <td>{{ product.category }}</td>
@@ -317,12 +322,24 @@ import { firstValueFrom } from 'rxjs';
                       />
                       <app-button size="xs" variant="ghost" label="Save" (action)="saveStock(product)"></app-button>
                     </td>
+                    <td>
+                      <span *ngIf=\"product.publish_at\" class=\"text-xs text-slate-600\">{{ product.publish_at | date: 'short' }}</span>
+                      <span *ngIf=\"!product.publish_at\" class=\"text-xs text-slate-400\">—</span>
+                    </td>
                     <td class="flex gap-2 py-2">
                       <app-button size="sm" variant="ghost" [label]="'adminUi.products.actions.update' | translate" (action)="loadProduct(product.slug)"></app-button>
+                      <app-button size="sm" variant="ghost" label="Duplicate" (action)="duplicateProduct(product.slug)"></app-button>
                     </td>
                   </tr>
                 </tbody>
               </table>
+            </div>
+            <div *ngIf=\"upcomingProducts().length\" class=\"rounded-lg border border-slate-200 p-3 text-sm text-slate-700\">
+              <p class=\"font-semibold text-slate-900 mb-2\">Upcoming scheduled products</p>
+              <div *ngFor=\"let p of upcomingProducts()\" class=\"flex items-center justify-between py-1 border-b border-slate-100 last:border-0\">
+                <span>{{ p.name }}</span>
+                <span class=\"text-xs text-slate-600\">Publishes {{ p.publish_at | date: 'medium' }}</span>
+              </div>
             </div>
           </section>
 
@@ -345,6 +362,10 @@ import { firstValueFrom } from 'rxjs';
               <app-input [label]="'adminUi.products.table.price' | translate" type="number" [(value)]="form.price"></app-input>
               <app-input [label]="'adminUi.products.table.stock' | translate" type="number" [(value)]="form.stock"></app-input>
               <label class="grid text-sm font-medium text-slate-700">
+                Publish at (optional)
+                <input class="rounded-lg border border-slate-200 px-3 py-2" type="datetime-local" [(ngModel)]="form.publish_at" />
+              </label>
+              <label class="grid text-sm font-medium text-slate-700">
                 {{ 'adminUi.products.table.status' | translate }}
                 <select class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="form.status">
                   <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
@@ -354,6 +375,14 @@ import { firstValueFrom } from 'rxjs';
               </label>
               <app-input [label]="'adminUi.products.form.sku' | translate" [(value)]="form.sku"></app-input>
               <app-input [label]="'adminUi.products.form.imageUrl' | translate" [(value)]="form.image"></app-input>
+            </div>
+            <div class="flex items-center gap-4 text-sm">
+              <label class="flex items-center gap-2">
+                <input type="checkbox" [(ngModel)]="form.is_bestseller" /> Bestseller badge
+              </label>
+              <label class="flex items-center gap-2">
+                <input type="checkbox" [(ngModel)]="form.is_highlight" /> Highlight badge
+              </label>
             </div>
             <label class="grid gap-1 text-sm font-medium text-slate-700">
               {{ 'adminUi.products.form.description' | translate }}
@@ -497,9 +526,8 @@ import { firstValueFrom } from 'rxjs';
               <div *ngFor="let c of contentBlocks" class="flex items-center justify-between rounded-lg border border-slate-200 p-3">
                 <div>
                   <p class="font-semibold text-slate-900">{{ c.title }}</p>
-                  <p class="text-xs text-slate-500">{{ c.key }}</p>
+                  <p class="text-xs text-slate-500">{{ c.key }} · v{{ c.version }} · {{ c.updated_at | date: 'short' }}</p>
                 </div>
-                <span class="text-xs text-slate-500">v{{ c.version }}</span>
                 <app-button size="sm" variant="ghost" [label]="'adminUi.actions.edit' | translate" (action)="selectContent(c)"></app-button>
               </div>
             </div>
@@ -520,6 +548,12 @@ import { firstValueFrom } from 'rxjs';
               <div class="flex gap-2">
                 <app-button size="sm" [label]="'adminUi.content.save' | translate" (action)="saveContent()"></app-button>
                 <app-button size="sm" variant="ghost" [label]="'adminUi.actions.cancel' | translate" (action)="cancelContent()"></app-button>
+                <label class="flex items-center gap-2 text-xs text-slate-600">
+                  <input type="checkbox" [(ngModel)]="showContentPreview" /> Live preview
+                </label>
+              </div>
+              <div *ngIf="showContentPreview" class="rounded-lg border border-slate-200 p-3 bg-slate-50 text-sm text-slate-800 whitespace-pre-line">
+                {{ contentForm.body_markdown || 'Nothing to preview yet.' }}
               </div>
             </div>
           </section>
@@ -678,7 +712,10 @@ export class AdminComponent implements OnInit {
     status: 'draft',
     sku: '',
     image: '',
-    description: ''
+    description: '',
+    publish_at: '',
+    is_bestseller: false,
+    is_highlight: false
   };
 
   orders: AdminOrder[] = [];
@@ -784,7 +821,10 @@ export class AdminComponent implements OnInit {
       status: 'draft',
       sku: '',
       image: '',
-      description: ''
+      description: '',
+      publish_at: '',
+      is_bestseller: false,
+      is_highlight: false
     };
   }
 
@@ -802,7 +842,10 @@ export class AdminComponent implements OnInit {
           status: prod.status,
           sku: (prod as any).sku || '',
           image: '',
-          description: prod.long_description || ''
+          description: prod.long_description || '',
+          publish_at: prod.publish_at ? this.toLocalDateTime(prod.publish_at) : '',
+          is_bestseller: (prod.tags || []).includes('bestseller'),
+          is_highlight: (prod.tags || []).includes('highlight')
         };
         this.productImages.set((prod as any).images || []);
       },
@@ -820,7 +863,9 @@ export class AdminComponent implements OnInit {
       status: this.form.status as any,
       short_description: this.form.description,
       long_description: this.form.description,
-      sku: this.form.sku
+      sku: this.form.sku,
+      publish_at: this.form.publish_at ? new Date(this.form.publish_at).toISOString() : null,
+      tags: this.buildTags()
     } as any;
     const op = this.editingId
       ? this.admin.updateProduct(this.editingId, payload)
@@ -877,6 +922,17 @@ export class AdminComponent implements OnInit {
     });
   }
 
+  duplicateProduct(slug: string): void {
+    this.admin.duplicateProduct(slug).subscribe({
+      next: (prod) => {
+        this.toast.success('Product duplicated as draft');
+        this.loadAll();
+        this.loadProduct(prod.slug);
+      },
+      error: () => this.toast.error('Could not duplicate product')
+    });
+  }
+
   setStock(id: string, value: number): void {
     this.stockEdits[id] = Number(value);
   }
@@ -907,6 +963,27 @@ export class AdminComponent implements OnInit {
     } catch {
       this.toast.error(this.t('adminUi.products.errors.save'));
     }
+  }
+
+  buildTags(): string[] {
+    const tags = new Set<string>();
+    if (this.form.is_bestseller) tags.add('bestseller');
+    if (this.form.is_highlight) tags.add('highlight');
+    if (this.productDetail?.tags) this.productDetail.tags.forEach((t) => tags.add(t));
+    return Array.from(tags);
+  }
+
+  upcomingProducts(): AdminProduct[] {
+    const now = new Date();
+    return this.products
+      .filter((p) => p.publish_at && new Date(p.publish_at) > now)
+      .sort((a, b) => new Date(a.publish_at || 0).getTime() - new Date(b.publish_at || 0).getTime());
+  }
+
+  toLocalDateTime(iso: string): string {
+    const d = new Date(iso);
+    const tzOffset = d.getTimezoneOffset() * 60000;
+    return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
   }
 
   onImageUpload(event: Event): void {
