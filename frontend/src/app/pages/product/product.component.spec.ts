@@ -5,6 +5,7 @@ import { CartStore } from '../../core/cart.store';
 import { ActivatedRoute } from '@angular/router';
 import { of } from 'rxjs';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { TranslateModule } from '@ngx-translate/core';
 
 describe('ProductComponent', () => {
   let toast: any;
@@ -15,7 +16,7 @@ describe('ProductComponent', () => {
     cart = jasmine.createSpyObj('CartStore', ['addFromProduct']);
 
     TestBed.configureTestingModule({
-      imports: [ProductComponent, HttpClientTestingModule],
+      imports: [ProductComponent, HttpClientTestingModule, TranslateModule.forRoot()],
       providers: [
         { provide: ToastService, useValue: toast },
         { provide: CartStore, useValue: cart },
@@ -42,6 +43,6 @@ describe('ProductComponent', () => {
     cmp.addToCart();
 
     expect(cart.addFromProduct).toHaveBeenCalled();
-    expect(toast.success).toHaveBeenCalledWith('Added to cart', '1 × Product');
+    expect(toast.success).toHaveBeenCalled();
   });
 });

@@ -7,6 +7,7 @@ import { CartStore } from '../../core/cart.store';
 import { CartApi } from '../../core/cart.api';
 import { ApiService } from '../../core/api.service';
 import { ActivatedRoute } from '@angular/router';
+import { TranslateModule } from '@ngx-translate/core';
 
 describe('CheckoutComponent', () => {
   const itemsSignal = signal([
@@ -42,7 +43,7 @@ describe('CheckoutComponent', () => {
     router = jasmine.createSpyObj('Router', ['navigate']);
 
     TestBed.configureTestingModule({
-      imports: [CheckoutComponent],
+      imports: [CheckoutComponent, TranslateModule.forRoot()],
       providers: [
         { provide: Router, useValue: router },
         { provide: CartStore, useValue: { items: itemsSignal, subtotal: subtotalSignal } },

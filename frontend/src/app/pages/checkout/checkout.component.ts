@@ -10,77 +10,80 @@ import { CartStore, CartItem } from '../../core/cart.store';
 import { CartApi } from '../../core/cart.api';
 import { loadStripe, Stripe, StripeElements, StripeCardElement, StripeCardElementChangeEvent } from '@stripe/stripe-js';
 import { ApiService } from '../../core/api.service';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 type ShippingMethod = { id: string; label: string; amount: number; eta: string };
 
 @Component({
   selector: 'app-checkout',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent, LocalizedCurrencyPipe],
+  imports: [CommonModule, FormsModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent, LocalizedCurrencyPipe, TranslateModule],
   template: `
     <app-container classes="py-10 grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
       <div class="grid lg:grid-cols-[2fr_1fr] gap-6 items-start">
         <section class="grid gap-4">
-          <h1 class="text-2xl font-semibold text-slate-900">Checkout</h1>
+          <h1 class="text-2xl font-semibold text-slate-900">{{ 'checkout.title' | translate }}</h1>
           <div
             *ngIf="errorMessage"
             class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex items-start justify-between gap-3"
           >
             <span>{{ errorMessage }}</span>
-            <app-button size="sm" variant="ghost" label="Retry" (action)="retryValidation()"></app-button>
+            <app-button size="sm" variant="ghost" [label]="'checkout.retry' | translate" (action)="retryValidation()"></app-button>
           </div>
           <form #checkoutForm="ngForm" class="grid gap-4" (ngSubmit)="placeOrder(checkoutForm)">
             <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">Step 1 · Who's checking out?</p>
+              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">{{ 'checkout.step1' | translate }}</p>
               <label class="flex items-center gap-2 text-sm">
-                <input type="radio" name="checkoutMode" value="guest" [(ngModel)]="mode" required /> Checkout as guest
+                <input type="radio" name="checkoutMode" value="guest" [(ngModel)]="mode" required />
+                {{ 'checkout.guest' | translate }}
               </label>
               <label class="flex items-center gap-2 text-sm">
-                <input type="radio" name="checkoutMode" value="create" [(ngModel)]="mode" required /> Create account during checkout
+                <input type="radio" name="checkoutMode" value="create" [(ngModel)]="mode" required />
+                {{ 'checkout.createAccount' | translate }}
               </label>
             </div>
 
             <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">Step 2 · Shipping address</p>
+              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">{{ 'checkout.step2' | translate }}</p>
               <div class="grid sm:grid-cols-2 gap-3">
                 <label class="text-sm grid gap-1">
-                  Full name
+                  {{ 'checkout.name' | translate }}
                   <input class="rounded-lg border border-slate-200 px-3 py-2" name="name" [(ngModel)]="address.name" required />
                 </label>
                 <label class="text-sm grid gap-1">
-                  Email
+                  {{ 'checkout.email' | translate }}
                   <input class="rounded-lg border border-slate-200 px-3 py-2" name="email" [(ngModel)]="address.email" type="email" required />
                 </label>
                 <label class="text-sm grid gap-1 sm:col-span-2">
-                  Address line
+                  {{ 'checkout.line1' | translate }}
                   <input class="rounded-lg border border-slate-200 px-3 py-2" name="line1" [(ngModel)]="address.line1" required />
                 </label>
                 <label class="text-sm grid gap-1">
-                  City
+                  {{ 'checkout.city' | translate }}
                   <input class="rounded-lg border border-slate-200 px-3 py-2" name="city" [(ngModel)]="address.city" required />
                 </label>
                 <label class="text-sm grid gap-1">
-                  Postal code
+                  {{ 'checkout.postal' | translate }}
                   <input class="rounded-lg border border-slate-200 px-3 py-2" name="postal" [(ngModel)]="address.postal" required />
                 </label>
                 <label class="text-sm grid gap-1 sm:col-span-2">
-                  Country
+                  {{ 'checkout.country' | translate }}
                   <select class="rounded-lg border border-slate-200 px-3 py-2" name="country" [(ngModel)]="address.country" required>
-                    <option value="">Select a country</option>
+                    <option value="">{{ 'checkout.countrySelect' | translate }}</option>
                     <option *ngFor="let c of countries" [value]="c">{{ c }}</option>
                   </select>
                 </label>
               </div>
               <label class="flex items-center gap-2 text-sm">
                 <input type="checkbox" [(ngModel)]="saveAddress" name="saveAddress" />
-                Save this address for next time
+                {{ 'checkout.saveAddress' | translate }}
               </label>
               <p *ngIf="addressError" class="text-sm text-amber-700">{{ addressError }}</p>
             </div>
 
             <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">Step 3 · Shipping method</p>
+              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">{{ 'checkout.step3' | translate }}</p>
               <label
                 *ngFor="let method of shippingMethods"
                 class="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
@@ -98,10 +101,15 @@ type ShippingMethod = { id: string; label: string; amount: number; eta: string }
             </div>
 
             <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">Step 4 · Promo code</p>
+              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">{{ 'checkout.step4' | translate }}</p>
               <div class="flex gap-3">
-                <input class="rounded-lg border border-slate-200 px-3 py-2 flex-1" [(ngModel)]="promo" name="promo" placeholder="Enter code" />
-                <app-button size="sm" label="Apply" (action)="applyPromo()"></app-button>
+                <input
+                  class="rounded-lg border border-slate-200 px-3 py-2 flex-1"
+                  [(ngModel)]="promo"
+                  name="promo"
+                  [placeholder]="'checkout.promoPlaceholder' | translate"
+                />
+                <app-button size="sm" [label]="'checkout.apply' | translate" (action)="applyPromo()"></app-button>
               </div>
               <p class="text-sm" [class.text-emerald-700]="promoMessage.startsWith('Applied')" [class.text-amber-700]="promoMessage.startsWith('Invalid')" *ngIf="promoMessage">
                 {{ promoMessage }}
@@ -109,7 +117,7 @@ type ShippingMethod = { id: string; label: string; amount: number; eta: string }
             </div>
 
             <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">Step 5 · Payment</p>
+              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em]">{{ 'checkout.step5' | translate }}</p>
               <div class="border border-dashed border-slate-200 rounded-lg p-3 text-sm">
                 <div #cardHost class="min-h-[48px]"></div>
                 <p *ngIf="cardError" class="text-rose-700 text-xs mt-2">{{ cardError }}</p>
@@ -117,14 +125,14 @@ type ShippingMethod = { id: string; label: string; amount: number; eta: string }
             </div>
 
             <div class="flex gap-3">
-              <app-button label="Place order" type="submit"></app-button>
-              <app-button variant="ghost" label="Back to cart" routerLink="/cart"></app-button>
+              <app-button [label]="'checkout.placeOrder' | translate" type="submit"></app-button>
+              <app-button variant="ghost" [label]="'checkout.backToCart' | translate" routerLink="/cart"></app-button>
             </div>
           </form>
         </section>
 
         <aside class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4">
-          <h2 class="text-lg font-semibold text-slate-900">Order summary</h2>
+          <h2 class="text-lg font-semibold text-slate-900">{{ 'checkout.summary' | translate }}</h2>
           <div class="grid gap-2 text-sm text-slate-700">
             <div *ngFor="let item of items()">
               <div class="flex justify-between">
@@ -135,19 +143,19 @@ type ShippingMethod = { id: string; label: string; amount: number; eta: string }
             </div>
           </div>
           <div class="flex items-center justify-between text-sm text-slate-700">
-            <span>Subtotal</span>
+            <span>{{ 'checkout.subtotal' | translate }}</span>
             <span>{{ subtotal() | localizedCurrency : currency }}</span>
           </div>
           <div class="flex items-center justify-between text-sm text-slate-700">
-            <span>Shipping</span>
+            <span>{{ 'checkout.shipping' | translate }}</span>
             <span>{{ shippingAmount | localizedCurrency : currency }}</span>
           </div>
           <div class="flex items-center justify-between text-sm text-slate-700">
-            <span>Promo</span>
+            <span>{{ 'checkout.promo' | translate }}</span>
             <span class="text-emerald-700">-{{ discount | localizedCurrency : currency }}</span>
           </div>
           <div class="border-t border-slate-200 pt-3 flex items-center justify-between text-base font-semibold text-slate-900">
-            <span>Estimated total</span>
+            <span>{{ 'checkout.estimatedTotal' | translate }}</span>
             <span>{{ total | localizedCurrency : currency }}</span>
           </div>
         </aside>
@@ -157,9 +165,9 @@ type ShippingMethod = { id: string; label: string; amount: number; eta: string }
 })
 export class CheckoutComponent implements AfterViewInit, OnDestroy {
   crumbs = [
-    { label: 'Home', url: '/' },
-    { label: 'Cart', url: '/cart' },
-    { label: 'Checkout' }
+    { label: 'nav.home', url: '/' },
+    { label: 'nav.cart', url: '/cart' },
+    { label: 'checkout.title' }
   ];
   mode: 'guest' | 'create' = 'guest';
   shipping: string = 'standard';
@@ -196,7 +204,13 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
   syncing = false;
   placing = false;
 
-  constructor(private cart: CartStore, private router: Router, private cartApi: CartApi, private api: ApiService) {
+  constructor(
+    private cart: CartStore,
+    private router: Router,
+    private cartApi: CartApi,
+    private api: ApiService,
+    private translate: TranslateService
+  ) {
     const saved = this.loadSavedAddress();
     if (saved) {
       this.address = saved;

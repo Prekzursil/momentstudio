@@ -11,6 +11,7 @@ import { ToastService } from '../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { Title, Meta } from '@angular/platform-browser';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-product-detail',
@@ -24,7 +25,8 @@ import { Title, Meta } from '@angular/platform-browser';
     ButtonComponent,
     SkeletonComponent,
     LocalizedCurrencyPipe,
-    BreadcrumbComponent
+    BreadcrumbComponent,
+    TranslateModule
   ],
   template: `
     <app-container classes="py-10">
@@ -79,13 +81,14 @@ import { Title, Meta } from '@angular/platform-browser';
 
             <div class="space-y-5">
               <div class="space-y-2">
-                <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Handmade collection</p>
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-500">{{ 'product.handmade' | translate }}</p>
                 <h1 class="text-3xl font-semibold text-slate-900">{{ product.name }}</h1>
               <p class="text-lg font-semibold text-slate-900">
                   {{ product.base_price | localizedCurrency : product.currency }}
                 </p>
                 <div class="flex items-center gap-2 text-sm text-amber-700" *ngIf="product.rating_count">
-                  ★ {{ product.rating_average?.toFixed(1) ?? '0.0' }} · {{ product.rating_count }} review(s)
+                  ★ {{ product.rating_average?.toFixed(1) ?? '0.0' }} ·
+                  {{ 'product.reviews' | translate : { count: product.rating_count } }}
                 </div>
               </div>
 
@@ -94,13 +97,12 @@ import { Title, Meta } from '@angular/platform-browser';
               </p>
 
               <div class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
-                Each piece is hand-thrown and glazed, so subtle variations in color and form are intentional. Expect
-                one-of-a-kind character in every item.
+                {{ 'product.uniqueness' | translate }}
               </div>
 
               <div class="space-y-3">
                 <label *ngIf="product.variants?.length" class="grid gap-1 text-sm font-medium text-slate-800">
-                  Variant
+                  {{ 'product.variant' | translate }}
                   <select
                     class="rounded-lg border border-slate-200 px-3 py-2 text-sm"
                     [(ngModel)]="selectedVariantId"
@@ -112,7 +114,7 @@ import { Title, Meta } from '@angular/platform-browser';
                 </label>
 
                 <label class="grid gap-1 text-sm font-medium text-slate-800">
-                  Quantity
+                  {{ 'product.quantity' | translate }}
                   <input
                     type="number"
                     min="1"
@@ -123,8 +125,8 @@ import { Title, Meta } from '@angular/platform-browser';
               </div>
 
               <div class="flex gap-3">
-                <app-button label="Add to cart" size="lg" (action)="addToCart()"></app-button>
-                <app-button label="Back to shop" variant="ghost" [routerLink]="['/shop']"></app-button>
+                <app-button [label]="'product.addToCart' | translate" size="lg" (action)="addToCart()"></app-button>
+                <app-button [label]="'product.backToShop' | translate" variant="ghost" [routerLink]="['/shop']"></app-button>
               </div>
 
               <div class="flex flex-wrap gap-2" *ngIf="product.tags?.length">
@@ -142,8 +144,8 @@ import { Title, Meta } from '@angular/platform-browser';
 
       <div *ngIf="recentlyViewed.length" class="mt-12 grid gap-4">
         <div class="flex items-center justify-between">
-          <h3 class="text-lg font-semibold text-slate-900">Recently viewed</h3>
-          <a routerLink="/shop" class="text-sm font-medium text-indigo-600">Back to shop</a>
+          <h3 class="text-lg font-semibold text-slate-900">{{ 'product.recentlyViewed' | translate }}</h3>
+          <a routerLink="/shop" class="text-sm font-medium text-indigo-600">{{ 'product.backToShop' | translate }}</a>
         </div>
         <div class="flex gap-4 overflow-x-auto pb-2">
           <app-button
@@ -201,8 +203,8 @@ import { Title, Meta } from '@angular/platform-browser';
 
       <ng-template #missing>
         <div class="border border-dashed border-slate-200 rounded-2xl p-10 text-center">
-          <p class="text-lg font-semibold text-slate-900">Product not found</p>
-          <a routerLink="/shop" class="text-indigo-600 font-medium">Back to shop</a>
+          <p class="text-lg font-semibold text-slate-900">{{ 'product.notFound' | translate }}</p>
+          <a routerLink="/shop" class="text-indigo-600 font-medium">{{ 'product.backToShop' | translate }}</a>
         </div>
       </ng-template>
     </app-container>
@@ -218,8 +220,8 @@ export class ProductComponent implements OnInit, OnDestroy {
   recentlyViewed: Product[] = [];
   private ldScript?: HTMLScriptElement;
   crumbs = [
-    { label: 'Home', url: '/' },
-    { label: 'Shop', url: '/shop' }
+    { label: 'nav.home', url: '/' },
+    { label: 'nav.shop', url: '/shop' }
   ];
 
   constructor(
@@ -228,7 +230,8 @@ export class ProductComponent implements OnInit, OnDestroy {
     private toast: ToastService,
     private title: Title,
     private meta: Meta,
-    private cartStore: CartStore
+    private cartStore: CartStore,
+    private translate: TranslateService
   ) {}
 
   ngOnDestroy(): void {
@@ -246,8 +249,8 @@ export class ProductComponent implements OnInit, OnDestroy {
           this.selectedVariantId = product.variants?.[0]?.id ?? null;
           this.loading = false;
           this.crumbs = [
-            { label: 'Home', url: '/' },
-            { label: 'Shop', url: '/shop' },
+            { label: 'nav.home', url: '/' },
+            { label: 'nav.shop', url: '/shop' },
             { label: product.name, url: `/products/${product.slug}` }
           ];
           this.updateMeta(product);
@@ -297,17 +300,22 @@ export class ProductComponent implements OnInit, OnDestroy {
       currency: this.product.currency,
       stock: this.product.stock_quantity ?? 99
     });
-    this.toast.success('Added to cart', `${this.quantity} × ${this.product.name}`);
+    this.toast.success(
+      this.translate.instant('product.addedTitle'),
+      this.translate.instant('product.addedBody', { qty: this.quantity, name: this.product.name })
+    );
   }
 
   private updateMeta(product: Product): void {
     const title = `${product.name} | AdrianaArt`;
+    const description =
+      product.short_description ?? this.translate.instant('product.metaDescriptionFallback', { name: product.name });
     this.title.setTitle(title);
-    this.meta.updateTag({ name: 'description', content: product.short_description ?? 'Handmade product detail' });
+    this.meta.updateTag({ name: 'description', content: description });
     this.meta.updateTag({ property: 'og:title', content: title });
     this.meta.updateTag({
       property: 'og:description',
-      content: product.short_description ?? 'Discover handmade product from AdrianaArt'
+      content: description
     });
     if (product.images?.[0]?.url) {
       this.meta.updateTag({ property: 'og:image', content: product.images[0].url });
