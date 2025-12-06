@@ -12,6 +12,16 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
+:root {
+  font-size: clamp(15px, 1.2vw + 12px, 18px);
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
 .shadow-soft {
   box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08);
 }

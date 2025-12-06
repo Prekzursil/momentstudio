@@ -15,10 +15,11 @@ import { PasswordResetRequestComponent } from './pages/auth/password-reset-reque
 import { PasswordResetComponent } from './pages/auth/password-reset.component';
 import { AccountComponent } from './pages/account/account.component';
 import { ChangePasswordComponent } from './pages/account/change-password.component';
+import { shopCategoriesResolver } from './core/shop.resolver';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent, title: 'AdrianaArt' },
-  { path: 'shop', component: ShopComponent, title: 'Shop | AdrianaArt' },
+  { path: 'shop', component: ShopComponent, title: 'Shop | AdrianaArt', resolve: { categories: shopCategoriesResolver } },
   { path: 'products/:slug', component: ProductComponent, title: 'Product | AdrianaArt' },
   { path: 'cart', component: CartComponent, title: 'Cart | AdrianaArt' },
   { path: 'checkout', component: CheckoutComponent, title: 'Checkout | AdrianaArt' },

@@ -292,23 +292,23 @@ Below is a structured checklist you can turn into issues.
 - [x] E2E: admin flow create coupon → apply to order (mock payment) + verify dashboard reflects coupon usage.
 
 ## UX, Performance, SEO & Accessibility
-- [ ] Mobile-first responsive design across pages.
+- [x] Mobile-first responsive design across pages(full mobile compatibility).
 - [x] Loading skeletons/spinners for lists and details.
 - [x] Toast notifications for key actions.
 - [x] Image optimization (srcset/lazy loading/modern formats).
-- [ ] SEO meta tags per page; Open Graph; sitemap/robots.
-- [ ] Lighthouse perf + accessibility fixes.
-- [ ] Keyboard navigation, contrast, accessible labels.
-- [ ] Prefetch critical API calls on navigation.
-- [ ] Asset compression and caching headers guidance.
-- [ ] ARIA labels for form controls and buttons.
+- [x] SEO meta tags per page; Open Graph; sitemap/robots.
+- [x] Lighthouse perf + accessibility fixes.
+- [x] Keyboard navigation, contrast, accessible labels.
+- [x] Prefetch critical API calls on navigation.
+- [x] Asset compression and caching headers guidance.
+- [x] ARIA labels for form controls and buttons.
 - [x] Focus styles consistent across components.
 - [x] Skip-to-content link.
 - [x] Motion-reduced animations option.
-- [ ] 404/500 error pages with helpful actions.
-- [ ] Structured data (JSON-LD) for products.
-- [ ] Breadcrumb structured data for SEO.
-- [ ] Perf budget and bundle analysis (Angular).
+- [x] 404/500 error pages with helpful actions.
+- [x] Structured data (JSON-LD) for products.
+- [x] Breadcrumb structured data for SEO.
+- [x] Perf budget and bundle analysis (Angular).
 
 ## Internationalization & Localization (RO/EN)
 - [ ] Pick frontend i18n strategy (Angular i18n vs ngx-translate) and set up RO/EN language switching.

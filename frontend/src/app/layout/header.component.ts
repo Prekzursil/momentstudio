@@ -27,8 +27,9 @@ import { FormsModule } from '@angular/forms';
           <button
             type="button"
             class="md:hidden text-slate-700 hover:text-slate-900 dark:text-slate-200 dark:hover:text-white"
-            (click)="drawerOpen = true"
+            (click)="toggleDrawer()"
             aria-label="Open navigation"
+            [attr.aria-expanded]="drawerOpen"
           >
             ☰
           </button>
@@ -90,5 +91,9 @@ export class HeaderComponent {
     const order: ThemePreference[] = ['system', 'light', 'dark'];
     const next = order[(order.indexOf(this.themePreference) + 1) % order.length];
     this.onThemeChange(next);
+  }
+
+  toggleDrawer(): void {
+    this.drawerOpen = !this.drawerOpen;
   }
 }

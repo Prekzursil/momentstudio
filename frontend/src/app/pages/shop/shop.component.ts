@@ -10,6 +10,8 @@ import { ProductCardComponent } from '../../shared/product-card.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
 import { ToastService } from '../../core/toast.service';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
+import { Meta, Title } from '@angular/platform-browser';
+import { ActivatedRouteSnapshot } from '@angular/router';
 
 @Component({
   selector: 'app-shop',
@@ -74,8 +76,8 @@ import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
             <p class="text-sm font-semibold text-slate-800">Price range</p>
             <div class="grid gap-3">
               <div class="flex items-center gap-3">
-                <input type="range" min="0" max="500" step="5" [(ngModel)]="filters.min_price" (change)="applyFilters()" />
-                <input type="range" min="0" max="500" step="5" [(ngModel)]="filters.max_price" (change)="applyFilters()" />
+                <input type="range" min="0" max="500" step="5" [(ngModel)]="filters.min_price" (change)="applyFilters()" aria-label="Minimum price" />
+                <input type="range" min="0" max="500" step="5" [(ngModel)]="filters.max_price" (change)="applyFilters()" aria-label="Maximum price" />
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <app-input label="Min" type="number" [(value)]="filters.min_price" (ngModelChange)="applyFilters()">
@@ -223,11 +225,28 @@ export class ShopComponent implements OnInit {
     private catalog: CatalogService,
     private route: ActivatedRoute,
     private router: Router,
-    private toast: ToastService
+    private toast: ToastService,
+    private title: Title,
+    private metaService: Meta
   ) {}
 
   ngOnInit(): void {
-    this.fetchCategories();
+    this.title.setTitle('Shop | AdrianaArt');
+    this.metaService.updateTag({
+      name: 'description',
+      content: 'Browse categories, filter by price and tags, and find handcrafted ceramics on AdrianaArt.'
+    });
+    this.metaService.updateTag({ property: 'og:title', content: 'Shop handcrafted ceramics | AdrianaArt' });
+    this.metaService.updateTag({
+      property: 'og:description',
+      content: 'Search and filter handcrafted ceramics by category, price, and tags.'
+    });
+    const dataCategories = (this.route.snapshot.data['categories'] as Category[]) ?? [];
+    if (dataCategories.length) {
+      this.categories = dataCategories;
+    } else {
+      this.fetchCategories();
+    }
     this.route.queryParams.subscribe((params) => {
       this.syncFiltersFromQuery(params);
       this.loadProducts(false);

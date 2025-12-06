@@ -19,7 +19,25 @@
             "tsConfig": "tsconfig.app.json",
             "assets": ["src/favicon.ico", "src/assets"],
             "styles": ["src/styles.css"],
-            "scripts": []
+            "scripts": [],
+            "budgets": [
+              {
+                "type": "initial",
+                "maximumWarning": "600kb",
+                "maximumError": "700kb"
+              },
+              {
+                "type": "bundle",
+                "name": "main",
+                "maximumWarning": "550kb",
+                "maximumError": "650kb"
+              },
+              {
+                "type": "anyComponentStyle",
+                "maximumWarning": "50kb",
+                "maximumError": "80kb"
+              }
+            ]
           }
         },
         "serve": {

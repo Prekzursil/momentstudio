@@ -1,5 +1,5 @@
 import { CommonModule, NgOptimizedImage } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CatalogService, Product } from '../../core/catalog.service';
@@ -208,7 +208,7 @@ import { Title, Meta } from '@angular/platform-browser';
     </app-container>
   `
 })
-export class ProductComponent implements OnInit {
+export class ProductComponent implements OnInit, OnDestroy {
   product: Product | null = null;
   loading = true;
   selectedVariantId: string | null = null;
@@ -216,6 +216,7 @@ export class ProductComponent implements OnInit {
   activeImageIndex = 0;
   previewOpen = false;
   recentlyViewed: Product[] = [];
+  private ldScript?: HTMLScriptElement;
   crumbs = [
     { label: 'Home', url: '/' },
     { label: 'Shop', url: '/shop' }
@@ -229,6 +230,12 @@ export class ProductComponent implements OnInit {
     private meta: Meta,
     private cartStore: CartStore
   ) {}
+
+  ngOnDestroy(): void {
+    if (this.ldScript && typeof document !== 'undefined') {
+      this.ldScript.remove();
+    }
+  }
 
   ngOnInit(): void {
     const slug = this.route.snapshot.paramMap.get('slug');
@@ -244,6 +251,7 @@ export class ProductComponent implements OnInit {
             { label: product.name, url: `/products/${product.slug}` }
           ];
           this.updateMeta(product);
+          this.updateStructuredData(product);
           this.saveRecentlyViewed(product);
           this.recentlyViewed = this.getRecentlyViewed().filter((p) => p.slug !== product.slug).slice(0, 8);
         },
@@ -304,6 +312,52 @@ export class ProductComponent implements OnInit {
     if (product.images?.[0]?.url) {
       this.meta.updateTag({ property: 'og:image', content: product.images[0].url });
     }
+    this.meta.updateTag({ property: 'og:type', content: 'product' });
+  }
+
+  private updateStructuredData(product: Product): void {
+    if (typeof document === 'undefined') return;
+    if (this.ldScript) {
+      this.ldScript.remove();
+    }
+    const availability =
+      (product.stock_quantity ?? 0) > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock';
+    const productLd = {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: product.name,
+      description: product.short_description ?? product.long_description ?? undefined,
+      image: product.images?.map((i) => i.url).filter(Boolean),
+      sku: product.id,
+      offers: {
+        '@type': 'Offer',
+        price: product.base_price,
+        priceCurrency: product.currency,
+        availability
+      },
+      aggregateRating:
+        product.rating_count && product.rating_count > 0
+          ? {
+              '@type': 'AggregateRating',
+              ratingValue: product.rating_average ?? 0,
+              reviewCount: product.rating_count
+            }
+          : undefined
+    };
+    const breadcrumbLd = {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: `${window.location.origin}/` },
+        { '@type': 'ListItem', position: 2, name: 'Shop', item: `${window.location.origin}/shop` },
+        { '@type': 'ListItem', position: 3, name: product.name, item: `${window.location.href}` }
+      ]
+    };
+    const script = document.createElement('script');
+    script.type = 'application/ld+json';
+    script.text = JSON.stringify([productLd, breadcrumbLd]);
+    document.head.appendChild(script);
+    this.ldScript = script;
   }
 
   private saveRecentlyViewed(product: Product): void {

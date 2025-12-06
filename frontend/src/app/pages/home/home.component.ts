@@ -6,6 +6,7 @@ import { ContainerComponent } from '../../layout/container.component';
 import { CatalogService, Product } from '../../core/catalog.service';
 import { ProductCardComponent } from '../../shared/product-card.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
+import { Meta, Title } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-home',
@@ -94,9 +95,19 @@ export class HomeComponent implements OnInit {
   featuredError = signal<boolean>(false);
   skeletons = Array.from({ length: 3 });
 
-  constructor(private catalog: CatalogService) {}
+  constructor(private catalog: CatalogService, private title: Title, private meta: Meta) {}
 
   ngOnInit(): void {
+    this.title.setTitle('AdrianaArt | Handcrafted ceramics storefront');
+    this.meta.updateTag({
+      name: 'description',
+      content: 'Discover handcrafted ceramics with curated collections, rich product detail, and smooth checkout.'
+    });
+    this.meta.updateTag({ property: 'og:title', content: 'AdrianaArt | Handcrafted ceramics storefront' });
+    this.meta.updateTag({
+      property: 'og:description',
+      content: 'Shop curated ceramics with rich detail pages, responsive design, and secure checkout.'
+    });
     this.loadFeatured();
   }
 
