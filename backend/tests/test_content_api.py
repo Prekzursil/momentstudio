@@ -127,3 +127,14 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     audit = client.get("/api/v1/content/admin/home.hero/audit", headers=auth_headers(admin_token))
     assert audit.status_code == 200
     assert len(audit.json()) >= 2
+
+    # Translations: add RO and fetch via lang
+    tr = client.patch(
+        "/api/v1/content/admin/home.hero",
+        json={"title": "Erou", "body_markdown": "Bun venit!", "lang": "ro"},
+        headers=auth_headers(admin_token),
+    )
+    assert tr.status_code == 200
+    ro_public = client.get("/api/v1/content/home.hero?lang=ro")
+    assert ro_public.status_code == 200
+    assert ro_public.json()["title"] == "Erou"

@@ -59,11 +59,24 @@ async def send_email(to_email: str, subject: str, text_body: str, html_body: str
         return False
 
 
-async def send_order_confirmation(to_email: str, order, items: Sequence | None = None) -> bool:
-    subject = f"Order confirmation {order.reference_code or order.id}"
-    lines = [f"Thank you for your order {order.reference_code or order.id}."]
+def _lang_or_default(lang: str | None) -> str:
+    return lang if lang in {"en", "ro"} else "en"
+
+
+async def send_order_confirmation(to_email: str, order, items: Sequence | None = None, lang: str | None = None) -> bool:
+    lng = _lang_or_default(lang)
+    subject = (
+        f"Order confirmation {order.reference_code or order.id}"
+        if lng == "en"
+        else f"Confirmare comandă {order.reference_code or order.id}"
+    )
+    lines = [
+        f"Thank you for your order {order.reference_code or order.id}."
+        if lng == "en"
+        else f"Îți mulțumim pentru comanda {order.reference_code or order.id}."
+    ]
     if items:
-        lines.append("Items:")
+        lines.append("Items:" if lng == "en" else "Produse:")
         for item in items:
             lines.append(f"- {getattr(item, 'product_id', '')} x {item.quantity}")
     lines.append(f"Total: {order.total_amount} {getattr(order, 'currency', 'USD')}")
@@ -71,29 +84,57 @@ async def send_order_confirmation(to_email: str, order, items: Sequence | None =
     return await send_email(to_email, subject, text_body)
 
 
-async def send_password_reset(to_email: str, token: str) -> bool:
-    subject = "Password reset"
-    text_body = f"Use this token to reset your password: {token}"
+async def send_password_reset(to_email: str, token: str, lang: str | None = None) -> bool:
+    lng = _lang_or_default(lang)
+    subject = "Password reset" if lng == "en" else "Resetare parolă"
+    text_body = (
+        f"Use this token to reset your password: {token}"
+        if lng == "en"
+        else f"Folosește acest cod pentru a reseta parola: {token}"
+    )
     return await send_email(to_email, subject, text_body)
 
 
-async def send_verification_email(to_email: str, token: str) -> bool:
-    subject = "Verify your email"
-    text_body = f"Use this token to verify your email: {token}"
+async def send_verification_email(to_email: str, token: str, lang: str | None = None) -> bool:
+    lng = _lang_or_default(lang)
+    subject = "Verify your email" if lng == "en" else "Verifică-ți emailul"
+    text_body = (
+        f"Use this token to verify your email: {token}"
+        if lng == "en"
+        else f"Folosește acest cod pentru a verifica emailul: {token}"
+    )
     return await send_email(to_email, subject, text_body)
 
 
-async def send_shipping_update(to_email: str, order, tracking_number: str | None = None) -> bool:
-    subject = f"Your order {order.reference_code or order.id} has shipped"
-    text_body = f"Order {order.reference_code or order.id} is on the way."
+async def send_shipping_update(to_email: str, order, tracking_number: str | None = None, lang: str | None = None) -> bool:
+    lng = _lang_or_default(lang)
+    subject = (
+        f"Your order {order.reference_code or order.id} has shipped"
+        if lng == "en"
+        else f"Comanda {order.reference_code or order.id} a fost expediată"
+    )
+    text_body = (
+        f"Order {order.reference_code or order.id} is on the way."
+        if lng == "en"
+        else f"Comanda {order.reference_code or order.id} este pe drum."
+    )
     if tracking_number:
         text_body += f"\nTracking: {tracking_number}"
     return await send_email(to_email, subject, text_body)
 
 
-async def send_delivery_confirmation(to_email: str, order) -> bool:
-    subject = f"Delivery confirmation for order {order.reference_code or order.id}"
-    text_body = f"Order {order.reference_code or order.id} has been delivered."
+async def send_delivery_confirmation(to_email: str, order, lang: str | None = None) -> bool:
+    lng = _lang_or_default(lang)
+    subject = (
+        f"Delivery confirmation for order {order.reference_code or order.id}"
+        if lng == "en"
+        else f"Confirmare livrare pentru comanda {order.reference_code or order.id}"
+    )
+    text_body = (
+        f"Order {order.reference_code or order.id} has been delivered."
+        if lng == "en"
+        else f"Comanda {order.reference_code or order.id} a fost livrată."
+    )
     return await send_email(to_email, subject, text_body)
 
 

@@ -13,6 +13,7 @@ class ContentBlockBase(BaseModel):
     status: ContentStatus = ContentStatus.draft
     meta: dict[str, Any] | None = None
     sort_order: int = 0
+    lang: str | None = Field(default=None, pattern="^(en|ro)$")
 
     @field_validator("body_markdown")
     @classmethod
@@ -32,6 +33,7 @@ class ContentBlockUpdate(BaseModel):
     status: ContentStatus | None = None
     meta: dict[str, Any] | None = None
     sort_order: int | None = None
+    lang: str | None = Field(default=None, pattern="^(en|ro)$")
 
     @field_validator("body_markdown")
     @classmethod
@@ -51,6 +53,7 @@ class ContentBlockRead(BaseModel):
     version: int
     meta: dict[str, Any] | None = None
     sort_order: int
+    lang: str | None = None
     published_at: datetime | None = None
     created_at: datetime
     updated_at: datetime

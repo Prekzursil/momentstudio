@@ -15,17 +15,25 @@ router = APIRouter(prefix="/content", tags=["content"])
 
 
 @router.get("/pages/{slug}", response_model=ContentBlockRead)
-async def get_static_page(slug: str, session: AsyncSession = Depends(get_session)) -> ContentBlockRead:
+async def get_static_page(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+) -> ContentBlockRead:
     key = f"page.{slug}"
-    block = await content_service.get_published_by_key(session, key)
+    block = await content_service.get_published_by_key(session, key, lang=lang)
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
     return block
 
 
 @router.get("/{key}", response_model=ContentBlockRead)
-async def get_content(key: str, session: AsyncSession = Depends(get_session)) -> ContentBlockRead:
-    block = await content_service.get_published_by_key(session, key)
+async def get_content(
+    key: str,
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+) -> ContentBlockRead:
+    block = await content_service.get_published_by_key(session, key, lang=lang)
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
     return block
@@ -35,9 +43,10 @@ async def get_content(key: str, session: AsyncSession = Depends(get_session)) ->
 async def admin_get_content(
     key: str,
     session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
     _: str = Depends(require_admin),
 ) -> ContentBlockRead:
-    block = await content_service.get_block_by_key(session, key)
+    block = await content_service.get_block_by_key(session, key, lang=lang)
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
     return block
@@ -74,8 +83,9 @@ async def admin_upload_content_image(
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
     admin=Depends(require_admin),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
 ) -> ContentBlockRead:
-    block = await content_service.get_block_by_key(session, key)
+    block = await content_service.get_block_by_key(session, key, lang=lang)
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
     block = await content_service.add_image(session, block, file, actor_id=admin.id)
@@ -87,10 +97,11 @@ async def admin_preview_content(
     key: str,
     token: str = Query(default="", description="Preview token"),
     session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
 ) -> ContentBlockRead:
     if token != settings.content_preview_token:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid preview token")
-    block = await content_service.get_block_by_key(session, key)
+    block = await content_service.get_block_by_key(session, key, lang=lang)
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
     return block

@@ -321,9 +321,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Internationalize admin dashboard labels/messages.
 - [x] `product_translations` (or JSONB) for localized product name/short/long description per language.
 - [x] `category_translations` (or JSONB) for localized category name/description per language.
-- [ ] Localized content blocks for static pages (About, FAQ, Shipping, etc.).
-- [ ] Content API supports `lang` query param with sensible fallbacks and `Accept-Language` defaults.
-- [ ] Localize email templates (order confirmation, password reset) into RO/EN based on user preference.
+- [x] Localized content blocks for static pages (About, FAQ, Shipping, etc.).
+- [x] Content API supports `lang` query param with sensible fallbacks and `Accept-Language` defaults.
+- [x] Localize email templates (order confirmation, password reset) into RO/EN based on user preference.
 - [ ] Localized SEO meta tags per language (home, category, product, about).
 - [ ] Tests rendering pages in RO/EN to verify translations/directionality.
 
