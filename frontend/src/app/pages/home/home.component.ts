@@ -5,6 +5,7 @@ import { ButtonComponent } from '../../shared/button.component';
 import { CardComponent } from '../../shared/card.component';
 import { ContainerComponent } from '../../layout/container.component';
 import { CatalogService, Product } from '../../core/catalog.service';
+import { RecentlyViewedService } from '../../core/recently-viewed.service';
 import { ProductCardComponent } from '../../shared/product-card.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -65,6 +66,16 @@ import { Meta, Title } from '@angular/platform-browser';
         </div>
       </div>
 
+      <div *ngIf="recentlyViewed.length" class="grid gap-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xl font-semibold text-slate-900">{{ 'product.recentlyViewed' | translate }}</h2>
+          <app-button [label]="'home.viewAll' | translate" variant="ghost" [routerLink]="['/shop']"></app-button>
+        </div>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <app-product-card *ngFor="let product of recentlyViewed" [product]="product"></app-product-card>
+        </div>
+      </div>
+
       <div class="grid gap-4">
         <h2 class="text-xl font-semibold text-slate-900">{{ 'home.why' | translate }}</h2>
         <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -87,6 +98,7 @@ import { Meta, Title } from '@angular/platform-browser';
 })
 export class HomeComponent implements OnInit, OnDestroy {
   featured: Product[] = [];
+  recentlyViewed: Product[] = [];
   featuredLoading = signal<boolean>(true);
   featuredError = signal<boolean>(false);
   skeletons = Array.from({ length: 3 });
@@ -95,6 +107,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   constructor(
     private catalog: CatalogService,
+    private recentlyViewedService: RecentlyViewedService,
     private title: Title,
     private meta: Meta,
     private translate: TranslateService
@@ -103,6 +116,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.setMetaTags();
     this.langSub = this.translate.onLangChange.subscribe(() => this.setMetaTags());
+    this.recentlyViewed = this.recentlyViewedService.list().slice(0, 6);
     this.loadFeatured();
   }
 
