@@ -385,7 +385,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Rate limiting on `/auth/login`, `/auth/register`, `/auth/google/*` with consistent 429 response.
 - [x] Wishlist/save-for-later feature per user.
 - [x] Recently viewed products widget using cookie/localStorage list (storefront).
-- [ ] Integration test covering register → login → add to cart → checkout (mock payment) → see order.
+- [x] Integration test covering register → login → add to cart → checkout (mock payment) → see order.
 - [x] Smoke test for Google OAuth using mocked Google endpoint.
 - [x] Metrics counters for signups, logins, failed logins, orders created, payment failures.
 - [x] robots.txt and sitemap.xml generation (with i18n URLs).
@@ -401,9 +401,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Docs: document Docker-based local dev flow in `infra/README.md` (ports, URLs, CORS expectations, Stripe webhook tunnelling).
 - [x] DX: introduce `pre-commit` config (Black/Ruff + Prettier/ESLint) and reference it in CONTRIBUTING.md.
 - [x] DX: add top-level `Makefile` shortcuts (`make dev`, `make test`, `make lint`, `make docker-up`).
-- [ ] CI: add Docker Compose build + smoke test (backend health/readiness + frontend HTTP 200).
+- [x] CI: add Docker Compose build + smoke test (backend health/readiness + frontend HTTP 200).
 - [x] DX: ignore runtime/generated artifacts (`uploads/`, `backend/uploads/`, `frontend/src/assets/app-config.js`, `*:Zone.Identifier`) to keep the working tree clean.
-- [ ] Tests: extend full checkout flow test to verify orders can be fetched via `/me/orders` and `/me/orders/{id}` after checkout.
+- [x] Tests: extend full checkout flow test to verify orders can be fetched via `/orders` and `/orders/{id}` after checkout.
 
 ### Medium priority
 - [ ] Backend: replace deprecated `imghdr` usage with Pillow-based file type detection and add tests.

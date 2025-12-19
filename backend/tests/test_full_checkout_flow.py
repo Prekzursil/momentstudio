@@ -94,6 +94,11 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
     )
     assert add_res.status_code in (200, 201), add_res.text
 
+    # Create PaymentIntent (mocked)
+    intent_res = client.post("/api/v1/payments/intent", headers={"Authorization": f"Bearer {token}"})
+    assert intent_res.status_code == 200, intent_res.text
+    assert intent_res.json().get("client_secret")
+
     # Checkout as authenticated user
     order_res = client.post(
         "/api/v1/orders",
@@ -113,6 +118,16 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
     body = order_res.json()
     assert body["id"]
     assert captured.get("email_sent") is True
+
+    # Verify order is visible via API endpoints
+    list_res = client.get("/api/v1/orders", headers={"Authorization": f"Bearer {token}"})
+    assert list_res.status_code == 200, list_res.text
+    ids = {o["id"] for o in list_res.json()}
+    assert body["id"] in ids
+
+    detail_res = client.get(f"/api/v1/orders/{body['id']}", headers={"Authorization": f"Bearer {token}"})
+    assert detail_res.status_code == 200, detail_res.text
+    assert detail_res.json()["id"] == body["id"]
 
     # Verify order persisted and tied to user
     async def fetch_order():
