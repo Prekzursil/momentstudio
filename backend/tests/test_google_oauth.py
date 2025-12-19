@@ -1,6 +1,7 @@
 import asyncio
 from urllib.parse import urlparse, parse_qs
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -62,6 +63,51 @@ def test_google_start_builds_url(monkeypatch: pytest.MonkeyPatch, test_app):
     assert "client_id=client-id" in url
     assert "redirect_uri=http%3A%2F%2Flocalhost%2Fcallback" in url
     assert "scope=openid+email+profile" in url
+
+
+def test_google_oauth_smoke_with_mocked_endpoints(monkeypatch: pytest.MonkeyPatch, test_app):
+    client: TestClient = test_app["client"]  # type: ignore
+    monkeypatch.setattr(settings, "google_client_id", "client-id")
+    monkeypatch.setattr(settings, "google_client_secret", "client-secret")
+    monkeypatch.setattr(settings, "google_redirect_uri", "http://localhost/callback")
+
+    calls = {"token": 0, "userinfo": 0}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == "https://oauth2.googleapis.com/token":
+            calls["token"] += 1
+            return httpx.Response(200, json={"access_token": "mock-access"}, request=request)
+        if str(request.url) == "https://www.googleapis.com/oauth2/v3/userinfo":
+            calls["userinfo"] += 1
+            return httpx.Response(
+                200,
+                json={"sub": "mock-sub", "email": "mocked@example.com", "email_verified": True, "name": "Mocked User"},
+                request=request,
+            )
+        return httpx.Response(404, json={"error": "not found"}, request=request)
+
+    transport = httpx.MockTransport(handler)
+
+    real_async_client = httpx.AsyncClient
+
+    class MockAsyncClient:
+        def __init__(self, *args, **kwargs):
+            self._client = real_async_client(transport=transport, timeout=kwargs.get("timeout"))
+
+        async def __aenter__(self):
+            return self._client
+
+        async def __aexit__(self, exc_type, exc, tb):
+            await self._client.aclose()
+
+    monkeypatch.setattr(auth_service.httpx, "AsyncClient", MockAsyncClient)
+
+    state = _parse_state_from_start(client)
+    res = client.post("/api/v1/auth/google/callback", json={"code": "abc", "state": state})
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["user"]["email"] == "mocked@example.com"
+    assert calls == {"token": 1, "userinfo": 1}
 
 
 def test_google_callback_existing_sub(monkeypatch: pytest.MonkeyPatch, test_app):

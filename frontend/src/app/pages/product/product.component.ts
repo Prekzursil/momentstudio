@@ -4,6 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CatalogService, Product } from '../../core/catalog.service';
 import { CartStore } from '../../core/cart.store';
+import { RecentlyViewedService } from '../../core/recently-viewed.service';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
@@ -235,6 +236,7 @@ export class ProductComponent implements OnInit, OnDestroy {
     private title: Title,
     private meta: Meta,
     private cartStore: CartStore,
+    private recentlyViewedService: RecentlyViewedService,
     private translate: TranslateService
   ) {}
 
@@ -265,8 +267,8 @@ export class ProductComponent implements OnInit, OnDestroy {
           ];
           this.updateMeta(product);
           this.updateStructuredData(product);
-          this.saveRecentlyViewed(product);
-          this.recentlyViewed = this.getRecentlyViewed().filter((p) => p.slug !== product.slug).slice(0, 8);
+          const updated = this.recentlyViewedService.add(product);
+          this.recentlyViewed = updated.filter((p) => p.slug !== product.slug).slice(0, 8);
         },
         error: () => {
           this.product = null;
@@ -393,30 +395,4 @@ export class ProductComponent implements OnInit, OnDestroy {
     this.canonicalEl = link;
   }
 
-  private saveRecentlyViewed(product: Product): void {
-    if (typeof localStorage === 'undefined') return;
-    const key = 'recently_viewed';
-    const existing: Product[] = this.getRecentlyViewed();
-    const filtered = existing.filter((p) => p.slug !== product.slug);
-    filtered.unshift({
-      id: product.id,
-      slug: product.slug,
-      name: product.name,
-      base_price: product.base_price,
-      currency: product.currency,
-      images: product.images
-    });
-    localStorage.setItem(key, JSON.stringify(filtered.slice(0, 12)));
-  }
-
-  private getRecentlyViewed(): Product[] {
-    if (typeof localStorage === 'undefined') return [];
-    const key = 'recently_viewed';
-    try {
-      const raw = localStorage.getItem(key);
-      return raw ? (JSON.parse(raw) as Product[]) : [];
-    } catch {
-      return [];
-    }
-  }
 }
