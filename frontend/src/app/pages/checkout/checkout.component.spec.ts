@@ -81,7 +81,7 @@ describe('CheckoutComponent', () => {
 
     expect(cartApi.sync).toHaveBeenCalled();
     expect(apiService.post).toHaveBeenCalled();
-    const payload = apiService.post.calls.mostRecent().args[1] as any;
+    const payload = apiService.post.calls.mostRecent().args[1];
     expect(payload.shipping_method_id).toBe('ship123');
     expect(payload.promo_code).toBe('SAVE');
     expect(payload.create_account).toBeTrue();

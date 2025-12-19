@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "start": "ng serve",
+    "prestart": "node scripts/generate-config.mjs",
+    "start": "ng serve --proxy-config proxy.conf.json",
+    "prebuild": "node scripts/generate-config.mjs",
     "build": "ng build",
+    "pretest": "node scripts/generate-config.mjs",
     "test": "ng test",
-    "lint": "ng lint"
+    "lint": "eslint . --ext .ts"
   },
   "private": true,
   "dependencies": {

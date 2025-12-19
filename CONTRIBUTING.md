@@ -49,6 +49,27 @@ docker compose up --build
 - Infra: `docker compose config` to validate compose file.
 - Run the relevant checks before opening a PR; fix lint/type issues in the same branch.
 
+## Pre-commit hooks
+
+This repo ships a `.pre-commit-config.yaml` to keep formatting and basic linting consistent.
+
+```
+python -m pip install pre-commit
+pre-commit install
+pre-commit run --all-files
+```
+
+It runs Black/Ruff for Python and Prettier/ESLint for the Angular code.
+
+## Shortcuts
+
+If you have `make` available, common workflows are:
+
+- `make dev`
+- `make test`
+- `make lint`
+- `make docker-up`
+
 ## Runbook
 
 - Sync main: `git checkout main && git pull --rebase origin main`.

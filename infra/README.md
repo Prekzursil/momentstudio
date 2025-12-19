@@ -1,0 +1,49 @@
+# Local Docker development
+
+The Docker Compose stack lives in `infra/docker-compose.yml` and starts:
+
+- Postgres (`db`) on `localhost:5432`
+- FastAPI backend (`backend`) on `localhost:8000`
+- Angular frontend (`frontend`) on `localhost:4200`
+
+## Quick start
+
+From the repo root:
+
+```bash
+cd infra
+docker compose up --build
+```
+
+Then open:
+
+- Frontend: http://localhost:4200
+- Backend health: http://localhost:8000/api/v1/health
+- Backend docs: http://localhost:8000/docs
+
+## Frontend ↔ backend routing / CORS
+
+The `frontend` container serves the Angular build via nginx and **reverse proxies**:
+
+- `/api/*` → `backend:8000`
+- `/media/*` → `backend:8000`
+
+That means the browser talks to a single origin (`localhost:4200`) and you typically **won’t hit CORS** in Docker mode.
+
+If you call the backend directly from a different origin in development, set `FRONTEND_ORIGIN=http://localhost:4200`
+in `backend/.env` (or edit `backend/.env.example` for quick local runs).
+
+## Stripe webhook tunneling (local)
+
+The backend webhook endpoint is:
+
+- `POST /api/v1/payments/webhook`
+
+For local development you can use the Stripe CLI:
+
+```bash
+stripe listen --forward-to http://localhost:8000/api/v1/payments/webhook
+```
+
+Then copy the printed signing secret into `backend/.env` as `STRIPE_WEBHOOK_SECRET=...`.
+

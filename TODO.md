@@ -6,7 +6,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Initialize monorepo with `backend/`, `frontend/`, `infra/`.
 - [x] Add `docker-compose.yml` for API, frontend, Postgres.
 - [x] Add backend `.env.example` (DATABASE_URL, SECRET_KEY, STRIPE_SECRET_KEY, SMTP_*, FRONTEND_ORIGIN).
-- [ ] Add frontend `.env.example` (API_BASE_URL, STRIPE_PUBLISHABLE_KEY, APP_ENV).
+- [x] Add frontend `.env.example` (API_BASE_URL, STRIPE_PUBLISHABLE_KEY, APP_ENV).
 - [x] Add `.gitignore` for Python, Node, env files, build artifacts.
 - [x] GitHub Actions for backend (lint, tests, type-checks).
 - [x] GitHub Actions for frontend (lint, tests, build).
@@ -395,10 +395,14 @@ Below is a structured checklist you can turn into issues.
 ## Backlog (New ideas inspired by Event Link)
 
 ### High priority
-- [ ] Docker: add `frontend/Dockerfile` + `frontend/.dockerignore` and make `infra/docker-compose.yml` work out of the box.
-- [ ] Frontend: generate runtime config from env (API_BASE_URL/STRIPE_PUBLISHABLE_KEY/APP_ENV) and remove hardcoded API base URL.
+- [x] Docker: add `frontend/Dockerfile` + `frontend/.dockerignore` and make `infra/docker-compose.yml` work out of the box.
+- [x] Frontend: generate runtime config from env (API_BASE_URL/STRIPE_PUBLISHABLE_KEY/APP_ENV) and remove hardcoded API base URL.
+- [x] Frontend: add Angular dev-server proxy configuration (`proxy.conf.json`) for `/api` and `/media` in local dev.
+- [x] Docs: document Docker-based local dev flow in `infra/README.md` (ports, URLs, CORS expectations, Stripe webhook tunnelling).
+- [x] DX: introduce `pre-commit` config (Black/Ruff + Prettier/ESLint) and reference it in CONTRIBUTING.md.
+- [x] DX: add top-level `Makefile` shortcuts (`make dev`, `make test`, `make lint`, `make docker-up`).
 - [ ] CI: add Docker Compose build + smoke test (backend health/readiness + frontend HTTP 200).
-- [ ] DX: ignore runtime/generated artifacts (`uploads/`, `backend/uploads/`, `frontend/src/app/config.generated.ts`, `*:Zone.Identifier`) to keep the working tree clean.
+- [x] DX: ignore runtime/generated artifacts (`uploads/`, `backend/uploads/`, `frontend/src/assets/app-config.js`, `*:Zone.Identifier`) to keep the working tree clean.
 - [ ] Tests: extend full checkout flow test to verify orders can be fetched via `/me/orders` and `/me/orders/{id}` after checkout.
 
 ### Medium priority
