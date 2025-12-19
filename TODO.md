@@ -6,7 +6,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Initialize monorepo with `backend/`, `frontend/`, `infra/`.
 - [x] Add `docker-compose.yml` for API, frontend, Postgres.
 - [x] Add backend `.env.example` (DATABASE_URL, SECRET_KEY, STRIPE_SECRET_KEY, SMTP_*, FRONTEND_ORIGIN).
-- [x] Add frontend `.env.example` (API_BASE_URL, STRIPE_PUBLISHABLE_KEY, APP_ENV).
+- [ ] Add frontend `.env.example` (API_BASE_URL, STRIPE_PUBLISHABLE_KEY, APP_ENV).
 - [x] Add `.gitignore` for Python, Node, env files, build artifacts.
 - [x] GitHub Actions for backend (lint, tests, type-checks).
 - [x] GitHub Actions for frontend (lint, tests, build).
@@ -391,3 +391,24 @@ Below is a structured checklist you can turn into issues.
 - [x] robots.txt and sitemap.xml generation (with i18n URLs).
 - [x] Per-language canonical URLs for product pages.
 - [x] Document “local-only dev” mode (SQLite + local media + Stripe test) and “prod-like” mode (Postgres + S3 + SMTP).
+
+## Backlog (New ideas inspired by Event Link)
+
+### High priority
+- [ ] Docker: add `frontend/Dockerfile` + `frontend/.dockerignore` and make `infra/docker-compose.yml` work out of the box.
+- [ ] Frontend: generate runtime config from env (API_BASE_URL/STRIPE_PUBLISHABLE_KEY/APP_ENV) and remove hardcoded API base URL.
+- [ ] CI: add Docker Compose build + smoke test (backend health/readiness + frontend HTTP 200).
+- [ ] DX: ignore runtime/generated artifacts (`uploads/`, `backend/uploads/`, `frontend/src/app/config.generated.ts`, `*:Zone.Identifier`) to keep the working tree clean.
+- [ ] Tests: extend full checkout flow test to verify orders can be fetched via `/me/orders` and `/me/orders/{id}` after checkout.
+
+### Medium priority
+- [ ] Backend: replace deprecated `imghdr` usage with Pillow-based file type detection and add tests.
+- [ ] Payments: validate Stripe webhook signatures (STRIPE_WEBHOOK_SECRET) and add tests for invalid signatures.
+- [ ] Payments: add webhook idempotency (store processed event IDs) to avoid double-processing.
+- [ ] Infra: add docker-compose healthchecks and `depends_on` conditions (db → backend → frontend).
+- [ ] Frontend: add Wishlist UI (product list/detail + account) and wire it to the backend wishlist endpoints.
+
+### Low priority
+- [ ] Docs: reconcile `README.md` and `start.sh`/`start.bat` with the actual tooling (pip/npm), env vars, and docker-compose location.
+- [ ] Observability: add optional Sentry wiring (backend + frontend) gated by env vars.
+- [ ] Performance: add ETag/Cache-Control guidance for catalog endpoints and media assets (CDN-friendly).
