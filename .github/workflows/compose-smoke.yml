@@ -1,0 +1,55 @@
+name: Docker Compose Smoke
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  compose-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and start stack
+        run: |
+          docker compose -f infra/docker-compose.yml up -d --build
+
+      - name: Smoke test (frontend + backend health)
+        run: |
+          set -euo pipefail
+
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8000/api/v1/health >/dev/null; then
+              echo "Backend is up"
+              break
+            fi
+            echo "Waiting for backend... ($i/60)"
+            sleep 2
+          done
+          curl -fsS http://localhost:8000/api/v1/health
+          curl -fsS http://localhost:8000/api/v1/health/ready
+
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:4200 >/dev/null; then
+              echo "Frontend is up"
+              break
+            fi
+            echo "Waiting for frontend... ($i/60)"
+            sleep 2
+          done
+          curl -fsS http://localhost:4200 >/dev/null
+
+      - name: Logs (on failure)
+        if: failure()
+        run: |
+          docker compose -f infra/docker-compose.yml ps
+          docker compose -f infra/docker-compose.yml logs --no-color
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker compose -f infra/docker-compose.yml down -v
+
