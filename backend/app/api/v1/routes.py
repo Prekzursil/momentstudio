@@ -12,7 +12,7 @@ from app.api.v1 import admin_dashboard
 from app.api.v1 import payment_methods
 from app.api.v1 import wishlist
 from app.models.catalog import Product, Category
-from fastapi import Response, Depends
+from fastapi import Response, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db.session import get_session
@@ -40,7 +40,14 @@ def healthcheck() -> dict[str, str]:
 
 
 @api_router.get("/health/ready", tags=["health"])
-def readiness() -> dict[str, str]:
+async def readiness(session: AsyncSession = Depends(get_session)) -> dict[str, str]:
+    try:
+        await session.execute(select(1))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not ready",
+        ) from exc
     return {"status": "ready"}
 
 

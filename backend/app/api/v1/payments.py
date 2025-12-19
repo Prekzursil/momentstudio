@@ -32,8 +32,12 @@ async def create_payment_intent(
 
 
 @router.post("/webhook", status_code=status.HTTP_200_OK)
-async def stripe_webhook(request: Request, stripe_signature: str | None = Header(default=None)) -> dict:
+async def stripe_webhook(
+    request: Request,
+    stripe_signature: str | None = Header(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
     payload = await request.body()
-    event = await payments.handle_webhook_event(payload, stripe_signature)
+    event = await payments.handle_webhook_event(session, payload, stripe_signature)
     # Order status updates would occur here based on event["type"]
     return {"received": True, "type": event.get("type")}

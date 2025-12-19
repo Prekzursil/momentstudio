@@ -89,7 +89,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Service to build order from cart (price snapshot).
 - [x] Stripe integration: PaymentIntent create, return client secret.
 - [x] Stripe webhook for payment succeeded/failed; update status.
-- [x] GET /me/orders and /me/orders/{id}.
+- [x] GET /orders and /orders/{id}.
 - [x] Admin order list/filter + status/tracking update.
 - [x] Order status enums and transitions (pending/paid/shipped/cancelled/refunded).
 - [x] Order reference code generator.
@@ -143,7 +143,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Structured logging with request ID.
 - [x] Health/readiness endpoints.
 - [x] Pytest suite for services (auth, catalog, cart, checkout).
-- [x] Integration tests against temp Postgres.
+- [x] Integration tests against in-memory SQLite (API/service flows).
 - [x] mypy type-checking and fixes.
 - [x] CI smoke test hitting health/readiness.
 - [x] API rate limit tests.
@@ -228,19 +228,19 @@ Below is a structured checklist you can turn into issues.
 - [x] Send set-password email flow for guest checkouts that create an account.
 - [x] Frontend cart/checkout tests (unit + e2e) against backend cart/payment intent APIs.
 - [x] Ensure frontend CI runs with Angular toolchain/Chrome to cover cart/checkout flows.
- - [x] Wire cart state to backend cart APIs (load/add/update/remove) instead of local-only.
- - [x] Replace checkout payment placeholder with Stripe Elements + PaymentIntent from backend.
+- [x] Wire cart state to backend cart APIs (load/add/update/remove) instead of local-only.
+- [x] Replace checkout payment placeholder with Stripe Elements + PaymentIntent from backend.
 - [x] Submit checkout to backend to create order, validate stock/pricing, and handle failures.
 - [x] Use backend shipping methods and promo validation instead of hardcoded values.
 - [x] Persist/save checkout address via backend (guest or user) and reuse on account.
 - [x] Add guest checkout API (session-based cart, guest address capture, optional account creation).
- - [x] Tests: guest checkout with promo + shipping validates PaymentIntent amount and queues set-password email.
- - [x] Tests: cart sync returns product metadata (name/slug/image/currency) and totals reflect shipping/promo.
- - [x] Tests: payment intent amount derived from backend totals (seeded cart).
- - [x] Frontend test: Checkout component calls /cart/sync, /payments/intent, /orders/guest-checkout with shipping_method_id/promo/create_account and handles errors/retry.
- - [x] Frontend test: CartStore add/remove via backend merges quantities and is resilient to errors.
- - [x] Frontend test: ProductComponent “Add to cart” posts to backend and shows toast (mock CartStore).
- - [x] E2E: guest checkout (add cart → sync → apply promo/shipping → mock pay → confirm order) with CHROME_BIN headless and --no-sandbox.
+- [x] Tests: guest checkout with promo + shipping validates PaymentIntent amount and queues set-password email.
+- [x] Tests: cart sync returns product metadata (name/slug/image/currency) and totals reflect shipping/promo.
+- [x] Tests: payment intent amount derived from backend totals (seeded cart).
+- [x] Frontend test: Checkout component calls /cart/sync, /payments/intent, /orders/guest-checkout with shipping_method_id/promo/create_account and handles errors/retry.
+- [x] Frontend test: CartStore add/remove via backend merges quantities and is resilient to errors.
+- [x] Frontend test: ProductComponent “Add to cart” posts to backend and shows toast (mock CartStore).
+- [x] E2E: guest checkout (add cart → sync → apply promo/shipping → mock pay → confirm order) with CHROME_BIN headless and --no-sandbox.
 
 ## Frontend - Auth & Account
 - [x] Login page with validation.
@@ -406,11 +406,12 @@ Below is a structured checklist you can turn into issues.
 - [x] Tests: extend full checkout flow test to verify orders can be fetched via `/orders` and `/orders/{id}` after checkout.
 
 ### Medium priority
-- [ ] Backend: replace deprecated `imghdr` usage with Pillow-based file type detection and add tests.
-- [ ] Payments: validate Stripe webhook signatures (STRIPE_WEBHOOK_SECRET) and add tests for invalid signatures.
-- [ ] Payments: add webhook idempotency (store processed event IDs) to avoid double-processing.
-- [ ] Infra: add docker-compose healthchecks and `depends_on` conditions (db → backend → frontend).
+- [x] Backend: replace deprecated `imghdr` usage with Pillow-based file type detection and add tests.
+- [x] Payments: add tests for Stripe webhook signature validation (STRIPE_WEBHOOK_SECRET), including invalid signatures.
+- [x] Payments: add webhook idempotency (store processed event IDs) to avoid double-processing.
+- [x] Infra: add docker-compose healthchecks and `depends_on` conditions (db → backend → frontend).
 - [ ] Frontend: add Wishlist UI (product list/detail + account) and wire it to the backend wishlist endpoints.
+- [ ] Testing: run core API flows against Postgres (Docker) in CI to catch SQL dialect issues.
 
 ### Low priority
 - [ ] Docs: reconcile `README.md` and `start.sh`/`start.bat` with the actual tooling (pip/npm), env vars, and docker-compose location.

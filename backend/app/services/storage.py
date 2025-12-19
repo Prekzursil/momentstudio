@@ -1,10 +1,10 @@
-import imghdr
 import logging
 import uuid
+from io import BytesIO
 from pathlib import Path
 from typing import Tuple
 
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from fastapi import HTTPException, UploadFile, status
 
 from app.core.config import settings
@@ -42,11 +42,9 @@ def save_upload(
     if allowed_content_types:
         if not file.content_type or file.content_type not in allowed_content_types:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
-        sniff = imghdr.what(None, h=content)
-        if sniff:
-            sniff_mime = f"image/{'jpeg' if sniff == 'jpg' else sniff}"
-            if sniff_mime not in allowed_content_types:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
+        sniff_mime = _detect_image_mime(content)
+        if not sniff_mime or sniff_mime not in allowed_content_types:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
 
     original_suffix = Path(file.filename or "").suffix.lower()
     safe_name = Path(filename or "").name if filename else ""
@@ -87,3 +85,26 @@ def _generate_thumbnails(path: Path) -> None:
                 thumb.save(thumb_path, optimize=True)
     except Exception as exc:  # pragma: no cover
         logger.warning("thumbnail_generation_failed", extra={"path": str(path), "error": str(exc)})
+
+
+def _detect_image_mime(content: bytes) -> str | None:
+    try:
+        with Image.open(BytesIO(content)) as img:
+            image_format = img.format
+            img.verify()
+    except (UnidentifiedImageError, OSError, ValueError):
+        return None
+
+    if not image_format:
+        return None
+
+    normalized = image_format.upper()
+    if normalized == "JPEG":
+        return "image/jpeg"
+    if normalized == "PNG":
+        return "image/png"
+    if normalized == "WEBP":
+        return "image/webp"
+    if normalized == "GIF":
+        return "image/gif"
+    return None
