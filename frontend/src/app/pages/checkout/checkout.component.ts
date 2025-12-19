@@ -10,6 +10,7 @@ import { CartStore, CartItem } from '../../core/cart.store';
 import { CartApi } from '../../core/cart.api';
 import { loadStripe, Stripe, StripeElements, StripeCardElement, StripeCardElementChangeEvent } from '@stripe/stripe-js';
 import { ApiService } from '../../core/api.service';
+import { appConfig } from '../../core/app-config';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 type ShippingMethod = { id: string; label: string; amount: number; eta: string };
@@ -315,8 +316,8 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
 
   async ngAfterViewInit(): Promise<void> {
     await this.setupStripe();
-    await this.syncBackendCart(this.items());
-    await this.loadPaymentIntent();
+    this.syncBackendCart(this.items());
+    this.loadPaymentIntent();
   }
 
   ngOnDestroy(): void {
@@ -345,11 +346,10 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
   }
 
   private getStripePublishableKey(): string | null {
-    const meta = document.querySelector('meta[name="stripe-publishable-key"]');
-    return meta?.getAttribute('content') || null;
+    return appConfig.stripePublishableKey || null;
   }
 
-  private async loadPaymentIntent(): Promise<void> {
+  private loadPaymentIntent(): void {
     this.cartApi.paymentIntent().subscribe({
       next: (res) => {
         this.clientSecret = res.client_secret;

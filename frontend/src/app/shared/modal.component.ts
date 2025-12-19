@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { AfterViewInit, Component, ElementRef, EventEmitter, HostListener, Input, OnChanges, Output, ViewChild } from '@angular/core';
 import { NgIf } from '@angular/common';
 import { ButtonComponent } from './button.component';

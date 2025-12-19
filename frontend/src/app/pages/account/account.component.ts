@@ -13,6 +13,7 @@ import { AccountService, Address, Order, AddressCreateRequest } from '../../core
 import { forkJoin } from 'rxjs';
 import { loadStripe, Stripe, StripeElements, StripeCardElement, StripeCardElementChangeEvent } from '@stripe/stripe-js';
 import { ApiService } from '../../core/api.service';
+import { appConfig } from '../../core/app-config';
 
 @Component({
   selector: 'app-account',
@@ -198,10 +199,10 @@ import { ApiService } from '../../core/api.service';
           <div *ngFor="let pm of paymentMethods" class="flex items-center justify-between text-sm border border-slate-200 rounded-lg p-3">
             <div class="flex items-center gap-2">
               <span class="font-semibold">{{ pm.brand || 'Card' }}</span>
-              <span *ngIf=\"pm.last4\">•••• {{ pm.last4 }}</span>
-              <span *ngIf=\"pm.exp_month && pm.exp_year\">(exp {{ pm.exp_month }}/{{ pm.exp_year }})</span>
+              <span *ngIf="pm.last4">•••• {{ pm.last4 }}</span>
+              <span *ngIf="pm.exp_month && pm.exp_year">(exp {{ pm.exp_month }}/{{ pm.exp_year }})</span>
             </div>
-            <app-button size=\"sm\" variant=\"ghost\" label=\"Remove\" (action)=\"removePaymentMethod(pm.id)\"></app-button>
+            <app-button size="sm" variant="ghost" label="Remove" (action)="removePaymentMethod(pm.id)"></app-button>
           </div>
         </section>
 
@@ -515,8 +516,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private getStripePublishableKey(): string | null {
-    const meta = document.querySelector('meta[name=\"stripe-publishable-key\"]');
-    return meta?.getAttribute('content') || null;
+    return appConfig.stripePublishableKey || null;
   }
 
   private createSetupIntent(): void {

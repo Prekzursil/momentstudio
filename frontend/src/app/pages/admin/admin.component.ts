@@ -307,8 +307,8 @@ import { firstValueFrom } from 'rxjs';
                     </td>
                     <td class="py-2 font-semibold text-slate-900">
                       {{ product.name }}
-                      <span *ngIf=\"product.tags?.includes('bestseller')\" class=\"ml-2 text-[10px] uppercase bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full\">Bestseller</span>
-                      <span *ngIf=\"product.tags?.includes('highlight')\" class=\"ml-1 text-[10px] uppercase bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full\">Highlight</span>
+                      <span *ngIf="product.tags?.includes('bestseller')" class="ml-2 text-[10px] uppercase bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Bestseller</span>
+                      <span *ngIf="product.tags?.includes('highlight')" class="ml-1 text-[10px] uppercase bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">Highlight</span>
                     </td>
                     <td>{{ product.price | localizedCurrency : product.currency || 'USD' }}</td>
                     <td><span class="text-xs rounded-full bg-slate-100 px-2 py-1">{{ product.status }}</span></td>
@@ -323,8 +323,8 @@ import { firstValueFrom } from 'rxjs';
                       <app-button size="xs" variant="ghost" label="Save" (action)="saveStock(product)"></app-button>
                     </td>
                     <td>
-                      <span *ngIf=\"product.publish_at\" class=\"text-xs text-slate-600\">{{ product.publish_at | date: 'short' }}</span>
-                      <span *ngIf=\"!product.publish_at\" class=\"text-xs text-slate-400\">—</span>
+                      <span *ngIf="product.publish_at" class="text-xs text-slate-600">{{ product.publish_at | date: 'short' }}</span>
+                      <span *ngIf="!product.publish_at" class="text-xs text-slate-400">—</span>
                     </td>
                     <td class="flex gap-2 py-2">
                       <app-button size="sm" variant="ghost" [label]="'adminUi.products.actions.update' | translate" (action)="loadProduct(product.slug)"></app-button>
@@ -334,11 +334,11 @@ import { firstValueFrom } from 'rxjs';
                 </tbody>
               </table>
             </div>
-            <div *ngIf=\"upcomingProducts().length\" class=\"rounded-lg border border-slate-200 p-3 text-sm text-slate-700\">
-              <p class=\"font-semibold text-slate-900 mb-2\">Upcoming scheduled products</p>
-              <div *ngFor=\"let p of upcomingProducts()\" class=\"flex items-center justify-between py-1 border-b border-slate-100 last:border-0\">
+            <div *ngIf="upcomingProducts().length" class="rounded-lg border border-slate-200 p-3 text-sm text-slate-700">
+              <p class="font-semibold text-slate-900 mb-2">Upcoming scheduled products</p>
+              <div *ngFor="let p of upcomingProducts()" class="flex items-center justify-between py-1 border-b border-slate-100 last:border-0">
                 <span>{{ p.name }}</span>
-                <span class=\"text-xs text-slate-600\">Publishes {{ p.publish_at | date: 'medium' }}</span>
+                <span class="text-xs text-slate-600">Publishes {{ p.publish_at | date: 'medium' }}</span>
               </div>
             </div>
           </section>

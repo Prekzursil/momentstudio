@@ -9,12 +9,20 @@ __pycache__/
 node_modules/
 dist/
 .angular/
+frontend/src/assets/app-config.js
 
 # Env files
 .env
 .env.*
 !.env.example
 !*/.env.example
+
+# Runtime uploads
+uploads/
+backend/uploads/
+
+# Windows download metadata
+*:Zone.Identifier
 
 # OS / editor
 .DS_Store

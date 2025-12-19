@@ -1,5 +1,5 @@
 import { CommonModule, NgOptimizedImage, DOCUMENT } from '@angular/common';
-import { Component, OnDestroy, OnInit, Inject, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CatalogService, Product } from '../../core/catalog.service';
@@ -385,7 +385,7 @@ export class ProductComponent implements OnInit, OnDestroy {
     if (typeof window === 'undefined' || !this.document) return;
     const lang = this.translate.currentLang || this.translate.getDefaultLang() || 'en';
     const href = `${window.location.origin}/products/${product.slug}?lang=${lang}`;
-    let link: HTMLLinkElement | null = this.document.querySelector('link[rel=\"canonical\"]');
+    let link: HTMLLinkElement | null = this.document.querySelector('link[rel="canonical"]');
     if (!link) {
       link = this.document.createElement('link');
       link.setAttribute('rel', 'canonical');

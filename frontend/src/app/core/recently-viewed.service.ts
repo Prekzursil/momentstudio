@@ -64,6 +64,7 @@ export class RecentlyViewedService {
       try {
         localStorage.setItem(this.storageKey, value);
       } catch {
+        // ignore localStorage write failures and fall back to cookie
       }
     }
     this.writeCookie(this.storageKey, value, 30);
