@@ -14,6 +14,8 @@ import { forkJoin } from 'rxjs';
 import { loadStripe, Stripe, StripeElements, StripeCardElement, StripeCardElementChangeEvent } from '@stripe/stripe-js';
 import { ApiService } from '../../core/api.service';
 import { appConfig } from '../../core/app-config';
+import { WishlistService } from '../../core/wishlist.service';
+import { ProductCardComponent } from '../../shared/product-card.component';
 
 @Component({
   selector: 'app-account',
@@ -26,7 +28,8 @@ import { appConfig } from '../../core/app-config';
     BreadcrumbComponent,
     ButtonComponent,
     LocalizedCurrencyPipe,
-    AddressFormComponent
+    AddressFormComponent,
+    ProductCardComponent
   ],
   template: `
     <app-container classes="py-10 grid gap-6">
@@ -138,10 +141,10 @@ import { appConfig } from '../../core/app-config';
           </div>
         </section>
 
-        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-slate-900">Orders</h2>
-            <a routerLink="/shop" class="text-sm text-indigo-600 font-medium">Shop new items</a>
+	        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+	          <div class="flex items-center justify-between">
+	            <h2 class="text-lg font-semibold text-slate-900">Orders</h2>
+	            <a routerLink="/shop" class="text-sm text-indigo-600 font-medium">Shop new items</a>
           </div>
           <div class="flex items-center gap-3 text-sm">
             <label class="flex items-center gap-1">
@@ -179,13 +182,29 @@ import { appConfig } from '../../core/app-config';
                 (action)="nextPage()"
               ></app-button>
             </div>
-          </div>
-        </section>
+	          </div>
+	        </section>
 
-        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-slate-900">Payment methods</h2>
-            <div class="flex gap-2 items-center">
+	        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+	          <div class="flex items-center justify-between">
+	            <h2 class="text-lg font-semibold text-slate-900">Wishlist</h2>
+	            <a routerLink="/shop" class="text-sm text-indigo-600 font-medium">Browse products</a>
+	          </div>
+	          <div
+	            *ngIf="wishlist.items().length === 0"
+	            class="border border-dashed border-slate-200 rounded-xl p-4 text-sm text-slate-600"
+	          >
+	            No saved items yet.
+	          </div>
+	          <div *ngIf="wishlist.items().length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+	            <app-product-card *ngFor="let item of wishlist.items()" [product]="item"></app-product-card>
+	          </div>
+	        </section>
+
+	        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+	          <div class="flex items-center justify-between">
+	            <h2 class="text-lg font-semibold text-slate-900">Payment methods</h2>
+	            <div class="flex gap-2 items-center">
               <app-button size="sm" variant="ghost" label="Add card" (action)="startAddCard()"></app-button>
               <app-button size="sm" label="Save card" (action)="confirmCard()" [disabled]="!cardReady || savingCard"></app-button>
             </div>
@@ -273,12 +292,14 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     private auth: AuthService,
     private account: AccountService,
     private router: Router,
-    private api: ApiService
+    private api: ApiService,
+    public wishlist: WishlistService
   ) {
     this.computeTotalPages();
   }
 
   ngOnInit(): void {
+    this.wishlist.refresh();
     this.loadData();
     this.loadPaymentMethods();
     this.resetIdleTimer();
@@ -466,6 +487,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
 
   signOut(): void {
     this.auth.logout().subscribe(() => {
+      this.wishlist.clear();
       this.toast.success('Signed out');
       this.router.navigateByUrl('/');
     });

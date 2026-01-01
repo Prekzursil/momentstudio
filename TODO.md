@@ -410,7 +410,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Payments: add tests for Stripe webhook signature validation (STRIPE_WEBHOOK_SECRET), including invalid signatures.
 - [x] Payments: add webhook idempotency (store processed event IDs) to avoid double-processing.
 - [x] Infra: add docker-compose healthchecks and `depends_on` conditions (db → backend → frontend).
-- [ ] Frontend: add Wishlist UI (product list/detail + account) and wire it to the backend wishlist endpoints.
+- [x] Frontend: add Wishlist UI (product list/detail + account) and wire it to the backend wishlist endpoints.
 - [ ] Testing: run core API flows against Postgres (Docker) in CI to catch SQL dialect issues.
 
 ### Low priority

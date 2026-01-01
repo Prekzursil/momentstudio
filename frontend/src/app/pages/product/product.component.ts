@@ -14,6 +14,9 @@ import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { Title, Meta } from '@angular/platform-browser';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
+import { WishlistService } from '../../core/wishlist.service';
+import { AuthService } from '../../core/auth.service';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-product-detail',
@@ -129,6 +132,19 @@ import { Subscription } from 'rxjs';
               <div class="flex gap-3">
                 <app-button [label]="'product.addToCart' | translate" size="lg" (action)="addToCart()"></app-button>
                 <app-button [label]="'product.backToShop' | translate" variant="ghost" [routerLink]="['/shop']"></app-button>
+                <app-button
+                  [label]="wishlisted ? ('wishlist.saved' | translate) : ('wishlist.save' | translate)"
+                  variant="ghost"
+                  (action)="toggleWishlist()"
+                >
+                  <svg viewBox="0 0 24 24" class="mr-2 h-4 w-4" [attr.fill]="wishlisted ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z"
+                    />
+                  </svg>
+                </app-button>
               </div>
 
               <div class="flex flex-wrap gap-2" *ngIf="product.tags?.length">
@@ -237,7 +253,10 @@ export class ProductComponent implements OnInit, OnDestroy {
     private meta: Meta,
     private cartStore: CartStore,
     private recentlyViewedService: RecentlyViewedService,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private wishlist: WishlistService,
+    private auth: AuthService,
+    private router: Router
   ) {}
 
   ngOnDestroy(): void {
@@ -248,6 +267,7 @@ export class ProductComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.wishlist.ensureLoaded();
     const slug = this.route.snapshot.paramMap.get('slug');
     this.langSub = this.translate.onLangChange.subscribe(() => {
       if (this.product) {
@@ -316,6 +336,42 @@ export class ProductComponent implements OnInit, OnDestroy {
       this.translate.instant('product.addedTitle'),
       this.translate.instant('product.addedBody', { qty: this.quantity, name: this.product.name })
     );
+  }
+
+  get wishlisted(): boolean {
+    return this.product ? this.wishlist.isWishlisted(this.product.id) : false;
+  }
+
+  toggleWishlist(): void {
+    if (!this.product) return;
+    if (!this.auth.isAuthenticated()) {
+      this.toast.info(this.translate.instant('wishlist.signInTitle'), this.translate.instant('wishlist.signInBody'));
+      this.router.navigateByUrl('/login');
+      return;
+    }
+
+    if (this.wishlisted) {
+      this.wishlist.remove(this.product.id).subscribe({
+        next: () => {
+          this.wishlist.removeLocal(this.product!.id);
+          this.toast.success(
+            this.translate.instant('wishlist.removedTitle'),
+            this.translate.instant('wishlist.removedBody', { name: this.product!.name })
+          );
+        }
+      });
+      return;
+    }
+
+    this.wishlist.add(this.product.id).subscribe({
+      next: (product) => {
+        this.wishlist.addLocal(product);
+        this.toast.success(
+          this.translate.instant('wishlist.addedTitle'),
+          this.translate.instant('wishlist.addedBody', { name: this.product!.name })
+        );
+      }
+    });
   }
 
   private updateMeta(product: Product): void {
