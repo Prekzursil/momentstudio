@@ -372,5 +372,17 @@
       "hint": "Below 5 units",
       "stock": "Stock: {{count}}"
     }
+  },
+  "wishlist": {
+    "add": "Add to wishlist",
+    "remove": "Remove from wishlist",
+    "save": "Save",
+    "saved": "Saved",
+    "signInTitle": "Sign in required",
+    "signInBody": "Please sign in to save items to your wishlist.",
+    "addedTitle": "Saved to wishlist",
+    "addedBody": "{{name}} was added to your wishlist.",
+    "removedTitle": "Removed from wishlist",
+    "removedBody": "{{name}} was removed from your wishlist."
   }
 }

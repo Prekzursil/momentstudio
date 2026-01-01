@@ -5,6 +5,10 @@ import { Product } from '../core/catalog.service';
 import { ButtonComponent } from './button.component';
 import { LocalizedCurrencyPipe } from './localized-currency.pipe';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { WishlistService } from '../core/wishlist.service';
+import { AuthService } from '../core/auth.service';
+import { ToastService } from '../core/toast.service';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-product-card',
@@ -23,6 +27,23 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
           decoding="async"
           sizes="(min-width: 1024px) 320px, (min-width: 768px) 33vw, 50vw"
         />
+        <button
+          type="button"
+          class="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white/90 text-slate-700 shadow-sm transition hover:bg-white dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
+          [class.border-rose-200]="wishlisted"
+          [class.text-rose-600]="wishlisted"
+          [attr.aria-label]="wishlisted ? ('wishlist.remove' | translate) : ('wishlist.add' | translate)"
+          [attr.aria-pressed]="wishlisted"
+          (click)="toggleWishlist($event)"
+        >
+          <svg viewBox="0 0 24 24" class="h-5 w-5" [attr.fill]="wishlisted ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z"
+            />
+          </svg>
+        </button>
         <span
           *ngIf="badge"
           class="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 shadow dark:bg-slate-900/90 dark:text-slate-100"
@@ -53,7 +74,19 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 export class ProductCardComponent {
   @Input({ required: true }) product!: Product;
   @Input() tag?: string | null;
-  constructor(private translate: TranslateService) {}
+  constructor(
+    private translate: TranslateService,
+    private wishlist: WishlistService,
+    private auth: AuthService,
+    private toast: ToastService,
+    private router: Router
+  ) {
+    this.wishlist.ensureLoaded();
+  }
+
+  get wishlisted(): boolean {
+    return this.product ? this.wishlist.isWishlisted(this.product.id) : false;
+  }
 
   get badge(): string | null {
     if (this.tag) return this.tag;
@@ -70,5 +103,40 @@ export class ProductCardComponent {
     if (this.product.stock_quantity === 0) return this.translate.instant('product.soldOut');
     if ((this.product.stock_quantity ?? 0) < 5) return this.translate.instant('product.lowStock');
     return null;
+  }
+
+  toggleWishlist(event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!this.product?.id) return;
+    if (!this.auth.isAuthenticated()) {
+      this.toast.info(this.translate.instant('wishlist.signInTitle'), this.translate.instant('wishlist.signInBody'));
+      this.router.navigateByUrl('/login');
+      return;
+    }
+
+    if (this.wishlisted) {
+      this.wishlist.remove(this.product.id).subscribe({
+        next: () => {
+          this.wishlist.removeLocal(this.product.id);
+          this.toast.success(
+            this.translate.instant('wishlist.removedTitle'),
+            this.translate.instant('wishlist.removedBody', { name: this.product.name })
+          );
+        }
+      });
+      return;
+    }
+
+    this.wishlist.add(this.product.id).subscribe({
+      next: (product) => {
+        this.wishlist.addLocal(product);
+        this.toast.success(
+          this.translate.instant('wishlist.addedTitle'),
+          this.translate.instant('wishlist.addedBody', { name: this.product.name })
+        );
+      }
+    });
   }
 }

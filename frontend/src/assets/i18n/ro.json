@@ -372,5 +372,17 @@
       "hint": "Sub 5 unități",
       "stock": "Stoc: {{count}}"
     }
+  },
+  "wishlist": {
+    "add": "Adaugă la favorite",
+    "remove": "Elimină din favorite",
+    "save": "Salvează",
+    "saved": "Salvat",
+    "signInTitle": "Autentificare necesară",
+    "signInBody": "Autentifică-te pentru a salva produse la favorite.",
+    "addedTitle": "Adăugat la favorite",
+    "addedBody": "{{name}} a fost adăugat la favorite.",
+    "removedTitle": "Eliminat din favorite",
+    "removedBody": "{{name}} a fost eliminat din favorite."
   }
 }
