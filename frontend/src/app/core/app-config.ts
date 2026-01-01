@@ -1,6 +1,7 @@
 export interface AppConfig {
   apiBaseUrl: string;
   appEnv: string;
+  appVersion: string;
   stripePublishableKey: string;
   sentryDsn: string;
 }
@@ -14,6 +15,7 @@ declare global {
 const defaults: AppConfig = {
   apiBaseUrl: '/api/v1',
   appEnv: 'development',
+  appVersion: '',
   stripePublishableKey: '',
   sentryDsn: ''
 };

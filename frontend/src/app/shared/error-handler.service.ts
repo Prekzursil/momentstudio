@@ -13,7 +13,7 @@ export class ErrorHandlerService {
         this.toast.error('Unauthorized', 'Please sign in to continue.');
         return;
       }
-      if (error.status === 500) {
+      if (error.status >= 500 && error.status < 600) {
         captureException(error);
         this.toast.error('Server error', 'Something went wrong. Please try again.');
         return;
