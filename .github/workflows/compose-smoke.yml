@@ -22,11 +22,11 @@ jobs:
           set -euo pipefail
 
           for i in $(seq 1 60); do
-            if curl -fsS http://localhost:8000/api/v1/health >/dev/null; then
-              echo "Backend is up"
+            if curl -fsS http://localhost:8000/api/v1/health/ready >/dev/null; then
+              echo "Backend is ready"
               break
             fi
-            echo "Waiting for backend... ($i/60)"
+            echo "Waiting for backend readiness... ($i/60)"
             sleep 2
           done
           curl -fsS http://localhost:8000/api/v1/health
@@ -52,4 +52,3 @@ jobs:
         if: always()
         run: |
           docker compose -f infra/docker-compose.yml down -v
-

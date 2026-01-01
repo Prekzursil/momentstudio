@@ -21,6 +21,7 @@ from app.models.address import Address  # noqa: F401
 from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod, OrderEvent  # noqa: F401
 from app.models.content import ContentBlock, ContentBlockVersion, ContentStatus, ContentImage, ContentAuditLog, ContentBlockTranslation  # noqa: F401
 from app.models.wishlist import WishlistItem  # noqa: F401
+from app.models.webhook import StripeWebhookEvent  # noqa: F401
 
 __all__ = [
     "Base",
@@ -55,4 +56,5 @@ __all__ = [
     "ContentAuditLog",
     "ContentBlockTranslation",
     "WishlistItem",
+    "StripeWebhookEvent",
 ]

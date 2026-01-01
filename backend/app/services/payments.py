@@ -3,11 +3,13 @@ from typing import Any, cast
 import stripe
 from fastapi import HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
 
 from app.core.config import settings
 from app.models.cart import Cart
+from app.models.webhook import StripeWebhookEvent
 from app.models.user import PaymentMethod, User
 from app.core import metrics
 
@@ -46,7 +48,7 @@ async def create_payment_intent(session: AsyncSession, cart: Cart, amount_cents:
     return {"client_secret": str(client_secret), "intent_id": str(intent_id)}
 
 
-async def handle_webhook_event(payload: bytes, sig_header: str | None) -> dict:
+async def handle_webhook_event(session: AsyncSession, payload: bytes, sig_header: str | None) -> dict:
     if not settings.stripe_webhook_secret:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Webhook secret not set")
     init_stripe()
@@ -54,6 +56,18 @@ async def handle_webhook_event(payload: bytes, sig_header: str | None) -> dict:
         event = stripe.Webhook.construct_event(payload, sig_header, settings.stripe_webhook_secret)
     except Exception as exc:  # broad for Stripe signature errors
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload") from exc
+
+    event_id = event.get("id")
+    if event_id:
+        record = StripeWebhookEvent(
+            stripe_event_id=str(event_id),
+            event_type=str(event.get("type")) if event.get("type") else None,
+        )
+        session.add(record)
+        try:
+            await session.commit()
+        except IntegrityError:
+            await session.rollback()
     return event
 
 

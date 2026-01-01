@@ -4,6 +4,7 @@ from typing import Dict
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -55,6 +56,12 @@ def create_admin_token(session_factory, email="admin@example.com"):
             return tokens["access_token"]
 
     return asyncio.run(create_admin())
+
+
+def _jpeg_bytes() -> bytes:
+    buf = io.BytesIO()
+    Image.new("RGB", (1, 1), color=(255, 0, 0)).save(buf, format="JPEG")
+    return buf.getvalue()
 
 
 def test_catalog_admin_and_public_flows(test_app: Dict[str, object]) -> None:
@@ -220,7 +227,7 @@ def test_product_image_upload_and_delete(tmp_path, test_app: Dict[str, object]) 
 
     upload_res = client.post(
         "/api/v1/catalog/products/plate/images",
-        files={"file": ("pic.jpg", b"fakeimagecontent", "image/jpeg")},
+        files={"file": ("pic.jpg", _jpeg_bytes(), "image/jpeg")},
         headers=auth_headers(admin_token),
     )
     assert upload_res.status_code == 200

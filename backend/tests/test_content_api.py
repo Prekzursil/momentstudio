@@ -1,8 +1,10 @@
 import asyncio
+from io import BytesIO
 from typing import Dict
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.main import app
@@ -49,6 +51,12 @@ def create_admin_token(session_factory) -> str:
             return tokens["access_token"]
 
     return asyncio.run(create_and_token())
+
+
+def _jpeg_bytes() -> bytes:
+    buf = BytesIO()
+    Image.new("RGB", (1, 1), color=(255, 0, 0)).save(buf, format="JPEG")
+    return buf.getvalue()
 
 
 def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
@@ -117,7 +125,7 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     # Image upload
     img_resp = client.post(
         "/api/v1/content/admin/home.hero/images",
-        files={"file": ("hero.jpg", b"fakeimg", "image/jpeg")},
+        files={"file": ("hero.jpg", _jpeg_bytes(), "image/jpeg")},
         headers=auth_headers(admin_token),
     )
     assert img_resp.status_code == 200
