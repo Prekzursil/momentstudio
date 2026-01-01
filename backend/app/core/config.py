@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     csp_enabled: bool = True
     csp_policy: str = "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     slow_query_threshold_ms: int = 500
+    sentry_dsn: str | None = None
+    sentry_traces_sample_rate: float = 0.0
 
     google_client_id: str | None = None
     google_client_secret: str | None = None

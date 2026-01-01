@@ -10,6 +10,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.logging_config import configure_logging
+from app.core.sentry import init_sentry
 from fastapi.encoders import jsonable_encoder
 from app.middleware import (
     AuditMiddleware,
@@ -23,6 +24,7 @@ from app.schemas.error import ErrorResponse
 
 def get_application() -> FastAPI:
     configure_logging(settings.log_json)
+    init_sentry()
     tags_metadata = [
         {"name": "auth", "description": "Authentication and user management"},
         {"name": "catalog", "description": "Products and categories"},

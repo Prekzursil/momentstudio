@@ -411,9 +411,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Payments: add webhook idempotency (store processed event IDs) to avoid double-processing.
 - [x] Infra: add docker-compose healthchecks and `depends_on` conditions (db → backend → frontend).
 - [x] Frontend: add Wishlist UI (product list/detail + account) and wire it to the backend wishlist endpoints.
-- [ ] Testing: run core API flows against Postgres (Docker) in CI to catch SQL dialect issues.
+- [x] Testing: run core API flows against Postgres (Docker) in CI to catch SQL dialect issues.
 
 ### Low priority
-- [ ] Docs: reconcile `README.md` and `start.sh`/`start.bat` with the actual tooling (pip/npm), env vars, and docker-compose location.
-- [ ] Observability: add optional Sentry wiring (backend + frontend) gated by env vars.
-- [ ] Performance: add ETag/Cache-Control guidance for catalog endpoints and media assets (CDN-friendly).
+- [x] Docs: reconcile `README.md` and `start.sh`/`start.bat` with the actual tooling (pip/npm), env vars, and docker-compose location.
+- [x] Observability: add optional Sentry wiring (backend + frontend) gated by env vars.
+- [x] Performance: add ETag/Cache-Control guidance for catalog endpoints and media assets (CDN-friendly).

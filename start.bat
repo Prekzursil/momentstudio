@@ -18,7 +18,7 @@ pip install -r "%BACKEND%\requirements.txt"
 
 if not exist "%FRONTEND%\node_modules" (
   pushd "%FRONTEND%"
-  npm install
+  npm ci
   popd
 )
 
