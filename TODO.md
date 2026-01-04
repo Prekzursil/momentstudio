@@ -391,6 +391,12 @@ Below is a structured checklist you can turn into issues.
 - [x] robots.txt and sitemap.xml generation (with i18n URLs).
 - [x] Per-language canonical URLs for product pages.
 - [x] Document “local-only dev” mode (SQLite + local media + Stripe test) and “prod-like” mode (Postgres + S3 + SMTP).
+- [x] Fix theme switching to override system (Tailwind `darkMode: 'class'`) and sync `color-scheme` to match selected theme.
+- [x] UX: prevent toast notifications from blocking interactions and dedupe repeated error toasts.
+- [x] UX: make Stripe CardElement readable in dark mode and update styles on theme changes (checkout + account).
+- [x] Perf: fix account idle-timer event listener cleanup (avoid leaking listeners with `.bind(this)`).
+- [ ] Follow-up: set `<meta name="theme-color">` dynamically based on selected theme (mobile address bar).
+- [ ] Follow-up: add early theme bootstrap in `frontend/src/index.html` to avoid flash of incorrect theme on load.
 
 ## Backlog (New ideas inspired by Event Link)
 

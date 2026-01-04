@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, AfterViewInit, OnDestroy, signal, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, AfterViewInit, OnDestroy, signal, ViewChild, ElementRef, effect, EffectRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
@@ -16,6 +16,7 @@ import { ApiService } from '../../core/api.service';
 import { appConfig } from '../../core/app-config';
 import { WishlistService } from '../../core/wishlist.service';
 import { ProductCardComponent } from '../../shared/product-card.component';
+import { ThemeMode, ThemeService } from '../../core/theme.service';
 
 @Component({
   selector: 'app-account',
@@ -35,11 +36,11 @@ import { ProductCardComponent } from '../../shared/product-card.component';
     <app-container classes="py-10 grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
       <ng-container *ngIf="!loading(); else loadingTpl">
-        <div *ngIf="error()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm">
+        <div *ngIf="error()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
           {{ error() }}
         </div>
         <div class="grid gap-6" *ngIf="!error()">
-        <div *ngIf="!emailVerified()" class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 text-sm grid gap-3">
+        <div *ngIf="!emailVerified()" class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 text-sm grid gap-3 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
           <div class="flex items-start justify-between gap-3">
             <span>Verify your email to secure your account and receive updates.</span>
             <app-button size="sm" variant="ghost" label="Resend link" (action)="resendVerification()"></app-button>
@@ -50,44 +51,44 @@ import { ProductCardComponent } from '../../shared/product-card.component';
               name="verificationToken"
               type="text"
               placeholder="Enter verification token"
-              class="border border-amber-300 rounded-lg px-3 py-2 text-sm flex-1"
+              class="border border-amber-300 bg-white rounded-lg px-3 py-2 text-sm flex-1 text-slate-900 dark:border-amber-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
               required
             />
             <app-button size="sm" label="Confirm" type="submit"></app-button>
           </form>
-          <p *ngIf="verificationStatus" class="text-xs text-amber-800">{{ verificationStatus }}</p>
+          <p *ngIf="verificationStatus" class="text-xs text-amber-800 dark:text-amber-200">{{ verificationStatus }}</p>
         </div>
         <header class="flex items-center justify-between">
           <div>
-            <p class="text-sm text-slate-500">Signed in as</p>
-            <h1 class="text-2xl font-semibold text-slate-900">{{ profile()?.email || '...' }}</h1>
+            <p class="text-sm text-slate-500 dark:text-slate-400">Signed in as</p>
+            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ profile()?.email || '...' }}</h1>
           </div>
           <app-button routerLink="/account/password" variant="ghost" label="Change password"></app-button>
         </header>
 
-        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-slate-900">Profile</h2>
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Profile</h2>
             <app-button size="sm" variant="ghost" label="Save"></app-button>
           </div>
           <div class="flex items-center gap-4">
-            <img [src]="avatar || placeholderAvatar" alt="avatar" class="h-16 w-16 rounded-full object-cover border" />
-            <label class="text-sm text-indigo-600 font-medium cursor-pointer">
+            <img [src]="avatar || placeholderAvatar" alt="avatar" class="h-16 w-16 rounded-full object-cover border border-slate-200 dark:border-slate-800" />
+            <label class="text-sm text-indigo-600 font-medium cursor-pointer dark:text-indigo-300">
               Upload avatar
               <input type="file" class="hidden" accept="image/*" (change)="onAvatarChange($event)" />
             </label>
         </div>
-        <p class="text-sm text-slate-700">Name: {{ profile()?.name || 'Not set' }}</p>
-        <p class="text-sm text-slate-700">Email: {{ profile()?.email || '...' }}</p>
-        <p class="text-sm text-slate-600">Session timeout: 30m. <a class="text-indigo-600" (click)="signOut()">Sign out</a></p>
+        <p class="text-sm text-slate-700 dark:text-slate-200">Name: {{ profile()?.name || 'Not set' }}</p>
+        <p class="text-sm text-slate-700 dark:text-slate-200">Email: {{ profile()?.email || '...' }}</p>
+        <p class="text-sm text-slate-600 dark:text-slate-300">Session timeout: 30m. <a class="text-indigo-600 dark:text-indigo-300" (click)="signOut()">Sign out</a></p>
         </section>
 
-        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-slate-900">Connected accounts</h2>
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Connected accounts</h2>
             <span
               class="text-xs rounded-full px-2 py-1"
-              [ngClass]="googleEmail() ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'"
+              [ngClass]="googleEmail() ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'"
             >
               {{ googleEmail() ? 'Google linked' : 'Not linked' }}
             </span>
@@ -97,11 +98,11 @@ import { ProductCardComponent } from '../../shared/product-card.component';
               *ngIf="googlePicture()"
               [src]="googlePicture()"
               alt="Google profile"
-              class="h-10 w-10 rounded-full border object-cover"
+              class="h-10 w-10 rounded-full border border-slate-200 dark:border-slate-700 object-cover"
             />
             <div>
-              <p class="font-semibold text-slate-900">Google</p>
-              <p class="text-slate-600">{{ googleEmail() || 'No Google account linked' }}</p>
+              <p class="font-semibold text-slate-900 dark:text-slate-50">Google</p>
+              <p class="text-slate-600 dark:text-slate-300">{{ googleEmail() || 'No Google account linked' }}</p>
             </div>
             <div class="flex gap-2 ml-auto">
               <app-button size="sm" variant="ghost" label="Link Google" *ngIf="!googleEmail()" (action)="linkGoogle()"></app-button>
@@ -110,25 +111,25 @@ import { ProductCardComponent } from '../../shared/product-card.component';
           </div>
         </section>
 
-        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-slate-900">Addresses</h2>
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Addresses</h2>
             <app-button size="sm" variant="ghost" label="Add address" (action)="openAddressForm()"></app-button>
           </div>
-          <div *ngIf="showAddressForm" class="rounded-lg border border-slate-200 p-3">
+          <div *ngIf="showAddressForm" class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
             <app-address-form
               [model]="addressModel"
               (save)="saveAddress($event)"
               (cancel)="closeAddressForm()"
             ></app-address-form>
           </div>
-          <div *ngIf="addresses().length === 0 && !showAddressForm" class="text-sm text-slate-700">No addresses yet.</div>
-          <div *ngFor="let addr of addresses()" class="rounded-lg border border-slate-200 p-3 grid gap-1 text-sm text-slate-700">
+          <div *ngIf="addresses().length === 0 && !showAddressForm" class="text-sm text-slate-700 dark:text-slate-200">No addresses yet.</div>
+          <div *ngFor="let addr of addresses()" class="rounded-lg border border-slate-200 p-3 grid gap-1 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200">
             <div class="flex items-center justify-between">
-              <span class="font-semibold text-slate-900">{{ addr.label || 'Address' }}</span>
+              <span class="font-semibold text-slate-900 dark:text-slate-50">{{ addr.label || 'Address' }}</span>
               <div class="flex items-center gap-2 text-xs">
-                <span *ngIf="addr.is_default_shipping" class="rounded-full bg-slate-100 px-2 py-0.5">Default shipping</span>
-                <span *ngIf="addr.is_default_billing" class="rounded-full bg-slate-100 px-2 py-0.5">Default billing</span>
+                <span *ngIf="addr.is_default_shipping" class="rounded-full bg-slate-100 px-2 py-0.5 dark:bg-slate-800">Default shipping</span>
+                <span *ngIf="addr.is_default_billing" class="rounded-full bg-slate-100 px-2 py-0.5 dark:bg-slate-800">Default billing</span>
               </div>
               <div class="flex gap-2">
                 <app-button size="sm" variant="ghost" label="Edit" (action)="editAddress(addr)"></app-button>
@@ -141,40 +142,40 @@ import { ProductCardComponent } from '../../shared/product-card.component';
           </div>
         </section>
 
-	        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-	          <div class="flex items-center justify-between">
-	            <h2 class="text-lg font-semibold text-slate-900">Orders</h2>
-	            <a routerLink="/shop" class="text-sm text-indigo-600 font-medium">Shop new items</a>
-          </div>
-          <div class="flex items-center gap-3 text-sm">
-            <label class="flex items-center gap-1">
-              Status
-              <select class="rounded-lg border border-slate-200 px-2 py-1" [(ngModel)]="orderFilter" (change)="filterOrders()">
-                <option value="">All</option>
-                <option value="pending">Pending</option>
-                <option value="paid">Paid</option>
-                <option value="shipped">Shipped</option>
-                <option value="cancelled">Cancelled</option>
-                <option value="refunded">Refunded</option>
-              </select>
-            </label>
-          </div>
-          <div *ngIf="pagedOrders().length === 0" class="border border-dashed border-slate-200 rounded-xl p-4 text-sm text-slate-600">
-            No orders yet.
-          </div>
-          <div *ngFor="let order of pagedOrders()" class="rounded-lg border border-slate-200 p-3 grid gap-1 text-sm text-slate-700">
-            <div class="flex items-center justify-between">
-              <span class="font-semibold text-slate-900">Order #{{ order.reference_code || order.id }}</span>
-              <span class="text-xs rounded-full bg-slate-100 px-2 py-1">{{ order.status }}</span>
-            </div>
-            <span>{{ order.created_at | date: 'mediumDate' }}</span>
-            <span class="font-semibold text-slate-900">{{ order.total_amount | localizedCurrency : order.currency || 'USD' }}</span>
-          </div>
-          <div class="flex items-center justify-between text-sm" *ngIf="pagedOrders().length">
-            <span>Page {{ page }} / {{ totalPages }}</span>
-            <div class="flex gap-2">
-              <app-button size="sm" variant="ghost" label="Prev" [disabled]="page === 1" (action)="prevPage()"></app-button>
-              <app-button
+		        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+		          <div class="flex items-center justify-between">
+		            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Orders</h2>
+		            <a routerLink="/shop" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">Shop new items</a>
+	          </div>
+	          <div class="flex items-center gap-3 text-sm">
+	            <label class="flex items-center gap-1">
+	              Status
+	              <select class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="orderFilter" (change)="filterOrders()">
+	                <option value="">All</option>
+	                <option value="pending">Pending</option>
+	                <option value="paid">Paid</option>
+	                <option value="shipped">Shipped</option>
+	                <option value="cancelled">Cancelled</option>
+	                <option value="refunded">Refunded</option>
+	              </select>
+	            </label>
+	          </div>
+	          <div *ngIf="pagedOrders().length === 0" class="border border-dashed border-slate-200 rounded-xl p-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
+	            No orders yet.
+	          </div>
+	          <div *ngFor="let order of pagedOrders()" class="rounded-lg border border-slate-200 p-3 grid gap-1 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200">
+	            <div class="flex items-center justify-between">
+	              <span class="font-semibold text-slate-900 dark:text-slate-50">Order #{{ order.reference_code || order.id }}</span>
+	              <span class="text-xs rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-800">{{ order.status }}</span>
+	            </div>
+	            <span>{{ order.created_at | date: 'mediumDate' }}</span>
+	            <span class="font-semibold text-slate-900 dark:text-slate-50">{{ order.total_amount | localizedCurrency : order.currency || 'USD' }}</span>
+	          </div>
+	          <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200" *ngIf="pagedOrders().length">
+	            <span>Page {{ page }} / {{ totalPages }}</span>
+	            <div class="flex gap-2">
+	              <app-button size="sm" variant="ghost" label="Prev" [disabled]="page === 1" (action)="prevPage()"></app-button>
+	              <app-button
                 size="sm"
                 variant="ghost"
                 label="Next"
@@ -183,39 +184,39 @@ import { ProductCardComponent } from '../../shared/product-card.component';
               ></app-button>
             </div>
 	          </div>
-	        </section>
+		        </section>
 
-	        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-	          <div class="flex items-center justify-between">
-	            <h2 class="text-lg font-semibold text-slate-900">Wishlist</h2>
-	            <a routerLink="/shop" class="text-sm text-indigo-600 font-medium">Browse products</a>
-	          </div>
-	          <div
-	            *ngIf="wishlist.items().length === 0"
-	            class="border border-dashed border-slate-200 rounded-xl p-4 text-sm text-slate-600"
-	          >
-	            No saved items yet.
-	          </div>
-	          <div *ngIf="wishlist.items().length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-	            <app-product-card *ngFor="let item of wishlist.items()" [product]="item"></app-product-card>
-	          </div>
-	        </section>
+		        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+		          <div class="flex items-center justify-between">
+		            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Wishlist</h2>
+		            <a routerLink="/shop" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">Browse products</a>
+		          </div>
+		          <div
+		            *ngIf="wishlist.items().length === 0"
+		            class="border border-dashed border-slate-200 rounded-xl p-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300"
+		          >
+		            No saved items yet.
+		          </div>
+		          <div *ngIf="wishlist.items().length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+		            <app-product-card *ngFor="let item of wishlist.items()" [product]="item"></app-product-card>
+		          </div>
+		        </section>
 
-	        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-	          <div class="flex items-center justify-between">
-	            <h2 class="text-lg font-semibold text-slate-900">Payment methods</h2>
-	            <div class="flex gap-2 items-center">
+		        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+		          <div class="flex items-center justify-between">
+		            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Payment methods</h2>
+		            <div class="flex gap-2 items-center">
               <app-button size="sm" variant="ghost" label="Add card" (action)="startAddCard()"></app-button>
               <app-button size="sm" label="Save card" (action)="confirmCard()" [disabled]="!cardReady || savingCard"></app-button>
             </div>
           </div>
-          <div *ngIf="paymentMethods.length === 0" class="text-sm text-slate-700">No cards saved yet.</div>
-          <div class="border border-dashed border-slate-200 rounded-lg p-3 text-sm" *ngIf="cardElementVisible">
-            <p class="text-slate-600 mb-2">Enter card details:</p>
+          <div *ngIf="paymentMethods.length === 0" class="text-sm text-slate-700 dark:text-slate-200">No cards saved yet.</div>
+          <div class="border border-dashed border-slate-200 rounded-lg p-3 text-sm dark:border-slate-700" *ngIf="cardElementVisible">
+            <p class="text-slate-600 dark:text-slate-300 mb-2">Enter card details:</p>
             <div #cardHost id="card-element" class="min-h-[48px]"></div>
-            <p *ngIf="cardError" class="text-rose-700 text-xs mt-2">{{ cardError }}</p>
+            <p *ngIf="cardError" class="text-rose-700 dark:text-rose-300 text-xs mt-2">{{ cardError }}</p>
           </div>
-          <div *ngFor="let pm of paymentMethods" class="flex items-center justify-between text-sm border border-slate-200 rounded-lg p-3">
+          <div *ngFor="let pm of paymentMethods" class="flex items-center justify-between text-sm border border-slate-200 rounded-lg p-3 dark:border-slate-700">
             <div class="flex items-center gap-2">
               <span class="font-semibold">{{ pm.brand || 'Card' }}</span>
               <span *ngIf="pm.last4">•••• {{ pm.last4 }}</span>
@@ -225,19 +226,19 @@ import { ProductCardComponent } from '../../shared/product-card.component';
           </div>
         </section>
 
-        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-          <h2 class="text-lg font-semibold text-slate-900">Session</h2>
-          <p class="text-sm text-slate-700">
-            You will be logged out after inactivity to keep your account safe. <a class="text-indigo-600" (click)="signOut()">Logout now</a>.
-          </p>
-          <div class="flex gap-2">
-            <app-button size="sm" variant="ghost" label="Refresh session" (action)="refreshSession()"></app-button>
-          </div>
-        </section>
+	        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Session</h2>
+	          <p class="text-sm text-slate-700 dark:text-slate-200">
+	            You will be logged out after inactivity to keep your account safe. <a class="text-indigo-600 dark:text-indigo-300" (click)="signOut()">Logout now</a>.
+	          </p>
+	          <div class="flex gap-2">
+	            <app-button size="sm" variant="ghost" label="Refresh session" (action)="refreshSession()"></app-button>
+	          </div>
+	        </section>
       </div>
       </ng-container>
       <ng-template #loadingTpl>
-        <div class="text-sm text-slate-600">Loading your account...</div>
+        <div class="text-sm text-slate-600 dark:text-slate-300">Loading your account...</div>
       </ng-template>
     </app-container>
   `
@@ -276,6 +277,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   private card?: StripeCardElement;
   private clientSecret: string | null = null;
   @ViewChild('cardHost') cardElementRef?: ElementRef<HTMLDivElement>;
+  private stripeThemeEffect?: EffectRef;
   showAddressForm = false;
   editingAddressId: string | null = null;
   addressModel: AddressCreateRequest = {
@@ -285,6 +287,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     country: 'US'
   };
   private idleTimer?: any;
+  private readonly handleUserActivity = () => this.resetIdleTimer();
   idleWarning = signal<string | null>(null);
 
   constructor(
@@ -293,9 +296,16 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     private account: AccountService,
     private router: Router,
     private api: ApiService,
-    public wishlist: WishlistService
+    public wishlist: WishlistService,
+    private theme: ThemeService
   ) {
     this.computeTotalPages();
+    this.stripeThemeEffect = effect(() => {
+      const mode = this.theme.mode()();
+      if (this.card) {
+        this.card.update({ style: this.buildStripeCardStyle(mode) });
+      }
+    });
   }
 
   ngOnInit(): void {
@@ -303,8 +313,8 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadData();
     this.loadPaymentMethods();
     this.resetIdleTimer();
-    window.addEventListener('mousemove', this.resetIdleTimer.bind(this));
-    window.addEventListener('keydown', this.resetIdleTimer.bind(this));
+    window.addEventListener('mousemove', this.handleUserActivity);
+    window.addEventListener('keydown', this.handleUserActivity);
   }
 
   async ngAfterViewInit(): Promise<void> {
@@ -516,8 +526,9 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.card) {
       this.card.destroy();
     }
-    window.removeEventListener('mousemove', this.resetIdleTimer.bind(this));
-    window.removeEventListener('keydown', this.resetIdleTimer.bind(this));
+    this.stripeThemeEffect?.destroy();
+    window.removeEventListener('mousemove', this.handleUserActivity);
+    window.removeEventListener('keydown', this.handleUserActivity);
   }
 
   private async setupStripe(): Promise<void> {
@@ -533,8 +544,33 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
     this.elements = this.stripe.elements();
-    this.card = this.elements.create('card');
+    this.card = this.elements.create('card', { style: this.buildStripeCardStyle(this.theme.mode()()) });
     this.mountCardElement();
+  }
+
+  private buildStripeCardStyle(mode: ThemeMode) {
+    const base =
+      mode === 'dark'
+        ? {
+            color: '#f8fafc',
+            iconColor: '#f8fafc',
+            fontFamily: 'Inter, system-ui, sans-serif',
+            fontSize: '16px',
+            '::placeholder': { color: '#94a3b8' }
+          }
+        : {
+            color: '#0f172a',
+            iconColor: '#0f172a',
+            fontFamily: 'Inter, system-ui, sans-serif',
+            fontSize: '16px',
+            '::placeholder': { color: '#64748b' }
+          };
+    return {
+      base,
+      invalid: {
+        color: mode === 'dark' ? '#fca5a5' : '#b91c1c'
+      }
+    };
   }
 
   private getStripePublishableKey(): string | null {

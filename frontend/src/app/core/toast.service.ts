@@ -31,6 +31,11 @@ export class ToastService {
   }
 
   private push(message: Omit<ToastMessage, 'id'>): void {
+    const hasDuplicate = this.messagesSignal().some(
+      (existing) =>
+        existing.title === message.title && existing.description === message.description && existing.tone === message.tone
+    );
+    if (hasDuplicate) return;
     const id = uuidv4();
     this.messagesSignal.update((msgs) => [...msgs, { id, ...message }]);
     setTimeout(() => this.clear(id), 4000);

@@ -13,7 +13,7 @@ export interface ToastMessage {
   standalone: true,
   imports: [NgForOf],
   template: `
-    <div class="fixed inset-x-0 top-4 z-50 flex flex-col items-center gap-3 px-4">
+    <div class="pointer-events-none fixed inset-x-0 top-4 z-50 flex flex-col items-center gap-3 px-4">
       <div
         *ngFor="let toast of messages"
         class="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-lg px-4 py-3 grid gap-1 dark:bg-slate-900 dark:border-slate-700 dark:shadow-none"

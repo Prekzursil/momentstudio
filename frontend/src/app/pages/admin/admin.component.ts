@@ -43,24 +43,24 @@ import { firstValueFrom } from 'rxjs';
     SkeletonComponent,
     TranslateModule
   ],
-  template: `
+ template: `
     <app-container classes="py-8 grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-      <div *ngIf="error()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm">
+      <div *ngIf="error()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
         {{ error() }}
       </div>
       <div class="grid lg:grid-cols-[260px_1fr] gap-6">
-        <aside class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-2 text-sm text-slate-700">
-          <a class="font-semibold text-slate-900">{{ 'adminUi.nav.dashboard' | translate }}</a>
-          <a class="hover:text-slate-900 text-slate-700">{{ 'adminUi.nav.products' | translate }}</a>
-          <a class="hover:text-slate-900 text-slate-700">{{ 'adminUi.nav.orders' | translate }}</a>
-          <a class="hover:text-slate-900 text-slate-700">{{ 'adminUi.nav.users' | translate }}</a>
-          <a class="hover:text-slate-900 text-slate-700">{{ 'adminUi.nav.content' | translate }}</a>
+        <aside class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+          <a class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.nav.dashboard' | translate }}</a>
+          <a class="hover:text-slate-900 text-slate-700 dark:text-slate-200 dark:hover:text-white">{{ 'adminUi.nav.products' | translate }}</a>
+          <a class="hover:text-slate-900 text-slate-700 dark:text-slate-200 dark:hover:text-white">{{ 'adminUi.nav.orders' | translate }}</a>
+          <a class="hover:text-slate-900 text-slate-700 dark:text-slate-200 dark:hover:text-white">{{ 'adminUi.nav.users' | translate }}</a>
+          <a class="hover:text-slate-900 text-slate-700 dark:text-slate-200 dark:hover:text-white">{{ 'adminUi.nav.content' | translate }}</a>
         </aside>
 
         <div class="grid gap-6" *ngIf="!loading(); else loadingTpl">
           <section class="grid gap-3">
-            <h1 class="text-2xl font-semibold text-slate-900">{{ 'adminUi.dashboardTitle' | translate }}</h1>
+            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboardTitle' | translate }}</h1>
             <div class="grid md:grid-cols-3 gap-4">
               <app-card [title]="'adminUi.cards.products' | translate" [subtitle]="summary()?.products + ' total'"></app-card>
               <app-card [title]="'adminUi.cards.orders' | translate" [subtitle]="summary()?.orders + ' total'"></app-card>
@@ -76,9 +76,9 @@ import { firstValueFrom } from 'rxjs';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Global assets</h2>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Global assets</h2>
               <app-button size="sm" variant="ghost" label="Reload" (action)="loadAssets()"></app-button>
             </div>
             <div class="grid md:grid-cols-3 gap-3 text-sm">
@@ -88,18 +88,18 @@ import { firstValueFrom } from 'rxjs';
             </div>
             <div class="flex items-center gap-2 text-sm">
               <app-button size="sm" label="Save assets" (action)="saveAssets()"></app-button>
-              <span class="text-xs text-emerald-700" *ngIf="assetsMessage">{{ assetsMessage }}</span>
-              <span class="text-xs text-rose-700" *ngIf="assetsError">{{ assetsError }}</span>
+              <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="assetsMessage">{{ assetsMessage }}</span>
+              <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="assetsError">{{ assetsError }}</span>
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">SEO meta (per page & language)</h2>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">SEO meta (per page & language)</h2>
               <div class="flex gap-2 text-sm">
                 <label class="flex items-center gap-2">
                   Page
-                  <select class="rounded border border-slate-200 px-2 py-1" [(ngModel)]="seoPage" (ngModelChange)="loadSeo()">
+                  <select class="rounded border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="seoPage" (ngModelChange)="loadSeo()">
                     <option value="home">Home</option>
                     <option value="shop">Shop</option>
                     <option value="product">Product</option>
@@ -119,21 +119,21 @@ import { firstValueFrom } from 'rxjs';
             </div>
             <div class="grid md:grid-cols-2 gap-3 text-sm">
               <app-input label="Meta title" [(value)]="seoForm.title"></app-input>
-              <label class="grid text-sm font-medium text-slate-700 md:col-span-2">
+              <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
                 Meta description
-                <textarea rows="2" class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="seoForm.description"></textarea>
+                <textarea rows="2" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="seoForm.description"></textarea>
               </label>
             </div>
             <div class="flex items-center gap-2 text-sm">
               <app-button size="sm" label="Save SEO" (action)="saveSeo()"></app-button>
-              <span class="text-xs text-emerald-700" *ngIf="seoMessage">{{ seoMessage }}</span>
-              <span class="text-xs text-rose-700" *ngIf="seoError">{{ seoError }}</span>
+              <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="seoMessage">{{ seoMessage }}</span>
+              <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="seoError">{{ seoError }}</span>
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Static pages (RO/EN)</h2>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Static pages (RO/EN)</h2>
               <div class="flex gap-2 text-sm">
                 <button class="px-3 py-1 rounded border" [class.bg-slate-900]="infoLang === 'en'" [class.text-white]="infoLang === 'en'" (click)="selectInfoLang('en')">
                   EN
@@ -144,35 +144,35 @@ import { firstValueFrom } from 'rxjs';
               </div>
             </div>
             <div class="grid gap-3 text-sm">
-              <label class="grid gap-1 font-medium text-slate-700">
+              <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
                 About content
-                <textarea rows="3" class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="infoForm.about"></textarea>
+                <textarea rows="3" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="infoForm.about"></textarea>
               </label>
               <div class="flex gap-2">
                 <app-button size="sm" label="Save About" (action)="saveInfo('page.about', infoForm.about)"></app-button>
               </div>
-              <label class="grid gap-1 font-medium text-slate-700">
+              <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
                 FAQ content
-                <textarea rows="3" class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="infoForm.faq"></textarea>
+                <textarea rows="3" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="infoForm.faq"></textarea>
               </label>
               <div class="flex gap-2">
                 <app-button size="sm" label="Save FAQ" (action)="saveInfo('page.faq', infoForm.faq)"></app-button>
               </div>
-              <label class="grid gap-1 font-medium text-slate-700">
+              <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
                 Shipping/Returns content
-                <textarea rows="3" class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="infoForm.shipping"></textarea>
+                <textarea rows="3" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="infoForm.shipping"></textarea>
               </label>
               <div class="flex gap-2">
                 <app-button size="sm" label="Save Shipping" (action)="saveInfo('page.shipping', infoForm.shipping)"></app-button>
-                <span class="text-xs text-emerald-700" *ngIf="infoMessage">{{ infoMessage }}</span>
-                <span class="text-xs text-rose-700" *ngIf="infoError">{{ infoError }}</span>
+                <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="infoMessage">{{ infoMessage }}</span>
+                <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="infoError">{{ infoError }}</span>
               </div>
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Homepage hero (per language)</h2>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Homepage hero (per language)</h2>
               <div class="flex gap-2 text-sm">
                 <button
                   class="px-3 py-1 rounded border"
@@ -201,70 +201,70 @@ import { firstValueFrom } from 'rxjs';
             </div>
             <div class="flex gap-2">
               <app-button label="Save hero" (action)="saveHero()"></app-button>
-              <span class="text-xs text-emerald-700" *ngIf="heroMessage()">{{ heroMessage() }}</span>
-              <span class="text-xs text-rose-700" *ngIf="heroError()">{{ heroError() }}</span>
+              <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="heroMessage()">{{ heroMessage() }}</span>
+              <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="heroError()">{{ heroError() }}</span>
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Homepage sections order</h2>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Homepage sections order</h2>
               <app-button size="sm" variant="ghost" label="Save order" (action)="saveSections()"></app-button>
             </div>
-            <p class="text-sm text-slate-600">Drag to reorder hero / collections / bestsellers / new arrivals.</p>
+            <p class="text-sm text-slate-600 dark:text-slate-300">Drag to reorder hero / collections / bestsellers / new arrivals.</p>
             <div class="grid gap-2">
               <div
                 *ngFor="let section of sectionOrder"
-                class="flex items-center justify-between rounded-lg border border-dashed border-slate-300 p-3 text-sm bg-slate-50"
+                class="flex items-center justify-between rounded-lg border border-dashed border-slate-300 p-3 text-sm bg-slate-50 dark:border-slate-700 dark:bg-slate-950/30"
                 draggable="true"
                 (dragstart)="onSectionDragStart(section)"
                 (dragover)="onSectionDragOver($event)"
                 (drop)="onSectionDrop(section)"
               >
-                <span class="font-semibold text-slate-900 capitalize">{{ section.replace('_', ' ') }}</span>
-                <span class="text-xs text-slate-500">drag</span>
+                <span class="font-semibold text-slate-900 dark:text-slate-50 capitalize">{{ section.replace('_', ' ') }}</span>
+                <span class="text-xs text-slate-500 dark:text-slate-400">drag</span>
               </div>
             </div>
-            <span class="text-xs text-emerald-700" *ngIf="sectionsMessage">{{ sectionsMessage }}</span>
+            <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="sectionsMessage">{{ sectionsMessage }}</span>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">Featured collections</h2>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Featured collections</h2>
               <app-button size="sm" variant="ghost" label="Reset" (action)="resetCollectionForm()"></app-button>
             </div>
             <div class="grid md:grid-cols-2 gap-3 text-sm">
               <app-input label="Slug" [(value)]="collectionForm.slug"></app-input>
               <app-input label="Name" [(value)]="collectionForm.name"></app-input>
-              <label class="grid text-sm font-medium text-slate-700 md:col-span-2">
+              <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
                 Description
-                <textarea class="rounded-lg border border-slate-200 px-3 py-2" rows="2" [(ngModel)]="collectionForm.description"></textarea>
+                <textarea class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" rows="2" [(ngModel)]="collectionForm.description"></textarea>
               </label>
-              <label class="grid text-sm font-medium text-slate-700 md:col-span-2">
+              <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
                 Products (hold Ctrl/Cmd to multi-select)
-                <select multiple class="rounded-lg border border-slate-200 px-3 py-2 min-h-[120px]" [(ngModel)]="collectionForm.product_ids">
+                <select multiple class="rounded-lg border border-slate-200 bg-white px-3 py-2 min-h-[120px] text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="collectionForm.product_ids">
                   <option *ngFor="let p of products" [value]="p.id">{{ p.name }} ({{ p.slug }})</option>
                 </select>
               </label>
             </div>
             <div class="flex gap-2">
               <app-button [label]="editingCollection ? 'Update collection' : 'Create collection'" (action)="saveCollection()"></app-button>
-              <span class="text-xs text-emerald-700" *ngIf="collectionMessage">{{ collectionMessage }}</span>
+              <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="collectionMessage">{{ collectionMessage }}</span>
             </div>
-            <div class="grid gap-2 text-sm text-slate-700">
-              <div *ngFor="let col of featuredCollections" class="rounded-lg border border-slate-200 p-3 flex items-center justify-between">
+            <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
+              <div *ngFor="let col of featuredCollections" class="rounded-lg border border-slate-200 p-3 flex items-center justify-between dark:border-slate-700">
                 <div>
-                  <p class="font-semibold text-slate-900">{{ col.name }}</p>
-                  <p class="text-xs text-slate-500">{{ col.slug }} · {{ col.description }}</p>
+                  <p class="font-semibold text-slate-900 dark:text-slate-50">{{ col.name }}</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">{{ col.slug }} · {{ col.description }}</p>
                 </div>
                 <app-button size="sm" variant="ghost" label="Edit" (action)="editCollection(col)"></app-button>
               </div>
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">{{ 'adminUi.products.title' | translate }}</h2>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.products.title' | translate }}</h2>
               <div class="flex gap-2">
                 <app-button size="sm" [label]="'adminUi.products.new' | translate" (action)="startNewProduct()"></app-button>
                 <app-button
@@ -283,7 +283,7 @@ import { firstValueFrom } from 'rxjs';
             <div class="overflow-auto">
               <table class="min-w-full text-sm text-left">
                 <thead>
-                  <tr class="border-b border-slate-200">
+                  <tr class="border-b border-slate-200 dark:border-slate-800">
                     <th class="py-2">
                       <input type="checkbox" [checked]="allSelected" (change)="toggleAll($event)" />
                     </th>
@@ -297,7 +297,7 @@ import { firstValueFrom } from 'rxjs';
                   </tr>
                 </thead>
                 <tbody>
-                  <tr *ngFor="let product of products" class="border-b border-slate-100">
+                  <tr *ngFor="let product of products" class="border-b border-slate-100 dark:border-slate-800">
                     <td class="py-2">
                       <input
                         type="checkbox"
@@ -305,17 +305,17 @@ import { firstValueFrom } from 'rxjs';
                         (change)="toggleSelect(product.id, $event)"
                       />
                     </td>
-                    <td class="py-2 font-semibold text-slate-900">
+                    <td class="py-2 font-semibold text-slate-900 dark:text-slate-50">
                       {{ product.name }}
                       <span *ngIf="product.tags?.includes('bestseller')" class="ml-2 text-[10px] uppercase bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Bestseller</span>
                       <span *ngIf="product.tags?.includes('highlight')" class="ml-1 text-[10px] uppercase bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">Highlight</span>
                     </td>
                     <td>{{ product.price | localizedCurrency : product.currency || 'USD' }}</td>
-                    <td><span class="text-xs rounded-full bg-slate-100 px-2 py-1">{{ product.status }}</span></td>
+                    <td><span class="text-xs rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-800">{{ product.status }}</span></td>
                     <td>{{ product.category }}</td>
                     <td class="flex items-center gap-2">
                       <input
-                        class="w-20 rounded border border-slate-200 px-2 py-1"
+                        class="w-20 rounded border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                         type="number"
                         [ngModel]="stockEdits[product.id] ?? product.stock_quantity"
                         (ngModelChange)="setStock(product.id, $event)"
@@ -323,8 +323,8 @@ import { firstValueFrom } from 'rxjs';
                       <app-button size="xs" variant="ghost" label="Save" (action)="saveStock(product)"></app-button>
                     </td>
                     <td>
-                      <span *ngIf="product.publish_at" class="text-xs text-slate-600">{{ product.publish_at | date: 'short' }}</span>
-                      <span *ngIf="!product.publish_at" class="text-xs text-slate-400">—</span>
+                      <span *ngIf="product.publish_at" class="text-xs text-slate-600 dark:text-slate-300">{{ product.publish_at | date: 'short' }}</span>
+                      <span *ngIf="!product.publish_at" class="text-xs text-slate-400 dark:text-slate-500">—</span>
                     </td>
                     <td class="flex gap-2 py-2">
                       <app-button size="sm" variant="ghost" [label]="'adminUi.products.actions.update' | translate" (action)="loadProduct(product.slug)"></app-button>
@@ -334,18 +334,18 @@ import { firstValueFrom } from 'rxjs';
                 </tbody>
               </table>
             </div>
-            <div *ngIf="upcomingProducts().length" class="rounded-lg border border-slate-200 p-3 text-sm text-slate-700">
-              <p class="font-semibold text-slate-900 mb-2">Upcoming scheduled products</p>
-              <div *ngFor="let p of upcomingProducts()" class="flex items-center justify-between py-1 border-b border-slate-100 last:border-0">
+            <div *ngIf="upcomingProducts().length" class="rounded-lg border border-slate-200 p-3 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200">
+              <p class="font-semibold text-slate-900 dark:text-slate-50 mb-2">Upcoming scheduled products</p>
+              <div *ngFor="let p of upcomingProducts()" class="flex items-center justify-between py-1 border-b border-slate-100 dark:border-slate-800 last:border-0">
                 <span>{{ p.name }}</span>
-                <span class="text-xs text-slate-600">Publishes {{ p.publish_at | date: 'medium' }}</span>
+                <span class="text-xs text-slate-600 dark:text-slate-300">Publishes {{ p.publish_at | date: 'medium' }}</span>
               </div>
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
                 {{ editingId ? ('adminUi.products.edit' | translate) : ('adminUi.products.create' | translate) }}
               </h2>
               <app-button size="sm" variant="ghost" [label]="'adminUi.actions.reset' | translate" (action)="startNewProduct()"></app-button>
@@ -353,21 +353,21 @@ import { firstValueFrom } from 'rxjs';
             <div class="grid md:grid-cols-2 gap-3 text-sm">
               <app-input [label]="'adminUi.products.table.name' | translate" [(value)]="form.name"></app-input>
               <app-input [label]="'adminUi.products.form.slug' | translate" [(value)]="form.slug"></app-input>
-              <label class="grid text-sm font-medium text-slate-700">
+              <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200">
                 {{ 'adminUi.products.table.category' | translate }}
-                <select class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="form.category_id">
+                <select class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="form.category_id">
                   <option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</option>
                 </select>
               </label>
               <app-input [label]="'adminUi.products.table.price' | translate" type="number" [(value)]="form.price"></app-input>
               <app-input [label]="'adminUi.products.table.stock' | translate" type="number" [(value)]="form.stock"></app-input>
-              <label class="grid text-sm font-medium text-slate-700">
+              <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200">
                 Publish at (optional)
-                <input class="rounded-lg border border-slate-200 px-3 py-2" type="datetime-local" [(ngModel)]="form.publish_at" />
+                <input class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" type="datetime-local" [(ngModel)]="form.publish_at" />
               </label>
-              <label class="grid text-sm font-medium text-slate-700">
+              <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200">
                 {{ 'adminUi.products.table.status' | translate }}
-                <select class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="form.status">
+                <select class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="form.status">
                   <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
                   <option value="published">{{ 'adminUi.status.published' | translate }}</option>
                   <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
@@ -384,51 +384,51 @@ import { firstValueFrom } from 'rxjs';
                 <input type="checkbox" [(ngModel)]="form.is_highlight" /> Highlight badge
               </label>
             </div>
-            <label class="grid gap-1 text-sm font-medium text-slate-700">
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
               {{ 'adminUi.products.form.description' | translate }}
-              <textarea rows="3" class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="form.description"></textarea>
+              <textarea rows="3" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="form.description"></textarea>
             </label>
             <div class="flex gap-3">
               <app-button [label]="'adminUi.products.form.save' | translate" (action)="saveProduct()"></app-button>
-              <label class="text-sm text-indigo-600 font-medium cursor-pointer">
+              <label class="text-sm text-indigo-600 dark:text-indigo-300 font-medium cursor-pointer">
                 {{ 'adminUi.products.form.upload' | translate }}
                 <input type="file" class="hidden" accept="image/*" (change)="onImageUpload($event)" />
               </label>
             </div>
             <div class="grid gap-2" *ngIf="productImages().length">
-              <p class="text-xs uppercase tracking-[0.2em] text-slate-500">{{ 'adminUi.products.form.images' | translate }}</p>
-              <div *ngFor="let img of productImages()" class="flex items-center gap-3 rounded-lg border border-slate-200 p-2">
+              <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.products.form.images' | translate }}</p>
+              <div *ngFor="let img of productImages()" class="flex items-center gap-3 rounded-lg border border-slate-200 p-2 dark:border-slate-700">
                 <img [src]="img.url" [alt]="img.alt_text || 'image'" class="h-12 w-12 rounded object-cover" />
                 <div class="flex-1">
-                  <p class="font-semibold text-slate-900">{{ img.alt_text || ('adminUi.products.form.image' | translate) }}</p>
+                  <p class="font-semibold text-slate-900 dark:text-slate-50">{{ img.alt_text || ('adminUi.products.form.image' | translate) }}</p>
                 </div>
                 <app-button size="sm" variant="ghost" [label]="'adminUi.actions.delete' | translate" (action)="deleteImage(img.id)"></app-button>
               </div>
             </div>
-            <p *ngIf="formMessage" class="text-sm text-emerald-700">{{ formMessage }}</p>
+            <p *ngIf="formMessage" class="text-sm text-emerald-700 dark:text-emerald-300">{{ formMessage }}</p>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">{{ 'adminUi.categories.title' | translate }}</h2>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.categories.title' | translate }}</h2>
             </div>
             <div class="grid md:grid-cols-3 gap-2 items-end text-sm">
               <app-input [label]="'adminUi.products.table.name' | translate" [(value)]="categoryName"></app-input>
               <app-input [label]="'adminUi.categories.slug' | translate" [(value)]="categorySlug"></app-input>
               <app-button size="sm" [label]="'adminUi.categories.add' | translate" (action)="addCategory()"></app-button>
             </div>
-            <div class="grid gap-2 text-sm text-slate-700">
+            <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
               <div
                 *ngFor="let cat of categories"
-                class="flex items-center justify-between rounded-lg border border-slate-200 p-3"
+                class="flex items-center justify-between rounded-lg border border-slate-200 p-3 dark:border-slate-700"
                 draggable="true"
                 (dragstart)="onCategoryDragStart(cat.slug)"
                 (dragover)="onCategoryDragOver($event)"
                 (drop)="onCategoryDrop(cat.slug)"
               >
                 <div>
-                  <p class="font-semibold text-slate-900">{{ cat.name }}</p>
-                  <p class="text-xs text-slate-500">Slug: {{ cat.slug }} · Order: {{ cat.sort_order }}</p>
+                  <p class="font-semibold text-slate-900 dark:text-slate-50">{{ cat.name }}</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">Slug: {{ cat.slug }} · Order: {{ cat.sort_order }}</p>
                 </div>
                 <div class="flex gap-2">
                   <app-button size="sm" variant="ghost" label="↑" (action)="moveCategory(cat, -1)"></app-button>
@@ -439,12 +439,12 @@ import { firstValueFrom } from 'rxjs';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">{{ 'adminUi.orders.title' | translate }}</h2>
-              <label class="text-sm text-slate-700">
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.title' | translate }}</h2>
+              <label class="text-sm text-slate-700 dark:text-slate-200">
                 {{ 'adminUi.orders.statusFilter' | translate }}
-                <select class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="orderFilter">
+                <select class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="orderFilter">
                   <option value="">{{ 'adminUi.orders.all' | translate }}</option>
                   <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
                   <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
@@ -454,19 +454,19 @@ import { firstValueFrom } from 'rxjs';
               </label>
             </div>
             <div class="grid md:grid-cols-[1.5fr_1fr] gap-4">
-              <div class="grid gap-2 text-sm text-slate-700">
-                <div *ngFor="let order of filteredOrders()" class="rounded-lg border border-slate-200 p-3 cursor-pointer" (click)="selectOrder(order)">
+              <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
+                <div *ngFor="let order of filteredOrders()" class="rounded-lg border border-slate-200 p-3 cursor-pointer dark:border-slate-700" (click)="selectOrder(order)">
                   <div class="flex items-center justify-between">
-                    <span class="font-semibold text-slate-900">Order #{{ order.id }}</span>
-                    <span class="text-xs rounded-full bg-slate-100 px-2 py-1">{{ order.status }}</span>
+                    <span class="font-semibold text-slate-900 dark:text-slate-50">Order #{{ order.id }}</span>
+                    <span class="text-xs rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-800">{{ order.status }}</span>
                   </div>
                   <p>{{ order.customer }} — {{ order.total_amount | localizedCurrency : order.currency || 'USD' }}</p>
                 </div>
               </div>
-              <div class="rounded-lg border border-slate-200 p-4 text-sm text-slate-700" *ngIf="activeOrder">
+              <div class="rounded-lg border border-slate-200 p-4 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200" *ngIf="activeOrder">
                 <div class="flex items-center justify-between">
-                  <h3 class="font-semibold text-slate-900">Order #{{ activeOrder.id }}</h3>
-                  <select class="rounded-lg border border-slate-200 px-2 py-1 text-sm" [ngModel]="activeOrder.status" (ngModelChange)="changeOrderStatus($event)">
+                  <h3 class="font-semibold text-slate-900 dark:text-slate-50">Order #{{ activeOrder.id }}</h3>
+                  <select class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [ngModel]="activeOrder.status" (ngModelChange)="changeOrderStatus($event)">
                     <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
                     <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
                     <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
@@ -474,16 +474,16 @@ import { firstValueFrom } from 'rxjs';
                     <option value="refunded">{{ 'adminUi.orders.refunded' | translate }}</option>
                   </select>
                 </div>
-                <p class="text-xs text-slate-500">Customer: {{ activeOrder.customer }}</p>
-                <p class="text-xs text-slate-500">Placed: {{ activeOrder.created_at | date: 'medium' }}</p>
-                <p class="font-semibold text-slate-900 mt-2">{{ activeOrder.total_amount | localizedCurrency : activeOrder.currency || 'USD' }}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Customer: {{ activeOrder.customer }}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Placed: {{ activeOrder.created_at | date: 'medium' }}</p>
+                <p class="font-semibold text-slate-900 dark:text-slate-50 mt-2">{{ activeOrder.total_amount | localizedCurrency : activeOrder.currency || 'USD' }}</p>
               </div>
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">{{ 'adminUi.users.title' | translate }}</h2>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.users.title' | translate }}</h2>
               <div class="flex gap-2">
                 <app-button
                   size="sm"
@@ -501,15 +501,15 @@ import { firstValueFrom } from 'rxjs';
                 ></app-button>
               </div>
             </div>
-            <div class="grid gap-2 text-sm text-slate-700">
-              <div *ngFor="let user of users" class="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+            <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
+              <div *ngFor="let user of users" class="flex items-center justify-between rounded-lg border border-slate-200 p-3 dark:border-slate-700">
                 <div>
-                  <p class="font-semibold text-slate-900">{{ user.name || user.email }}</p>
-                  <p class="text-xs text-slate-500">{{ user.email }}</p>
+                  <p class="font-semibold text-slate-900 dark:text-slate-50">{{ user.name || user.email }}</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">{{ user.email }}</p>
                 </div>
                 <div class="flex items-center gap-2 text-xs">
                   <input type="radio" name="userSelect" [value]="user.id" [(ngModel)]="selectedUserId" />
-                  <select class="rounded border border-slate-200 px-2 py-1" [ngModel]="user.role" (ngModelChange)="selectUser(user.id, $event)">
+                  <select class="rounded border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [ngModel]="user.role" (ngModelChange)="selectUser(user.id, $event)">
                     <option value="customer">{{ 'adminUi.users.roles.customer' | translate }}</option>
                     <option value="admin">{{ 'adminUi.users.roles.admin' | translate }}</option>
                   </select>
@@ -518,60 +518,60 @@ import { firstValueFrom } from 'rxjs';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">{{ 'adminUi.content.title' | translate }}</h2>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.content.title' | translate }}</h2>
             </div>
-            <div class="grid gap-2 text-sm text-slate-700">
-              <div *ngFor="let c of contentBlocks" class="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+            <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
+              <div *ngFor="let c of contentBlocks" class="flex items-center justify-between rounded-lg border border-slate-200 p-3 dark:border-slate-700">
                 <div>
-                  <p class="font-semibold text-slate-900">{{ c.title }}</p>
-                  <p class="text-xs text-slate-500">{{ c.key }} · v{{ c.version }} · {{ c.updated_at | date: 'short' }}</p>
+                  <p class="font-semibold text-slate-900 dark:text-slate-50">{{ c.title }}</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">{{ c.key }} · v{{ c.version }} · {{ c.updated_at | date: 'short' }}</p>
                 </div>
                 <app-button size="sm" variant="ghost" [label]="'adminUi.actions.edit' | translate" (action)="selectContent(c)"></app-button>
               </div>
             </div>
-            <div *ngIf="selectedContent" class="grid gap-2 pt-3 border-t border-slate-200">
-              <p class="text-sm font-semibold text-slate-900">{{ 'adminUi.content.editing' | translate }}: {{ selectedContent.key }}</p>
+            <div *ngIf="selectedContent" class="grid gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.content.editing' | translate }}: {{ selectedContent.key }}</p>
               <app-input [label]="'adminUi.content.titleLabel' | translate" [(value)]="contentForm.title"></app-input>
-              <label class="grid text-sm font-medium text-slate-700">
+              <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200">
                 {{ 'adminUi.content.status' | translate }}
-                <select class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="contentForm.status">
+                <select class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="contentForm.status">
                   <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
                   <option value="published">{{ 'adminUi.status.published' | translate }}</option>
                 </select>
               </label>
-              <label class="grid gap-1 text-sm font-medium text-slate-700">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                 {{ 'adminUi.content.body' | translate }}
-                <textarea rows="4" class="rounded-lg border border-slate-200 px-3 py-2" [(ngModel)]="contentForm.body_markdown"></textarea>
+                <textarea rows="4" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="contentForm.body_markdown"></textarea>
               </label>
               <div class="flex gap-2">
                 <app-button size="sm" [label]="'adminUi.content.save' | translate" (action)="saveContent()"></app-button>
                 <app-button size="sm" variant="ghost" [label]="'adminUi.actions.cancel' | translate" (action)="cancelContent()"></app-button>
-                <label class="flex items-center gap-2 text-xs text-slate-600">
+                <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                   <input type="checkbox" [(ngModel)]="showContentPreview" /> Live preview
                 </label>
               </div>
-              <div *ngIf="showContentPreview" class="rounded-lg border border-slate-200 p-3 bg-slate-50 text-sm text-slate-800 whitespace-pre-line">
+              <div *ngIf="showContentPreview" class="rounded-lg border border-slate-200 p-3 bg-slate-50 text-sm text-slate-800 whitespace-pre-line dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200">
                 {{ contentForm.body_markdown || 'Nothing to preview yet.' }}
               </div>
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">{{ 'adminUi.coupons.title' | translate }}</h2>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.coupons.title' | translate }}</h2>
             </div>
-            <div class="grid gap-2 text-sm text-slate-700">
+            <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
               <div class="grid md:grid-cols-3 gap-2 items-end">
                 <app-input [label]="'adminUi.coupons.code' | translate" [(value)]="newCoupon.code"></app-input>
                 <app-input [label]="'adminUi.coupons.percentOff' | translate" type="number" [(value)]="newCoupon.percentage_off"></app-input>
                 <app-button size="sm" [label]="'adminUi.coupons.add' | translate" (action)="createCoupon()"></app-button>
               </div>
-              <div *ngFor="let coupon of coupons" class="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+              <div *ngFor="let coupon of coupons" class="flex items-center justify-between rounded-lg border border-slate-200 p-3 dark:border-slate-700">
                 <div>
-                  <p class="font-semibold text-slate-900">{{ coupon.code }}</p>
-                  <p class="text-xs text-slate-500">
+                  <p class="font-semibold text-slate-900 dark:text-slate-50">{{ coupon.code }}</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
                     <ng-container *ngIf="coupon.percentage_off">-{{ coupon.percentage_off }}%</ng-container>
                     <ng-container *ngIf="coupon.amount_off">-{{ coupon.amount_off | localizedCurrency : coupon.currency || 'USD' }}</ng-container>
                     <ng-container *ngIf="!coupon.percentage_off && !coupon.amount_off">{{ 'adminUi.coupons.none' | translate }}</ng-container>
@@ -579,7 +579,7 @@ import { firstValueFrom } from 'rxjs';
                 </div>
                 <button
                   type="button"
-                  class="text-xs rounded-full px-2 py-1 border"
+                  class="text-xs rounded-full px-2 py-1 border border-slate-200 dark:border-slate-700"
                   [class.bg-emerald-100]="coupon.active"
                   [class.text-emerald-800]="coupon.active"
                   (click)="toggleCoupon(coupon)"
@@ -590,56 +590,56 @@ import { firstValueFrom } from 'rxjs';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">{{ 'adminUi.audit.title' | translate }}</h2>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.audit.title' | translate }}</h2>
               <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadAudit()"></app-button>
             </div>
-            <div class="grid md:grid-cols-2 gap-4 text-sm text-slate-700">
+            <div class="grid md:grid-cols-2 gap-4 text-sm text-slate-700 dark:text-slate-200">
               <div class="grid gap-2">
-                <p class="text-xs uppercase tracking-[0.2em] text-slate-500">{{ 'adminUi.audit.products' | translate }}</p>
-                <div *ngFor="let log of productAudit" class="rounded-lg border border-slate-200 p-3">
-                  <p class="font-semibold text-slate-900">{{ log.action }}</p>
-                  <p class="text-xs text-slate-500">{{ 'adminUi.audit.productId' | translate }} {{ log.product_id }}</p>
-                  <p class="text-xs text-slate-500">{{ 'adminUi.audit.at' | translate }} {{ log.created_at | date: 'short' }}</p>
+                <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.audit.products' | translate }}</p>
+                <div *ngFor="let log of productAudit" class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                  <p class="font-semibold text-slate-900 dark:text-slate-50">{{ log.action }}</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.audit.productId' | translate }} {{ log.product_id }}</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.audit.at' | translate }} {{ log.created_at | date: 'short' }}</p>
                 </div>
               </div>
               <div class="grid gap-2">
-                <p class="text-xs uppercase tracking-[0.2em] text-slate-500">{{ 'adminUi.audit.content' | translate }}</p>
-                <div *ngFor="let log of contentAudit" class="rounded-lg border border-slate-200 p-3">
-                  <p class="font-semibold text-slate-900">{{ log.action }}</p>
-                  <p class="text-xs text-slate-500">{{ 'adminUi.audit.blockId' | translate }} {{ log.block_id }}</p>
-                  <p class="text-xs text-slate-500">{{ 'adminUi.audit.at' | translate }} {{ log.created_at | date: 'short' }}</p>
+                <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.audit.content' | translate }}</p>
+                <div *ngFor="let log of contentAudit" class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                  <p class="font-semibold text-slate-900 dark:text-slate-50">{{ log.action }}</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.audit.blockId' | translate }} {{ log.block_id }}</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.audit.at' | translate }} {{ log.created_at | date: 'short' }}</p>
                 </div>
               </div>
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">{{ 'adminUi.maintenance.title' | translate }}</h2>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.maintenance.title' | translate }}</h2>
               <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="saveMaintenance()"></app-button>
             </div>
             <div class="flex items-center gap-3 text-sm">
               <label class="flex items-center gap-2">
                 <input type="checkbox" [(ngModel)]="maintenanceEnabledValue" /> {{ 'adminUi.maintenance.mode' | translate }}
               </label>
-              <a class="text-indigo-600" href="/api/v1/sitemap.xml" target="_blank" rel="noopener">{{ 'adminUi.maintenance.sitemap' | translate }}</a>
-              <a class="text-indigo-600" href="/api/v1/robots.txt" target="_blank" rel="noopener">{{ 'adminUi.maintenance.robots' | translate }}</a>
-              <a class="text-indigo-600" href="/api/v1/feeds/products.json" target="_blank" rel="noopener">{{ 'adminUi.maintenance.feed' | translate }}</a>
+              <a class="text-indigo-600 dark:text-indigo-300" href="/api/v1/sitemap.xml" target="_blank" rel="noopener">{{ 'adminUi.maintenance.sitemap' | translate }}</a>
+              <a class="text-indigo-600 dark:text-indigo-300" href="/api/v1/robots.txt" target="_blank" rel="noopener">{{ 'adminUi.maintenance.robots' | translate }}</a>
+              <a class="text-indigo-600 dark:text-indigo-300" href="/api/v1/feeds/products.json" target="_blank" rel="noopener">{{ 'adminUi.maintenance.feed' | translate }}</a>
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">{{ 'adminUi.lowStock.title' | translate }}</h2>
-              <span class="text-xs text-slate-500">{{ 'adminUi.lowStock.hint' | translate }}</span>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.lowStock.title' | translate }}</h2>
+              <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.lowStock.hint' | translate }}</span>
             </div>
-            <div class="grid gap-2 text-sm text-slate-700">
-              <div *ngFor="let item of lowStock" class="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+            <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
+              <div *ngFor="let item of lowStock" class="flex items-center justify-between rounded-lg border border-slate-200 p-3 dark:border-slate-700">
                 <div>
-                  <p class="font-semibold text-slate-900">{{ item.name }}</p>
-                  <p class="text-xs text-slate-500">{{ item.sku }} — {{ item.slug }}</p>
+                  <p class="font-semibold text-slate-900 dark:text-slate-50">{{ item.name }}</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">{{ item.sku }} — {{ item.slug }}</p>
                 </div>
                 <span class="text-xs rounded-full bg-amber-100 px-2 py-1 text-amber-900">{{ 'adminUi.lowStock.stock' | translate:{count: item.stock_quantity} }}</span>
               </div>
@@ -647,7 +647,7 @@ import { firstValueFrom } from 'rxjs';
           </section>
         </div>
         <ng-template #loadingTpl>
-          <div class="rounded-2xl border border-slate-200 bg-white p-4">
+          <div class="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <app-skeleton [rows]="6"></app-skeleton>
           </div>
         </ng-template>

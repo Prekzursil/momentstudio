@@ -14,14 +14,14 @@ export interface Crumb {
   imports: [NgForOf, NgIf, RouterLink, TranslateModule],
   template: `
     <nav aria-label="Breadcrumb">
-      <ol class="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+      <ol class="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
         <li *ngFor="let crumb of crumbs; let last = last" class="flex items-center gap-2">
           <ng-container *ngIf="crumb.url && !last; else lastCrumb">
-            <a [routerLink]="crumb.url" class="hover:text-slate-900 font-medium">{{ crumb.label | translate }}</a>
-            <span aria-hidden="true" class="text-slate-400">/</span>
+            <a [routerLink]="crumb.url" class="hover:text-slate-900 font-medium dark:hover:text-white">{{ crumb.label | translate }}</a>
+            <span aria-hidden="true" class="text-slate-400 dark:text-slate-500">/</span>
           </ng-container>
           <ng-template #lastCrumb>
-            <span class="font-semibold text-slate-900">{{ crumb.label | translate }}</span>
+            <span class="font-semibold text-slate-900 dark:text-slate-50">{{ crumb.label | translate }}</span>
           </ng-template>
         </li>
       </ol>

@@ -12,17 +12,17 @@ import { ButtonComponent } from './button.component';
         #dialogRef
         role="dialog"
         aria-modal="true"
-        class="w-full max-w-lg rounded-2xl bg-white shadow-xl border border-slate-200 p-6 grid gap-4 outline-none"
+        class="w-full max-w-lg rounded-2xl bg-white shadow-xl border border-slate-200 p-6 grid gap-4 outline-none dark:bg-slate-900 dark:border-slate-700 dark:shadow-none"
         tabindex="-1"
       >
         <div class="flex items-start justify-between gap-4">
           <div class="grid gap-1">
-            <div class="text-lg font-semibold text-slate-900">{{ title }}</div>
-            <div class="text-slate-600 text-sm" *ngIf="subtitle">{{ subtitle }}</div>
+            <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ title }}</div>
+            <div class="text-slate-600 text-sm dark:text-slate-300" *ngIf="subtitle">{{ subtitle }}</div>
           </div>
           <app-button variant="ghost" size="sm" label="Close" (action)="close()"></app-button>
         </div>
-        <div class="text-sm text-slate-700">
+        <div class="text-sm text-slate-700 dark:text-slate-200">
           <ng-content></ng-content>
         </div>
         <div class="flex justify-end gap-3" *ngIf="showActions">
