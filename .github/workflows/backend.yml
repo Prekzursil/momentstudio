@@ -40,3 +40,64 @@ jobs:
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd)/backend
           pytest backend/tests
+
+  backend-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: adrianaart_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d adrianaart_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/adrianaart_test
+      RUN_POSTGRES_INTEGRATION: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+      - name: Install dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Wait for Postgres
+        run: |
+          cd backend
+          python - <<'PY'
+          import asyncio
+          import os
+          import asyncpg
+          url = os.environ["DATABASE_URL"].replace("postgresql+asyncpg://", "postgresql://", 1)
+          async def main():
+            for i in range(60):
+              try:
+                conn = await asyncpg.connect(url)
+                await conn.close()
+                print("Postgres is ready")
+                return
+              except Exception as exc:
+                print(f"Waiting for Postgres... ({i+1}/60) {exc}")
+                await asyncio.sleep(1)
+            raise SystemExit("Postgres did not become ready")
+          asyncio.run(main())
+          PY
+      - name: Run migrations
+        run: |
+          cd backend
+          alembic upgrade head
+      - name: Run Postgres integration tests
+        run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/backend
+          pytest backend/tests/test_integration_postgres.py

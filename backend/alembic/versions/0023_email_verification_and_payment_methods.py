@@ -16,6 +16,15 @@ depends_on = None
 
 
 def upgrade() -> None:
+    if op.get_bind().dialect.name == "postgresql":
+        op.alter_column(
+            "alembic_version",
+            "version_num",
+            existing_type=sa.String(length=32),
+            type_=sa.String(length=255),
+            existing_nullable=False,
+        )
+
     op.add_column("users", sa.Column("email_verified", sa.Boolean(), nullable=False, server_default=sa.text("false")))
     op.add_column("users", sa.Column("stripe_customer_id", sa.String(length=255), nullable=True))
     op.alter_column("users", "email_verified", server_default=None)

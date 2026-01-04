@@ -1,4 +1,4 @@
-"""add order status enum, reference code, shipping methods
+"""add order reference code and shipping methods
 
 Revision ID: 0015
 Revises: 0014
@@ -29,12 +29,12 @@ def upgrade() -> None:
     )
 
     op.add_column("orders", sa.Column("reference_code", sa.String(length=20), nullable=True, unique=True))
-    op.add_column("orders", sa.Column("status", sa.String(length=20), nullable=False, server_default="pending"))
     op.add_column("orders", sa.Column("shipping_method_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("shipping_methods.id"), nullable=True))
     op.add_column("orders", sa.Column("tracking_number", sa.String(length=50), nullable=True))
     op.add_column("orders", sa.Column("tax_amount", sa.Numeric(10, 2), nullable=False, server_default="0"))
     op.add_column("orders", sa.Column("shipping_amount", sa.Numeric(10, 2), nullable=False, server_default="0"))
-    op.alter_column("orders", "status", server_default=None)
+    if "status" in {col["name"] for col in sa.inspect(op.get_bind()).get_columns("orders")}:
+        op.alter_column("orders", "status", server_default=None)
     op.alter_column("orders", "tax_amount", server_default=None)
     op.alter_column("orders", "shipping_amount", server_default=None)
 
@@ -44,6 +44,7 @@ def downgrade() -> None:
     op.drop_column("orders", "tax_amount")
     op.drop_column("orders", "tracking_number")
     op.drop_column("orders", "shipping_method_id")
-    op.drop_column("orders", "status")
     op.drop_column("orders", "reference_code")
+    if "status" in {col["name"] for col in sa.inspect(op.get_bind()).get_columns("orders")}:
+        op.alter_column("orders", "status", server_default="pending")
     op.drop_table("shipping_methods")

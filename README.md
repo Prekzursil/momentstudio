@@ -98,13 +98,15 @@ You can swap pieces later, but the initial design assumes:
   - Use SQLite by setting `DATABASE_URL=sqlite+aiosqlite:///./local.db` in `backend/.env` (already handled by pydantic settings).  
   - Media goes to the local `uploads/` directory; no S3 keys required.  
   - Use Stripe test keys (`STRIPE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY`) and the built-in email console logger (no SMTP).  
-  - Start API: `cd backend && poetry install` (or `pip install -r requirements.txt`) then `uvicorn app.main:app --reload`.  
-  - Start frontend: `cd frontend && npm install && npm start` with `API_BASE_URL=http://localhost:8000/api/v1`.
+  - Start both (recommended): `make dev` (or `./start.sh` / `start.bat`).  
+  - Backend only: `cd backend && pip install -r requirements.txt && uvicorn app.main:app --reload`.  
+  - Frontend only: `cd frontend && npm ci && npm start` (uses `frontend/.env` / `.env.example`; keep `API_BASE_URL=/api/v1` when using the dev proxy).
 
 - **Prod-like mode**:  
   - Set `DATABASE_URL` to Postgres (`postgresql+asyncpg://...`).  
   - Configure S3-compatible storage in `backend/.env` (bucket, region, access keys) and point `MEDIA_ROOT` to the mounted volume or S3 base path.  
   - SMTP settings (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`) for real email delivery.  
+  - Optional: configure Sentry (`SENTRY_DSN` in `backend/.env` and `frontend/.env`) for error reporting.  
   - Stripe live keys in `.env` (and webhook secret) plus HTTPS/TLS in the reverse proxy.  
   - Run migrations: `cd backend && alembic upgrade head`.  
   - Build frontend: `cd frontend && npm install && npm run build` and serve the `dist/` output via your web server or CDN.
@@ -368,3 +370,8 @@ npm start
 cd infra
 docker compose up --build
 ```
+
+### Caching & CDN (guidance)
+
+- **Catalog** (`GET /api/v1/catalog/*`): public responses can be cached (short TTL) and/or served with ETags for CDN efficiency.
+- **Media** (`/media/*`): assets are stored with unique filenames (UUID-based), so they’re safe to cache with a long TTL (e.g. `Cache-Control: public, max-age=31536000, immutable`) when served via a CDN/reverse proxy.

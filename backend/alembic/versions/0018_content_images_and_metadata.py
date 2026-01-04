@@ -35,6 +35,12 @@ def upgrade() -> None:
 
     # update sort order/metadata for seeded blocks
     connection = op.get_bind()
+    content_blocks = sa.table(
+        "content_blocks",
+        sa.column("key", sa.String()),
+        sa.column("meta", sa.JSON()),
+        sa.column("sort_order", sa.Integer()),
+    )
     defaults = [
         ("home.hero", {"headline": "Welcome to AdrianaArt", "cta": "Shop now", "cta_link": "/shop"}),
         ("home.grid", {"sections": ["featured", "new", "bestsellers"]}),
@@ -42,10 +48,7 @@ def upgrade() -> None:
         ("page.faq", {"priority": 1}),
     ]
     for key, meta in defaults:
-        connection.execute(
-            sa.text("UPDATE content_blocks SET meta = :meta, sort_order = :sort WHERE key = :key"),
-            {"meta": meta, "sort": 0, "key": key},
-        )
+        connection.execute(sa.update(content_blocks).where(content_blocks.c.key == key).values(meta=meta, sort_order=0))
 
 
 def downgrade() -> None:

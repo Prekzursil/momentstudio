@@ -1,7 +1,7 @@
 """add user avatar url
 
 Revision ID: 0021_user_avatar
-Revises: 0020_password_reset_tokens
+Revises: 0020
 Create Date: 2025-12-01 01:06:00.000000
 """
 
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = "0021_user_avatar"
-down_revision = "0020_password_reset_tokens"
+down_revision = "0020"
 branch_labels = None
 depends_on = None
 

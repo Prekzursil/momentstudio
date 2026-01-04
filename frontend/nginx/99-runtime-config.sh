@@ -9,7 +9,9 @@ escape() {
 
 API_BASE_URL="${API_BASE_URL:-/api/v1}"
 APP_ENV="${APP_ENV:-production}"
+APP_VERSION="${APP_VERSION:-}"
 STRIPE_PUBLISHABLE_KEY="${STRIPE_PUBLISHABLE_KEY:-}"
+SENTRY_DSN="${SENTRY_DSN:-}"
 
 mkdir -p "$(dirname "$CONFIG_PATH")"
 
@@ -18,7 +20,8 @@ cat > "$CONFIG_PATH" <<EOF
 window.__APP_CONFIG__ = {
   "apiBaseUrl": "$(escape "$API_BASE_URL")",
   "appEnv": "$(escape "$APP_ENV")",
-  "stripePublishableKey": "$(escape "$STRIPE_PUBLISHABLE_KEY")"
+  "appVersion": "$(escape "$APP_VERSION")",
+  "stripePublishableKey": "$(escape "$STRIPE_PUBLISHABLE_KEY")",
+  "sentryDsn": "$(escape "$SENTRY_DSN")"
 };
 EOF
-

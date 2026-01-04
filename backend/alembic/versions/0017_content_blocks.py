@@ -21,7 +21,7 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    content_status = sa.Enum("draft", "published", name="contentstatus")
+    content_status = postgresql.ENUM("draft", "published", name="contentstatus", create_type=False)
     content_status.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
@@ -94,5 +94,5 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("content_block_versions")
     op.drop_table("content_blocks")
-    content_status = sa.Enum("draft", "published", name="contentstatus")
+    content_status = postgresql.ENUM("draft", "published", name="contentstatus", create_type=False)
     content_status.drop(op.get_bind(), checkfirst=True)

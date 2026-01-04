@@ -23,6 +23,7 @@
     "@angular/router": "^18.0.0",
     "@ngx-translate/core": "^16.0.0",
     "@ngx-translate/http-loader": "^16.0.0",
+    "@sentry/browser": "^10.32.1",
     "@stripe/stripe-js": "^4.10.0",
     "rxjs": "^7.8.1",
     "zone.js": "^0.14.4"

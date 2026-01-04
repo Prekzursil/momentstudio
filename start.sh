@@ -21,7 +21,7 @@ pip install -r "${BACKEND_DIR}/requirements.txt"
 
 # Node deps
 if [ ! -d "${FRONTEND_DIR}/node_modules" ]; then
-  (cd "${FRONTEND_DIR}" && npm install)
+  (cd "${FRONTEND_DIR}" && npm ci)
 fi
 
 UVICORN_HOST="${UVICORN_HOST:-127.0.0.1}"
