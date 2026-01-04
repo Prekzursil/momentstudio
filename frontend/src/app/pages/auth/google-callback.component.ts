@@ -10,11 +10,11 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
   standalone: true,
   imports: [CommonModule, TranslateModule],
   template: `
-    <div class="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-      <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 w-full max-w-md grid gap-3 text-center">
-        <p class="text-lg font-semibold text-slate-900">{{ 'auth.googleFinishing' | translate }}</p>
-        <p class="text-sm text-slate-600" *ngIf="message()">{{ message() }}</p>
-        <p class="text-sm text-rose-700" *ngIf="error()">{{ error() }}</p>
+    <div class="min-h-screen flex items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">
+      <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 w-full max-w-md grid gap-3 text-center dark:bg-slate-900 dark:border-slate-700 dark:shadow-none">
+        <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'auth.googleFinishing' | translate }}</p>
+        <p class="text-sm text-slate-600 dark:text-slate-300" *ngIf="message()">{{ message() }}</p>
+        <p class="text-sm text-rose-700 dark:text-rose-300" *ngIf="error()">{{ error() }}</p>
       </div>
     </div>
   `

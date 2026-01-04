@@ -51,7 +51,7 @@ import { Router } from '@angular/router';
           <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
           <div class="grid gap-10 lg:grid-cols-2">
             <div class="space-y-4">
-              <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white cursor-zoom-in" (click)="openPreview()">
+              <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white cursor-zoom-in dark:border-slate-800 dark:bg-slate-900" (click)="openPreview()">
                 <img
                   [ngSrc]="activeImage"
                   [alt]="product.name"
@@ -66,8 +66,8 @@ import { Router } from '@angular/router';
               <div class="flex gap-3">
                 <button
                   *ngFor="let image of product.images ?? []; let idx = index"
-                  class="h-20 w-20 rounded-xl border"
-                  [ngClass]="idx === activeImageIndex ? 'border-slate-900' : 'border-slate-200'"
+                  class="h-20 w-20 rounded-xl border border-slate-200 dark:border-slate-700"
+                  [ngClass]="idx === activeImageIndex ? 'border-slate-900 dark:border-slate-50' : ''"
                   type="button"
                   (click)="setActiveImage(idx)"
                 >
@@ -86,30 +86,30 @@ import { Router } from '@angular/router';
 
             <div class="space-y-5">
               <div class="space-y-2">
-                <p class="text-xs uppercase tracking-[0.3em] text-slate-500">{{ 'product.handmade' | translate }}</p>
-                <h1 class="text-3xl font-semibold text-slate-900">{{ product.name }}</h1>
-              <p class="text-lg font-semibold text-slate-900">
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">{{ 'product.handmade' | translate }}</p>
+                <h1 class="text-3xl font-semibold text-slate-900 dark:text-slate-50">{{ product.name }}</h1>
+              <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">
                   {{ product.base_price | localizedCurrency : product.currency }}
                 </p>
-                <div class="flex items-center gap-2 text-sm text-amber-700" *ngIf="product.rating_count">
+                <div class="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300" *ngIf="product.rating_count">
                   ★ {{ product.rating_average?.toFixed(1) ?? '0.0' }} ·
                   {{ 'product.reviews' | translate : { count: product.rating_count } }}
                 </div>
               </div>
 
-              <p class="text-sm text-slate-700 leading-relaxed" *ngIf="product.long_description">
+              <p class="text-sm text-slate-700 dark:text-slate-200 leading-relaxed" *ngIf="product.long_description">
                 {{ product.long_description }}
               </p>
 
-              <div class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
+              <div class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:border-amber-900/40 dark:text-amber-100">
                 {{ 'product.uniqueness' | translate }}
               </div>
 
               <div class="space-y-3">
-                <label *ngIf="product.variants?.length" class="grid gap-1 text-sm font-medium text-slate-800">
+                <label *ngIf="product.variants?.length" class="grid gap-1 text-sm font-medium text-slate-800 dark:text-slate-200">
                   {{ 'product.variant' | translate }}
                   <select
-                    class="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="selectedVariantId"
                   >
                     <option *ngFor="let variant of product.variants" [value]="variant.id">
@@ -118,12 +118,12 @@ import { Router } from '@angular/router';
                   </select>
                 </label>
 
-                <label class="grid gap-1 text-sm font-medium text-slate-800">
+                <label class="grid gap-1 text-sm font-medium text-slate-800 dark:text-slate-200">
                   {{ 'product.quantity' | translate }}
                   <input
                     type="number"
                     min="1"
-                    class="w-24 rounded-lg border border-slate-200 px-3 py-2"
+                    class="w-24 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="quantity"
                   />
                 </label>
@@ -150,7 +150,7 @@ import { Router } from '@angular/router';
               <div class="flex flex-wrap gap-2" *ngIf="product.tags?.length">
                 <span
                   *ngFor="let tag of product.tags"
-                  class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
+                  class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200"
                 >
                   {{ tag.name ?? tag }}
                 </span>
@@ -162,8 +162,8 @@ import { Router } from '@angular/router';
 
       <div *ngIf="recentlyViewed.length" class="mt-12 grid gap-4">
         <div class="flex items-center justify-between">
-          <h3 class="text-lg font-semibold text-slate-900">{{ 'product.recentlyViewed' | translate }}</h3>
-          <a routerLink="/shop" class="text-sm font-medium text-indigo-600">{{ 'product.backToShop' | translate }}</a>
+          <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.recentlyViewed' | translate }}</h3>
+          <a routerLink="/shop" class="text-sm font-medium text-indigo-600 dark:text-indigo-300">{{ 'product.backToShop' | translate }}</a>
         </div>
         <div class="flex gap-4 overflow-x-auto pb-2">
           <app-button
@@ -182,9 +182,9 @@ import { Router } from '@angular/router';
                 loading="lazy"
                 decoding="async"
               />
-              <div class="grid gap-1">
-                <p class="text-sm font-semibold text-slate-900">{{ item.name }}</p>
-                <p class="text-sm text-slate-600">
+                <div class="grid gap-1">
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ item.name }}</p>
+                <p class="text-sm text-slate-600 dark:text-slate-300">
                   {{ item.base_price | localizedCurrency : item.currency }}
                 </p>
               </div>
@@ -220,9 +220,9 @@ import { Router } from '@angular/router';
       </div>
 
       <ng-template #missing>
-        <div class="border border-dashed border-slate-200 rounded-2xl p-10 text-center">
-          <p class="text-lg font-semibold text-slate-900">{{ 'product.notFound' | translate }}</p>
-          <a routerLink="/shop" class="text-indigo-600 font-medium">{{ 'product.backToShop' | translate }}</a>
+        <div class="border border-dashed border-slate-200 rounded-2xl p-10 text-center dark:border-slate-800">
+          <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.notFound' | translate }}</p>
+          <a routerLink="/shop" class="text-indigo-600 dark:text-indigo-300 font-medium">{{ 'product.backToShop' | translate }}</a>
         </div>
       </ng-template>
     </app-container>

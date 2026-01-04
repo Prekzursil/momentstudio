@@ -27,7 +27,11 @@ video {
 }
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
+}
+
+:root.dark {
+  color-scheme: dark;
 }
 
 *:focus-visible {

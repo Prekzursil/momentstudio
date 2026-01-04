@@ -33,11 +33,11 @@ import { Meta, Title } from '@angular/platform-browser';
     <app-container classes="py-10 grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
       <div class="grid gap-8 lg:grid-cols-[280px_1fr]">
-        <aside class="border border-slate-200 rounded-2xl p-4 bg-white h-fit space-y-6">
+        <aside class="border border-slate-200 rounded-2xl p-4 bg-white h-fit space-y-6 dark:border-slate-800 dark:bg-slate-900">
           <div class="space-y-3">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900">{{ 'shop.filters' | translate }}</h2>
-              <button class="text-sm text-indigo-600 font-medium" type="button" (click)="resetFilters()">
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'shop.filters' | translate }}</h2>
+              <button class="text-sm text-indigo-600 font-medium dark:text-indigo-300" type="button" (click)="resetFilters()">
                 {{ 'shop.reset' | translate }}
               </button>
             </div>
@@ -51,27 +51,27 @@ import { Meta, Title } from '@angular/platform-browser';
           </div>
 
           <div class="space-y-3">
-            <p class="text-sm font-semibold text-slate-800">{{ 'shop.categories' | translate }}</p>
+            <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ 'shop.categories' | translate }}</p>
             <div class="space-y-2 max-h-48 overflow-auto pr-1">
               <label
                 *ngFor="let category of categories"
-                class="flex items-center gap-2 text-sm text-slate-700"
+                class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300"
               >
                 <input
                   type="radio"
                   name="category"
-                  class="h-4 w-4 rounded border-slate-300"
+                  class="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
                   [value]="category.slug"
                   [(ngModel)]="filters.category_slug"
                   (change)="applyFilters()"
                 />
                 <span>{{ category.name }}</span>
               </label>
-              <label class="flex items-center gap-2 text-sm text-slate-700">
+              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
                 <input
                   type="radio"
                   name="category"
-                  class="h-4 w-4 rounded border-slate-300"
+                  class="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
                   value=""
                   [(ngModel)]="filters.category_slug"
                   (change)="applyFilters()"
@@ -82,7 +82,7 @@ import { Meta, Title } from '@angular/platform-browser';
           </div>
 
           <div class="space-y-3">
-            <p class="text-sm font-semibold text-slate-800">{{ 'shop.priceRange' | translate }}</p>
+            <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ 'shop.priceRange' | translate }}</p>
             <div class="grid gap-3">
               <div class="flex items-center gap-3">
                 <input type="range" min="0" max="500" step="5" [(ngModel)]="filters.min_price" (change)="applyFilters()" aria-label="Minimum price" />
@@ -94,17 +94,17 @@ import { Meta, Title } from '@angular/platform-browser';
                 <app-input [label]="'shop.max' | translate" type="number" [(value)]="filters.max_price" (ngModelChange)="applyFilters()">
                 </app-input>
               </div>
-              <p class="text-xs text-slate-500">{{ 'shop.priceHint' | translate }}</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'shop.priceHint' | translate }}</p>
             </div>
           </div>
 
           <div class="space-y-3" *ngIf="allTags.size">
-            <p class="text-sm font-semibold text-slate-800">{{ 'shop.tags' | translate }}</p>
+            <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ 'shop.tags' | translate }}</p>
             <div class="flex flex-wrap gap-2">
               <button
                 type="button"
                 class="rounded-full border px-3 py-1 text-xs font-medium transition"
-                [ngClass]="filters.tags.has(tag) ? 'bg-slate-900 text-white border-slate-900' : 'border-slate-200 text-slate-700'"
+                [ngClass]="filters.tags.has(tag) ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:border-slate-50' : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-slate-50'"
                 *ngFor="let tag of allTags"
                 (click)="toggleTag(tag)"
               >
@@ -118,17 +118,17 @@ import { Meta, Title } from '@angular/platform-browser';
           <div class="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
             <div class="flex items-center gap-3">
               <input
-                class="w-64 max-w-full rounded-lg border border-slate-200 px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none"
+                class="w-64 max-w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
                 [placeholder]="'shop.searchPlaceholder' | translate"
                 [(ngModel)]="filters.search"
                 (keyup.enter)="onSearch()"
               />
               <app-button [label]="'shop.search' | translate" size="sm" (action)="onSearch()"></app-button>
             </div>
-            <label class="flex items-center gap-2 text-sm text-slate-700">
+            <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
               <span>{{ 'shop.sort' | translate }}</span>
               <select
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 [(ngModel)]="filters.sort"
                 (change)="applyFilters()"
               >
@@ -141,18 +141,18 @@ import { Meta, Title } from '@angular/platform-browser';
             <app-skeleton *ngFor="let i of placeholders" height="260px"></app-skeleton>
           </div>
 
-          <div *ngIf="hasError()" class="border border-amber-200 bg-amber-50 rounded-2xl p-6 text-center grid gap-3">
-            <p class="text-lg font-semibold text-amber-900">{{ 'shop.errorTitle' | translate }}</p>
-            <p class="text-sm text-amber-800">{{ 'shop.errorCopy' | translate }}</p>
+          <div *ngIf="hasError()" class="border border-amber-200 bg-amber-50 rounded-2xl p-6 text-center grid gap-3 dark:border-amber-900/40 dark:bg-amber-950/30">
+            <p class="text-lg font-semibold text-amber-900 dark:text-amber-100">{{ 'shop.errorTitle' | translate }}</p>
+            <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'shop.errorCopy' | translate }}</p>
             <div class="flex justify-center gap-3">
               <app-button [label]="'shop.retry' | translate" size="sm" (action)="loadProducts()"></app-button>
               <app-button [label]="'shop.reset' | translate" size="sm" variant="ghost" (action)="resetFilters()"></app-button>
             </div>
           </div>
 
-          <div *ngIf="!loading() && !hasError() && products.length === 0" class="border border-dashed border-slate-200 rounded-2xl p-10 text-center grid gap-2">
-            <p class="text-lg font-semibold text-slate-900">{{ 'shop.noResults' | translate }}</p>
-            <p class="text-sm text-slate-600">{{ 'shop.tryAdjust' | translate }}</p>
+          <div *ngIf="!loading() && !hasError() && products.length === 0" class="border border-dashed border-slate-200 rounded-2xl p-10 text-center grid gap-2 dark:border-slate-800">
+            <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'shop.noResults' | translate }}</p>
+            <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'shop.tryAdjust' | translate }}</p>
             <div class="flex justify-center gap-3">
               <app-button [label]="'shop.reset' | translate" size="sm" variant="ghost" (action)="resetFilters()"></app-button>
               <app-button [label]="'shop.backHome' | translate" size="sm" variant="ghost" routerLink="/"></app-button>
@@ -163,7 +163,7 @@ import { Meta, Title } from '@angular/platform-browser';
             <app-product-card *ngFor="let product of products" [product]="product"></app-product-card>
           </div>
 
-          <div *ngIf="pageMeta" class="flex items-center justify-between text-sm text-slate-700">
+          <div *ngIf="pageMeta" class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-300">
             <div>
               {{ 'shop.pageMeta' | translate : { page: pageMeta.page, totalPages: pageMeta.total_pages, totalItems: pageMeta.total_items } }}
             </div>

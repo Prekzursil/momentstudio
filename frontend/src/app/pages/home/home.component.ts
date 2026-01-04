@@ -19,18 +19,18 @@ import { Meta, Title } from '@angular/platform-browser';
     <section class="grid gap-10">
       <div class="grid gap-6 lg:grid-cols-[1.2fr_1fr] items-center">
         <div class="grid gap-4">
-          <p class="uppercase text-sm tracking-[0.3em] text-slate-500">{{ 'app.tagline' | translate }}</p>
-          <h1 class="text-3xl sm:text-4xl lg:text-5xl font-semibold leading-tight text-slate-900">
+          <p class="uppercase text-sm tracking-[0.3em] text-slate-500 dark:text-slate-400">{{ 'app.tagline' | translate }}</p>
+          <h1 class="text-3xl sm:text-4xl lg:text-5xl font-semibold leading-tight text-slate-900 dark:text-slate-50">
             {{ 'home.headline' | translate }}
           </h1>
-          <p class="text-lg text-slate-600">{{ 'home.subhead' | translate }}</p>
+          <p class="text-lg text-slate-600 dark:text-slate-300">{{ 'home.subhead' | translate }}</p>
           <div class="flex flex-wrap gap-3">
             <app-button [label]="'home.ctaShop' | translate" [routerLink]="['/shop']"></app-button>
             <app-button [label]="'home.ctaAdmin' | translate" variant="ghost" [routerLink]="['/admin']"></app-button>
           </div>
         </div>
         <div class="relative">
-          <div class="absolute -inset-4 rounded-3xl bg-slate-900/5 blur-xl"></div>
+          <div class="absolute -inset-4 rounded-3xl bg-slate-900/5 blur-xl dark:bg-slate-50/10"></div>
           <app-card class="relative">
             <div class="aspect-video rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 grid place-items-center text-white text-xl font-semibold">
               Hero image slot
@@ -41,7 +41,7 @@ import { Meta, Title } from '@angular/platform-browser';
 
       <div class="grid gap-4">
         <div class="flex items-center justify-between">
-          <h2 class="text-xl font-semibold text-slate-900">{{ 'home.featured' | translate }}</h2>
+          <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ 'home.featured' | translate }}</h2>
           <app-button [label]="'home.viewAll' | translate" variant="ghost" [routerLink]="['/shop']"></app-button>
         </div>
 
@@ -49,10 +49,10 @@ import { Meta, Title } from '@angular/platform-browser';
           <app-skeleton *ngFor="let i of skeletons" height="260px"></app-skeleton>
         </div>
 
-          <div *ngIf="featuredError()" class="border border-amber-200 bg-amber-50 rounded-2xl p-4 flex items-center justify-between">
+          <div *ngIf="featuredError()" class="border border-amber-200 bg-amber-50 rounded-2xl p-4 flex items-center justify-between dark:border-amber-900/40 dark:bg-amber-950/30">
             <div>
-              <p class="font-semibold text-amber-900">{{ 'home.featuredError.title' | translate }}</p>
-              <p class="text-sm text-amber-800">{{ 'home.featuredError.copy' | translate }}</p>
+              <p class="font-semibold text-amber-900 dark:text-amber-100">{{ 'home.featuredError.title' | translate }}</p>
+              <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'home.featuredError.copy' | translate }}</p>
             </div>
             <app-button [label]="'shop.retry' | translate" size="sm" (action)="loadFeatured()"></app-button>
           </div>
@@ -61,14 +61,14 @@ import { Meta, Title } from '@angular/platform-browser';
           <app-product-card *ngFor="let product of featured" [product]="product"></app-product-card>
         </div>
 
-        <div *ngIf="!featuredLoading() && !featuredError() && !featured.length" class="text-sm text-slate-600">
+        <div *ngIf="!featuredLoading() && !featuredError() && !featured.length" class="text-sm text-slate-600 dark:text-slate-300">
           {{ 'home.noFeatured' | translate }}
         </div>
       </div>
 
       <div *ngIf="recentlyViewed.length" class="grid gap-4">
         <div class="flex items-center justify-between">
-          <h2 class="text-xl font-semibold text-slate-900">{{ 'product.recentlyViewed' | translate }}</h2>
+          <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ 'product.recentlyViewed' | translate }}</h2>
           <app-button [label]="'home.viewAll' | translate" variant="ghost" [routerLink]="['/shop']"></app-button>
         </div>
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -77,7 +77,7 @@ import { Meta, Title } from '@angular/platform-browser';
       </div>
 
       <div class="grid gap-4">
-        <h2 class="text-xl font-semibold text-slate-900">{{ 'home.why' | translate }}</h2>
+        <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ 'home.why' | translate }}</h2>
         <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <app-card [title]="'home.cards.strictTitle' | translate">
             <p>{{ 'home.cards.strict' | translate }}</p>

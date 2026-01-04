@@ -16,36 +16,36 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
   template: `
     <app-container classes="py-10 grid gap-6 max-w-xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-      <h1 class="text-2xl font-semibold text-slate-900">{{ 'auth.loginTitle' | translate }}</h1>
+      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'auth.loginTitle' | translate }}</h1>
       <form #loginForm="ngForm" class="grid gap-4" (ngSubmit)="onSubmit(loginForm)">
-        <label class="grid gap-1 text-sm font-medium text-slate-700">
+        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           {{ 'auth.email' | translate }}
           <input
             name="email"
             type="email"
-            class="rounded-lg border border-slate-200 px-3 py-2"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
             required
             [(ngModel)]="email"
           />
         </label>
-        <label class="grid gap-1 text-sm font-medium text-slate-700">
+        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           {{ 'auth.password' | translate }}
           <input
             name="password"
             type="password"
-            class="rounded-lg border border-slate-200 px-3 py-2"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
             required
             minlength="6"
             [(ngModel)]="password"
           />
         </label>
         <div class="flex items-center justify-between text-sm">
-          <a routerLink="/password-reset" class="text-indigo-600 font-medium">{{ 'auth.forgot' | translate }}</a>
-          <a routerLink="/register" class="text-slate-600 hover:text-slate-900">{{ 'auth.createAccount' | translate }}</a>
+          <a routerLink="/password-reset" class="text-indigo-600 dark:text-indigo-300 font-medium">{{ 'auth.forgot' | translate }}</a>
+          <a routerLink="/register" class="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-50">{{ 'auth.createAccount' | translate }}</a>
         </div>
         <app-button [label]="'auth.login' | translate" type="submit"></app-button>
-        <div class="border-t border-slate-200 pt-4 grid gap-2">
-          <p class="text-sm text-slate-600 text-center">{{ 'auth.orContinue' | translate }}</p>
+        <div class="border-t border-slate-200 pt-4 grid gap-2 dark:border-slate-800">
+          <p class="text-sm text-slate-600 dark:text-slate-300 text-center">{{ 'auth.orContinue' | translate }}</p>
           <app-button variant="ghost" [label]="'auth.googleContinue' | translate" (action)="startGoogle()"></app-button>
         </div>
       </form>

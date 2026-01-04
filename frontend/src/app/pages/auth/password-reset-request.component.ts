@@ -16,15 +16,15 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
   template: `
     <app-container classes="py-10 grid gap-6 max-w-xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-      <h1 class="text-2xl font-semibold text-slate-900">{{ 'auth.resetRequestTitle' | translate }}</h1>
-      <p class="text-sm text-slate-600">{{ 'auth.resetRequestCopy' | translate }}</p>
+      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'auth.resetRequestTitle' | translate }}</h1>
+      <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'auth.resetRequestCopy' | translate }}</p>
       <form #resetForm="ngForm" class="grid gap-4" (ngSubmit)="onSubmit(resetForm)">
-        <label class="grid gap-1 text-sm font-medium text-slate-700">
+        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           {{ 'auth.email' | translate }}
-          <input name="email" type="email" class="rounded-lg border border-slate-200 px-3 py-2" required [(ngModel)]="email" />
+          <input name="email" type="email" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400" required [(ngModel)]="email" />
         </label>
         <app-button [label]="'auth.resetLink' | translate" type="submit"></app-button>
-        <a routerLink="/login" class="text-sm text-indigo-600 font-medium">{{ 'auth.backToLogin' | translate }}</a>
+        <a routerLink="/login" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">{{ 'auth.backToLogin' | translate }}</a>
       </form>
     </app-container>
   `

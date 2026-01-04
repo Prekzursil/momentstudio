@@ -16,36 +16,36 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
   template: `
     <app-container classes="py-10 grid gap-6 max-w-xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-      <h1 class="text-2xl font-semibold text-slate-900">{{ 'auth.resetTitle' | translate }}</h1>
+      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'auth.resetTitle' | translate }}</h1>
       <form #resetForm="ngForm" class="grid gap-4" (ngSubmit)="onSubmit(resetForm)">
-        <label class="grid gap-1 text-sm font-medium text-slate-700">
+        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           {{ 'auth.resetCode' | translate }}
-          <input name="token" class="rounded-lg border border-slate-200 px-3 py-2" required [(ngModel)]="token" />
+          <input name="token" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400" required [(ngModel)]="token" />
         </label>
-        <label class="grid gap-1 text-sm font-medium text-slate-700">
+        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           {{ 'auth.password' | translate }}
           <input
             name="password"
             type="password"
-            class="rounded-lg border border-slate-200 px-3 py-2"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
             required
             minlength="6"
             [(ngModel)]="password"
           />
         </label>
-        <label class="grid gap-1 text-sm font-medium text-slate-700">
+        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           {{ 'auth.confirmPassword' | translate }}
           <input
             name="confirm"
             type="password"
-            class="rounded-lg border border-slate-200 px-3 py-2"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
             required
             [(ngModel)]="confirmPassword"
           />
         </label>
-        <p *ngIf="error" class="text-sm text-amber-700">{{ error }}</p>
+        <p *ngIf="error" class="text-sm text-amber-700 dark:text-amber-300">{{ error }}</p>
         <app-button [label]="'auth.setPassword' | translate" type="submit"></app-button>
-        <a routerLink="/login" class="text-sm text-indigo-600 font-medium">{{ 'auth.backToLogin' | translate }}</a>
+        <a routerLink="/login" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">{{ 'auth.backToLogin' | translate }}</a>
       </form>
     </app-container>
   `
