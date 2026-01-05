@@ -174,6 +174,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Frontend: add `/about` route rendering CMS `page.about` content.
 - [x] Header: make theme/language dropdown options readable in dark mode.
 - [x] Header: avoid search/nav overlap on medium screens (use nav drawer + show search on wide screens).
+- [x] Header: keep product search accessible on windowed/small screens (show search at `lg`, provide a search overlay below `lg`).
+- [x] UI: hide admin CTA/nav items unless the signed-in user is an admin.
 - [x] Global error handling / boundary route.
 - [x] API service layer + interceptors.
 - [x] Theme tokens (spacing, typography, colors).

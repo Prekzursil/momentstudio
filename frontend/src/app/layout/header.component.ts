@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, computed } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ButtonComponent } from '../shared/button.component';
 import { NavDrawerComponent, NavLink } from '../shared/nav-drawer.component';
@@ -7,6 +7,7 @@ import { CartStore } from '../core/cart.store';
 import { ThemePreference } from '../core/theme.service';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule } from '@ngx-translate/core';
+import { AuthService } from '../core/auth.service';
 
 @Component({
   selector: 'app-header',
@@ -19,12 +20,12 @@ import { TranslateModule } from '@ngx-translate/core';
           <span class="h-10 w-10 rounded-full bg-slate-900 text-white grid place-items-center font-bold dark:bg-slate-50 dark:text-slate-900">AA</span>
           <span>{{ 'app.name' | translate }}</span>
         </a>
-        <nav class="hidden lg:flex items-center gap-6 text-sm font-medium text-slate-700 dark:text-slate-200">
+        <nav class="hidden xl:flex items-center gap-6 text-sm font-medium text-slate-700 dark:text-slate-200">
           <a routerLink="/" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.home' | translate }}</a>
           <a routerLink="/shop" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.shop' | translate }}</a>
           <a routerLink="/about" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.about' | translate }}</a>
         </nav>
-        <form class="hidden xl:flex flex-1 min-w-0 justify-center" (submit)="submitSearch($event)">
+        <form class="hidden lg:flex flex-1 min-w-0 justify-center" (submit)="submitSearch($event)">
           <div class="relative w-full max-w-sm min-w-0">
             <input
               name="q"
@@ -45,12 +46,20 @@ import { TranslateModule } from '@ngx-translate/core';
         <div class="flex items-center gap-3">
           <button
             type="button"
-            class="lg:hidden text-slate-700 hover:text-slate-900 dark:text-slate-200 dark:hover:text-white"
+            class="xl:hidden text-slate-700 hover:text-slate-900 dark:text-slate-200 dark:hover:text-white"
             (click)="toggleDrawer()"
             aria-label="Open navigation"
             [attr.aria-expanded]="drawerOpen"
           >
             ☰
+          </button>
+          <button
+            type="button"
+            class="lg:hidden inline-flex items-center justify-center h-10 w-10 rounded-full bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
+            aria-label="Search"
+            (click)="openSearch()"
+          >
+            🔎
           </button>
           <a
             routerLink="/cart"
@@ -112,7 +121,33 @@ import { TranslateModule } from '@ngx-translate/core';
         </div>
       </div>
     </header>
-    <app-nav-drawer [open]="drawerOpen" [links]="navLinks" (closed)="drawerOpen = false"></app-nav-drawer>
+    <div *ngIf="searchOpen" class="fixed inset-0 z-50" (click)="closeSearch()">
+      <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm dark:bg-black/60"></div>
+      <div
+        class="absolute top-20 left-1/2 -translate-x-1/2 w-[min(92vw,560px)] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+        (click)="$event.stopPropagation()"
+        role="dialog"
+        aria-modal="true"
+      >
+        <form class="flex gap-2" (submit)="submitSearch($event); closeSearch()">
+          <input
+            name="q"
+            type="search"
+            class="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+            [placeholder]="'shop.searchPlaceholder' | translate"
+            [(ngModel)]="searchQuery"
+            (keydown.escape)="closeSearch()"
+          />
+          <button
+            type="submit"
+            class="h-10 px-4 rounded-xl bg-slate-900 text-white text-sm font-medium dark:bg-slate-50 dark:text-slate-900"
+          >
+            {{ 'shop.search' | translate }}
+          </button>
+        </form>
+      </div>
+    </div>
+    <app-nav-drawer [open]="drawerOpen" [links]="navLinks()" (closed)="drawerOpen = false"></app-nav-drawer>
   `
 })
 export class HeaderComponent {
@@ -121,15 +156,26 @@ export class HeaderComponent {
   @Input() language = 'en';
   @Output() languageChange = new EventEmitter<string>();
   drawerOpen = false;
+  searchOpen = false;
   searchQuery = '';
-  navLinks: NavLink[] = [
-    { label: 'nav.home', path: '/' },
-    { label: 'nav.shop', path: '/shop' },
-    { label: 'nav.about', path: '/about' },
-    { label: 'nav.admin', path: '/admin' }
-  ];
 
-  constructor(private cart: CartStore, private router: Router) {}
+  readonly navLinks = computed<NavLink[]>(() => {
+    const links: NavLink[] = [
+      { label: 'nav.home', path: '/' },
+      { label: 'nav.shop', path: '/shop' },
+      { label: 'nav.about', path: '/about' }
+    ];
+    if (this.auth.role() === 'admin') {
+      links.push({ label: 'nav.admin', path: '/admin' });
+    }
+    return links;
+  });
+
+  constructor(
+    private cart: CartStore,
+    private router: Router,
+    private auth: AuthService
+  ) {}
 
   cartCount = this.cart.count;
 
@@ -145,10 +191,22 @@ export class HeaderComponent {
 
   toggleDrawer(): void {
     this.drawerOpen = !this.drawerOpen;
+    if (this.drawerOpen) {
+      this.searchOpen = false;
+    }
   }
 
   onLanguageChange(lang: string): void {
     this.languageChange.emit(lang);
+  }
+
+  openSearch(): void {
+    this.searchOpen = true;
+    this.drawerOpen = false;
+  }
+
+  closeSearch(): void {
+    this.searchOpen = false;
   }
 
   submitSearch(event: Event): void {
