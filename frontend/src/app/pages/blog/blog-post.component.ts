@@ -1,5 +1,5 @@
-import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, signal } from '@angular/core';
+import { CommonModule, DOCUMENT } from '@angular/common';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
@@ -7,6 +7,7 @@ import { Subscription } from 'rxjs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 import { AuthService } from '../../core/auth.service';
+import { MarkdownService } from '../../core/markdown.service';
 import { ToastService } from '../../core/toast.service';
 import { BlogComment, BlogPost, BlogService } from '../../core/blog.service';
 import { ContainerComponent } from '../../layout/container.component';
@@ -69,9 +70,10 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
               class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
               loading="lazy"
             />
-            <div class="text-slate-700 leading-relaxed whitespace-pre-line dark:text-slate-200">
-              {{ post()!.body_markdown }}
-            </div>
+            <div class="markdown text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
+            <a routerLink="/blog" class="text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200">
+              ← {{ 'blog.post.backToBlog' | translate }}
+            </a>
           </div>
         </app-card>
       </div>
@@ -237,6 +239,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   post = signal<BlogPost | null>(null);
   loadingPost = signal<boolean>(true);
   hasPostError = signal<boolean>(false);
+  bodyHtml = signal<string>('');
 
   comments = signal<BlogComment[]>([]);
   loadingComments = signal<boolean>(true);
@@ -250,6 +253,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   private slug = '';
   private langSub?: Subscription;
   private routeSub?: Subscription;
+  private canonicalEl?: HTMLLinkElement;
+  private document: Document = inject(DOCUMENT);
 
   constructor(
     private blog: BlogService,
@@ -258,6 +263,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     private title: Title,
     private meta: Meta,
     private toast: ToastService,
+    private markdown: MarkdownService,
     public auth: AuthService
   ) {}
 
@@ -279,11 +285,13 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     this.loadingPost.set(true);
     this.hasPostError.set(false);
     this.post.set(null);
+    this.setCanonical();
 
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     this.blog.getPost(this.slug, lang).subscribe({
       next: (post) => {
         this.post.set(post);
+        this.bodyHtml.set(this.markdown.render(post.body_markdown));
         this.loadingPost.set(false);
         this.hasPostError.set(false);
         this.crumbs = [
@@ -296,6 +304,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       },
       error: () => {
         this.post.set(null);
+        this.bodyHtml.set('');
         this.loadingPost.set(false);
         this.hasPostError.set(true);
         this.setErrorMetaTags();
@@ -400,6 +409,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     if (post.images?.length) {
       this.meta.updateTag({ property: 'og:image', content: post.images[0].url });
     }
+    this.setCanonical();
   }
 
   private setErrorMetaTags(): void {
@@ -409,6 +419,21 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     this.meta.updateTag({ name: 'description', content: description });
     this.meta.updateTag({ property: 'og:title', content: title });
     this.meta.updateTag({ property: 'og:description', content: description });
+    this.setCanonical();
+  }
+
+  private setCanonical(): void {
+    if (!this.slug || typeof window === 'undefined' || !this.document) return;
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    const href = `${window.location.origin}/blog/${this.slug}?lang=${lang}`;
+    let link: HTMLLinkElement | null = this.document.querySelector('link[rel="canonical"]');
+    if (!link) {
+      link = this.document.createElement('link');
+      link.setAttribute('rel', 'canonical');
+      this.document.head.appendChild(link);
+    }
+    link.setAttribute('href', href);
+    this.canonicalEl = link;
+    this.meta.updateTag({ property: 'og:url', content: href });
   }
 }
-

@@ -7,6 +7,7 @@ import { ContainerComponent } from '../../layout/container.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { CardComponent } from '../../shared/card.component';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { MarkdownService } from '../../core/markdown.service';
 
 interface ContentImage {
   url: string;
@@ -46,9 +47,7 @@ interface ContentBlock {
             class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
             loading="lazy"
           />
-          <div class="text-slate-700 leading-relaxed whitespace-pre-line dark:text-slate-200">
-            {{ block()!.body_markdown }}
-          </div>
+          <div class="markdown text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
         </div>
       </app-card>
     </app-container>
@@ -63,10 +62,17 @@ export class AboutComponent implements OnInit, OnDestroy {
   block = signal<ContentBlock | null>(null);
   loading = signal<boolean>(true);
   hasError = signal<boolean>(false);
+  bodyHtml = signal<string>('');
 
   private langSub?: Subscription;
 
-  constructor(private api: ApiService, private translate: TranslateService, private title: Title, private meta: Meta) {}
+  constructor(
+    private api: ApiService,
+    private translate: TranslateService,
+    private title: Title,
+    private meta: Meta,
+    private markdown: MarkdownService
+  ) {}
 
   ngOnInit(): void {
     this.load();
@@ -84,12 +90,14 @@ export class AboutComponent implements OnInit, OnDestroy {
     this.api.get<ContentBlock>('/content/pages/about', { lang }).subscribe({
       next: (block) => {
         this.block.set(block);
+        this.bodyHtml.set(this.markdown.render(block.body_markdown));
         this.loading.set(false);
         this.hasError.set(false);
         this.setMetaTags(block.title, block.body_markdown);
       },
       error: () => {
         this.block.set(null);
+        this.bodyHtml.set('');
         this.loading.set(false);
         this.hasError.set(true);
         this.setMetaTags(this.translate.instant('about.metaTitle'), this.translate.instant('about.metaDescription'));
@@ -108,4 +116,3 @@ export class AboutComponent implements OnInit, OnDestroy {
     this.meta.updateTag({ name: 'og:title', content: pageTitle });
   }
 }
-
