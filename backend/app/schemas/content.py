@@ -82,8 +82,18 @@ class ContentBlockVersionListItem(BaseModel):
     created_at: datetime
 
 
+class ContentTranslationSnapshot(BaseModel):
+    lang: str
+    title: str
+    body_markdown: str
+
+
 class ContentBlockVersionRead(ContentBlockVersionListItem):
     body_markdown: str
+    meta: dict[str, Any] | None = None
+    lang: str | None = None
+    published_at: datetime | None = None
+    translations: list[ContentTranslationSnapshot] | None = None
 
 
 class ContentAuditRead(BaseModel):

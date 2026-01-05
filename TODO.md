@@ -237,9 +237,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Scheduling: support publish_at / scheduled publishing and “unpublish”.
 - [x] WYSIWYG editor (Toast UI) with Markdown import/export.
 - [x] Revisions: show version history and diff/rollback per post.
-- [ ] Revisions v2: include meta/translations/published_at in version snapshots + rollback.
-- [ ] Editor: improve dark-mode styling for the rich editor UI.
-- [ ] Social preview images (OG image generation per post).
+- [x] Revisions v2: include meta/translations/published_at in version snapshots + rollback.
+- [x] Editor: improve dark-mode styling for the rich editor UI.
+- [x] Social preview images (OG image generation per post).
 - [ ] Moderation: admin tools to hide/delete comments and review flagged content.
 - [ ] Notifications: optional email notifications for new comments (admin/user opt-in).
 

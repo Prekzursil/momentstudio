@@ -6,6 +6,7 @@ import { Meta, Title } from '@angular/platform-browser';
 import { Subscription, combineLatest } from 'rxjs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
+import { appConfig } from '../../core/app-config';
 import { AuthService } from '../../core/auth.service';
 import { MarkdownService } from '../../core/markdown.service';
 import { ToastService } from '../../core/toast.service';
@@ -430,11 +431,23 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     if (description) {
       this.meta.updateTag({ name: 'description', content: description });
       this.meta.updateTag({ property: 'og:description', content: description });
+      this.meta.updateTag({ name: 'twitter:description', content: description });
     }
     this.meta.updateTag({ property: 'og:title', content: pageTitle });
-    if (post.cover_image_url) {
-      this.meta.updateTag({ property: 'og:image', content: post.cover_image_url });
-    }
+    this.meta.updateTag({ property: 'og:type', content: 'article' });
+    this.meta.updateTag({ property: 'og:site_name', content: 'AdrianaArt' });
+
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    const apiBaseUrl = (appConfig.apiBaseUrl || '/api/v1').replace(/\/$/, '');
+    const ogPath = `${apiBaseUrl}/blog/posts/${this.slug}/og.png?lang=${lang}`;
+    const ogImage =
+      ogPath.startsWith('http://') || ogPath.startsWith('https://') || typeof window === 'undefined'
+        ? ogPath
+        : `${window.location.origin}${ogPath}`;
+    this.meta.updateTag({ property: 'og:image', content: ogImage });
+    this.meta.updateTag({ name: 'twitter:card', content: 'summary_large_image' });
+    this.meta.updateTag({ name: 'twitter:title', content: pageTitle });
+    this.meta.updateTag({ name: 'twitter:image', content: ogImage });
     this.setCanonical();
   }
 

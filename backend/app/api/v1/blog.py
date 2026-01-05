@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -20,6 +20,7 @@ from app.schemas.blog import (
 from app.schemas.catalog import PaginationMeta
 from app.services import blog as blog_service
 from app.services import content as content_service
+from app.services import og_images
 
 router = APIRouter(prefix="/blog", tags=["blog"])
 
@@ -89,6 +90,38 @@ async def create_blog_preview_token(
     chosen_lang = lang or (block.lang if getattr(block, "lang", None) in ("en", "ro") else "en") or "en"
     url = f"{settings.frontend_origin.rstrip('/')}/blog/{slug}?preview={token}&lang={chosen_lang}"
     return BlogPreviewTokenResponse(token=token, expires_at=expires_at, url=url)
+
+
+@router.get("/posts/{slug}/og.png", response_class=Response)
+async def blog_post_og_image(
+    slug: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+) -> Response:
+    block = await blog_service.get_published_post(session, slug=slug, lang=lang)
+    if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+
+    etag = f'W/"blog-og-{slug}-v{block.version}-{lang or "base"}"'
+    cache_control = "public, max-age=3600"
+    if_none_match = request.headers.get("if-none-match")
+    if if_none_match and if_none_match != "*":
+        normalized_etag = etag[2:] if etag.startswith("W/") else etag
+        for raw_candidate in if_none_match.split(","):
+            candidate = raw_candidate.strip()
+            if not candidate:
+                continue
+            normalized_candidate = candidate[2:] if candidate.startswith("W/") else candidate
+            if normalized_candidate == normalized_etag:
+                return Response(
+                    status_code=status.HTTP_304_NOT_MODIFIED,
+                    headers={"ETag": etag, "Cache-Control": cache_control},
+                )
+
+    data = blog_service.to_read(block, lang=lang)
+    png = og_images.render_blog_post_og(title=str(data.get("title") or ""), subtitle=data.get("summary") or None)
+    return Response(content=png, media_type="image/png", headers={"ETag": etag, "Cache-Control": cache_control})
 
 
 @router.get("/posts/{slug}/comments", response_model=BlogCommentListResponse)

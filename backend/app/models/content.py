@@ -63,6 +63,10 @@ class ContentBlockVersion(Base):
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     body_markdown: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[ContentStatus] = mapped_column(Enum(ContentStatus), nullable=False)
+    meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    lang: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    translations: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     block: Mapped[ContentBlock] = relationship("ContentBlock", back_populates="versions")

@@ -35,6 +35,11 @@ def _apply_content_translation(block: ContentBlock, lang: str | None) -> None:
         block.body_markdown = match.body_markdown
 
 
+def _snapshot_translations(block: ContentBlock) -> list[dict[str, object]]:
+    items = getattr(block, "translations", None) or []
+    return [{"lang": t.lang, "title": t.title, "body_markdown": t.body_markdown} for t in items]
+
+
 async def get_published_by_key(session: AsyncSession, key: str, lang: str | None = None) -> ContentBlock | None:
     options = [
         selectinload(ContentBlock.images),
@@ -105,6 +110,10 @@ async def upsert_block(
             title=block.title,
             body_markdown=block.body_markdown,
             status=block.status,
+            meta=block.meta,
+            lang=block.lang,
+            published_at=block.published_at,
+            translations=[],
         )
         audit = ContentAuditLog(content_block_id=block.id, action="created", version=block.version, user_id=actor_id)
         session.add_all([version_row, audit])
@@ -131,10 +140,27 @@ async def upsert_block(
                 body_markdown=data.get("body_markdown") or block.body_markdown,
             )
             session.add(translation)
+            block.translations.append(translation)
+
+        block.version += 1
+        session.add(block)
+        translations_snapshot = _snapshot_translations(block)
+        version_row = ContentBlockVersion(
+            content_block_id=block.id,
+            version=block.version,
+            title=block.title,
+            body_markdown=block.body_markdown,
+            status=block.status,
+            meta=block.meta,
+            lang=block.lang,
+            published_at=block.published_at,
+            translations=translations_snapshot,
+        )
         audit = ContentAuditLog(content_block_id=block.id, action=f"translated:{lang}", version=block.version, user_id=actor_id)
-        session.add(audit)
+        session.add_all([version_row, audit])
         await session.commit()
         await session.refresh(block)
+        await session.refresh(block, attribute_names=["translations"])
         _apply_content_translation(block, lang)
         return block
 
@@ -160,13 +186,19 @@ async def upsert_block(
         block.sort_order = data["sort_order"]
     if "lang" in data and data["lang"] is not None:
         block.lang = data["lang"]
+    await session.refresh(block, attribute_names=["translations"])
     session.add(block)
+    translations_snapshot = _snapshot_translations(block)
     version_row = ContentBlockVersion(
         content_block_id=block.id,
         version=block.version,
         title=block.title,
         body_markdown=block.body_markdown,
         status=block.status,
+        meta=block.meta,
+        lang=block.lang,
+        published_at=block.published_at,
+        translations=translations_snapshot,
     )
     audit = ContentAuditLog(content_block_id=block.id, action="updated", version=block.version, user_id=actor_id)
     session.add_all([version_row, audit])
@@ -212,18 +244,53 @@ async def rollback_to_version(
     block.title = snapshot.title
     block.body_markdown = snapshot.body_markdown
     block.status = snapshot.status
+    if hasattr(snapshot, "meta"):
+        block.meta = snapshot.meta
+    if hasattr(snapshot, "lang"):
+        block.lang = snapshot.lang
+    if hasattr(snapshot, "published_at"):
+        block.published_at = snapshot.published_at
     if block.status == ContentStatus.draft:
         block.published_at = None
     elif block.status == ContentStatus.published and block.published_at is None:
         block.published_at = now
+    snapshot_translations = getattr(snapshot, "translations", None)
+    if snapshot_translations is not None:
+        await session.refresh(block, attribute_names=["translations"])
+        existing_by_lang = {t.lang: t for t in block.translations}
+        target_langs: set[str] = set()
+        for item in snapshot_translations:
+            lang = item.get("lang") if isinstance(item, dict) else None
+            title = item.get("title") if isinstance(item, dict) else None
+            body = item.get("body_markdown") if isinstance(item, dict) else None
+            if not isinstance(lang, str) or not lang:
+                continue
+            if not isinstance(title, str) or not isinstance(body, str):
+                continue
+            target_langs.add(lang)
+            tr = existing_by_lang.get(lang)
+            if tr:
+                tr.title = title
+                tr.body_markdown = body
+            else:
+                session.add(ContentBlockTranslation(content_block_id=block.id, lang=lang, title=title, body_markdown=body))
+        for tr in list(block.translations):
+            if tr.lang not in target_langs:
+                await session.delete(tr)
     session.add(block)
 
+    await session.refresh(block, attribute_names=["translations"])
+    translations_snapshot = _snapshot_translations(block)
     version_row = ContentBlockVersion(
         content_block_id=block.id,
         version=block.version,
         title=block.title,
         body_markdown=block.body_markdown,
         status=block.status,
+        meta=block.meta,
+        lang=block.lang,
+        published_at=block.published_at,
+        translations=translations_snapshot,
     )
     audit = ContentAuditLog(
         content_block_id=block.id,
