@@ -46,9 +46,8 @@ describe('BlogService', () => {
     expect(req.request.method).toBe('POST');
     req.flush({
       token: 't',
-      expires_at: '2026-01-01T00:00:00+00:00',
+      expires_at: '2000-01-01T00:00:00+00:00',
       url: 'http://localhost:4200/blog/hello-world?preview=t&lang=ro'
     });
   });
 });
-

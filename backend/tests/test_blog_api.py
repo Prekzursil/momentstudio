@@ -124,6 +124,7 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert detail_ro.status_code == 200, detail_ro.text
     assert detail_ro.json()["title"] == "Salut"
     assert detail_ro.json()["body_markdown"] == "Postare RO"
+    assert detail_ro.json()["summary"] == "Rezumat RO"
 
     # OG image: returns PNG bytes with cache headers and supports If-None-Match.
     og = client.get("/api/v1/blog/posts/first-post/og.png", params={"lang": "en"})
@@ -149,23 +150,6 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
         headers={"If-None-Match": normalized},
     )
     assert og_304_norm.status_code == 304
-    assert detail_ro.json()["summary"] == "Rezumat RO"
-
-    og = client.get("/api/v1/blog/posts/first-post/og.png", params={"lang": "en"})
-    assert og.status_code == 200, og.text
-    assert og.headers.get("content-type", "").startswith("image/png")
-    assert og.content[:8] == b"\x89PNG\r\n\x1a\n"
-    etag = og.headers.get("etag")
-    assert etag
-    og_cached = client.get("/api/v1/blog/posts/first-post/og.png", params={"lang": "en"}, headers={"If-None-Match": etag})
-    assert og_cached.status_code == 304
-    etag_strong = etag[2:] if etag.startswith('W/') else etag
-    og_cached_strong = client.get(
-        "/api/v1/blog/posts/first-post/og.png",
-        params={"lang": "en"},
-        headers={"If-None-Match": etag_strong},
-    )
-    assert og_cached_strong.status_code == 304
     og_missing = client.get("/api/v1/blog/posts/missing/og.png", params={"lang": "en"})
     assert og_missing.status_code == 404, og_missing.text
 

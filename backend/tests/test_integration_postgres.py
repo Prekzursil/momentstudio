@@ -1,11 +1,12 @@
 import os
 import uuid
 
+import httpx
 import pytest
 from httpx import AsyncClient
 
 from app.core.config import settings
-from app.db.session import SessionLocal
+from app.db.session import SessionLocal, engine as app_engine
 from app.main import app
 from app.models.catalog import Category, Product, ProductStatus
 from app.models.content import ContentBlock, ContentBlockTranslation, ContentStatus
@@ -18,13 +19,20 @@ if not settings.database_url.startswith("postgresql"):
     pytest.skip("Postgres integration test requires DATABASE_URL pointing to Postgres", allow_module_level=True)
 
 
+@pytest.fixture(autouse=True)
+async def _dispose_engine_between_tests():
+    yield
+    await app_engine.dispose()
+
+
 def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.mark.anyio
 async def test_postgres_core_flow_wishlist() -> None:
-    async with AsyncClient(app=app, base_url="http://testserver") as client:
+    transport = httpx.ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         email = f"pg-{uuid.uuid4().hex[:8]}@example.com"
         register = await client.post(
             "/api/v1/auth/register",
@@ -74,7 +82,8 @@ async def test_postgres_core_flow_wishlist() -> None:
 
 @pytest.mark.anyio
 async def test_postgres_blog_flow() -> None:
-    async with AsyncClient(app=app, base_url="http://testserver") as client:
+    transport = httpx.ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         email = f"pgblog-{uuid.uuid4().hex[:8]}@example.com"
         register = await client.post(
             "/api/v1/auth/register",
