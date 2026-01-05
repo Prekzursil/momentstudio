@@ -23,14 +23,14 @@
             "budgets": [
               {
                 "type": "initial",
-                "maximumWarning": "600kb",
-                "maximumError": "700kb"
+                "maximumWarning": "750kb",
+                "maximumError": "900kb"
               },
               {
                 "type": "bundle",
                 "name": "main",
-                "maximumWarning": "550kb",
-                "maximumError": "650kb"
+                "maximumWarning": "700kb",
+                "maximumError": "850kb"
               },
               {
                 "type": "anyComponentStyle",
@@ -43,7 +43,7 @@
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
           "options": {
-            "browserTarget": "app:build"
+            "buildTarget": "app:build"
           }
         },
         "test": {

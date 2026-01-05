@@ -38,7 +38,7 @@ export class GoogleCallbackComponent implements OnInit {
     if (!code || !state) {
       this.error.set(this.translate.instant('auth.googleMissingCode'));
       this.toast.error(this.translate.instant('auth.googleMissingCode'));
-      this.router.navigateByUrl('/login');
+      void this.router.navigateByUrl('/login');
       return;
     }
 
@@ -47,7 +47,7 @@ export class GoogleCallbackComponent implements OnInit {
       if (!password) {
         this.error.set(this.translate.instant('auth.googleLinkPasswordMissing'));
         this.toast.error(this.translate.instant('auth.googleLinkPasswordMissing'));
-        this.router.navigateByUrl('/account');
+        void this.router.navigateByUrl('/account');
         return;
       }
       this.handleLink(code, state, password);
@@ -62,14 +62,14 @@ export class GoogleCallbackComponent implements OnInit {
       next: (res) => {
         localStorage.removeItem('google_flow');
         this.toast.success(this.translate.instant('auth.googleLoginSuccess'), res.user.email);
-        this.router.navigateByUrl('/account');
+        void this.router.navigateByUrl('/account');
       },
       error: (err) => {
         localStorage.removeItem('google_flow');
         const message = err?.error?.detail || this.translate.instant('auth.googleError');
         this.error.set(message);
         this.toast.error(message);
-        this.router.navigateByUrl('/login');
+        void this.router.navigateByUrl('/login');
       }
     });
   }
@@ -81,7 +81,7 @@ export class GoogleCallbackComponent implements OnInit {
         localStorage.removeItem('google_flow');
         sessionStorage.removeItem('google_link_password');
         this.toast.success(this.translate.instant('auth.googleLinkSuccess'), user.email);
-        this.router.navigateByUrl('/account');
+        void this.router.navigateByUrl('/account');
       },
       error: (err) => {
         localStorage.removeItem('google_flow');
@@ -89,7 +89,7 @@ export class GoogleCallbackComponent implements OnInit {
         const message = err?.error?.detail || this.translate.instant('auth.googleError');
         this.error.set(message);
         this.toast.error(message);
-        this.router.navigateByUrl('/account');
+        void this.router.navigateByUrl('/account');
       }
     });
   }

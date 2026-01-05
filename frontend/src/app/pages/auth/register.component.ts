@@ -105,7 +105,7 @@ export class RegisterComponent {
     this.auth.register(this.name, this.email, this.password).subscribe({
       next: (res) => {
         this.toast.success(this.translate.instant('auth.successRegister'), `Welcome, ${res.user.email}`);
-        this.router.navigateByUrl('/account');
+        void this.router.navigateByUrl('/account');
       },
       error: (err) => {
         const message = err?.error?.detail || this.translate.instant('auth.errorRegister');

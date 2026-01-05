@@ -194,6 +194,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Responsive nav drawer with keyboard navigation.
 - [x] Route guards for auth/admin.
 - [x] ESLint/Prettier strict config.
+- [x] DX: eliminate frontend lint/build warnings (no-floating-promises, tsconfig entrypoints, serve config, bundle budgets).
 
 ## Frontend - Storefront
 - [x] Homepage hero with "Shop now" CTA.

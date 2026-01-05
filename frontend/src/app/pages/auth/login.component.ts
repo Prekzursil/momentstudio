@@ -82,7 +82,7 @@ export class LoginComponent {
     this.auth.login(this.email, this.password).subscribe({
       next: (res) => {
         this.toast.success(this.translate.instant('auth.successLogin'), res.user.email);
-        this.router.navigateByUrl('/account');
+        void this.router.navigateByUrl('/account');
       },
       error: (err) => {
         const message = err?.error?.detail || this.translate.instant('auth.errorLogin');

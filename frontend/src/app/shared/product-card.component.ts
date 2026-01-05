@@ -112,7 +112,7 @@ export class ProductCardComponent {
     if (!this.product?.id) return;
     if (!this.auth.isAuthenticated()) {
       this.toast.info(this.translate.instant('wishlist.signInTitle'), this.translate.instant('wishlist.signInBody'));
-      this.router.navigateByUrl('/login');
+      void this.router.navigateByUrl('/login');
       return;
     }
 

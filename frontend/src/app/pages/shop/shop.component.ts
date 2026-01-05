@@ -387,7 +387,7 @@ export class ShopComponent implements OnInit, OnDestroy {
       page: this.filters.page !== 1 ? this.filters.page : undefined,
       tags: this.filters.tags.size ? Array.from(this.filters.tags).join(',') : undefined
     };
-    this.router.navigate([], { relativeTo: this.route, queryParams: params, queryParamsHandling: 'merge' });
+    void this.router.navigate([], { relativeTo: this.route, queryParams: params, queryParamsHandling: 'merge' });
   }
 
   private syncFiltersFromQuery(params: Params): void {
