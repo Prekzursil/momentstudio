@@ -12,7 +12,7 @@ import { TranslateModule } from '@ngx-translate/core';
         <p class="text-slate-500 dark:text-slate-400">{{ 'footer.tagline' | translate }}</p>
         <div class="flex gap-4">
           <a class="hover:text-slate-900 dark:hover:text-white" href="#">{{ 'footer.instagram' | translate }}</a>
-          <a class="hover:text-slate-900 dark:hover:text-white" href="#">{{ 'footer.pinterest' | translate }}</a>
+          <a class="hover:text-slate-900 dark:hover:text-white" href="#">{{ 'footer.facebook' | translate }}</a>
           <a class="hover:text-slate-900 dark:hover:text-white" href="#">{{ 'footer.contact' | translate }}</a>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { ButtonComponent } from '../shared/button.component';
 import { NavDrawerComponent, NavLink } from '../shared/nav-drawer.component';
 import { NgIf, NgForOf } from '@angular/common';
@@ -24,6 +24,24 @@ import { TranslateModule } from '@ngx-translate/core';
           <a routerLink="/shop" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.shop' | translate }}</a>
           <a routerLink="/about" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.about' | translate }}</a>
         </nav>
+        <form class="hidden md:flex flex-1 justify-center" (submit)="submitSearch($event)">
+          <div class="relative w-full max-w-md">
+            <input
+              name="q"
+              type="search"
+              class="w-full h-10 rounded-full border border-slate-200 bg-white px-4 pr-10 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              [placeholder]="'shop.searchPlaceholder' | translate"
+              [(ngModel)]="searchQuery"
+            />
+            <button
+              type="submit"
+              class="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 grid place-items-center rounded-full text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+              aria-label="Search"
+            >
+              🔎
+            </button>
+          </div>
+        </form>
         <div class="flex items-center gap-3">
           <button
             type="button"
@@ -50,25 +68,42 @@ import { TranslateModule } from '@ngx-translate/core';
           <a routerLink="/login" class="text-sm font-medium text-slate-700 hover:text-slate-900 hidden sm:inline dark:text-slate-200 dark:hover:text-white">
             {{ 'nav.signIn' | translate }}
           </a>
-          <label class="hidden sm:flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-            <span class="sr-only">Theme</span>
-            <select
-              class="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-              [ngModel]="themePreference"
-              (ngModelChange)="onThemeChange($event)"
-            >
-              <option value="system">System</option>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </select>
-          </label>
+          <div class="hidden sm:flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-2 py-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/70">
+            <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+              <span class="sr-only">Theme</span>
+              <select
+                class="h-9 rounded-full bg-transparent px-2 text-sm text-slate-900 focus:outline-none dark:text-slate-100"
+                [ngModel]="themePreference"
+                (ngModelChange)="onThemeChange($event)"
+                aria-label="Theme"
+              >
+                <option value="system">System</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
+            </label>
+            <div class="h-6 w-px bg-slate-200 dark:bg-slate-700"></div>
+            <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+              <span class="sr-only">Language</span>
+              <select
+                class="h-9 rounded-full bg-transparent px-2 text-sm text-slate-900 focus:outline-none dark:text-slate-100"
+                [ngModel]="language"
+                (ngModelChange)="onLanguageChange($event)"
+                aria-label="Language"
+              >
+                <option value="en">EN</option>
+                <option value="ro">RO</option>
+              </select>
+            </label>
+          </div>
           <app-button label="Theme" size="sm" variant="ghost" class="sm:hidden" (action)="cycleTheme()"></app-button>
-          <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+          <label class="sm:hidden flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
             <span class="sr-only">Language</span>
             <select
-              class="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              class="h-10 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               [ngModel]="language"
               (ngModelChange)="onLanguageChange($event)"
+              aria-label="Language"
             >
               <option value="en">EN</option>
               <option value="ro">RO</option>
@@ -86,6 +121,7 @@ export class HeaderComponent {
   @Input() language = 'en';
   @Output() languageChange = new EventEmitter<string>();
   drawerOpen = false;
+  searchQuery = '';
   navLinks: NavLink[] = [
     { label: 'nav.home', path: '/' },
     { label: 'nav.shop', path: '/shop' },
@@ -93,7 +129,7 @@ export class HeaderComponent {
     { label: 'nav.admin', path: '/admin' }
   ];
 
-  constructor(private cart: CartStore) {}
+  constructor(private cart: CartStore, private router: Router) {}
 
   cartCount = this.cart.count;
 
@@ -113,5 +149,11 @@ export class HeaderComponent {
 
   onLanguageChange(lang: string): void {
     this.languageChange.emit(lang);
+  }
+
+  submitSearch(event: Event): void {
+    event.preventDefault();
+    const q = this.searchQuery.trim();
+    void this.router.navigate(['/shop'], { queryParams: q ? { q } : {} });
   }
 }
