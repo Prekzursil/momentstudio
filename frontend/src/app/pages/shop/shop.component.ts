@@ -84,31 +84,27 @@ import { Meta, Title } from '@angular/platform-browser';
           <div class="space-y-3">
             <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ 'shop.priceRange' | translate }}</p>
             <div class="grid gap-3">
-              <div class="flex items-center gap-3">
-                <div class="min-w-0 flex-1">
-                  <input
-                    type="range"
-                    min="0"
-                    max="500"
-                    step="5"
-                    class="w-full"
-                    [(ngModel)]="filters.min_price"
-                    (change)="applyFilters()"
-                    aria-label="Minimum price"
-                  />
-                </div>
-                <div class="min-w-0 flex-1">
-                  <input
-                    type="range"
-                    min="0"
-                    max="500"
-                    step="5"
-                    class="w-full"
-                    [(ngModel)]="filters.max_price"
-                    (change)="applyFilters()"
-                    aria-label="Maximum price"
-                  />
-                </div>
+              <div class="grid gap-2">
+                <input
+                  type="range"
+                  min="0"
+                  max="500"
+                  step="5"
+                  class="w-full accent-indigo-600"
+                  [(ngModel)]="filters.min_price"
+                  (change)="applyFilters()"
+                  aria-label="Minimum price"
+                />
+                <input
+                  type="range"
+                  min="0"
+                  max="500"
+                  step="5"
+                  class="w-full accent-indigo-600"
+                  [(ngModel)]="filters.max_price"
+                  (change)="applyFilters()"
+                  aria-label="Maximum price"
+                />
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <app-input [label]="'shop.min' | translate" type="number" [(value)]="filters.min_price" (ngModelChange)="applyFilters()">

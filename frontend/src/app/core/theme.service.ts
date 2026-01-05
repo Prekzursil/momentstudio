@@ -57,6 +57,24 @@ export class ThemeService {
     this.modeSignal.set(mode);
     if (typeof document !== 'undefined') {
       document.documentElement.classList.toggle('dark', mode === 'dark');
+      document.documentElement.style.colorScheme = mode;
+
+      const overrideId = 'theme-color-override';
+      const existing = document.getElementById(overrideId) as HTMLMetaElement | null;
+      const preference = this.preferenceSignal();
+      if (preference === 'system') {
+        existing?.remove();
+        return;
+      }
+
+      const color = mode === 'dark' ? '#0f172a' : '#f8fafc';
+      const meta = existing ?? document.createElement('meta');
+      meta.id = overrideId;
+      meta.name = 'theme-color';
+      meta.content = color;
+      if (!existing) {
+        document.head.appendChild(meta);
+      }
     }
   }
 
