@@ -1,5 +1,6 @@
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { Meta, Title } from '@angular/platform-browser';
@@ -17,6 +18,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     RouterLink,
     TranslateModule,
     ContainerComponent,
@@ -31,6 +33,41 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
 
       <div class="flex items-center justify-between gap-4">
         <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.title' | translate }}</h1>
+      </div>
+
+      <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <div class="grid gap-3 md:grid-cols-[1fr_240px_auto] items-end">
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            <span>{{ 'blog.searchLabel' | translate }}</span>
+            <input
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              [placeholder]="'blog.searchPlaceholder' | translate"
+              name="blogSearch"
+              [(ngModel)]="searchQuery"
+              (keyup.enter)="applyFilters()"
+            />
+          </label>
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            <span>{{ 'blog.tagLabel' | translate }}</span>
+            <input
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              [placeholder]="'blog.tagPlaceholder' | translate"
+              name="blogTag"
+              [(ngModel)]="tagQuery"
+              (keyup.enter)="applyFilters()"
+            />
+          </label>
+          <div class="flex items-center justify-end gap-2">
+            <app-button size="sm" [label]="'blog.searchCta' | translate" (action)="applyFilters()"></app-button>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'blog.clearFilters' | translate"
+              [disabled]="!searchQuery.trim() && !tagQuery.trim()"
+              (action)="clearFilters()"
+            ></app-button>
+          </div>
+        </div>
       </div>
 
       <div *ngIf="loading()" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -74,6 +111,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
               <div class="grid gap-1">
                 <p class="text-sm text-slate-500 dark:text-slate-400" *ngIf="post.published_at">
                   {{ post.published_at | date: 'mediumDate' }}
+                  <ng-container *ngIf="post.reading_time_minutes"> · {{ 'blog.minutesRead' | translate : { minutes: post.reading_time_minutes } }}</ng-container>
                 </p>
                 <h2 class="text-lg font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-50 dark:group-hover:text-indigo-300">
                   {{ post.title }}
@@ -81,6 +119,16 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
                 <p class="text-sm text-slate-600 dark:text-slate-300">
                   {{ post.excerpt }}
                 </p>
+                <div class="flex flex-wrap gap-1 pt-1" *ngIf="post.tags?.length">
+                  <button
+                    *ngFor="let tag of post.tags"
+                    type="button"
+                    class="text-xs rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-700 hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200 dark:hover:border-slate-600"
+                    (click)="filterByTag($event, tag)"
+                  >
+                    #{{ tag }}
+                  </button>
+                </div>
               </div>
             </div>
           </app-card>
@@ -118,6 +166,8 @@ export class BlogListComponent implements OnInit, OnDestroy {
   loading = signal<boolean>(true);
   hasError = signal<boolean>(false);
   skeletons = Array.from({ length: 6 });
+  searchQuery = '';
+  tagQuery = '';
 
   private sub?: Subscription;
   private langSub?: Subscription;
@@ -155,6 +205,8 @@ export class BlogListComponent implements OnInit, OnDestroy {
 
   private loadFromQuery(params: Params): void {
     const page = params['page'] ? Number(params['page']) : 1;
+    this.searchQuery = typeof params['q'] === 'string' ? params['q'] : '';
+    this.tagQuery = typeof params['tag'] === 'string' ? params['tag'] : '';
     this.load(page);
   }
 
@@ -163,7 +215,7 @@ export class BlogListComponent implements OnInit, OnDestroy {
     this.hasError.set(false);
     this.setCanonical(page);
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-    this.blog.listPosts({ lang, page, limit: 9 }).subscribe({
+    this.blog.listPosts({ lang, page, limit: 9, q: this.searchQuery.trim() || undefined, tag: this.tagQuery.trim() || undefined }).subscribe({
       next: (resp) => {
         this.posts = resp.items;
         this.pageMeta = resp.meta;
@@ -188,11 +240,42 @@ export class BlogListComponent implements OnInit, OnDestroy {
     void this.router.navigate([], { relativeTo: this.route, queryParams, queryParamsHandling: 'merge' });
   }
 
+  applyFilters(): void {
+    const q = this.searchQuery.trim() || undefined;
+    const tag = this.tagQuery.trim() || undefined;
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { q, tag, page: undefined },
+      queryParamsHandling: 'merge'
+    });
+  }
+
+  clearFilters(): void {
+    this.searchQuery = '';
+    this.tagQuery = '';
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { q: undefined, tag: undefined, page: undefined },
+      queryParamsHandling: 'merge'
+    });
+  }
+
+  filterByTag(event: MouseEvent, tag: string): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.tagQuery = tag;
+    this.applyFilters();
+  }
+
   private setCanonical(page: number): void {
     if (typeof window === 'undefined' || !this.document) return;
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     const qs = new URLSearchParams({ lang });
     if (page > 1) qs.set('page', String(page));
+    const q = this.searchQuery.trim();
+    const tag = this.tagQuery.trim();
+    if (q) qs.set('q', q);
+    if (tag) qs.set('tag', tag);
     const href = `${window.location.origin}/blog?${qs.toString()}`;
     let link: HTMLLinkElement | null = this.document.querySelector('link[rel="canonical"]');
     if (!link) {

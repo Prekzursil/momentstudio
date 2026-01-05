@@ -12,6 +12,8 @@ class BlogPostListItem(BaseModel):
     excerpt: str
     published_at: datetime | None = None
     cover_image_url: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    reading_time_minutes: int | None = None
 
 
 class BlogPostListResponse(BaseModel):
@@ -37,6 +39,10 @@ class BlogPostRead(BaseModel):
     updated_at: datetime
     images: list[BlogPostImage] = Field(default_factory=list)
     meta: dict | None = None
+    summary: str | None = None
+    cover_image_url: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    reading_time_minutes: int | None = None
 
 
 class BlogCommentAuthor(BaseModel):

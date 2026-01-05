@@ -28,6 +28,13 @@
   },
   "blog": {
     "title": "Blog",
+    "searchLabel": "Caută",
+    "searchPlaceholder": "Caută articole",
+    "tagLabel": "Etichetă",
+    "tagPlaceholder": "Filtrează după etichetă",
+    "searchCta": "Căutare",
+    "clearFilters": "Șterge",
+    "minutesRead": "{{minutes}} min citire",
     "errorTitle": "Nu am putut încărca postările.",
     "errorCopy": "Verifică conexiunea și încearcă din nou.",
     "retry": "Reîncearcă",

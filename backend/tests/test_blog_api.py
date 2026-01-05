@@ -61,7 +61,18 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     # Create a blog post as content (base RO) and add EN translation
     create = client.post(
         "/api/v1/content/admin/blog.first-post",
-        json={"title": "Salut", "body_markdown": "Postare RO", "status": "published", "lang": "ro"},
+        json={
+            "title": "Salut",
+            "body_markdown": "Postare RO",
+            "status": "published",
+            "lang": "ro",
+            "meta": {
+                "summary": {"ro": "Rezumat RO", "en": "Summary EN"},
+                "tags": ["Ceramics", "News"],
+                "reading_time_minutes": 7,
+                "cover_image_url": "https://example.com/cover.jpg",
+            },
+        },
         headers=auth_headers(admin_token),
     )
     assert create.status_code == 201, create.text
@@ -79,16 +90,49 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert len(items) == 1
     assert items[0]["slug"] == "first-post"
     assert items[0]["title"] == "Hello"
+    assert items[0]["excerpt"] == "Summary EN"
+    assert items[0]["tags"] == ["Ceramics", "News"]
+    assert items[0]["reading_time_minutes"] == 7
+    assert items[0]["cover_image_url"] == "https://example.com/cover.jpg"
 
     detail_en = client.get("/api/v1/blog/posts/first-post", params={"lang": "en"})
     assert detail_en.status_code == 200, detail_en.text
     assert detail_en.json()["title"] == "Hello"
     assert detail_en.json()["body_markdown"] == "Post EN"
+    assert detail_en.json()["summary"] == "Summary EN"
+    assert detail_en.json()["tags"] == ["Ceramics", "News"]
+    assert detail_en.json()["reading_time_minutes"] == 7
+    assert detail_en.json()["cover_image_url"] == "https://example.com/cover.jpg"
 
     detail_ro = client.get("/api/v1/blog/posts/first-post", params={"lang": "ro"})
     assert detail_ro.status_code == 200, detail_ro.text
     assert detail_ro.json()["title"] == "Salut"
     assert detail_ro.json()["body_markdown"] == "Postare RO"
+    assert detail_ro.json()["summary"] == "Rezumat RO"
+
+    # Create another blog post to verify filters
+    create2 = client.post(
+        "/api/v1/content/admin/blog.second-post",
+        json={
+            "title": "Another post",
+            "body_markdown": "Some content about glazing techniques.",
+            "status": "published",
+            "lang": "en",
+            "meta": {"tags": ["Tech"], "summary": "Second summary"},
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert create2.status_code == 201, create2.text
+
+    filtered_tag = client.get("/api/v1/blog/posts", params={"lang": "en", "tag": "ceramics"})
+    assert filtered_tag.status_code == 200, filtered_tag.text
+    assert filtered_tag.json()["meta"]["total_items"] == 1
+    assert filtered_tag.json()["items"][0]["slug"] == "first-post"
+
+    filtered_q = client.get("/api/v1/blog/posts", params={"lang": "en", "q": "glazing"})
+    assert filtered_q.status_code == 200, filtered_q.text
+    assert filtered_q.json()["meta"]["total_items"] == 1
+    assert filtered_q.json()["items"][0]["slug"] == "second-post"
 
     # Comments: create and list
     created = client.post(
@@ -113,4 +157,3 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert comments_after.status_code == 200
     assert comments_after.json()["items"][0]["is_deleted"] is True
     assert comments_after.json()["items"][0]["body"] == ""
-
