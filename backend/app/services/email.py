@@ -206,9 +206,9 @@ async def send_blog_comment_reply_notification(
     subject = "New reply to your comment" if lng == "en" else "Răspuns nou la comentariul tău"
     if env is None:
         text_body = (
-            f"New reply on: {post_title}\nFrom: {replier_name}\n\n{comment_body}\n\nView: {post_url}"
+            f"New reply to your comment on: {post_title}\nFrom: {replier_name}\n\n{comment_body}\n\nView: {post_url}"
             if lng == "en"
-            else f"Răspuns nou la: {post_title}\nDe la: {replier_name}\n\n{comment_body}\n\nVezi: {post_url}"
+            else f"Răspuns nou la comentariul tău pe: {post_title}\nDe la: {replier_name}\n\n{comment_body}\n\nVezi: {post_url}"
         )
         return await send_email(to_email, subject, text_body)
     text_body, html_body = render_template(
