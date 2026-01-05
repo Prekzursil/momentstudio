@@ -4,6 +4,8 @@ import { NotFoundComponent } from './pages/not-found/not-found.component';
 import { ErrorComponent } from './pages/error/error.component';
 import { ShopComponent } from './pages/shop/shop.component';
 import { AboutComponent } from './pages/about/about.component';
+import { BlogListComponent } from './pages/blog/blog-list.component';
+import { BlogPostComponent } from './pages/blog/blog-post.component';
 import { ProductComponent } from './pages/product/product.component';
 import { AdminComponent } from './pages/admin/admin.component';
 import { authGuard, adminGuard } from './core/auth.guard';
@@ -23,6 +25,8 @@ export const routes: Routes = [
   { path: '', component: HomeComponent, title: 'AdrianaArt' },
   { path: 'shop', component: ShopComponent, title: 'Shop | AdrianaArt', resolve: { categories: shopCategoriesResolver } },
   { path: 'about', component: AboutComponent, title: 'About | AdrianaArt' },
+  { path: 'blog', component: BlogListComponent, title: 'Blog | AdrianaArt' },
+  { path: 'blog/:slug', component: BlogPostComponent, title: 'Blog | AdrianaArt' },
   { path: 'products/:slug', component: ProductComponent, title: 'Product | AdrianaArt' },
   { path: 'cart', component: CartComponent, title: 'Cart | AdrianaArt' },
   { path: 'checkout', component: CheckoutComponent, title: 'Checkout | AdrianaArt' },

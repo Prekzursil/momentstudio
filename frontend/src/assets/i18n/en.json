@@ -5,6 +5,7 @@
   },
   "nav": {
     "home": "Home",
+    "blog": "Blog",
     "shop": "Shop",
     "about": "About",
     "admin": "Admin",
@@ -24,6 +25,50 @@
     "errorCopy": "Please try again in a moment.",
     "metaTitle": "About AdrianaArt",
     "metaDescription": "Learn about AdrianaArt and the story behind our handcrafted ceramics."
+  },
+  "blog": {
+    "title": "Blog",
+    "errorTitle": "Could not load posts.",
+    "errorCopy": "Check your connection and retry.",
+    "retry": "Retry",
+    "emptyTitle": "No posts yet",
+    "emptyCopy": "Check back soon for new articles.",
+    "pageMeta": "Page {{page}} of {{totalPages}} · {{totalItems}} posts",
+    "metaTitle": "Blog | AdrianaArt",
+    "metaDescription": "Stories, updates, and behind-the-scenes from AdrianaArt.",
+    "prev": "Prev",
+    "next": "Next",
+    "post": {
+      "breadcrumb": "Post",
+      "loadingTitle": "Loading…",
+      "errorTitle": "Could not load this post.",
+      "errorCopy": "Please try again in a moment.",
+      "metaTitle": "Blog post | AdrianaArt",
+      "metaDescription": "Read the latest article on AdrianaArt."
+    },
+    "comments": {
+      "title": "Comments ({{count}})",
+      "refresh": "Refresh",
+      "errorTitle": "Could not load comments.",
+      "errorCopy": "Please try again.",
+      "empty": "No comments yet. Be the first to start the discussion.",
+      "anonymous": "Customer",
+      "reply": "Reply",
+      "delete": "Delete",
+      "deleted": "This comment was deleted.",
+      "signInPrompt": "Sign in to join the discussion",
+      "replyingTo": "Replying to {{name}}",
+      "cancelReply": "Cancel",
+      "yourComment": "Your comment",
+      "placeholder": "Write something…",
+      "submit": "Post comment",
+      "submitting": "Posting…",
+      "createErrorTitle": "Could not post comment",
+      "createErrorCopy": "Please try again.",
+      "confirmDelete": "Delete this comment?",
+      "deleteErrorTitle": "Could not delete comment",
+      "deleteErrorCopy": "Please try again."
+    }
   },
   "home": {
     "headline": "Build the AdrianaArt storefront experience.",

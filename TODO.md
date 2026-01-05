@@ -219,6 +219,18 @@ Below is a structured checklist you can turn into issues.
 - [x] Localized currency display.
 - [x] SEO meta tags per product/category.
 
+## Blog & Community
+- [x] Nav: add “Blog” link between Home and Shop (header + drawer).
+- [x] Backend: add public blog endpoints (list + detail) backed by ContentBlocks with optional translations (fallback to available language).
+- [x] Backend: add blog comments/discussion model and endpoints (list/create/delete) with auth + basic moderation.
+- [x] Frontend: add `/blog` list page (pagination, loading/error, meta tags).
+- [x] Frontend: add `/blog/:slug` post page (render content + comments/discussion thread UI).
+- [x] Admin: add blog post authoring (create/edit/publish) with language selection and optional translation.
+- [ ] Editor: add markdown editor toolbar + live preview for blog posts.
+- [x] SEO: include blog URLs in sitemap.xml and add OpenGraph meta per post.
+- [ ] Moderation: admin tools to hide/delete comments and review flagged content.
+- [ ] Notifications: optional email notifications for new comments (admin/user opt-in).
+
 ## Frontend - Cart & Checkout
 - [x] Cart page/drawer with quantities and totals.
 - [x] Update quantity/remove items; stock error messaging.

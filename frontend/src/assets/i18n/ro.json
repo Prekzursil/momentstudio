@@ -5,6 +5,7 @@
   },
   "nav": {
     "home": "Acasă",
+    "blog": "Blog",
     "shop": "Magazin",
     "about": "Despre",
     "admin": "Admin",
@@ -24,6 +25,50 @@
     "errorCopy": "Încearcă din nou în câteva momente.",
     "metaTitle": "Despre AdrianaArt",
     "metaDescription": "Află povestea AdrianaArt și detalii despre ceramica noastră realizată manual."
+  },
+  "blog": {
+    "title": "Blog",
+    "errorTitle": "Nu am putut încărca postările.",
+    "errorCopy": "Verifică conexiunea și încearcă din nou.",
+    "retry": "Reîncearcă",
+    "emptyTitle": "Nu există postări încă",
+    "emptyCopy": "Revino curând pentru articole noi.",
+    "pageMeta": "Pagina {{page}} din {{totalPages}} · {{totalItems}} postări",
+    "metaTitle": "Blog | AdrianaArt",
+    "metaDescription": "Povești, noutăți și culise de la AdrianaArt.",
+    "prev": "Înapoi",
+    "next": "Înainte",
+    "post": {
+      "breadcrumb": "Articol",
+      "loadingTitle": "Se încarcă…",
+      "errorTitle": "Nu am putut încărca acest articol.",
+      "errorCopy": "Încearcă din nou în câteva momente.",
+      "metaTitle": "Articol | AdrianaArt",
+      "metaDescription": "Citește cel mai nou articol de pe AdrianaArt."
+    },
+    "comments": {
+      "title": "Comentarii ({{count}})",
+      "refresh": "Reîncarcă",
+      "errorTitle": "Nu am putut încărca comentariile.",
+      "errorCopy": "Încearcă din nou.",
+      "empty": "Nu există comentarii încă. Fii primul care începe discuția.",
+      "anonymous": "Client",
+      "reply": "Răspunde",
+      "delete": "Șterge",
+      "deleted": "Acest comentariu a fost șters.",
+      "signInPrompt": "Autentifică-te pentru a participa la discuție",
+      "replyingTo": "Răspunzi lui {{name}}",
+      "cancelReply": "Anulează",
+      "yourComment": "Comentariul tău",
+      "placeholder": "Scrie ceva…",
+      "submit": "Publică",
+      "submitting": "Se publică…",
+      "createErrorTitle": "Nu am putut publica comentariul",
+      "createErrorCopy": "Încearcă din nou.",
+      "confirmDelete": "Ștergi acest comentariu?",
+      "deleteErrorTitle": "Nu am putut șterge comentariul",
+      "deleteErrorCopy": "Încearcă din nou."
+    }
   },
   "home": {
     "headline": "Construiește experiența magazinului AdrianaArt.",

@@ -520,6 +520,201 @@ import { firstValueFrom } from 'rxjs';
 
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Blog posts</h2>
+              <div class="flex items-center gap-2">
+                <app-button size="sm" variant="ghost" label="New post" (action)="startBlogCreate()"></app-button>
+                <app-button
+                  *ngIf="selectedBlogKey"
+                  size="sm"
+                  variant="ghost"
+                  label="Close editor"
+                  (action)="closeBlogEditor()"
+                ></app-button>
+              </div>
+            </div>
+
+            <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
+              <div *ngIf="blogPosts().length === 0" class="text-sm text-slate-500 dark:text-slate-400">
+                No posts yet. Create the first one to populate /blog.
+              </div>
+              <div
+                *ngFor="let post of blogPosts()"
+                class="flex items-center justify-between rounded-lg border border-slate-200 p-3 dark:border-slate-700"
+              >
+                <div>
+                  <p class="font-semibold text-slate-900 dark:text-slate-50">{{ post.title }}</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ post.key }} · v{{ post.version }} · {{ post.updated_at | date: 'short' }}
+                  </p>
+                </div>
+                <div class="flex items-center gap-3">
+                  <a
+                    class="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
+                    [attr.href]="'/blog/' + extractBlogSlug(post.key)"
+                    target="_blank"
+                    rel="noopener"
+                    (click)="$event.stopPropagation()"
+                  >
+                    View
+                  </a>
+                  <app-button size="sm" variant="ghost" label="Edit" (action)="selectBlogPost(post)"></app-button>
+                </div>
+              </div>
+            </div>
+
+            <div *ngIf="showBlogCreate" class="grid gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">Create blog post</p>
+              <div class="grid md:grid-cols-2 gap-3 text-sm">
+                <app-input label="Slug" [(value)]="blogCreate.slug" placeholder="e.g. my-first-post"></app-input>
+                <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Base language
+                  <select
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogCreate.baseLang"
+                  >
+                    <option value="en">EN</option>
+                    <option value="ro">RO</option>
+                  </select>
+                </label>
+                <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Status
+                  <select
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogCreate.status"
+                  >
+                    <option value="draft">draft</option>
+                    <option value="published">published</option>
+                  </select>
+                </label>
+                <div class="md:col-span-2">
+                  <app-input label="Title" [(value)]="blogCreate.title"></app-input>
+                </div>
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                  Body (Markdown)
+                  <textarea
+                    rows="6"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogCreate.body_markdown"
+                  ></textarea>
+                </label>
+              </div>
+
+              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                <input type="checkbox" [(ngModel)]="blogCreate.includeTranslation" /> Add optional translation
+              </label>
+
+              <div *ngIf="blogCreate.includeTranslation" class="grid md:grid-cols-2 gap-3 text-sm">
+                <p class="md:col-span-2 text-xs text-slate-500 dark:text-slate-400">
+                  Translation language: {{ blogCreate.baseLang === 'en' ? 'RO' : 'EN' }} (leave blank to skip).
+                </p>
+                <app-input label="Translated title" [(value)]="blogCreate.translationTitle"></app-input>
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                  Translated body (Markdown)
+                  <textarea
+                    rows="5"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogCreate.translationBody"
+                  ></textarea>
+                </label>
+              </div>
+
+              <div class="flex gap-2">
+                <app-button label="Create post" (action)="createBlogPost()"></app-button>
+                <app-button size="sm" variant="ghost" label="Cancel" (action)="cancelBlogCreate()"></app-button>
+              </div>
+            </div>
+
+            <div *ngIf="selectedBlogKey" class="grid gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="grid gap-1">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    Editing: {{ selectedBlogKey }}
+                  </p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    Base language: {{ blogBaseLang.toUpperCase() }} · Editing: {{ blogEditLang.toUpperCase() }}
+                  </p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    label="EN"
+                    [disabled]="blogEditLang === 'en'"
+                    (action)="setBlogEditLang('en')"
+                  ></app-button>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    label="RO"
+                    [disabled]="blogEditLang === 'ro'"
+                    (action)="setBlogEditLang('ro')"
+                  ></app-button>
+                </div>
+              </div>
+
+              <div class="grid md:grid-cols-2 gap-3 text-sm">
+                <app-input label="Title" [(value)]="blogForm.title"></app-input>
+                <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Status (base only)
+                  <select
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogForm.status"
+                    [disabled]="blogEditLang !== blogBaseLang"
+                  >
+                    <option value="draft">draft</option>
+                    <option value="published">published</option>
+                  </select>
+                </label>
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                  Body (Markdown)
+                  <textarea
+                    rows="10"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogForm.body_markdown"
+                  ></textarea>
+                </label>
+              </div>
+
+              <div class="grid gap-2">
+                <label class="text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Upload image
+                  <input type="file" accept="image/*" class="block mt-1 text-sm" (change)="uploadBlogImage($event)" />
+                </label>
+                <div *ngIf="blogImages.length" class="grid gap-2">
+                  <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Images</p>
+                  <div *ngFor="let img of blogImages" class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                    <a class="text-xs text-indigo-600 dark:text-indigo-300 hover:underline truncate" [href]="img.url" target="_blank" rel="noopener">
+                      {{ img.url }}
+                    </a>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      label="Insert markdown"
+                      (action)="insertBlogImageMarkdown(img.url, img.alt_text)"
+                    ></app-button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex gap-2">
+                <app-button label="Save" (action)="saveBlogPost()"></app-button>
+                <a
+                  class="inline-flex items-center justify-center rounded-full font-semibold transition px-3 py-2 text-sm bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-slate-800 dark:text-slate-50 dark:border-slate-700 dark:hover:border-slate-600"
+                  [attr.href]="'/blog/' + currentBlogSlug()"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  View
+                </a>
+              </div>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Tip: Posts render markdown as plain text for now. Add a renderer later if needed.
+              </p>
+            </div>
+          </section>
+
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.content.title' | translate }}</h2>
             </div>
             <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
@@ -734,6 +929,37 @@ export class AdminComponent implements OnInit {
     status: 'draft'
   };
   showContentPreview = false;
+
+  showBlogCreate = false;
+  blogCreate: {
+    slug: string;
+    baseLang: 'en' | 'ro';
+    status: 'draft' | 'published';
+    title: string;
+    body_markdown: string;
+    includeTranslation: boolean;
+    translationTitle: string;
+    translationBody: string;
+  } = {
+    slug: '',
+    baseLang: 'en',
+    status: 'draft',
+    title: '',
+    body_markdown: '',
+    includeTranslation: false,
+    translationTitle: '',
+    translationBody: ''
+  };
+  selectedBlogKey: string | null = null;
+  blogBaseLang: 'en' | 'ro' = 'en';
+  blogEditLang: 'en' | 'ro' = 'en';
+  blogForm = {
+    title: '',
+    body_markdown: '',
+    status: 'draft'
+  };
+  blogImages: { id: string; url: string; alt_text?: string | null }[] = [];
+
   assetsForm = { logo_url: '', favicon_url: '', social_image_url: '' };
   assetsMessage: string | null = null;
   assetsError: string | null = null;
@@ -1160,11 +1386,17 @@ export class AdminComponent implements OnInit {
 
   selectContent(content: AdminContent): void {
     this.selectedContent = content;
-    this.contentForm = {
-      title: content.title,
-      body_markdown: content.body_markdown || '',
-      status: content.status || 'draft'
-    };
+    this.contentForm = { title: content.title, body_markdown: '', status: 'draft' };
+    this.admin.getContent(content.key).subscribe({
+      next: (block) => {
+        this.contentForm = {
+          title: block.title,
+          body_markdown: block.body_markdown,
+          status: block.status
+        };
+      },
+      error: () => this.toast.error(this.t('adminUi.content.errors.update'))
+    });
   }
 
   saveContent(): void {
@@ -1187,6 +1419,215 @@ export class AdminComponent implements OnInit {
 
   cancelContent(): void {
     this.selectedContent = null;
+  }
+
+  blogPosts(): AdminContent[] {
+    return this.contentBlocks.filter((c) => c.key.startsWith('blog.'));
+  }
+
+  extractBlogSlug(key: string): string {
+    return key.startsWith('blog.') ? key.slice('blog.'.length) : key;
+  }
+
+  currentBlogSlug(): string {
+    return this.selectedBlogKey ? this.extractBlogSlug(this.selectedBlogKey) : '';
+  }
+
+  startBlogCreate(): void {
+    this.showBlogCreate = true;
+    this.selectedBlogKey = null;
+    this.blogImages = [];
+    this.blogCreate = {
+      slug: '',
+      baseLang: 'en',
+      status: 'draft',
+      title: '',
+      body_markdown: '',
+      includeTranslation: false,
+      translationTitle: '',
+      translationBody: ''
+    };
+  }
+
+  cancelBlogCreate(): void {
+    this.showBlogCreate = false;
+  }
+
+  closeBlogEditor(): void {
+    this.selectedBlogKey = null;
+    this.blogImages = [];
+    this.replyResetBlogForm();
+  }
+
+  async createBlogPost(): Promise<void> {
+    const slug = this.normalizeBlogSlug(this.blogCreate.slug);
+    if (!slug) {
+      this.toast.error('Slug is required', 'Use letters/numbers/dashes, e.g. "my-first-post".');
+      return;
+    }
+    if (!this.blogCreate.title.trim() || !this.blogCreate.body_markdown.trim()) {
+      this.toast.error('Title and body are required');
+      return;
+    }
+
+    const key = `blog.${slug}`;
+    const baseLang = this.blogCreate.baseLang;
+    const translationLang: 'en' | 'ro' = baseLang === 'en' ? 'ro' : 'en';
+
+    try {
+      await firstValueFrom(
+        this.admin.createContent(key, {
+          title: this.blogCreate.title.trim(),
+          body_markdown: this.blogCreate.body_markdown,
+          status: this.blogCreate.status,
+          lang: baseLang
+        })
+      );
+
+      if (this.blogCreate.includeTranslation) {
+        const tTitle = this.blogCreate.translationTitle.trim();
+        const tBody = this.blogCreate.translationBody.trim();
+        if (tTitle || tBody) {
+          await firstValueFrom(
+            this.admin.updateContentBlock(key, {
+              title: tTitle || this.blogCreate.title.trim(),
+              body_markdown: tBody || this.blogCreate.body_markdown,
+              lang: translationLang
+            })
+          );
+        }
+      }
+
+      this.toast.success('Blog post created');
+      this.showBlogCreate = false;
+      this.reloadContentBlocks();
+      this.loadBlogEditor(key);
+    } catch {
+      this.toast.error('Could not create blog post');
+    }
+  }
+
+  selectBlogPost(post: AdminContent): void {
+    this.showBlogCreate = false;
+    this.loadBlogEditor(post.key);
+  }
+
+  setBlogEditLang(lang: 'en' | 'ro'): void {
+    if (!this.selectedBlogKey) return;
+    this.blogEditLang = lang;
+    const key = this.selectedBlogKey;
+    const wantsBase = lang === this.blogBaseLang;
+    this.admin.getContent(key, wantsBase ? undefined : lang).subscribe({
+      next: (block) => {
+        this.blogForm.title = block.title;
+        this.blogForm.body_markdown = block.body_markdown;
+        if (wantsBase) {
+          this.blogForm.status = block.status;
+        }
+      },
+      error: () => this.toast.error('Could not load blog post content')
+    });
+  }
+
+  saveBlogPost(): void {
+    if (!this.selectedBlogKey) return;
+    if (!this.blogForm.title.trim() || !this.blogForm.body_markdown.trim()) {
+      this.toast.error('Title and body are required');
+      return;
+    }
+
+    const key = this.selectedBlogKey;
+    const isBase = this.blogEditLang === this.blogBaseLang;
+    if (isBase) {
+      this.admin
+        .updateContent(key, {
+          title: this.blogForm.title.trim(),
+          body_markdown: this.blogForm.body_markdown,
+          status: this.blogForm.status as any
+        })
+        .subscribe({
+          next: () => {
+            this.toast.success('Saved');
+            this.reloadContentBlocks();
+            this.loadBlogEditor(key);
+          },
+          error: () => this.toast.error('Could not save blog post')
+        });
+      return;
+    }
+
+    this.admin
+      .updateContentBlock(key, {
+        title: this.blogForm.title.trim(),
+        body_markdown: this.blogForm.body_markdown,
+        lang: this.blogEditLang
+      })
+      .subscribe({
+        next: () => {
+          this.toast.success('Saved translation');
+          this.reloadContentBlocks();
+          this.setBlogEditLang(this.blogEditLang);
+        },
+        error: () => this.toast.error('Could not save translation')
+      });
+  }
+
+  uploadBlogImage(event: Event): void {
+    if (!this.selectedBlogKey) return;
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    this.admin.uploadContentImage(this.selectedBlogKey, file).subscribe({
+      next: (block) => {
+        this.blogImages = (block.images || []).map((img) => ({ id: img.id, url: img.url, alt_text: img.alt_text }));
+        this.toast.success('Image uploaded');
+        input.value = '';
+      },
+      error: () => this.toast.error('Could not upload image')
+    });
+  }
+
+  insertBlogImageMarkdown(url: string, altText?: string | null): void {
+    const alt = (altText || 'image').replace(/[\r\n]+/g, ' ').trim();
+    const snippet = `\n\n![${alt}](${url})\n`;
+    this.blogForm.body_markdown = (this.blogForm.body_markdown || '').trimEnd() + snippet;
+    this.toast.info('Inserted image markdown');
+  }
+
+  private loadBlogEditor(key: string): void {
+    this.selectedBlogKey = key;
+    this.replyResetBlogForm();
+    this.admin.getContent(key).subscribe({
+      next: (block) => {
+        this.blogBaseLang = (block.lang === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
+        this.blogEditLang = this.blogBaseLang;
+        this.blogForm = {
+          title: block.title,
+          body_markdown: block.body_markdown,
+          status: block.status
+        };
+        this.blogImages = (block.images || []).map((img) => ({ id: img.id, url: img.url, alt_text: img.alt_text }));
+      },
+      error: () => this.toast.error('Could not load blog post')
+    });
+  }
+
+  private reloadContentBlocks(): void {
+    this.admin.content().subscribe({ next: (c) => (this.contentBlocks = c) });
+  }
+
+  private replyResetBlogForm(): void {
+    this.blogForm = { title: '', body_markdown: '', status: 'draft' };
+  }
+
+  private normalizeBlogSlug(raw: string): string {
+    return raw
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
   }
 
   loadAssets(): void {
