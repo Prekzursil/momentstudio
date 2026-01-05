@@ -85,26 +85,30 @@ import { Meta, Title } from '@angular/platform-browser';
             <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ 'shop.priceRange' | translate }}</p>
             <div class="grid gap-3">
               <div class="flex items-center gap-3">
-                <input
-                  type="range"
-                  min="0"
-                  max="500"
-                  step="5"
-                  class="min-w-0 flex-1"
-                  [(ngModel)]="filters.min_price"
-                  (change)="applyFilters()"
-                  aria-label="Minimum price"
-                />
-                <input
-                  type="range"
-                  min="0"
-                  max="500"
-                  step="5"
-                  class="min-w-0 flex-1"
-                  [(ngModel)]="filters.max_price"
-                  (change)="applyFilters()"
-                  aria-label="Maximum price"
-                />
+                <div class="min-w-0 flex-1">
+                  <input
+                    type="range"
+                    min="0"
+                    max="500"
+                    step="5"
+                    class="w-full"
+                    [(ngModel)]="filters.min_price"
+                    (change)="applyFilters()"
+                    aria-label="Minimum price"
+                  />
+                </div>
+                <div class="min-w-0 flex-1">
+                  <input
+                    type="range"
+                    min="0"
+                    max="500"
+                    step="5"
+                    class="w-full"
+                    [(ngModel)]="filters.max_price"
+                    (change)="applyFilters()"
+                    aria-label="Maximum price"
+                  />
+                </div>
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <app-input [label]="'shop.min' | translate" type="number" [(value)]="filters.min_price" (ngModelChange)="applyFilters()">

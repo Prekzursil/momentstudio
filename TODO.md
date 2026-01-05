@@ -172,6 +172,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Header: improve theme/language control layout and add a global product search field.
 - [x] Footer: remove year suffix from tagline and replace Pinterest link with Facebook.
 - [x] Frontend: add `/about` route rendering CMS `page.about` content.
+- [x] Header: make theme/language dropdown options readable in dark mode.
+- [x] Header: avoid search/nav overlap on medium screens (use nav drawer + show search on wide screens).
 - [x] Global error handling / boundary route.
 - [x] API service layer + interceptors.
 - [x] Theme tokens (spacing, typography, colors).

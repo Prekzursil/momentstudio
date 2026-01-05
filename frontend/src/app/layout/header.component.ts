@@ -19,12 +19,12 @@ import { TranslateModule } from '@ngx-translate/core';
           <span class="h-10 w-10 rounded-full bg-slate-900 text-white grid place-items-center font-bold dark:bg-slate-50 dark:text-slate-900">AA</span>
           <span>{{ 'app.name' | translate }}</span>
         </a>
-        <nav class="hidden md:flex items-center gap-6 text-sm font-medium text-slate-700 dark:text-slate-200">
+        <nav class="hidden lg:flex items-center gap-6 text-sm font-medium text-slate-700 dark:text-slate-200">
           <a routerLink="/" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.home' | translate }}</a>
           <a routerLink="/shop" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.shop' | translate }}</a>
           <a routerLink="/about" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.about' | translate }}</a>
         </nav>
-        <form class="hidden md:flex flex-1 justify-center" (submit)="submitSearch($event)">
+        <form class="hidden xl:flex flex-1 justify-center" (submit)="submitSearch($event)">
           <div class="relative w-full max-w-md">
             <input
               name="q"
@@ -45,7 +45,7 @@ import { TranslateModule } from '@ngx-translate/core';
         <div class="flex items-center gap-3">
           <button
             type="button"
-            class="md:hidden text-slate-700 hover:text-slate-900 dark:text-slate-200 dark:hover:text-white"
+            class="lg:hidden text-slate-700 hover:text-slate-900 dark:text-slate-200 dark:hover:text-white"
             (click)="toggleDrawer()"
             aria-label="Open navigation"
             [attr.aria-expanded]="drawerOpen"
