@@ -499,7 +499,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     this.auth.logout().subscribe(() => {
       this.wishlist.clear();
       this.toast.success('Signed out');
-      this.router.navigateByUrl('/');
+      void this.router.navigateByUrl('/');
     });
   }
 

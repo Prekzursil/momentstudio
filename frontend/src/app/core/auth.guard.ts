@@ -9,7 +9,7 @@ export const authGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   if (auth.isAuthenticated()) return true;
   toast.error('Please sign in to continue.');
-  router.navigateByUrl('/login');
+  void router.navigateByUrl('/login');
   return false;
 };
 
@@ -19,6 +19,6 @@ export const adminGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   if (auth.isAuthenticated() && auth.role() === 'admin') return true;
   toast.error('Admin access required.');
-  router.navigateByUrl('/');
+  void router.navigateByUrl('/');
   return false;
 };

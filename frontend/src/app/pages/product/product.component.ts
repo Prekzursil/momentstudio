@@ -346,7 +346,7 @@ export class ProductComponent implements OnInit, OnDestroy {
     if (!this.product) return;
     if (!this.auth.isAuthenticated()) {
       this.toast.info(this.translate.instant('wishlist.signInTitle'), this.translate.instant('wishlist.signInBody'));
-      this.router.navigateByUrl('/login');
+      void this.router.navigateByUrl('/login');
       return;
     }
 

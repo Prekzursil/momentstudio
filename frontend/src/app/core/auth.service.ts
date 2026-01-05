@@ -169,7 +169,7 @@ export class AuthService {
       localStorage.removeItem('auth_user');
       localStorage.removeItem('auth_role');
     }
-    this.router.navigateByUrl('/');
+    void this.router.navigateByUrl('/');
   }
 
   private loadTokens(): AuthTokens | null {

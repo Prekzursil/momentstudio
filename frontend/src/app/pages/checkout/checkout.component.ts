@@ -466,7 +466,7 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
       .subscribe({
         next: () => {
           if (this.saveAddress) this.persistAddress();
-          this.router.navigate(['/checkout/success']);
+          void this.router.navigate(['/checkout/success']);
         },
         error: (err) => {
           this.errorMessage = err?.error?.detail || 'Checkout failed';
