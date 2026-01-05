@@ -22,6 +22,7 @@ import { AuthService } from '../core/auth.service';
         </a>
         <nav class="hidden xl:flex items-center gap-6 text-sm font-medium text-slate-700 dark:text-slate-200">
           <a routerLink="/" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.home' | translate }}</a>
+          <a routerLink="/blog" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.blog' | translate }}</a>
           <a routerLink="/shop" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.shop' | translate }}</a>
           <a routerLink="/about" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.about' | translate }}</a>
         </nav>
@@ -162,6 +163,7 @@ export class HeaderComponent {
   readonly navLinks = computed<NavLink[]>(() => {
     const links: NavLink[] = [
       { label: 'nav.home', path: '/' },
+      { label: 'nav.blog', path: '/blog' },
       { label: 'nav.shop', path: '/shop' },
       { label: 'nav.about', path: '/about' }
     ];

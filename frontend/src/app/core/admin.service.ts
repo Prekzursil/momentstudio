@@ -123,6 +123,7 @@ export interface ContentBlock {
   meta?: Record<string, any> | null;
   lang?: string | null;
   sort_order?: number;
+  images?: { id: string; url: string; alt_text?: string | null; sort_order?: number }[];
 }
 
 export interface ContentSavePayload {
@@ -282,5 +283,12 @@ export class AdminService {
 
   createContent(key: string, payload: Partial<ContentBlock>): Observable<ContentBlock> {
     return this.api.post<ContentBlock>(`/content/admin/${key}`, payload);
+  }
+
+  uploadContentImage(key: string, file: File, lang?: string): Observable<ContentBlock> {
+    const form = new FormData();
+    form.append('file', file);
+    const suffix = lang ? `?lang=${lang}` : '';
+    return this.api.post<ContentBlock>(`/content/admin/${key}/images${suffix}`, form);
   }
 }
