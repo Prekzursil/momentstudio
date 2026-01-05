@@ -26,6 +26,7 @@ import {
 import { ToastService } from '../../core/toast.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { firstValueFrom } from 'rxjs';
+import { MarkdownService } from '../../core/markdown.service';
 
 @Component({
   selector: 'app-admin',
@@ -665,21 +666,90 @@ import { firstValueFrom } from 'rxjs';
                     <option value="published">published</option>
                   </select>
                 </label>
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                  Body (Markdown)
+                <div class="grid gap-2 md:col-span-2">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <p class="text-sm font-medium text-slate-700 dark:text-slate-200">Body (Markdown)</p>
+                    <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                      <input type="checkbox" [(ngModel)]="showBlogPreview" /> Live preview
+                    </label>
+                  </div>
+
+                  <div class="flex flex-wrap items-center gap-2 text-xs">
+                    <button
+                      type="button"
+                      class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                      (click)="applyBlogHeading(blogBody, 1)"
+                    >
+                      H1
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                      (click)="applyBlogHeading(blogBody, 2)"
+                    >
+                      H2
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                      (click)="wrapBlogSelection(blogBody, '**', '**', 'bold text')"
+                    >
+                      B
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-full border border-slate-200 bg-white px-3 py-1 italic text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                      (click)="wrapBlogSelection(blogBody, '*', '*', 'italic text')"
+                    >
+                      I
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                      (click)="insertBlogLink(blogBody)"
+                    >
+                      Link
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                      (click)="insertBlogCodeBlock(blogBody)"
+                    >
+                      Code
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                      (click)="applyBlogList(blogBody)"
+                    >
+                      List
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                      (click)="blogImageInput.click()"
+                    >
+                      Image
+                    </button>
+                    <input #blogImageInput type="file" accept="image/*" class="hidden" (change)="uploadAndInsertBlogImage(blogBody, $event)" />
+                  </div>
+
                   <textarea
+                    #blogBody
                     rows="10"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="blogForm.body_markdown"
                   ></textarea>
-                </label>
+
+                  <div
+                    *ngIf="showBlogPreview"
+                    class="markdown rounded-lg border border-slate-200 p-3 bg-slate-50 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200"
+                    [innerHTML]="renderMarkdown(blogForm.body_markdown || 'Nothing to preview yet.')"
+                  ></div>
+                </div>
               </div>
 
               <div class="grid gap-2">
-                <label class="text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Upload image
-                  <input type="file" accept="image/*" class="block mt-1 text-sm" (change)="uploadBlogImage($event)" />
-                </label>
                 <div *ngIf="blogImages.length" class="grid gap-2">
                   <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Images</p>
                   <div *ngFor="let img of blogImages" class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
@@ -708,7 +778,7 @@ import { firstValueFrom } from 'rxjs';
                 </a>
               </div>
               <p class="text-xs text-slate-500 dark:text-slate-400">
-                Tip: Posts render markdown as plain text for now. Add a renderer later if needed.
+                Tip: Use the toolbar to format markdown and insert images (uploads go to the post's content images).
               </p>
             </div>
           </section>
@@ -959,6 +1029,7 @@ export class AdminComponent implements OnInit {
     status: 'draft'
   };
   blogImages: { id: string; url: string; alt_text?: string | null }[] = [];
+  showBlogPreview = false;
 
   assetsForm = { logo_url: '', favicon_url: '', social_image_url: '' };
   assetsMessage: string | null = null;
@@ -981,7 +1052,12 @@ export class AdminComponent implements OnInit {
   contentAudit: AdminAudit['content'] = [];
   lowStock: LowStockItem[] = [];
 
-  constructor(private admin: AdminService, private toast: ToastService, private translate: TranslateService) {}
+  constructor(
+    private admin: AdminService,
+    private toast: ToastService,
+    private translate: TranslateService,
+    private markdown: MarkdownService
+  ) {}
 
   private t(key: string, params?: Record<string, unknown>): string {
     return this.translate.instant(key, params);
@@ -1572,15 +1648,75 @@ export class AdminComponent implements OnInit {
       });
   }
 
-  uploadBlogImage(event: Event): void {
+  renderMarkdown(markdown: string): string {
+    return this.markdown.render(markdown);
+  }
+
+  applyBlogHeading(textarea: HTMLTextAreaElement, level: 1 | 2): void {
+    const prefix = `${'#'.repeat(level)} `;
+    this.prefixBlogLines(textarea, prefix);
+  }
+
+  applyBlogList(textarea: HTMLTextAreaElement): void {
+    this.prefixBlogLines(textarea, '- ');
+  }
+
+  wrapBlogSelection(textarea: HTMLTextAreaElement, before: string, after: string, placeholder: string): void {
+    const value = textarea.value;
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? start;
+    const hasSelection = end > start;
+    const selected = hasSelection ? value.slice(start, end) : placeholder;
+    const next = value.slice(0, start) + before + selected + after + value.slice(end);
+    const selStart = start + before.length;
+    const selEnd = selStart + selected.length;
+    this.updateBlogBody(textarea, next, selStart, selEnd);
+  }
+
+  insertBlogLink(textarea: HTMLTextAreaElement): void {
+    const value = textarea.value;
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? start;
+    const hasSelection = end > start;
+    const text = hasSelection ? value.slice(start, end) : 'link text';
+    const url = 'https://';
+    const snippet = `[${text}](${url})`;
+    const next = value.slice(0, start) + snippet + value.slice(end);
+    const urlStart = start + text.length + 3;
+    this.updateBlogBody(textarea, next, urlStart, urlStart + url.length);
+  }
+
+  insertBlogCodeBlock(textarea: HTMLTextAreaElement): void {
+    const value = textarea.value;
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? start;
+    const hasSelection = end > start;
+    const selected = hasSelection ? value.slice(start, end) : 'code';
+    const snippet = `\n\`\`\`\n${selected}\n\`\`\`\n`;
+    const next = value.slice(0, start) + snippet + value.slice(end);
+    const codeStart = start + 5;
+    this.updateBlogBody(textarea, next, codeStart, codeStart + selected.length);
+  }
+
+  uploadAndInsertBlogImage(textarea: HTMLTextAreaElement, event: Event): void {
     if (!this.selectedBlogKey) return;
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
     this.admin.uploadContentImage(this.selectedBlogKey, file).subscribe({
       next: (block) => {
-        this.blogImages = (block.images || []).map((img) => ({ id: img.id, url: img.url, alt_text: img.alt_text }));
+        const images = (block.images || [])
+          .map((img) => ({ id: img.id, url: img.url, alt_text: img.alt_text, sort_order: img.sort_order ?? 0 }))
+          .sort((a, b) => a.sort_order - b.sort_order);
+        this.blogImages = images.map((img) => ({ id: img.id, url: img.url, alt_text: img.alt_text }));
         this.toast.success('Image uploaded');
+        const inserted = images[images.length - 1];
+        if (inserted?.url) {
+          const alt = file.name.replace(/\.[^.]+$/, '').replace(/[\r\n]+/g, ' ').trim() || 'image';
+          const snippet = `![${alt}](${inserted.url})`;
+          this.insertAtCursor(textarea, snippet);
+          this.toast.info('Inserted image markdown');
+        }
         input.value = '';
       },
       error: () => this.toast.error('Could not upload image')
@@ -1592,6 +1728,45 @@ export class AdminComponent implements OnInit {
     const snippet = `\n\n![${alt}](${url})\n`;
     this.blogForm.body_markdown = (this.blogForm.body_markdown || '').trimEnd() + snippet;
     this.toast.info('Inserted image markdown');
+  }
+
+  private prefixBlogLines(textarea: HTMLTextAreaElement, prefix: string): void {
+    const value = textarea.value;
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? start;
+    const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+    const lineEnd = end === start ? value.indexOf('\n', start) : value.indexOf('\n', end);
+    const safeLineEnd = lineEnd === -1 ? value.length : lineEnd;
+    const segment = value.slice(lineStart, safeLineEnd);
+    const lines = segment.split('\n');
+    const nextSegment = lines
+      .map((line) => {
+        const trimmed = line.trim();
+        if (!trimmed) return line;
+        if (line.startsWith(prefix)) return line;
+        return prefix + line;
+      })
+      .join('\n');
+    const nextValue = value.slice(0, lineStart) + nextSegment + value.slice(safeLineEnd);
+    const added = nextSegment.length - segment.length;
+    this.updateBlogBody(textarea, nextValue, start + added, end + added);
+  }
+
+  private insertAtCursor(textarea: HTMLTextAreaElement, text: string): void {
+    const value = textarea.value;
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? start;
+    const next = value.slice(0, start) + text + value.slice(end);
+    const pos = start + text.length;
+    this.updateBlogBody(textarea, next, pos, pos);
+  }
+
+  private updateBlogBody(textarea: HTMLTextAreaElement, nextValue: string, selectionStart: number, selectionEnd: number): void {
+    this.blogForm.body_markdown = nextValue;
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(selectionStart, selectionEnd);
+    });
   }
 
   private loadBlogEditor(key: string): void {

@@ -2,6 +2,56 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .markdown a {
+    @apply text-indigo-600 underline underline-offset-4 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200;
+  }
+
+  .markdown p {
+    @apply my-3;
+  }
+
+  .markdown h1 {
+    @apply mt-6 mb-3 text-2xl font-semibold text-slate-900 dark:text-slate-50;
+  }
+
+  .markdown h2 {
+    @apply mt-5 mb-2 text-xl font-semibold text-slate-900 dark:text-slate-50;
+  }
+
+  .markdown h3 {
+    @apply mt-4 mb-2 text-lg font-semibold text-slate-900 dark:text-slate-50;
+  }
+
+  .markdown ul {
+    @apply my-3 list-disc pl-6;
+  }
+
+  .markdown ol {
+    @apply my-3 list-decimal pl-6;
+  }
+
+  .markdown li {
+    @apply my-1;
+  }
+
+  .markdown code {
+    @apply rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[0.95em] text-slate-900 dark:bg-slate-800 dark:text-slate-100;
+  }
+
+  .markdown pre {
+    @apply my-4 overflow-x-auto rounded-xl bg-slate-950 p-4 text-slate-100;
+  }
+
+  .markdown pre code {
+    @apply bg-transparent p-0 text-slate-100;
+  }
+
+  .markdown blockquote {
+    @apply my-4 border-l-4 border-slate-200 pl-4 italic text-slate-700 dark:border-slate-700 dark:text-slate-200;
+  }
+}
+
 :root {
   --aa-bg: #0f172a;
   --aa-ink: #0f172a;

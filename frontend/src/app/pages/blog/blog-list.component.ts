@@ -1,5 +1,5 @@
-import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, signal } from '@angular/core';
+import { CommonModule, DOCUMENT } from '@angular/common';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { Meta, Title } from '@angular/platform-browser';
@@ -121,6 +121,8 @@ export class BlogListComponent implements OnInit, OnDestroy {
 
   private sub?: Subscription;
   private langSub?: Subscription;
+  private canonicalEl?: HTMLLinkElement;
+  private document: Document = inject(DOCUMENT);
 
   constructor(
     private blog: BlogService,
@@ -159,6 +161,7 @@ export class BlogListComponent implements OnInit, OnDestroy {
   load(page = 1): void {
     this.loading.set(true);
     this.hasError.set(false);
+    this.setCanonical(page);
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     this.blog.listPosts({ lang, page, limit: 9 }).subscribe({
       next: (resp) => {
@@ -183,5 +186,22 @@ export class BlogListComponent implements OnInit, OnDestroy {
     const next = Math.min(Math.max(1, this.pageMeta.page + delta), this.pageMeta.total_pages);
     const queryParams: Params = { page: next !== 1 ? next : undefined };
     void this.router.navigate([], { relativeTo: this.route, queryParams, queryParamsHandling: 'merge' });
+  }
+
+  private setCanonical(page: number): void {
+    if (typeof window === 'undefined' || !this.document) return;
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    const qs = new URLSearchParams({ lang });
+    if (page > 1) qs.set('page', String(page));
+    const href = `${window.location.origin}/blog?${qs.toString()}`;
+    let link: HTMLLinkElement | null = this.document.querySelector('link[rel="canonical"]');
+    if (!link) {
+      link = this.document.createElement('link');
+      link.setAttribute('rel', 'canonical');
+      this.document.head.appendChild(link);
+    }
+    link.setAttribute('href', href);
+    this.canonicalEl = link;
+    this.meta.updateTag({ property: 'og:url', content: href });
   }
 }

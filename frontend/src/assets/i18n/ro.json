@@ -40,6 +40,7 @@
     "next": "Înainte",
     "post": {
       "breadcrumb": "Articol",
+      "backToBlog": "Înapoi la blog",
       "loadingTitle": "Se încarcă…",
       "errorTitle": "Nu am putut încărca acest articol.",
       "errorCopy": "Încearcă din nou în câteva momente.",

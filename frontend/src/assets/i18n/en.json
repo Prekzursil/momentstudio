@@ -40,6 +40,7 @@
     "next": "Next",
     "post": {
       "breadcrumb": "Post",
+      "backToBlog": "Back to blog",
       "loadingTitle": "Loading…",
       "errorTitle": "Could not load this post.",
       "errorCopy": "Please try again in a moment.",
