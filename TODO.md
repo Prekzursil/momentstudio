@@ -169,6 +169,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Main layout (header/footer/responsive nav).
 - [x] Shared components: button, input, card, modal, toast.
 - [x] Fix shared standalone components missing `NgIf` imports so buttons/labels render correctly.
+- [x] Header: improve theme/language control layout and add a global product search field.
+- [x] Footer: remove year suffix from tagline and replace Pinterest link with Facebook.
+- [x] Frontend: add `/about` route rendering CMS `page.about` content.
 - [x] Global error handling / boundary route.
 - [x] API service layer + interceptors.
 - [x] Theme tokens (spacing, typography, colors).
@@ -193,6 +196,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Featured products grid on homepage.
 - [x] Category listing with grid + pagination.
 - [x] Filter sidebar (category, price range, tags).
+- [x] Shop: fix filter sidebar price slider overflow.
 - [x] Search bar hitting /products.
 - [x] Product card component (image, name, price, stock badge).
 - [x] Product detail page with gallery, variants, quantity/add-to-cart.

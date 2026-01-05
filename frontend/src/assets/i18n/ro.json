@@ -13,10 +13,17 @@
     "menu": "Meniu"
   },
   "footer": {
-    "tagline": "Ceramică realizată manual · Din 2024",
+    "tagline": "Ceramică realizată manual",
     "instagram": "Instagram",
-    "pinterest": "Pinterest",
+    "facebook": "Facebook",
     "contact": "Contact"
+  },
+  "about": {
+    "loading": "Se încarcă pagina Despre…",
+    "errorTitle": "Nu am putut încărca pagina Despre.",
+    "errorCopy": "Încearcă din nou în câteva momente.",
+    "metaTitle": "Despre AdrianaArt",
+    "metaDescription": "Află povestea AdrianaArt și detalii despre ceramica noastră realizată manual."
   },
   "home": {
     "headline": "Construiește experiența magazinului AdrianaArt.",

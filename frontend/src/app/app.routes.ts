@@ -3,6 +3,7 @@ import { HomeComponent } from './pages/home/home.component';
 import { NotFoundComponent } from './pages/not-found/not-found.component';
 import { ErrorComponent } from './pages/error/error.component';
 import { ShopComponent } from './pages/shop/shop.component';
+import { AboutComponent } from './pages/about/about.component';
 import { ProductComponent } from './pages/product/product.component';
 import { AdminComponent } from './pages/admin/admin.component';
 import { authGuard, adminGuard } from './core/auth.guard';
@@ -21,6 +22,7 @@ import { shopCategoriesResolver } from './core/shop.resolver';
 export const routes: Routes = [
   { path: '', component: HomeComponent, title: 'AdrianaArt' },
   { path: 'shop', component: ShopComponent, title: 'Shop | AdrianaArt', resolve: { categories: shopCategoriesResolver } },
+  { path: 'about', component: AboutComponent, title: 'About | AdrianaArt' },
   { path: 'products/:slug', component: ProductComponent, title: 'Product | AdrianaArt' },
   { path: 'cart', component: CartComponent, title: 'Cart | AdrianaArt' },
   { path: 'checkout', component: CheckoutComponent, title: 'Checkout | AdrianaArt' },

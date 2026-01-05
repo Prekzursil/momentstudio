@@ -13,10 +13,17 @@
     "menu": "Menu"
   },
   "footer": {
-    "tagline": "Handcrafted ceramics · Since 2024",
+    "tagline": "Handcrafted ceramics",
     "instagram": "Instagram",
-    "pinterest": "Pinterest",
+    "facebook": "Facebook",
     "contact": "Contact"
+  },
+  "about": {
+    "loading": "Loading about page…",
+    "errorTitle": "Could not load About content.",
+    "errorCopy": "Please try again in a moment.",
+    "metaTitle": "About AdrianaArt",
+    "metaDescription": "Learn about AdrianaArt and the story behind our handcrafted ceramics."
   },
   "home": {
     "headline": "Build the AdrianaArt storefront experience.",
