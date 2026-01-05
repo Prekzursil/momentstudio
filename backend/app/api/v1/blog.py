@@ -17,13 +17,15 @@ router = APIRouter(prefix="/blog", tags=["blog"])
 async def list_blog_posts(
     session: AsyncSession = Depends(get_session),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+    q: str | None = Query(default=None, max_length=200),
+    tag: str | None = Query(default=None, max_length=50),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=50),
 ) -> BlogPostListResponse:
-    blocks, total_items = await blog_service.list_published_posts(session, lang=lang, page=page, limit=limit)
+    blocks, total_items = await blog_service.list_published_posts(session, lang=lang, page=page, limit=limit, q=q, tag=tag)
     total_pages = (total_items + limit - 1) // limit if total_items else 1
     return BlogPostListResponse(
-        items=[blog_service.to_list_item(b) for b in blocks],
+        items=[blog_service.to_list_item(b, lang=lang) for b in blocks],
         meta=PaginationMeta(total_items=total_items, total_pages=total_pages, page=page, limit=limit),
     )
 
@@ -37,7 +39,7 @@ async def get_blog_post(
     block = await blog_service.get_published_post(session, slug=slug, lang=lang)
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
-    return BlogPostRead.model_validate(blog_service.to_read(block))
+    return BlogPostRead.model_validate(blog_service.to_read(block, lang=lang))
 
 
 @router.get("/posts/{slug}/comments", response_model=BlogCommentListResponse)

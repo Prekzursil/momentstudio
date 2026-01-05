@@ -41,7 +41,19 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
         </h1>
         <p class="text-sm text-slate-500 dark:text-slate-400" *ngIf="post()?.published_at">
           {{ post()!.published_at | date: 'mediumDate' }}
+          <ng-container *ngIf="post()?.reading_time_minutes"> · {{ 'blog.minutesRead' | translate : { minutes: post()!.reading_time_minutes } }}</ng-container>
         </p>
+        <p class="text-sm text-slate-600 dark:text-slate-300" *ngIf="post()?.summary">{{ post()!.summary }}</p>
+        <div class="flex flex-wrap gap-1" *ngIf="post()?.tags?.length">
+          <a
+            *ngFor="let tag of post()!.tags"
+            [routerLink]="['/blog']"
+            [queryParams]="{ tag: tag }"
+            class="text-xs rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-700 hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200 dark:hover:border-slate-600"
+          >
+            #{{ tag }}
+          </a>
+        </div>
       </div>
 
       <div *ngIf="loadingPost()" class="grid gap-4">
@@ -64,9 +76,9 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
         <app-card>
           <div class="grid gap-6">
             <img
-              *ngIf="post()!.images?.length"
-              [src]="post()!.images[0].url"
-              [alt]="post()!.images[0].alt_text || post()!.title"
+              *ngIf="post()!.cover_image_url"
+              [src]="post()!.cover_image_url"
+              [alt]="post()!.title"
               class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
               loading="lazy"
             />
@@ -399,15 +411,15 @@ export class BlogPostComponent implements OnInit, OnDestroy {
 
   private setMetaTags(post: BlogPost): void {
     const pageTitle = `${post.title} | AdrianaArt`;
-    const description = (post.body_markdown || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+    const description = (post.summary || post.body_markdown || '').replace(/\s+/g, ' ').trim().slice(0, 160);
     this.title.setTitle(pageTitle);
     if (description) {
       this.meta.updateTag({ name: 'description', content: description });
       this.meta.updateTag({ property: 'og:description', content: description });
     }
     this.meta.updateTag({ property: 'og:title', content: pageTitle });
-    if (post.images?.length) {
-      this.meta.updateTag({ property: 'og:image', content: post.images[0].url });
+    if (post.cover_image_url) {
+      this.meta.updateTag({ property: 'og:image', content: post.cover_image_url });
     }
     this.setCanonical();
   }

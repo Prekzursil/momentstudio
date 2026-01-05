@@ -28,6 +28,13 @@
   },
   "blog": {
     "title": "Blog",
+    "searchLabel": "Search",
+    "searchPlaceholder": "Search posts",
+    "tagLabel": "Tag",
+    "tagPlaceholder": "Filter by tag",
+    "searchCta": "Search",
+    "clearFilters": "Clear",
+    "minutesRead": "{{minutes}} min read",
     "errorTitle": "Could not load posts.",
     "errorCopy": "Check your connection and retry.",
     "retry": "Retry",

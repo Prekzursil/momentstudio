@@ -591,6 +591,29 @@ import { MarkdownService } from '../../core/markdown.service';
                   <app-input label="Title" [(value)]="blogCreate.title"></app-input>
                 </div>
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                  Summary (optional)
+                  <textarea
+                    rows="3"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogCreate.summary"
+                  ></textarea>
+                </label>
+                <app-input label="Tags (comma-separated)" [(value)]="blogCreate.tags" placeholder="e.g. ceramics, studio, news"></app-input>
+                <app-input
+                  label="Cover image URL (optional)"
+                  [(value)]="blogCreate.cover_image_url"
+                  placeholder="https://..."
+                ></app-input>
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Reading time minutes (optional)
+                  <input
+                    type="number"
+                    min="1"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogCreate.reading_time_minutes"
+                  />
+                </label>
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
                   Body (Markdown)
                   <textarea
                     rows="6"
@@ -665,6 +688,26 @@ import { MarkdownService } from '../../core/markdown.service';
                     <option value="draft">draft</option>
                     <option value="published">published</option>
                   </select>
+                </label>
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                  Summary ({{ blogEditLang.toUpperCase() }}) (optional)
+                  <textarea
+                    rows="3"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogForm.summary"
+                  ></textarea>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">Used for the blog list excerpt and SEO description.</span>
+                </label>
+                <app-input label="Tags (comma-separated)" [(value)]="blogForm.tags" placeholder="e.g. ceramics, studio, news"></app-input>
+                <app-input label="Cover image URL (optional)" [(value)]="blogForm.cover_image_url" placeholder="https://..."></app-input>
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Reading time minutes (optional)
+                  <input
+                    type="number"
+                    min="1"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogForm.reading_time_minutes"
+                  />
                 </label>
                 <div class="grid gap-2 md:col-span-2">
                   <div class="flex flex-wrap items-center justify-between gap-2">
@@ -1007,6 +1050,10 @@ export class AdminComponent implements OnInit {
     status: 'draft' | 'published';
     title: string;
     body_markdown: string;
+    summary: string;
+    tags: string;
+    cover_image_url: string;
+    reading_time_minutes: string;
     includeTranslation: boolean;
     translationTitle: string;
     translationBody: string;
@@ -1016,6 +1063,10 @@ export class AdminComponent implements OnInit {
     status: 'draft',
     title: '',
     body_markdown: '',
+    summary: '',
+    tags: '',
+    cover_image_url: '',
+    reading_time_minutes: '',
     includeTranslation: false,
     translationTitle: '',
     translationBody: ''
@@ -1026,8 +1077,13 @@ export class AdminComponent implements OnInit {
   blogForm = {
     title: '',
     body_markdown: '',
-    status: 'draft'
+    status: 'draft',
+    summary: '',
+    tags: '',
+    cover_image_url: '',
+    reading_time_minutes: ''
   };
+  blogMeta: Record<string, any> = {};
   blogImages: { id: string; url: string; alt_text?: string | null }[] = [];
   showBlogPreview = false;
 
@@ -1519,6 +1575,10 @@ export class AdminComponent implements OnInit {
       status: 'draft',
       title: '',
       body_markdown: '',
+      summary: '',
+      tags: '',
+      cover_image_url: '',
+      reading_time_minutes: '',
       includeTranslation: false,
       translationTitle: '',
       translationBody: ''
@@ -1549,6 +1609,23 @@ export class AdminComponent implements OnInit {
     const key = `blog.${slug}`;
     const baseLang = this.blogCreate.baseLang;
     const translationLang: 'en' | 'ro' = baseLang === 'en' ? 'ro' : 'en';
+    const meta: Record<string, any> = {};
+    const summary = this.blogCreate.summary.trim();
+    if (summary) {
+      meta['summary'] = { [baseLang]: summary };
+    }
+    const tags = this.parseTags(this.blogCreate.tags);
+    if (tags.length) {
+      meta['tags'] = tags;
+    }
+    const cover = this.blogCreate.cover_image_url.trim();
+    if (cover) {
+      meta['cover_image_url'] = cover;
+    }
+    const rt = Number(String(this.blogCreate.reading_time_minutes || '').trim());
+    if (Number.isFinite(rt) && rt > 0) {
+      meta['reading_time_minutes'] = Math.trunc(rt);
+    }
 
     try {
       await firstValueFrom(
@@ -1556,7 +1633,8 @@ export class AdminComponent implements OnInit {
           title: this.blogCreate.title.trim(),
           body_markdown: this.blogCreate.body_markdown,
           status: this.blogCreate.status,
-          lang: baseLang
+          lang: baseLang,
+          meta: Object.keys(meta).length ? meta : undefined
         })
       );
 
@@ -1600,6 +1678,8 @@ export class AdminComponent implements OnInit {
         if (wantsBase) {
           this.blogForm.status = block.status;
         }
+        this.blogMeta = block.meta || this.blogMeta || {};
+        this.syncBlogMetaToForm(lang);
       },
       error: () => this.toast.error('Could not load blog post content')
     });
@@ -1613,16 +1693,20 @@ export class AdminComponent implements OnInit {
     }
 
     const key = this.selectedBlogKey;
+    const nextMeta = this.buildBlogMeta(this.blogEditLang);
+    const metaChanged = JSON.stringify(nextMeta) !== JSON.stringify(this.blogMeta || {});
     const isBase = this.blogEditLang === this.blogBaseLang;
     if (isBase) {
       this.admin
         .updateContent(key, {
           title: this.blogForm.title.trim(),
           body_markdown: this.blogForm.body_markdown,
-          status: this.blogForm.status as any
+          status: this.blogForm.status as any,
+          meta: nextMeta
         })
         .subscribe({
           next: () => {
+            this.blogMeta = nextMeta;
             this.toast.success('Saved');
             this.reloadContentBlocks();
             this.loadBlogEditor(key);
@@ -1640,9 +1724,25 @@ export class AdminComponent implements OnInit {
       })
       .subscribe({
         next: () => {
-          this.toast.success('Saved translation');
-          this.reloadContentBlocks();
-          this.setBlogEditLang(this.blogEditLang);
+          const onDone = () => {
+            this.toast.success('Saved translation');
+            this.reloadContentBlocks();
+            this.setBlogEditLang(this.blogEditLang);
+          };
+          if (!metaChanged) {
+            onDone();
+            return;
+          }
+          this.admin.updateContent(key, { meta: nextMeta }).subscribe({
+            next: () => {
+              this.blogMeta = nextMeta;
+              onDone();
+            },
+            error: () => {
+              this.toast.error('Saved translation, but could not save metadata');
+              onDone();
+            }
+          });
         },
         error: () => this.toast.error('Could not save translation')
       });
@@ -1776,11 +1876,17 @@ export class AdminComponent implements OnInit {
       next: (block) => {
         this.blogBaseLang = (block.lang === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
         this.blogEditLang = this.blogBaseLang;
+        this.blogMeta = block.meta || {};
         this.blogForm = {
           title: block.title,
           body_markdown: block.body_markdown,
-          status: block.status
+          status: block.status,
+          summary: '',
+          tags: '',
+          cover_image_url: '',
+          reading_time_minutes: ''
         };
+        this.syncBlogMetaToForm(this.blogEditLang);
         this.blogImages = (block.images || []).map((img) => ({ id: img.id, url: img.url, alt_text: img.alt_text }));
       },
       error: () => this.toast.error('Could not load blog post')
@@ -1792,7 +1898,8 @@ export class AdminComponent implements OnInit {
   }
 
   private resetBlogForm(): void {
-    this.blogForm = { title: '', body_markdown: '', status: 'draft' };
+    this.blogForm = { title: '', body_markdown: '', status: 'draft', summary: '', tags: '', cover_image_url: '', reading_time_minutes: '' };
+    this.blogMeta = {};
   }
 
   private normalizeBlogSlug(raw: string): string {
@@ -1803,6 +1910,83 @@ export class AdminComponent implements OnInit {
       .replace(/[^a-z0-9-]/g, '')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
+  }
+
+  private parseTags(raw: string): string[] {
+    const parts = (raw || '')
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const part of parts) {
+      const key = part.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(part);
+    }
+    return out;
+  }
+
+  private getBlogSummary(meta: Record<string, any>, lang: 'en' | 'ro'): string {
+    const summary = meta?.['summary'];
+    if (summary && typeof summary === 'object' && !Array.isArray(summary)) {
+      const value = summary[lang];
+      return typeof value === 'string' ? value : '';
+    }
+    if (typeof summary === 'string') {
+      return lang === this.blogBaseLang ? summary : '';
+    }
+    return '';
+  }
+
+  private syncBlogMetaToForm(lang: 'en' | 'ro'): void {
+    const meta = this.blogMeta || {};
+    this.blogForm.summary = this.getBlogSummary(meta, lang);
+    const tags = meta['tags'];
+    if (Array.isArray(tags)) {
+      this.blogForm.tags = tags.join(', ');
+    } else if (typeof tags === 'string') {
+      this.blogForm.tags = tags;
+    } else {
+      this.blogForm.tags = '';
+    }
+
+    const cover = meta['cover_image_url'] || meta['cover_image'] || '';
+    this.blogForm.cover_image_url = typeof cover === 'string' ? cover : '';
+    const rt = meta['reading_time_minutes'] ?? meta['reading_time'] ?? '';
+    this.blogForm.reading_time_minutes = rt ? String(rt) : '';
+  }
+
+  private buildBlogMeta(lang: 'en' | 'ro'): Record<string, any> {
+    const meta: Record<string, any> = { ...(this.blogMeta || {}) };
+
+    const tags = this.parseTags(this.blogForm.tags);
+    if (tags.length) meta['tags'] = tags;
+    else delete meta['tags'];
+
+    const cover = this.blogForm.cover_image_url.trim();
+    if (cover) meta['cover_image_url'] = cover;
+    else delete meta['cover_image_url'];
+
+    const rt = Number(String(this.blogForm.reading_time_minutes || '').trim());
+    if (Number.isFinite(rt) && rt > 0) meta['reading_time_minutes'] = Math.trunc(rt);
+    else delete meta['reading_time_minutes'];
+
+    const summaryValue = this.blogForm.summary.trim();
+    const existing = meta['summary'];
+    let summary: Record<string, any> = {};
+    if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
+      summary = { ...existing };
+    } else if (typeof existing === 'string' && existing.trim()) {
+      summary = { [this.blogBaseLang]: existing.trim() };
+    }
+    if (summaryValue) summary[lang] = summaryValue;
+    else delete summary[lang];
+    if (Object.keys(summary).length) meta['summary'] = summary;
+    else delete meta['summary'];
+
+    return meta;
   }
 
   loadAssets(): void {

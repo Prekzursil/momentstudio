@@ -15,6 +15,8 @@ export interface BlogPostListItem {
   excerpt: string;
   published_at?: string | null;
   cover_image_url?: string | null;
+  tags: string[];
+  reading_time_minutes?: number | null;
 }
 
 export interface BlogPostListResponse {
@@ -38,6 +40,10 @@ export interface BlogPost {
   updated_at: string;
   images: BlogPostImage[];
   meta?: Record<string, unknown> | null;
+  summary?: string | null;
+  cover_image_url?: string | null;
+  tags?: string[];
+  reading_time_minutes?: number | null;
 }
 
 export interface BlogCommentAuthor {
@@ -66,11 +72,13 @@ export interface BlogCommentListResponse {
 export class BlogService {
   constructor(private api: ApiService) {}
 
-  listPosts(params: { lang?: string; page?: number; limit?: number }): Observable<BlogPostListResponse> {
+  listPosts(params: { lang?: string; page?: number; limit?: number; q?: string; tag?: string }): Observable<BlogPostListResponse> {
     return this.api.get<BlogPostListResponse>('/blog/posts', {
       lang: params.lang,
       page: params.page ?? 1,
-      limit: params.limit ?? 10
+      limit: params.limit ?? 10,
+      q: params.q,
+      tag: params.tag
     });
   }
 

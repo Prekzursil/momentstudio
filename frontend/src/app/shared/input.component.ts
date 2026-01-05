@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { NgClass, NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -13,6 +13,7 @@ import { FormsModule } from '@angular/forms';
         class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
         [placeholder]="placeholder"
         [(ngModel)]="value"
+        (ngModelChange)="valueChange.emit($event)"
         [type]="type"
       />
       <span *ngIf="hint" class="text-xs text-slate-500 dark:text-slate-400">{{ hint }}</span>
@@ -25,4 +26,5 @@ export class InputComponent {
   @Input() type: 'text' | 'email' | 'password' = 'text';
   @Input() hint = '';
   @Input() value: string | number = '';
+  @Output() valueChange = new EventEmitter<string | number>();
 }
