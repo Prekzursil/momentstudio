@@ -173,12 +173,24 @@ async def send_blog_comment_admin_notification(
 ) -> bool:
     lng = _lang_or_default(lang)
     subject = "New blog comment" if lng == "en" else "Comentariu nou pe blog"
-    text_body = (
-        f"New comment on: {post_title}\nFrom: {commenter_name}\n\n{comment_body}\n\nView: {post_url}"
-        if lng == "en"
-        else f"Comentariu nou la: {post_title}\nDe la: {commenter_name}\n\n{comment_body}\n\nVezi: {post_url}"
+    if env is None:
+        text_body = (
+            f"New comment on: {post_title}\nFrom: {commenter_name}\n\n{comment_body}\n\nView: {post_url}"
+            if lng == "en"
+            else f"Comentariu nou la: {post_title}\nDe la: {commenter_name}\n\n{comment_body}\n\nVezi: {post_url}"
+        )
+        return await send_email(to_email, subject, text_body)
+    text_body, html_body = render_template(
+        "blog_comment_admin.txt.j2",
+        {
+            "lang": lng,
+            "post_title": post_title,
+            "post_url": post_url,
+            "commenter_name": commenter_name,
+            "comment_body": comment_body,
+        },
     )
-    return await send_email(to_email, subject, text_body)
+    return await send_email(to_email, subject, text_body, html_body)
 
 
 async def send_blog_comment_reply_notification(
@@ -192,12 +204,24 @@ async def send_blog_comment_reply_notification(
 ) -> bool:
     lng = _lang_or_default(lang)
     subject = "New reply to your comment" if lng == "en" else "Răspuns nou la comentariul tău"
-    text_body = (
-        f"New reply on: {post_title}\nFrom: {replier_name}\n\n{comment_body}\n\nView: {post_url}"
-        if lng == "en"
-        else f"Răspuns nou la: {post_title}\nDe la: {replier_name}\n\n{comment_body}\n\nVezi: {post_url}"
+    if env is None:
+        text_body = (
+            f"New reply on: {post_title}\nFrom: {replier_name}\n\n{comment_body}\n\nView: {post_url}"
+            if lng == "en"
+            else f"Răspuns nou la: {post_title}\nDe la: {replier_name}\n\n{comment_body}\n\nVezi: {post_url}"
+        )
+        return await send_email(to_email, subject, text_body)
+    text_body, html_body = render_template(
+        "blog_comment_reply.txt.j2",
+        {
+            "lang": lng,
+            "post_title": post_title,
+            "post_url": post_url,
+            "replier_name": replier_name,
+            "comment_body": comment_body,
+        },
     )
-    return await send_email(to_email, subject, text_body)
+    return await send_email(to_email, subject, text_body, html_body)
 
 
 def render_template(template_name: str, context: dict) -> tuple[str, str]:

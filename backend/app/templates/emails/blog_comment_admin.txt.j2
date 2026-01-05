@@ -1,0 +1,15 @@
+{% if lang == 'ro' -%}
+Comentariu nou la: {{ post_title }}
+De la: {{ commenter_name }}
+
+{{ comment_body }}
+
+Vezi: {{ post_url }}
+{%- else -%}
+New comment on: {{ post_title }}
+From: {{ commenter_name }}
+
+{{ comment_body }}
+
+View: {{ post_url }}
+{%- endif %}
