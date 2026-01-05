@@ -1,14 +1,15 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
-import { NgClass } from '@angular/common';
+import { NgClass, NgIf } from '@angular/common';
 import { RouterLink } from '@angular/router';
 
 type ButtonVariant = 'primary' | 'ghost';
 type ButtonSize = 'md' | 'sm';
+type ButtonType = 'button' | 'submit' | 'reset';
 
 @Component({
   selector: 'app-button',
   standalone: true,
-  imports: [NgClass, RouterLink],
+  imports: [NgIf, NgClass, RouterLink],
   template: `
     <ng-container *ngIf="routerLink; else buttonTpl">
       <a
@@ -22,11 +23,11 @@ type ButtonSize = 'md' | 'sm';
     </ng-container>
     <ng-template #buttonTpl>
       <button
-        type="button"
+        [attr.type]="type"
         [ngClass]="classes"
         class="inline-flex items-center justify-center rounded-full font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
         [disabled]="disabled"
-        (click)="!disabled && action.emit()"
+        (click)="onClick($event)"
       >
         <ng-content></ng-content>
         <span *ngIf="label">{{ label }}</span>
@@ -38,6 +39,7 @@ export class ButtonComponent {
   @Input() label = '';
   @Input() variant: ButtonVariant = 'primary';
   @Input() size: ButtonSize = 'md';
+  @Input() type: ButtonType = 'button';
   @Input() routerLink?: string | any[];
   @Input() disabled = false;
   @Output() action = new EventEmitter<void>();
@@ -49,5 +51,17 @@ export class ButtonComponent {
     const sizeCls = this.size === 'sm' ? 'px-3 py-2 text-sm' : 'px-4 py-2.5 text-sm';
     const state = this.disabled ? 'opacity-60 cursor-not-allowed' : '';
     return `${base} ${sizeCls} ${state}`;
+  }
+
+  onClick(event: MouseEvent): void {
+    if (this.disabled) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
+    if (this.type === 'button') {
+      this.action.emit();
+    }
   }
 }

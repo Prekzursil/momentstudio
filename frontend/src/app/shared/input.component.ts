@@ -1,11 +1,11 @@
 import { Component, Input } from '@angular/core';
-import { NgClass } from '@angular/common';
+import { NgClass, NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-input',
   standalone: true,
-  imports: [FormsModule, NgClass],
+  imports: [FormsModule, NgClass, NgIf],
   template: `
     <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
       <span *ngIf="label">{{ label }}</span>

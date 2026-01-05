@@ -168,6 +168,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Tailwind CSS and design tokens.
 - [x] Main layout (header/footer/responsive nav).
 - [x] Shared components: button, input, card, modal, toast.
+- [x] Fix shared standalone components missing `NgIf` imports so buttons/labels render correctly.
 - [x] Global error handling / boundary route.
 - [x] API service layer + interceptors.
 - [x] Theme tokens (spacing, typography, colors).
