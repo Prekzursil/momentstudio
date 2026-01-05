@@ -242,7 +242,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Social preview images (OG image generation per post).
 - [x] Moderation: admin tools to hide/delete comments and review flagged content.
 - [x] Notifications: optional email notifications for new comments (admin/user opt-in).
-- [ ] Notifications: localize account notification settings UI + improve email templates.
+- [x] Notifications: localize account notification settings UI + improve email templates.
 
 ## Frontend - Cart & Checkout
 - [x] Cart page/drawer with quantities and totals.

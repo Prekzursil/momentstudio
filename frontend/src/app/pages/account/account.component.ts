@@ -17,6 +17,7 @@ import { appConfig } from '../../core/app-config';
 import { WishlistService } from '../../core/wishlist.service';
 import { ProductCardComponent } from '../../shared/product-card.component';
 import { ThemeMode, ThemeService } from '../../core/theme.service';
+import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-account',
@@ -25,6 +26,7 @@ import { ThemeMode, ThemeService } from '../../core/theme.service';
     CommonModule,
     FormsModule,
     RouterLink,
+    TranslateModule,
     ContainerComponent,
     BreadcrumbComponent,
     ButtonComponent,
@@ -85,20 +87,30 @@ import { ThemeMode, ThemeService } from '../../core/theme.service';
 
         <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Notifications</h2>
-            <app-button size="sm" variant="ghost" label="Save" [disabled]="savingNotifications" (action)="saveNotifications()"></app-button>
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'account.notifications.title' | translate }}</h2>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'account.notifications.save' | translate"
+              [disabled]="savingNotifications"
+              (action)="saveNotifications()"
+            ></app-button>
           </div>
           <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
             <label class="flex items-center gap-2">
               <input type="checkbox" [(ngModel)]="notifyBlogCommentReplies" />
-              <span>Email me when someone replies to my blog comment.</span>
+              <span>{{ 'account.notifications.replyLabel' | translate }}</span>
             </label>
             <label *ngIf="isAdmin()" class="flex items-center gap-2">
               <input type="checkbox" [(ngModel)]="notifyBlogComments" />
-              <span>Email me when new blog comments are posted (admin).</span>
+              <span>{{ 'account.notifications.adminLabel' | translate }}</span>
             </label>
-            <span *ngIf="notificationsMessage" class="text-xs text-emerald-700 dark:text-emerald-300">{{ notificationsMessage }}</span>
-            <span *ngIf="notificationsError" class="text-xs text-rose-700 dark:text-rose-300">{{ notificationsError }}</span>
+            <span *ngIf="notificationsMessage" class="text-xs text-emerald-700 dark:text-emerald-300">{{
+              notificationsMessage | translate
+            }}</span>
+            <span *ngIf="notificationsError" class="text-xs text-rose-700 dark:text-rose-300">{{
+              notificationsError | translate
+            }}</span>
           </div>
         </section>
 
@@ -548,10 +560,11 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
           this.profile.set(user);
           this.notifyBlogComments = Boolean(user?.notify_blog_comments);
           this.notifyBlogCommentReplies = Boolean(user?.notify_blog_comment_replies);
-          this.notificationsMessage = 'Saved.';
+          this.notificationsMessage = 'account.notifications.saved';
         },
         error: () => {
-          this.notificationsError = 'Could not save notification preferences.';
+          this.notificationsError = 'account.notifications.saveError';
+          this.savingNotifications = false;
         },
         complete: () => (this.savingNotifications = false)
       });

@@ -26,6 +26,16 @@
     "metaTitle": "Despre AdrianaArt",
     "metaDescription": "Află povestea AdrianaArt și detalii despre ceramica noastră realizată manual."
   },
+  "account": {
+    "notifications": {
+      "title": "Notificări",
+      "save": "Salvează",
+      "replyLabel": "Trimite-mi email când cineva răspunde la comentariul meu de pe blog.",
+      "adminLabel": "Trimite-mi email când se postează comentarii noi pe blog (admin).",
+      "saved": "Salvat.",
+      "saveError": "Nu am putut salva preferințele de notificare."
+    }
+  },
   "blog": {
     "title": "Blog",
     "searchLabel": "Caută",

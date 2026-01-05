@@ -1,0 +1,15 @@
+{% if lang == 'ro' -%}
+<p><strong>Comentariu nou la:</strong> {{ post_title|e }}</p>
+<p><strong>De la:</strong> {{ commenter_name|e }}</p>
+<p style="white-space: pre-wrap; margin: 16px 0; padding: 12px; border: 1px solid #e5e7eb; border-radius: 10px;">
+  {{ comment_body|e }}
+</p>
+<p><a href="{{ post_url|e }}">Vezi articolul</a></p>
+{%- else -%}
+<p><strong>New comment on:</strong> {{ post_title|e }}</p>
+<p><strong>From:</strong> {{ commenter_name|e }}</p>
+<p style="white-space: pre-wrap; margin: 16px 0; padding: 12px; border: 1px solid #e5e7eb; border-radius: 10px;">
+  {{ comment_body|e }}
+</p>
+<p><a href="{{ post_url|e }}">View post</a></p>
+{%- endif %}

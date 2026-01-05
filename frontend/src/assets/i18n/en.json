@@ -26,6 +26,16 @@
     "metaTitle": "About AdrianaArt",
     "metaDescription": "Learn about AdrianaArt and the story behind our handcrafted ceramics."
   },
+  "account": {
+    "notifications": {
+      "title": "Notifications",
+      "save": "Save",
+      "replyLabel": "Email me when someone replies to my blog comment.",
+      "adminLabel": "Email me when new blog comments are posted (admin).",
+      "saved": "Saved.",
+      "saveError": "Could not save notification preferences."
+    }
+  },
   "blog": {
     "title": "Blog",
     "searchLabel": "Search",

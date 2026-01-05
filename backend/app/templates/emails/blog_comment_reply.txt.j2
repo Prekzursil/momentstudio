@@ -1,0 +1,15 @@
+{% if lang == 'ro' -%}
+Răspuns nou la comentariul tău pe: {{ post_title }}
+De la: {{ replier_name }}
+
+{{ comment_body }}
+
+Vezi: {{ post_url }}
+{%- else -%}
+New reply to your comment on: {{ post_title }}
+From: {{ replier_name }}
+
+{{ comment_body }}
+
+View: {{ post_url }}
+{%- endif %}
