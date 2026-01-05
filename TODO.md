@@ -231,6 +231,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Media: add “insert image” action that uploads to `/content/admin/blog.{slug}/images` and inserts the URL into Markdown.
 - [x] SEO: add canonical link tags for blog list/post pages.
 - [x] SEO: include blog URLs in sitemap.xml and add OpenGraph meta per post.
+- [x] Testing: add blog unit/integration coverage (SEO meta/canonical, OG image caching, sitemap inclusion, Postgres smoke).
 - [x] Metadata: add summary, cover_image, tags, reading_time to ContentBlock.meta and show them in list/cards.
 - [x] Filters: tag filter + search within blog posts (server-side).
 - [x] Draft previews: shareable preview URL (token-based) for unpublished posts.
