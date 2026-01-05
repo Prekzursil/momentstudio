@@ -66,6 +66,11 @@ def upgrade() -> None:
             {"lang": lang, "title": title, "body_markdown": body_markdown}
         )
 
+    # NOTE:
+    # These columns didn't exist for historical version rows, so we cannot reconstruct
+    # their exact past values. We backfill from the current content_blocks state to
+    # avoid NULLs during rollback/reads; versions created after this migration will
+    # store accurate snapshots on write.
     for block_id, meta, lang, published_at in blocks:
         conn.execute(
             sa.update(versions)
