@@ -20,6 +20,7 @@ export class RichEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
   private editor: Editor | null = null;
   private isApplyingExternalUpdate = false;
   private themeObserver?: MutationObserver;
+  private destroyed = false;
 
   ngAfterViewInit(): void {
     this.editor = new Editor({
@@ -37,6 +38,7 @@ export class RichEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
       this.themeObserver = new MutationObserver(() => this.syncThemeClass());
       this.themeObserver.observe(this.document.documentElement, { attributes: true, attributeFilter: ['class'] });
     }
+    setTimeout(() => this.syncThemeClass(), 0);
 
     this.editor.on('change', () => {
       if (!this.editor || this.isApplyingExternalUpdate) return;
@@ -64,6 +66,7 @@ export class RichEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   private syncThemeClass(): void {
+    if (this.destroyed || !this.host?.nativeElement) return;
     const isDark = this.document.documentElement.classList.contains('dark');
     const root = this.host.nativeElement.querySelector('.toastui-editor-defaultUI') as HTMLElement | null;
     const target = root ?? this.host.nativeElement;
@@ -71,6 +74,7 @@ export class RichEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
     this.themeObserver?.disconnect();
     this.themeObserver = undefined;
     this.editor?.destroy();

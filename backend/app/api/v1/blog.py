@@ -105,8 +105,19 @@ async def blog_post_og_image(
 
     etag = f'W/"blog-og-{slug}-v{block.version}-{lang or "base"}"'
     cache_control = "public, max-age=3600"
-    if request.headers.get("if-none-match") == etag:
-        return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers={"ETag": etag, "Cache-Control": cache_control})
+    if_none_match = request.headers.get("if-none-match")
+    if if_none_match and if_none_match != "*":
+        normalized_etag = etag[2:] if etag.startswith("W/") else etag
+        for raw_candidate in if_none_match.split(","):
+            candidate = raw_candidate.strip()
+            if not candidate:
+                continue
+            normalized_candidate = candidate[2:] if candidate.startswith("W/") else candidate
+            if normalized_candidate == normalized_etag:
+                return Response(
+                    status_code=status.HTTP_304_NOT_MODIFIED,
+                    headers={"ETag": etag, "Cache-Control": cache_control},
+                )
 
     data = blog_service.to_read(block, lang=lang)
     png = og_images.render_blog_post_og(title=str(data.get("title") or ""), subtitle=data.get("summary") or None)

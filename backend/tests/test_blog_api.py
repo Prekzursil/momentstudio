@@ -124,6 +124,15 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert etag
     og_cached = client.get("/api/v1/blog/posts/first-post/og.png", params={"lang": "en"}, headers={"If-None-Match": etag})
     assert og_cached.status_code == 304
+    etag_strong = etag[2:] if etag.startswith('W/') else etag
+    og_cached_strong = client.get(
+        "/api/v1/blog/posts/first-post/og.png",
+        params={"lang": "en"},
+        headers={"If-None-Match": etag_strong},
+    )
+    assert og_cached_strong.status_code == 304
+    og_missing = client.get("/api/v1/blog/posts/missing/og.png", params={"lang": "en"})
+    assert og_missing.status_code == 404, og_missing.text
 
     # Create another blog post to verify filters
     create2 = client.post(
@@ -171,6 +180,8 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
 
     scheduled_detail = client.get("/api/v1/blog/posts/scheduled-post", params={"lang": "en"})
     assert scheduled_detail.status_code == 404, scheduled_detail.text
+    scheduled_og = client.get("/api/v1/blog/posts/scheduled-post/og.png", params={"lang": "en"})
+    assert scheduled_og.status_code == 404, scheduled_og.text
 
     # Draft previews: admin can mint a token and fetch the unpublished/scheduled post.
     minted = client.post(

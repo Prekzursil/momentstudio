@@ -32,7 +32,7 @@ def _load_font(size: int, *, bold: bool = False) -> Font:
     for path in candidates:
         try:
             return ImageFont.truetype(path, size=size)
-        except Exception:
+        except OSError:
             continue
     return ImageFont.load_default()
 
