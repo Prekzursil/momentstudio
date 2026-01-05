@@ -10,7 +10,10 @@ OG_WIDTH = 1200
 OG_HEIGHT = 630
 
 
-def _load_font(size: int, *, bold: bool = False) -> ImageFont.ImageFont:
+Font = ImageFont.FreeTypeFont | ImageFont.ImageFont
+
+
+def _load_font(size: int, *, bold: bool = False) -> Font:
     candidates = []
     if bold:
         candidates.extend(
@@ -61,7 +64,7 @@ def render_blog_post_og(*, title: str, subtitle: str | None = None, brand: str =
     title_font_size = 74
     title_font = _load_font(title_font_size, bold=True)
 
-    def fits(lines: list[str], font: ImageFont.ImageFont) -> bool:
+    def fits(lines: list[str], font: Font) -> bool:
         for line in lines:
             bbox = draw.textbbox((0, 0), line, font=font)
             if bbox[2] - bbox[0] > max_text_width:
@@ -90,4 +93,3 @@ def render_blog_post_og(*, title: str, subtitle: str | None = None, brand: str =
     buf = io.BytesIO()
     img.save(buf, format="PNG", optimize=True)
     return buf.getvalue()
-

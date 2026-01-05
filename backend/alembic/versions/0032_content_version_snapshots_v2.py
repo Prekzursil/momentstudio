@@ -9,6 +9,7 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "0032"
@@ -24,23 +25,25 @@ def upgrade() -> None:
     op.add_column("content_block_versions", sa.Column("translations", sa.JSON(), nullable=True))
 
     conn = op.get_bind()
+    is_postgres = conn.dialect.name == "postgresql"
+    uuid_type = postgresql.UUID(as_uuid=True) if is_postgres else sa.String()
     content_blocks = sa.table(
         "content_blocks",
-        sa.column("id", sa.String()),
+        sa.column("id", uuid_type),
         sa.column("meta", sa.JSON()),
         sa.column("lang", sa.String()),
         sa.column("published_at", sa.DateTime(timezone=True)),
     )
     content_translations = sa.table(
         "content_block_translations",
-        sa.column("content_block_id", sa.String()),
+        sa.column("content_block_id", uuid_type),
         sa.column("lang", sa.String()),
         sa.column("title", sa.String()),
         sa.column("body_markdown", sa.Text()),
     )
     versions = sa.table(
         "content_block_versions",
-        sa.column("content_block_id", sa.String()),
+        sa.column("content_block_id", uuid_type),
         sa.column("meta", sa.JSON()),
         sa.column("lang", sa.String()),
         sa.column("published_at", sa.DateTime(timezone=True)),
@@ -81,4 +84,3 @@ def downgrade() -> None:
     op.drop_column("content_block_versions", "published_at")
     op.drop_column("content_block_versions", "lang")
     op.drop_column("content_block_versions", "meta")
-

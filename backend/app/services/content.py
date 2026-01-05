@@ -276,7 +276,7 @@ async def rollback_to_version(
                 session.add(ContentBlockTranslation(content_block_id=block.id, lang=lang, title=title, body_markdown=body))
         for tr in list(block.translations):
             if tr.lang not in target_langs:
-                session.delete(tr)
+                await session.delete(tr)
     session.add(block)
 
     await session.refresh(block, attribute_names=["translations"])
