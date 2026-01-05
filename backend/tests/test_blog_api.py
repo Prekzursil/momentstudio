@@ -126,21 +126,30 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert detail_ro.json()["body_markdown"] == "Postare RO"
     assert detail_ro.json()["summary"] == "Rezumat RO"
 
+    # OG image: returns PNG bytes with cache headers and supports If-None-Match.
     og = client.get("/api/v1/blog/posts/first-post/og.png", params={"lang": "en"})
     assert og.status_code == 200, og.text
-    assert og.headers.get("content-type", "").startswith("image/png")
+    assert og.headers["content-type"].startswith("image/png")
     assert og.content[:8] == b"\x89PNG\r\n\x1a\n"
-    etag = og.headers.get("etag")
-    assert etag
-    og_cached = client.get("/api/v1/blog/posts/first-post/og.png", params={"lang": "en"}, headers={"If-None-Match": etag})
-    assert og_cached.status_code == 304
-    etag_strong = etag[2:] if etag.startswith('W/') else etag
-    og_cached_strong = client.get(
+    assert "ETag" in og.headers
+    assert "Cache-Control" in og.headers
+    etag = og.headers["ETag"]
+    og_304 = client.get(
         "/api/v1/blog/posts/first-post/og.png",
         params={"lang": "en"},
-        headers={"If-None-Match": etag_strong},
+        headers={"If-None-Match": etag},
     )
-    assert og_cached_strong.status_code == 304
+    assert og_304.status_code == 304
+    assert og_304.headers.get("ETag") == etag
+
+    # Weak ETag normalization: allow match even without the W/ prefix.
+    normalized = etag[2:] if etag.startswith('W/') else etag
+    og_304_norm = client.get(
+        "/api/v1/blog/posts/first-post/og.png",
+        params={"lang": "en"},
+        headers={"If-None-Match": normalized},
+    )
+    assert og_304_norm.status_code == 304
     og_missing = client.get("/api/v1/blog/posts/missing/og.png", params={"lang": "en"})
     assert og_missing.status_code == 404, og_missing.text
 
@@ -193,6 +202,12 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     scheduled_og = client.get("/api/v1/blog/posts/scheduled-post/og.png", params={"lang": "en"})
     assert scheduled_og.status_code == 404, scheduled_og.text
 
+    sitemap = client.get("/api/v1/sitemap.xml")
+    assert sitemap.status_code == 200
+    assert "blog/first-post?lang=en" in sitemap.text
+    assert "blog/second-post?lang=en" in sitemap.text
+    assert "blog/scheduled-post?lang=en" not in sitemap.text
+
     # Draft previews: admin can mint a token and fetch the unpublished/scheduled post.
     minted = client.post(
         "/api/v1/blog/posts/scheduled-post/preview-token",
@@ -200,12 +215,20 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
         headers=auth_headers(admin_token),
     )
     assert minted.status_code == 200, minted.text
-    token = minted.json()["token"]
+    minted_json = minted.json()
+    token = minted_json["token"]
     assert token
+    assert minted_json["url"].startswith("http://localhost:4200/blog/scheduled-post?")
+    assert f"preview={token}" in minted_json["url"]
+    assert "lang=en" in minted_json["url"]
+    assert datetime.fromisoformat(minted_json["expires_at"]) > datetime.now(timezone.utc)
 
     preview = client.get("/api/v1/blog/posts/scheduled-post/preview", params={"lang": "en", "token": token})
     assert preview.status_code == 200, preview.text
     assert preview.json()["title"] == "Scheduled"
+
+    invalid_preview = client.get("/api/v1/blog/posts/scheduled-post/preview", params={"lang": "en", "token": "nope"})
+    assert invalid_preview.status_code == 403, invalid_preview.text
 
     wrong = client.get("/api/v1/blog/posts/first-post/preview", params={"token": token})
     assert wrong.status_code == 403, wrong.text
@@ -262,10 +285,20 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     comment_id = created.json()["id"]
     assert created.json()["body"] == "Nice post!"
 
+    reply = client.post(
+        "/api/v1/blog/posts/first-post/comments",
+        json={"body": "Reply here", "parent_id": comment_id},
+        headers=auth_headers(flagger_token),
+    )
+    assert reply.status_code == 201, reply.text
+    reply_id = reply.json()["id"]
+
     comments = client.get("/api/v1/blog/posts/first-post/comments")
     assert comments.status_code == 200, comments.text
-    assert comments.json()["meta"]["total_items"] == 1
-    assert comments.json()["items"][0]["id"] == comment_id
+    assert comments.json()["meta"]["total_items"] == 2
+    by_id = {item["id"]: item for item in comments.json()["items"]}
+    assert by_id[comment_id]["parent_id"] is None
+    assert by_id[reply_id]["parent_id"] == comment_id
 
     # Moderation: users can flag comments, admins can review/resolve/hide/unhide.
     flagged = client.post(
@@ -309,8 +342,9 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
 
     comments_hidden = client.get("/api/v1/blog/posts/first-post/comments")
     assert comments_hidden.status_code == 200, comments_hidden.text
-    assert comments_hidden.json()["items"][0]["is_hidden"] is True
-    assert comments_hidden.json()["items"][0]["body"] == ""
+    comments_hidden_by_id = {item["id"]: item for item in comments_hidden.json()["items"]}
+    assert comments_hidden_by_id[comment_id]["is_hidden"] is True
+    assert comments_hidden_by_id[comment_id]["body"] == ""
 
     unhidden = client.post(
         f"/api/v1/blog/admin/comments/{comment_id}/unhide",
@@ -325,5 +359,26 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
 
     comments_after = client.get("/api/v1/blog/posts/first-post/comments")
     assert comments_after.status_code == 200
-    assert comments_after.json()["items"][0]["is_deleted"] is True
-    assert comments_after.json()["items"][0]["body"] == ""
+    comments_after_by_id = {item["id"]: item for item in comments_after.json()["items"]}
+    assert comments_after_by_id[comment_id]["is_deleted"] is True
+    assert comments_after_by_id[comment_id]["body"] == ""
+    assert comments_after_by_id[reply_id]["is_deleted"] is False
+    assert comments_after_by_id[reply_id]["body"] == "Reply here"
+
+    # Unpublish: setting status back to draft removes post from public endpoints/sitemap.
+    unpublish = client.patch(
+        "/api/v1/content/admin/blog.second-post",
+        json={"status": "draft"},
+        headers=auth_headers(admin_token),
+    )
+    assert unpublish.status_code == 200, unpublish.text
+    listing_after_unpublish = client.get("/api/v1/blog/posts", params={"lang": "en"})
+    assert listing_after_unpublish.status_code == 200, listing_after_unpublish.text
+    assert listing_after_unpublish.json()["meta"]["total_items"] == 1
+    assert {i["slug"] for i in listing_after_unpublish.json()["items"]} == {"first-post"}
+    detail_unpublished = client.get("/api/v1/blog/posts/second-post", params={"lang": "en"})
+    assert detail_unpublished.status_code == 404, detail_unpublished.text
+    sitemap_after_unpublish = client.get("/api/v1/sitemap.xml")
+    assert sitemap_after_unpublish.status_code == 200
+    assert "blog/first-post?lang=en" in sitemap_after_unpublish.text
+    assert "blog/second-post?lang=en" not in sitemap_after_unpublish.text
