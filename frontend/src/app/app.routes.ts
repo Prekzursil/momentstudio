@@ -7,7 +7,6 @@ import { AboutComponent } from './pages/about/about.component';
 import { BlogListComponent } from './pages/blog/blog-list.component';
 import { BlogPostComponent } from './pages/blog/blog-post.component';
 import { ProductComponent } from './pages/product/product.component';
-import { AdminComponent } from './pages/admin/admin.component';
 import { authGuard, adminGuard } from './core/auth.guard';
 import { CartComponent } from './pages/cart/cart.component';
 import { CheckoutComponent } from './pages/checkout/checkout.component';
@@ -38,7 +37,12 @@ export const routes: Routes = [
   { path: 'password-reset/confirm', component: PasswordResetComponent, title: 'Set new password | AdrianaArt' },
   { path: 'account', canActivate: [authGuard], component: AccountComponent, title: 'Account | AdrianaArt' },
   { path: 'account/password', canActivate: [authGuard], component: ChangePasswordComponent, title: 'Change password | AdrianaArt' },
-  { path: 'admin', component: AdminComponent, canActivate: [adminGuard], title: 'Admin' },
+  {
+    path: 'admin',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./pages/admin/admin.component').then((m) => m.AdminComponent),
+    title: 'Admin'
+  },
   { path: 'error', component: ErrorComponent, title: 'Something went wrong' },
   { path: '**', component: NotFoundComponent, title: 'Not Found' }
 ];

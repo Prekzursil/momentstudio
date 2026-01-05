@@ -35,6 +35,9 @@
     "searchCta": "Căutare",
     "clearFilters": "Șterge",
     "minutesRead": "{{minutes}} min citire",
+    "preview": {
+      "banner": "Mod previzualizare — acest articol nu este încă publicat."
+    },
     "errorTitle": "Nu am putut încărca postările.",
     "errorCopy": "Verifică conexiunea și încearcă din nou.",
     "retry": "Reîncearcă",

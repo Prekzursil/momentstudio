@@ -11,6 +11,7 @@ class ContentBlockBase(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     body_markdown: str = Field(min_length=1)
     status: ContentStatus = ContentStatus.draft
+    published_at: datetime | None = None
     meta: dict[str, Any] | None = None
     sort_order: int = 0
     lang: str | None = Field(default=None, pattern="^(en|ro)$")
@@ -31,6 +32,7 @@ class ContentBlockUpdate(BaseModel):
     title: str | None = Field(default=None, max_length=200)
     body_markdown: str | None = Field(default=None)
     status: ContentStatus | None = None
+    published_at: datetime | None = None
     meta: dict[str, Any] | None = None
     sort_order: int | None = None
     lang: str | None = Field(default=None, pattern="^(en|ro)$")
@@ -68,6 +70,20 @@ class ContentImageRead(BaseModel):
     url: str
     alt_text: str | None = None
     sort_order: int
+
+
+class ContentBlockVersionListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    version: int
+    title: str
+    status: ContentStatus
+    created_at: datetime
+
+
+class ContentBlockVersionRead(ContentBlockVersionListItem):
+    body_markdown: str
 
 
 class ContentAuditRead(BaseModel):

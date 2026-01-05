@@ -40,3 +40,16 @@ def decode_token(token: str) -> Optional[dict[str, Any]]:
         return jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
     except JWTError:
         return None
+
+
+def create_content_preview_token(*, content_key: str, expires_at: datetime) -> str:
+    to_encode = {"type": "content_preview", "key": content_key, "exp": expires_at}
+    return jwt.encode(to_encode, settings.secret_key, algorithm=settings.jwt_algorithm)
+
+
+def decode_content_preview_token(token: str) -> str | None:
+    payload = decode_token(token)
+    if not payload or payload.get("type") != "content_preview":
+        return None
+    key = payload.get("key")
+    return str(key) if isinstance(key, str) and key else None

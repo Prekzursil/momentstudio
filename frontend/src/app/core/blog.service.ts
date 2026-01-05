@@ -24,6 +24,12 @@ export interface BlogPostListResponse {
   meta: PaginationMeta;
 }
 
+export interface BlogPreviewTokenResponse {
+  token: string;
+  expires_at: string;
+  url: string;
+}
+
 export interface BlogPostImage {
   id: string;
   url: string;
@@ -84,6 +90,21 @@ export class BlogService {
 
   getPost(slug: string, lang?: string): Observable<BlogPost> {
     return this.api.get<BlogPost>(`/blog/posts/${slug}`, { lang });
+  }
+
+  getPreviewPost(slug: string, token: string, lang?: string): Observable<BlogPost> {
+    return this.api.get<BlogPost>(`/blog/posts/${slug}/preview`, { token, lang });
+  }
+
+  createPreviewToken(
+    slug: string,
+    params: { lang?: string; expires_minutes?: number } = {}
+  ): Observable<BlogPreviewTokenResponse> {
+    const qs = new URLSearchParams();
+    if (params.lang) qs.set('lang', params.lang);
+    if (params.expires_minutes) qs.set('expires_minutes', String(params.expires_minutes));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return this.api.post<BlogPreviewTokenResponse>(`/blog/posts/${slug}/preview-token${suffix}`, {});
   }
 
   listComments(slug: string, params: { page?: number; limit?: number } = {}): Observable<BlogCommentListResponse> {

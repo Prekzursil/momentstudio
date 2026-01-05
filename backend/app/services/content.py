@@ -3,6 +3,7 @@ from uuid import UUID
 import re
 
 from fastapi import HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -17,6 +18,12 @@ from app.models.content import (
 )
 from app.schemas.content import ContentBlockCreate, ContentBlockUpdate
 from app.services import storage
+
+
+def _ensure_utc(dt: datetime | None) -> datetime | None:
+    if not dt:
+        return None
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
 
 
 def _apply_content_translation(block: ContentBlock, lang: str | None) -> None:
@@ -35,8 +42,15 @@ async def get_published_by_key(session: AsyncSession, key: str, lang: str | None
     ]
     if lang:
         options.append(selectinload(ContentBlock.translations))
+    now = datetime.now(timezone.utc)
     result = await session.execute(
-        select(ContentBlock).options(*options).where(ContentBlock.key == key, ContentBlock.status == ContentStatus.published)
+        select(ContentBlock)
+        .options(*options)
+        .where(
+            ContentBlock.key == key,
+            ContentBlock.status == ContentStatus.published,
+            or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
+        )
     )
     block = result.scalar_one_or_none()
     if block:
@@ -67,14 +81,18 @@ async def upsert_block(
     if "body_markdown" in data and data["body_markdown"] is not None:
         _sanitize_markdown(data["body_markdown"])
     lang = data.get("lang")
+    published_at = _ensure_utc(data.get("published_at"))
     if not block:
+        wants_published_at = None
+        if data.get("status") == ContentStatus.published:
+            wants_published_at = published_at or now
         block = ContentBlock(
             key=key,
             title=data.get("title") or "",
             body_markdown=data.get("body_markdown") or "",
             status=data.get("status") or ContentStatus.draft,
             version=1,
-            published_at=now if data.get("status") == ContentStatus.published else None,
+            published_at=wants_published_at,
             meta=data.get("meta"),
             sort_order=data.get("sort_order", 0),
             lang=lang,
@@ -128,7 +146,14 @@ async def upsert_block(
     if "status" in data and data["status"] is not None:
         block.status = data["status"]
         if block.status == ContentStatus.published:
-            block.published_at = now
+            if "published_at" in data:
+                block.published_at = published_at or now
+            elif block.published_at is None:
+                block.published_at = now
+        elif block.status == ContentStatus.draft:
+            block.published_at = None
+    elif "published_at" in data:
+        block.published_at = published_at
     if "meta" in data:
         block.meta = data["meta"]
     if "sort_order" in data and data["sort_order"] is not None:
@@ -159,6 +184,56 @@ async def add_image(session: AsyncSession, block: ContentBlock, file, actor_id: 
     audit = ContentAuditLog(content_block_id=block.id, action="image_upload", version=block.version, user_id=actor_id)
     session.add_all([image, audit])
     await session.commit()
+    await session.refresh(block, attribute_names=["images", "audits"])
+    return block
+
+
+async def rollback_to_version(
+    session: AsyncSession,
+    *,
+    key: str,
+    version: int,
+    actor_id: UUID | None = None,
+) -> ContentBlock:
+    block = await get_block_by_key(session, key)
+    if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+    result = await session.execute(
+        select(ContentBlockVersion).where(
+            ContentBlockVersion.content_block_id == block.id, ContentBlockVersion.version == version
+        )
+    )
+    snapshot = result.scalar_one_or_none()
+    if not snapshot:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Version not found")
+
+    now = datetime.now(timezone.utc)
+    block.version += 1
+    block.title = snapshot.title
+    block.body_markdown = snapshot.body_markdown
+    block.status = snapshot.status
+    if block.status == ContentStatus.draft:
+        block.published_at = None
+    elif block.status == ContentStatus.published and block.published_at is None:
+        block.published_at = now
+    session.add(block)
+
+    version_row = ContentBlockVersion(
+        content_block_id=block.id,
+        version=block.version,
+        title=block.title,
+        body_markdown=block.body_markdown,
+        status=block.status,
+    )
+    audit = ContentAuditLog(
+        content_block_id=block.id,
+        action=f"rollback:{snapshot.version}",
+        version=block.version,
+        user_id=actor_id,
+    )
+    session.add_all([version_row, audit])
+    await session.commit()
+    await session.refresh(block)
     await session.refresh(block, attribute_names=["images", "audits"])
     return block
 
