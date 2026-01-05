@@ -59,6 +59,10 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     admin_token = create_user_token(SessionLocal, email="admin@example.com", role=UserRole.admin)
     user_token = create_user_token(SessionLocal, email="user@example.com", role=UserRole.customer)
 
+    now = datetime.now(timezone.utc)
+    past_v1 = (now - timedelta(days=7)).isoformat()
+    past_v3 = (now - timedelta(days=1)).isoformat()
+
     # Create a blog post as content (base RO) and add EN translation
     create = client.post(
         "/api/v1/content/admin/blog.first-post",
@@ -67,6 +71,7 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
             "body_markdown": "Postare RO",
             "status": "published",
             "lang": "ro",
+            "published_at": past_v1,
             "meta": {
                 "summary": {"ro": "Rezumat RO", "en": "Summary EN"},
                 "tags": ["Ceramics", "News"],
@@ -110,6 +115,15 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert detail_ro.json()["title"] == "Salut"
     assert detail_ro.json()["body_markdown"] == "Postare RO"
     assert detail_ro.json()["summary"] == "Rezumat RO"
+
+    og = client.get("/api/v1/blog/posts/first-post/og.png", params={"lang": "en"})
+    assert og.status_code == 200, og.text
+    assert og.headers.get("content-type", "").startswith("image/png")
+    assert og.content[:8] == b"\x89PNG\r\n\x1a\n"
+    etag = og.headers.get("etag")
+    assert etag
+    og_cached = client.get("/api/v1/blog/posts/first-post/og.png", params={"lang": "en"}, headers={"If-None-Match": etag})
+    assert og_cached.status_code == 304
 
     # Create another blog post to verify filters
     create2 = client.post(
@@ -175,27 +189,47 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     wrong = client.get("/api/v1/blog/posts/first-post/preview", params={"token": token})
     assert wrong.status_code == 403, wrong.text
 
-    # Revisions: base updates create versions and rollback restores previous snapshot.
+    # Revisions: translation + base updates create versions, and rollback restores snapshot
     update_base = client.patch(
         "/api/v1/content/admin/blog.first-post",
-        json={"title": "Salut (v2)", "body_markdown": "Postare RO v2"},
+        json={
+            "title": "Salut (v2)",
+            "body_markdown": "Postare RO v2",
+            "published_at": past_v3,
+            "meta": {"summary": {"ro": "Rezumat RO v2", "en": "Summary EN v2"}, "tags": ["Ceramics"]},
+        },
         headers=auth_headers(admin_token),
     )
     assert update_base.status_code == 200, update_base.text
 
+    update_tr = client.patch(
+        "/api/v1/content/admin/blog.first-post",
+        json={"title": "Hello (v2)", "body_markdown": "Post EN v2", "lang": "en"},
+        headers=auth_headers(admin_token),
+    )
+    assert update_tr.status_code == 200, update_tr.text
+
     versions = client.get("/api/v1/content/admin/blog.first-post/versions", headers=auth_headers(admin_token))
     assert versions.status_code == 200, versions.text
     versions_json = versions.json()
-    assert versions_json[0]["version"] == 2
+    assert versions_json[0]["version"] == 4
     assert versions_json[-1]["version"] == 1
 
-    v1 = client.get("/api/v1/content/admin/blog.first-post/versions/1", headers=auth_headers(admin_token))
-    assert v1.status_code == 200, v1.text
+    v2 = client.get("/api/v1/content/admin/blog.first-post/versions/2", headers=auth_headers(admin_token))
+    assert v2.status_code == 200, v2.text
 
-    rolled = client.post("/api/v1/content/admin/blog.first-post/versions/1/rollback", headers=auth_headers(admin_token))
+    rolled = client.post("/api/v1/content/admin/blog.first-post/versions/2/rollback", headers=auth_headers(admin_token))
     assert rolled.status_code == 200, rolled.text
-    assert rolled.json()["title"] == v1.json()["title"]
-    assert rolled.json()["body_markdown"] == v1.json()["body_markdown"]
+    rolled_json = rolled.json()
+    assert rolled_json["title"] == v2.json()["title"]
+    assert rolled_json["body_markdown"] == v2.json()["body_markdown"]
+    assert rolled_json["meta"] == v2.json()["meta"]
+    assert datetime.fromisoformat(rolled_json["published_at"]) == datetime.fromisoformat(v2.json()["published_at"])
+
+    rolled_en = client.get("/api/v1/content/admin/blog.first-post", params={"lang": "en"}, headers=auth_headers(admin_token))
+    assert rolled_en.status_code == 200, rolled_en.text
+    assert rolled_en.json()["title"] == "Hello"
+    assert rolled_en.json()["body_markdown"] == "Post EN"
 
     # Comments: create and list
     created = client.post(

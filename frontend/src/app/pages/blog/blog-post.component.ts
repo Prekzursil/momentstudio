@@ -430,11 +430,19 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     if (description) {
       this.meta.updateTag({ name: 'description', content: description });
       this.meta.updateTag({ property: 'og:description', content: description });
+      this.meta.updateTag({ name: 'twitter:description', content: description });
     }
     this.meta.updateTag({ property: 'og:title', content: pageTitle });
-    if (post.cover_image_url) {
-      this.meta.updateTag({ property: 'og:image', content: post.cover_image_url });
-    }
+    this.meta.updateTag({ property: 'og:type', content: 'article' });
+    this.meta.updateTag({ property: 'og:site_name', content: 'AdrianaArt' });
+
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const ogImage = `${origin}/api/v1/blog/posts/${this.slug}/og.png?lang=${lang}`;
+    this.meta.updateTag({ property: 'og:image', content: ogImage });
+    this.meta.updateTag({ name: 'twitter:card', content: 'summary_large_image' });
+    this.meta.updateTag({ name: 'twitter:title', content: pageTitle });
+    this.meta.updateTag({ name: 'twitter:image', content: ogImage });
     this.setCanonical();
   }
 

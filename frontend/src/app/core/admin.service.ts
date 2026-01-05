@@ -136,8 +136,18 @@ export interface ContentBlockVersionListItem {
   created_at: string;
 }
 
+export interface ContentTranslationSnapshot {
+  lang: string;
+  title: string;
+  body_markdown: string;
+}
+
 export interface ContentBlockVersionRead extends ContentBlockVersionListItem {
   body_markdown: string;
+  meta?: Record<string, any> | null;
+  lang?: string | null;
+  published_at?: string | null;
+  translations?: ContentTranslationSnapshot[] | null;
 }
 
 export interface ContentSavePayload {

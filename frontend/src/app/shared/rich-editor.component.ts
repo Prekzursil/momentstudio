@@ -1,4 +1,5 @@
-import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnChanges, OnDestroy, Output, SimpleChanges, ViewChild } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
+import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnChanges, OnDestroy, Output, SimpleChanges, ViewChild, inject } from '@angular/core';
 import Editor from '@toast-ui/editor';
 
 @Component({
@@ -15,8 +16,10 @@ export class RichEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
   @Input() height = '420px';
   @Input() initialEditType: 'markdown' | 'wysiwyg' = 'markdown';
 
+  private document: Document = inject(DOCUMENT);
   private editor: Editor | null = null;
   private isApplyingExternalUpdate = false;
+  private themeObserver?: MutationObserver;
 
   ngAfterViewInit(): void {
     this.editor = new Editor({
@@ -28,6 +31,12 @@ export class RichEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
       usageStatistics: false,
       initialValue: this.value || ''
     });
+
+    this.syncThemeClass();
+    if (typeof MutationObserver !== 'undefined') {
+      this.themeObserver = new MutationObserver(() => this.syncThemeClass());
+      this.themeObserver.observe(this.document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    }
 
     this.editor.on('change', () => {
       if (!this.editor || this.isApplyingExternalUpdate) return;
@@ -54,9 +63,17 @@ export class RichEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.editor.insertText(text);
   }
 
+  private syncThemeClass(): void {
+    const isDark = this.document.documentElement.classList.contains('dark');
+    const root = this.host.nativeElement.querySelector('.toastui-editor-defaultUI') as HTMLElement | null;
+    const target = root ?? this.host.nativeElement;
+    target.classList.toggle('toastui-editor-dark', isDark);
+  }
+
   ngOnDestroy(): void {
+    this.themeObserver?.disconnect();
+    this.themeObserver = undefined;
     this.editor?.destroy();
     this.editor = null;
   }
 }
-
