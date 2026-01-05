@@ -6,11 +6,11 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.blog import BlogComment
+from app.models.blog import BlogComment, BlogCommentFlag
 from app.models.content import ContentBlock, ContentStatus
 from app.models.user import User, UserRole
 
@@ -361,14 +361,195 @@ def to_comment_read(comment: BlogComment) -> dict:
     return {
         "id": comment.id,
         "parent_id": comment.parent_id,
-        "body": "" if comment.is_deleted else comment.body,
+        "body": "" if comment.is_deleted or comment.is_hidden else comment.body,
         "is_deleted": comment.is_deleted,
+        "is_hidden": comment.is_hidden,
         "created_at": comment.created_at,
         "updated_at": comment.updated_at,
         "deleted_at": comment.deleted_at,
+        "hidden_at": comment.hidden_at,
         "author": {
             "id": author.id if author else comment.user_id,
             "name": author.name if author else None,
             "avatar_url": (author.avatar_url or author.google_picture_url) if author else None,
         }
     }
+
+
+def to_flag_read(flag: BlogCommentFlag) -> dict:
+    return {
+        "id": flag.id,
+        "user_id": flag.user_id,
+        "reason": flag.reason,
+        "created_at": flag.created_at,
+    }
+
+
+def to_comment_admin_read(
+    comment: BlogComment,
+    *,
+    post_key: str,
+    flags: list[BlogCommentFlag] | None = None,
+    flag_count: int = 0,
+) -> dict:
+    author = comment.author
+    return {
+        "id": comment.id,
+        "content_block_id": comment.content_block_id,
+        "post_slug": _extract_slug(post_key),
+        "parent_id": comment.parent_id,
+        "body": "" if comment.is_deleted else comment.body,
+        "is_deleted": comment.is_deleted,
+        "deleted_at": comment.deleted_at,
+        "deleted_by": comment.deleted_by,
+        "is_hidden": comment.is_hidden,
+        "hidden_at": comment.hidden_at,
+        "hidden_by": comment.hidden_by,
+        "hidden_reason": comment.hidden_reason,
+        "created_at": comment.created_at,
+        "updated_at": comment.updated_at,
+        "author": {
+            "id": author.id if author else comment.user_id,
+            "name": author.name if author else None,
+            "avatar_url": (author.avatar_url or author.google_picture_url) if author else None,
+        },
+        "flag_count": int(flag_count or 0),
+        "flags": [to_flag_read(f) for f in (flags or [])],
+    }
+
+
+async def flag_comment(
+    session: AsyncSession,
+    *,
+    comment_id: UUID,
+    actor: User,
+    reason: str | None = None,
+) -> BlogCommentFlag:
+    comment = await session.get(BlogComment, comment_id)
+    if not comment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
+    if comment.user_id == actor.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot flag your own comment")
+
+    existing = await session.scalar(
+        select(BlogCommentFlag).where(BlogCommentFlag.comment_id == comment_id, BlogCommentFlag.user_id == actor.id)
+    )
+    if existing:
+        return existing
+
+    cleaned_reason = (reason or "").strip() or None
+    flag = BlogCommentFlag(comment_id=comment_id, user_id=actor.id, reason=cleaned_reason)
+    session.add(flag)
+    await session.commit()
+    await session.refresh(flag)
+    return flag
+
+
+async def list_flagged_comments(
+    session: AsyncSession,
+    *,
+    page: int,
+    limit: int,
+) -> tuple[list[dict], int]:
+    page = max(1, page)
+    limit = max(1, min(limit, 50))
+    offset = (page - 1) * limit
+
+    summary = (
+        select(
+            BlogCommentFlag.comment_id.label("comment_id"),
+            func.count().label("flag_count"),
+            func.max(BlogCommentFlag.created_at).label("last_flagged_at"),
+        )
+        .where(BlogCommentFlag.resolved_at.is_(None))
+        .group_by(BlogCommentFlag.comment_id)
+        .subquery()
+    )
+
+    total = await session.scalar(select(func.count()).select_from(summary))
+    rows = await session.execute(
+        select(BlogComment, ContentBlock.key, summary.c.flag_count)
+        .join(summary, summary.c.comment_id == BlogComment.id)
+        .join(ContentBlock, ContentBlock.id == BlogComment.content_block_id)
+        .options(selectinload(BlogComment.author))
+        .order_by(summary.c.last_flagged_at.desc().nullslast())
+        .limit(limit)
+        .offset(offset)
+    )
+    items = list(rows.all())
+    if not items:
+        return [], int(total or 0)
+
+    comment_ids = [c.id for c, _, _ in items]
+    flag_rows = await session.execute(
+        select(BlogCommentFlag)
+        .where(BlogCommentFlag.comment_id.in_(comment_ids), BlogCommentFlag.resolved_at.is_(None))
+        .order_by(BlogCommentFlag.created_at.desc())
+    )
+    flags_by_comment: dict[UUID, list[BlogCommentFlag]] = {}
+    for flag in flag_rows.scalars().all():
+        flags_by_comment.setdefault(flag.comment_id, []).append(flag)
+
+    out: list[dict] = []
+    for comment, post_key, flag_count in items:
+        out.append(
+            to_comment_admin_read(
+                comment,
+                post_key=str(post_key),
+                flag_count=int(flag_count or 0),
+                flags=flags_by_comment.get(comment.id, []),
+            )
+        )
+    return out, int(total or 0)
+
+
+async def set_comment_hidden(
+    session: AsyncSession,
+    *,
+    comment_id: UUID,
+    actor: User,
+    hidden: bool,
+    reason: str | None = None,
+) -> BlogComment:
+    if actor.role != UserRole.admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+
+    comment = await session.get(BlogComment, comment_id)
+    if not comment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
+
+    if hidden:
+        comment.is_hidden = True
+        comment.hidden_at = datetime.now(timezone.utc)
+        comment.hidden_by = actor.id
+        comment.hidden_reason = (reason or "").strip() or None
+    else:
+        comment.is_hidden = False
+        comment.hidden_at = None
+        comment.hidden_by = None
+        comment.hidden_reason = None
+
+    session.add(comment)
+    await session.execute(
+        update(BlogCommentFlag)
+        .where(BlogCommentFlag.comment_id == comment_id, BlogCommentFlag.resolved_at.is_(None))
+        .values(resolved_at=datetime.now(timezone.utc), resolved_by=actor.id)
+    )
+    await session.commit()
+    loaded = await session.execute(
+        select(BlogComment).options(selectinload(BlogComment.author)).where(BlogComment.id == comment_id)
+    )
+    return loaded.scalar_one()
+
+
+async def resolve_comment_flags(session: AsyncSession, *, comment_id: UUID, actor: User) -> int:
+    if actor.role != UserRole.admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+    now = datetime.now(timezone.utc)
+    result = await session.execute(
+        update(BlogCommentFlag)
+        .where(BlogCommentFlag.comment_id == comment_id, BlogCommentFlag.resolved_at.is_(None))
+        .values(resolved_at=now, resolved_by=actor.id)
+    )
+    await session.commit()
+    return int(result.rowcount or 0)

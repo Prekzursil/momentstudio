@@ -154,6 +154,14 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
                       {{ 'blog.comments.reply' | translate }}
                     </button>
                     <button
+                      *ngIf="canFlag(comment)"
+                      type="button"
+                      class="text-slate-600 hover:text-slate-800 dark:text-slate-300 dark:hover:text-slate-100"
+                      (click)="flagComment(comment)"
+                    >
+                      {{ 'blog.comments.report' | translate }}
+                    </button>
+                    <button
                       *ngIf="canDelete(comment)"
                       type="button"
                       class="text-rose-600 hover:text-rose-700 dark:text-rose-300 dark:hover:text-rose-200"
@@ -166,9 +174,15 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
 
                 <div
                   class="text-sm leading-relaxed whitespace-pre-line"
-                  [ngClass]="comment.is_deleted ? 'text-slate-500 dark:text-slate-400 italic' : 'text-slate-700 dark:text-slate-200'"
+                  [ngClass]="comment.is_deleted || comment.is_hidden ? 'text-slate-500 dark:text-slate-400 italic' : 'text-slate-700 dark:text-slate-200'"
                 >
-                  {{ comment.is_deleted ? ('blog.comments.deleted' | translate) : comment.body }}
+                  {{
+                    comment.is_deleted
+                      ? ('blog.comments.deleted' | translate)
+                      : comment.is_hidden
+                        ? ('blog.comments.hidden' | translate)
+                        : comment.body
+                  }}
                 </div>
 
                 <div *ngIf="replies(comment.id).length" class="grid gap-2 border-l border-slate-200 pl-4 dark:border-slate-700">
@@ -184,6 +198,14 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
                       </div>
                       <div class="flex items-center gap-2 text-xs">
                         <button
+                          *ngIf="canFlag(reply)"
+                          type="button"
+                          class="text-slate-600 hover:text-slate-800 dark:text-slate-300 dark:hover:text-slate-100"
+                          (click)="flagComment(reply)"
+                        >
+                          {{ 'blog.comments.report' | translate }}
+                        </button>
+                        <button
                           *ngIf="canDelete(reply)"
                           type="button"
                           class="text-rose-600 hover:text-rose-700 dark:text-rose-300 dark:hover:text-rose-200"
@@ -195,9 +217,15 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
                     </div>
                     <div
                       class="text-sm leading-relaxed whitespace-pre-line"
-                      [ngClass]="reply.is_deleted ? 'text-slate-500 dark:text-slate-400 italic' : 'text-slate-700 dark:text-slate-200'"
+                      [ngClass]="reply.is_deleted || reply.is_hidden ? 'text-slate-500 dark:text-slate-400 italic' : 'text-slate-700 dark:text-slate-200'"
                     >
-                      {{ reply.is_deleted ? ('blog.comments.deleted' | translate) : reply.body }}
+                      {{
+                        reply.is_deleted
+                          ? ('blog.comments.deleted' | translate)
+                          : reply.is_hidden
+                            ? ('blog.comments.hidden' | translate)
+                            : reply.body
+                      }}
                     </div>
                   </div>
                 </div>
@@ -420,6 +448,27 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       },
       error: () => {
         this.toast.error(this.translate.instant('blog.comments.deleteErrorTitle'), this.translate.instant('blog.comments.deleteErrorCopy'));
+      }
+    });
+  }
+
+  canFlag(comment: BlogComment): boolean {
+    if (!this.auth.isAuthenticated()) return false;
+    const me = this.auth.user();
+    if (!me) return false;
+    if (comment.is_deleted || comment.is_hidden) return false;
+    return comment.author?.id !== me.id;
+  }
+
+  flagComment(comment: BlogComment): void {
+    if (!this.canFlag(comment)) return;
+    const reason = prompt(this.translate.instant('blog.comments.reportPrompt')) || '';
+    this.blog.flagComment(comment.id, { reason: reason.trim() || null }).subscribe({
+      next: () => {
+        this.toast.success(this.translate.instant('blog.comments.reportedTitle'), this.translate.instant('blog.comments.reportedCopy'));
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('blog.comments.reportErrorTitle'), this.translate.instant('blog.comments.reportErrorCopy'));
       }
     });
   }

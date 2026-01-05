@@ -240,8 +240,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Revisions v2: include meta/translations/published_at in version snapshots + rollback.
 - [x] Editor: improve dark-mode styling for the rich editor UI.
 - [x] Social preview images (OG image generation per post).
-- [ ] Moderation: admin tools to hide/delete comments and review flagged content.
-- [ ] Notifications: optional email notifications for new comments (admin/user opt-in).
+- [x] Moderation: admin tools to hide/delete comments and review flagged content.
+- [x] Notifications: optional email notifications for new comments (admin/user opt-in).
+- [ ] Notifications: localize account notification settings UI + improve email templates.
 
 ## Frontend - Cart & Checkout
 - [x] Cart page/drawer with quantities and totals.

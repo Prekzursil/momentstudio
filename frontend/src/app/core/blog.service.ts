@@ -63,14 +63,48 @@ export interface BlogComment {
   parent_id?: string | null;
   body: string;
   is_deleted: boolean;
+  is_hidden?: boolean;
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
+  hidden_at?: string | null;
   author: BlogCommentAuthor;
 }
 
 export interface BlogCommentListResponse {
   items: BlogComment[];
+  meta: PaginationMeta;
+}
+
+export interface BlogCommentFlag {
+  id: string;
+  user_id: string;
+  reason?: string | null;
+  created_at: string;
+}
+
+export interface AdminBlogComment {
+  id: string;
+  content_block_id: string;
+  post_slug: string;
+  parent_id?: string | null;
+  body: string;
+  is_deleted: boolean;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+  is_hidden: boolean;
+  hidden_at?: string | null;
+  hidden_by?: string | null;
+  hidden_reason?: string | null;
+  created_at: string;
+  updated_at: string;
+  author: BlogCommentAuthor;
+  flag_count: number;
+  flags: BlogCommentFlag[];
+}
+
+export interface AdminBlogCommentListResponse {
+  items: AdminBlogComment[];
   meta: PaginationMeta;
 }
 
@@ -120,5 +154,28 @@ export class BlogService {
 
   deleteComment(commentId: string): Observable<void> {
     return this.api.delete<void>(`/blog/comments/${commentId}`);
+  }
+
+  flagComment(commentId: string, payload: { reason?: string | null }): Observable<BlogCommentFlag> {
+    return this.api.post<BlogCommentFlag>(`/blog/comments/${commentId}/flag`, payload);
+  }
+
+  listFlaggedComments(params: { page?: number; limit?: number } = {}): Observable<AdminBlogCommentListResponse> {
+    return this.api.get<AdminBlogCommentListResponse>('/blog/admin/comments/flagged', {
+      page: params.page ?? 1,
+      limit: params.limit ?? 20
+    });
+  }
+
+  hideCommentAdmin(commentId: string, payload: { reason?: string | null } = {}): Observable<AdminBlogComment> {
+    return this.api.post<AdminBlogComment>(`/blog/admin/comments/${commentId}/hide`, payload);
+  }
+
+  unhideCommentAdmin(commentId: string): Observable<AdminBlogComment> {
+    return this.api.post<AdminBlogComment>(`/blog/admin/comments/${commentId}/unhide`, {});
+  }
+
+  resolveCommentFlagsAdmin(commentId: string): Observable<{ resolved: number }> {
+    return this.api.post<{ resolved: number }>(`/blog/admin/comments/${commentId}/resolve-flags`, {});
   }
 }

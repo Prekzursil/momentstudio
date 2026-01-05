@@ -162,6 +162,44 @@ async def send_error_alert(to_email: str, message: str) -> bool:
     return await send_email(to_email, subject, text_body)
 
 
+async def send_blog_comment_admin_notification(
+    to_email: str,
+    *,
+    post_title: str,
+    post_url: str,
+    commenter_name: str,
+    comment_body: str,
+    lang: str | None = None,
+) -> bool:
+    lng = _lang_or_default(lang)
+    subject = "New blog comment" if lng == "en" else "Comentariu nou pe blog"
+    text_body = (
+        f"New comment on: {post_title}\nFrom: {commenter_name}\n\n{comment_body}\n\nView: {post_url}"
+        if lng == "en"
+        else f"Comentariu nou la: {post_title}\nDe la: {commenter_name}\n\n{comment_body}\n\nVezi: {post_url}"
+    )
+    return await send_email(to_email, subject, text_body)
+
+
+async def send_blog_comment_reply_notification(
+    to_email: str,
+    *,
+    post_title: str,
+    post_url: str,
+    replier_name: str,
+    comment_body: str,
+    lang: str | None = None,
+) -> bool:
+    lng = _lang_or_default(lang)
+    subject = "New reply to your comment" if lng == "en" else "Răspuns nou la comentariul tău"
+    text_body = (
+        f"New reply on: {post_title}\nFrom: {replier_name}\n\n{comment_body}\n\nView: {post_url}"
+        if lng == "en"
+        else f"Răspuns nou la: {post_title}\nDe la: {replier_name}\n\n{comment_body}\n\nVezi: {post_url}"
+    )
+    return await send_email(to_email, subject, text_body)
+
+
 def render_template(template_name: str, context: dict) -> tuple[str, str]:
     if env is None:
         body = str(context)

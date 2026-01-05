@@ -58,6 +58,16 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
 
     admin_token = create_user_token(SessionLocal, email="admin@example.com", role=UserRole.admin)
     user_token = create_user_token(SessionLocal, email="user@example.com", role=UserRole.customer)
+    flagger_token = create_user_token(SessionLocal, email="flagger@example.com", role=UserRole.customer)
+    flagger2_token = create_user_token(SessionLocal, email="flagger2@example.com", role=UserRole.customer)
+
+    prefs = client.patch(
+        "/api/v1/auth/me/notifications",
+        json={"notify_blog_comment_replies": True},
+        headers=auth_headers(user_token),
+    )
+    assert prefs.status_code == 200, prefs.text
+    assert prefs.json()["notify_blog_comment_replies"] is True
 
     now = datetime.now(timezone.utc)
     past_v1 = (now - timedelta(days=7)).isoformat()
@@ -256,6 +266,58 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert comments.status_code == 200, comments.text
     assert comments.json()["meta"]["total_items"] == 1
     assert comments.json()["items"][0]["id"] == comment_id
+
+    # Moderation: users can flag comments, admins can review/resolve/hide/unhide.
+    flagged = client.post(
+        f"/api/v1/blog/comments/{comment_id}/flag",
+        json={"reason": "Spam"},
+        headers=auth_headers(flagger_token),
+    )
+    assert flagged.status_code == 201, flagged.text
+    flagged2 = client.post(
+        f"/api/v1/blog/comments/{comment_id}/flag",
+        json={"reason": "Offensive"},
+        headers=auth_headers(flagger2_token),
+    )
+    assert flagged2.status_code == 201, flagged2.text
+
+    flagged_list = client.get("/api/v1/blog/admin/comments/flagged", headers=auth_headers(admin_token))
+    assert flagged_list.status_code == 200, flagged_list.text
+    assert flagged_list.json()["meta"]["total_items"] == 1
+    flagged_item = flagged_list.json()["items"][0]
+    assert flagged_item["id"] == comment_id
+    assert flagged_item["flag_count"] == 2
+    assert len(flagged_item["flags"]) == 2
+
+    resolved = client.post(
+        f"/api/v1/blog/admin/comments/{comment_id}/resolve-flags",
+        headers=auth_headers(admin_token),
+    )
+    assert resolved.status_code == 200, resolved.text
+    assert resolved.json()["resolved"] == 2
+    flagged_list_after = client.get("/api/v1/blog/admin/comments/flagged", headers=auth_headers(admin_token))
+    assert flagged_list_after.status_code == 200, flagged_list_after.text
+    assert flagged_list_after.json()["meta"]["total_items"] == 0
+
+    hidden = client.post(
+        f"/api/v1/blog/admin/comments/{comment_id}/hide",
+        json={"reason": "Abuse"},
+        headers=auth_headers(admin_token),
+    )
+    assert hidden.status_code == 200, hidden.text
+    assert hidden.json()["is_hidden"] is True
+
+    comments_hidden = client.get("/api/v1/blog/posts/first-post/comments")
+    assert comments_hidden.status_code == 200, comments_hidden.text
+    assert comments_hidden.json()["items"][0]["is_hidden"] is True
+    assert comments_hidden.json()["items"][0]["body"] == ""
+
+    unhidden = client.post(
+        f"/api/v1/blog/admin/comments/{comment_id}/unhide",
+        headers=auth_headers(admin_token),
+    )
+    assert unhidden.status_code == 200, unhidden.text
+    assert unhidden.json()["is_hidden"] is False
 
     # Delete by author
     deleted = client.delete(f"/api/v1/blog/comments/{comment_id}", headers=auth_headers(user_token))

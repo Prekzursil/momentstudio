@@ -8,7 +8,7 @@ import { ButtonComponent } from '../../shared/button.component';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { AddressFormComponent } from '../../shared/address-form.component';
 import { ToastService } from '../../core/toast.service';
-import { AuthService } from '../../core/auth.service';
+import { AuthService, AuthUser } from '../../core/auth.service';
 import { AccountService, Address, Order, AddressCreateRequest } from '../../core/account.service';
 import { forkJoin } from 'rxjs';
 import { loadStripe, Stripe, StripeElements, StripeCardElement, StripeCardElementChangeEvent } from '@stripe/stripe-js';
@@ -81,6 +81,25 @@ import { ThemeMode, ThemeService } from '../../core/theme.service';
         <p class="text-sm text-slate-700 dark:text-slate-200">Name: {{ profile()?.name || 'Not set' }}</p>
         <p class="text-sm text-slate-700 dark:text-slate-200">Email: {{ profile()?.email || '...' }}</p>
         <p class="text-sm text-slate-600 dark:text-slate-300">Session timeout: 30m. <a class="text-indigo-600 dark:text-indigo-300" (click)="signOut()">Sign out</a></p>
+        </section>
+
+        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Notifications</h2>
+            <app-button size="sm" variant="ghost" label="Save" [disabled]="savingNotifications" (action)="saveNotifications()"></app-button>
+          </div>
+          <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
+            <label class="flex items-center gap-2">
+              <input type="checkbox" [(ngModel)]="notifyBlogCommentReplies" />
+              <span>Email me when someone replies to my blog comment.</span>
+            </label>
+            <label *ngIf="isAdmin()" class="flex items-center gap-2">
+              <input type="checkbox" [(ngModel)]="notifyBlogComments" />
+              <span>Email me when new blog comments are posted (admin).</span>
+            </label>
+            <span *ngIf="notificationsMessage" class="text-xs text-emerald-700 dark:text-emerald-300">{{ notificationsMessage }}</span>
+            <span *ngIf="notificationsError" class="text-xs text-rose-700 dark:text-rose-300">{{ notificationsError }}</span>
+          </div>
         </section>
 
         <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -256,7 +275,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   verificationToken = '';
   verificationStatus: string | null = null;
 
-  profile = signal<{ email: string; name?: string | null } | null>(null);
+  profile = signal<AuthUser | null>(null);
   googleEmail = signal<string | null>(null);
   googlePicture = signal<string | null>(null);
   orders = signal<Order[]>([]);
@@ -289,6 +308,11 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   private idleTimer?: any;
   private readonly handleUserActivity = () => this.resetIdleTimer();
   idleWarning = signal<string | null>(null);
+  notifyBlogComments = false;
+  notifyBlogCommentReplies = false;
+  savingNotifications = false;
+  notificationsMessage: string | null = null;
+  notificationsError: string | null = null;
 
   constructor(
     private toast: ToastService,
@@ -333,6 +357,8 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
         this.googleEmail.set(profile.google_email ?? null);
         this.googlePicture.set(profile.google_picture_url ?? null);
         this.emailVerified.set(Boolean(profile?.email_verified));
+        this.notifyBlogComments = Boolean(profile?.notify_blog_comments);
+        this.notifyBlogCommentReplies = Boolean(profile?.notify_blog_comment_replies);
         this.addresses.set(addresses);
         this.orders.set(orders);
         this.computeTotalPages();
@@ -501,6 +527,34 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
       this.toast.success('Signed out');
       void this.router.navigateByUrl('/');
     });
+  }
+
+  isAdmin(): boolean {
+    return this.auth.role() === 'admin' || this.profile()?.role === 'admin';
+  }
+
+  saveNotifications(): void {
+    if (!this.auth.isAuthenticated()) return;
+    this.savingNotifications = true;
+    this.notificationsMessage = null;
+    this.notificationsError = null;
+    this.auth
+      .updateNotificationPreferences({
+        notify_blog_comments: this.notifyBlogComments,
+        notify_blog_comment_replies: this.notifyBlogCommentReplies
+      })
+      .subscribe({
+        next: (user) => {
+          this.profile.set(user);
+          this.notifyBlogComments = Boolean(user?.notify_blog_comments);
+          this.notifyBlogCommentReplies = Boolean(user?.notify_blog_comment_replies);
+          this.notificationsMessage = 'Saved.';
+        },
+        error: () => {
+          this.notificationsError = 'Could not save notification preferences.';
+        },
+        complete: () => (this.savingNotifications = false)
+      });
   }
 
   private computeTotalPages(total?: number): void {
@@ -675,7 +729,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
       next: (user) => {
         this.googleEmail.set(user.google_email ?? null);
         this.googlePicture.set(user.google_picture_url ?? null);
-        this.profile.set({ ...this.profile(), email: user.email, name: user.name });
+        this.profile.set(user);
         this.toast.success('Google account disconnected');
       },
       error: (err) => {
