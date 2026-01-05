@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { ButtonComponent } from '../../shared/button.component';
 import { CardComponent } from '../../shared/card.component';
@@ -10,6 +10,7 @@ import { ProductCardComponent } from '../../shared/product-card.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Meta, Title } from '@angular/platform-browser';
+import { AuthService } from '../../core/auth.service';
 
 @Component({
   selector: 'app-home',
@@ -26,7 +27,12 @@ import { Meta, Title } from '@angular/platform-browser';
           <p class="text-lg text-slate-600 dark:text-slate-300">{{ 'home.subhead' | translate }}</p>
           <div class="flex flex-wrap gap-3">
             <app-button [label]="'home.ctaShop' | translate" [routerLink]="['/shop']"></app-button>
-            <app-button [label]="'home.ctaAdmin' | translate" variant="ghost" [routerLink]="['/admin']"></app-button>
+            <app-button
+              *ngIf="isAdmin()"
+              [label]="'home.ctaAdmin' | translate"
+              variant="ghost"
+              [routerLink]="['/admin']"
+            ></app-button>
           </div>
         </div>
         <div class="relative">
@@ -102,6 +108,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   featuredLoading = signal<boolean>(true);
   featuredError = signal<boolean>(false);
   skeletons = Array.from({ length: 3 });
+  readonly isAdmin = computed(() => this.auth.role() === 'admin');
 
   private langSub?: Subscription;
 
@@ -110,7 +117,8 @@ export class HomeComponent implements OnInit, OnDestroy {
     private recentlyViewedService: RecentlyViewedService,
     private title: Title,
     private meta: Meta,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private auth: AuthService
   ) {}
 
   ngOnInit(): void {
