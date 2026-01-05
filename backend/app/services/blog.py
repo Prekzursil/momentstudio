@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
@@ -121,7 +122,7 @@ def to_read(block: ContentBlock) -> dict:
 async def list_comments(
     session: AsyncSession,
     *,
-    content_block_id,
+    content_block_id: UUID,
     page: int,
     limit: int,
 ) -> tuple[list[BlogComment], int]:
@@ -147,10 +148,10 @@ async def list_comments(
 async def create_comment(
     session: AsyncSession,
     *,
-    content_block_id,
+    content_block_id: UUID,
     user: User,
     body: str,
-    parent_id=None,
+    parent_id: UUID | None = None,
 ) -> BlogComment:
     body = (body or "").strip()
     if not body:
@@ -177,7 +178,7 @@ async def create_comment(
 async def soft_delete_comment(
     session: AsyncSession,
     *,
-    comment_id,
+    comment_id: UUID,
     actor: User,
 ) -> None:
     comment = await session.get(BlogComment, comment_id)
@@ -206,10 +207,8 @@ def to_comment_read(comment: BlogComment) -> dict:
         "updated_at": comment.updated_at,
         "deleted_at": comment.deleted_at,
         "author": {
-            "id": author.id,
-            "name": author.name,
-            "avatar_url": author.avatar_url or author.google_picture_url,
+            "id": author.id if author else comment.user_id,
+            "name": author.name if author else None,
+            "avatar_url": (author.avatar_url or author.google_picture_url) if author else None,
         }
-        if author
-        else None,
     }

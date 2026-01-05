@@ -1456,7 +1456,7 @@ export class AdminComponent implements OnInit {
   closeBlogEditor(): void {
     this.selectedBlogKey = null;
     this.blogImages = [];
-    this.replyResetBlogForm();
+    this.resetBlogForm();
   }
 
   async createBlogPost(): Promise<void> {
@@ -1596,7 +1596,7 @@ export class AdminComponent implements OnInit {
 
   private loadBlogEditor(key: string): void {
     this.selectedBlogKey = key;
-    this.replyResetBlogForm();
+    this.resetBlogForm();
     this.admin.getContent(key).subscribe({
       next: (block) => {
         this.blogBaseLang = (block.lang === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
@@ -1616,7 +1616,7 @@ export class AdminComponent implements OnInit {
     this.admin.content().subscribe({ next: (c) => (this.contentBlocks = c) });
   }
 
-  private replyResetBlogForm(): void {
+  private resetBlogForm(): void {
     this.blogForm = { title: '', body_markdown: '', status: 'draft' };
   }
 
