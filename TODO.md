@@ -171,6 +171,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Fix shared standalone components missing `NgIf` imports so buttons/labels render correctly.
 - [x] Header: improve theme/language control layout and add a global product search field.
 - [x] Footer: remove year suffix from tagline and replace Pinterest link with Facebook.
+- [x] Footer: turn Facebook/Instagram links into drop-up menus for multiple pages.
 - [x] Frontend: add `/about` route rendering CMS `page.about` content.
 - [x] Header: make theme/language dropdown options readable in dark mode.
 - [x] Header: avoid search/nav overlap on medium screens (use nav drawer + show search on wide screens).
