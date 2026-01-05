@@ -1,6 +1,6 @@
 # Architecture Overview
 
-AdrianaArt is a monorepo with a FastAPI backend, Angular frontend, and lightweight infra for local and CI environments. The stack favors clear boundaries between HTTP/API, domain logic, persistence, and presentation.
+Moment Studio is a monorepo with a FastAPI backend, Angular frontend, and lightweight infra for local and CI environments. The stack favors clear boundaries between HTTP/API, domain logic, persistence, and presentation.
 
 ## Monorepo layout
 

@@ -6,6 +6,7 @@ import { ShopComponent } from './pages/shop/shop.component';
 import { AboutComponent } from './pages/about/about.component';
 import { BlogListComponent } from './pages/blog/blog-list.component';
 import { BlogPostComponent } from './pages/blog/blog-post.component';
+import { ContactComponent } from './pages/contact/contact.component';
 import { ProductComponent } from './pages/product/product.component';
 import { authGuard, adminGuard } from './core/auth.guard';
 import { CartComponent } from './pages/cart/cart.component';
@@ -21,22 +22,23 @@ import { ChangePasswordComponent } from './pages/account/change-password.compone
 import { shopCategoriesResolver } from './core/shop.resolver';
 
 export const routes: Routes = [
-  { path: '', component: HomeComponent, title: 'AdrianaArt' },
-  { path: 'shop', component: ShopComponent, title: 'Shop | AdrianaArt', resolve: { categories: shopCategoriesResolver } },
-  { path: 'about', component: AboutComponent, title: 'About | AdrianaArt' },
-  { path: 'blog', component: BlogListComponent, title: 'Blog | AdrianaArt' },
-  { path: 'blog/:slug', component: BlogPostComponent, title: 'Blog | AdrianaArt' },
-  { path: 'products/:slug', component: ProductComponent, title: 'Product | AdrianaArt' },
-  { path: 'cart', component: CartComponent, title: 'Cart | AdrianaArt' },
-  { path: 'checkout', component: CheckoutComponent, title: 'Checkout | AdrianaArt' },
-  { path: 'checkout/success', component: SuccessComponent, title: 'Order placed | AdrianaArt' },
-  { path: 'login', component: LoginComponent, title: 'Login | AdrianaArt' },
-  { path: 'register', component: RegisterComponent, title: 'Register | AdrianaArt' },
-  { path: 'auth/google/callback', component: GoogleCallbackComponent, title: 'Google sign-in | AdrianaArt' },
-  { path: 'password-reset', component: PasswordResetRequestComponent, title: 'Password reset | AdrianaArt' },
-  { path: 'password-reset/confirm', component: PasswordResetComponent, title: 'Set new password | AdrianaArt' },
-  { path: 'account', canActivate: [authGuard], component: AccountComponent, title: 'Account | AdrianaArt' },
-  { path: 'account/password', canActivate: [authGuard], component: ChangePasswordComponent, title: 'Change password | AdrianaArt' },
+  { path: '', component: HomeComponent, title: 'Moment Studio' },
+  { path: 'shop', component: ShopComponent, title: 'Shop | Moment Studio', resolve: { categories: shopCategoriesResolver } },
+  { path: 'about', component: AboutComponent, title: 'About | Moment Studio' },
+  { path: 'contact', component: ContactComponent, title: 'Contact | Moment Studio' },
+  { path: 'blog', component: BlogListComponent, title: 'Blog | Moment Studio' },
+  { path: 'blog/:slug', component: BlogPostComponent, title: 'Blog | Moment Studio' },
+  { path: 'products/:slug', component: ProductComponent, title: 'Product | Moment Studio' },
+  { path: 'cart', component: CartComponent, title: 'Cart | Moment Studio' },
+  { path: 'checkout', component: CheckoutComponent, title: 'Checkout | Moment Studio' },
+  { path: 'checkout/success', component: SuccessComponent, title: 'Order placed | Moment Studio' },
+  { path: 'login', component: LoginComponent, title: 'Login | Moment Studio' },
+  { path: 'register', component: RegisterComponent, title: 'Register | Moment Studio' },
+  { path: 'auth/google/callback', component: GoogleCallbackComponent, title: 'Google sign-in | Moment Studio' },
+  { path: 'password-reset', component: PasswordResetRequestComponent, title: 'Password reset | Moment Studio' },
+  { path: 'password-reset/confirm', component: PasswordResetComponent, title: 'Set new password | Moment Studio' },
+  { path: 'account', canActivate: [authGuard], component: AccountComponent, title: 'Account | Moment Studio' },
+  { path: 'account/password', canActivate: [authGuard], component: ChangePasswordComponent, title: 'Change password | Moment Studio' },
   {
     path: 'admin',
     canActivate: [adminGuard],

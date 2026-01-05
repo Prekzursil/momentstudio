@@ -1,6 +1,6 @@
-# Contributing to AdrianaArt
+# Contributing to Moment Studio
 
-Thanks for helping build the AdrianaArt storefront and admin suite. This monorepo contains the FastAPI backend, Angular frontend, and infra tooling. Keep changes small, tested, and documented so the project stays easy to evolve.
+Thanks for helping build the Moment Studio storefront and admin suite. This monorepo contains the FastAPI backend, Angular frontend, and infra tooling. Keep changes small, tested, and documented so the project stays easy to evolve.
 
 ## Workflow
 

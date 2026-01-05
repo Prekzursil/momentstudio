@@ -14,7 +14,7 @@ import { RouterLink } from '@angular/router';
       <div class="flex justify-center gap-3 flex-wrap">
         <app-button label="Retry" (action)="onRetry()"></app-button>
         <app-button variant="ghost" routerLink="/" label="Go home"></app-button>
-        <a class="text-sm text-indigo-600 dark:text-indigo-300 font-medium" href="mailto:hello@adrianaart.com">Contact support</a>
+        <a class="text-sm text-indigo-600 dark:text-indigo-300 font-medium" href="mailto:momentstudio.ro@gmail.com">Contact support</a>
       </div>
     </div>
   `

@@ -1,11 +1,12 @@
 import { NgClass, NgForOf, NgIf } from '@angular/common';
 import { Component, ElementRef, HostListener } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-footer',
   standalone: true,
-  imports: [NgIf, NgForOf, NgClass, TranslateModule],
+  imports: [NgIf, NgForOf, NgClass, RouterLink, TranslateModule],
   template: `
     <footer class="border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
       <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-slate-600 dark:text-slate-300">
@@ -78,7 +79,7 @@ import { TranslateModule } from '@ngx-translate/core';
             </div>
           </div>
 
-          <a class="font-medium hover:text-slate-900 dark:hover:text-white" href="#">{{ 'footer.contact' | translate }}</a>
+          <a class="font-medium hover:text-slate-900 dark:hover:text-white" routerLink="/contact">{{ 'footer.contact' | translate }}</a>
         </div>
       </div>
     </footer>
@@ -95,10 +96,10 @@ export class FooterComponent {
       avatarClass: 'bg-gradient-to-br from-fuchsia-500 to-rose-500'
     },
     {
-      name: 'AdrianaArt',
+      name: 'Moment Studio',
       url: 'https://www.instagram.com/adrianaartizanat?igsh=ZmZmaDU1MGcxZHEy',
-      initials: 'AA',
-      avatarClass: 'bg-gradient-to-br from-indigo-500 to-sky-500'
+      initials: 'MS',
+      avatarClass: 'bg-gradient-to-br from-amber-500 to-rose-500'
     }
   ];
 
@@ -110,10 +111,10 @@ export class FooterComponent {
       avatarClass: 'bg-gradient-to-br from-blue-600 to-sky-500'
     },
     {
-      name: 'AdrianaArt',
+      name: 'Moment Studio',
       url: 'https://www.facebook.com/share/1APqKJM6Zi/',
-      initials: 'AA',
-      avatarClass: 'bg-gradient-to-br from-blue-600 to-indigo-600'
+      initials: 'MS',
+      avatarClass: 'bg-gradient-to-br from-blue-600 to-fuchsia-500'
     }
   ];
 

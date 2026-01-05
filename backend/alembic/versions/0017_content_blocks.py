@@ -57,8 +57,8 @@ def upgrade() -> None:
     # Seed default blocks
     now = datetime.now(timezone.utc)
     defaults = [
-        ("home.hero", "Welcome to AdrianaArt", "Handmade art for your home", now),
-        ("page.about", "About Us", "Story about AdrianaArt.", now),
+        ("home.hero", "Welcome to Moment Studio", "Handmade art for your home", now),
+        ("page.about", "About Us", "Story about Moment Studio.", now),
         ("page.faq", "FAQ", "Frequently asked questions.", now),
         ("page.shipping", "Shipping & Returns", "Shipping and return policies.", now),
         ("page.care", "Care Instructions", "How to care for your items.", now),

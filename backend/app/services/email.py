@@ -28,7 +28,7 @@ _rate_per_recipient: dict[str, list[float]] = {}
 def _build_message(to_email: str, subject: str, text_body: str, html_body: str | None = None) -> EmailMessage:
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"] = settings.smtp_from_email or "no-reply@adrianaart.local"
+    msg["From"] = settings.smtp_from_email or "no-reply@momentstudio.local"
     msg["To"] = to_email
     msg.set_content(text_body)
     if html_body:

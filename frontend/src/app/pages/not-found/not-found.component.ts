@@ -14,7 +14,7 @@ import { ButtonComponent } from '../../shared/button.component';
       <div class="flex justify-center gap-3 flex-wrap">
         <app-button routerLink="/" label="Back to home"></app-button>
         <app-button routerLink="/shop" variant="ghost" label="Browse shop"></app-button>
-        <a class="text-sm text-indigo-600 dark:text-indigo-300 font-medium" href="mailto:hello@adrianaart.com">Contact support</a>
+        <a class="text-sm text-indigo-600 dark:text-indigo-300 font-medium" href="mailto:momentstudio.ro@gmail.com">Contact support</a>
       </div>
     </div>
   `

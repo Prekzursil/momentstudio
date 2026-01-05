@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "AdrianaArt",
+    "name": "Moment Studio",
     "tagline": "Artă ceramică realizată manual"
   },
   "nav": {
@@ -8,6 +8,7 @@
     "blog": "Blog",
     "shop": "Magazin",
     "about": "Despre",
+    "contact": "Contact",
     "admin": "Admin",
     "cart": "Coș",
     "signIn": "Autentificare",
@@ -23,8 +24,17 @@
     "loading": "Se încarcă pagina Despre…",
     "errorTitle": "Nu am putut încărca pagina Despre.",
     "errorCopy": "Încearcă din nou în câteva momente.",
-    "metaTitle": "Despre AdrianaArt",
-    "metaDescription": "Află povestea AdrianaArt și detalii despre ceramica noastră realizată manual."
+    "metaTitle": "Despre Moment Studio",
+    "metaDescription": "Află povestea Moment Studio și detalii despre ceramica noastră realizată manual."
+  },
+  "contact": {
+    "title": "Contact",
+    "metaTitle": "Contact | Moment Studio",
+    "metaDescription": "Contactează Moment Studio pentru întrebări, comenzi personalizate sau suport.",
+    "intro": "Ai întrebări despre o comandă, o piesă personalizată sau o colaborare? Scrie-ne și îți răspundem cu drag.",
+    "replyTime": "De obicei răspundem în 1–2 zile lucrătoare.",
+    "phoneLabel": "Telefon",
+    "emailLabel": "Email"
   },
   "account": {
     "notifications": {
@@ -54,8 +64,8 @@
     "emptyTitle": "Nu există postări încă",
     "emptyCopy": "Revino curând pentru articole noi.",
     "pageMeta": "Pagina {{page}} din {{totalPages}} · {{totalItems}} postări",
-    "metaTitle": "Blog | AdrianaArt",
-    "metaDescription": "Povești, noutăți și culise de la AdrianaArt.",
+    "metaTitle": "Blog | Moment Studio",
+    "metaDescription": "Povești, noutăți și culise de la Moment Studio.",
     "prev": "Înapoi",
     "next": "Înainte",
     "post": {
@@ -64,8 +74,8 @@
       "loadingTitle": "Se încarcă…",
       "errorTitle": "Nu am putut încărca acest articol.",
       "errorCopy": "Încearcă din nou în câteva momente.",
-      "metaTitle": "Articol | AdrianaArt",
-      "metaDescription": "Citește cel mai nou articol de pe AdrianaArt."
+      "metaTitle": "Articol | Moment Studio",
+      "metaDescription": "Citește cel mai nou articol de pe Moment Studio."
     },
     "comments": {
       "title": "Comentarii ({{count}})",
@@ -99,9 +109,9 @@
     }
   },
   "home": {
-    "headline": "Construiește experiența magazinului AdrianaArt.",
+    "headline": "Construiește experiența magazinului Moment Studio.",
     "subhead": "Un starter Angular curat cu token-uri Tailwind, componente comune și un shell responsiv pregătit pentru produse, coș și conținut.",
-    "metaTitle": "AdrianaArt | Magazin de ceramică artizanală",
+    "metaTitle": "Moment Studio | Magazin de ceramică artizanală",
     "metaDescription": "Descoperă ceramică lucrată manual cu colecții curate, detalii bogate și checkout fluent.",
     "ctaShop": "Cumpără acum",
     "ctaAdmin": "Vezi admin",
@@ -150,8 +160,8 @@
     "errorTitle": "A apărut o problemă la încărcarea produselor.",
     "errorCopy": "Verifică conexiunea sau încearcă din nou.",
     "pageMeta": "Pagina {{page}} din {{totalPages}} · {{totalItems}} produse",
-    "metaTitle": "Magazin ceramică lucrată manual | AdrianaArt",
-    "metaDescription": "Descoperă piesele ceramice AdrianaArt. Filtrează după categorie, preț și etichete."
+    "metaTitle": "Magazin ceramică lucrată manual | Moment Studio",
+    "metaDescription": "Descoperă piesele ceramice Moment Studio. Filtrează după categorie, preț și etichete."
   },
   "product": {
     "viewDetails": "Vezi detalii",
@@ -168,8 +178,8 @@
     "notFound": "Produsul nu a fost găsit",
     "addedTitle": "Adăugat în coș",
     "addedBody": "{{qty}} × {{name}} au fost adăugate în coș",
-    "metaTitle": "{{name}} | AdrianaArt",
-    "metaDescriptionFallback": "Descoperă {{name}} — o piesă lucrată manual de AdrianaArt."
+    "metaTitle": "{{name}} | Moment Studio",
+    "metaDescriptionFallback": "Descoperă {{name}} — o piesă lucrată manual de Moment Studio."
   },
   "cart": {
     "title": "Coșul tău",
