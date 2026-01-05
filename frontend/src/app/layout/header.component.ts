@@ -14,7 +14,7 @@ import { TranslateModule } from '@ngx-translate/core';
   imports: [RouterLink, ButtonComponent, NavDrawerComponent, NgIf, NgForOf, FormsModule, TranslateModule],
   template: `
     <header class="border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
-      <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-6">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-6">
         <a routerLink="/" class="flex items-center gap-2 text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-50">
           <span class="h-10 w-10 rounded-full bg-slate-900 text-white grid place-items-center font-bold dark:bg-slate-50 dark:text-slate-900">AA</span>
           <span>{{ 'app.name' | translate }}</span>
@@ -24,8 +24,8 @@ import { TranslateModule } from '@ngx-translate/core';
           <a routerLink="/shop" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.shop' | translate }}</a>
           <a routerLink="/about" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.about' | translate }}</a>
         </nav>
-        <form class="hidden xl:flex flex-1 justify-center" (submit)="submitSearch($event)">
-          <div class="relative w-full max-w-md">
+        <form class="hidden xl:flex flex-1 min-w-0 justify-center" (submit)="submitSearch($event)">
+          <div class="relative w-full max-w-sm min-w-0">
             <input
               name="q"
               type="search"
@@ -72,27 +72,27 @@ import { TranslateModule } from '@ngx-translate/core';
             <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
               <span class="sr-only">Theme</span>
               <select
-                class="h-9 rounded-full bg-transparent px-2 text-sm text-slate-900 focus:outline-none dark:text-slate-100"
+                class="h-9 rounded-full bg-transparent px-2 text-sm text-slate-900 focus:outline-none [color-scheme:light] dark:text-slate-100 dark:[color-scheme:dark]"
                 [ngModel]="themePreference"
                 (ngModelChange)="onThemeChange($event)"
                 aria-label="Theme"
               >
-                <option value="system">System</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
+                <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="system">System</option>
+                <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="light">Light</option>
+                <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="dark">Dark</option>
               </select>
             </label>
             <div class="h-6 w-px bg-slate-200 dark:bg-slate-700"></div>
             <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
               <span class="sr-only">Language</span>
               <select
-                class="h-9 rounded-full bg-transparent px-2 text-sm text-slate-900 focus:outline-none dark:text-slate-100"
+                class="h-9 rounded-full bg-transparent px-2 text-sm text-slate-900 focus:outline-none [color-scheme:light] dark:text-slate-100 dark:[color-scheme:dark]"
                 [ngModel]="language"
                 (ngModelChange)="onLanguageChange($event)"
                 aria-label="Language"
               >
-                <option value="en">EN</option>
-                <option value="ro">RO</option>
+                <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="en">EN</option>
+                <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="ro">RO</option>
               </select>
             </label>
           </div>
@@ -100,13 +100,13 @@ import { TranslateModule } from '@ngx-translate/core';
           <label class="sm:hidden flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
             <span class="sr-only">Language</span>
             <select
-              class="h-10 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              class="h-10 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
               [ngModel]="language"
               (ngModelChange)="onLanguageChange($event)"
               aria-label="Language"
             >
-              <option value="en">EN</option>
-              <option value="ro">RO</option>
+              <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="en">EN</option>
+              <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="ro">RO</option>
             </select>
           </label>
         </div>

@@ -198,7 +198,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Featured products grid on homepage.
 - [x] Category listing with grid + pagination.
 - [x] Filter sidebar (category, price range, tags).
-- [x] Shop: fix filter sidebar price slider overflow.
+- [x] Shop: prevent price range sliders overflowing the sidebar (stack vertically).
 - [x] Search bar hitting /products.
 - [x] Product card component (image, name, price, stock badge).
 - [x] Product detail page with gallery, variants, quantity/add-to-cart.
@@ -402,8 +402,8 @@ Below is a structured checklist you can turn into issues.
 - [x] UX: prevent toast notifications from blocking interactions and dedupe repeated error toasts.
 - [x] UX: make Stripe CardElement readable in dark mode and update styles on theme changes (checkout + account).
 - [x] Perf: fix account idle-timer event listener cleanup (avoid leaking listeners with `.bind(this)`).
-- [ ] Follow-up: set `<meta name="theme-color">` dynamically based on selected theme (mobile address bar).
-- [ ] Follow-up: add early theme bootstrap in `frontend/src/index.html` to avoid flash of incorrect theme on load.
+- [x] Follow-up: set `<meta name="theme-color">` dynamically based on selected theme (mobile address bar).
+- [x] Follow-up: add early theme bootstrap in `frontend/src/index.html` to avoid flash of incorrect theme on load.
 
 ## Backlog (New ideas inspired by Event Link)
 
