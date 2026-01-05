@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -141,10 +141,15 @@ async def list_published_posts(
     q: str | None = None,
     tag: str | None = None,
 ) -> tuple[list[ContentBlock], int]:
+    now = datetime.now(timezone.utc)
     page = max(1, page)
     limit = max(1, min(limit, 50))
 
-    filters = (ContentBlock.key.like(f"{BLOG_KEY_PREFIX}%"), ContentBlock.status == ContentStatus.published)
+    filters = (
+        ContentBlock.key.like(f"{BLOG_KEY_PREFIX}%"),
+        ContentBlock.status == ContentStatus.published,
+        or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
+    )
     query_text = (q or "").strip().lower()
     tag_text = (tag or "").strip().lower()
 
@@ -209,11 +214,16 @@ async def get_published_post(
     slug: str,
     lang: str | None,
 ) -> ContentBlock | None:
+    now = datetime.now(timezone.utc)
     key = f"{BLOG_KEY_PREFIX}{slug}"
     query = (
         select(ContentBlock)
         .options(selectinload(ContentBlock.images))
-        .where(ContentBlock.key == key, ContentBlock.status == ContentStatus.published)
+        .where(
+            ContentBlock.key == key,
+            ContentBlock.status == ContentStatus.published,
+            or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
+        )
     )
     if lang:
         query = query.options(selectinload(ContentBlock.translations))

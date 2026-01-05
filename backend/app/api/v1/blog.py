@@ -1,14 +1,25 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_user
+from app.core.config import settings
+from app.core.dependencies import get_current_user, require_admin
+from app.core.security import create_content_preview_token, decode_content_preview_token
 from app.db.session import get_session
 from app.models.user import User
-from app.schemas.blog import BlogCommentCreate, BlogCommentListResponse, BlogCommentRead, BlogPostListResponse, BlogPostRead
+from app.schemas.blog import (
+    BlogCommentCreate,
+    BlogCommentListResponse,
+    BlogCommentRead,
+    BlogPostListResponse,
+    BlogPostRead,
+    BlogPreviewTokenResponse,
+)
 from app.schemas.catalog import PaginationMeta
 from app.services import blog as blog_service
+from app.services import content as content_service
 
 router = APIRouter(prefix="/blog", tags=["blog"])
 
@@ -40,6 +51,44 @@ async def get_blog_post(
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
     return BlogPostRead.model_validate(blog_service.to_read(block, lang=lang))
+
+
+@router.get("/posts/{slug}/preview", response_model=BlogPostRead)
+async def preview_blog_post(
+    slug: str,
+    token: str = Query(..., min_length=1, description="Preview token"),
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+) -> BlogPostRead:
+    key = decode_content_preview_token(token)
+    expected_key = f"blog.{slug}"
+    if not key or key != expected_key:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid preview token")
+    block = await content_service.get_block_by_key(session, expected_key, lang=lang)
+    if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    return BlogPostRead.model_validate(blog_service.to_read(block, lang=lang))
+
+
+@router.post("/posts/{slug}/preview-token", response_model=BlogPreviewTokenResponse)
+async def create_blog_preview_token(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+    expires_minutes: int = Query(default=60, ge=5, le=7 * 24 * 60),
+    _: User = Depends(require_admin),
+) -> BlogPreviewTokenResponse:
+    key = f"blog.{slug}"
+    block = await content_service.get_block_by_key(session, key)
+    if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+    token = create_content_preview_token(content_key=key, expires_at=expires_at)
+
+    chosen_lang = lang or (block.lang if getattr(block, "lang", None) in ("en", "ro") else "en") or "en"
+    url = f"{settings.frontend_origin.rstrip('/')}/blog/{slug}?preview={token}&lang={chosen_lang}"
+    return BlogPreviewTokenResponse(token=token, expires_at=expires_at, url=url)
 
 
 @router.get("/posts/{slug}/comments", response_model=BlogCommentListResponse)

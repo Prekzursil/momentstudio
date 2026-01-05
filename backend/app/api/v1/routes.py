@@ -14,9 +14,10 @@ from app.api.v1 import wishlist
 from app.api.v1 import blog
 from app.models.catalog import Product, Category
 from app.models.content import ContentBlock, ContentStatus
+from datetime import datetime, timezone
 from fastapi import Response, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from app.db.session import get_session
 from app.core.config import settings
 from app.core.metrics import snapshot as metrics_snapshot
@@ -61,6 +62,7 @@ def metrics() -> dict:
 
 @api_router.get("/sitemap.xml", tags=["sitemap"])
 async def sitemap(session: AsyncSession = Depends(get_session)) -> Response:
+    now = datetime.now(timezone.utc)
     products = (await session.execute(select(Product.slug))).scalars().all()
     categories = (await session.execute(select(Category.slug))).scalars().all()
     blog_keys = (
@@ -68,6 +70,7 @@ async def sitemap(session: AsyncSession = Depends(get_session)) -> Response:
             select(ContentBlock.key).where(
                 ContentBlock.key.like("blog.%"),
                 ContentBlock.status == ContentStatus.published,
+                or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
             )
         )
     ).scalars().all()

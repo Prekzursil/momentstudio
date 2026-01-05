@@ -52,6 +52,7 @@ export interface AdminContent {
   meta?: Record<string, any> | null;
   lang?: string | null;
   sort_order?: number | null;
+  published_at?: string | null;
 }
 
 export interface AdminCoupon {
@@ -123,7 +124,20 @@ export interface ContentBlock {
   meta?: Record<string, any> | null;
   lang?: string | null;
   sort_order?: number;
+  published_at?: string | null;
   images?: { id: string; url: string; alt_text?: string | null; sort_order?: number }[];
+}
+
+export interface ContentBlockVersionListItem {
+  id: string;
+  version: number;
+  title: string;
+  status: string;
+  created_at: string;
+}
+
+export interface ContentBlockVersionRead extends ContentBlockVersionListItem {
+  body_markdown: string;
 }
 
 export interface ContentSavePayload {
@@ -290,5 +304,17 @@ export class AdminService {
     form.append('file', file);
     const suffix = lang ? `?lang=${lang}` : '';
     return this.api.post<ContentBlock>(`/content/admin/${key}/images${suffix}`, form);
+  }
+
+  listContentVersions(key: string): Observable<ContentBlockVersionListItem[]> {
+    return this.api.get<ContentBlockVersionListItem[]>(`/content/admin/${key}/versions`);
+  }
+
+  getContentVersion(key: string, version: number): Observable<ContentBlockVersionRead> {
+    return this.api.get<ContentBlockVersionRead>(`/content/admin/${key}/versions/${version}`);
+  }
+
+  rollbackContentVersion(key: string, version: number): Observable<ContentBlock> {
+    return this.api.post<ContentBlock>(`/content/admin/${key}/versions/${version}/rollback`, {});
   }
 }

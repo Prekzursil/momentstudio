@@ -7,6 +7,7 @@ import { ContainerComponent } from '../../layout/container.component';
 import { CardComponent } from '../../shared/card.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { InputComponent } from '../../shared/input.component';
+import { RichEditorComponent } from '../../shared/rich-editor.component';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { SkeletonComponent } from '../../shared/skeleton.component';
 import {
@@ -21,12 +22,16 @@ import {
   LowStockItem,
   AdminCategory,
   AdminProductDetail,
-  FeaturedCollection
+  FeaturedCollection,
+  ContentBlockVersionListItem,
+  ContentBlockVersionRead
 } from '../../core/admin.service';
+import { BlogService } from '../../core/blog.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { firstValueFrom } from 'rxjs';
 import { MarkdownService } from '../../core/markdown.service';
+import { diffLines } from 'diff';
 
 @Component({
   selector: 'app-admin',
@@ -40,6 +45,7 @@ import { MarkdownService } from '../../core/markdown.service';
     CardComponent,
     ButtonComponent,
     InputComponent,
+    RichEditorComponent,
     LocalizedCurrencyPipe,
     SkeletonComponent,
     TranslateModule
@@ -587,6 +593,15 @@ import { MarkdownService } from '../../core/markdown.service';
                     <option value="published">published</option>
                   </select>
                 </label>
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Publish at (optional)
+                  <input
+                    type="datetime-local"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogCreate.published_at"
+                  />
+                  <span class="text-xs text-slate-500 dark:text-slate-400">Set a future time to schedule publishing.</span>
+                </label>
                 <div class="md:col-span-2">
                   <app-input label="Title" [(value)]="blogCreate.title"></app-input>
                 </div>
@@ -613,14 +628,14 @@ import { MarkdownService } from '../../core/markdown.service';
                     [(ngModel)]="blogCreate.reading_time_minutes"
                   />
                 </label>
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                  Body (Markdown)
-                  <textarea
-                    rows="6"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [(ngModel)]="blogCreate.body_markdown"
-                  ></textarea>
-                </label>
+                <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                  Body
+                  <app-rich-editor
+                    [(value)]="blogCreate.body_markdown"
+                    [initialEditType]="'wysiwyg'"
+                    [height]="'420px'"
+                  ></app-rich-editor>
+                </div>
               </div>
 
               <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
@@ -690,6 +705,18 @@ import { MarkdownService } from '../../core/markdown.service';
                   </select>
                 </label>
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                  Publish at (base only) (optional)
+                  <input
+                    type="datetime-local"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogForm.published_at"
+                    [disabled]="blogEditLang !== blogBaseLang"
+                  />
+                  <span class="text-xs text-slate-500 dark:text-slate-400">
+                    If this is in the future and status is published, the post will go live at that time.
+                  </span>
+                </label>
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
                   Summary ({{ blogEditLang.toUpperCase() }}) (optional)
                   <textarea
                     rows="3"
@@ -711,84 +738,117 @@ import { MarkdownService } from '../../core/markdown.service';
                 </label>
                 <div class="grid gap-2 md:col-span-2">
                   <div class="flex flex-wrap items-center justify-between gap-2">
-                    <p class="text-sm font-medium text-slate-700 dark:text-slate-200">Body (Markdown)</p>
-                    <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                      <input type="checkbox" [(ngModel)]="showBlogPreview" /> Live preview
-                    </label>
+                    <p class="text-sm font-medium text-slate-700 dark:text-slate-200">Body</p>
+                    <div class="flex flex-wrap items-center gap-3">
+                      <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                        <input type="checkbox" [(ngModel)]="useRichBlogEditor" /> Rich editor
+                      </label>
+                      <label *ngIf="!useRichBlogEditor" class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                        <input type="checkbox" [(ngModel)]="showBlogPreview" /> Live preview
+                      </label>
+                    </div>
                   </div>
 
-                  <div class="flex flex-wrap items-center gap-2 text-xs">
-                    <button
-                      type="button"
-                      class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                      (click)="applyBlogHeading(blogBody, 1)"
-                    >
-                      H1
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                      (click)="applyBlogHeading(blogBody, 2)"
-                    >
-                      H2
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                      (click)="wrapBlogSelection(blogBody, '**', '**', 'bold text')"
-                    >
-                      B
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-full border border-slate-200 bg-white px-3 py-1 italic text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                      (click)="wrapBlogSelection(blogBody, '*', '*', 'italic text')"
-                    >
-                      I
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                      (click)="insertBlogLink(blogBody)"
-                    >
-                      Link
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                      (click)="insertBlogCodeBlock(blogBody)"
-                    >
-                      Code
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                      (click)="applyBlogList(blogBody)"
-                    >
-                      List
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                      (click)="blogImageInput.click()"
-                    >
-                      Image
-                    </button>
-                    <input #blogImageInput type="file" accept="image/*" class="hidden" (change)="uploadAndInsertBlogImage(blogBody, $event)" />
-                  </div>
+                  <ng-container *ngIf="useRichBlogEditor; else markdownBlogEditor">
+                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="blogImageInputRich.click()"
+                      >
+                        Image
+                      </button>
+                      <input
+                        #blogImageInputRich
+                        type="file"
+                        accept="image/*"
+                        class="hidden"
+                        (change)="uploadAndInsertBlogImage(blogEditor, $event)"
+                      />
+                    </div>
 
-                  <textarea
-                    #blogBody
-                    rows="10"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [(ngModel)]="blogForm.body_markdown"
-                  ></textarea>
+                    <app-rich-editor
+                      #blogEditor
+                      [(value)]="blogForm.body_markdown"
+                      [initialEditType]="'wysiwyg'"
+                      [height]="'520px'"
+                    ></app-rich-editor>
+                  </ng-container>
 
-                  <div
-                    *ngIf="showBlogPreview"
-                    class="markdown rounded-lg border border-slate-200 p-3 bg-slate-50 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200"
-                    [innerHTML]="renderMarkdown(blogForm.body_markdown || 'Nothing to preview yet.')"
-                  ></div>
+                  <ng-template #markdownBlogEditor>
+                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="applyBlogHeading(blogBody, 1)"
+                      >
+                        H1
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="applyBlogHeading(blogBody, 2)"
+                      >
+                        H2
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="wrapBlogSelection(blogBody, '**', '**', 'bold text')"
+                      >
+                        B
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 italic text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="wrapBlogSelection(blogBody, '*', '*', 'italic text')"
+                      >
+                        I
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="insertBlogLink(blogBody)"
+                      >
+                        Link
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="insertBlogCodeBlock(blogBody)"
+                      >
+                        Code
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="applyBlogList(blogBody)"
+                      >
+                        List
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="blogImageInput.click()"
+                      >
+                        Image
+                      </button>
+                      <input #blogImageInput type="file" accept="image/*" class="hidden" (change)="uploadAndInsertBlogImage(blogBody, $event)" />
+                    </div>
+
+                    <textarea
+                      #blogBody
+                      rows="10"
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [(ngModel)]="blogForm.body_markdown"
+                    ></textarea>
+
+                    <div
+                      *ngIf="showBlogPreview"
+                      class="markdown rounded-lg border border-slate-200 p-3 bg-slate-50 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200"
+                      [innerHTML]="renderMarkdown(blogForm.body_markdown || 'Nothing to preview yet.')"
+                    ></div>
+                  </ng-template>
                 </div>
               </div>
 
@@ -809,8 +869,9 @@ import { MarkdownService } from '../../core/markdown.service';
                 </div>
               </div>
 
-              <div class="flex gap-2">
+              <div class="flex flex-wrap gap-2">
                 <app-button label="Save" (action)="saveBlogPost()"></app-button>
+                <app-button size="sm" variant="ghost" label="Preview link" (action)="generateBlogPreviewLink()"></app-button>
                 <a
                   class="inline-flex items-center justify-center rounded-full font-semibold transition px-3 py-2 text-sm bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-slate-800 dark:text-slate-50 dark:border-slate-700 dark:hover:border-slate-600"
                   [attr.href]="'/blog/' + currentBlogSlug()"
@@ -819,6 +880,53 @@ import { MarkdownService } from '../../core/markdown.service';
                 >
                   View
                 </a>
+              </div>
+              <div *ngIf="blogPreviewUrl" class="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-950/30">
+                <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Preview link</p>
+                <div class="flex items-center gap-2">
+                  <input
+                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [value]="blogPreviewUrl"
+                    readonly
+                  />
+                  <app-button size="sm" variant="ghost" label="Copy" (action)="copyBlogPreviewLink()"></app-button>
+                </div>
+                <p *ngIf="blogPreviewExpiresAt" class="text-xs text-slate-500 dark:text-slate-400">
+                  Expires {{ blogPreviewExpiresAt | date: 'short' }}
+                </p>
+              </div>
+              <div class="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-900">
+                <div class="flex items-center justify-between gap-2">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">Revisions</p>
+                  <app-button size="sm" variant="ghost" label="Refresh" (action)="loadBlogVersions()"></app-button>
+                </div>
+                <div *ngIf="blogVersions.length === 0" class="text-xs text-slate-500 dark:text-slate-400">
+                  No revisions loaded yet.
+                </div>
+                <div *ngFor="let v of blogVersions" class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                  <div>
+                    <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">v{{ v.version }} · {{ v.created_at | date: 'short' }}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ v.status }}</p>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <app-button size="sm" variant="ghost" label="Diff" (action)="selectBlogVersion(v.version)"></app-button>
+                    <app-button size="sm" variant="ghost" label="Rollback" (action)="rollbackBlogVersion(v.version)"></app-button>
+                  </div>
+                </div>
+
+                <div *ngIf="blogVersionDetail" class="grid gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                  <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                    Diff vs current (v{{ blogVersionDetail.version }})
+                  </p>
+                  <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-xs whitespace-pre-wrap text-slate-900 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-100">
+                    <ng-container *ngFor="let part of blogDiffParts">
+                      <span
+                        [ngClass]="part.added ? 'bg-emerald-200 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100' : part.removed ? 'bg-rose-200 text-rose-900 dark:bg-rose-900/40 dark:text-rose-100' : ''"
+                        >{{ part.value }}</span
+                      >
+                    </ng-container>
+                  </div>
+                </div>
               </div>
               <p class="text-xs text-slate-500 dark:text-slate-400">
                 Tip: Use the toolbar to format markdown and insert images (uploads go to the post's content images).
@@ -1048,6 +1156,7 @@ export class AdminComponent implements OnInit {
     slug: string;
     baseLang: 'en' | 'ro';
     status: 'draft' | 'published';
+    published_at: string;
     title: string;
     body_markdown: string;
     summary: string;
@@ -1061,6 +1170,7 @@ export class AdminComponent implements OnInit {
     slug: '',
     baseLang: 'en',
     status: 'draft',
+    published_at: '',
     title: '',
     body_markdown: '',
     summary: '',
@@ -1078,6 +1188,7 @@ export class AdminComponent implements OnInit {
     title: '',
     body_markdown: '',
     status: 'draft',
+    published_at: '',
     summary: '',
     tags: '',
     cover_image_url: '',
@@ -1086,6 +1197,12 @@ export class AdminComponent implements OnInit {
   blogMeta: Record<string, any> = {};
   blogImages: { id: string; url: string; alt_text?: string | null }[] = [];
   showBlogPreview = false;
+  useRichBlogEditor = true;
+  blogPreviewUrl: string | null = null;
+  blogPreviewExpiresAt: string | null = null;
+  blogVersions: ContentBlockVersionListItem[] = [];
+  blogVersionDetail: ContentBlockVersionRead | null = null;
+  blogDiffParts: { value: string; added?: boolean; removed?: boolean }[] = [];
 
   assetsForm = { logo_url: '', favicon_url: '', social_image_url: '' };
   assetsMessage: string | null = null;
@@ -1110,6 +1227,7 @@ export class AdminComponent implements OnInit {
 
   constructor(
     private admin: AdminService,
+    private blog: BlogService,
     private toast: ToastService,
     private translate: TranslateService,
     private markdown: MarkdownService
@@ -1573,6 +1691,7 @@ export class AdminComponent implements OnInit {
       slug: '',
       baseLang: 'en',
       status: 'draft',
+      published_at: '',
       title: '',
       body_markdown: '',
       summary: '',
@@ -1592,6 +1711,11 @@ export class AdminComponent implements OnInit {
   closeBlogEditor(): void {
     this.selectedBlogKey = null;
     this.blogImages = [];
+    this.blogPreviewUrl = null;
+    this.blogPreviewExpiresAt = null;
+    this.blogVersions = [];
+    this.blogVersionDetail = null;
+    this.blogDiffParts = [];
     this.resetBlogForm();
   }
 
@@ -1626,6 +1750,7 @@ export class AdminComponent implements OnInit {
     if (Number.isFinite(rt) && rt > 0) {
       meta['reading_time_minutes'] = Math.trunc(rt);
     }
+    const published_at = this.blogCreate.published_at ? new Date(this.blogCreate.published_at).toISOString() : undefined;
 
     try {
       await firstValueFrom(
@@ -1634,6 +1759,7 @@ export class AdminComponent implements OnInit {
           body_markdown: this.blogCreate.body_markdown,
           status: this.blogCreate.status,
           lang: baseLang,
+          published_at,
           meta: Object.keys(meta).length ? meta : undefined
         })
       );
@@ -1678,6 +1804,7 @@ export class AdminComponent implements OnInit {
         if (wantsBase) {
           this.blogForm.status = block.status;
         }
+        this.blogForm.published_at = block.published_at ? this.toLocalDateTime(block.published_at) : '';
         this.blogMeta = block.meta || this.blogMeta || {};
         this.syncBlogMetaToForm(lang);
       },
@@ -1696,12 +1823,18 @@ export class AdminComponent implements OnInit {
     const nextMeta = this.buildBlogMeta(this.blogEditLang);
     const metaChanged = JSON.stringify(nextMeta) !== JSON.stringify(this.blogMeta || {});
     const isBase = this.blogEditLang === this.blogBaseLang;
+    const published_at = isBase
+      ? this.blogForm.published_at
+        ? new Date(this.blogForm.published_at).toISOString()
+        : null
+      : undefined;
     if (isBase) {
       this.admin
         .updateContent(key, {
           title: this.blogForm.title.trim(),
           body_markdown: this.blogForm.body_markdown,
           status: this.blogForm.status as any,
+          published_at,
           meta: nextMeta
         })
         .subscribe({
@@ -1746,6 +1879,91 @@ export class AdminComponent implements OnInit {
         },
         error: () => this.toast.error('Could not save translation')
       });
+  }
+
+  generateBlogPreviewLink(): void {
+    if (!this.selectedBlogKey) return;
+    const slug = this.currentBlogSlug();
+    this.blog.createPreviewToken(slug, { lang: this.blogEditLang }).subscribe({
+      next: (resp) => {
+        this.blogPreviewUrl = resp.url;
+        this.blogPreviewExpiresAt = resp.expires_at;
+        this.toast.success('Preview link ready');
+        void this.copyToClipboard(resp.url).then((ok) => {
+          if (ok) this.toast.info('Copied to clipboard');
+        });
+      },
+      error: () => this.toast.error('Could not generate preview link')
+    });
+  }
+
+  copyBlogPreviewLink(): void {
+    if (!this.blogPreviewUrl) return;
+    void this.copyToClipboard(this.blogPreviewUrl).then((ok) => {
+      if (ok) this.toast.info('Copied to clipboard');
+      else this.toast.error('Could not copy to clipboard');
+    });
+  }
+
+  loadBlogVersions(): void {
+    if (!this.selectedBlogKey) return;
+    this.admin.listContentVersions(this.selectedBlogKey).subscribe({
+      next: (items) => {
+        this.blogVersions = items;
+        this.blogVersionDetail = null;
+        this.blogDiffParts = [];
+      },
+      error: () => this.toast.error('Could not load revisions')
+    });
+  }
+
+  selectBlogVersion(version: number): void {
+    if (!this.selectedBlogKey) return;
+    this.admin.getContentVersion(this.selectedBlogKey, version).subscribe({
+      next: (v) => {
+        this.blogVersionDetail = v;
+        this.blogDiffParts = diffLines(v.body_markdown || '', this.blogForm.body_markdown || '');
+      },
+      error: () => this.toast.error('Could not load version')
+    });
+  }
+
+  rollbackBlogVersion(version: number): void {
+    if (!this.selectedBlogKey) return;
+    const ok = confirm(`Rollback to version ${version}? This will overwrite the current draft.`);
+    if (!ok) return;
+    const key = this.selectedBlogKey;
+    this.admin.rollbackContentVersion(key, version).subscribe({
+      next: () => {
+        this.toast.success('Rolled back');
+        this.reloadContentBlocks();
+        this.loadBlogEditor(key);
+        this.loadBlogVersions();
+      },
+      error: () => this.toast.error('Could not rollback')
+    });
+  }
+
+  private async copyToClipboard(text: string): Promise<boolean> {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        return ok;
+      } catch {
+        return false;
+      }
+    }
   }
 
   renderMarkdown(markdown: string): string {
@@ -1798,7 +2016,7 @@ export class AdminComponent implements OnInit {
     this.updateBlogBody(textarea, next, codeStart, codeStart + selected.length);
   }
 
-  uploadAndInsertBlogImage(textarea: HTMLTextAreaElement, event: Event): void {
+  uploadAndInsertBlogImage(target: HTMLTextAreaElement | RichEditorComponent, event: Event): void {
     if (!this.selectedBlogKey) return;
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -1814,7 +2032,11 @@ export class AdminComponent implements OnInit {
         if (inserted?.url) {
           const alt = file.name.replace(/\.[^.]+$/, '').replace(/[\r\n]+/g, ' ').trim() || 'image';
           const snippet = `![${alt}](${inserted.url})`;
-          this.insertAtCursor(textarea, snippet);
+          if (target instanceof HTMLTextAreaElement) {
+            this.insertAtCursor(target, snippet);
+          } else {
+            target.insertMarkdown(snippet);
+          }
           this.toast.info('Inserted image markdown');
         }
         input.value = '';
@@ -1872,6 +2094,11 @@ export class AdminComponent implements OnInit {
   private loadBlogEditor(key: string): void {
     this.selectedBlogKey = key;
     this.resetBlogForm();
+    this.blogPreviewUrl = null;
+    this.blogPreviewExpiresAt = null;
+    this.blogVersions = [];
+    this.blogVersionDetail = null;
+    this.blogDiffParts = [];
     this.admin.getContent(key).subscribe({
       next: (block) => {
         this.blogBaseLang = (block.lang === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
@@ -1881,6 +2108,7 @@ export class AdminComponent implements OnInit {
           title: block.title,
           body_markdown: block.body_markdown,
           status: block.status,
+          published_at: block.published_at ? this.toLocalDateTime(block.published_at) : '',
           summary: '',
           tags: '',
           cover_image_url: '',
@@ -1888,6 +2116,7 @@ export class AdminComponent implements OnInit {
         };
         this.syncBlogMetaToForm(this.blogEditLang);
         this.blogImages = (block.images || []).map((img) => ({ id: img.id, url: img.url, alt_text: img.alt_text }));
+        this.loadBlogVersions();
       },
       error: () => this.toast.error('Could not load blog post')
     });
@@ -1898,7 +2127,16 @@ export class AdminComponent implements OnInit {
   }
 
   private resetBlogForm(): void {
-    this.blogForm = { title: '', body_markdown: '', status: 'draft', summary: '', tags: '', cover_image_url: '', reading_time_minutes: '' };
+    this.blogForm = {
+      title: '',
+      body_markdown: '',
+      status: 'draft',
+      published_at: '',
+      summary: '',
+      tags: '',
+      cover_image_url: '',
+      reading_time_minutes: ''
+    };
     this.blogMeta = {};
   }
 

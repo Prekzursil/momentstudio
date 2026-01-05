@@ -1,13 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.dependencies import get_session, require_admin
+from app.models.content import ContentBlockVersion
 from app.schemas.content import (
     ContentAuditRead,
     ContentBlockCreate,
     ContentBlockRead,
     ContentBlockUpdate,
+    ContentBlockVersionListItem,
+    ContentBlockVersionRead,
 )
 from app.services import content as content_service
 
@@ -117,3 +121,51 @@ async def admin_list_content_audit(
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
     return block.audits
+
+
+@router.get("/admin/{key}/versions", response_model=list[ContentBlockVersionListItem])
+async def admin_list_content_versions(
+    key: str,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> list[ContentBlockVersionListItem]:
+    block = await content_service.get_block_by_key(session, key)
+    if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+    result = await session.execute(
+        select(ContentBlockVersion)
+        .where(ContentBlockVersion.content_block_id == block.id)
+        .order_by(ContentBlockVersion.version.desc())
+    )
+    return list(result.scalars().all())
+
+
+@router.get("/admin/{key}/versions/{version}", response_model=ContentBlockVersionRead)
+async def admin_get_content_version(
+    key: str,
+    version: int,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> ContentBlockVersionRead:
+    block = await content_service.get_block_by_key(session, key)
+    if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+    result = await session.execute(
+        select(ContentBlockVersion).where(
+            ContentBlockVersion.content_block_id == block.id, ContentBlockVersion.version == version
+        )
+    )
+    row = result.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Version not found")
+    return row
+
+
+@router.post("/admin/{key}/versions/{version}/rollback", response_model=ContentBlockRead)
+async def admin_rollback_content_version(
+    key: str,
+    version: int,
+    session: AsyncSession = Depends(get_session),
+    admin=Depends(require_admin),
+) -> ContentBlockRead:
+    return await content_service.rollback_to_version(session, key=key, version=version, actor_id=admin.id)

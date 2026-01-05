@@ -35,6 +35,9 @@
     "searchCta": "Search",
     "clearFilters": "Clear",
     "minutesRead": "{{minutes}} min read",
+    "preview": {
+      "banner": "Preview mode — this post is not published yet."
+    },
     "errorTitle": "Could not load posts.",
     "errorCopy": "Check your connection and retry.",
     "retry": "Retry",

@@ -21,6 +21,12 @@ class BlogPostListResponse(BaseModel):
     meta: PaginationMeta
 
 
+class BlogPreviewTokenResponse(BaseModel):
+    token: str
+    expires_at: datetime
+    url: str
+
+
 class BlogPostImage(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -3,7 +3,7 @@ import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
-import { Subscription } from 'rxjs';
+import { Subscription, combineLatest } from 'rxjs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 import { AuthService } from '../../core/auth.service';
@@ -33,6 +33,13 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
   template: `
     <app-container classes="py-10 grid gap-6 max-w-4xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
+
+      <div
+        *ngIf="isPreview()"
+        class="rounded-2xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-100"
+      >
+        {{ 'blog.preview.banner' | translate }}
+      </div>
 
       <div class="grid gap-2">
         <h1 class="text-3xl font-semibold text-slate-900 dark:text-slate-50">
@@ -261,8 +268,10 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   commentBody = '';
   submitting = signal<boolean>(false);
   replyTo = signal<BlogComment | null>(null);
+  isPreview = signal<boolean>(false);
 
   private slug = '';
+  private previewToken = '';
   private langSub?: Subscription;
   private routeSub?: Subscription;
   private canonicalEl?: HTMLLinkElement;
@@ -280,8 +289,10 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.routeSub = this.route.params.subscribe((params) => {
+    this.routeSub = combineLatest([this.route.params, this.route.queryParams]).subscribe(([params, query]) => {
       this.slug = params['slug'];
+      this.previewToken = typeof query['preview'] === 'string' ? query['preview'] : '';
+      this.isPreview.set(!!this.previewToken);
       this.load();
     });
     this.langSub = this.translate.onLangChange.subscribe(() => this.load());
@@ -300,7 +311,10 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     this.setCanonical();
 
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-    this.blog.getPost(this.slug, lang).subscribe({
+    const req = this.previewToken
+      ? this.blog.getPreviewPost(this.slug, this.previewToken, lang)
+      : this.blog.getPost(this.slug, lang);
+    req.subscribe({
       next: (post) => {
         this.post.set(post);
         this.bodyHtml.set(this.markdown.render(post.body_markdown));
