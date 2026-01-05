@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, String, func, ForeignKey
+from sqlalchemy import Boolean, DateTime, Enum, String, func, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,6 +24,8 @@ class User(Base):
     avatar_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
     preferred_language: Mapped[str | None] = mapped_column(String(10), nullable=True, default="en")
     email_verified: Mapped[bool] = mapped_column(default=False, nullable=False)
+    notify_blog_comments: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    notify_blog_comment_replies: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     google_sub: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True, index=True)
     google_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     google_picture_url: Mapped[str | None] = mapped_column(String(255), nullable=True)

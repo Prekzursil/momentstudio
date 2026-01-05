@@ -103,6 +103,11 @@ class GoogleCallback(BaseModel):
     state: str
 
 
+class NotificationPreferencesUpdate(BaseModel):
+    notify_blog_comments: bool | None = None
+    notify_blog_comment_replies: bool | None = None
+
+
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=AuthResponse)
 async def register(
     user_in: UserCreate,
@@ -217,6 +222,22 @@ async def update_language(
     session: AsyncSession = Depends(get_session),
 ) -> UserResponse:
     current_user.preferred_language = payload.preferred_language
+    session.add(current_user)
+    await session.commit()
+    await session.refresh(current_user)
+    return UserResponse.model_validate(current_user)
+
+
+@router.patch("/me/notifications", response_model=UserResponse)
+async def update_notification_preferences(
+    payload: NotificationPreferencesUpdate,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    if payload.notify_blog_comments is not None:
+        current_user.notify_blog_comments = bool(payload.notify_blog_comments)
+    if payload.notify_blog_comment_replies is not None:
+        current_user.notify_blog_comment_replies = bool(payload.notify_blog_comment_replies)
     session.add(current_user)
     await session.commit()
     await session.refresh(current_user)

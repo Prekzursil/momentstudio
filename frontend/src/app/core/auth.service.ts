@@ -14,6 +14,8 @@ export interface AuthUser {
   email: string;
   name?: string | null;
   email_verified?: boolean;
+  notify_blog_comments?: boolean;
+  notify_blog_comment_replies?: boolean;
   google_sub?: string | null;
   google_email?: string | null;
   google_picture_url?: string | null;
@@ -99,6 +101,16 @@ export class AuthService {
         this.setUser(user);
       })
     );
+  }
+
+  updateNotificationPreferences(payload: {
+    notify_blog_comments?: boolean | null;
+    notify_blog_comment_replies?: boolean | null;
+  }): Observable<AuthUser> {
+    if (!this.isAuthenticated()) {
+      return of({} as AuthUser);
+    }
+    return this.api.patch<AuthUser>('/auth/me/notifications', payload).pipe(tap((user) => this.setUser(user)));
   }
 
   requestEmailVerification(): Observable<{ detail: string }> {

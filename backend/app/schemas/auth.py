@@ -31,6 +31,8 @@ class UserResponse(BaseModel):
     avatar_url: str | None = None
     preferred_language: str | None = None
     email_verified: bool = False
+    notify_blog_comments: bool = False
+    notify_blog_comment_replies: bool = False
     google_sub: str | None = None
     google_email: str | None = None
     google_picture_url: str | None = None

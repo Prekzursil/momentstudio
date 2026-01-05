@@ -62,17 +62,59 @@ class BlogCommentCreate(BaseModel):
     parent_id: UUID | None = None
 
 
+class BlogCommentFlagCreate(BaseModel):
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class BlogCommentFlagRead(BaseModel):
+    id: UUID
+    user_id: UUID
+    reason: str | None = None
+    created_at: datetime
+
+
 class BlogCommentRead(BaseModel):
     id: UUID
     parent_id: UUID | None = None
     body: str
     is_deleted: bool
+    is_hidden: bool = False
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None = None
+    hidden_at: datetime | None = None
     author: BlogCommentAuthor
 
 
 class BlogCommentListResponse(BaseModel):
     items: list[BlogCommentRead]
     meta: PaginationMeta
+
+
+class BlogCommentAdminRead(BaseModel):
+    id: UUID
+    content_block_id: UUID
+    post_slug: str
+    parent_id: UUID | None = None
+    body: str
+    is_deleted: bool
+    deleted_at: datetime | None = None
+    deleted_by: UUID | None = None
+    is_hidden: bool
+    hidden_at: datetime | None = None
+    hidden_by: UUID | None = None
+    hidden_reason: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    author: BlogCommentAuthor
+    flag_count: int = 0
+    flags: list[BlogCommentFlagRead] = Field(default_factory=list)
+
+
+class BlogCommentAdminListResponse(BaseModel):
+    items: list[BlogCommentAdminRead]
+    meta: PaginationMeta
+
+
+class BlogCommentHideRequest(BaseModel):
+    reason: str | None = Field(default=None, max_length=500)

@@ -1,16 +1,25 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+import sqlalchemy as sa
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.dependencies import get_current_user, require_admin
 from app.core.security import create_content_preview_token, decode_content_preview_token
 from app.db.session import get_session
-from app.models.user import User
+from app.models.blog import BlogComment
+from app.models.content import ContentBlock
+from app.models.user import User, UserRole
 from app.schemas.blog import (
     BlogCommentCreate,
+    BlogCommentFlagCreate,
+    BlogCommentFlagRead,
+    BlogCommentAdminListResponse,
+    BlogCommentAdminRead,
+    BlogCommentHideRequest,
     BlogCommentListResponse,
     BlogCommentRead,
     BlogPostListResponse,
@@ -20,6 +29,7 @@ from app.schemas.blog import (
 from app.schemas.catalog import PaginationMeta
 from app.services import blog as blog_service
 from app.services import content as content_service
+from app.services import email as email_service
 from app.services import og_images
 
 router = APIRouter(prefix="/blog", tags=["blog"])
@@ -148,6 +158,7 @@ async def list_blog_comments(
 async def create_blog_comment(
     slug: str,
     payload: BlogCommentCreate,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> BlogCommentRead:
@@ -161,6 +172,52 @@ async def create_blog_comment(
         body=payload.body,
         parent_id=payload.parent_id,
     )
+    if settings.smtp_enabled:
+        post_url = f"{settings.frontend_origin.rstrip('/')}/blog/{slug}"
+        snippet = (payload.body or "").strip()
+        snippet = (snippet[:400] + "…") if len(snippet) > 400 else snippet
+
+        admins = await session.execute(
+            sa.select(User).where(User.role == UserRole.admin, User.notify_blog_comments.is_(True))
+        )
+        for admin in admins.scalars().all():
+            if not admin.email:
+                continue
+            if admin.id == current_user.id:
+                continue
+            background_tasks.add_task(
+                email_service.send_blog_comment_admin_notification,
+                admin.email,
+                post_title=post.title,
+                post_url=post_url,
+                commenter_name=current_user.name or current_user.email,
+                comment_body=snippet,
+                lang=admin.preferred_language,
+            )
+
+        if payload.parent_id:
+            parent = await session.execute(
+                sa.select(BlogComment)
+                .options(selectinload(BlogComment.author))
+                .where(BlogComment.id == payload.parent_id)
+            )
+            parent_comment = parent.scalar_one_or_none()
+            recipient = parent_comment.author if parent_comment else None
+            if (
+                recipient
+                and recipient.email
+                and recipient.id != current_user.id
+                and recipient.notify_blog_comment_replies
+            ):
+                background_tasks.add_task(
+                    email_service.send_blog_comment_reply_notification,
+                    recipient.email,
+                    post_title=post.title,
+                    post_url=post_url,
+                    replier_name=current_user.name or current_user.email,
+                    comment_body=snippet,
+                    lang=recipient.preferred_language,
+                )
     return BlogCommentRead.model_validate(blog_service.to_comment_read(comment))
 
 
@@ -172,3 +229,64 @@ async def delete_blog_comment(
 ) -> None:
     await blog_service.soft_delete_comment(session, comment_id=comment_id, actor=current_user)
     return None
+
+
+@router.post("/comments/{comment_id}/flag", response_model=BlogCommentFlagRead, status_code=status.HTTP_201_CREATED)
+async def flag_blog_comment(
+    comment_id: uuid.UUID,
+    payload: BlogCommentFlagCreate,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> BlogCommentFlagRead:
+    flag = await blog_service.flag_comment(session, comment_id=comment_id, actor=current_user, reason=payload.reason)
+    return BlogCommentFlagRead.model_validate(blog_service.to_flag_read(flag))
+
+
+@router.get("/admin/comments/flagged", response_model=BlogCommentAdminListResponse)
+async def list_flagged_blog_comments(
+    _: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=50),
+) -> BlogCommentAdminListResponse:
+    items, total_items = await blog_service.list_flagged_comments(session, page=page, limit=limit)
+    total_pages = (total_items + limit - 1) // limit if total_items else 1
+    return BlogCommentAdminListResponse(
+        items=[BlogCommentAdminRead.model_validate(item) for item in items],
+        meta=PaginationMeta(total_items=total_items, total_pages=total_pages, page=page, limit=limit),
+    )
+
+
+@router.post("/admin/comments/{comment_id}/hide", response_model=BlogCommentAdminRead)
+async def hide_blog_comment(
+    comment_id: uuid.UUID,
+    payload: BlogCommentHideRequest,
+    admin_user: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> BlogCommentAdminRead:
+    comment = await blog_service.set_comment_hidden(
+        session, comment_id=comment_id, actor=admin_user, hidden=True, reason=payload.reason
+    )
+    post_key = await session.scalar(sa.select(ContentBlock.key).where(ContentBlock.id == comment.content_block_id))
+    return BlogCommentAdminRead.model_validate(blog_service.to_comment_admin_read(comment, post_key=str(post_key or "")))
+
+
+@router.post("/admin/comments/{comment_id}/unhide", response_model=BlogCommentAdminRead)
+async def unhide_blog_comment(
+    comment_id: uuid.UUID,
+    admin_user: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> BlogCommentAdminRead:
+    comment = await blog_service.set_comment_hidden(session, comment_id=comment_id, actor=admin_user, hidden=False)
+    post_key = await session.scalar(sa.select(ContentBlock.key).where(ContentBlock.id == comment.content_block_id))
+    return BlogCommentAdminRead.model_validate(blog_service.to_comment_admin_read(comment, post_key=str(post_key or "")))
+
+
+@router.post("/admin/comments/{comment_id}/resolve-flags", response_model=dict[str, int])
+async def resolve_blog_comment_flags(
+    comment_id: uuid.UUID,
+    admin_user: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, int]:
+    resolved = await blog_service.resolve_comment_flags(session, comment_id=comment_id, actor=admin_user)
+    return {"resolved": resolved}

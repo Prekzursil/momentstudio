@@ -22,7 +22,7 @@ from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod, Orde
 from app.models.content import ContentBlock, ContentBlockVersion, ContentStatus, ContentImage, ContentAuditLog, ContentBlockTranslation  # noqa: F401
 from app.models.wishlist import WishlistItem  # noqa: F401
 from app.models.webhook import StripeWebhookEvent  # noqa: F401
-from app.models.blog import BlogComment  # noqa: F401
+from app.models.blog import BlogComment, BlogCommentFlag  # noqa: F401
 
 __all__ = [
     "Base",
@@ -59,4 +59,5 @@ __all__ = [
     "WishlistItem",
     "StripeWebhookEvent",
     "BlogComment",
+    "BlogCommentFlag",
 ]

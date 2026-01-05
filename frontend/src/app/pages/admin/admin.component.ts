@@ -26,7 +26,7 @@ import {
   ContentBlockVersionListItem,
   ContentBlockVersionRead
 } from '../../core/admin.service';
-import { BlogService } from '../../core/blog.service';
+import { AdminBlogComment, BlogService } from '../../core/blog.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { firstValueFrom } from 'rxjs';
@@ -931,13 +931,69 @@ import { diffLines } from 'diff';
               <p class="text-xs text-slate-500 dark:text-slate-400">
                 Tip: Use the toolbar to format markdown and insert images (uploads go to the post's content images).
               </p>
-            </div>
-          </section>
+	            </div>
+	          </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.content.title' | translate }}</h2>
-            </div>
+	          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	            <div class="flex items-center justify-between">
+	              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Blog comment moderation</h2>
+	              <app-button size="sm" variant="ghost" label="Refresh" (action)="loadFlaggedComments()"></app-button>
+	            </div>
+	            <div
+	              *ngIf="flaggedCommentsError"
+	              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+	            >
+	              {{ flaggedCommentsError }}
+	            </div>
+	            <div *ngIf="flaggedCommentsLoading()" class="text-sm text-slate-600 dark:text-slate-300">Loading flagged comments…</div>
+	            <div
+	              *ngIf="!flaggedCommentsLoading() && !flaggedCommentsError && flaggedComments().length === 0"
+	              class="text-sm text-slate-500 dark:text-slate-400"
+	            >
+	              No flagged comments right now.
+	            </div>
+	            <div *ngIf="!flaggedCommentsLoading() && flaggedComments().length" class="grid gap-3">
+	              <div *ngFor="let c of flaggedComments()" class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+	                <div class="flex items-start justify-between gap-3">
+	                  <div class="grid gap-0.5">
+	                    <p class="font-semibold text-slate-900 dark:text-slate-50">{{ c.author.name || c.author.id }}</p>
+	                    <p class="text-xs text-slate-500 dark:text-slate-400">
+	                      /blog/{{ c.post_slug }} · {{ c.created_at | date: 'short' }} · {{ c.flag_count }} flags
+	                    </p>
+	                  </div>
+	                  <div class="flex items-center gap-2">
+	                    <a
+	                      class="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
+	                      [attr.href]="'/blog/' + c.post_slug"
+	                      target="_blank"
+	                      rel="noopener"
+	                      (click)="$event.stopPropagation()"
+	                    >
+	                      View
+	                    </a>
+	                    <app-button size="sm" variant="ghost" label="Resolve" (action)="resolveFlags(c)"></app-button>
+	                    <app-button size="sm" variant="ghost" [label]="c.is_hidden ? 'Unhide' : 'Hide'" (action)="toggleHide(c)"></app-button>
+	                    <app-button size="sm" variant="ghost" label="Delete" (action)="adminDeleteComment(c)"></app-button>
+	                  </div>
+	                </div>
+	                <p class="mt-2 text-sm whitespace-pre-line text-slate-700 dark:text-slate-200">
+	                  {{ c.body || '(deleted)' }}
+	                </p>
+	                <div *ngIf="c.flags?.length" class="mt-2 grid gap-1 text-xs text-slate-600 dark:text-slate-300">
+	                  <p class="font-semibold text-slate-900 dark:text-slate-50">Flags</p>
+	                  <div *ngFor="let f of c.flags" class="flex items-center justify-between gap-2">
+	                    <span>{{ f.reason || '—' }}</span>
+	                    <span class="text-slate-500 dark:text-slate-400">{{ f.created_at | date: 'short' }}</span>
+	                  </div>
+	                </div>
+	              </div>
+	            </div>
+	          </section>
+
+	          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	            <div class="flex items-center justify-between">
+	              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.content.title' | translate }}</h2>
+	            </div>
             <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
               <div *ngFor="let c of contentBlocks" class="flex items-center justify-between rounded-lg border border-slate-200 p-3 dark:border-slate-700">
                 <div>
@@ -1203,6 +1259,9 @@ export class AdminComponent implements OnInit {
   blogVersions: ContentBlockVersionListItem[] = [];
   blogVersionDetail: ContentBlockVersionRead | null = null;
   blogDiffParts: { value: string; added?: boolean; removed?: boolean }[] = [];
+  flaggedComments = signal<AdminBlogComment[]>([]);
+  flaggedCommentsLoading = signal<boolean>(false);
+  flaggedCommentsError: string | null = null;
 
   assetsForm = { logo_url: '', favicon_url: '', social_image_url: '' };
   assetsMessage: string | null = null;
@@ -1275,6 +1334,7 @@ export class AdminComponent implements OnInit {
     this.loadAssets();
     this.loadSeo();
     this.loadInfo();
+    this.loadFlaggedComments();
     this.admin.getMaintenance().subscribe({
       next: (m) => {
         this.maintenanceEnabled.set(m.enabled);
@@ -1914,6 +1974,64 @@ export class AdminComponent implements OnInit {
         this.blogDiffParts = [];
       },
       error: () => this.toast.error('Could not load revisions')
+    });
+  }
+
+  loadFlaggedComments(): void {
+    this.flaggedCommentsLoading.set(true);
+    this.flaggedCommentsError = null;
+    this.blog.listFlaggedComments().subscribe({
+      next: (resp) => {
+        this.flaggedComments.set(resp.items || []);
+      },
+      error: () => {
+        this.flaggedComments.set([]);
+        this.flaggedCommentsError = 'Could not load flagged comments.';
+      },
+      complete: () => this.flaggedCommentsLoading.set(false)
+    });
+  }
+
+  resolveFlags(comment: AdminBlogComment): void {
+    this.blog.resolveCommentFlagsAdmin(comment.id).subscribe({
+      next: () => {
+        this.toast.success('Flags resolved');
+        this.loadFlaggedComments();
+      },
+      error: () => this.toast.error('Could not resolve flags')
+    });
+  }
+
+  toggleHide(comment: AdminBlogComment): void {
+    if (comment.is_hidden) {
+      this.blog.unhideCommentAdmin(comment.id).subscribe({
+        next: () => {
+          this.toast.success('Comment unhidden');
+          this.loadFlaggedComments();
+        },
+        error: () => this.toast.error('Could not unhide comment')
+      });
+      return;
+    }
+    const reason = prompt('Hide reason (optional):') || '';
+    this.blog.hideCommentAdmin(comment.id, { reason: reason.trim() || null }).subscribe({
+      next: () => {
+        this.toast.success('Comment hidden');
+        this.loadFlaggedComments();
+      },
+      error: () => this.toast.error('Could not hide comment')
+    });
+  }
+
+  adminDeleteComment(comment: AdminBlogComment): void {
+    const ok = confirm('Delete this comment? This removes its body for everyone.');
+    if (!ok) return;
+    this.blog.deleteComment(comment.id).subscribe({
+      next: () => {
+        this.toast.success('Comment deleted');
+        this.loadFlaggedComments();
+      },
+      error: () => this.toast.error('Could not delete comment')
     });
   }
 
