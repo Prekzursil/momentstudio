@@ -16,15 +16,26 @@ import { AuthService } from '../core/auth.service';
   template: `
     <header class="border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-6">
-        <a routerLink="/" class="flex items-center gap-2 text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-          <span class="h-10 w-10 rounded-full bg-slate-900 text-white grid place-items-center font-bold dark:bg-slate-50 dark:text-slate-900">AA</span>
-          <span>{{ 'app.name' | translate }}</span>
+        <a routerLink="/" class="flex items-center gap-3 min-w-0">
+          <img
+            class="h-10 w-auto max-w-[220px] dark:hidden"
+            src="assets/brand/moment-studio-light.svg"
+            [alt]="'app.name' | translate"
+            loading="eager"
+          />
+          <img
+            class="h-10 w-auto max-w-[220px] hidden dark:block"
+            src="assets/brand/moment-studio-dark.svg"
+            [alt]="'app.name' | translate"
+            loading="eager"
+          />
         </a>
         <nav class="hidden xl:flex items-center gap-6 text-sm font-medium text-slate-700 dark:text-slate-200">
           <a routerLink="/" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.home' | translate }}</a>
           <a routerLink="/blog" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.blog' | translate }}</a>
           <a routerLink="/shop" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.shop' | translate }}</a>
           <a routerLink="/about" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.about' | translate }}</a>
+          <a routerLink="/contact" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.contact' | translate }}</a>
         </nav>
         <form class="hidden lg:flex flex-1 min-w-0 justify-center" (submit)="submitSearch($event)">
           <div class="relative w-full max-w-sm min-w-0">
@@ -165,7 +176,8 @@ export class HeaderComponent {
       { label: 'nav.home', path: '/' },
       { label: 'nav.blog', path: '/blog' },
       { label: 'nav.shop', path: '/shop' },
-      { label: 'nav.about', path: '/about' }
+      { label: 'nav.about', path: '/about' },
+      { label: 'nav.contact', path: '/contact' }
     ];
     if (this.auth.role() === 'admin') {
       links.push({ label: 'nav.admin', path: '/admin' });

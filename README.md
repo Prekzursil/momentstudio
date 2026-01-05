@@ -1,4 +1,4 @@
-# AdrianaArt
+# Moment Studio
 
 A modern e‑commerce site for showcasing and selling handmade / artisanal products (ceramics, decor, textiles, etc.).
 
@@ -89,7 +89,7 @@ You can swap pieces later, but the initial design assumes:
 - Schedule backups (example cron, daily at 3:00):
 
   ```
-  0 3 * * * cd /opt/adrianaart/infra/backup && DATABASE_URL=... ./export_all.sh >> /var/log/adrianaart-backup.log 2>&1
+  0 3 * * * cd /opt/momentstudio/infra/backup && DATABASE_URL=... ./export_all.sh >> /var/log/momentstudio-backup.log 2>&1
   ```
 
 ## 3.2 Running locally vs. prod-like
