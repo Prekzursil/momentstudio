@@ -34,6 +34,10 @@ def test_app() -> Dict[str, object]:
     app.dependency_overrides.clear()
 
 
+def auth_headers(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
 def test_register_and_login_flow(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 
@@ -156,3 +160,60 @@ def test_update_profile_me(test_app: Dict[str, object]) -> None:
     )
     assert cleared.status_code == 200
     assert cleared.json()["phone"] is None
+
+
+def test_change_password_persists_and_updates_login(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    res = client.post(
+        "/api/v1/auth/register",
+        json={"email": "pw@example.com", "password": "oldsecret", "name": "PW"},
+    )
+    assert res.status_code == 201, res.text
+    token = res.json()["tokens"]["access_token"]
+
+    wrong = client.post(
+        "/api/v1/auth/password/change",
+        json={"current_password": "wrong", "new_password": "newsecret"},
+        headers=auth_headers(token),
+    )
+    assert wrong.status_code == 400
+
+    ok = client.post(
+        "/api/v1/auth/password/change",
+        json={"current_password": "oldsecret", "new_password": "newsecret"},
+        headers=auth_headers(token),
+    )
+    assert ok.status_code == 200, ok.text
+
+    old_login = client.post("/api/v1/auth/login", json={"email": "pw@example.com", "password": "oldsecret"})
+    assert old_login.status_code == 401
+
+    new_login = client.post("/api/v1/auth/login", json={"email": "pw@example.com", "password": "newsecret"})
+    assert new_login.status_code == 200, new_login.text
+
+
+def test_update_notification_preferences(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    res = client.post(
+        "/api/v1/auth/register", json={"email": "notify@example.com", "password": "supersecret", "name": "N"}
+    )
+    assert res.status_code == 201, res.text
+    token = res.json()["tokens"]["access_token"]
+
+    patch = client.patch(
+        "/api/v1/auth/me/notifications",
+        json={"notify_blog_comments": True, "notify_marketing": True},
+        headers=auth_headers(token),
+    )
+    assert patch.status_code == 200, patch.text
+    updated = patch.json()
+    assert updated["notify_blog_comments"] is True
+    assert updated["notify_marketing"] is True
+
+    me = client.get("/api/v1/auth/me", headers=auth_headers(token))
+    assert me.status_code == 200, me.text
+    body = me.json()
+    assert body["notify_blog_comments"] is True
+    assert body["notify_marketing"] is True

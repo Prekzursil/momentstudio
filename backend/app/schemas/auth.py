@@ -59,3 +59,10 @@ class PasswordResetConfirm(BaseModel):
 
 class EmailVerificationConfirm(BaseModel):
     token: str
+
+
+class AccountDeletionStatus(BaseModel):
+    requested_at: datetime | None = None
+    scheduled_for: datetime | None = None
+    deleted_at: datetime | None = None
+    cooldown_hours: int

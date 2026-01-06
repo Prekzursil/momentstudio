@@ -25,7 +25,7 @@ import { Router } from '@angular/router';
           height="640"
           loading="lazy"
           decoding="async"
-          sizes="(min-width: 1024px) 320px, (min-width: 768px) 33vw, 50vw"
+          sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw"
         />
         <button
           type="button"

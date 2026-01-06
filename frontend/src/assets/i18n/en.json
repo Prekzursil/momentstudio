@@ -40,8 +40,19 @@
     "notifications": {
       "title": "Notifications",
       "save": "Save",
+      "lastUpdated": "Last updated: {{date}}",
+      "showPreview": "Show preview",
+      "hidePreview": "Hide preview",
+      "communityHeading": "Community",
+      "adminHeading": "Admin alerts",
+      "marketingHeading": "Marketing",
       "replyLabel": "Email me when someone replies to my blog comment.",
       "adminLabel": "Email me when new blog comments are posted (admin).",
+      "marketingLabel": "Email me occasional product updates and news.",
+      "previewTitle": "Email preview",
+      "previewReply": "New reply to your comment on: Example post\\nFrom: Alex\\n\\nThanks for your message!\\n\\nView: https://momentstudio.ro/blog/example",
+      "previewAdmin": "New comment on: Example post\\nFrom: Sam\\n\\nGreat work!\\n\\nReview: https://momentstudio.ro/admin",
+      "previewMarketing": "New collection: Spring ceramics\\nSee what's new: https://momentstudio.ro/shop",
       "saved": "Saved.",
       "saveError": "Could not save notification preferences."
     }

@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 from jose import jwt
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Response, UploadFile, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +20,7 @@ from app.db.session import get_session
 from app.models.user import User
 from app.schemas.auth import (
     AuthResponse,
+    AccountDeletionStatus,
     EmailVerificationConfirm,
     PasswordResetConfirm,
     PasswordResetRequest,
@@ -29,6 +31,7 @@ from app.schemas.auth import (
 from app.schemas.user import UserCreate
 from app.services import auth as auth_service
 from app.services import email as email_service
+from app.services import self_service
 from app.services import storage
 from app.core import metrics
 
@@ -115,6 +118,10 @@ class ProfileUpdate(BaseModel):
     preferred_language: str | None = Field(default=None, pattern="^(en|ro)$")
 
 
+class AccountDeletionRequest(BaseModel):
+    confirm: str = Field(..., min_length=1, max_length=20, description='Type "DELETE" to confirm account deletion')
+
+
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=AuthResponse)
 async def register(
     user_in: UserCreate,
@@ -157,6 +164,11 @@ async def refresh_tokens(
     user = await session.get(User, stored.user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    if getattr(user, "deleted_at", None) is not None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
+        await self_service.execute_account_deletion(session, user)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
     # rotate token
     stored.revoked = True
     stored.revoked_reason = "rotated"
@@ -193,7 +205,7 @@ async def change_password(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
     current_user.hashed_password = security.hash_password(payload.new_password)
     session.add(current_user)
-    await session.flush()
+    await session.commit()
     return {"detail": "Password updated"}
 
 
@@ -220,6 +232,77 @@ async def confirm_email_verification(
 @router.get("/me", response_model=UserResponse)
 async def read_me(current_user: User = Depends(get_current_user)) -> UserResponse:
     return UserResponse.model_validate(current_user)
+
+
+@router.get("/me/export")
+async def export_me(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    data = await self_service.export_user_data(session, current_user)
+    filename = f"moment-studio-export-{current_user.id}.json"
+    return JSONResponse(
+        content=data,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/me/delete/status", response_model=AccountDeletionStatus)
+async def account_delete_status(current_user: User = Depends(get_current_user)) -> AccountDeletionStatus:
+    return AccountDeletionStatus(
+        requested_at=current_user.deletion_requested_at,
+        scheduled_for=current_user.deletion_scheduled_for,
+        deleted_at=current_user.deleted_at,
+        cooldown_hours=settings.account_deletion_cooldown_hours,
+    )
+
+
+@router.post("/me/delete", response_model=AccountDeletionStatus)
+async def request_account_deletion(
+    payload: AccountDeletionRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> AccountDeletionStatus:
+    if payload.confirm.strip().upper() != "DELETE":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Type "DELETE" to confirm')
+    now = datetime.now(timezone.utc)
+    scheduled_for = current_user.deletion_scheduled_for
+    if scheduled_for and scheduled_for.tzinfo is None:
+        scheduled_for = scheduled_for.replace(tzinfo=timezone.utc)
+    if scheduled_for and scheduled_for > now:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Account deletion is already scheduled. Cancel it before scheduling again.",
+        )
+    current_user.deletion_requested_at = now
+    current_user.deletion_scheduled_for = now + timedelta(hours=settings.account_deletion_cooldown_hours)
+    session.add(current_user)
+    await session.commit()
+    await session.refresh(current_user)
+    return AccountDeletionStatus(
+        requested_at=current_user.deletion_requested_at,
+        scheduled_for=current_user.deletion_scheduled_for,
+        deleted_at=current_user.deleted_at,
+        cooldown_hours=settings.account_deletion_cooldown_hours,
+    )
+
+
+@router.post("/me/delete/cancel", response_model=AccountDeletionStatus)
+async def cancel_account_deletion(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> AccountDeletionStatus:
+    current_user.deletion_requested_at = None
+    current_user.deletion_scheduled_for = None
+    session.add(current_user)
+    await session.commit()
+    await session.refresh(current_user)
+    return AccountDeletionStatus(
+        requested_at=current_user.deletion_requested_at,
+        scheduled_for=current_user.deletion_scheduled_for,
+        deleted_at=current_user.deleted_at,
+        cooldown_hours=settings.account_deletion_cooldown_hours,
+    )
 
 
 @router.patch("/me/language", response_model=UserResponse)
@@ -364,6 +447,11 @@ async def google_callback(
 
     existing_sub = await auth_service.get_user_by_google_sub(session, sub)
     if existing_sub:
+        if getattr(existing_sub, "deletion_scheduled_for", None) and self_service.is_deletion_due(existing_sub):
+            await self_service.execute_account_deletion(session, existing_sub)
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+        if getattr(existing_sub, "deleted_at", None) is not None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
         tokens = await auth_service.issue_tokens_for_user(session, existing_sub)
         if response:
             set_refresh_cookie(response, tokens["refresh_token"])

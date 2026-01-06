@@ -43,9 +43,9 @@ async def create_address(session: AsyncSession, user_id, payload: AddressCreate)
     data = payload.model_dump()
     data.update({"country": country, "postal_code": postal_code})
     address = Address(user_id=user_id, **data)
-    session.add(address)
     if payload.is_default_shipping or payload.is_default_billing:
         await _clear_defaults(session, user_id, payload.is_default_shipping, payload.is_default_billing)
+    session.add(address)
     await session.commit()
     await session.refresh(address)
     return address

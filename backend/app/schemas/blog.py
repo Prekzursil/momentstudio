@@ -118,3 +118,35 @@ class BlogCommentAdminListResponse(BaseModel):
 
 class BlogCommentHideRequest(BaseModel):
     reason: str | None = Field(default=None, max_length=500)
+
+
+class BlogMyCommentParentContext(BaseModel):
+    id: UUID
+    author_name: str | None = None
+    snippet: str
+
+
+class BlogMyCommentLastReplyContext(BaseModel):
+    id: UUID
+    author_name: str | None = None
+    snippet: str
+    created_at: datetime
+
+
+class BlogMyCommentRead(BaseModel):
+    id: UUID
+    post_slug: str
+    post_title: str
+    parent_id: UUID | None = None
+    body: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    reply_count: int = 0
+    parent: BlogMyCommentParentContext | None = None
+    last_reply: BlogMyCommentLastReplyContext | None = None
+
+
+class BlogMyCommentListResponse(BaseModel):
+    items: list[BlogMyCommentRead]
+    meta: PaginationMeta

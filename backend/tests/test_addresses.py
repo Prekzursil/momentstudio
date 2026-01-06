@@ -72,3 +72,60 @@ def test_address_validation(test_app: Dict[str, object]) -> None:
         headers=auth_headers(token),
     )
     assert bad.status_code == 400
+
+
+def test_address_default_flags_are_exclusive(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    token = create_user_token(SessionLocal)
+
+    base = {
+        "line1": "123 Main",
+        "city": "Bucharest",
+        "region": "IF",
+        "postal_code": "010203",
+        "country": "ro",
+    }
+
+    first = client.post(
+        "/api/v1/me/addresses",
+        json={**base, "label": "Home", "is_default_shipping": True, "is_default_billing": True},
+        headers=auth_headers(token),
+    )
+    assert first.status_code == 201, first.text
+    first_id = first.json()["id"]
+    assert first.json()["is_default_shipping"] is True
+    assert first.json()["is_default_billing"] is True
+
+    second = client.post(
+        "/api/v1/me/addresses",
+        json={**base, "label": "Work", "line1": "456 Work", "postal_code": "010204", "is_default_shipping": True},
+        headers=auth_headers(token),
+    )
+    assert second.status_code == 201, second.text
+    second_id = second.json()["id"]
+    assert second.json()["is_default_shipping"] is True
+
+    listed = client.get("/api/v1/me/addresses", headers=auth_headers(token))
+    assert listed.status_code == 200, listed.text
+    by_id = {addr["id"]: addr for addr in listed.json()}
+    assert by_id[first_id]["is_default_shipping"] is False
+    assert by_id[first_id]["is_default_billing"] is True
+    assert by_id[second_id]["is_default_shipping"] is True
+    assert by_id[second_id]["is_default_billing"] is False
+
+    third = client.post(
+        "/api/v1/me/addresses",
+        json={**base, "label": "Alt", "line1": "789 Alt", "postal_code": "010205", "is_default_billing": True},
+        headers=auth_headers(token),
+    )
+    assert third.status_code == 201, third.text
+    third_id = third.json()["id"]
+    assert third.json()["is_default_billing"] is True
+
+    listed_again = client.get("/api/v1/me/addresses", headers=auth_headers(token))
+    assert listed_again.status_code == 200
+    by_id2 = {addr["id"]: addr for addr in listed_again.json()}
+    assert by_id2[third_id]["is_default_billing"] is True
+    assert by_id2[first_id]["is_default_billing"] is False

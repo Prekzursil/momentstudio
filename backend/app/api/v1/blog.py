@@ -22,6 +22,8 @@ from app.schemas.blog import (
     BlogCommentHideRequest,
     BlogCommentListResponse,
     BlogCommentRead,
+    BlogMyCommentListResponse,
+    BlogMyCommentRead,
     BlogPostListResponse,
     BlogPostRead,
     BlogPreviewTokenResponse,
@@ -150,6 +152,24 @@ async def list_blog_comments(
     total_pages = (total_items + limit - 1) // limit if total_items else 1
     return BlogCommentListResponse(
         items=[BlogCommentRead.model_validate(blog_service.to_comment_read(c)) for c in comments],
+        meta=PaginationMeta(total_items=total_items, total_pages=total_pages, page=page, limit=limit),
+    )
+
+
+@router.get("/me/comments", response_model=BlogMyCommentListResponse)
+async def list_my_blog_comments(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=50),
+) -> BlogMyCommentListResponse:
+    items, total_items = await blog_service.list_user_comments(
+        session, user_id=current_user.id, lang=lang, page=page, limit=limit
+    )
+    total_pages = (total_items + limit - 1) // limit if total_items else 1
+    return BlogMyCommentListResponse(
+        items=[BlogMyCommentRead.model_validate(item) for item in items],
         meta=PaginationMeta(total_items=total_items, total_pages=total_pages, page=page, limit=limit),
     )
 
