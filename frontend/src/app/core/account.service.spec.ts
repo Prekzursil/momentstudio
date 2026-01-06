@@ -41,5 +41,26 @@ describe('AccountService', () => {
     expect(req.request.body).toEqual({ confirm: 'DELETE' });
     req.flush({ requested_at: null, scheduled_for: '2030-01-01T00:00:00+00:00', deleted_at: null, cooldown_hours: 24 });
   });
-});
 
+  it('getDeletionStatus fetches current deletion status', () => {
+    service.getDeletionStatus().subscribe((resp) => {
+      expect(resp.cooldown_hours).toBe(24);
+      expect(resp.scheduled_for).toBeNull();
+    });
+
+    const req = httpMock.expectOne('/api/v1/auth/me/delete/status');
+    expect(req.request.method).toBe('GET');
+    req.flush({ requested_at: null, scheduled_for: null, deleted_at: null, cooldown_hours: 24 });
+  });
+
+  it('cancelAccountDeletion posts to cancel endpoint', () => {
+    service.cancelAccountDeletion().subscribe((resp) => {
+      expect(resp.scheduled_for).toBeNull();
+    });
+
+    const req = httpMock.expectOne('/api/v1/auth/me/delete/cancel');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({});
+    req.flush({ requested_at: null, scheduled_for: null, deleted_at: null, cooldown_hours: 24 });
+  });
+});
