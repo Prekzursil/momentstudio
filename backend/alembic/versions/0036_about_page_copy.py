@@ -11,6 +11,7 @@ import uuid
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "0036"
@@ -19,8 +20,8 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
 
 
-EN_TITLE = "About momentstudio"
-RO_TITLE = "Despre momentstudio"
+EN_TITLE = "Our story"
+RO_TITLE = "Povestea noastră"
 
 EN_BODY = """We work with clay, wood, and colour—with patience and the joy of making things that never turn out identical.
 Here, mugs, plates, and ceramic pieces take shape—objects that gather the quiet moments of the day and a sense of well-being.
@@ -48,6 +49,7 @@ Tot ce vezi aici e făcut manual, cu grijă, cu atenție și cu bucuria de a cre
 def upgrade() -> None:
     conn = op.get_bind()
     now = datetime.now(timezone.utc)
+    content_status = postgresql.ENUM("draft", "published", name="contentstatus", create_type=False)
 
     content_blocks = sa.table(
         "content_blocks",
@@ -55,7 +57,7 @@ def upgrade() -> None:
         sa.column("key", sa.String()),
         sa.column("title", sa.String()),
         sa.column("body_markdown", sa.Text()),
-        sa.column("status", sa.String()),
+        sa.column("status", content_status),
         sa.column("version", sa.Integer()),
         sa.column("meta", sa.JSON()),
         sa.column("lang", sa.String()),
@@ -77,7 +79,7 @@ def upgrade() -> None:
         sa.column("version", sa.Integer()),
         sa.column("title", sa.String()),
         sa.column("body_markdown", sa.Text()),
-        sa.column("status", sa.String()),
+        sa.column("status", content_status),
         sa.column("meta", sa.JSON()),
         sa.column("lang", sa.String()),
         sa.column("published_at", sa.DateTime(timezone=True)),
@@ -185,4 +187,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Data migration only; no automatic rollback.
     pass
-
