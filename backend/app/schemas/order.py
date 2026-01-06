@@ -23,12 +23,21 @@ class ShippingMethodRead(ShippingMethodBase):
     created_at: datetime
 
 
+class OrderItemProductRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    slug: str
+    name: str
+
+
 class OrderItemRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     product_id: UUID
     variant_id: UUID | None = None
+    product: OrderItemProductRead | None = None
     quantity: int
     shipped_quantity: int
     unit_price: float

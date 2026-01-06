@@ -19,7 +19,10 @@ export interface Address {
 export interface OrderItem {
   id: string;
   product_id: string;
+  variant_id?: string | null;
+  product?: { id: string; slug: string; name: string } | null;
   quantity: number;
+  shipped_quantity?: number;
   unit_price: number;
   subtotal: number;
 }
@@ -28,8 +31,15 @@ export interface Order {
   id: string;
   reference_code?: string | null;
   status: string;
+  payment_retry_count?: number;
   total_amount: number;
+  tax_amount?: number;
+  shipping_amount?: number;
   currency: string;
+  tracking_number?: string | null;
+  shipping_method?: { id: string; name: string } | null;
+  shipping_address_id?: string | null;
+  billing_address_id?: string | null;
   created_at: string;
   updated_at: string;
   items: OrderItem[];
@@ -61,6 +71,14 @@ export class AccountService {
 
   getOrders(): Observable<Order[]> {
     return this.api.get<Order[]>('/orders');
+  }
+
+  reorderOrder(orderId: string): Observable<unknown> {
+    return this.api.post(`/orders/${orderId}/reorder`, {});
+  }
+
+  downloadReceipt(orderId: string): Observable<Blob> {
+    return this.api.getBlob(`/orders/${orderId}/receipt`);
   }
 
   createAddress(payload: AddressCreateRequest): Observable<Address> {

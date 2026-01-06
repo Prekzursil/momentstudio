@@ -106,6 +106,13 @@ class GoogleCallback(BaseModel):
 class NotificationPreferencesUpdate(BaseModel):
     notify_blog_comments: bool | None = None
     notify_blog_comment_replies: bool | None = None
+    notify_marketing: bool | None = None
+
+
+class ProfileUpdate(BaseModel):
+    name: str | None = Field(default=None, max_length=255)
+    phone: str | None = Field(default=None, max_length=32)
+    preferred_language: str | None = Field(default=None, pattern="^(en|ro)$")
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=AuthResponse)
@@ -238,6 +245,29 @@ async def update_notification_preferences(
         current_user.notify_blog_comments = bool(payload.notify_blog_comments)
     if payload.notify_blog_comment_replies is not None:
         current_user.notify_blog_comment_replies = bool(payload.notify_blog_comment_replies)
+    if payload.notify_marketing is not None:
+        current_user.notify_marketing = bool(payload.notify_marketing)
+    session.add(current_user)
+    await session.commit()
+    await session.refresh(current_user)
+    return UserResponse.model_validate(current_user)
+
+
+@router.patch("/me", response_model=UserResponse)
+async def update_me(
+    payload: ProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    data = payload.model_dump(exclude_unset=True)
+    if "name" in data:
+        cleaned = (payload.name or "").strip()
+        current_user.name = cleaned or None
+    if "phone" in data:
+        cleaned = (payload.phone or "").strip()
+        current_user.phone = cleaned or None
+    if "preferred_language" in data and payload.preferred_language is not None:
+        current_user.preferred_language = payload.preferred_language
     session.add(current_user)
     await session.commit()
     await session.refresh(current_user)
@@ -262,7 +292,8 @@ async def upload_avatar(
     )
     current_user.avatar_url = url_path
     session.add(current_user)
-    await session.flush()
+    await session.commit()
+    await session.refresh(current_user)
     return UserResponse.model_validate(current_user)
 
 

@@ -28,11 +28,13 @@ class UserResponse(BaseModel):
     id: UUID
     email: str
     name: str | None = None
+    phone: str | None = None
     avatar_url: str | None = None
     preferred_language: str | None = None
     email_verified: bool = False
     notify_blog_comments: bool = False
     notify_blog_comment_replies: bool = False
+    notify_marketing: bool = False
     google_sub: str | None = None
     google_email: str | None = None
     google_picture_url: str | None = None

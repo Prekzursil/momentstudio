@@ -26,6 +26,11 @@ export class ApiService {
     return this.http.delete<T>(`${this.baseUrl}${path}`, { headers });
   }
 
+  getBlob(path: string, params?: Record<string, string | number | boolean | string[] | number[] | undefined>, headers?: Record<string, string>): Observable<Blob> {
+    const httpParams = this.buildParams(params);
+    return this.http.get(`${this.baseUrl}${path}`, { params: httpParams, headers, responseType: 'blob' as const });
+  }
+
   private buildParams(params?: Record<string, string | number | boolean | string[] | number[] | undefined>): HttpParams {
     let httpParams = new HttpParams();
     if (!params) return httpParams;

@@ -7,7 +7,7 @@ import { ToastComponent } from './shared/toast.component';
 import { ToastService } from './core/toast.service';
 import { ThemeService, ThemePreference } from './core/theme.service';
 import { TranslateService } from '@ngx-translate/core';
-import { AuthService } from './core/auth.service';
+import { LanguageService } from './core/language.service';
 
 @Component({
   selector: 'app-root',
@@ -18,7 +18,7 @@ import { AuthService } from './core/auth.service';
     <div class="min-h-screen flex flex-col bg-gradient-to-b from-slate-50 to-white text-slate-900 dark:from-slate-950 dark:to-slate-900 dark:text-slate-50 transition-colors">
       <app-header
         [themePreference]="preference()"
-        [language]="language"
+        [language]="language()"
         (themeChange)="onThemeChange($event)"
         (languageChange)="onLanguageChange($event)"
       ></app-header>
@@ -33,19 +33,15 @@ import { AuthService } from './core/auth.service';
 export class AppComponent {
   toasts = this.toast.messages();
   preference = this.theme.preference();
-  language = 'en';
+  language = this.lang.language;
 
   constructor(
     private toast: ToastService,
     private theme: ThemeService,
     private translate: TranslateService,
-    private auth: AuthService
+    private lang: LanguageService
   ) {
-    const savedLang = typeof localStorage !== 'undefined' ? localStorage.getItem('lang') : null;
-    const userLang = this.auth.user()?.preferred_language;
-    const browserLang = this.translate.getBrowserLang() ?? 'en';
-    this.language = userLang || savedLang || (browserLang === 'ro' ? 'ro' : 'en');
-    this.translate.use(this.language);
+    // Language is handled by LanguageService (localStorage + preferred_language + browser fallback).
   }
 
   onThemeChange(pref: ThemePreference): void {
@@ -55,19 +51,8 @@ export class AppComponent {
   }
 
   onLanguageChange(lang: string): void {
-    this.language = lang;
-    this.translate.use(lang);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('lang', lang);
-    }
-    if (this.auth.isAuthenticated()) {
-      this.auth.updatePreferredLanguage(lang).subscribe({
-        error: () =>
-          this.toast.error(
-            this.translate.instant('auth.languageNotSaved'),
-            this.translate.instant('auth.languageNotSavedDetail')
-          )
-      });
+    if (lang === 'en' || lang === 'ro') {
+      this.lang.setLanguage(lang);
     }
   }
 }

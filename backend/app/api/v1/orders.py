@@ -332,6 +332,27 @@ async def get_order(order_id: UUID, current_user=Depends(get_current_user), sess
     return order
 
 
+@router.get("/{order_id}/receipt")
+async def download_receipt(
+    order_id: UUID,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    order = await order_service.get_order(session, current_user.id, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    ref = order.reference_code or str(order.id)
+    filename = f"receipt-{ref}.pdf"
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    content = (
+        f"Receipt for order {ref}\n"
+        f"Status: {order.status}\n"
+        f"Total: {order.total_amount} {order.currency}\n"
+        f"Items: {len(order.items)}\n"
+    )
+    return PlainTextResponse(content, media_type="application/pdf", headers=headers)
+
+
 @router.post("/{order_id}/reorder", response_model=CartRead)
 async def reorder_order(
     order_id: UUID,

@@ -16,8 +16,11 @@ import { ApiService } from '../../core/api.service';
 import { appConfig } from '../../core/app-config';
 import { WishlistService } from '../../core/wishlist.service';
 import { ProductCardComponent } from '../../shared/product-card.component';
-import { ThemeMode, ThemeService } from '../../core/theme.service';
+import { ThemeMode, ThemePreference, ThemeService } from '../../core/theme.service';
 import { TranslateModule } from '@ngx-translate/core';
+import { SkeletonComponent } from '../../shared/skeleton.component';
+import { LanguageService } from '../../core/language.service';
+import { CartStore } from '../../core/cart.store';
 
 @Component({
   selector: 'app-account',
@@ -32,7 +35,8 @@ import { TranslateModule } from '@ngx-translate/core';
     ButtonComponent,
     LocalizedCurrencyPipe,
     AddressFormComponent,
-    ProductCardComponent
+    ProductCardComponent,
+    SkeletonComponent
   ],
   template: `
     <app-container classes="py-10 grid gap-6">
@@ -60,32 +64,152 @@ import { TranslateModule } from '@ngx-translate/core';
           </form>
           <p *ngIf="verificationStatus" class="text-xs text-amber-800 dark:text-amber-200">{{ verificationStatus }}</p>
         </div>
-        <header class="flex items-center justify-between">
-          <div>
+        <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div class="min-w-0">
             <p class="text-sm text-slate-500 dark:text-slate-400">Signed in as</p>
-            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ profile()?.email || '...' }}</h1>
+            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50 truncate">{{ profile()?.email || '...' }}</h1>
           </div>
-          <app-button routerLink="/account/password" variant="ghost" label="Change password"></app-button>
+          <div class="flex flex-wrap items-center gap-2">
+            <app-button routerLink="/account/password" variant="ghost" label="Change password"></app-button>
+            <app-button variant="ghost" label="Sign out" (action)="signOut()"></app-button>
+          </div>
         </header>
 
-        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <section
+          id="overview"
+          class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+        >
           <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Profile</h2>
-            <app-button size="sm" variant="ghost" label="Save"></app-button>
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Overview</h2>
+            <span class="text-xs text-slate-500 dark:text-slate-400">Quick links</span>
           </div>
-          <div class="flex items-center gap-4">
-            <img [src]="avatar || placeholderAvatar" alt="avatar" class="h-16 w-16 rounded-full object-cover border border-slate-200 dark:border-slate-800" />
-            <label class="text-sm text-indigo-600 font-medium cursor-pointer dark:text-indigo-300">
-              Upload avatar
-              <input type="file" class="hidden" accept="image/*" (change)="onAvatarChange($event)" />
-            </label>
-        </div>
-        <p class="text-sm text-slate-700 dark:text-slate-200">Name: {{ profile()?.name || 'Not set' }}</p>
-        <p class="text-sm text-slate-700 dark:text-slate-200">Email: {{ profile()?.email || '...' }}</p>
-        <p class="text-sm text-slate-600 dark:text-slate-300">Session timeout: 30m. <a class="text-indigo-600 dark:text-indigo-300" (click)="signOut()">Sign out</a></p>
+          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <a
+              href="#orders"
+              class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-slate-700"
+            >
+              <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Orders</p>
+              <p class="mt-1 font-semibold text-slate-900 dark:text-slate-50">{{ lastOrderLabel() }}</p>
+              <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ lastOrderSubcopy() }}</p>
+            </a>
+            <a
+              href="#addresses"
+              class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-slate-700"
+            >
+              <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Addresses</p>
+              <p class="mt-1 font-semibold text-slate-900 dark:text-slate-50">{{ defaultAddressLabel() }}</p>
+              <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ defaultAddressSubcopy() }}</p>
+            </a>
+            <a
+              href="#wishlist"
+              class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-slate-700"
+            >
+              <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Wishlist</p>
+              <p class="mt-1 font-semibold text-slate-900 dark:text-slate-50">{{ wishlistCountLabel() }}</p>
+              <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Saved items ready for later.</p>
+            </a>
+            <a
+              href="#notifications"
+              class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-slate-700"
+            >
+              <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Notifications</p>
+              <p class="mt-1 font-semibold text-slate-900 dark:text-slate-50">{{ notificationsLabel() }}</p>
+              <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Control email updates.</p>
+            </a>
+            <a
+              href="#security"
+              class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-slate-700"
+            >
+              <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Security</p>
+              <p class="mt-1 font-semibold text-slate-900 dark:text-slate-50">{{ securityLabel() }}</p>
+              <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Password, Google link, verification.</p>
+            </a>
+          </div>
         </section>
 
-        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <section
+          id="profile"
+          class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+        >
+          <div class="flex items-center justify-between">
+            <div class="grid gap-1">
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Profile</h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Profile completeness: {{ profileCompleteness().completed }}/{{ profileCompleteness().total }} ({{ profileCompleteness().percent }}%)
+              </p>
+            </div>
+            <app-button size="sm" variant="ghost" label="Save" [disabled]="savingProfile" (action)="saveProfile()"></app-button>
+          </div>
+          <div class="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+            <div class="h-2 rounded-full bg-indigo-600" [style.width.%]="profileCompleteness().percent"></div>
+          </div>
+          <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+            <img
+              [src]="avatar || profile()?.avatar_url || placeholderAvatar"
+              alt="avatar"
+              class="h-16 w-16 rounded-full object-cover border border-slate-200 dark:border-slate-800"
+            />
+            <div class="flex flex-wrap items-center gap-3">
+              <label class="text-sm text-indigo-600 font-medium cursor-pointer dark:text-indigo-300">
+                Upload avatar
+                <input type="file" class="hidden" accept="image/*" (change)="onAvatarChange($event)" />
+              </label>
+              <span class="text-xs text-slate-500 dark:text-slate-400">JPG/PNG/WebP up to 5MB</span>
+            </div>
+          </div>
+
+          <div class="grid gap-3 sm:grid-cols-2">
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              Display name
+              <input
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                name="profileName"
+                autocomplete="name"
+                [(ngModel)]="profileName"
+              />
+            </label>
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              Phone
+              <input
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                name="profilePhone"
+                autocomplete="tel"
+                placeholder="+40723204204"
+                [(ngModel)]="profilePhone"
+              />
+            </label>
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              Preferred language
+              <select
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                name="profileLanguage"
+                [(ngModel)]="profileLanguage"
+              >
+                <option value="en">EN</option>
+                <option value="ro">RO</option>
+              </select>
+            </label>
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              Theme
+              <select
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                name="profileTheme"
+                [(ngModel)]="profileThemePreference"
+              >
+                <option value="system">System</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
+            </label>
+          </div>
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            Session timeout: 30m. Your theme is saved on this device; language is saved to your profile when signed in.
+          </p>
+          <p *ngIf="profileError" class="text-sm text-rose-700 dark:text-rose-300">{{ profileError }}</p>
+          <p *ngIf="profileSaved" class="text-sm text-emerald-700 dark:text-emerald-300">Saved.</p>
+        </section>
+
+        <section id="notifications" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <div class="flex items-center justify-between">
             <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'account.notifications.title' | translate }}</h2>
             <app-button
@@ -114,7 +238,7 @@ import { TranslateModule } from '@ngx-translate/core';
           </div>
         </section>
 
-        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <section id="security" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <div class="flex items-center justify-between">
             <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Connected accounts</h2>
             <span
@@ -142,7 +266,7 @@ import { TranslateModule } from '@ngx-translate/core';
           </div>
         </section>
 
-        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <section id="addresses" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <div class="flex items-center justify-between">
             <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Addresses</h2>
             <app-button size="sm" variant="ghost" label="Add address" (action)="openAddressForm()"></app-button>
@@ -162,7 +286,21 @@ import { TranslateModule } from '@ngx-translate/core';
                 <span *ngIf="addr.is_default_shipping" class="rounded-full bg-slate-100 px-2 py-0.5 dark:bg-slate-800">Default shipping</span>
                 <span *ngIf="addr.is_default_billing" class="rounded-full bg-slate-100 px-2 py-0.5 dark:bg-slate-800">Default billing</span>
               </div>
-              <div class="flex gap-2">
+              <div class="flex flex-wrap gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  label="Default shipping"
+                  *ngIf="!addr.is_default_shipping"
+                  (action)="setDefaultShipping(addr)"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  label="Default billing"
+                  *ngIf="!addr.is_default_billing"
+                  (action)="setDefaultBilling(addr)"
+                ></app-button>
                 <app-button size="sm" variant="ghost" label="Edit" (action)="editAddress(addr)"></app-button>
                 <app-button size="sm" variant="ghost" label="Remove" (action)="removeAddress(addr.id)"></app-button>
               </div>
@@ -173,51 +311,155 @@ import { TranslateModule } from '@ngx-translate/core';
           </div>
         </section>
 
-		        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-		          <div class="flex items-center justify-between">
-		            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Orders</h2>
-		            <a routerLink="/shop" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">Shop new items</a>
-	          </div>
-	          <div class="flex items-center gap-3 text-sm">
-	            <label class="flex items-center gap-1">
-	              Status
-	              <select class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="orderFilter" (change)="filterOrders()">
-	                <option value="">All</option>
-	                <option value="pending">Pending</option>
-	                <option value="paid">Paid</option>
-	                <option value="shipped">Shipped</option>
-	                <option value="cancelled">Cancelled</option>
-	                <option value="refunded">Refunded</option>
-	              </select>
-	            </label>
-	          </div>
-	          <div *ngIf="pagedOrders().length === 0" class="border border-dashed border-slate-200 rounded-xl p-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
-	            No orders yet.
-	          </div>
-	          <div *ngFor="let order of pagedOrders()" class="rounded-lg border border-slate-200 p-3 grid gap-1 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200">
-	            <div class="flex items-center justify-between">
-	              <span class="font-semibold text-slate-900 dark:text-slate-50">Order #{{ order.reference_code || order.id }}</span>
-	              <span class="text-xs rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-800">{{ order.status }}</span>
-	            </div>
-	            <span>{{ order.created_at | date: 'mediumDate' }}</span>
-	            <span class="font-semibold text-slate-900 dark:text-slate-50">{{ order.total_amount | localizedCurrency : order.currency || 'USD' }}</span>
-	          </div>
-	          <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200" *ngIf="pagedOrders().length">
-	            <span>Page {{ page }} / {{ totalPages }}</span>
-	            <div class="flex gap-2">
-	              <app-button size="sm" variant="ghost" label="Prev" [disabled]="page === 1" (action)="prevPage()"></app-button>
-	              <app-button
-                size="sm"
-                variant="ghost"
-                label="Next"
-                [disabled]="page === totalPages"
-                (action)="nextPage()"
-              ></app-button>
-            </div>
-	          </div>
-		        </section>
+        <section id="orders" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Orders</h2>
+            <a routerLink="/shop" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">Shop new items</a>
+          </div>
 
-		        <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <div class="flex flex-wrap items-center gap-3 text-sm">
+            <label class="flex items-center gap-2">
+              <span class="text-slate-600 dark:text-slate-300">Status</span>
+              <select
+                class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                [(ngModel)]="orderFilter"
+                (change)="filterOrders()"
+              >
+                <option value="">All</option>
+                <option value="pending">Pending</option>
+                <option value="paid">Paid</option>
+                <option value="shipped">Shipped</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="refunded">Refunded</option>
+              </select>
+            </label>
+          </div>
+
+          <div
+            *ngIf="pagedOrders().length === 0"
+            class="border border-dashed border-slate-200 rounded-xl p-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300 grid gap-2"
+          >
+            <p>No orders yet.</p>
+            <a routerLink="/shop" class="text-indigo-600 dark:text-indigo-300 font-medium">Browse products</a>
+          </div>
+
+          <details
+            *ngFor="let order of pagedOrders()"
+            class="rounded-lg border border-slate-200 p-3 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200"
+          >
+            <summary
+              class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden"
+            >
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-semibold text-slate-900 dark:text-slate-50">Order #{{ order.reference_code || order.id }}</span>
+                  <span class="text-xs rounded-full px-2 py-1" [ngClass]="orderStatusChipClass(order.status)">{{ order.status }}</span>
+                </div>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ order.created_at | date: 'mediumDate' }} · {{ order.items.length }} item{{ order.items.length === 1 ? '' : 's' }}
+                </p>
+              </div>
+              <div class="text-right">
+                <p class="font-semibold text-slate-900 dark:text-slate-50">{{ order.total_amount | localizedCurrency : order.currency || 'USD' }}</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Updated {{ order.updated_at | date: 'mediumDate' }}</p>
+              </div>
+            </summary>
+
+            <div class="mt-4 grid gap-4">
+              <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <span class="text-slate-500 dark:text-slate-400">Tracking</span>
+                  <a
+                    *ngIf="order.tracking_number"
+                    class="text-indigo-600 dark:text-indigo-300 font-medium"
+                    [href]="trackingUrl(order.tracking_number)"
+                    target="_blank"
+                    rel="noopener"
+                    >{{ order.tracking_number }}</a
+                  >
+                  <span *ngIf="!order.tracking_number" class="text-slate-600 dark:text-slate-300">Not available</span>
+                </div>
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <span class="text-slate-500 dark:text-slate-400">Shipping</span>
+                  <span>{{ order.shipping_method?.name || '—' }}</span>
+                </div>
+              </div>
+
+              <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Items</p>
+                <div class="mt-2 grid gap-2">
+                  <div *ngFor="let item of order.items" class="flex items-start justify-between gap-4">
+                    <div class="min-w-0">
+                      <a
+                        *ngIf="item.product?.slug"
+                        [routerLink]="['/products', item.product.slug]"
+                        class="font-medium text-slate-900 dark:text-slate-50 hover:underline"
+                        >{{ item.product?.name }}</a
+                      >
+                      <p *ngIf="!item.product?.slug" class="font-medium text-slate-900 dark:text-slate-50 truncate">
+                        {{ item.product?.name || item.product_id }}
+                      </p>
+                      <p class="text-xs text-slate-500 dark:text-slate-400">Qty {{ item.quantity }}</p>
+                    </div>
+                    <div class="text-right text-sm font-medium text-slate-900 dark:text-slate-50">
+                      {{ item.subtotal | localizedCurrency : order.currency || 'USD' }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div class="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700">
+                  <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Totals</p>
+                  <div class="mt-2 grid gap-1 text-slate-700 dark:text-slate-200">
+                    <div class="flex items-center justify-between">
+                      <span class="text-slate-500 dark:text-slate-400">Tax</span>
+                      <span>{{ (order.tax_amount || 0) | localizedCurrency : order.currency || 'USD' }}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-slate-500 dark:text-slate-400">Shipping</span>
+                      <span>{{ (order.shipping_amount || 0) | localizedCurrency : order.currency || 'USD' }}</span>
+                    </div>
+                    <div class="flex items-center justify-between font-semibold text-slate-900 dark:text-slate-50 pt-1">
+                      <span>Total</span>
+                      <span>{{ order.total_amount | localizedCurrency : order.currency || 'USD' }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700">
+                  <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Actions</p>
+                  <div class="mt-2 flex flex-wrap gap-2">
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      label="Reorder"
+                      [disabled]="reorderingOrderId === order.id"
+                      (action)="reorder(order)"
+                    ></app-button>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      label="Receipt (PDF)"
+                      [disabled]="downloadingReceiptId === order.id"
+                      (action)="downloadReceipt(order)"
+                    ></app-button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200" *ngIf="pagedOrders().length">
+            <span>Page {{ page }} / {{ totalPages }}</span>
+            <div class="flex gap-2">
+              <app-button size="sm" variant="ghost" label="Prev" [disabled]="page === 1" (action)="prevPage()"></app-button>
+              <app-button size="sm" variant="ghost" label="Next" [disabled]="page === totalPages" (action)="nextPage()"></app-button>
+            </div>
+          </div>
+        </section>
+
+		        <section id="wishlist" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
 		          <div class="flex items-center justify-between">
 		            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Wishlist</h2>
 		            <a routerLink="/shop" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">Browse products</a>
@@ -237,7 +479,7 @@ import { TranslateModule } from '@ngx-translate/core';
 		          <div class="flex items-center justify-between">
 		            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Payment methods</h2>
 		            <div class="flex gap-2 items-center">
-              <app-button size="sm" variant="ghost" label="Add card" (action)="startAddCard()"></app-button>
+              <app-button size="sm" variant="ghost" label="Add card" (action)="addCard()"></app-button>
               <app-button size="sm" label="Save card" (action)="confirmCard()" [disabled]="!cardReady || savingCard"></app-button>
             </div>
           </div>
@@ -269,7 +511,11 @@ import { TranslateModule } from '@ngx-translate/core';
       </div>
       </ng-container>
       <ng-template #loadingTpl>
-        <div class="text-sm text-slate-600 dark:text-slate-300">Loading your account...</div>
+        <div class="grid gap-4">
+          <app-skeleton height="28px" width="40%"></app-skeleton>
+          <app-skeleton height="140px"></app-skeleton>
+          <app-skeleton height="140px"></app-skeleton>
+        </div>
       </ng-template>
     </app-container>
   `
@@ -325,15 +571,27 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   savingNotifications = false;
   notificationsMessage: string | null = null;
   notificationsError: string | null = null;
+  notifyMarketing = false;
+  savingProfile = false;
+  profileSaved = false;
+  profileError: string | null = null;
+  profileName = '';
+  profilePhone = '';
+  profileLanguage: 'en' | 'ro' = 'en';
+  profileThemePreference: ThemePreference = 'system';
+  reorderingOrderId: string | null = null;
+  downloadingReceiptId: string | null = null;
 
   constructor(
     private toast: ToastService,
     private auth: AuthService,
     private account: AccountService,
+    private cart: CartStore,
     private router: Router,
     private api: ApiService,
     public wishlist: WishlistService,
-    private theme: ThemeService
+    private theme: ThemeService,
+    private lang: LanguageService
   ) {
     this.computeTotalPages();
     this.stripeThemeEffect = effect(() => {
@@ -371,8 +629,14 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
         this.emailVerified.set(Boolean(profile?.email_verified));
         this.notifyBlogComments = Boolean(profile?.notify_blog_comments);
         this.notifyBlogCommentReplies = Boolean(profile?.notify_blog_comment_replies);
+        this.notifyMarketing = Boolean(profile?.notify_marketing);
         this.addresses.set(addresses);
         this.orders.set(orders);
+        this.avatar = profile.avatar_url ?? null;
+        this.profileName = profile.name ?? '';
+        this.profilePhone = profile.phone ?? '';
+        this.profileLanguage = (profile.preferred_language === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
+        this.profileThemePreference = (this.theme.preference()() ?? 'system') as ThemePreference;
         this.computeTotalPages();
       },
       error: () => {
@@ -406,6 +670,64 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.page > 1) this.page -= 1;
   }
 
+  orderStatusChipClass(status: string): string {
+    const styles: Record<string, string> = {
+      pending: 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-100',
+      paid: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100',
+      shipped: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-100',
+      cancelled: 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-100',
+      refunded: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'
+    };
+    return styles[status] || styles['refunded'];
+  }
+
+  trackingUrl(trackingNumber: string): string {
+    const trimmed = (trackingNumber || '').trim();
+    if (!trimmed) return '';
+    return `https://t.17track.net/en#nums=${encodeURIComponent(trimmed)}`;
+  }
+
+  reorder(order: Order): void {
+    if (this.reorderingOrderId) return;
+    this.reorderingOrderId = order.id;
+    this.account.reorderOrder(order.id).subscribe({
+      next: () => {
+        this.cart.loadFromBackend();
+        this.toast.success('Added items to cart');
+        void this.router.navigateByUrl('/cart');
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Could not reorder.';
+        this.toast.error(message);
+      },
+      complete: () => (this.reorderingOrderId = null)
+    });
+  }
+
+  downloadReceipt(order: Order): void {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    if (this.downloadingReceiptId) return;
+    this.downloadingReceiptId = order.id;
+    this.account.downloadReceipt(order.id).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `receipt-${order.reference_code || order.id}.pdf`;
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Could not download receipt.';
+        this.toast.error(message);
+      },
+      complete: () => (this.downloadingReceiptId = null)
+    });
+  }
+
   openAddressForm(existing?: Address): void {
     this.showAddressForm = true;
     this.editingAddressId = existing?.id ?? null;
@@ -432,7 +754,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
       this.account.updateAddress(this.editingAddressId, payload).subscribe({
         next: (addr) => {
           this.toast.success('Address updated');
-          this.addresses.set(this.addresses().map((a) => (a.id === this.editingAddressId ? addr : a)));
+          this.upsertAddress(addr);
           this.closeAddressForm();
         },
         error: (err) => this.toast.error(err?.error?.detail || 'Could not update address.')
@@ -441,7 +763,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
       this.account.createAddress(payload).subscribe({
         next: (addr) => {
           this.toast.success('Address added');
-          this.addresses.set([...this.addresses(), addr]);
+          this.upsertAddress(addr);
           this.closeAddressForm();
         },
         error: (err) => this.toast.error(err?.error?.detail || 'Could not add address.')
@@ -462,6 +784,40 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
       },
       error: () => this.toast.error('Could not remove address.')
     });
+  }
+
+  setDefaultShipping(addr: Address): void {
+    this.account.updateAddress(addr.id, { is_default_shipping: true }).subscribe({
+      next: (updated) => {
+        this.upsertAddress(updated);
+        this.toast.success('Default shipping updated');
+      },
+      error: (err) => this.toast.error(err?.error?.detail || 'Could not update default shipping.')
+    });
+  }
+
+  setDefaultBilling(addr: Address): void {
+    this.account.updateAddress(addr.id, { is_default_billing: true }).subscribe({
+      next: (updated) => {
+        this.upsertAddress(updated);
+        this.toast.success('Default billing updated');
+      },
+      error: (err) => this.toast.error(err?.error?.detail || 'Could not update default billing.')
+    });
+  }
+
+  private upsertAddress(next: Address): void {
+    const current = this.addresses();
+    const exists = current.some((a) => a.id === next.id);
+    const merged = exists ? current.map((a) => (a.id === next.id ? next : a)) : [...current, next];
+
+    const normalized = merged.map((a) => ({
+      ...a,
+      is_default_shipping: next.is_default_shipping ? a.id === next.id : a.is_default_shipping,
+      is_default_billing: next.is_default_billing ? a.id === next.id : a.is_default_billing
+    }));
+
+    this.addresses.set(normalized);
   }
 
   addCard(): void {
@@ -543,6 +899,101 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
 
   isAdmin(): boolean {
     return this.auth.role() === 'admin' || this.profile()?.role === 'admin';
+  }
+
+  profileCompleteness(): { completed: number; total: number; percent: number } {
+    const total = 5;
+    let completed = 0;
+
+    if (this.profileName.trim()) completed += 1;
+    if (this.profilePhone.trim()) completed += 1;
+    if (this.avatar || this.profile()?.avatar_url) completed += 1;
+    if (this.profileLanguage === 'en' || this.profileLanguage === 'ro') completed += 1;
+    if (this.emailVerified()) completed += 1;
+
+    return {
+      completed,
+      total,
+      percent: Math.round((completed / total) * 100)
+    };
+  }
+
+  saveProfile(): void {
+    if (!this.auth.isAuthenticated()) return;
+    this.savingProfile = true;
+    this.profileSaved = false;
+    this.profileError = null;
+
+    const name = this.profileName.trim();
+    const phone = this.profilePhone.trim();
+    const payload = {
+      name: name ? name : null,
+      phone: phone ? phone : null,
+      preferred_language: this.profileLanguage
+    };
+
+    this.theme.setPreference(this.profileThemePreference);
+    this.lang.setLanguage(this.profileLanguage, { syncBackend: false });
+
+    this.auth.updateProfile(payload).subscribe({
+      next: (user) => {
+        this.profile.set(user);
+        this.profileName = user.name ?? '';
+        this.profilePhone = user.phone ?? '';
+        this.profileLanguage = (user.preferred_language === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
+        this.avatar = user.avatar_url ?? this.avatar;
+        this.profileSaved = true;
+        this.toast.success('Profile saved');
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Could not save profile.';
+        this.profileError = message;
+        this.toast.error(message);
+      },
+      complete: () => (this.savingProfile = false)
+    });
+  }
+
+  lastOrderLabel(): string {
+    const order = this.lastOrder();
+    if (!order) return 'No orders yet';
+    return `#${order.reference_code || order.id} · ${order.status}`;
+  }
+
+  lastOrderSubcopy(): string {
+    const order = this.lastOrder();
+    if (!order) return 'Your recent orders will appear here.';
+    const when = order.created_at ? new Date(order.created_at).toLocaleDateString() : '';
+    return `${this.formatMoney(order.total_amount, order.currency)}${when ? ` · ${when}` : ''}`;
+  }
+
+  defaultAddressLabel(): string {
+    const addr = this.defaultShippingAddress();
+    if (!addr) return 'No addresses yet';
+    return addr.label || 'Default shipping';
+  }
+
+  defaultAddressSubcopy(): string {
+    const addr = this.defaultShippingAddress();
+    if (!addr) return 'Add a shipping address for faster checkout.';
+    const line = [addr.line1, addr.city].filter(Boolean).join(', ');
+    return line || 'Saved address';
+  }
+
+  wishlistCountLabel(): string {
+    const count = this.wishlist.items().length;
+    return `${count} saved item${count === 1 ? '' : 's'}`;
+  }
+
+  notificationsLabel(): string {
+    const enabled = [this.notifyBlogCommentReplies, this.notifyBlogComments, this.notifyMarketing].filter(Boolean).length;
+    return enabled ? `${enabled} enabled` : 'All off';
+  }
+
+  securityLabel(): string {
+    const verified = this.emailVerified() ? 'Email verified' : 'Email unverified';
+    const google = this.googleEmail() ? 'Google linked' : 'Google unlinked';
+    return `${verified} · ${google}`;
   }
 
   saveNotifications(): void {
@@ -750,5 +1201,25 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
         this.toast.error(message);
       }
     });
+  }
+
+  private lastOrder(): Order | null {
+    const orders = this.orders();
+    if (!orders.length) return null;
+    return [...orders].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
+  }
+
+  private defaultShippingAddress(): Address | null {
+    const addresses = this.addresses();
+    if (!addresses.length) return null;
+    return addresses.find((a) => a.is_default_shipping) ?? addresses[0] ?? null;
+  }
+
+  private formatMoney(amount: number, currency: string): string {
+    try {
+      return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD' }).format(amount);
+    } catch {
+      return `${amount.toFixed(2)} ${currency || ''}`.trim();
+    }
   }
 }

@@ -78,7 +78,8 @@ async def build_order_from_cart(
     except Exception:
         # metrics should never break order creation
         pass
-    return order
+    hydrated = await get_order_by_id(session, order.id)
+    return hydrated or order
 
 
 async def get_orders_for_user(session: AsyncSession, user_id: UUID) -> Sequence[Order]:
@@ -86,7 +87,7 @@ async def get_orders_for_user(session: AsyncSession, user_id: UUID) -> Sequence[
         select(Order)
         .where(Order.user_id == user_id)
         .options(
-            selectinload(Order.items),
+            selectinload(Order.items).selectinload(OrderItem.product),
             selectinload(Order.shipping_method),
             selectinload(Order.events),
             selectinload(Order.user),
@@ -101,7 +102,7 @@ async def get_order(session: AsyncSession, user_id: UUID, order_id: UUID) -> Ord
         select(Order)
         .where(Order.user_id == user_id, Order.id == order_id)
         .options(
-            selectinload(Order.items),
+            selectinload(Order.items).selectinload(OrderItem.product),
             selectinload(Order.shipping_method),
             selectinload(Order.events),
             selectinload(Order.user),
@@ -114,7 +115,7 @@ async def list_orders(session: AsyncSession, status: OrderStatus | None = None, 
     query = (
         select(Order)
         .options(
-            selectinload(Order.items),
+            selectinload(Order.items).selectinload(OrderItem.product),
             selectinload(Order.shipping_method),
             selectinload(Order.events),
             selectinload(Order.user),
@@ -164,9 +165,8 @@ async def update_order(
         setattr(order, field, value)
     session.add(order)
     await session.commit()
-    await session.refresh(order)
-    await session.refresh(order, attribute_names=["items", "shipping_method", "events"])
-    return order
+    hydrated = await get_order_by_id(session, order.id)
+    return hydrated or order
 
 
 async def _generate_reference_code(session: AsyncSession, length: int = 10) -> str:
@@ -210,8 +210,9 @@ async def list_shipping_methods(session: AsyncSession) -> list[ShippingMethod]:
 async def get_order_by_id(session: AsyncSession, order_id: UUID) -> Order | None:
     result = await session.execute(
         select(Order)
+        .execution_options(populate_existing=True)
         .options(
-            selectinload(Order.items),
+            selectinload(Order.items).selectinload(OrderItem.product),
             selectinload(Order.shipping_method),
             selectinload(Order.events),
             selectinload(Order.user),
@@ -234,7 +235,8 @@ async def update_fulfillment(session: AsyncSession, order: Order, item_id: UUID,
     await _log_event(session, order.id, "fulfillment_update", f"Item {item_id} shipped {shipped_quantity}")
     await session.refresh(order)
     await session.refresh(order, attribute_names=["events"])
-    return order
+    hydrated = await get_order_by_id(session, order.id)
+    return hydrated or order
 
 
 async def retry_payment(session: AsyncSession, order: Order) -> Order:
@@ -244,9 +246,8 @@ async def retry_payment(session: AsyncSession, order: Order) -> Order:
     await _log_event(session, order.id, "payment_retry", f"Attempt {order.payment_retry_count}")
     session.add(order)
     await session.commit()
-    await session.refresh(order)
-    await session.refresh(order, attribute_names=["events", "items", "shipping_method"])
-    return order
+    hydrated = await get_order_by_id(session, order.id)
+    return hydrated or order
 
 
 async def refund_order(session: AsyncSession, order: Order, note: str | None = None) -> Order:
@@ -257,9 +258,8 @@ async def refund_order(session: AsyncSession, order: Order, note: str | None = N
     await _log_event(session, order.id, "refund_requested", note or f"Manual refund requested from {previous.value}")
     session.add(order)
     await session.commit()
-    await session.refresh(order)
-    await session.refresh(order, attribute_names=["events", "items", "shipping_method"])
-    return order
+    hydrated = await get_order_by_id(session, order.id)
+    return hydrated or order
 
 
 async def capture_payment(session: AsyncSession, order: Order, intent_id: str | None = None) -> Order:
@@ -274,9 +274,8 @@ async def capture_payment(session: AsyncSession, order: Order, intent_id: str | 
     await _log_event(session, order.id, "payment_captured", f"Intent {payment_intent_id}")
     session.add(order)
     await session.commit()
-    await session.refresh(order)
-    await session.refresh(order, attribute_names=["events", "items", "shipping_method"])
-    return order
+    hydrated = await get_order_by_id(session, order.id)
+    return hydrated or order
 
 
 async def void_payment(session: AsyncSession, order: Order, intent_id: str | None = None) -> Order:
@@ -291,9 +290,8 @@ async def void_payment(session: AsyncSession, order: Order, intent_id: str | Non
     await _log_event(session, order.id, "payment_voided", f"Intent {payment_intent_id}")
     session.add(order)
     await session.commit()
-    await session.refresh(order)
-    await session.refresh(order, attribute_names=["events", "items", "shipping_method"])
-    return order
+    hydrated = await get_order_by_id(session, order.id)
+    return hydrated or order
 
 
 async def _log_event(session: AsyncSession, order_id: UUID, event: str, note: str | None = None) -> None:
