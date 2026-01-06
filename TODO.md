@@ -180,9 +180,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Branding: rebrand AdrianaArt → momentstudio across UI/docs/meta and backend app name.
 - [x] Branding: update header branding (flower mark + momentstudio wordmark).
 - [x] Header: add descriptive alt text for the flower brand mark.
-- [ ] Header UX: reduce desktop clutter and support more nav items (wrap/overflow or two-row layout).
-- [ ] Header UX: widen the desktop search bar without pushing nav/actions off-screen.
-- [ ] Header UX: improve spacing between brand and nav categories; keep layout resilient when adding more links.
+- [x] Header UX: reduce desktop clutter and support more nav items (wrap/overflow or two-row layout).
+- [x] Header UX: widen the desktop search bar without pushing nav/actions off-screen.
+- [x] Header UX: improve spacing between brand and nav categories; keep layout resilient when adding more links.
 - [ ] Mobile UX: consolidate header actions (search/theme/lang) for a cleaner top bar and easier tapping.
 - [x] Frontend: add `/contact` route/page with phone/email and link it from header/footer.
 - [x] Global error handling / boundary route.
