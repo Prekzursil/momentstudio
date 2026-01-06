@@ -6,6 +6,7 @@ from sqlalchemy.future import select
 from app.core.security import decode_token
 from app.db.session import get_session
 from app.models.user import User, UserRole
+from app.services import self_service
 from uuid import UUID
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -34,6 +35,12 @@ async def get_current_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
+    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
+        await self_service.execute_account_deletion(session, user)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+    if getattr(user, "deleted_at", None) is not None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+
     return user
 
 
@@ -53,7 +60,15 @@ async def get_current_user_optional(
         return None
 
     result = await session.execute(select(User).where(User.id == user_id))
-    return result.scalar_one_or_none()
+    user = result.scalar_one_or_none()
+    if not user:
+        return None
+    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
+        await self_service.execute_account_deletion(session, user)
+        return None
+    if getattr(user, "deleted_at", None) is not None:
+        return None
+    return user
 
 
 async def require_admin(user: User = Depends(get_current_user)) -> User:

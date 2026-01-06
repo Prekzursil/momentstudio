@@ -108,6 +108,38 @@ export interface AdminBlogCommentListResponse {
   meta: PaginationMeta;
 }
 
+export interface BlogMyCommentParentContext {
+  id: string;
+  author_name?: string | null;
+  snippet: string;
+}
+
+export interface BlogMyCommentLastReplyContext {
+  id: string;
+  author_name?: string | null;
+  snippet: string;
+  created_at: string;
+}
+
+export interface BlogMyComment {
+  id: string;
+  post_slug: string;
+  post_title: string;
+  parent_id?: string | null;
+  body: string;
+  status: 'posted' | 'hidden' | 'deleted' | string;
+  created_at: string;
+  updated_at: string;
+  reply_count: number;
+  parent?: BlogMyCommentParentContext | null;
+  last_reply?: BlogMyCommentLastReplyContext | null;
+}
+
+export interface BlogMyCommentListResponse {
+  items: BlogMyComment[];
+  meta: PaginationMeta;
+}
+
 @Injectable({ providedIn: 'root' })
 export class BlogService {
   constructor(private api: ApiService) {}
@@ -162,6 +194,14 @@ export class BlogService {
 
   listFlaggedComments(params: { page?: number; limit?: number } = {}): Observable<AdminBlogCommentListResponse> {
     return this.api.get<AdminBlogCommentListResponse>('/blog/admin/comments/flagged', {
+      page: params.page ?? 1,
+      limit: params.limit ?? 20
+    });
+  }
+
+  listMyComments(params: { lang?: string; page?: number; limit?: number } = {}): Observable<BlogMyCommentListResponse> {
+    return this.api.get<BlogMyCommentListResponse>('/blog/me/comments', {
+      lang: params.lang,
       page: params.page ?? 1,
       limit: params.limit ?? 20
     });

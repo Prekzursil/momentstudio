@@ -12,15 +12,16 @@ from app.core import security
 from app.core.config import settings
 from app.models.user import EmailVerificationToken, PasswordResetToken, RefreshSession, User
 from app.schemas.user import UserCreate
+from app.services import self_service
 
 
 async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
-    result = await session.execute(select(User).where(User.email == email))
+    result = await session.execute(select(User).where(User.email == email, User.deleted_at.is_(None)))
     return result.scalar_one_or_none()
 
 
 async def get_user_by_google_sub(session: AsyncSession, google_sub: str) -> User | None:
-    result = await session.execute(select(User).where(User.google_sub == google_sub))
+    result = await session.execute(select(User).where(User.google_sub == google_sub, User.deleted_at.is_(None)))
     return result.scalar_one_or_none()
 
 
@@ -45,6 +46,9 @@ async def authenticate_user(session: AsyncSession, email: str, password: str) ->
     user = await get_user_by_email(session, email)
     if not user or not security.verify_password(password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
+        await self_service.execute_account_deletion(session, user)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
     return user
 
 

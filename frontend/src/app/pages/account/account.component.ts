@@ -9,7 +9,8 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { AddressFormComponent } from '../../shared/address-form.component';
 import { ToastService } from '../../core/toast.service';
 import { AuthService, AuthUser } from '../../core/auth.service';
-import { AccountService, Address, Order, AddressCreateRequest } from '../../core/account.service';
+import { AccountService, AccountDeletionStatus, Address, Order, AddressCreateRequest } from '../../core/account.service';
+import { BlogMyComment, BlogService, PaginationMeta } from '../../core/blog.service';
 import { forkJoin } from 'rxjs';
 import { loadStripe, Stripe, StripeElements, StripeCardElement, StripeCardElementChangeEvent } from '@stripe/stripe-js';
 import { ApiService } from '../../core/api.service';
@@ -210,25 +211,73 @@ import { CartStore } from '../../core/cart.store';
         </section>
 
         <section id="notifications" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'account.notifications.title' | translate }}</h2>
-            <app-button
-              size="sm"
-              variant="ghost"
-              [label]="'account.notifications.save' | translate"
-              [disabled]="savingNotifications"
-              (action)="saveNotifications()"
-            ></app-button>
+          <div class="flex items-start justify-between gap-3">
+            <div class="grid gap-1">
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'account.notifications.title' | translate }}</h2>
+              <p *ngIf="notificationLastUpdated" class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'account.notifications.lastUpdated' | translate: { date: formatTimestamp(notificationLastUpdated) } }}
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="showNotificationPreview ? ('account.notifications.hidePreview' | translate) : ('account.notifications.showPreview' | translate)"
+                (action)="toggleNotificationPreview()"
+              ></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'account.notifications.save' | translate"
+                [disabled]="savingNotifications"
+                (action)="saveNotifications()"
+              ></app-button>
+            </div>
           </div>
-          <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
-            <label class="flex items-center gap-2">
-              <input type="checkbox" [(ngModel)]="notifyBlogCommentReplies" />
-              <span>{{ 'account.notifications.replyLabel' | translate }}</span>
-            </label>
-            <label *ngIf="isAdmin()" class="flex items-center gap-2">
-              <input type="checkbox" [(ngModel)]="notifyBlogComments" />
-              <span>{{ 'account.notifications.adminLabel' | translate }}</span>
-            </label>
+
+          <div class="grid gap-4 text-sm text-slate-700 dark:text-slate-200">
+            <div class="grid gap-2">
+              <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {{ 'account.notifications.communityHeading' | translate }}
+              </p>
+              <label class="flex items-center gap-2">
+                <input type="checkbox" [(ngModel)]="notifyBlogCommentReplies" />
+                <span>{{ 'account.notifications.replyLabel' | translate }}</span>
+              </label>
+            </div>
+
+            <div class="grid gap-2" *ngIf="isAdmin()">
+              <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {{ 'account.notifications.adminHeading' | translate }}
+              </p>
+              <label class="flex items-center gap-2">
+                <input type="checkbox" [(ngModel)]="notifyBlogComments" />
+                <span>{{ 'account.notifications.adminLabel' | translate }}</span>
+              </label>
+            </div>
+
+            <div class="grid gap-2">
+              <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {{ 'account.notifications.marketingHeading' | translate }}
+              </p>
+              <label class="flex items-center gap-2">
+                <input type="checkbox" [(ngModel)]="notifyMarketing" />
+                <span>{{ 'account.notifications.marketingLabel' | translate }}</span>
+              </label>
+            </div>
+
+            <div
+              *ngIf="showNotificationPreview"
+              class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200 grid gap-2"
+            >
+              <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {{ 'account.notifications.previewTitle' | translate }}
+              </p>
+              <p class="whitespace-pre-wrap">{{ 'account.notifications.previewReply' | translate }}</p>
+              <p *ngIf="isAdmin()" class="whitespace-pre-wrap">{{ 'account.notifications.previewAdmin' | translate }}</p>
+              <p class="whitespace-pre-wrap">{{ 'account.notifications.previewMarketing' | translate }}</p>
+            </div>
+
             <span *ngIf="notificationsMessage" class="text-xs text-emerald-700 dark:text-emerald-300">{{
               notificationsMessage | translate
             }}</span>
@@ -239,30 +288,192 @@ import { CartStore } from '../../core/cart.store';
         </section>
 
         <section id="security" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Connected accounts</h2>
-            <span
-              class="text-xs rounded-full px-2 py-1"
-              [ngClass]="googleEmail() ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'"
-            >
-              {{ googleEmail() ? 'Google linked' : 'Not linked' }}
-            </span>
+          <div class="flex items-start justify-between gap-3">
+            <div class="grid gap-1">
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Security</h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Manage password and connected accounts.</p>
+            </div>
+            <app-button routerLink="/account/password" size="sm" variant="ghost" label="Change password"></app-button>
           </div>
-          <div class="flex items-center gap-3 text-sm">
-            <img
-              *ngIf="googlePicture()"
-              [src]="googlePicture()"
-              alt="Google profile"
-              class="h-10 w-10 rounded-full border border-slate-200 dark:border-slate-700 object-cover"
-            />
-            <div>
-              <p class="font-semibold text-slate-900 dark:text-slate-50">Google</p>
-              <p class="text-slate-600 dark:text-slate-300">{{ googleEmail() || 'No Google account linked' }}</p>
+
+          <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-2">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3 text-sm">
+              <img
+                *ngIf="googlePicture()"
+                [src]="googlePicture()"
+                alt="Google profile"
+                class="h-10 w-10 rounded-full border border-slate-200 dark:border-slate-700 object-cover"
+              />
+              <div class="min-w-0">
+                <p class="font-semibold text-slate-900 dark:text-slate-50">Google</p>
+                <p class="text-slate-600 dark:text-slate-300 truncate">{{ googleEmail() || 'No Google account linked' }}</p>
+              </div>
+              <div class="flex flex-col sm:flex-row gap-2 sm:ml-auto w-full sm:w-auto">
+                <input
+                  type="password"
+                  name="googlePassword"
+                  [(ngModel)]="googlePassword"
+                  autocomplete="current-password"
+                  placeholder="Confirm password"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                />
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  label="Link Google"
+                  *ngIf="!googleEmail()"
+                  [disabled]="googleBusy || !googlePassword"
+                  (action)="linkGoogle()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  label="Unlink"
+                  *ngIf="googleEmail()"
+                  [disabled]="googleBusy || !googlePassword"
+                  (action)="unlinkGoogle()"
+                ></app-button>
+              </div>
             </div>
-            <div class="flex gap-2 ml-auto">
-              <app-button size="sm" variant="ghost" label="Link Google" *ngIf="!googleEmail()" (action)="linkGoogle()"></app-button>
-              <app-button size="sm" variant="ghost" label="Unlink" *ngIf="googleEmail()" (action)="unlinkGoogle()"></app-button>
+            <p *ngIf="googleError" class="text-xs text-rose-700 dark:text-rose-300">{{ googleError }}</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              Linking Google lets you sign in faster. We never post without permission.
+            </p>
+          </div>
+        </section>
+
+        <section id="community" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">My comments</h2>
+            <app-button size="sm" variant="ghost" label="Refresh" (action)="loadMyComments(myCommentsPage)"></app-button>
+          </div>
+
+          <div *ngIf="myCommentsLoading(); else myCommentsBody" class="grid gap-3">
+            <app-skeleton height="64px"></app-skeleton>
+            <app-skeleton height="64px"></app-skeleton>
+          </div>
+          <ng-template #myCommentsBody>
+            <div *ngIf="myCommentsError()" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+              {{ myCommentsError() }}
             </div>
+            <div
+              *ngIf="!myCommentsError() && myComments().length === 0"
+              class="border border-dashed border-slate-200 rounded-xl p-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300"
+            >
+              No comments yet. <a routerLink="/blog" class="text-indigo-600 dark:text-indigo-300 font-medium">Browse the blog</a>.
+            </div>
+
+            <div *ngIf="!myCommentsError() && myComments().length" class="grid gap-3">
+              <div *ngFor="let c of myComments()" class="rounded-lg border border-slate-200 p-3 grid gap-2 dark:border-slate-700">
+                <div class="flex items-start justify-between gap-3">
+                  <a [routerLink]="['/blog', c.post_slug]" class="font-semibold text-slate-900 dark:text-slate-50 hover:underline">
+                    {{ c.post_title || c.post_slug }}
+                  </a>
+                  <span class="text-xs rounded-full px-2 py-1 whitespace-nowrap" [ngClass]="commentStatusChipClass(c.status)">
+                    {{ c.status }}
+                  </span>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{{ formatTimestamp(c.created_at) }}</p>
+                <p *ngIf="c.body" class="text-sm text-slate-700 dark:text-slate-200">{{ c.body }}</p>
+                <p *ngIf="!c.body && c.status === 'deleted'" class="text-sm text-slate-500 dark:text-slate-400">This comment was deleted.</p>
+                <p *ngIf="!c.body && c.status === 'hidden'" class="text-sm text-slate-500 dark:text-slate-400">This comment was hidden by moderators.</p>
+
+                <div
+                  *ngIf="c.parent"
+                  class="rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
+                >
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    Replying to {{ c.parent.author_name || ('blog.comments.anonymous' | translate) }}
+                  </p>
+                  <p>{{ c.parent.snippet }}</p>
+                </div>
+
+                <div *ngIf="c.reply_count" class="text-sm text-slate-700 dark:text-slate-200">
+                  {{ c.reply_count }} repl{{ c.reply_count === 1 ? 'y' : 'ies' }}
+                  <span *ngIf="c.last_reply">
+                    · Latest: {{ c.last_reply.author_name || ('blog.comments.anonymous' | translate) }} — {{ c.last_reply.snippet }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200" *ngIf="myCommentsMeta()">
+                <span>Page {{ myCommentsMeta()?.page }} / {{ myCommentsMeta()?.total_pages }}</span>
+                <div class="flex gap-2">
+                  <app-button size="sm" variant="ghost" label="Prev" [disabled]="(myCommentsMeta()?.page || 1) <= 1" (action)="prevMyCommentsPage()"></app-button>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    label="Next"
+                    [disabled]="(myCommentsMeta()?.page || 1) >= (myCommentsMeta()?.total_pages || 1)"
+                    (action)="nextMyCommentsPage()"
+                  ></app-button>
+                </div>
+              </div>
+            </div>
+          </ng-template>
+        </section>
+
+        <section id="privacy" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Privacy & data</h2>
+
+          <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-2">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="font-semibold text-slate-900 dark:text-slate-50">Download my data</p>
+                <p class="text-sm text-slate-600 dark:text-slate-300">Export your profile, orders, wishlist, and blog activity as JSON.</p>
+              </div>
+              <app-button size="sm" variant="ghost" [label]="exportingData ? 'Downloading…' : 'Download'" [disabled]="exportingData" (action)="downloadMyData()"></app-button>
+            </div>
+            <p *ngIf="exportError" class="text-xs text-rose-700 dark:text-rose-300">{{ exportError }}</p>
+          </div>
+
+          <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900/40 dark:bg-rose-950/30 grid gap-3">
+            <div class="flex items-center justify-between">
+              <p class="font-semibold text-rose-900 dark:text-rose-100">Delete account</p>
+              <span *ngIf="deletionStatus()?.scheduled_for" class="text-xs text-rose-800 dark:text-rose-200">
+                Scheduled
+              </span>
+            </div>
+
+            <div *ngIf="deletionLoading(); else deletionBody" class="grid gap-2">
+              <app-skeleton height="18px" width="70%"></app-skeleton>
+              <app-skeleton height="18px" width="90%"></app-skeleton>
+            </div>
+            <ng-template #deletionBody>
+              <p class="text-sm text-rose-900 dark:text-rose-100">
+                Requesting deletion schedules your account to be removed after {{ deletionStatus()?.cooldown_hours || 24 }} hours.
+              </p>
+
+              <div *ngIf="deletionStatus()?.scheduled_for; else requestDelete" class="grid gap-2">
+                <p class="text-sm text-rose-900 dark:text-rose-100">
+                  Scheduled for {{ formatTimestamp(deletionStatus()?.scheduled_for || '') }}.
+                </p>
+                <div class="flex gap-2">
+                  <app-button size="sm" variant="ghost" label="Cancel deletion" [disabled]="cancellingDeletion" (action)="cancelDeletion()"></app-button>
+                </div>
+              </div>
+              <ng-template #requestDelete>
+                <p class="text-sm text-rose-900 dark:text-rose-100">
+                  Type <span class="font-semibold">DELETE</span> to confirm. You can cancel during the {{ deletionStatus()?.cooldown_hours || 24 }}h cooldown window.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-2">
+                  <input
+                    name="deletionConfirmText"
+                    [(ngModel)]="deletionConfirmText"
+                    placeholder="DELETE"
+                    class="rounded-lg border border-rose-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-rose-900/40 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  />
+                  <app-button
+                    size="sm"
+                    label="Request deletion"
+                    [disabled]="requestingDeletion || deletionConfirmText.trim().toUpperCase() !== 'DELETE'"
+                    (action)="requestDeletion()"
+                  ></app-button>
+                </div>
+              </ng-template>
+
+              <p *ngIf="deletionError()" class="text-xs text-rose-700 dark:text-rose-300">{{ deletionError() }}</p>
+            </ng-template>
           </div>
         </section>
 
@@ -572,6 +783,8 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   notificationsMessage: string | null = null;
   notificationsError: string | null = null;
   notifyMarketing = false;
+  showNotificationPreview = false;
+  notificationLastUpdated: string | null = null;
   savingProfile = false;
   profileSaved = false;
   profileError: string | null = null;
@@ -582,10 +795,32 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   reorderingOrderId: string | null = null;
   downloadingReceiptId: string | null = null;
 
+  googlePassword = '';
+  googleBusy = false;
+  googleError: string | null = null;
+
+  exportingData = false;
+  exportError: string | null = null;
+
+  deletionStatus = signal<AccountDeletionStatus | null>(null);
+  deletionLoading = signal<boolean>(false);
+  deletionError = signal<string | null>(null);
+  deletionConfirmText = '';
+  requestingDeletion = false;
+  cancellingDeletion = false;
+
+  myComments = signal<BlogMyComment[]>([]);
+  myCommentsMeta = signal<PaginationMeta | null>(null);
+  myCommentsLoading = signal<boolean>(false);
+  myCommentsError = signal<string | null>(null);
+  myCommentsPage = 1;
+  myCommentsLimit = 10;
+
   constructor(
     private toast: ToastService,
     private auth: AuthService,
     private account: AccountService,
+    private blog: BlogService,
     private cart: CartStore,
     private router: Router,
     private api: ApiService,
@@ -605,6 +840,8 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit(): void {
     this.wishlist.refresh();
     this.loadData();
+    this.loadDeletionStatus();
+    this.loadMyComments();
     this.loadPaymentMethods();
     this.resetIdleTimer();
     window.addEventListener('mousemove', this.handleUserActivity);
@@ -630,6 +867,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
         this.notifyBlogComments = Boolean(profile?.notify_blog_comments);
         this.notifyBlogCommentReplies = Boolean(profile?.notify_blog_comment_replies);
         this.notifyMarketing = Boolean(profile?.notify_marketing);
+        this.notificationLastUpdated = profile.updated_at ?? null;
         this.addresses.set(addresses);
         this.orders.set(orders);
         this.avatar = profile.avatar_url ?? null;
@@ -1004,13 +1242,16 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     this.auth
       .updateNotificationPreferences({
         notify_blog_comments: this.notifyBlogComments,
-        notify_blog_comment_replies: this.notifyBlogCommentReplies
+        notify_blog_comment_replies: this.notifyBlogCommentReplies,
+        notify_marketing: this.notifyMarketing
       })
       .subscribe({
         next: (user) => {
           this.profile.set(user);
           this.notifyBlogComments = Boolean(user?.notify_blog_comments);
           this.notifyBlogCommentReplies = Boolean(user?.notify_blog_comment_replies);
+          this.notifyMarketing = Boolean(user?.notify_marketing);
+          this.notificationLastUpdated = user.updated_at ?? null;
           this.notificationsMessage = 'account.notifications.saved';
         },
         error: () => {
@@ -1019,6 +1260,148 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
         },
         complete: () => (this.savingNotifications = false)
       });
+  }
+
+  toggleNotificationPreview(): void {
+    this.showNotificationPreview = !this.showNotificationPreview;
+  }
+
+  private loadDeletionStatus(): void {
+    if (!this.auth.isAuthenticated()) return;
+    this.deletionLoading.set(true);
+    this.deletionError.set(null);
+    this.account.getDeletionStatus().subscribe({
+      next: (status) => {
+        this.deletionStatus.set(status);
+      },
+      error: () => {
+        this.deletionError.set('Could not load deletion status.');
+      },
+      complete: () => this.deletionLoading.set(false)
+    });
+  }
+
+  downloadMyData(): void {
+    if (this.exportingData || !this.auth.isAuthenticated()) return;
+    this.exportingData = true;
+    this.exportError = null;
+    this.account.downloadExport().subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const date = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = `moment-studio-export-${date}.json`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+        this.toast.success('Export downloaded');
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Could not download export.';
+        this.exportError = message;
+        this.toast.error(message);
+      },
+      complete: () => {
+        this.exportingData = false;
+      }
+    });
+  }
+
+  requestDeletion(): void {
+    if (this.requestingDeletion || !this.auth.isAuthenticated()) return;
+    this.requestingDeletion = true;
+    this.deletionError.set(null);
+    this.account.requestAccountDeletion(this.deletionConfirmText).subscribe({
+      next: (status) => {
+        this.deletionStatus.set(status);
+        this.deletionConfirmText = '';
+        this.toast.success('Deletion scheduled');
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Could not request account deletion.';
+        this.deletionError.set(message);
+        this.toast.error(message);
+      },
+      complete: () => {
+        this.requestingDeletion = false;
+      }
+    });
+  }
+
+  cancelDeletion(): void {
+    if (this.cancellingDeletion || !this.auth.isAuthenticated()) return;
+    this.cancellingDeletion = true;
+    this.deletionError.set(null);
+    this.account.cancelAccountDeletion().subscribe({
+      next: (status) => {
+        this.deletionStatus.set(status);
+        this.toast.success('Deletion canceled');
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Could not cancel account deletion.';
+        this.deletionError.set(message);
+        this.toast.error(message);
+      },
+      complete: () => {
+        this.cancellingDeletion = false;
+      }
+    });
+  }
+
+  loadMyComments(page: number = 1): void {
+    if (!this.auth.isAuthenticated()) return;
+    this.myCommentsLoading.set(true);
+    this.myCommentsError.set(null);
+    const lang = this.lang.language();
+    this.blog.listMyComments({ lang, page, limit: this.myCommentsLimit }).subscribe({
+      next: (res) => {
+        this.myComments.set(res.items);
+        this.myCommentsMeta.set(res.meta);
+        this.myCommentsPage = res.meta.page;
+      },
+      error: () => {
+        this.myCommentsError.set('Could not load your comments.');
+      },
+      complete: () => this.myCommentsLoading.set(false)
+    });
+  }
+
+  nextMyCommentsPage(): void {
+    const meta = this.myCommentsMeta();
+    if (!meta) return;
+    if (meta.page < meta.total_pages) {
+      this.loadMyComments(meta.page + 1);
+    }
+  }
+
+  prevMyCommentsPage(): void {
+    const meta = this.myCommentsMeta();
+    if (!meta) return;
+    if (meta.page > 1) {
+      this.loadMyComments(meta.page - 1);
+    }
+  }
+
+  commentStatusChipClass(status: string): string {
+    switch (status) {
+      case 'posted':
+        return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100';
+      case 'hidden':
+        return 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-100';
+      case 'deleted':
+        return 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
+      default:
+        return 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
+    }
+  }
+
+  formatTimestamp(value: string | null | undefined): string {
+    if (!value) return '';
+    try {
+      return new Date(value).toLocaleString();
+    } catch {
+      return value;
+    }
   }
 
   private computeTotalPages(total?: number): void {
@@ -1170,8 +1553,13 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   linkGoogle(): void {
-    const password = prompt('Confirm your password to link Google');
-    if (!password) return;
+    const password = this.googlePassword.trim();
+    this.googleError = null;
+    if (!password) {
+      this.googleError = 'Enter your password to link Google.';
+      return;
+    }
+    this.googleBusy = true;
     sessionStorage.setItem('google_link_password', password);
     localStorage.setItem('google_flow', 'link');
     this.auth.startGoogleLink().subscribe({
@@ -1181,24 +1569,36 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
       error: (err) => {
         sessionStorage.removeItem('google_link_password');
         const message = err?.error?.detail || 'Could not start Google link flow.';
+        this.googleError = message;
         this.toast.error(message);
+        this.googleBusy = false;
       }
     });
   }
 
   unlinkGoogle(): void {
-    const password = prompt('Enter your password to unlink Google');
-    if (!password) return;
+    const password = this.googlePassword.trim();
+    this.googleError = null;
+    if (!password) {
+      this.googleError = 'Enter your password to unlink Google.';
+      return;
+    }
+    this.googleBusy = true;
     this.auth.unlinkGoogle(password).subscribe({
       next: (user) => {
         this.googleEmail.set(user.google_email ?? null);
         this.googlePicture.set(user.google_picture_url ?? null);
         this.profile.set(user);
+        this.googlePassword = '';
         this.toast.success('Google account disconnected');
       },
       error: (err) => {
         const message = err?.error?.detail || 'Could not unlink Google account.';
+        this.googleError = message;
         this.toast.error(message);
+      },
+      complete: () => {
+        this.googleBusy = false;
       }
     });
   }

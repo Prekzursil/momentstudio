@@ -57,6 +57,13 @@ export interface AddressCreateRequest {
   is_default_billing?: boolean;
 }
 
+export interface AccountDeletionStatus {
+  requested_at?: string | null;
+  scheduled_for?: string | null;
+  deleted_at?: string | null;
+  cooldown_hours: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AccountService {
   constructor(private api: ApiService) {}
@@ -71,6 +78,22 @@ export class AccountService {
 
   getOrders(): Observable<Order[]> {
     return this.api.get<Order[]>('/orders');
+  }
+
+  downloadExport(): Observable<Blob> {
+    return this.api.getBlob('/auth/me/export');
+  }
+
+  getDeletionStatus(): Observable<AccountDeletionStatus> {
+    return this.api.get<AccountDeletionStatus>('/auth/me/delete/status');
+  }
+
+  requestAccountDeletion(confirm: string): Observable<AccountDeletionStatus> {
+    return this.api.post<AccountDeletionStatus>('/auth/me/delete', { confirm });
+  }
+
+  cancelAccountDeletion(): Observable<AccountDeletionStatus> {
+    return this.api.post<AccountDeletionStatus>('/auth/me/delete/cancel', {});
   }
 
   reorderOrder(orderId: string): Observable<unknown> {

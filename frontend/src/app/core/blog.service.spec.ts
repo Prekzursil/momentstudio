@@ -50,4 +50,18 @@ describe('BlogService', () => {
       url: 'http://localhost:4200/blog/hello-world?preview=t&lang=ro'
     });
   });
+
+  it('listMyComments forwards pagination and lang', () => {
+    service.listMyComments({ lang: 'ro', page: 3, limit: 15 }).subscribe((resp) => {
+      expect(resp.items.length).toBe(0);
+      expect(resp.meta.page).toBe(3);
+    });
+
+    const req = httpMock.expectOne((r) => r.url === '/api/v1/blog/me/comments');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.get('lang')).toBe('ro');
+    expect(req.request.params.get('page')).toBe('3');
+    expect(req.request.params.get('limit')).toBe('15');
+    req.flush({ items: [], meta: { total_items: 0, total_pages: 1, page: 3, limit: 15 } });
+  });
 });

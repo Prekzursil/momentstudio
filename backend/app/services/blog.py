@@ -58,6 +58,13 @@ def _excerpt(body: str, max_len: int = 180) -> str:
     return cleaned[: max_len - 1].rstrip() + "…"
 
 
+def _snippet(text: str, max_len: int = 140) -> str:
+    cleaned = " ".join((text or "").split())
+    if len(cleaned) <= max_len:
+        return cleaned
+    return cleaned[: max_len - 1].rstrip() + "…"
+
+
 def _normalize_tags(raw: object) -> list[str]:
     if raw is None:
         return []
@@ -302,6 +309,124 @@ async def list_comments(
         base.order_by(BlogComment.created_at.asc()).limit(limit).offset(offset)
     )
     items = list(result.scalars().unique())
+    return items, int(total or 0)
+
+
+async def list_user_comments(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    lang: str | None,
+    page: int,
+    limit: int,
+) -> tuple[list[dict], int]:
+    page = max(1, page)
+    limit = max(1, min(limit, 50))
+    offset = (page - 1) * limit
+
+    total = await session.scalar(select(func.count()).select_from(BlogComment).where(BlogComment.user_id == user_id))
+    result = await session.execute(
+        select(BlogComment)
+        .options(
+            selectinload(BlogComment.post).selectinload(ContentBlock.translations),
+            selectinload(BlogComment.parent).selectinload(BlogComment.author),
+            selectinload(BlogComment.author),
+        )
+        .where(BlogComment.user_id == user_id)
+        .order_by(BlogComment.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    comments = list(result.scalars().unique())
+
+    if lang:
+        seen_posts: set[UUID] = set()
+        for comment in comments:
+            post = getattr(comment, "post", None)
+            if not post or post.id in seen_posts:
+                continue
+            seen_posts.add(post.id)
+            _apply_translation(post, lang)
+
+    comment_ids = [c.id for c in comments]
+    reply_counts: dict[UUID, int] = {}
+    last_replies: dict[UUID, BlogComment] = {}
+    if comment_ids:
+        counts_rows = await session.execute(
+            select(BlogComment.parent_id, func.count().label("cnt"))
+            .where(
+                BlogComment.parent_id.in_(comment_ids),
+                BlogComment.is_deleted.is_(False),
+                BlogComment.is_hidden.is_(False),
+            )
+            .group_by(BlogComment.parent_id)
+        )
+        for parent_id, cnt in counts_rows.all():
+            if parent_id:
+                reply_counts[parent_id] = int(cnt or 0)
+
+        reply_rows = await session.execute(
+            select(BlogComment)
+            .options(selectinload(BlogComment.author))
+            .where(
+                BlogComment.parent_id.in_(comment_ids),
+                BlogComment.is_deleted.is_(False),
+                BlogComment.is_hidden.is_(False),
+            )
+            .order_by(BlogComment.created_at.desc())
+        )
+        for reply_comment in reply_rows.scalars().unique():
+            parent_id = reply_comment.parent_id
+            if parent_id and parent_id not in last_replies:
+                last_replies[parent_id] = reply_comment
+
+    items: list[dict] = []
+    for comment in comments:
+        post = getattr(comment, "post", None)
+        post_key = getattr(post, "key", "") if post else ""
+        post_title = getattr(post, "title", "") if post else ""
+
+        status_value = "deleted" if comment.is_deleted else "hidden" if comment.is_hidden else "posted"
+        body_value = "" if comment.is_deleted or comment.is_hidden else comment.body
+
+        parent_ctx = None
+        if getattr(comment, "parent", None):
+            parent = comment.parent
+            parent_body = "" if parent.is_deleted or parent.is_hidden else parent.body
+            author = getattr(parent, "author", None)
+            parent_ctx = {
+                "id": parent.id,
+                "author_name": getattr(author, "name", None) if author else None,
+                "snippet": _snippet(parent_body),
+            }
+
+        last_reply_ctx = None
+        last_reply = last_replies.get(comment.id)
+        if last_reply:
+            author = getattr(last_reply, "author", None)
+            last_reply_ctx = {
+                "id": last_reply.id,
+                "author_name": getattr(author, "name", None) if author else None,
+                "snippet": _snippet(last_reply.body),
+                "created_at": last_reply.created_at,
+            }
+
+        items.append(
+            {
+                "id": comment.id,
+                "post_slug": _extract_slug(post_key),
+                "post_title": post_title,
+                "parent_id": comment.parent_id,
+                "body": body_value,
+                "status": status_value,
+                "created_at": comment.created_at,
+                "updated_at": comment.updated_at,
+                "reply_count": reply_counts.get(comment.id, 0),
+                "parent": parent_ctx,
+                "last_reply": last_reply_ctx,
+            }
+        )
+
     return items, int(total or 0)
 
 

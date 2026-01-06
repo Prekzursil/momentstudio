@@ -306,11 +306,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Account UX: profile basics editor (avatar, display name, phone, preferred language + theme) with optional profile completeness indicator.
 - [x] Account UX: orders UI improvements (status chips, expandable details, tracking link, invoice/receipt download, and “Reorder”).
 - [x] Account UX: address book improvements (mark defaults, inline validation, “use as billing too”, and mobile-friendly inputs/autofill).
-- [ ] Account UX: security center polish (change password + link/unlink Google).
-- [ ] Account UX: notifications grouped toggles (blog replies/admin alerts/marketing) with email preview and last updated timestamp.
-- [ ] Account UX: error/loading polish for profile sections (skeletons, empty states, avoid blocking overlays).
-- [ ] Account UX: privacy/self-service (data export + account deletion flow with confirmation + cooldown).
-- [ ] Account UX: community “My comments” list (links + status) and reply notification context.
+- [x] Account UX: security center polish (change password + link/unlink Google).
+- [x] Account UX: notifications grouped toggles (blog replies/admin alerts/marketing) with email preview and last updated timestamp.
+- [x] Account UX: error/loading polish for profile sections (skeletons, empty states, avoid blocking overlays).
+- [x] Account UX: privacy/self-service (data export + account deletion flow with confirmation + cooldown).
+- [x] Account UX: community “My comments” list (links + status) and reply notification context.
 
 ## Frontend - Admin Dashboard
 - [x] /admin layout with sidebar + guard.
