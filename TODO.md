@@ -183,7 +183,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Header UX: reduce desktop clutter and support more nav items (wrap/overflow or two-row layout).
 - [x] Header UX: widen the desktop search bar without pushing nav/actions off-screen.
 - [x] Header UX: improve spacing between brand and nav categories; keep layout resilient when adding more links.
-- [ ] Mobile UX: consolidate header actions (search/theme/lang) for a cleaner top bar and easier tapping.
+- [x] Mobile UX: consolidate header actions (search/theme/lang) for a cleaner top bar and easier tapping.
+- [ ] Mobile UX: improve nav drawer auth actions (show Account when signed in, hide Sign in, add Sign out).
+- [ ] i18n: localize theme option labels (System/Light/Dark) and consider icon-based theme display.
 - [x] Frontend: add `/contact` route/page with phone/email and link it from header/footer.
 - [x] Global error handling / boundary route.
 - [x] API service layer + interceptors.

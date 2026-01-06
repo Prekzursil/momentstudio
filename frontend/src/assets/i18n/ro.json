@@ -13,7 +13,10 @@
     "admin": "Admin",
     "cart": "Coș",
     "signIn": "Autentificare",
-    "menu": "Meniu"
+    "menu": "Meniu",
+    "preferences": "Preferințe",
+    "theme": "Temă",
+    "language": "Limbă"
   },
   "footer": {
     "tagline": "Artă Realizată Manual",

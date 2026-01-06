@@ -1,6 +1,5 @@
 import { Component, EventEmitter, Input, Output, computed } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { ButtonComponent } from '../shared/button.component';
 import { NavDrawerComponent, NavLink } from '../shared/nav-drawer.component';
 import { NgIf, NgForOf } from '@angular/common';
 import { CartStore } from '../core/cart.store';
@@ -12,7 +11,7 @@ import { AuthService } from '../core/auth.service';
 @Component({
   selector: 'app-header',
   standalone: true,
-  imports: [RouterLink, ButtonComponent, NavDrawerComponent, NgIf, NgForOf, FormsModule, TranslateModule],
+  imports: [RouterLink, NavDrawerComponent, NgIf, NgForOf, FormsModule, TranslateModule],
   template: `
     <header class="border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
       <div class="max-w-7xl mx-auto px-4 sm:px-6">
@@ -80,7 +79,7 @@ import { AuthService } from '../core/auth.service';
             <a routerLink="/login" class="text-sm font-medium text-slate-700 hover:text-slate-900 hidden sm:inline dark:text-slate-200 dark:hover:text-white">
               {{ 'nav.signIn' | translate }}
             </a>
-            <div class="hidden sm:flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-2 py-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/70">
+            <div class="hidden lg:flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-2 py-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/70">
               <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
                 <span class="sr-only">Theme</span>
                 <select
@@ -108,19 +107,6 @@ import { AuthService } from '../core/auth.service';
                 </select>
               </label>
             </div>
-            <app-button label="Theme" size="sm" variant="ghost" class="sm:hidden" (action)="cycleTheme()"></app-button>
-            <label class="sm:hidden flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-              <span class="sr-only">Language</span>
-              <select
-                class="h-10 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
-                [ngModel]="language"
-                (ngModelChange)="onLanguageChange($event)"
-                aria-label="Language"
-              >
-                <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="en">EN</option>
-                <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="ro">RO</option>
-              </select>
-            </label>
           </div>
         </div>
         <nav class="hidden lg:flex items-center gap-6 border-t border-slate-200/60 py-2 text-sm font-medium text-slate-700 dark:border-slate-800/60 dark:text-slate-200 overflow-x-auto whitespace-nowrap">
@@ -158,7 +144,15 @@ import { AuthService } from '../core/auth.service';
         </form>
       </div>
     </div>
-    <app-nav-drawer [open]="drawerOpen" [links]="navLinks()" (closed)="drawerOpen = false"></app-nav-drawer>
+    <app-nav-drawer
+      [open]="drawerOpen"
+      [links]="navLinks()"
+      [themePreference]="themePreference"
+      (themeChange)="onThemeChange($event)"
+      [language]="language"
+      (languageChange)="onLanguageChange($event)"
+      (closed)="drawerOpen = false"
+    ></app-nav-drawer>
   `
 })
 export class HeaderComponent {
@@ -176,7 +170,8 @@ export class HeaderComponent {
       { label: 'nav.blog', path: '/blog' },
       { label: 'nav.shop', path: '/shop' },
       { label: 'nav.about', path: '/about' },
-      { label: 'nav.contact', path: '/contact' }
+      { label: 'nav.contact', path: '/contact' },
+      { label: 'nav.signIn', path: '/login' }
     ];
     if (this.auth.role() === 'admin') {
       links.push({ label: 'nav.admin', path: '/admin' });
@@ -194,12 +189,6 @@ export class HeaderComponent {
 
   onThemeChange(pref: ThemePreference): void {
     this.themeChange.emit(pref);
-  }
-
-  cycleTheme(): void {
-    const order: ThemePreference[] = ['system', 'light', 'dark'];
-    const next = order[(order.indexOf(this.themePreference) + 1) % order.length];
-    this.onThemeChange(next);
   }
 
   toggleDrawer(): void {
