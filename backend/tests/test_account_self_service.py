@@ -81,6 +81,9 @@ def test_account_export_and_deletion_flow(test_app: Dict[str, object]) -> None:
     scheduled_json = scheduled.json()
     assert scheduled_json["scheduled_for"] is not None
 
+    reschedule = client.post("/api/v1/auth/me/delete", json={"confirm": "DELETE"}, headers=auth_headers(token))
+    assert reschedule.status_code == 400, reschedule.text
+
     canceled = client.post("/api/v1/auth/me/delete/cancel", json={}, headers=auth_headers(token))
     assert canceled.status_code == 200
     assert canceled.json()["scheduled_for"] is None

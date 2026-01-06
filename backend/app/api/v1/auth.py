@@ -266,6 +266,14 @@ async def request_account_deletion(
     if payload.confirm.strip().upper() != "DELETE":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Type "DELETE" to confirm')
     now = datetime.now(timezone.utc)
+    scheduled_for = current_user.deletion_scheduled_for
+    if scheduled_for and scheduled_for.tzinfo is None:
+        scheduled_for = scheduled_for.replace(tzinfo=timezone.utc)
+    if scheduled_for and scheduled_for > now:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Account deletion is already scheduled. Cancel it before scheduling again.",
+        )
     current_user.deletion_requested_at = now
     current_user.deletion_scheduled_for = now + timedelta(hours=settings.account_deletion_cooldown_hours)
     session.add(current_user)
