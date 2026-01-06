@@ -11,8 +11,10 @@
     "about": "Our story",
     "contact": "Contact",
     "admin": "Admin",
+    "account": "Account",
     "cart": "Cart",
     "signIn": "Sign in",
+    "signOut": "Sign out",
     "menu": "Menu",
     "preferences": "Preferences",
     "theme": "Theme",
@@ -289,7 +291,10 @@
   },
   "theme": {
     "switched": "Theme updated",
-    "now": "Theme is now {{mode}}"
+    "now": "Theme is now {{mode}}",
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark"
   },
   "validation": {
     "required": "This field is required.",

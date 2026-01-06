@@ -81,26 +81,32 @@ import { AuthService } from '../core/auth.service';
             </a>
             <div class="hidden lg:flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-2 py-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/70">
               <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <span class="sr-only">Theme</span>
+                <span class="sr-only">{{ 'nav.theme' | translate }}</span>
                 <select
                   class="h-9 rounded-full bg-transparent px-2 text-sm text-slate-900 focus:outline-none [color-scheme:light] dark:text-slate-100 dark:[color-scheme:dark]"
                   [ngModel]="themePreference"
                   (ngModelChange)="onThemeChange($event)"
-                  aria-label="Theme"
+                  [attr.aria-label]="'nav.theme' | translate"
                 >
-                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="system">System</option>
-                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="light">Light</option>
-                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="dark">Dark</option>
+                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="system">
+                    {{ 'theme.system' | translate }}
+                  </option>
+                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="light">
+                    {{ 'theme.light' | translate }}
+                  </option>
+                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="dark">
+                    {{ 'theme.dark' | translate }}
+                  </option>
                 </select>
               </label>
               <div class="h-6 w-px bg-slate-200 dark:bg-slate-700"></div>
               <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <span class="sr-only">Language</span>
+                <span class="sr-only">{{ 'nav.language' | translate }}</span>
                 <select
                   class="h-9 rounded-full bg-transparent px-2 text-sm text-slate-900 focus:outline-none [color-scheme:light] dark:text-slate-100 dark:[color-scheme:dark]"
                   [ngModel]="language"
                   (ngModelChange)="onLanguageChange($event)"
-                  aria-label="Language"
+                  [attr.aria-label]="'nav.language' | translate"
                 >
                   <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="en">EN</option>
                   <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="ro">RO</option>
@@ -147,6 +153,8 @@ import { AuthService } from '../core/auth.service';
     <app-nav-drawer
       [open]="drawerOpen"
       [links]="navLinks()"
+      [isAuthenticated]="isAuthenticated()"
+      (signOut)="signOut()"
       [themePreference]="themePreference"
       (themeChange)="onThemeChange($event)"
       [language]="language"
@@ -164,15 +172,22 @@ export class HeaderComponent {
   searchOpen = false;
   searchQuery = '';
 
+  readonly isAuthenticated = computed(() => Boolean(this.auth.user()));
+
   readonly navLinks = computed<NavLink[]>(() => {
+    const authenticated = this.isAuthenticated();
     const links: NavLink[] = [
       { label: 'nav.home', path: '/' },
       { label: 'nav.blog', path: '/blog' },
       { label: 'nav.shop', path: '/shop' },
       { label: 'nav.about', path: '/about' },
-      { label: 'nav.contact', path: '/contact' },
-      { label: 'nav.signIn', path: '/login' }
+      { label: 'nav.contact', path: '/contact' }
     ];
+    if (authenticated) {
+      links.push({ label: 'nav.account', path: '/account' });
+    } else {
+      links.push({ label: 'nav.signIn', path: '/login' });
+    }
     if (this.auth.role() === 'admin') {
       links.push({ label: 'nav.admin', path: '/admin' });
     }
@@ -215,5 +230,11 @@ export class HeaderComponent {
     event.preventDefault();
     const q = this.searchQuery.trim();
     void this.router.navigate(['/shop'], { queryParams: q ? { q } : {} });
+  }
+
+  signOut(): void {
+    this.drawerOpen = false;
+    this.searchOpen = false;
+    this.auth.logout().subscribe();
   }
 }

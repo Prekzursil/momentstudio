@@ -1,5 +1,5 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
-import { NgClass, NgForOf } from '@angular/common';
+import { NgClass, NgForOf, NgIf } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { FormsModule } from '@angular/forms';
@@ -14,7 +14,7 @@ export type ThemePreference = 'system' | 'light' | 'dark';
 @Component({
   selector: 'app-nav-drawer',
   standalone: true,
-  imports: [NgForOf, NgClass, RouterLink, TranslateModule, FormsModule],
+  imports: [NgForOf, NgClass, NgIf, RouterLink, TranslateModule, FormsModule],
   template: `
     <div
       class="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm transition-opacity dark:bg-black/60"
@@ -58,11 +58,17 @@ export type ThemePreference = 'system' | 'light' | 'dark';
               class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
               [ngModel]="themePreference"
               (ngModelChange)="onThemeChange($event)"
-              aria-label="Theme"
+              [attr.aria-label]="'nav.theme' | translate"
             >
-              <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="system">System</option>
-              <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="light">Light</option>
-              <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="dark">Dark</option>
+              <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="system">
+                {{ 'theme.system' | translate }}
+              </option>
+              <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="light">
+                {{ 'theme.light' | translate }}
+              </option>
+              <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="dark">
+                {{ 'theme.dark' | translate }}
+              </option>
             </select>
           </label>
           <label class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
@@ -71,7 +77,7 @@ export type ThemePreference = 'system' | 'light' | 'dark';
               class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
               [ngModel]="language"
               (ngModelChange)="onLanguageChange($event)"
-              aria-label="Language"
+              [attr.aria-label]="'nav.language' | translate"
             >
               <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="en">EN</option>
               <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="ro">RO</option>
@@ -79,12 +85,23 @@ export type ThemePreference = 'system' | 'light' | 'dark';
           </label>
         </div>
       </div>
+      <div *ngIf="isAuthenticated" class="p-4 border-t border-slate-200 dark:border-slate-700">
+        <button
+          type="button"
+          class="w-full h-11 rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200 dark:hover:bg-rose-950/40"
+          (click)="onSignOut()"
+        >
+          {{ 'nav.signOut' | translate }}
+        </button>
+      </div>
     </aside>
   `
 })
 export class NavDrawerComponent {
   @Input() open = false;
   @Input() links: NavLink[] = [];
+  @Input() isAuthenticated = false;
+  @Output() signOut = new EventEmitter<void>();
   @Input() themePreference: ThemePreference = 'system';
   @Output() themeChange = new EventEmitter<ThemePreference>();
   @Input() language = 'en';
@@ -93,6 +110,11 @@ export class NavDrawerComponent {
 
   onClose(): void {
     this.closed.emit();
+  }
+
+  onSignOut(): void {
+    this.signOut.emit();
+    this.onClose();
   }
 
   onThemeChange(pref: ThemePreference): void {

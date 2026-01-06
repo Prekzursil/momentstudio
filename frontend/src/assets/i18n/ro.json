@@ -11,8 +11,10 @@
     "about": "Povestea noastră",
     "contact": "Contact",
     "admin": "Admin",
+    "account": "Cont",
     "cart": "Coș",
     "signIn": "Autentificare",
+    "signOut": "Deconectare",
     "menu": "Meniu",
     "preferences": "Preferințe",
     "theme": "Temă",
@@ -289,7 +291,10 @@
   },
   "theme": {
     "switched": "Tema a fost schimbată",
-    "now": "Tema este acum {{mode}}"
+    "now": "Tema este acum {{mode}}",
+    "system": "Sistem",
+    "light": "Deschisă",
+    "dark": "Întunecată"
   },
   "validation": {
     "required": "Acest câmp este obligatoriu.",
