@@ -20,7 +20,7 @@ import { AuthService } from '../../core/auth.service';
     <section class="grid gap-10">
       <div class="grid gap-6 lg:grid-cols-[1.2fr_1fr] items-center">
         <div class="grid gap-4">
-          <p class="font-cinzel font-semibold text-sm tracking-[0.3em] text-slate-500 dark:text-slate-400">{{ 'app.tagline' | translate }}</p>
+          <p class="font-cinzel font-semibold text-[28px] tracking-[0.3em] text-slate-500 dark:text-slate-400">{{ 'app.tagline' | translate }}</p>
           <h1 class="text-3xl sm:text-4xl lg:text-5xl font-semibold leading-tight text-slate-900 dark:text-slate-50">
             {{ 'home.headline' | translate }}
           </h1>
