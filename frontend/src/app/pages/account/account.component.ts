@@ -315,6 +315,7 @@ import { CartStore } from '../../core/cart.store';
                   [(ngModel)]="googlePassword"
                   autocomplete="current-password"
                   placeholder="Confirm password"
+                  aria-label="Confirm password for Google account"
                   class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
                 />
                 <app-button
@@ -461,6 +462,7 @@ import { CartStore } from '../../core/cart.store';
                     name="deletionConfirmText"
                     [(ngModel)]="deletionConfirmText"
                     placeholder="DELETE"
+                    aria-label="Confirm account deletion"
                     class="rounded-lg border border-rose-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-rose-900/40 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
                   />
                   <app-button
