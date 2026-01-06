@@ -197,9 +197,9 @@ import { CartStore } from '../../core/cart.store';
                 name="profileTheme"
                 [(ngModel)]="profileThemePreference"
               >
-                <option value="system">System</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
+                <option value="system">{{ 'theme.system' | translate }}</option>
+                <option value="light">{{ 'theme.light' | translate }}</option>
+                <option value="dark">{{ 'theme.dark' | translate }}</option>
               </select>
             </label>
           </div>

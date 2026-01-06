@@ -1,7 +1,8 @@
 {
   "app": {
     "name": "momentstudio",
-    "tagline": "art. handcrafted"
+    "tagline": "art. handcrafted",
+    "brandMarkAlt": "momentstudio flower logo"
   },
   "nav": {
     "home": "Home",
@@ -10,9 +11,15 @@
     "about": "Our story",
     "contact": "Contact",
     "admin": "Admin",
+    "account": "Account",
     "cart": "Cart",
     "signIn": "Sign in",
-    "menu": "Menu"
+    "register": "Register",
+    "signOut": "Sign out",
+    "menu": "Menu",
+    "preferences": "Preferences",
+    "theme": "Theme",
+    "language": "Language"
   },
   "footer": {
     "tagline": "Handcrafted Art",
@@ -285,7 +292,10 @@
   },
   "theme": {
     "switched": "Theme updated",
-    "now": "Theme is now {{mode}}"
+    "now": "Theme is now {{mode}}",
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark"
   },
   "validation": {
     "required": "This field is required.",
