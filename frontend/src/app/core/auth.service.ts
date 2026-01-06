@@ -13,9 +13,12 @@ export interface AuthUser {
   id: string;
   email: string;
   name?: string | null;
+  phone?: string | null;
+  avatar_url?: string | null;
   email_verified?: boolean;
   notify_blog_comments?: boolean;
   notify_blog_comment_replies?: boolean;
+  notify_marketing?: boolean;
   google_sub?: string | null;
   google_email?: string | null;
   google_picture_url?: string | null;
@@ -106,11 +109,23 @@ export class AuthService {
   updateNotificationPreferences(payload: {
     notify_blog_comments?: boolean | null;
     notify_blog_comment_replies?: boolean | null;
+    notify_marketing?: boolean | null;
   }): Observable<AuthUser> {
     if (!this.isAuthenticated()) {
       return of({} as AuthUser);
     }
     return this.api.patch<AuthUser>('/auth/me/notifications', payload).pipe(tap((user) => this.setUser(user)));
+  }
+
+  updateProfile(payload: {
+    name?: string | null;
+    phone?: string | null;
+    preferred_language?: string | null;
+  }): Observable<AuthUser> {
+    if (!this.isAuthenticated()) {
+      return of({} as AuthUser);
+    }
+    return this.api.patch<AuthUser>('/auth/me', payload).pipe(tap((user) => this.setUser(user)));
   }
 
   requestEmailVerification(): Observable<{ detail: string }> {

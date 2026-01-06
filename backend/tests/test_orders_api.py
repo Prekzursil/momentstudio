@@ -198,6 +198,16 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     assert "Items:" in packing.text
     assert sent["shipped"] == 1
 
+    receipt = client.get(f"/api/v1/orders/{order_id}/receipt", headers=auth_headers(token))
+    assert receipt.status_code == 200
+    assert receipt.headers.get("content-type", "").startswith("application/pdf")
+    assert receipt.headers.get("content-disposition", "").startswith("attachment;")
+    assert "Receipt for order" in receipt.text
+
+    other_token, _ = create_user_token(SessionLocal, email="otherbuyer@example.com")
+    forbidden = client.get(f"/api/v1/orders/{order_id}/receipt", headers=auth_headers(other_token))
+    assert forbidden.status_code == 404
+
     delivery = client.post(f"/api/v1/orders/admin/{order_id}/delivery-email", headers=auth_headers(admin_token))
     assert delivery.status_code == 200
     assert sent["delivered"] == 1

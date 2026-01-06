@@ -128,3 +128,31 @@ def test_password_reset_flow(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str
 
     login = client.post("/api/v1/auth/login", json={"email": "reset@example.com", "password": "newsecret"})
     assert login.status_code == 200
+
+
+def test_update_profile_me(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    res = client.post("/api/v1/auth/register", json={"email": "me@example.com", "password": "supersecret", "name": "Old"})
+    assert res.status_code == 201, res.text
+    token = res.json()["tokens"]["access_token"]
+
+    patch = client.patch(
+        "/api/v1/auth/me",
+        json={"name": "New Name", "phone": "+40723204204", "preferred_language": "ro"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert patch.status_code == 200, patch.text
+    body = patch.json()
+    assert body["name"] == "New Name"
+    assert body["phone"] == "+40723204204"
+    assert body["preferred_language"] == "ro"
+    assert body["notify_marketing"] is False
+
+    cleared = client.patch(
+        "/api/v1/auth/me",
+        json={"phone": "   "},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert cleared.status_code == 200
+    assert cleared.json()["phone"] is None
