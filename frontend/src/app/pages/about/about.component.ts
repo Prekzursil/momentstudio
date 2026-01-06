@@ -47,7 +47,7 @@ interface ContentBlock {
             class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
             loading="lazy"
           />
-          <div class="markdown text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
+          <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
         </div>
       </app-card>
     </app-container>
