@@ -18,17 +18,14 @@ import { AuthService } from '../core/auth.service';
       <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-6">
         <a routerLink="/" class="flex items-center gap-3 min-w-0">
           <img
-            class="h-10 w-auto max-w-[220px] dark:hidden"
-            src="assets/brand/moment-studio-light.svg"
-            [alt]="'app.name' | translate"
+            class="h-10 w-auto shrink-0 hidden lg:block"
+            src="assets/brand/momentstudio-flower.png"
+            alt=""
             loading="eager"
           />
-          <img
-            class="h-10 w-auto max-w-[220px] hidden dark:block"
-            src="assets/brand/moment-studio-dark.svg"
-            [alt]="'app.name' | translate"
-            loading="eager"
-          />
+          <span class="text-2xl font-semibold text-slate-900 dark:text-slate-100 truncate">
+            {{ 'app.name' | translate }}
+          </span>
         </a>
         <nav class="hidden xl:flex items-center gap-6 text-sm font-medium text-slate-700 dark:text-slate-200">
           <a routerLink="/" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.home' | translate }}</a>

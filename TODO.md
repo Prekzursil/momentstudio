@@ -177,8 +177,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Header: avoid search/nav overlap on medium screens (use nav drawer + show search on wide screens).
 - [x] Header: keep product search accessible on windowed/small screens (show search at `lg`, provide a search overlay below `lg`).
 - [x] UI: hide admin CTA/nav items unless the signed-in user is an admin.
-- [x] Branding: rebrand AdrianaArt → Moment Studio across UI/docs/meta and backend app name.
-- [x] Branding: add Moment Studio logo assets and wire them into the header for light/dark themes.
+- [x] Branding: rebrand AdrianaArt → momentstudio across UI/docs/meta and backend app name.
+- [x] Branding: update header branding (flower mark + momentstudio wordmark).
 - [x] Frontend: add `/contact` route/page with phone/email and link it from header/footer.
 - [x] Global error handling / boundary route.
 - [x] API service layer + interceptors.

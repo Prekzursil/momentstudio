@@ -106,7 +106,7 @@ export class AboutComponent implements OnInit, OnDestroy {
   }
 
   private setMetaTags(title: string, body: string): void {
-    const pageTitle = title ? `${title} | Moment Studio` : 'About | Moment Studio';
+    const pageTitle = title ? `${title} | momentstudio` : 'About | momentstudio';
     const description = (body || '').replace(/\s+/g, ' ').trim().slice(0, 160);
     this.title.setTitle(pageTitle);
     if (description) {

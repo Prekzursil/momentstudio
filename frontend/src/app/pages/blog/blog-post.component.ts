@@ -474,7 +474,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   }
 
   private setMetaTags(post: BlogPost): void {
-    const pageTitle = `${post.title} | Moment Studio`;
+    const pageTitle = `${post.title} | momentstudio`;
     const description = (post.summary || post.body_markdown || '').replace(/\s+/g, ' ').trim().slice(0, 160);
     this.title.setTitle(pageTitle);
     if (description) {
@@ -484,7 +484,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     }
     this.meta.updateTag({ property: 'og:title', content: pageTitle });
     this.meta.updateTag({ property: 'og:type', content: 'article' });
-    this.meta.updateTag({ property: 'og:site_name', content: 'Moment Studio' });
+    this.meta.updateTag({ property: 'og:site_name', content: 'momentstudio' });
 
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     const apiBaseUrl = (appConfig.apiBaseUrl || '/api/v1').replace(/\/$/, '');

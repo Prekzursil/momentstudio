@@ -1,7 +1,7 @@
 {
   "app": {
-    "name": "Moment Studio",
-    "tagline": "Handcrafted ceramic art"
+    "name": "momentstudio",
+    "tagline": "Art. Handcrafted."
   },
   "nav": {
     "home": "Home",
@@ -15,7 +15,7 @@
     "menu": "Menu"
   },
   "footer": {
-    "tagline": "Handcrafted ceramics",
+    "tagline": "Handcrafted Art",
     "instagram": "Instagram",
     "facebook": "Facebook",
     "contact": "Contact"
@@ -24,13 +24,13 @@
     "loading": "Loading about page…",
     "errorTitle": "Could not load About content.",
     "errorCopy": "Please try again in a moment.",
-    "metaTitle": "About Moment Studio",
-    "metaDescription": "Learn about Moment Studio and the story behind our handcrafted ceramics."
+    "metaTitle": "About momentstudio",
+    "metaDescription": "Learn about momentstudio and the story behind our handcrafted ceramics."
   },
   "contact": {
     "title": "Contact",
-    "metaTitle": "Contact | Moment Studio",
-    "metaDescription": "Get in touch with Moment Studio for questions, custom orders, or support.",
+    "metaTitle": "Contact | momentstudio",
+    "metaDescription": "Get in touch with momentstudio for questions, custom orders, or support.",
     "intro": "Questions about an order, a custom piece, or a collaboration? We'd love to hear from you.",
     "replyTime": "We typically reply within 1–2 business days.",
     "phoneLabel": "Phone",
@@ -75,8 +75,8 @@
     "emptyTitle": "No posts yet",
     "emptyCopy": "Check back soon for new articles.",
     "pageMeta": "Page {{page}} of {{totalPages}} · {{totalItems}} posts",
-    "metaTitle": "Blog | Moment Studio",
-    "metaDescription": "Stories, updates, and behind-the-scenes from Moment Studio.",
+    "metaTitle": "Blog | momentstudio",
+    "metaDescription": "Stories, updates, and behind-the-scenes from momentstudio.",
     "prev": "Prev",
     "next": "Next",
     "post": {
@@ -85,8 +85,8 @@
       "loadingTitle": "Loading…",
       "errorTitle": "Could not load this post.",
       "errorCopy": "Please try again in a moment.",
-      "metaTitle": "Blog post | Moment Studio",
-      "metaDescription": "Read the latest article on Moment Studio."
+      "metaTitle": "Blog post | momentstudio",
+      "metaDescription": "Read the latest article on momentstudio."
     },
     "comments": {
       "title": "Comments ({{count}})",
@@ -120,9 +120,9 @@
     }
   },
   "home": {
-    "headline": "Build the Moment Studio storefront experience.",
+    "headline": "Build the momentstudio storefront experience.",
     "subhead": "A crisp Angular starter with Tailwind design tokens, shared components, and a responsive shell ready for product, cart, and content flows.",
-    "metaTitle": "Moment Studio | Handcrafted ceramics storefront",
+    "metaTitle": "momentstudio | Handcrafted ceramics storefront",
     "metaDescription": "Discover handcrafted ceramics with curated collections, rich product detail, and smooth checkout.",
     "ctaShop": "Shop now",
     "ctaAdmin": "View admin",
@@ -171,8 +171,8 @@
     "errorTitle": "We hit a snag loading products.",
     "errorCopy": "Check your connection or retry in a moment.",
     "pageMeta": "Page {{page}} of {{totalPages}} · {{totalItems}} items",
-    "metaTitle": "Shop handcrafted ceramics | Moment Studio",
-    "metaDescription": "Browse handcrafted ceramic pieces by Moment Studio. Filter by category, price, and tags."
+    "metaTitle": "Shop handcrafted ceramics | momentstudio",
+    "metaDescription": "Browse handcrafted ceramic pieces by momentstudio. Filter by category, price, and tags."
   },
   "product": {
     "viewDetails": "View details",
@@ -189,8 +189,8 @@
     "notFound": "Product not found",
     "addedTitle": "Added to cart",
     "addedBody": "{{qty}} × {{name}} added to cart",
-    "metaTitle": "{{name}} | Moment Studio",
-    "metaDescriptionFallback": "Discover {{name}} — a handcrafted piece from Moment Studio."
+    "metaTitle": "{{name}} | momentstudio",
+    "metaDescriptionFallback": "Discover {{name}} — a handcrafted piece from momentstudio."
   },
   "cart": {
     "title": "Your cart",
