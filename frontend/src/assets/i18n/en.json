@@ -7,7 +7,7 @@
     "home": "Home",
     "blog": "Blog",
     "shop": "Shop",
-    "about": "About",
+    "about": "Our story",
     "contact": "Contact",
     "admin": "Admin",
     "cart": "Cart",
@@ -21,11 +21,11 @@
     "contact": "Contact"
   },
   "about": {
-    "loading": "Loading about page…",
-    "errorTitle": "Could not load About content.",
+    "loading": "Loading story…",
+    "errorTitle": "Could not load our story.",
     "errorCopy": "Please try again in a moment.",
-    "metaTitle": "About momentstudio",
-    "metaDescription": "Learn about momentstudio and the story behind our handcrafted ceramics."
+    "metaTitle": "Our story",
+    "metaDescription": "Learn about momentstudio and the story behind our handcrafted art."
   },
   "contact": {
     "title": "Contact",

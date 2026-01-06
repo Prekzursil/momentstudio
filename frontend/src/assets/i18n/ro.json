@@ -7,7 +7,7 @@
     "home": "Acasă",
     "blog": "Blog",
     "shop": "Magazin",
-    "about": "Despre",
+    "about": "Povestea noastră",
     "contact": "Contact",
     "admin": "Admin",
     "cart": "Coș",
@@ -21,11 +21,11 @@
     "contact": "Contact"
   },
   "about": {
-    "loading": "Se încarcă pagina Despre…",
-    "errorTitle": "Nu am putut încărca pagina Despre.",
+    "loading": "Se încarcă pagina Povestea noastră…",
+    "errorTitle": "Nu am putut încărca pagina Povestea noastră.",
     "errorCopy": "Încearcă din nou în câteva momente.",
-    "metaTitle": "Despre momentstudio",
-    "metaDescription": "Află povestea momentstudio și detalii despre ceramica noastră realizată manual."
+    "metaTitle": "Povestea noastră",
+    "metaDescription": "Află povestea momentstudio și detalii despre arta noastră realizată manual."
   },
   "contact": {
     "title": "Contact",
