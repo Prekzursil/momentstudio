@@ -1,7 +1,8 @@
 {
   "app": {
     "name": "momentstudio",
-    "tagline": "artă. meșteșug"
+    "tagline": "artă. meșteșug",
+    "brandMarkAlt": "logo cu floare momentstudio"
   },
   "nav": {
     "home": "Acasă",

@@ -1,7 +1,8 @@
 {
   "app": {
     "name": "momentstudio",
-    "tagline": "art. handcrafted"
+    "tagline": "art. handcrafted",
+    "brandMarkAlt": "momentstudio flower logo"
   },
   "nav": {
     "home": "Home",

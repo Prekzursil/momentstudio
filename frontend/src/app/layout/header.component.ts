@@ -20,7 +20,7 @@ import { AuthService } from '../core/auth.service';
           <img
             class="h-10 w-auto shrink-0 hidden lg:block"
             src="assets/brand/momentstudio-flower.png"
-            alt=""
+            [alt]="'app.brandMarkAlt' | translate"
             loading="eager"
           />
           <span class="text-2xl font-semibold text-slate-900 dark:text-slate-100 truncate">
