@@ -25,14 +25,14 @@ describe('ContactComponent', () => {
     translate.setTranslation(
       'en',
       {
-        contact: { metaTitle: 'Contact | Moment Studio', metaDescription: 'Contact desc' }
+        contact: { metaTitle: 'Contact | momentstudio', metaDescription: 'Contact desc' }
       },
       true
     );
     translate.setTranslation(
       'ro',
       {
-        contact: { metaTitle: 'Contact | Moment Studio (RO)', metaDescription: 'Descriere contact' }
+        contact: { metaTitle: 'Contact | momentstudio (RO)', metaDescription: 'Descriere contact' }
       },
       true
     );
@@ -44,10 +44,10 @@ describe('ContactComponent', () => {
     const cmp = fixture.componentInstance;
     cmp.ngOnInit();
 
-    expect(title.setTitle).toHaveBeenCalledWith('Contact | Moment Studio');
+    expect(title.setTitle).toHaveBeenCalledWith('Contact | momentstudio');
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Contact desc' });
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:description', content: 'Contact desc' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'Contact | Moment Studio' });
+    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'Contact | momentstudio' });
   });
 
   it('updates meta tags when language changes', () => {
@@ -60,10 +60,10 @@ describe('ContactComponent', () => {
 
     translate.use('ro');
 
-    expect(title.setTitle).toHaveBeenCalledWith('Contact | Moment Studio (RO)');
+    expect(title.setTitle).toHaveBeenCalledWith('Contact | momentstudio (RO)');
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Descriere contact' });
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:description', content: 'Descriere contact' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'Contact | Moment Studio (RO)' });
+    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'Contact | momentstudio (RO)' });
   });
 
   it('stops updating after destroy', () => {
@@ -81,4 +81,3 @@ describe('ContactComponent', () => {
     expect(meta.updateTag).not.toHaveBeenCalled();
   });
 });
-

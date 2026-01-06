@@ -42,7 +42,7 @@ def upgrade() -> None:
         sa.column("sort_order", sa.Integer()),
     )
     defaults = [
-        ("home.hero", {"headline": "Welcome to Moment Studio", "cta": "Shop now", "cta_link": "/shop"}),
+        ("home.hero", {"headline": "Welcome to momentstudio", "cta": "Shop now", "cta_link": "/shop"}),
         ("home.grid", {"sections": ["featured", "new", "bestsellers"]}),
         ("home.testimonials", {"quotes": []}),
         ("page.faq", {"priority": 1}),

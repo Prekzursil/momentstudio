@@ -76,7 +76,7 @@ describe('BlogPostComponent', () => {
     cmp.load();
 
     expect(blog.getPost).toHaveBeenCalledWith('first-post', 'en');
-    expect(title.setTitle).toHaveBeenCalledWith('Hello | Moment Studio');
+    expect(title.setTitle).toHaveBeenCalledWith('Hello | momentstudio');
 
     const ogImageCall = meta.updateTag.calls.allArgs().find((args) => args[0]?.property === 'og:image');
     expect(ogImageCall).toBeTruthy();

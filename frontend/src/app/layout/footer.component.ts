@@ -96,7 +96,7 @@ export class FooterComponent {
       avatarClass: 'bg-gradient-to-br from-fuchsia-500 to-rose-500'
     },
     {
-      name: 'Moment Studio',
+      name: 'momentstudio',
       url: 'https://www.instagram.com/adrianaartizanat?igsh=ZmZmaDU1MGcxZHEy',
       initials: 'MS',
       avatarClass: 'bg-gradient-to-br from-amber-500 to-rose-500'
@@ -111,7 +111,7 @@ export class FooterComponent {
       avatarClass: 'bg-gradient-to-br from-blue-600 to-sky-500'
     },
     {
-      name: 'Moment Studio',
+      name: 'momentstudio',
       url: 'https://www.facebook.com/share/1APqKJM6Zi/',
       initials: 'MS',
       avatarClass: 'bg-gradient-to-br from-blue-600 to-fuchsia-500'

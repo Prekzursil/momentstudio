@@ -1,4 +1,4 @@
-# Moment Studio
+# momentstudio
 
 A modern e‑commerce site for showcasing and selling handmade / artisanal products (ceramics, decor, textiles, etc.).
 

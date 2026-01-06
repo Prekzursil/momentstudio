@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 56" role="img" aria-label="Moment Studio">
-  <title>Moment Studio</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 56" role="img" aria-label="momentstudio">
+  <title>momentstudio</title>
   <defs>
     <linearGradient id="msGradient" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#f9a8d4" />
@@ -27,6 +27,6 @@
     font-weight="700"
     fill="#0f172a"
   >
-    Moment Studio
+    momentstudio
   </text>
 </svg>

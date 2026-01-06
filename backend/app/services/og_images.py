@@ -37,7 +37,7 @@ def _load_font(size: int, *, bold: bool = False) -> Font:
     return ImageFont.load_default()
 
 
-def render_blog_post_og(*, title: str, subtitle: str | None = None, brand: str = "Moment Studio") -> bytes:
+def render_blog_post_og(*, title: str, subtitle: str | None = None, brand: str = "momentstudio") -> bytes:
     title = (title or "").strip() or "Blog"
     subtitle = (subtitle or "").strip() or ""
 
