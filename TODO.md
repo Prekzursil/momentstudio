@@ -186,7 +186,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Mobile UX: consolidate header actions (search/theme/lang) for a cleaner top bar and easier tapping.
 - [x] Mobile UX: improve nav drawer auth actions (show Account when signed in, hide Sign in, add Sign out).
 - [x] i18n: localize theme option labels (System/Light/Dark) and consider icon-based theme display.
-- [ ] Mobile UX: show signed-in user summary in nav drawer (name/email + optional avatar) for better context.
+- [x] Mobile UX: show signed-in user summary in nav drawer (name/email + optional avatar) for better context.
+- [ ] Auth: add unique username field for users (required for new accounts; backfill existing users).
+- [ ] Auth: allow login via username or email (single identifier field in UI + backend support).
+- [ ] Profile: add non-unique display name discriminator (e.g., `name#1234`) and decide where to show it (comments, account, admin).
 - [ ] Theme UX: replace theme `<select>` with an icon segmented control (System/Light/Dark) on desktop + drawer.
 - [x] Frontend: add `/contact` route/page with phone/email and link it from header/footer.
 - [x] Global error handling / boundary route.

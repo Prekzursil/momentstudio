@@ -11,6 +11,13 @@ export interface NavLink {
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
+export interface NavDrawerUser {
+  email: string;
+  name?: string | null;
+  avatar_url?: string | null;
+  google_picture_url?: string | null;
+}
+
 @Component({
   selector: 'app-nav-drawer',
   standalone: true,
@@ -36,6 +43,33 @@ export type ThemePreference = 'system' | 'light' | 'dark';
         >
           ✕
         </button>
+      </div>
+      <div *ngIf="user" class="p-4 border-b border-slate-200 dark:border-slate-700">
+        <div class="flex items-center gap-3">
+          <img
+            *ngIf="avatarUrl() as src"
+            class="h-10 w-10 rounded-full object-cover border border-slate-200 dark:border-slate-800 shrink-0"
+            [src]="src"
+            alt=""
+            loading="lazy"
+            referrerpolicy="no-referrer"
+          />
+          <div
+            *ngIf="!avatarUrl()"
+            class="h-10 w-10 rounded-full bg-slate-200 text-slate-700 grid place-items-center font-semibold dark:bg-slate-800 dark:text-slate-200 shrink-0"
+            aria-hidden="true"
+          >
+            {{ initials() }}
+          </div>
+          <div class="min-w-0">
+            <div class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+              {{ displayName() }}
+            </div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 truncate">
+              {{ user.email }}
+            </div>
+          </div>
+        </div>
       </div>
       <nav class="p-4 grid gap-3">
         <a
@@ -100,6 +134,7 @@ export type ThemePreference = 'system' | 'light' | 'dark';
 export class NavDrawerComponent {
   @Input() open = false;
   @Input() links: NavLink[] = [];
+  @Input() user: NavDrawerUser | null = null;
   @Input() isAuthenticated = false;
   @Output() signOut = new EventEmitter<void>();
   @Input() themePreference: ThemePreference = 'system';
@@ -123,5 +158,30 @@ export class NavDrawerComponent {
 
   onLanguageChange(lang: string): void {
     this.languageChange.emit(lang);
+  }
+
+  avatarUrl(): string | null {
+    const user = this.user;
+    if (!user) return null;
+    return user.avatar_url || user.google_picture_url || null;
+  }
+
+  displayName(): string {
+    const user = this.user;
+    if (!user) return '';
+    return (user.name ?? '').trim() || user.email;
+  }
+
+  initials(): string {
+    const user = this.user;
+    if (!user) return '?';
+    const name = (user.name ?? '').trim();
+    const src = name || user.email;
+    const letters = src
+      .split(/[\s._-]+/)
+      .filter(Boolean)
+      .map((p) => p[0]?.toUpperCase())
+      .filter(Boolean);
+    return (letters.slice(0, 2).join('') || src.slice(0, 1).toUpperCase()) as string;
   }
 }

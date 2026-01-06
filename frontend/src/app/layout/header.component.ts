@@ -76,8 +76,19 @@ import { AuthService } from '../core/auth.service';
                 {{ cartCount() }}
               </span>
             </a>
-            <a routerLink="/login" class="text-sm font-medium text-slate-700 hover:text-slate-900 hidden sm:inline dark:text-slate-200 dark:hover:text-white">
+            <a
+              *ngIf="!isAuthenticated()"
+              routerLink="/login"
+              class="text-sm font-medium text-slate-700 hover:text-slate-900 hidden sm:inline dark:text-slate-200 dark:hover:text-white"
+            >
               {{ 'nav.signIn' | translate }}
+            </a>
+            <a
+              *ngIf="isAuthenticated()"
+              routerLink="/account"
+              class="text-sm font-medium text-slate-700 hover:text-slate-900 hidden sm:inline dark:text-slate-200 dark:hover:text-white"
+            >
+              {{ 'nav.account' | translate }}
             </a>
             <div class="hidden lg:flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-2 py-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/70">
               <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
@@ -153,6 +164,7 @@ import { AuthService } from '../core/auth.service';
     <app-nav-drawer
       [open]="drawerOpen"
       [links]="navLinks()"
+      [user]="currentUser()"
       [isAuthenticated]="isAuthenticated()"
       (signOut)="signOut()"
       [themePreference]="themePreference"
@@ -173,6 +185,7 @@ export class HeaderComponent {
   searchQuery = '';
 
   readonly isAuthenticated = computed(() => Boolean(this.auth.user()));
+  readonly currentUser = computed(() => this.auth.user());
 
   readonly navLinks = computed<NavLink[]>(() => {
     const authenticated = this.isAuthenticated();
@@ -187,6 +200,7 @@ export class HeaderComponent {
       links.push({ label: 'nav.account', path: '/account' });
     } else {
       links.push({ label: 'nav.signIn', path: '/login' });
+      links.push({ label: 'nav.register', path: '/register' });
     }
     if (this.auth.role() === 'admin') {
       links.push({ label: 'nav.admin', path: '/admin' });
