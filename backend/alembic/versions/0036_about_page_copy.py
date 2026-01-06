@@ -109,7 +109,8 @@ def upgrade() -> None:
         return
 
     block_id, current_version, meta, lang, published_at = row
-    new_version = int(current_version or 1) + 1
+    # Be resilient to unexpected NULLs (some environments may have legacy rows).
+    new_version = int(current_version or 0) + 1
     effective_published_at = published_at or now
     effective_lang = lang or "en"
 
