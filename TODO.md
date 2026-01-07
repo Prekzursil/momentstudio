@@ -236,8 +236,8 @@ Below is a structured checklist you can turn into issues.
 - [x] SEO meta tags per product/category.
 - [x] Shop: add API-powered price bounds (min/max) so the price range UI can cap to real data without an extra list request (and optionally per-filter bounds).
 - [x] Frontend: extract repeated image placeholder-on-error handlers into a shared directive/helper for consistency.
-- [x] Pricing: show EN approx EUR/USD for RON prices (display-only; checkout remains in RON).
-- [ ] Pricing: make FX rates admin-configurable or auto-refreshed (optional).
+- [x] Pricing: show EN approx EUR/USD for RON prices (display-only; checkout remains in RON) using live FX rates.
+- [ ] Pricing: add FX rate source/TTL settings + optional admin override/fallback.
 - [ ] Pricing: enforce single-currency RON across products/orders and document the policy.
 
 ## Blog & Community

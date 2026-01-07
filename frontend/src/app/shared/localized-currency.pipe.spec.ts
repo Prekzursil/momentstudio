@@ -1,12 +1,21 @@
 import { TestBed } from '@angular/core/testing';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
+import { FxRatesService } from '../core/fx-rates.service';
 import { LocalizedCurrencyPipe } from './localized-currency.pipe';
+
+class FxRatesServiceStub {
+  ensureLoaded(): void {}
+  get snapshot() {
+    return { base: 'RON', eurPerRon: 0.2, usdPerRon: 0.22, loaded: true };
+  }
+}
 
 describe('LocalizedCurrencyPipe', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [TranslateModule.forRoot()]
+      imports: [TranslateModule.forRoot()],
+      providers: [{ provide: FxRatesService, useClass: FxRatesServiceStub }]
     });
   });
 
@@ -40,4 +49,3 @@ describe('LocalizedCurrencyPipe', () => {
     expect(result).not.toContain('≈');
   });
 });
-
