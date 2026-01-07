@@ -109,6 +109,7 @@ export class CartComponent implements OnInit {
     { label: 'nav.cart' }
   ];
   errorMsg = '';
+  private readonly fallbackImage = 'assets/placeholder/product-placeholder.svg';
 
   constructor(private cart: CartStore, private translate: TranslateService) {}
 
@@ -123,9 +124,9 @@ export class CartComponent implements OnInit {
   onImageError(event: Event): void {
     const target = event.target as HTMLImageElement | null;
     if (!target) return;
-    const fallback = 'assets/placeholder/product-placeholder.svg';
-    if (target.src.includes(fallback)) return;
-    target.src = fallback;
+    if (target.dataset['fallbackApplied'] === 'true') return;
+    target.dataset['fallbackApplied'] = 'true';
+    target.src = this.fallbackImage;
   }
 
   onQuantityChange(id: string, value: number): void {

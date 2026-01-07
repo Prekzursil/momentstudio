@@ -87,30 +87,38 @@ import { Meta, Title } from '@angular/platform-browser';
               <div class="grid gap-2">
                 <input
                   type="range"
-                  min="0"
-                  max="500"
-                  step="5"
+                  [min]="priceMinBound"
+                  [max]="priceMaxBound"
+                  [step]="priceStep"
                   class="w-full accent-indigo-600"
                   [(ngModel)]="filters.min_price"
-                  (change)="applyFilters()"
+                  (change)="onPriceCommit('min')"
                   aria-label="Minimum price"
                 />
                 <input
                   type="range"
-                  min="0"
-                  max="500"
-                  step="5"
+                  [min]="priceMinBound"
+                  [max]="priceMaxBound"
+                  [step]="priceStep"
                   class="w-full accent-indigo-600"
                   [(ngModel)]="filters.max_price"
-                  (change)="applyFilters()"
+                  (change)="onPriceCommit('max')"
                   aria-label="Maximum price"
                 />
               </div>
               <div class="grid grid-cols-2 gap-3">
-                <app-input [label]="'shop.min' | translate" type="number" [(value)]="filters.min_price" (ngModelChange)="applyFilters()">
-                </app-input>
-                <app-input [label]="'shop.max' | translate" type="number" [(value)]="filters.max_price" (ngModelChange)="applyFilters()">
-                </app-input>
+                <app-input
+                  [label]="'shop.min' | translate"
+                  type="number"
+                  [value]="filters.min_price"
+                  (valueChange)="onPriceTextChange('min', $event)"
+                ></app-input>
+                <app-input
+                  [label]="'shop.max' | translate"
+                  type="number"
+                  [value]="filters.max_price"
+                  (valueChange)="onPriceTextChange('max', $event)"
+                ></app-input>
               </div>
               <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'shop.priceHint' | translate }}</p>
             </div>
@@ -219,8 +227,8 @@ export class ShopComponent implements OnInit, OnDestroy {
   filters: {
     search: string;
     category_slug: string;
-    min_price?: number | string;
-    max_price?: number | string;
+    min_price: number;
+    max_price: number;
     tags: Set<string>;
     sort: SortOption;
     page: number;
@@ -228,11 +236,19 @@ export class ShopComponent implements OnInit, OnDestroy {
   } = {
     search: '',
     category_slug: '',
+    min_price: 0,
+    max_price: 500,
     tags: new Set<string>(),
     sort: 'newest',
     page: 1,
     limit: 12
   };
+
+  readonly priceMinBound = 0;
+  priceMaxBound = 500;
+  readonly priceStep = 5;
+  private hasMinQuery = false;
+  private hasMaxQuery = false;
 
   sortOptions: { label: string; value: SortOption }[] = [
     { label: 'shop.sortNew', value: 'newest' },
@@ -257,6 +273,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.setMetaTags();
     this.langSub = this.translate.onLangChange.subscribe(() => this.setMetaTags());
+    this.loadPriceBounds();
     const dataCategories = (this.route.snapshot.data['categories'] as Category[]) ?? [];
     if (dataCategories.length) {
       this.categories = dataCategories;
@@ -280,6 +297,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   loadProducts(pushQuery = true): void {
+    this.normalizePriceRange();
     this.loading.set(true);
     this.hasError.set(false);
     if (pushQuery) {
@@ -289,8 +307,8 @@ export class ShopComponent implements OnInit, OnDestroy {
       .listProducts({
         search: this.filters.search || undefined,
         category_slug: this.filters.category_slug || undefined,
-        min_price: this.filters.min_price ? Number(this.filters.min_price) : undefined,
-        max_price: this.filters.max_price ? Number(this.filters.max_price) : undefined,
+        min_price: this.filters.min_price > this.priceMinBound ? this.filters.min_price : undefined,
+        max_price: this.filters.max_price < this.priceMaxBound ? this.filters.max_price : undefined,
         tags: Array.from(this.filters.tags),
         sort: this.filters.sort,
         page: this.filters.page,
@@ -338,6 +356,22 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.loadProducts();
   }
 
+  onPriceCommit(changed: 'min' | 'max'): void {
+    this.normalizePriceRange(changed);
+    this.applyFilters();
+  }
+
+  onPriceTextChange(changed: 'min' | 'max', raw: string | number): void {
+    const parsed = this.parsePrice(raw);
+    if (changed === 'min') {
+      this.filters.min_price = parsed ?? this.priceMinBound;
+    } else {
+      this.filters.max_price = parsed ?? this.priceMaxBound;
+    }
+    this.normalizePriceRange(changed);
+    this.applyFilters();
+  }
+
   onSearch(): void {
     this.applyFilters();
   }
@@ -362,8 +396,8 @@ export class ShopComponent implements OnInit, OnDestroy {
   resetFilters(): void {
     this.filters.search = '';
     this.filters.category_slug = '';
-    this.filters.min_price = undefined;
-    this.filters.max_price = undefined;
+    this.filters.min_price = this.priceMinBound;
+    this.filters.max_price = this.priceMaxBound;
     this.filters.tags = new Set<string>();
     this.filters.sort = 'newest';
     this.filters.page = 1;
@@ -383,8 +417,8 @@ export class ShopComponent implements OnInit, OnDestroy {
     const params: Params = {
       q: this.filters.search || undefined,
       cat: this.filters.category_slug || undefined,
-      min: this.filters.min_price || undefined,
-      max: this.filters.max_price || undefined,
+      min: this.filters.min_price > this.priceMinBound ? this.filters.min_price : undefined,
+      max: this.filters.max_price < this.priceMaxBound ? this.filters.max_price : undefined,
       sort: this.filters.sort !== 'newest' ? this.filters.sort : undefined,
       page: this.filters.page !== 1 ? this.filters.page : undefined,
       tags: this.filters.tags.size ? Array.from(this.filters.tags).join(',') : undefined
@@ -395,13 +429,81 @@ export class ShopComponent implements OnInit, OnDestroy {
   private syncFiltersFromQuery(params: Params): void {
     this.filters.search = params['q'] ?? '';
     this.filters.category_slug = params['cat'] ?? '';
-    this.filters.min_price = params['min'] ?? undefined;
-    this.filters.max_price = params['max'] ?? undefined;
+    this.hasMinQuery = params['min'] !== undefined;
+    this.hasMaxQuery = params['max'] !== undefined;
+    const min = this.parsePrice(params['min']);
+    const max = this.parsePrice(params['max']);
+    this.filters.min_price = min ?? this.priceMinBound;
+    this.filters.max_price = max ?? this.priceMaxBound;
     this.filters.sort = (params['sort'] as SortOption) ?? 'newest';
     this.filters.page = params['page'] ? Number(params['page']) : 1;
     const tagParam = params['tags'];
     this.filters.tags = new Set<string>(
       typeof tagParam === 'string' && tagParam.length ? tagParam.split(',') : []
     );
+    this.normalizePriceRange();
+  }
+
+  private loadPriceBounds(): void {
+    this.catalog
+      .listProducts({
+        sort: 'price_desc',
+        page: 1,
+        limit: 1
+      })
+      .subscribe({
+        next: (resp) => {
+          const max = resp.items?.[0]?.base_price;
+          if (typeof max === 'number' && Number.isFinite(max)) {
+            const rounded = Math.ceil(max / this.priceStep) * this.priceStep;
+            this.priceMaxBound = Math.max(this.priceMinBound, rounded);
+          }
+          if (!this.hasMaxQuery) {
+            this.filters.max_price = this.priceMaxBound;
+          }
+          if (!this.hasMinQuery) {
+            this.filters.min_price = this.priceMinBound;
+          }
+          this.normalizePriceRange();
+        },
+        error: () => {
+          // Keep defaults if we can't infer bounds.
+        }
+      });
+  }
+
+  private parsePrice(raw: unknown): number | undefined {
+    if (raw === null || raw === undefined) return undefined;
+    if (typeof raw === 'number') {
+      if (!Number.isFinite(raw)) return undefined;
+      return raw;
+    }
+    const str = String(raw).trim();
+    if (!str.length) return undefined;
+    const n = Number(str);
+    if (!Number.isFinite(n)) return undefined;
+    return n;
+  }
+
+  private normalizePriceRange(changed?: 'min' | 'max'): void {
+    this.filters.min_price = this.clampPrice(this.filters.min_price);
+    this.filters.max_price = this.clampPrice(this.filters.max_price);
+
+    if (this.filters.max_price < this.filters.min_price) {
+      if (changed === 'min') {
+        this.filters.max_price = this.filters.min_price;
+      } else if (changed === 'max') {
+        this.filters.min_price = this.filters.max_price;
+      } else {
+        this.filters.max_price = this.filters.min_price;
+      }
+    }
+  }
+
+  private clampPrice(value: number): number {
+    if (!Number.isFinite(value)) return this.priceMinBound;
+    const clamped = Math.min(Math.max(value, this.priceMinBound), this.priceMaxBound);
+    const stepped = Math.round(clamped / this.priceStep) * this.priceStep;
+    return Math.min(Math.max(stepped, this.priceMinBound), this.priceMaxBound);
   }
 }

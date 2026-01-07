@@ -104,7 +104,8 @@ export class ProductCardComponent {
   onImageError(event: Event): void {
     const target = event.target as HTMLImageElement | null;
     if (!target) return;
-    if (target.src.includes(this.fallbackImage)) return;
+    if (target.dataset['fallbackApplied'] === 'true') return;
+    target.dataset['fallbackApplied'] = 'true';
     target.src = this.fallbackImage;
     target.srcset = '';
   }
