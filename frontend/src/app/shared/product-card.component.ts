@@ -96,7 +96,7 @@ export class ProductCardComponent {
   }
 
   get primaryImage(): string {
-    return this.product.images?.[0]?.url ?? 'https://via.placeholder.com/640x640?text=Product';
+    return this.product.images?.[0]?.url ?? 'assets/placeholder/product-placeholder.svg';
   }
 
   get stockBadge(): string | null {

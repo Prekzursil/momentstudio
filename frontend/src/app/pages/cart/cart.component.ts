@@ -34,7 +34,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
           <div *ngFor="let item of items()" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex gap-4">
               <img
-                [src]="item.image ?? 'https://via.placeholder.com/120'"
+                [src]="item.image ?? 'assets/placeholder/product-placeholder.svg'"
                 [alt]="item.name"
                 class="h-24 w-24 rounded-xl object-cover border border-slate-100 dark:border-slate-800"
               />

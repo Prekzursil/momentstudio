@@ -116,17 +116,17 @@ import { Meta, Title } from '@angular/platform-browser';
             </div>
           </div>
 
-          <div class="space-y-3" *ngIf="allTags.size">
+          <div class="space-y-3" *ngIf="allTags.length">
             <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ 'shop.tags' | translate }}</p>
             <div class="flex flex-wrap gap-2">
               <button
                 type="button"
                 class="rounded-full border px-3 py-1 text-xs font-medium transition"
-                [ngClass]="filters.tags.has(tag) ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:border-slate-50' : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-slate-50'"
+                [ngClass]="filters.tags.has(tag.slug) ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:border-slate-50' : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-slate-50'"
                 *ngFor="let tag of allTags"
-                (click)="toggleTag(tag)"
+                (click)="toggleTag(tag.slug)"
               >
-                {{ tag }}
+                {{ tag.name }}
               </button>
             </div>
           </div>
@@ -207,7 +207,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   products: Product[] = [];
   categories: Category[] = [];
   pageMeta: PaginationMeta | null = null;
-  allTags = new Set<string>();
+  allTags: { slug: string; name: string }[] = [];
   loading = signal<boolean>(true);
   hasError = signal<boolean>(false);
   placeholders = Array.from({ length: 6 });
@@ -313,11 +313,13 @@ export class ShopComponent implements OnInit, OnDestroy {
               { label: 'nav.shop' }
             ];
           }
-          this.allTags = new Set(
-            response.items
-              .flatMap((p) => p.tags ?? [])
-              .map((t) => ('name' in t ? t.name : String(t)))
-          );
+          const tagMap = new Map<string, string>();
+          response.items.forEach((p) => {
+            (p.tags ?? []).forEach((tag) => tagMap.set(tag.slug, tag.name));
+          });
+          this.allTags = Array.from(tagMap.entries())
+            .map(([slug, name]) => ({ slug, name }))
+            .sort((a, b) => a.name.localeCompare(b.name));
           this.setMetaTags();
           this.loading.set(false);
           this.hasError.set(false);
@@ -348,11 +350,11 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.loadProducts();
   }
 
-  toggleTag(tag: string): void {
-    if (this.filters.tags.has(tag)) {
-      this.filters.tags.delete(tag);
+  toggleTag(tagSlug: string): void {
+    if (this.filters.tags.has(tagSlug)) {
+      this.filters.tags.delete(tagSlug);
     } else {
-      this.filters.tags.add(tag);
+      this.filters.tags.add(tagSlug);
     }
     this.applyFilters();
   }

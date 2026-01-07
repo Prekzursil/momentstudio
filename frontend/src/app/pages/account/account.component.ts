@@ -795,7 +795,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   emailVerified = signal<boolean>(false);
   addresses = signal<Address[]>([]);
   avatar: string | null = null;
-  placeholderAvatar = 'https://via.placeholder.com/120?text=Avatar';
+  placeholderAvatar = 'assets/placeholder/avatar-placeholder.svg';
   verificationToken = '';
   verificationStatus: string | null = null;
 

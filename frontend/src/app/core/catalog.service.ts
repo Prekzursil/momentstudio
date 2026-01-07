@@ -75,7 +75,7 @@ export class CatalogService {
       min_price: params.min_price,
       max_price: params.max_price,
       is_featured: params.is_featured,
-      tags: params.tags?.join(','),
+      tags: params.tags?.length ? params.tags : undefined,
       sort: params.sort,
       page: params.page ?? 1,
       limit: params.limit ?? 12

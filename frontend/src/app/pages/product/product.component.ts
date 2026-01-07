@@ -174,7 +174,7 @@ import { Router } from '@angular/router';
           >
             <div class="flex items-center gap-3 text-left">
               <img
-                [ngSrc]="item.images?.[0]?.url ?? 'https://via.placeholder.com/96'"
+                [ngSrc]="item.images?.[0]?.url ?? 'assets/placeholder/product-placeholder.svg'"
                 [alt]="item.name"
                 class="h-14 w-14 rounded-xl object-cover"
                 width="96"
@@ -302,7 +302,7 @@ export class ProductComponent implements OnInit, OnDestroy {
 
   get activeImage(): string {
     if (!this.product || !this.product.images?.length) {
-      return 'https://via.placeholder.com/960x960?text=Product';
+      return 'assets/placeholder/product-placeholder.svg';
     }
     return this.product.images[this.activeImageIndex]?.url ?? this.product.images[0].url;
   }
