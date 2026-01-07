@@ -191,7 +191,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Auth: allow login via username or email (single identifier field in UI + backend support).
 - [x] Profile: add non-unique display name discriminator (e.g., `name#1234`) and decide where to show it (comments, account, admin).
 - [x] Profile: add username/display name history (user + admin views).
-- [ ] Theme UX: replace theme `<select>` with an icon segmented control (System/Light/Dark) on desktop + drawer.
+- [x] Theme UX: replace theme `<select>` with an icon segmented control (System/Light/Dark) on desktop + drawer.
 - [x] Frontend: add `/contact` route/page with phone/email and link it from header/footer.
 - [x] Global error handling / boundary route.
 - [x] API service layer + interceptors.

@@ -4,13 +4,13 @@ import { RouterLink } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { FormsModule } from '@angular/forms';
 import { formatIdentity, initialsFromIdentity } from './user-identity';
+import { ThemePreference } from '../core/theme.service';
+import { ThemeSegmentedControlComponent } from './theme-segmented-control.component';
 
 export interface NavLink {
   label: string;
   path: string;
 }
-
-export type ThemePreference = 'system' | 'light' | 'dark';
 
 export interface NavDrawerUser {
   email: string;
@@ -24,7 +24,7 @@ export interface NavDrawerUser {
 @Component({
   selector: 'app-nav-drawer',
   standalone: true,
-  imports: [NgForOf, NgClass, NgIf, RouterLink, TranslateModule, FormsModule],
+  imports: [NgForOf, NgClass, NgIf, RouterLink, TranslateModule, FormsModule, ThemeSegmentedControlComponent],
   template: `
     <div
       class="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm transition-opacity dark:bg-black/60"
@@ -32,7 +32,7 @@ export interface NavDrawerUser {
       (click)="onClose()"
     ></div>
     <aside
-      class="fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-xl border-r border-slate-200 transform transition-transform dark:bg-slate-900 dark:border-slate-700"
+      class="fixed inset-y-0 left-0 z-50 w-72 overflow-x-hidden bg-white shadow-xl border-r border-slate-200 transform transition-transform dark:bg-slate-900 dark:border-slate-700"
       [ngClass]="{ '-translate-x-full': !open, 'translate-x-0': open }"
       role="dialog"
       aria-modal="true"
@@ -89,25 +89,19 @@ export interface NavDrawerUser {
           {{ 'nav.preferences' | translate }}
         </div>
         <div class="mt-3 grid gap-3">
-          <label class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+          <div class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
             <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'nav.theme' | translate }}</span>
-            <select
-              class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
-              [ngModel]="themePreference"
-              (ngModelChange)="onThemeChange($event)"
-              [attr.aria-label]="'nav.theme' | translate"
-            >
-              <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="system">
-                {{ 'theme.system' | translate }}
-              </option>
-              <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="light">
-                {{ 'theme.light' | translate }}
-              </option>
-              <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="dark">
-                {{ 'theme.dark' | translate }}
-              </option>
-            </select>
-          </label>
+            <app-theme-segmented-control
+              class="w-full"
+              [preference]="themePreference"
+              (preferenceChange)="onThemeChange($event)"
+              [showLabels]="true"
+              [size]="'lg'"
+              [stretch]="true"
+              [layout]="'stacked'"
+              [ariaLabel]="'nav.theme' | translate"
+            ></app-theme-segmented-control>
+          </div>
           <label class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
             <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'nav.language' | translate }}</span>
             <select

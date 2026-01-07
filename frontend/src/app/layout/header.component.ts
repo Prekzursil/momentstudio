@@ -7,11 +7,12 @@ import { ThemePreference } from '../core/theme.service';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule } from '@ngx-translate/core';
 import { AuthService } from '../core/auth.service';
+import { ThemeSegmentedControlComponent } from '../shared/theme-segmented-control.component';
 
 @Component({
   selector: 'app-header',
   standalone: true,
-  imports: [RouterLink, NavDrawerComponent, NgIf, NgForOf, FormsModule, TranslateModule],
+  imports: [RouterLink, NavDrawerComponent, NgIf, NgForOf, FormsModule, TranslateModule, ThemeSegmentedControlComponent],
   template: `
     <header class="border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
       <div class="max-w-7xl mx-auto px-4 sm:px-6">
@@ -91,25 +92,14 @@ import { AuthService } from '../core/auth.service';
               {{ 'nav.account' | translate }}
             </a>
             <div class="hidden lg:flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-2 py-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/70">
-              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <span class="sr-only">{{ 'nav.theme' | translate }}</span>
-                <select
-                  class="h-9 rounded-full bg-transparent px-2 text-sm text-slate-900 focus:outline-none [color-scheme:light] dark:text-slate-100 dark:[color-scheme:dark]"
-                  [ngModel]="themePreference"
-                  (ngModelChange)="onThemeChange($event)"
-                  [attr.aria-label]="'nav.theme' | translate"
-                >
-                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="system">
-                    {{ 'theme.system' | translate }}
-                  </option>
-                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="light">
-                    {{ 'theme.light' | translate }}
-                  </option>
-                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="dark">
-                    {{ 'theme.dark' | translate }}
-                  </option>
-                </select>
-              </label>
+              <app-theme-segmented-control
+                [preference]="themePreference"
+                (preferenceChange)="onThemeChange($event)"
+                [showLabels]="false"
+                [size]="'sm'"
+                [variant]="'embedded'"
+                [ariaLabel]="'nav.theme' | translate"
+              ></app-theme-segmented-control>
               <div class="h-6 w-px bg-slate-200 dark:bg-slate-700"></div>
               <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
                 <span class="sr-only">{{ 'nav.language' | translate }}</span>
