@@ -34,9 +34,10 @@ async def test_postgres_core_flow_wishlist() -> None:
     transport = httpx.ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         email = f"pg-{uuid.uuid4().hex[:8]}@example.com"
+        username = f"pg{uuid.uuid4().hex[:8]}"
         register = await client.post(
             "/api/v1/auth/register",
-            json={"email": email, "password": "supersecret", "name": "PG"},
+            json={"email": email, "username": username, "password": "supersecret", "name": "PG"},
         )
         assert register.status_code == 201, register.text
         token = register.json()["tokens"]["access_token"]
@@ -85,9 +86,10 @@ async def test_postgres_blog_flow() -> None:
     transport = httpx.ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         email = f"pgblog-{uuid.uuid4().hex[:8]}@example.com"
+        username = f"pgblog{uuid.uuid4().hex[:8]}"
         register = await client.post(
             "/api/v1/auth/register",
-            json={"email": email, "password": "supersecret", "name": "PG Blog"},
+            json={"email": email, "username": username, "password": "supersecret", "name": "PG Blog"},
         )
         assert register.status_code == 201, register.text
         token = register.json()["tokens"]["access_token"]

@@ -93,7 +93,7 @@ def clear_refresh_cookie(response: Response) -> None:
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
-    new_password: str
+    new_password: str = Field(min_length=6, max_length=128)
 
 
 class PreferredLanguageUpdate(BaseModel):
@@ -125,7 +125,7 @@ class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=30, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$")
     email: EmailStr
     name: str = Field(min_length=1, max_length=255)
-    password: str = Field(min_length=8, max_length=128)
+    password: str = Field(min_length=6, max_length=128)
     preferred_language: str | None = Field(default=None, pattern="^(en|ro)$")
 
 

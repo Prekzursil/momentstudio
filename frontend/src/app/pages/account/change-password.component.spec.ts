@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { RouterTestingModule } from '@angular/router/testing';
+import { TranslateModule } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
 import { ChangePasswordComponent } from './change-password.component';
@@ -16,7 +17,7 @@ describe('ChangePasswordComponent', () => {
     auth.changePassword.and.returnValue(of({ detail: 'Password updated' }));
 
     TestBed.configureTestingModule({
-      imports: [RouterTestingModule, ChangePasswordComponent],
+      imports: [RouterTestingModule, TranslateModule.forRoot(), ChangePasswordComponent],
       providers: [
         { provide: ToastService, useValue: toast },
         { provide: AuthService, useValue: auth }
@@ -67,4 +68,3 @@ describe('ChangePasswordComponent', () => {
     expect(toast.error).toHaveBeenCalledWith('Nope');
   });
 });
-

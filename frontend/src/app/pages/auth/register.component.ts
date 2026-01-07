@@ -5,6 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
+import { PasswordStrengthComponent } from '../../shared/password-strength.component';
 import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -12,7 +13,16 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent, TranslateModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    ContainerComponent,
+    ButtonComponent,
+    BreadcrumbComponent,
+    PasswordStrengthComponent,
+    TranslateModule
+  ],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -49,6 +59,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
             [(ngModel)]="password"
           />
         </label>
+        <app-password-strength [password]="password"></app-password-strength>
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           {{ 'auth.confirmPassword' | translate }}
           <input
