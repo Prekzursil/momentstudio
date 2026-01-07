@@ -12,7 +12,9 @@ export interface AuthTokens {
 export interface AuthUser {
   id: string;
   email: string;
+  username: string;
   name?: string | null;
+  name_tag?: number;
   phone?: string | null;
   avatar_url?: string | null;
   email_verified?: boolean;
@@ -31,6 +33,22 @@ export interface AuthUser {
 export interface AuthResponse {
   user: AuthUser;
   tokens: AuthTokens;
+}
+
+export interface UsernameHistoryItem {
+  username: string;
+  created_at: string;
+}
+
+export interface DisplayNameHistoryItem {
+  name: string;
+  name_tag: number;
+  created_at: string;
+}
+
+export interface UserAliasesResponse {
+  usernames: UsernameHistoryItem[];
+  display_names: DisplayNameHistoryItem[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -58,12 +76,14 @@ export class AuthService {
     return this.tokens?.refresh_token ?? null;
   }
 
-  login(email: string, password: string): Observable<AuthResponse> {
-    return this.api.post<AuthResponse>('/auth/login', { email, password }).pipe(tap((res) => this.persist(res)));
+  login(identifier: string, password: string): Observable<AuthResponse> {
+    return this.api.post<AuthResponse>('/auth/login', { identifier, password }).pipe(tap((res) => this.persist(res)));
   }
 
-  register(name: string, email: string, password: string): Observable<AuthResponse> {
-    return this.api.post<AuthResponse>('/auth/register', { name, email, password }).pipe(tap((res) => this.persist(res)));
+  register(name: string, username: string, email: string, password: string): Observable<AuthResponse> {
+    return this.api
+      .post<AuthResponse>('/auth/register', { name, username, email, password })
+      .pipe(tap((res) => this.persist(res)));
   }
 
   changePassword(current: string, newPassword: string): Observable<{ detail: string }> {
@@ -126,6 +146,17 @@ export class AuthService {
       return of({} as AuthUser);
     }
     return this.api.patch<AuthUser>('/auth/me', payload).pipe(tap((user) => this.setUser(user)));
+  }
+
+  updateUsername(username: string): Observable<AuthUser> {
+    if (!this.isAuthenticated()) {
+      return of({} as AuthUser);
+    }
+    return this.api.patch<AuthUser>('/auth/me/username', { username }).pipe(tap((user) => this.setUser(user)));
+  }
+
+  getAliases(): Observable<UserAliasesResponse> {
+    return this.api.get<UserAliasesResponse>('/auth/me/aliases');
   }
 
   requestEmailVerification(): Observable<{ detail: string }> {

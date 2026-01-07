@@ -138,7 +138,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
                 <div class="flex items-start justify-between gap-2">
                   <div>
                     <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                      {{ comment.author.name || ('blog.comments.anonymous' | translate) }}
+                      {{ authorLabel(comment.author) }}
                     </p>
                     <p class="text-xs text-slate-500 dark:text-slate-400">
                       {{ comment.created_at | date: 'short' }}
@@ -190,7 +190,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
                     <div class="flex items-start justify-between gap-2">
                       <div>
                         <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                          {{ reply.author.name || ('blog.comments.anonymous' | translate) }}
+                          {{ authorLabel(reply.author) }}
                         </p>
                         <p class="text-xs text-slate-500 dark:text-slate-400">
                           {{ reply.created_at | date: 'short' }}
@@ -244,7 +244,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
           <form *ngIf="auth.isAuthenticated()" class="grid gap-3" (submit)="submitComment($event)">
             <div *ngIf="replyTo()" class="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200">
               <span>
-                {{ 'blog.comments.replyingTo' | translate : { name: replyTo()!.author.name || ('blog.comments.anonymous' | translate) } }}
+                {{ 'blog.comments.replyingTo' | translate : { name: authorLabel(replyTo()!.author) } }}
               </span>
               <button type="button" class="text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white" (click)="cancelReply()">
                 {{ 'blog.comments.cancelReply' | translate }}
@@ -413,6 +413,22 @@ export class BlogPostComponent implements OnInit, OnDestroy {
 
   cancelReply(): void {
     this.replyTo.set(null);
+  }
+
+  authorLabel(author: BlogComment['author'] | null | undefined): string {
+    if (!author) {
+      return this.translate.instant('blog.comments.anonymous');
+    }
+    const name = (author.name ?? '').trim();
+    const username = (author.username ?? '').trim();
+    const tag = author.name_tag;
+    if (name && username && typeof tag === 'number') {
+      return `${name}#${tag} (${username})`;
+    }
+    if (name && username) {
+      return `${name} (${username})`;
+    }
+    return name || username || this.translate.instant('blog.comments.anonymous');
   }
 
   submitComment(event?: Event): void {

@@ -13,7 +13,9 @@ export type ThemePreference = 'system' | 'light' | 'dark';
 
 export interface NavDrawerUser {
   email: string;
+  username: string;
   name?: string | null;
+  name_tag?: number | null;
   avatar_url?: string | null;
   google_picture_url?: string | null;
 }
@@ -169,14 +171,24 @@ export class NavDrawerComponent {
   displayName(): string {
     const user = this.user;
     if (!user) return '';
-    return (user.name ?? '').trim() || user.email;
+    const name = (user.name ?? '').trim();
+    const username = (user.username ?? '').trim();
+    const tag = user.name_tag;
+    if (name && username && typeof tag === 'number') {
+      return `${name}#${tag} (${username})`;
+    }
+    if (name && username) {
+      return `${name} (${username})`;
+    }
+    return name || username || user.email;
   }
 
   initials(): string {
     const user = this.user;
     if (!user) return '?';
     const name = (user.name ?? '').trim();
-    const src = name || user.email;
+    const username = (user.username ?? '').trim();
+    const src = name || username || user.email;
     const letters = src
       .split(/[\s._-]+/)
       .filter(Boolean)

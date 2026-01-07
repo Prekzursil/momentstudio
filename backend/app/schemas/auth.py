@@ -27,7 +27,9 @@ class UserResponse(BaseModel):
 
     id: UUID
     email: str
+    username: str
     name: str | None = None
+    name_tag: int = 0
     phone: str | None = None
     avatar_url: str | None = None
     preferred_language: str | None = None

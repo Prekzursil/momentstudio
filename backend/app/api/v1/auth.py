@@ -1,5 +1,4 @@
 from pathlib import Path
-import secrets
 import logging
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
@@ -8,7 +7,7 @@ from jose import jwt
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Response, UploadFile, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
@@ -122,13 +121,56 @@ class AccountDeletionRequest(BaseModel):
     confirm: str = Field(..., min_length=1, max_length=20, description='Type "DELETE" to confirm account deletion')
 
 
+class RegisterRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=30, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$")
+    email: EmailStr
+    name: str = Field(min_length=1, max_length=255)
+    password: str = Field(min_length=8, max_length=128)
+    preferred_language: str | None = Field(default=None, pattern="^(en|ro)$")
+
+
+class LoginRequest(BaseModel):
+    identifier: str | None = None
+    email: str | None = None
+    password: str = Field(min_length=1, max_length=128)
+
+
+class UsernameUpdateRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=30, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$")
+
+
+class UsernameHistoryItem(BaseModel):
+    username: str
+    created_at: datetime
+
+
+class DisplayNameHistoryItem(BaseModel):
+    name: str
+    name_tag: int
+    created_at: datetime
+
+
+class UserAliasesResponse(BaseModel):
+    usernames: list[UsernameHistoryItem]
+    display_names: list[DisplayNameHistoryItem]
+
+
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=AuthResponse)
 async def register(
-    user_in: UserCreate,
+    payload: RegisterRequest,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(register_rate_limit),
 ) -> AuthResponse:
-    user = await auth_service.create_user(session, user_in)
+    user = await auth_service.create_user(
+        session,
+        UserCreate(
+            username=payload.username,
+            email=payload.email,
+            password=payload.password,
+            name=payload.name,
+            preferred_language=payload.preferred_language,
+        ),
+    )
     metrics.record_signup()
     tokens = await auth_service.issue_tokens_for_user(session, user)
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
@@ -136,13 +178,16 @@ async def register(
 
 @router.post("/login", response_model=AuthResponse)
 async def login(
-    user_in: UserCreate,  # reuse for email/password fields
+    payload: LoginRequest,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(login_rate_limit),
     response: Response = None,
 ) -> AuthResponse:
+    identifier = (payload.identifier or payload.email or "").strip()
+    if not identifier:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Identifier is required")
     try:
-        user = await auth_service.authenticate_user(session, user_in.email, user_in.password)
+        user = await auth_service.authenticate_user(session, identifier, payload.password)
     except HTTPException:
         metrics.record_login_failure()
         raise
@@ -232,6 +277,31 @@ async def confirm_email_verification(
 @router.get("/me", response_model=UserResponse)
 async def read_me(current_user: User = Depends(get_current_user)) -> UserResponse:
     return UserResponse.model_validate(current_user)
+
+
+@router.get("/me/aliases", response_model=UserAliasesResponse)
+async def read_aliases(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserAliasesResponse:
+    usernames = await auth_service.list_username_history(session, current_user.id)
+    display_names = await auth_service.list_display_name_history(session, current_user.id)
+    return UserAliasesResponse(
+        usernames=[UsernameHistoryItem(username=row.username, created_at=row.created_at) for row in usernames],
+        display_names=[
+            DisplayNameHistoryItem(name=row.name, name_tag=row.name_tag, created_at=row.created_at) for row in display_names
+        ],
+    )
+
+
+@router.patch("/me/username", response_model=UserResponse)
+async def update_username(
+    payload: UsernameUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    user = await auth_service.update_username(session, current_user, payload.username)
+    return UserResponse.model_validate(user)
 
 
 @router.get("/me/export")
@@ -344,8 +414,7 @@ async def update_me(
 ) -> UserResponse:
     data = payload.model_dump(exclude_unset=True)
     if "name" in data:
-        cleaned = (payload.name or "").strip()
-        current_user.name = cleaned or None
+        await auth_service.update_display_name(session, current_user, payload.name or "")
     if "phone" in data:
         cleaned = (payload.phone or "").strip()
         current_user.phone = cleaned or None
@@ -462,23 +531,20 @@ async def google_callback(
     if existing_email and existing_email.google_sub and existing_email.google_sub != sub:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Google account already linked elsewhere")
     if existing_email and not existing_email.google_sub:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Account exists; linking required")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This email is already registered. Sign in with your password and link Google in your account settings.",
+        )
 
-    password_placeholder = security.hash_password(secrets.token_urlsafe(16))
-    user = User(
+    user = await auth_service.create_google_user(
+        session,
         email=email,
-        hashed_password=password_placeholder,
         name=name,
-        avatar_url=picture,
-        google_sub=sub,
-        google_email=email,
-        google_picture_url=picture,
+        picture=picture,
+        sub=sub,
         email_verified=email_verified,
         preferred_language="en",
     )
-    session.add(user)
-    await session.commit()
-    await session.refresh(user)
     logger.info("google_login_first_time", extra={"user_id": str(user.id)})
     tokens = await auth_service.issue_tokens_for_user(session, user)
     if response:

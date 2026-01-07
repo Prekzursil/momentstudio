@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, String, func, ForeignKey
+from sqlalchemy import Boolean, DateTime, Enum, String, func, ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -16,11 +16,14 @@ class UserRole(str, enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (UniqueConstraint("name", "name_tag", name="uq_users_name_name_tag"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    username: Mapped[str] = mapped_column(String(30), unique=True, nullable=False, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    name_tag: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
     preferred_language: Mapped[str | None] = mapped_column(String(10), nullable=True, default="en")
@@ -58,6 +61,35 @@ class User(Base):
     payment_methods: Mapped[list["PaymentMethod"]] = relationship(
         "PaymentMethod", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
     )
+    username_history: Mapped[list["UserUsernameHistory"]] = relationship(
+        "UserUsernameHistory", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
+    )
+    display_name_history: Mapped[list["UserDisplayNameHistory"]] = relationship(
+        "UserDisplayNameHistory", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class UserUsernameHistory(Base):
+    __tablename__ = "user_username_history"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    username: Mapped[str] = mapped_column(String(30), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user: Mapped[User] = relationship("User", back_populates="username_history")
+
+
+class UserDisplayNameHistory(Base):
+    __tablename__ = "user_display_name_history"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    name_tag: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user: Mapped[User] = relationship("User", back_populates="display_name_history")
 
 
 class PasswordResetToken(Base):

@@ -60,12 +60,14 @@ async def seed(session_factory):
 
         admin = User(
             email="admin@example.com",
+            username="admin",
             hashed_password=security.hash_password("Password123"),
             name="Admin",
             role=UserRole.admin,
         )
         customer = User(
             email="customer@example.com",
+            username="customer",
             hashed_password=security.hash_password("Password123"),
             name="Customer",
             role=UserRole.customer,

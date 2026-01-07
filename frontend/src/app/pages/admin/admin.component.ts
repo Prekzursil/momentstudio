@@ -16,6 +16,7 @@ import {
   AdminProduct,
   AdminOrder,
   AdminUser,
+  AdminUserAliasesResponse,
   AdminContent,
   AdminCoupon,
   AdminAudit,
@@ -511,15 +512,51 @@ import { diffLines } from 'diff';
             <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
               <div *ngFor="let user of users" class="flex items-center justify-between rounded-lg border border-slate-200 p-3 dark:border-slate-700">
                 <div>
-                  <p class="font-semibold text-slate-900 dark:text-slate-50">{{ user.name || user.email }}</p>
+                  <p class="font-semibold text-slate-900 dark:text-slate-50">{{ userIdentity(user) }}</p>
                   <p class="text-xs text-slate-500 dark:text-slate-400">{{ user.email }}</p>
                 </div>
                 <div class="flex items-center gap-2 text-xs">
-                  <input type="radio" name="userSelect" [value]="user.id" [(ngModel)]="selectedUserId" />
+                  <input type="radio" name="userSelect" [value]="user.id" [(ngModel)]="selectedUserId" (ngModelChange)="onSelectedUserIdChange($event)" />
                   <select class="rounded border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [ngModel]="user.role" (ngModelChange)="selectUser(user.id, $event)">
                     <option value="customer">{{ 'adminUi.users.roles.customer' | translate }}</option>
                     <option value="admin">{{ 'adminUi.users.roles.admin' | translate }}</option>
                   </select>
+                </div>
+              </div>
+            </div>
+
+            <div *ngIf="selectedUserId" class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">User aliases</p>
+                <app-button size="sm" variant="ghost" label="Refresh" (action)="loadUserAliases(selectedUserId!)"></app-button>
+              </div>
+
+              <div *ngIf="userAliasesLoading" class="mt-2 grid gap-2">
+                <app-skeleton height="44px"></app-skeleton>
+              </div>
+
+              <div *ngIf="userAliasesError" class="mt-2 text-sm text-rose-700 dark:text-rose-300">
+                {{ userAliasesError }}
+              </div>
+
+              <div *ngIf="userAliases" class="mt-3 grid gap-3 sm:grid-cols-2 text-sm text-slate-700 dark:text-slate-200">
+                <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                  <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">Username history</p>
+                  <ul class="mt-2 grid gap-2">
+                    <li *ngFor="let h of userAliases.usernames" class="flex items-center justify-between gap-2">
+                      <span class="font-medium text-slate-900 dark:text-slate-50 truncate">{{ h.username }}</span>
+                      <span class="text-xs text-slate-500 dark:text-slate-400 shrink-0">{{ h.created_at | date: 'short' }}</span>
+                    </li>
+                  </ul>
+                </div>
+                <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                  <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">Display name history</p>
+                  <ul class="mt-2 grid gap-2">
+                    <li *ngFor="let h of userAliases.display_names" class="flex items-center justify-between gap-2">
+                      <span class="font-medium text-slate-900 dark:text-slate-50 truncate">{{ h.name }}#{{ h.name_tag }}</span>
+                      <span class="text-xs text-slate-500 dark:text-slate-400 shrink-0">{{ h.created_at | date: 'short' }}</span>
+                    </li>
+                  </ul>
                 </div>
               </div>
             </div>
@@ -956,7 +993,7 @@ import { diffLines } from 'diff';
 	              <div *ngFor="let c of flaggedComments()" class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
 	                <div class="flex items-start justify-between gap-3">
 	                  <div class="grid gap-0.5">
-	                    <p class="font-semibold text-slate-900 dark:text-slate-50">{{ c.author.name || c.author.id }}</p>
+	                    <p class="font-semibold text-slate-900 dark:text-slate-50">{{ commentAuthorLabel(c.author) }}</p>
 	                    <p class="text-xs text-slate-500 dark:text-slate-400">
 	                      /blog/{{ c.post_slug }} · {{ c.created_at | date: 'short' }} · {{ c.flag_count }} flags
 	                    </p>
@@ -1197,6 +1234,9 @@ export class AdminComponent implements OnInit {
   users: AdminUser[] = [];
   selectedUserId: string | null = null;
   selectedUserRole: string | null = null;
+  userAliases: AdminUserAliasesResponse | null = null;
+  userAliasesLoading = false;
+  userAliasesError: string | null = null;
 
   contentBlocks: AdminContent[] = [];
   selectedContent: AdminContent | null = null;
@@ -1599,6 +1639,58 @@ export class AdminComponent implements OnInit {
   selectUser(userId: string, role: string): void {
     this.selectedUserId = userId;
     this.selectedUserRole = role;
+    this.loadUserAliases(userId);
+  }
+
+  onSelectedUserIdChange(userId: string): void {
+    this.selectedUserId = userId;
+    const user = this.users.find((u) => u.id === userId);
+    this.selectedUserRole = user?.role ?? this.selectedUserRole;
+    this.loadUserAliases(userId);
+  }
+
+  loadUserAliases(userId: string): void {
+    if (!userId) return;
+    this.userAliasesLoading = true;
+    this.userAliasesError = null;
+    this.userAliases = null;
+    this.admin.userAliases(userId).subscribe({
+      next: (resp) => {
+        this.userAliases = resp;
+      },
+      error: () => {
+        this.userAliasesError = 'Could not load alias history.';
+      },
+      complete: () => {
+        this.userAliasesLoading = false;
+      }
+    });
+  }
+
+  userIdentity(user: AdminUser): string {
+    const name = (user.name ?? '').trim();
+    const username = (user.username ?? '').trim();
+    const tag = user.name_tag;
+    if (name && username && typeof tag === 'number') {
+      return `${name}#${tag} (${username})`;
+    }
+    if (name && username) {
+      return `${name} (${username})`;
+    }
+    return name || username || user.email;
+  }
+
+  commentAuthorLabel(author: { id: string; name?: string | null; username?: string | null; name_tag?: number | null }): string {
+    const name = (author.name ?? '').trim();
+    const username = (author.username ?? '').trim();
+    const tag = author.name_tag;
+    if (name && username && typeof tag === 'number') {
+      return `${name}#${tag} (${username})`;
+    }
+    if (name && username) {
+      return `${name} (${username})`;
+    }
+    return name || username || author.id;
   }
 
   updateRole(): void {

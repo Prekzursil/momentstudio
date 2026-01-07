@@ -23,6 +23,18 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
           <input name="name" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400" required [(ngModel)]="name" />
         </label>
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+          {{ 'auth.username' | translate }}
+          <input
+            name="username"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+            required
+            minlength="3"
+            maxlength="30"
+            pattern="^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$"
+            [(ngModel)]="username"
+          />
+        </label>
+        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           {{ 'auth.email' | translate }}
           <input name="email" type="email" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400" required [(ngModel)]="email" />
         </label>
@@ -67,6 +79,7 @@ export class RegisterComponent {
     { label: 'auth.registerTitle' }
   ];
   name = '';
+  username = '';
   email = '';
   password = '';
   confirmPassword = '';
@@ -102,7 +115,7 @@ export class RegisterComponent {
     }
     this.error = '';
     this.loading = true;
-    this.auth.register(this.name, this.email, this.password).subscribe({
+    this.auth.register(this.name, this.username, this.email, this.password).subscribe({
       next: (res) => {
         this.toast.success(this.translate.instant('auth.successRegister'), `Welcome, ${res.user.email}`);
         void this.router.navigateByUrl('/account');

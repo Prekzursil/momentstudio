@@ -121,7 +121,9 @@ def test_google_callback_existing_sub(monkeypatch: pytest.MonkeyPatch, test_app)
         async with SessionLocal() as session:
             user = User(
                 email="google@example.com",
+                username="googleuser",
                 hashed_password="hashed",
+                name="G User",
                 google_sub="sub-123",
                 google_email="google@example.com",
                 email_verified=True,
@@ -151,7 +153,12 @@ def test_google_callback_email_collision(monkeypatch: pytest.MonkeyPatch, test_a
 
     async def seed_user():
         async with SessionLocal() as session:
-            user = User(email="existing@example.com", hashed_password="hashed")
+            user = User(
+                email="existing@example.com",
+                username="existing",
+                hashed_password="hashed",
+                name="Existing User",
+            )
             session.add(user)
             await session.commit()
     asyncio.run(seed_user())
@@ -206,7 +213,15 @@ def test_google_link_and_unlink(monkeypatch: pytest.MonkeyPatch, test_app):
     monkeypatch.setattr(settings, "google_redirect_uri", "http://localhost/callback")
 
     # Register and login to get token
-    res = client.post("/api/v1/auth/register", json={"email": "link@example.com", "password": "linkpass"})
+    res = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "link@example.com",
+            "username": "linkuser",
+            "name": "Link User",
+            "password": "linkpass",
+        },
+    )
     assert res.status_code == 201
     token = res.json()["tokens"]["access_token"]
 

@@ -23,7 +23,7 @@ async def test_user_model_persists_in_sqlite_memory() -> None:
     SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
     async with SessionLocal() as session:
-        user = User(email="alice@example.com", hashed_password="hashedpw", name="Alice")
+        user = User(email="alice@example.com", username="alice", hashed_password="hashedpw", name="Alice")
         session.add(user)
         await session.commit()
         await session.refresh(user)
@@ -104,7 +104,7 @@ async def test_order_models_sqlite_memory() -> None:
 
     SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
     async with SessionLocal() as session:
-        user = User(email="order@example.com", hashed_password="x")
+        user = User(email="order@example.com", username="order", hashed_password="x")
         category = Category(slug="order-cups", name="Cups")
         product = Product(
             category=category,

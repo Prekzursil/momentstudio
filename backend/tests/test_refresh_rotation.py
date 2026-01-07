@@ -25,7 +25,7 @@ def test_refresh_token_rotation() -> None:
     app.dependency_overrides[get_session] = override_get_session
     client = TestClient(app)
 
-    register_payload = {"email": "rotate@example.com", "password": "password1", "name": "Rotate"}
+    register_payload = {"email": "rotate@example.com", "username": "rotate", "password": "password1", "name": "Rotate"}
     res = client.post("/api/v1/auth/register", json=register_payload)
     assert res.status_code == 201, res.text
     refresh_token = res.json()["tokens"]["refresh_token"]

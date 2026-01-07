@@ -14,6 +14,7 @@ from app.services import exporter as exporter_service
 from app.models.order import Order
 from app.models.user import User, RefreshSession, UserRole
 from app.models.promo import PromoCode
+from app.services import auth as auth_service
 
 router = APIRouter(prefix="/admin/dashboard", tags=["admin"])
 
@@ -106,12 +107,41 @@ async def admin_users(session: AsyncSession = Depends(get_session), _: str = Dep
         {
             "id": str(u.id),
             "email": u.email,
+            "username": u.username,
             "name": u.name,
+            "name_tag": u.name_tag,
             "role": u.role,
             "created_at": u.created_at,
         }
         for u in users
     ]
+
+
+@router.get("/users/{user_id}/aliases")
+async def admin_user_aliases(
+    user_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    user = await session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    usernames = await auth_service.list_username_history(session, user_id)
+    display_names = await auth_service.list_display_name_history(session, user_id)
+    return {
+        "user": {
+            "id": str(user.id),
+            "email": user.email,
+            "username": user.username,
+            "name": user.name,
+            "name_tag": user.name_tag,
+            "role": user.role,
+        },
+        "usernames": [{"username": row.username, "created_at": row.created_at} for row in usernames],
+        "display_names": [
+            {"name": row.name, "name_tag": row.name_tag, "created_at": row.created_at} for row in display_names
+        ],
+    }
 
 
 @router.get("/content")
@@ -284,10 +314,13 @@ async def update_user_role(
     user.role = UserRole(role)
     session.add(user)
     await session.flush()
+    await session.commit()
     return {
         "id": str(user.id),
         "email": user.email,
+        "username": user.username,
         "name": user.name,
+        "name_tag": user.name_tag,
         "role": user.role,
         "created_at": user.created_at,
     }

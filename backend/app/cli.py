@@ -1,16 +1,54 @@
 import argparse
 import asyncio
 import json
+import re
+import uuid
 from pathlib import Path
 from typing import Any, Dict
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.db.session import SessionLocal
-from app.models.user import User, UserRole
+from app.core import security
+from app.models.user import User, UserDisplayNameHistory, UserRole, UserUsernameHistory
 from app.models.address import Address
 from app.models.catalog import Category, Product, ProductImage, ProductOption, ProductVariant, Tag
 from app.models.order import Order, OrderItem, ShippingMethod
+
+
+USERNAME_MAX_LEN = 30
+USERNAME_MIN_LEN = 3
+USERNAME_ALLOWED_RE = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _sanitize_username(raw: str) -> str:
+    candidate = USERNAME_ALLOWED_RE.sub("-", (raw or "").strip())
+    candidate = candidate.strip("._-")
+    if not candidate:
+        candidate = "user"
+    if not candidate[0].isalnum():
+        candidate = f"u{candidate}"
+    candidate = candidate[:USERNAME_MAX_LEN]
+    while len(candidate) < USERNAME_MIN_LEN:
+        candidate = f"{candidate}0"
+        candidate = candidate[:USERNAME_MAX_LEN]
+    return candidate
+
+
+def _make_unique_username(base: str, used: set[str]) -> str:
+    base = base[:USERNAME_MAX_LEN]
+    if base not in used:
+        used.add(base)
+        return base
+    suffix_num = 2
+    while True:
+        suffix = f"-{suffix_num}"
+        trimmed = base[: USERNAME_MAX_LEN - len(suffix)]
+        candidate = f"{trimmed}{suffix}"
+        if candidate not in used:
+            used.add(candidate)
+            return candidate
+        suffix_num += 1
 
 
 async def export_data(output: Path) -> None:
@@ -21,7 +59,9 @@ async def export_data(output: Path) -> None:
             {
                 "id": str(u.id),
                 "email": u.email,
+                "username": u.username,
                 "name": u.name,
+                "name_tag": u.name_tag,
                 "avatar_url": u.avatar_url,
                 "preferred_language": u.preferred_language,
                 "email_verified": u.email_verified,
@@ -127,12 +167,53 @@ async def export_data(output: Path) -> None:
 async def import_data(input_path: Path) -> None:
     payload = json.loads(input_path.read_text(encoding="utf-8"))
     async with SessionLocal() as session:
+        used_usernames = set((await session.execute(select(User.username))).scalars().all())
+        existing_max_tags = (
+            await session.execute(
+                select(User.name, func.max(User.name_tag)).where(User.name.is_not(None)).group_by(User.name)
+            )
+        ).all()
+        next_tag_by_name = {
+            str(name): int(max_tag if max_tag is not None else -1) + 1 for name, max_tag in existing_max_tags
+        }
+
         # users
         for u in payload.get("users", []):
-            user_obj: User | None = await session.get(User, u["id"])
+            user_id = uuid.UUID(str(u["id"]))
+            email = str(u["email"])
+            user_obj: User | None = await session.get(User, user_id)
             if not user_obj:
-                user_obj = User(id=u["id"], email=u["email"], hashed_password="placeholder", role=UserRole.customer)
-            user_obj.name = u.get("name")
+                preferred = str(u.get("username") or "").strip() or email.split("@")[0]
+                username = _make_unique_username(_sanitize_username(preferred), used_usernames)
+                display_name = str(u.get("name") or "").strip() or username
+                name_tag = next_tag_by_name.get(display_name, 0)
+                next_tag_by_name[display_name] = name_tag + 1
+                user_obj = User(
+                    id=user_id,
+                    email=email,
+                    username=username,
+                    hashed_password=security.hash_password("placeholder"),
+                    name=display_name,
+                    name_tag=name_tag,
+                    role=UserRole.customer,
+                )
+                session.add(user_obj)
+                session.add(UserUsernameHistory(user_id=user_id, username=username))
+                session.add(UserDisplayNameHistory(user_id=user_id, name=display_name, name_tag=name_tag))
+            elif not getattr(user_obj, "username", None):
+                preferred = str(u.get("username") or "").strip() or email.split("@")[0]
+                username = _make_unique_username(_sanitize_username(preferred), used_usernames)
+                user_obj.username = username
+                session.add(UserUsernameHistory(user_id=user_obj.id, username=username))
+
+            if u.get("name") and u.get("name") != user_obj.name:
+                display_name = str(u.get("name") or "").strip()
+                name_tag = next_tag_by_name.get(display_name, 0)
+                next_tag_by_name[display_name] = name_tag + 1
+                user_obj.name = display_name
+                user_obj.name_tag = name_tag
+                session.add(UserDisplayNameHistory(user_id=user_obj.id, name=display_name, name_tag=name_tag))
+
             user_obj.avatar_url = u.get("avatar_url")
             user_obj.preferred_language = u.get("preferred_language")
             user_obj.email_verified = u.get("email_verified", False)

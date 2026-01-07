@@ -54,6 +54,8 @@ class BlogPostRead(BaseModel):
 class BlogCommentAuthor(BaseModel):
     id: UUID
     name: str | None = None
+    name_tag: int | None = None
+    username: str | None = None
     avatar_url: str | None = None
 
 

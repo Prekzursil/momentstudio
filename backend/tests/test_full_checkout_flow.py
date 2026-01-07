@@ -82,7 +82,10 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
     monkeypatch.setattr(email_service, "send_order_confirmation", fake_order_email)
 
     # Register and login
-    reg = client.post("/api/v1/auth/register", json={"email": "flow@example.com", "password": "secret123"})
+    reg = client.post(
+        "/api/v1/auth/register",
+        json={"email": "flow@example.com", "username": "flow", "password": "secret123", "name": "Flow"},
+    )
     assert reg.status_code == 201, reg.text
     token = reg.json()["tokens"]["access_token"]
 
