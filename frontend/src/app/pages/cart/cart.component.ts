@@ -119,7 +119,10 @@ export class CartComponent implements OnInit {
 
   items = this.cart.items;
   subtotal = this.cart.subtotal;
-  currency = 'USD';
+
+  get currency(): string {
+    return this.items().find((i) => i.currency)?.currency ?? 'USD';
+  }
 
   onImageError(event: Event): void {
     const target = event.target as HTMLImageElement | null;
