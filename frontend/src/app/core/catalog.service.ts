@@ -48,6 +48,12 @@ export interface ProductListResponse {
   meta: PaginationMeta;
 }
 
+export interface ProductPriceBounds {
+  min_price: number;
+  max_price: number;
+  currency?: string | null;
+}
+
 export interface ProductFilterParams {
   category_slug?: string;
   search?: string;
@@ -84,5 +90,14 @@ export class CatalogService {
 
   getProduct(slug: string): Observable<Product> {
     return this.api.get<Product>(`/catalog/products/${slug}`);
+  }
+
+  getProductPriceBounds(params: Pick<ProductFilterParams, 'category_slug' | 'search' | 'is_featured' | 'tags'>): Observable<ProductPriceBounds> {
+    return this.api.get<ProductPriceBounds>('/catalog/products/price-bounds', {
+      category_slug: params.category_slug,
+      search: params.search,
+      is_featured: params.is_featured,
+      tags: params.tags?.length ? params.tags : undefined
+    });
   }
 }

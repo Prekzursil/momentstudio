@@ -246,9 +246,9 @@ export class ShopComponent implements OnInit, OnDestroy {
 
   readonly priceMinBound = 0;
   priceMaxBound = 500;
-  readonly priceStep = 5;
-  private hasMinQuery = false;
-  private hasMaxQuery = false;
+  readonly priceStep = 1;
+  private suppressNextQueryLoad = false;
+  private lastBoundsKey = '';
 
   sortOptions: { label: string; value: SortOption }[] = [
     { label: 'shop.sortNew', value: 'newest' },
@@ -273,7 +273,6 @@ export class ShopComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.setMetaTags();
     this.langSub = this.translate.onLangChange.subscribe(() => this.setMetaTags());
-    this.loadPriceBounds();
     const dataCategories = (this.route.snapshot.data['categories'] as Category[]) ?? [];
     if (dataCategories.length) {
       this.categories = dataCategories;
@@ -281,6 +280,10 @@ export class ShopComponent implements OnInit, OnDestroy {
       this.fetchCategories();
     }
     this.route.queryParams.subscribe((params) => {
+      if (this.suppressNextQueryLoad) {
+        this.suppressNextQueryLoad = false;
+        return;
+      }
       this.syncFiltersFromQuery(params);
       this.loadProducts(false);
     });
@@ -301,8 +304,13 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.loading.set(true);
     this.hasError.set(false);
     if (pushQuery) {
+      this.suppressNextQueryLoad = true;
       this.updateQueryParams();
     }
+    this.loadPriceBoundsIfNeeded(() => this.fetchProducts());
+  }
+
+  private fetchProducts(): void {
     this.catalog
       .listProducts({
         search: this.filters.search || undefined,
@@ -429,8 +437,6 @@ export class ShopComponent implements OnInit, OnDestroy {
   private syncFiltersFromQuery(params: Params): void {
     this.filters.search = params['q'] ?? '';
     this.filters.category_slug = params['cat'] ?? '';
-    this.hasMinQuery = params['min'] !== undefined;
-    this.hasMaxQuery = params['max'] !== undefined;
     const min = this.parsePrice(params['min']);
     const max = this.parsePrice(params['max']);
     this.filters.min_price = min ?? this.priceMinBound;
@@ -444,30 +450,45 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.normalizePriceRange();
   }
 
-  private loadPriceBounds(): void {
+  private loadPriceBoundsIfNeeded(after: () => void): void {
+    const key = this.computeBoundsKey();
+    if (key === this.lastBoundsKey) {
+      after();
+      return;
+    }
+    this.lastBoundsKey = key;
+    this.loadPriceBounds(after);
+  }
+
+  private computeBoundsKey(): string {
+    const tags = Array.from(this.filters.tags).sort().join(',');
+    return `${this.filters.category_slug}|${this.filters.search}|${tags}`;
+  }
+
+  private loadPriceBounds(after: () => void): void {
+    const previousMaxBound = this.priceMaxBound;
     this.catalog
-      .listProducts({
-        sort: 'price_desc',
-        page: 1,
-        limit: 1
+      .getProductPriceBounds({
+        category_slug: this.filters.category_slug || undefined,
+        search: this.filters.search || undefined,
+        tags: Array.from(this.filters.tags)
       })
       .subscribe({
         next: (resp) => {
-          const max = resp.items?.[0]?.base_price;
+          const max = resp.max_price;
           if (typeof max === 'number' && Number.isFinite(max)) {
             const rounded = Math.ceil(max / this.priceStep) * this.priceStep;
             this.priceMaxBound = Math.max(this.priceMinBound, rounded);
           }
-          if (!this.hasMaxQuery) {
+          if (this.filters.max_price === previousMaxBound) {
             this.filters.max_price = this.priceMaxBound;
           }
-          if (!this.hasMinQuery) {
-            this.filters.min_price = this.priceMinBound;
-          }
           this.normalizePriceRange();
+          after();
         },
         error: () => {
           // Keep defaults if we can't infer bounds.
+          after();
         }
       });
   }

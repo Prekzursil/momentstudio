@@ -6,13 +6,14 @@ import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { CartStore } from '../../core/cart.store';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
+import { ImgFallbackDirective } from '../../shared/img-fallback.directive';
 import { OnInit } from '@angular/core';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-cart',
   standalone: true,
-  imports: [CommonModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent, LocalizedCurrencyPipe, TranslateModule],
+  imports: [CommonModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent, LocalizedCurrencyPipe, TranslateModule, ImgFallbackDirective],
   template: `
     <app-container classes="py-10 grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -37,7 +38,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
                 [src]="item.image ?? 'assets/placeholder/product-placeholder.svg'"
                 [alt]="item.name"
                 class="h-24 w-24 rounded-xl object-cover border border-slate-100 dark:border-slate-800"
-                (error)="onImageError($event)"
+                [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
               />
               <div class="flex-1 grid gap-2">
                 <div class="flex items-start justify-between">
@@ -109,7 +110,6 @@ export class CartComponent implements OnInit {
     { label: 'nav.cart' }
   ];
   errorMsg = '';
-  private readonly fallbackImage = 'assets/placeholder/product-placeholder.svg';
 
   constructor(private cart: CartStore, private translate: TranslateService) {}
 
@@ -122,14 +122,6 @@ export class CartComponent implements OnInit {
 
   get currency(): string {
     return this.items().find((i) => i.currency)?.currency ?? 'USD';
-  }
-
-  onImageError(event: Event): void {
-    const target = event.target as HTMLImageElement | null;
-    if (!target) return;
-    if (target.dataset['fallbackApplied'] === 'true') return;
-    target.dataset['fallbackApplied'] = 'true';
-    target.src = this.fallbackImage;
   }
 
   onQuantityChange(id: string, value: number): void {

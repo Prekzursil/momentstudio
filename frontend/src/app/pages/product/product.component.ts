@@ -11,6 +11,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
 import { ToastService } from '../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
+import { ImgFallbackDirective } from '../../shared/img-fallback.directive';
 import { Title, Meta } from '@angular/platform-browser';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
@@ -31,7 +32,8 @@ import { Router } from '@angular/router';
     SkeletonComponent,
     LocalizedCurrencyPipe,
     BreadcrumbComponent,
-    TranslateModule
+    TranslateModule,
+    ImgFallbackDirective
   ],
   template: `
     <app-container classes="py-10">
@@ -61,7 +63,7 @@ import { Router } from '@angular/router';
                   loading="lazy"
                   decoding="async"
                   sizes="(min-width: 1024px) 480px, 100vw"
-                  (error)="onImageError($event)"
+                  [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
                 />
               </div>
               <div class="flex gap-3">
@@ -80,7 +82,7 @@ import { Router } from '@angular/router';
                     height="96"
                     loading="lazy"
                     decoding="async"
-                    (error)="onImageError($event)"
+                    [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
                   />
                 </button>
               </div>
@@ -179,12 +181,12 @@ import { Router } from '@angular/router';
                 [ngSrc]="item.images?.[0]?.url ?? 'assets/placeholder/product-placeholder.svg'"
                 [alt]="item.name"
                 class="h-14 w-14 rounded-xl object-cover"
-                width="96"
-                height="96"
-                loading="lazy"
-                decoding="async"
-                (error)="onImageError($event)"
-              />
+	                width="96"
+	                height="96"
+	                loading="lazy"
+	                decoding="async"
+	                [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
+	              />
                 <div class="grid gap-1">
                 <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ item.name }}</p>
                 <p class="text-sm text-slate-600 dark:text-slate-300">
@@ -215,11 +217,11 @@ import { Router } from '@angular/router';
             class="w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl"
             width="1600"
             height="1200"
-            loading="lazy"
-            decoding="async"
-            sizes="(min-width: 1024px) 960px, 100vw"
-            (error)="onImageError($event)"
-          />
+	            loading="lazy"
+	            decoding="async"
+	            sizes="(min-width: 1024px) 960px, 100vw"
+	            [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
+	          />
         </div>
       </div>
 
@@ -244,7 +246,6 @@ export class ProductComponent implements OnInit, OnDestroy {
   private langSub?: Subscription;
   private canonicalEl?: HTMLLinkElement;
   private document: Document = inject(DOCUMENT);
-  private readonly fallbackImage = 'assets/placeholder/product-placeholder.svg';
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'nav.shop', url: '/shop' }
@@ -314,15 +315,6 @@ export class ProductComponent implements OnInit, OnDestroy {
 
   setActiveImage(index: number): void {
     this.activeImageIndex = index;
-  }
-
-  onImageError(event: Event): void {
-    const target = event.target as HTMLImageElement | null;
-    if (!target) return;
-    if (target.dataset['fallbackApplied'] === 'true') return;
-    target.dataset['fallbackApplied'] = 'true';
-    target.src = this.fallbackImage;
-    target.srcset = '';
   }
 
   openPreview(): void {
