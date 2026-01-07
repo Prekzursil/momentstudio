@@ -89,7 +89,7 @@ export interface NavDrawerUser {
           {{ 'nav.preferences' | translate }}
         </div>
         <div class="mt-3 grid gap-3">
-          <label class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+          <div class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
             <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'nav.theme' | translate }}</span>
             <app-theme-segmented-control
               class="w-full"
@@ -100,7 +100,7 @@ export interface NavDrawerUser {
               [stretch]="true"
               [ariaLabel]="'nav.theme' | translate"
             ></app-theme-segmented-control>
-          </label>
+          </div>
           <label class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
             <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'nav.language' | translate }}</span>
             <select

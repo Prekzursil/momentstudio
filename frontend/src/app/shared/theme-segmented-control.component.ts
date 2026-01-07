@@ -29,7 +29,7 @@ type ThemeOption = {
         [attr.title]="opt.labelKey | translate"
         [attr.tabindex]="preference === opt.value ? 0 : -1"
         class="inline-flex items-center justify-center rounded-full transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-        [ngClass]="buttonClass(opt.value) + (stretch ? ' flex-1' : '') + (showLabels ? ' gap-2' : '')"
+        [ngClass]="[buttonClass(opt.value), stretch ? 'flex-1' : '', showLabels ? 'gap-2' : ''].join(' ')"
         (click)="setPreference(opt.value)"
         (keydown)="onKeyDown($event, idx)"
       >
@@ -142,14 +142,22 @@ export class ThemeSegmentedControlComponent {
     event.preventDefault();
     const last = this.options.length - 1;
     let nextIndex = index;
-    if (key === 'ArrowLeft') nextIndex = index === 0 ? last : index - 1;
-    if (key === 'ArrowRight') nextIndex = index === last ? 0 : index + 1;
-    if (key === 'Home') nextIndex = 0;
-    if (key === 'End') nextIndex = last;
     if (key === 'Enter' || key === ' ') {
       this.setPreference(this.options[index].value);
       return;
     }
+    if (key === 'ArrowLeft') nextIndex = index === 0 ? last : index - 1;
+    if (key === 'ArrowRight') nextIndex = index === last ? 0 : index + 1;
+    if (key === 'Home') nextIndex = 0;
+    if (key === 'End') nextIndex = last;
     this.setPreference(this.options[nextIndex].value);
+    this.focusOption(nextIndex, event.currentTarget);
+  }
+
+  private focusOption(index: number, target: EventTarget | null): void {
+    const container = (target as HTMLElement | null)?.closest('[role="radiogroup"]') as HTMLElement | null;
+    if (!container) return;
+    const buttons = Array.from(container.querySelectorAll('button[role="radio"]')) as HTMLButtonElement[];
+    buttons[index]?.focus();
   }
 }
