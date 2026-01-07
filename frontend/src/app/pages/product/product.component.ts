@@ -61,6 +61,7 @@ import { Router } from '@angular/router';
                   loading="lazy"
                   decoding="async"
                   sizes="(min-width: 1024px) 480px, 100vw"
+                  (error)="onImageError($event)"
                 />
               </div>
               <div class="flex gap-3">
@@ -79,6 +80,7 @@ import { Router } from '@angular/router';
                     height="96"
                     loading="lazy"
                     decoding="async"
+                    (error)="onImageError($event)"
                   />
                 </button>
               </div>
@@ -181,6 +183,7 @@ import { Router } from '@angular/router';
                 height="96"
                 loading="lazy"
                 decoding="async"
+                (error)="onImageError($event)"
               />
                 <div class="grid gap-1">
                 <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ item.name }}</p>
@@ -215,6 +218,7 @@ import { Router } from '@angular/router';
             loading="lazy"
             decoding="async"
             sizes="(min-width: 1024px) 960px, 100vw"
+            (error)="onImageError($event)"
           />
         </div>
       </div>
@@ -240,6 +244,7 @@ export class ProductComponent implements OnInit, OnDestroy {
   private langSub?: Subscription;
   private canonicalEl?: HTMLLinkElement;
   private document: Document = inject(DOCUMENT);
+  private readonly fallbackImage = 'assets/placeholder/product-placeholder.svg';
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'nav.shop', url: '/shop' }
@@ -309,6 +314,14 @@ export class ProductComponent implements OnInit, OnDestroy {
 
   setActiveImage(index: number): void {
     this.activeImageIndex = index;
+  }
+
+  onImageError(event: Event): void {
+    const target = event.target as HTMLImageElement | null;
+    if (!target) return;
+    if (target.src.includes(this.fallbackImage)) return;
+    target.src = this.fallbackImage;
+    target.srcset = '';
   }
 
   openPreview(): void {

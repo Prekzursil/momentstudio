@@ -26,6 +26,7 @@ import { Router } from '@angular/router';
           loading="lazy"
           decoding="async"
           sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw"
+          (error)="onImageError($event)"
         />
         <button
           type="button"
@@ -74,6 +75,7 @@ import { Router } from '@angular/router';
 export class ProductCardComponent {
   @Input({ required: true }) product!: Product;
   @Input() tag?: string | null;
+  private readonly fallbackImage = 'assets/placeholder/product-placeholder.svg';
   constructor(
     private translate: TranslateService,
     private wishlist: WishlistService,
@@ -97,6 +99,14 @@ export class ProductCardComponent {
 
   get primaryImage(): string {
     return this.product.images?.[0]?.url ?? 'assets/placeholder/product-placeholder.svg';
+  }
+
+  onImageError(event: Event): void {
+    const target = event.target as HTMLImageElement | null;
+    if (!target) return;
+    if (target.src.includes(this.fallbackImage)) return;
+    target.src = this.fallbackImage;
+    target.srcset = '';
   }
 
   get stockBadge(): string | null {

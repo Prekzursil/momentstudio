@@ -37,6 +37,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
                 [src]="item.image ?? 'assets/placeholder/product-placeholder.svg'"
                 [alt]="item.name"
                 class="h-24 w-24 rounded-xl object-cover border border-slate-100 dark:border-slate-800"
+                (error)="onImageError($event)"
               />
               <div class="flex-1 grid gap-2">
                 <div class="flex items-start justify-between">
@@ -118,6 +119,14 @@ export class CartComponent implements OnInit {
   items = this.cart.items;
   subtotal = this.cart.subtotal;
   currency = 'USD';
+
+  onImageError(event: Event): void {
+    const target = event.target as HTMLImageElement | null;
+    if (!target) return;
+    const fallback = 'assets/placeholder/product-placeholder.svg';
+    if (target.src.includes(fallback)) return;
+    target.src = fallback;
+  }
 
   onQuantityChange(id: string, value: number): void {
     const qty = Number(value);
