@@ -98,6 +98,7 @@ export interface NavDrawerUser {
               [showLabels]="true"
               [size]="'lg'"
               [stretch]="true"
+              [layout]="'stacked'"
               [ariaLabel]="'nav.theme' | translate"
             ></app-theme-segmented-control>
           </div>

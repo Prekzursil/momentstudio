@@ -9,6 +9,8 @@ type ThemeOption = {
   icon: 'system' | 'light' | 'dark';
 };
 
+type ThemeSegmentedLayout = 'horizontal' | 'stacked';
+
 @Component({
   selector: 'app-theme-segmented-control',
   standalone: true,
@@ -36,11 +38,11 @@ type ThemeOption = {
         [attr.title]="opt.labelKey | translate"
         [attr.tabindex]="preference === opt.value ? 0 : -1"
         class="inline-flex items-center justify-center rounded-full transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-        [ngClass]="[buttonClass(opt.value), stretch ? 'flex-1' : '', showLabels ? 'gap-2' : ''].join(' ')"
+        [ngClass]="buttonNgClass(opt.value)"
         (click)="setPreference(opt.value)"
         (keydown)="onKeyDown($event, idx)"
       >
-        <span class="grid place-items-center" [ngClass]="size === 'lg' ? 'h-9 w-9' : 'h-8 w-8'">
+        <span class="grid place-items-center" [ngClass]="iconBoxClass()">
           <ng-container [ngSwitch]="opt.icon">
             <svg
               *ngSwitchCase="'system'"
@@ -98,8 +100,8 @@ type ThemeOption = {
         </span>
         <span
           *ngIf="showLabels"
-          class="pr-3 text-sm font-medium min-w-0 truncate"
-          [ngClass]="size === 'lg' ? 'pl-0.5' : 'pl-0'"
+          class="font-medium min-w-0 text-center"
+          [ngClass]="labelClass()"
         >
           {{ opt.labelKey | translate }}
         </span>
@@ -115,6 +117,7 @@ export class ThemeSegmentedControlComponent {
   @Input() stretch = false;
   @Input() variant: 'standalone' | 'embedded' = 'standalone';
   @Input() ariaLabel = 'Theme';
+  @Input() layout: ThemeSegmentedLayout = 'horizontal';
 
   readonly options: ThemeOption[] = [
     { value: 'system', labelKey: 'theme.system', icon: 'system' },
@@ -134,6 +137,25 @@ export class ThemeSegmentedControlComponent {
 
   setPreference(pref: ThemePreference): void {
     this.preferenceChange.emit(pref);
+  }
+
+  buttonNgClass(value: ThemePreference): string {
+    const layoutClass = this.layout === 'stacked' ? 'flex-col gap-0.5 py-1' : this.showLabels ? 'gap-2' : '';
+    return [this.buttonClass(value), this.stretch ? 'flex-1' : '', layoutClass].filter(Boolean).join(' ');
+  }
+
+  iconBoxClass(): string {
+    if (this.layout === 'stacked') {
+      return this.size === 'lg' ? 'h-8 w-8' : 'h-7 w-7';
+    }
+    return this.size === 'lg' ? 'h-9 w-9' : 'h-8 w-8';
+  }
+
+  labelClass(): string {
+    if (this.layout === 'stacked') {
+      return 'px-1 pb-0.5 text-[11px] leading-tight';
+    }
+    return ['pr-3 text-sm truncate', this.size === 'lg' ? 'pl-0.5' : 'pl-0'].join(' ');
   }
 
   buttonClass(value: ThemePreference): string {
