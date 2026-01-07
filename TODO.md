@@ -234,6 +234,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Recently viewed carousel.
 - [x] Localized currency display.
 - [x] SEO meta tags per product/category.
+- [ ] Shop: add API-powered price bounds (min/max) so the price range UI can cap to real data without an extra list request (and optionally per-filter bounds).
+- [ ] Frontend: extract repeated image placeholder-on-error handlers into a shared directive/helper for consistency.
 
 ## Blog & Community
 - [x] Nav: add “Blog” link between Home and Shop (header + drawer).
