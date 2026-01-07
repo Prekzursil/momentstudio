@@ -194,6 +194,83 @@ def test_catalog_admin_and_public_flows(test_app: Dict[str, object]) -> None:
     res = client.get("/api/v1/catalog/products")
     assert all(p["slug"] != "white-cup" for p in res.json()["items"])
 
+def test_product_price_bounds(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal, email="boundsadmin@example.com")
+
+    res = client.post(
+        "/api/v1/catalog/categories",
+        json={"slug": "bounds-cups", "name": "Cups"},
+        headers=auth_headers(admin_token),
+    )
+    assert res.status_code == 201
+    cup_category_id = res.json()["id"]
+
+    res = client.post(
+        "/api/v1/catalog/categories",
+        json={"slug": "bounds-plates", "name": "Plates"},
+        headers=auth_headers(admin_token),
+    )
+    assert res.status_code == 201
+    plate_category_id = res.json()["id"]
+
+    res = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": cup_category_id,
+            "slug": "cheap-cup",
+            "name": "Cheap Cup",
+            "base_price": 10,
+            "currency": "RON",
+            "stock_quantity": 10,
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert res.status_code == 201
+
+    res = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": cup_category_id,
+            "slug": "fancy-cup",
+            "name": "Fancy Cup",
+            "base_price": 25,
+            "currency": "RON",
+            "stock_quantity": 5,
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert res.status_code == 201
+
+    res = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": plate_category_id,
+            "slug": "luxury-plate",
+            "name": "Luxury Plate",
+            "base_price": 100,
+            "currency": "RON",
+            "stock_quantity": 2,
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert res.status_code == 201
+
+    all_bounds = client.get("/api/v1/catalog/products/price-bounds")
+    assert all_bounds.status_code == 200
+    data = all_bounds.json()
+    assert data["min_price"] == 10
+    assert data["max_price"] == 100
+    assert data["currency"] == "RON"
+
+    cup_bounds = client.get("/api/v1/catalog/products/price-bounds", params={"category_slug": "bounds-cups"})
+    assert cup_bounds.status_code == 200
+    data = cup_bounds.json()
+    assert data["min_price"] == 10
+    assert data["max_price"] == 25
+    assert data["currency"] == "RON"
+
 
 def test_product_image_upload_and_delete(tmp_path, test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]

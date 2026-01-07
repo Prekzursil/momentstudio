@@ -460,6 +460,40 @@ def slugify(value: str) -> str:
     return "-".join(filter(None, cleaned.split("-")))
 
 
+async def get_product_price_bounds(
+    session: AsyncSession,
+    category_slug: str | None,
+    is_featured: bool | None,
+    search: str | None,
+    tags: list[str] | None,
+) -> tuple[float, float, str | None]:
+    query = select(
+        func.min(Product.base_price),
+        func.max(Product.base_price),
+        func.count(func.distinct(Product.currency)),
+        func.min(Product.currency),
+    ).where(Product.is_deleted.is_(False))
+
+    if category_slug:
+        query = query.join(Category).where(Category.slug == category_slug)
+    if is_featured is not None:
+        query = query.where(Product.is_featured == is_featured)
+    if search:
+        like = f"%{search.lower()}%"
+        query = query.where(
+            (Product.name.ilike(like)) | (Product.short_description.ilike(like)) | (Product.long_description.ilike(like))
+        )
+    if tags:
+        query = query.join(Product.tags).where(Tag.slug.in_(tags))
+
+    row = (await session.execute(query)).one()
+    min_price, max_price, currency_count, currency = row
+    min_value = float(min_price) if min_price is not None else 0.0
+    max_value = float(max_price) if max_price is not None else 0.0
+    currency_value = currency if int(currency_count or 0) == 1 else None
+    return min_value, max_value, currency_value
+
+
 async def list_products_with_filters(
     session: AsyncSession,
     category_slug: str | None,

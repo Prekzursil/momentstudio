@@ -26,6 +26,7 @@ from app.schemas.catalog import (
     FeaturedCollectionRead,
     FeaturedCollectionUpdate,
     ProductFeedItem,
+    ProductPriceBounds,
 )
 from app.services import catalog as catalog_service
 from app.services import storage
@@ -71,6 +72,24 @@ async def list_products(
         items=items,
         meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
     )
+
+
+@router.get("/products/price-bounds", response_model=ProductPriceBounds)
+async def get_product_price_bounds(
+    session: AsyncSession = Depends(get_session),
+    category_slug: str | None = Query(default=None),
+    is_featured: bool | None = Query(default=None),
+    search: str | None = Query(default=None),
+    tags: list[str] | None = Query(default=None),
+) -> ProductPriceBounds:
+    min_price, max_price, currency = await catalog_service.get_product_price_bounds(
+        session,
+        category_slug=category_slug,
+        is_featured=is_featured,
+        search=search,
+        tags=tags,
+    )
+    return ProductPriceBounds(min_price=min_price, max_price=max_price, currency=currency)
 
 
 @router.get("/products/feed", response_model=list[ProductFeedItem])

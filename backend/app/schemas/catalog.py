@@ -259,6 +259,12 @@ class ProductFeedItem(BaseModel):
     tags: list[str] = []
 
 
+class ProductPriceBounds(BaseModel):
+    min_price: float
+    max_price: float
+    currency: str | None = None
+
+
 class ProductListResponse(BaseModel):
     items: list[ProductRead]
     meta: PaginationMeta
