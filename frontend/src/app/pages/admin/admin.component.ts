@@ -221,7 +221,7 @@ import { formatIdentity } from '../../shared/user-identity';
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Homepage sections order</h2>
               <app-button size="sm" variant="ghost" label="Save order" (action)="saveSections()"></app-button>
             </div>
-            <p class="text-sm text-slate-600 dark:text-slate-300">Drag to reorder hero / collections / bestsellers / new arrivals.</p>
+            <p class="text-sm text-slate-600 dark:text-slate-300">Drag to reorder sections and toggle visibility.</p>
             <div class="grid gap-2">
               <div
                 *ngFor="let section of sectionOrder"
@@ -231,8 +231,17 @@ import { formatIdentity } from '../../shared/user-identity';
                 (dragover)="onSectionDragOver($event)"
                 (drop)="onSectionDrop(section)"
               >
-                <span class="font-semibold text-slate-900 dark:text-slate-50 capitalize">{{ section.replace('_', ' ') }}</span>
-                <span class="text-xs text-slate-500 dark:text-slate-400">drag</span>
+                <div class="grid gap-1">
+                  <span class="font-semibold text-slate-900 dark:text-slate-50">{{ sectionLabel(section) }}</span>
+                  <span class="text-[11px] text-slate-500 dark:text-slate-400">{{ section }}</span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                    <input type="checkbox" [checked]="isSectionEnabled(section)" (change)="toggleSectionEnabled(section, $event)" />
+                    Enabled
+                  </label>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">drag</span>
+                </div>
               </div>
             </div>
             <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="sectionsMessage">{{ sectionsMessage }}</span>
@@ -1332,7 +1341,8 @@ export class AdminComponent implements OnInit {
   draggingSlug: string | null = null;
   selectedIds = new Set<string>();
   allSelected = false;
-  sectionOrder: string[] = ['hero', 'collections', 'bestsellers', 'new_arrivals'];
+  sectionOrder: string[] = ['hero', 'featured_products', 'new_arrivals', 'featured_collections', 'story', 'recently_viewed', 'why'];
+  sectionEnabled: Record<string, boolean> = {};
   draggingSection: string | null = null;
   sectionsMessage = '';
 
@@ -2852,15 +2862,67 @@ export class AdminComponent implements OnInit {
   loadSections(): void {
     this.admin.getContent('home.sections').subscribe({
       next: (block) => {
-        const order = block.meta?.['order'];
-        if (Array.isArray(order) && order.length) {
-          this.sectionOrder = order;
+        const rawSections = block.meta?.['sections'];
+        if (Array.isArray(rawSections) && rawSections.length) {
+          const order: string[] = [];
+          const enabled: Record<string, boolean> = {};
+          for (const raw of rawSections) {
+            if (!raw || typeof raw !== 'object') continue;
+            const id = (raw as { id?: unknown }).id;
+            if (typeof id !== 'string' || !id.trim()) continue;
+            order.push(id);
+            const isEnabled = (raw as { enabled?: unknown }).enabled;
+            enabled[id] = isEnabled === false ? false : true;
+          }
+          if (order.length) {
+            this.sectionOrder = order;
+            this.sectionEnabled = enabled;
+            return;
+          }
         }
+
+        const legacyOrder = block.meta?.['order'];
+        if (Array.isArray(legacyOrder) && legacyOrder.length) {
+          this.sectionOrder = legacyOrder;
+          const enabled: Record<string, boolean> = {};
+          for (const id of legacyOrder) {
+            if (typeof id === 'string' && id.trim()) enabled[id] = true;
+          }
+          this.sectionEnabled = enabled;
+          return;
+        }
+
+        this.applyDefaultHomeSections();
       },
       error: () => {
-        this.sectionOrder = ['hero', 'collections', 'bestsellers', 'new_arrivals'];
+        this.applyDefaultHomeSections();
       }
     });
+  }
+
+  private applyDefaultHomeSections(): void {
+    const defaults = ['hero', 'featured_products', 'new_arrivals', 'featured_collections', 'story', 'recently_viewed', 'why'];
+    this.sectionOrder = defaults;
+    const enabled: Record<string, boolean> = {};
+    for (const id of defaults) enabled[id] = true;
+    this.sectionEnabled = enabled;
+  }
+
+  sectionLabel(section: string): string {
+    return section
+      .split('_')
+      .filter((s) => s.length)
+      .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
+      .join(' ');
+  }
+
+  isSectionEnabled(section: string): boolean {
+    return this.sectionEnabled[section] !== false;
+  }
+
+  toggleSectionEnabled(section: string, event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.sectionEnabled[section] = Boolean(target?.checked);
   }
 
   onSectionDragStart(section: string): void {
@@ -2887,10 +2949,11 @@ export class AdminComponent implements OnInit {
   }
 
   saveSections(): void {
+    const sections = this.sectionOrder.map((id) => ({ id, enabled: this.isSectionEnabled(id) }));
     const payload = {
       title: 'Home sections',
       body_markdown: 'Home layout order',
-      meta: { order: this.sectionOrder },
+      meta: { version: 1, sections },
       status: 'published'
     };
     this.admin.updateContent('home.sections', payload).subscribe({

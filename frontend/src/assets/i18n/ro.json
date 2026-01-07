@@ -134,10 +134,22 @@
     "ctaShop": "Cumpără acum",
     "ctaAdmin": "Vezi admin",
     "featured": "Produse recomandate",
+    "newArrivals": "Cele mai noi",
     "viewAll": "Vezi toate",
     "noFeatured": "Nu există produse recomandate acum.",
+    "newArrivalsEmpty": "Nu există noutăți acum.",
     "featuredError": {
       "title": "Nu am putut încărca produsele recomandate.",
+      "copy": "Verifică conexiunea și încearcă din nou."
+    },
+    "newArrivalsError": {
+      "title": "Nu am putut încărca noutățile.",
+      "copy": "Verifică conexiunea și încearcă din nou."
+    },
+    "collections": "Colecții recomandate",
+    "collectionsEmpty": "Nu există colecții recomandate acum.",
+    "collectionsError": {
+      "title": "Nu am putut încărca colecțiile recomandate.",
       "copy": "Verifică conexiunea și încearcă din nou."
     },
     "why": "De ce acest starter",

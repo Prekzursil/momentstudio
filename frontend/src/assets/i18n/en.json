@@ -134,10 +134,22 @@
     "ctaShop": "Shop now",
     "ctaAdmin": "View admin",
     "featured": "Featured pieces",
+    "newArrivals": "New arrivals",
     "viewAll": "View all",
     "noFeatured": "No featured products right now.",
+    "newArrivalsEmpty": "No new arrivals right now.",
     "featuredError": {
       "title": "Could not load featured products.",
+      "copy": "Check your connection and retry."
+    },
+    "newArrivalsError": {
+      "title": "Could not load new arrivals.",
+      "copy": "Check your connection and retry."
+    },
+    "collections": "Featured collections",
+    "collectionsEmpty": "No featured collections right now.",
+    "collectionsError": {
+      "title": "Could not load featured collections.",
       "copy": "Check your connection and retry."
     },
     "why": "Why this starter",
