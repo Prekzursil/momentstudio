@@ -86,11 +86,18 @@ describe('AccountComponent', () => {
 
   beforeEach(() => {
     toast = jasmine.createSpyObj<ToastService>('ToastService', ['success', 'error', 'info']);
-    auth = jasmine.createSpyObj<AuthService>('AuthService', ['isAuthenticated', 'updateNotificationPreferences', 'logout', 'role']);
+    auth = jasmine.createSpyObj<AuthService>('AuthService', [
+      'isAuthenticated',
+      'updateNotificationPreferences',
+      'logout',
+      'role',
+      'getAliases'
+    ]);
     auth.isAuthenticated.and.returnValue(true);
     auth.role.and.returnValue('customer');
     auth.updateNotificationPreferences.and.returnValue(of({ ...profile, notify_marketing: true } as any));
     auth.logout.and.returnValue(of(void 0));
+    auth.getAliases.and.returnValue(of({ usernames: [], display_names: [] } as any));
 
     account = jasmine.createSpyObj<AccountService>('AccountService', [
       'getProfile',

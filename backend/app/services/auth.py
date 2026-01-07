@@ -1,28 +1,118 @@
 from datetime import datetime, timedelta, timezone
 import secrets
 import uuid
+import re
 from typing import Any
 
 import httpx
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.core import security
 from app.core.config import settings
-from app.models.user import EmailVerificationToken, PasswordResetToken, RefreshSession, User
+from app.models.user import (
+    EmailVerificationToken,
+    PasswordResetToken,
+    RefreshSession,
+    User,
+    UserUsernameHistory,
+    UserDisplayNameHistory,
+)
 from app.schemas.user import UserCreate
 from app.services import self_service
 
 
 async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
-    result = await session.execute(select(User).where(User.email == email, User.deleted_at.is_(None)))
+    result = await session.execute(select(User).where(User.email == email))
+    return result.scalar_one_or_none()
+
+
+async def get_user_by_username(session: AsyncSession, username: str) -> User | None:
+    result = await session.execute(select(User).where(User.username == username))
     return result.scalar_one_or_none()
 
 
 async def get_user_by_google_sub(session: AsyncSession, google_sub: str) -> User | None:
-    result = await session.execute(select(User).where(User.google_sub == google_sub, User.deleted_at.is_(None)))
+    result = await session.execute(select(User).where(User.google_sub == google_sub))
     return result.scalar_one_or_none()
+
+
+USERNAME_ALLOWED_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$")
+
+
+def _validate_username(username: str) -> str:
+    cleaned = (username or "").strip()
+    if not USERNAME_ALLOWED_RE.match(cleaned):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username must be 3-30 chars and contain only letters, numbers, '.', '_', or '-'",
+        )
+    return cleaned
+
+
+def _sanitize_username_from_email(email: str) -> str:
+    local = (email or "").split("@")[0]
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", local).strip("._-")
+    if not cleaned:
+        cleaned = "user"
+    if not cleaned[0].isalnum():
+        cleaned = f"u{cleaned}"
+    cleaned = cleaned[:30]
+    while len(cleaned) < 3:
+        cleaned = f"{cleaned}0"
+        cleaned = cleaned[:30]
+    if not USERNAME_ALLOWED_RE.match(cleaned):
+        cleaned = f"user-{secrets.token_hex(3)}"[:30]
+    return cleaned
+
+
+async def _generate_unique_username(session: AsyncSession, email: str) -> str:
+    base = _sanitize_username_from_email(email)
+    if not await get_user_by_username(session, base):
+        return base
+    suffix_num = 2
+    while True:
+        suffix = f"-{suffix_num}"
+        trimmed = base[: 30 - len(suffix)]
+        candidate = f"{trimmed}{suffix}"
+        if not await get_user_by_username(session, candidate):
+            return candidate
+        suffix_num += 1
+
+
+async def _allocate_name_tag(session: AsyncSession, name: str, *, exclude_user_id: uuid.UUID | None = None) -> int:
+    q = select(func.max(User.name_tag)).where(User.name == name)
+    if exclude_user_id:
+        q = q.where(User.id != exclude_user_id)
+    max_tag = await session.scalar(q)
+    return int(max_tag if max_tag is not None else -1) + 1
+
+
+async def _try_reuse_name_tag(
+    session: AsyncSession, *, user_id: uuid.UUID, name: str
+) -> int | None:
+    rows = (
+        (
+            await session.execute(
+                select(UserDisplayNameHistory.name_tag)
+                .where(UserDisplayNameHistory.user_id == user_id, UserDisplayNameHistory.name == name)
+                .order_by(UserDisplayNameHistory.created_at.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for tag in sorted({int(x) for x in rows}):
+        existing = await session.scalar(
+            select(func.count())
+            .select_from(User)
+            .where(User.name == name, User.name_tag == tag, User.id != user_id)
+        )
+        if int(existing or 0) == 0:
+            return tag
+    return None
 
 
 async def create_user(session: AsyncSession, user_in: UserCreate) -> User:
@@ -30,26 +120,138 @@ async def create_user(session: AsyncSession, user_in: UserCreate) -> User:
     if existing:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
 
+    username = _validate_username(user_in.username) if user_in.username else await _generate_unique_username(session, user_in.email)
+    if await get_user_by_username(session, username):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken")
+
+    display_name = (user_in.name or "").strip() or username
+    display_name = display_name[:255]
+    name_tag = await _allocate_name_tag(session, display_name)
+
     db_user = User(
         email=user_in.email,
+        username=username,
         hashed_password=security.hash_password(user_in.password),
-        name=user_in.name,
+        name=display_name,
+        name_tag=name_tag,
         preferred_language=user_in.preferred_language or "en",
     )
     session.add(db_user)
+    await session.flush()
+    now = datetime.now(timezone.utc)
+    session.add(UserUsernameHistory(user_id=db_user.id, username=username, created_at=now))
+    session.add(UserDisplayNameHistory(user_id=db_user.id, name=display_name, name_tag=name_tag, created_at=now))
     await session.commit()
     await session.refresh(db_user)
     return db_user
 
 
-async def authenticate_user(session: AsyncSession, email: str, password: str) -> User:
-    user = await get_user_by_email(session, email)
+async def authenticate_user(session: AsyncSession, identifier: str, password: str) -> User:
+    identifier = (identifier or "").strip()
+    if "@" in identifier:
+        user = await get_user_by_email(session, identifier)
+    else:
+        user = await get_user_by_username(session, identifier)
     if not user or not security.verify_password(password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    if getattr(user, "deleted_at", None) is not None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
     if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
         await self_service.execute_account_deletion(session, user)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
     return user
+
+
+async def update_username(session: AsyncSession, user: User, new_username: str) -> User:
+    new_username = _validate_username(new_username)
+    if new_username == user.username:
+        return user
+    existing = await get_user_by_username(session, new_username)
+    if existing and existing.id != user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken")
+    user.username = new_username
+    session.add(user)
+    session.add(UserUsernameHistory(user_id=user.id, username=new_username, created_at=datetime.now(timezone.utc)))
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
+async def update_display_name(session: AsyncSession, user: User, new_name: str) -> User:
+    cleaned = (new_name or "").strip()
+    if not cleaned:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Display name is required")
+    cleaned = cleaned[:255]
+    if cleaned == (user.name or ""):
+        return user
+
+    reused = await _try_reuse_name_tag(session, user_id=user.id, name=cleaned)
+    tag = reused if reused is not None else await _allocate_name_tag(session, cleaned, exclude_user_id=user.id)
+    user.name = cleaned
+    user.name_tag = tag
+    session.add(user)
+    session.add(UserDisplayNameHistory(user_id=user.id, name=cleaned, name_tag=tag, created_at=datetime.now(timezone.utc)))
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
+async def list_username_history(session: AsyncSession, user_id: uuid.UUID) -> list[UserUsernameHistory]:
+    result = await session.execute(
+        select(UserUsernameHistory)
+        .where(UserUsernameHistory.user_id == user_id)
+        .order_by(UserUsernameHistory.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+async def list_display_name_history(session: AsyncSession, user_id: uuid.UUID) -> list[UserDisplayNameHistory]:
+    result = await session.execute(
+        select(UserDisplayNameHistory)
+        .where(UserDisplayNameHistory.user_id == user_id)
+        .order_by(UserDisplayNameHistory.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+async def create_google_user(
+    session: AsyncSession,
+    *,
+    email: str,
+    name: str | None,
+    picture: str | None,
+    sub: str,
+    email_verified: bool,
+    preferred_language: str = "en",
+) -> User:
+    username = await _generate_unique_username(session, email)
+    display_name = (name or "").strip() or username
+    display_name = display_name[:255]
+    name_tag = await _allocate_name_tag(session, display_name)
+
+    password_placeholder = security.hash_password(secrets.token_urlsafe(16))
+    user = User(
+        email=email,
+        username=username,
+        hashed_password=password_placeholder,
+        name=display_name,
+        name_tag=name_tag,
+        avatar_url=picture,
+        google_sub=sub,
+        google_email=email,
+        google_picture_url=picture,
+        email_verified=email_verified,
+        preferred_language=preferred_language or "en",
+    )
+    session.add(user)
+    await session.flush()
+    now = datetime.now(timezone.utc)
+    session.add(UserUsernameHistory(user_id=user.id, username=username, created_at=now))
+    session.add(UserDisplayNameHistory(user_id=user.id, name=display_name, name_tag=name_tag, created_at=now))
+    await session.commit()
+    await session.refresh(user)
+    return user
+
 
 
 async def _revoke_other_reset_tokens(session: AsyncSession, user_id: uuid.UUID) -> None:

@@ -5,7 +5,7 @@ from pydantic import BaseModel, EmailStr, Field
 class GuestCheckoutRequest(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     email: EmailStr
-    password: str | None = Field(default=None, min_length=8)
+    password: str | None = Field(default=None, min_length=6, max_length=128)
     create_account: bool = False
     line1: str = Field(min_length=1, max_length=200)
     line2: str | None = Field(default=None, max_length=200)

@@ -47,6 +47,7 @@ async def seed_admin(session_factory):
         await session.execute(delete(User).where(User.email == "admin@example.com"))
         admin = User(
             email="admin@example.com",
+            username="admin",
             hashed_password=security.hash_password("Password123"),
             name="Admin",
             role=UserRole.admin,
@@ -110,6 +111,7 @@ async def seed_dashboard_data(session_factory):
 
         user = User(
             email="user@example.com",
+            username="user",
             hashed_password=security.hash_password("Password123"),
             name="Customer",
             role=UserRole.customer,

@@ -36,9 +36,37 @@ export interface AdminOrder {
 export interface AdminUser {
   id: string;
   email: string;
+  username: string;
   name?: string | null;
+  name_tag?: number;
   role: string;
   created_at: string;
+}
+
+export interface AdminUserAliasHistoryItem {
+  created_at: string;
+}
+
+export interface AdminUserUsernameHistoryItem extends AdminUserAliasHistoryItem {
+  username: string;
+}
+
+export interface AdminUserDisplayNameHistoryItem extends AdminUserAliasHistoryItem {
+  name: string;
+  name_tag: number;
+}
+
+export interface AdminUserAliasesResponse {
+  user: {
+    id: string;
+    email: string;
+    username: string;
+    name?: string | null;
+    name_tag?: number;
+    role: string;
+  };
+  usernames: AdminUserUsernameHistoryItem[];
+  display_names: AdminUserDisplayNameHistoryItem[];
 }
 
 export interface AdminContent {
@@ -177,6 +205,10 @@ export class AdminService {
 
   users(): Observable<AdminUser[]> {
     return this.api.get<AdminUser[]>('/admin/dashboard/users');
+  }
+
+  userAliases(userId: string): Observable<AdminUserAliasesResponse> {
+    return this.api.get<AdminUserAliasesResponse>(`/admin/dashboard/users/${userId}/aliases`);
   }
 
   content(): Observable<AdminContent[]> {

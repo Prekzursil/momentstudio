@@ -41,21 +41,25 @@ def auth_headers(token: str) -> dict[str, str]:
 def test_register_and_login_flow(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 
-    register_payload = {"email": "user@example.com", "password": "supersecret", "name": "User"}
+    register_payload = {"email": "user@example.com", "username": "user", "password": "supersecret", "name": "User"}
     res = client.post("/api/v1/auth/register", json=register_payload)
     assert res.status_code == 201, res.text
     body = res.json()
     assert body["user"]["email"] == "user@example.com"
+    assert body["user"]["username"] == "user"
     assert body["tokens"]["access_token"]
     assert body["tokens"]["refresh_token"]
 
-    # Login
-    login_payload = {"email": "user@example.com", "password": "supersecret"}
-    res = client.post("/api/v1/auth/login", json=login_payload)
+    # Login by email
+    res = client.post("/api/v1/auth/login", json={"identifier": "user@example.com", "password": "supersecret"})
     assert res.status_code == 200, res.text
     tokens = res.json()["tokens"]
     assert tokens["access_token"]
     assert tokens["refresh_token"]
+
+    # Login by username
+    res = client.post("/api/v1/auth/login", json={"identifier": "user", "password": "supersecret"})
+    assert res.status_code == 200, res.text
 
     # Refresh
     res = client.post("/api/v1/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
@@ -80,7 +84,9 @@ def test_admin_guard(test_app: Dict[str, object]) -> None:
     SessionLocal: Callable = test_app["session_factory"]  # type: ignore[assignment]
 
     # Register user
-    res = client.post("/api/v1/auth/register", json={"email": "admin@example.com", "password": "adminpass"})
+    res = client.post(
+        "/api/v1/auth/register", json={"email": "admin@example.com", "username": "admin", "password": "adminpass", "name": "Admin"}
+    )
     assert res.status_code == 201
     access_token = res.json()["tokens"]["access_token"]
 
@@ -99,7 +105,7 @@ def test_admin_guard(test_app: Dict[str, object]) -> None:
     asyncio.run(promote())
 
     # Acquire new tokens after role change
-    res = client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "adminpass"})
+    res = client.post("/api/v1/auth/login", json={"identifier": "admin@example.com", "password": "adminpass"})
     admin_access = res.json()["tokens"]["access_token"]
 
     res = client.get("/api/v1/auth/admin/ping", headers={"Authorization": f"Bearer {admin_access}"})
@@ -117,7 +123,10 @@ def test_password_reset_flow(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str
 
     monkeypatch.setattr("app.services.email.send_password_reset", fake_send)
 
-    res = client.post("/api/v1/auth/register", json={"email": "reset@example.com", "password": "resetpass"})
+    res = client.post(
+        "/api/v1/auth/register",
+        json={"email": "reset@example.com", "username": "reset", "password": "resetpass", "name": "Reset"},
+    )
     assert res.status_code == 201
 
     req = client.post("/api/v1/auth/password-reset/request", json={"email": "reset@example.com"})
@@ -130,14 +139,17 @@ def test_password_reset_flow(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str
     )
     assert confirm.status_code == 200
 
-    login = client.post("/api/v1/auth/login", json={"email": "reset@example.com", "password": "newsecret"})
+    login = client.post("/api/v1/auth/login", json={"identifier": "reset@example.com", "password": "newsecret"})
     assert login.status_code == 200
 
 
 def test_update_profile_me(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 
-    res = client.post("/api/v1/auth/register", json={"email": "me@example.com", "password": "supersecret", "name": "Old"})
+    res = client.post(
+        "/api/v1/auth/register",
+        json={"email": "me@example.com", "username": "me1", "password": "supersecret", "name": "Old"},
+    )
     assert res.status_code == 201, res.text
     token = res.json()["tokens"]["access_token"]
 
@@ -167,7 +179,7 @@ def test_change_password_persists_and_updates_login(test_app: Dict[str, object])
 
     res = client.post(
         "/api/v1/auth/register",
-        json={"email": "pw@example.com", "password": "oldsecret", "name": "PW"},
+        json={"email": "pw@example.com", "username": "pw1", "password": "oldsecret", "name": "PW"},
     )
     assert res.status_code == 201, res.text
     token = res.json()["tokens"]["access_token"]
@@ -186,10 +198,10 @@ def test_change_password_persists_and_updates_login(test_app: Dict[str, object])
     )
     assert ok.status_code == 200, ok.text
 
-    old_login = client.post("/api/v1/auth/login", json={"email": "pw@example.com", "password": "oldsecret"})
+    old_login = client.post("/api/v1/auth/login", json={"identifier": "pw@example.com", "password": "oldsecret"})
     assert old_login.status_code == 401
 
-    new_login = client.post("/api/v1/auth/login", json={"email": "pw@example.com", "password": "newsecret"})
+    new_login = client.post("/api/v1/auth/login", json={"identifier": "pw@example.com", "password": "newsecret"})
     assert new_login.status_code == 200, new_login.text
 
 
@@ -197,7 +209,8 @@ def test_update_notification_preferences(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 
     res = client.post(
-        "/api/v1/auth/register", json={"email": "notify@example.com", "password": "supersecret", "name": "N"}
+        "/api/v1/auth/register",
+        json={"email": "notify@example.com", "username": "notify", "password": "supersecret", "name": "N"},
     )
     assert res.status_code == 201, res.text
     token = res.json()["tokens"]["access_token"]
@@ -217,3 +230,82 @@ def test_update_notification_preferences(test_app: Dict[str, object]) -> None:
     body = me.json()
     assert body["notify_blog_comments"] is True
     assert body["notify_marketing"] is True
+
+
+def test_alias_history_and_display_name_tags(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    res1 = client.post(
+        "/api/v1/auth/register",
+        json={"email": "ana1@example.com", "username": "ana1", "password": "supersecret", "name": "Ana"},
+    )
+    assert res1.status_code == 201, res1.text
+    assert res1.json()["user"]["name_tag"] == 0
+    token = res1.json()["tokens"]["access_token"]
+
+    res2 = client.post(
+        "/api/v1/auth/register",
+        json={"email": "ana2@example.com", "username": "ana2", "password": "supersecret", "name": "Ana"},
+    )
+    assert res2.status_code == 201, res2.text
+    assert res2.json()["user"]["name_tag"] == 1
+
+    aliases = client.get("/api/v1/auth/me/aliases", headers=auth_headers(token))
+    assert aliases.status_code == 200, aliases.text
+    data = aliases.json()
+    assert data["usernames"][0]["username"] == "ana1"
+    assert data["display_names"][0]["name"] == "Ana"
+    assert data["display_names"][0]["name_tag"] == 0
+
+    update = client.patch("/api/v1/auth/me/username", json={"username": "ana1-new"}, headers=auth_headers(token))
+    assert update.status_code == 200, update.text
+    aliases2 = client.get("/api/v1/auth/me/aliases", headers=auth_headers(token))
+    assert aliases2.status_code == 200, aliases2.text
+    usernames = [u["username"] for u in aliases2.json()["usernames"]]
+    assert usernames[:2] == ["ana1-new", "ana1"]
+
+
+def test_display_name_history_reuses_name_tag_on_revert(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    res1 = client.post(
+        "/api/v1/auth/register",
+        json={"email": "tagreuse1@example.com", "username": "tagreuse1", "password": "supersecret", "name": "Ana"},
+    )
+    assert res1.status_code == 201, res1.text
+    token = res1.json()["tokens"]["access_token"]
+    assert res1.json()["user"]["name_tag"] == 0
+
+    res2 = client.post(
+        "/api/v1/auth/register",
+        json={"email": "tagreuse2@example.com", "username": "tagreuse2", "password": "supersecret", "name": "Ana"},
+    )
+    assert res2.status_code == 201, res2.text
+    assert res2.json()["user"]["name_tag"] == 1
+
+    renamed = client.patch(
+        "/api/v1/auth/me",
+        json={"name": "Maria"},
+        headers=auth_headers(token),
+    )
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["name"] == "Maria"
+    assert renamed.json()["name_tag"] == 0
+
+    reverted = client.patch(
+        "/api/v1/auth/me",
+        json={"name": "Ana"},
+        headers=auth_headers(token),
+    )
+    assert reverted.status_code == 200, reverted.text
+    assert reverted.json()["name"] == "Ana"
+    assert reverted.json()["name_tag"] == 0
+
+    aliases = client.get("/api/v1/auth/me/aliases", headers=auth_headers(token))
+    assert aliases.status_code == 200, aliases.text
+    display_names = [(h["name"], h["name_tag"]) for h in aliases.json()["display_names"]]
+    assert display_names[0] == ("Ana", 0)
+    assert ("Maria", 0) in display_names
+
+    bad = client.patch("/api/v1/auth/me", json={"name": "   "}, headers=auth_headers(token))
+    assert bad.status_code == 400

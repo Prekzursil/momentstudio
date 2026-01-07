@@ -49,7 +49,9 @@ Tot ce vezi aici e făcut manual, cu grijă, cu atenție și cu bucuria de a cre
 def upgrade() -> None:
     conn = op.get_bind()
     now = datetime.now(timezone.utc)
+    is_postgres = conn.dialect.name == "postgresql"
     content_status = postgresql.ENUM("draft", "published", name="contentstatus", create_type=False)
+    published_status = sa.text("'published'::contentstatus") if is_postgres else "published"
 
     content_blocks = sa.table(
         "content_blocks",
@@ -121,7 +123,7 @@ def upgrade() -> None:
             title=EN_TITLE,
             body_markdown=EN_BODY,
             version=new_version,
-            status="published",
+            status=published_status,
             lang=effective_lang,
             published_at=effective_published_at,
             updated_at=now,
@@ -165,7 +167,7 @@ def upgrade() -> None:
             version=new_version,
             title=EN_TITLE,
             body_markdown=EN_BODY,
-            status="published",
+            status=published_status,
             meta=meta,
             lang=effective_lang,
             published_at=effective_published_at,

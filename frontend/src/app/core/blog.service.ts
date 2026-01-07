@@ -55,6 +55,8 @@ export interface BlogPost {
 export interface BlogCommentAuthor {
   id: string;
   name?: string | null;
+  name_tag?: number | null;
+  username?: string | null;
   avatar_url?: string | null;
 }
 

@@ -19,13 +19,13 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
       <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'auth.loginTitle' | translate }}</h1>
       <form #loginForm="ngForm" class="grid gap-4" (ngSubmit)="onSubmit(loginForm)">
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-          {{ 'auth.email' | translate }}
+          {{ 'auth.emailOrUsername' | translate }}
           <input
-            name="email"
-            type="email"
+            name="identifier"
+            type="text"
             class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
             required
-            [(ngModel)]="email"
+            [(ngModel)]="identifier"
           />
         </label>
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -57,7 +57,7 @@ export class LoginComponent {
     { label: 'nav.home', url: '/' },
     { label: 'auth.loginTitle' }
   ];
-  email = '';
+  identifier = '';
   password = '';
   loading = false;
 
@@ -79,7 +79,7 @@ export class LoginComponent {
   onSubmit(form: NgForm): void {
     if (!form.valid) return;
     this.loading = true;
-    this.auth.login(this.email, this.password).subscribe({
+    this.auth.login(this.identifier, this.password).subscribe({
       next: (res) => {
         this.toast.success(this.translate.instant('auth.successLogin'), res.user.email);
         void this.router.navigateByUrl('/account');

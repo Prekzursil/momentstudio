@@ -5,6 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
+import { PasswordStrengthComponent } from '../../shared/password-strength.component';
 import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -12,7 +13,16 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent, TranslateModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    ContainerComponent,
+    ButtonComponent,
+    BreadcrumbComponent,
+    PasswordStrengthComponent,
+    TranslateModule
+  ],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -21,6 +31,18 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           {{ 'auth.name' | translate }}
           <input name="name" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400" required [(ngModel)]="name" />
+        </label>
+        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+          {{ 'auth.username' | translate }}
+          <input
+            name="username"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+            required
+            minlength="3"
+            maxlength="30"
+            pattern="^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$"
+            [(ngModel)]="username"
+          />
         </label>
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           {{ 'auth.email' | translate }}
@@ -37,6 +59,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
             [(ngModel)]="password"
           />
         </label>
+        <app-password-strength [password]="password"></app-password-strength>
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           {{ 'auth.confirmPassword' | translate }}
           <input
@@ -67,6 +90,7 @@ export class RegisterComponent {
     { label: 'auth.registerTitle' }
   ];
   name = '';
+  username = '';
   email = '';
   password = '';
   confirmPassword = '';
@@ -102,7 +126,7 @@ export class RegisterComponent {
     }
     this.error = '';
     this.loading = true;
-    this.auth.register(this.name, this.email, this.password).subscribe({
+    this.auth.register(this.name, this.username, this.email, this.password).subscribe({
       next: (res) => {
         this.toast.success(this.translate.instant('auth.successRegister'), `Welcome, ${res.user.email}`);
         void this.router.navigateByUrl('/account');

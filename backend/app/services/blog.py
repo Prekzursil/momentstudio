@@ -51,6 +51,17 @@ def _plain_text_from_markdown(body: str) -> str:
     return text
 
 
+def _author_display(author: User | None) -> str | None:
+    if not author:
+        return None
+    name = (getattr(author, "name", None) or "").strip()
+    username = getattr(author, "username", None)
+    tag = getattr(author, "name_tag", None)
+    if name and username and tag is not None:
+        return f"{name}#{tag} ({username})"
+    return name or username or None
+
+
 def _excerpt(body: str, max_len: int = 180) -> str:
     cleaned = " ".join((body or "").split())
     if len(cleaned) <= max_len:
@@ -396,7 +407,7 @@ async def list_user_comments(
             author = getattr(parent, "author", None)
             parent_ctx = {
                 "id": parent.id,
-                "author_name": getattr(author, "name", None) if author else None,
+                "author_name": _author_display(author),
                 "snippet": _snippet(parent_body),
             }
 
@@ -406,7 +417,7 @@ async def list_user_comments(
             author = getattr(last_reply, "author", None)
             last_reply_ctx = {
                 "id": last_reply.id,
-                "author_name": getattr(author, "name", None) if author else None,
+                "author_name": _author_display(author),
                 "snippet": _snippet(last_reply.body),
                 "created_at": last_reply.created_at,
             }
@@ -496,6 +507,8 @@ def to_comment_read(comment: BlogComment) -> dict:
         "author": {
             "id": author.id if author else comment.user_id,
             "name": author.name if author else None,
+            "name_tag": getattr(author, "name_tag", None) if author else None,
+            "username": getattr(author, "username", None) if author else None,
             "avatar_url": (author.avatar_url or author.google_picture_url) if author else None,
         }
     }
@@ -536,6 +549,8 @@ def to_comment_admin_read(
         "author": {
             "id": author.id if author else comment.user_id,
             "name": author.name if author else None,
+            "name_tag": getattr(author, "name_tag", None) if author else None,
+            "username": getattr(author, "username", None) if author else None,
             "avatar_url": (author.avatar_url or author.google_picture_url) if author else None,
         },
         "flag_count": int(flag_count or 0),

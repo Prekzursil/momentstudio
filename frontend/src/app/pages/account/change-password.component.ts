@@ -5,13 +5,14 @@ import { RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
+import { PasswordStrengthComponent } from '../../shared/password-strength.component';
 import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
 
 @Component({
   selector: 'app-change-password',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent],
+  imports: [CommonModule, FormsModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent, PasswordStrengthComponent],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -38,6 +39,7 @@ import { AuthService } from '../../core/auth.service';
             [(ngModel)]="password"
           />
         </label>
+        <app-password-strength [password]="password"></app-password-strength>
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           Confirm new password
           <input

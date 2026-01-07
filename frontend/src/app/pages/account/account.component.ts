@@ -8,10 +8,10 @@ import { ButtonComponent } from '../../shared/button.component';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { AddressFormComponent } from '../../shared/address-form.component';
 import { ToastService } from '../../core/toast.service';
-import { AuthService, AuthUser } from '../../core/auth.service';
+import { AuthService, AuthUser, UserAliasesResponse } from '../../core/auth.service';
 import { AccountService, AccountDeletionStatus, Address, Order, AddressCreateRequest } from '../../core/account.service';
 import { BlogMyComment, BlogService, PaginationMeta } from '../../core/blog.service';
-import { forkJoin } from 'rxjs';
+import { forkJoin, map, of, switchMap } from 'rxjs';
 import { loadStripe, Stripe, StripeElements, StripeCardElement, StripeCardElementChangeEvent } from '@stripe/stripe-js';
 import { ApiService } from '../../core/api.service';
 import { appConfig } from '../../core/app-config';
@@ -22,6 +22,7 @@ import { TranslateModule } from '@ngx-translate/core';
 import { SkeletonComponent } from '../../shared/skeleton.component';
 import { LanguageService } from '../../core/language.service';
 import { CartStore } from '../../core/cart.store';
+import { formatIdentity } from '../../shared/user-identity';
 
 @Component({
   selector: 'app-account',
@@ -168,6 +169,24 @@ import { CartStore } from '../../core/cart.store';
                 autocomplete="name"
                 [(ngModel)]="profileName"
               />
+              <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+                Public: {{ publicIdentityLabel() }}
+              </span>
+            </label>
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'auth.username' | translate }}
+              <input
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                name="profileUsername"
+                autocomplete="username"
+                minlength="3"
+                maxlength="30"
+                pattern="^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$"
+                [(ngModel)]="profileUsername"
+              />
+              <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+                Use this to sign in and as a stable handle in public activity.
+              </span>
             </label>
             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
               Phone
@@ -203,6 +222,40 @@ import { CartStore } from '../../core/cart.store';
               </select>
             </label>
           </div>
+
+          <div class="grid gap-3 sm:grid-cols-2" *ngIf="auth.isAuthenticated()">
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+              <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">Username history</p>
+              <div *ngIf="aliasesLoading()" class="mt-2">
+                <app-skeleton height="44px"></app-skeleton>
+              </div>
+              <p *ngIf="!aliasesLoading() && aliases()?.usernames?.length === 0" class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                No history yet.
+              </p>
+              <ul *ngIf="!aliasesLoading() && aliases()?.usernames?.length" class="mt-2 grid gap-2 text-sm">
+                <li *ngFor="let h of aliases()!.usernames" class="flex items-center justify-between gap-2">
+                  <span class="font-medium text-slate-900 dark:text-slate-50 truncate">{{ h.username }}</span>
+                  <span class="text-xs text-slate-500 dark:text-slate-400 shrink-0">{{ h.created_at | date: 'short' }}</span>
+                </li>
+              </ul>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+              <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">Display name history</p>
+              <div *ngIf="aliasesLoading()" class="mt-2">
+                <app-skeleton height="44px"></app-skeleton>
+              </div>
+              <p *ngIf="!aliasesLoading() && aliases()?.display_names?.length === 0" class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                No history yet.
+              </p>
+              <ul *ngIf="!aliasesLoading() && aliases()?.display_names?.length" class="mt-2 grid gap-2 text-sm">
+                <li *ngFor="let h of aliases()!.display_names" class="flex items-center justify-between gap-2">
+                  <span class="font-medium text-slate-900 dark:text-slate-50 truncate">{{ h.name }}#{{ h.name_tag }}</span>
+                  <span class="text-xs text-slate-500 dark:text-slate-400 shrink-0">{{ h.created_at | date: 'short' }}</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <p *ngIf="aliasesError()" class="text-sm text-rose-700 dark:text-rose-300">{{ aliasesError() }}</p>
           <p class="text-xs text-slate-500 dark:text-slate-400">
             Session timeout: 30m. Your theme is saved on this device; language is saved to your profile when signed in.
           </p>
@@ -791,6 +844,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   profileSaved = false;
   profileError: string | null = null;
   profileName = '';
+  profileUsername = '';
   profilePhone = '';
   profileLanguage: 'en' | 'ro' = 'en';
   profileThemePreference: ThemePreference = 'system';
@@ -818,6 +872,10 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   myCommentsPage = 1;
   myCommentsLimit = 10;
 
+  aliases = signal<UserAliasesResponse | null>(null);
+  aliasesLoading = signal<boolean>(false);
+  aliasesError = signal<string | null>(null);
+
   constructor(
     private toast: ToastService,
     private auth: AuthService,
@@ -842,6 +900,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit(): void {
     this.wishlist.refresh();
     this.loadData();
+    this.loadAliases();
     this.loadDeletionStatus();
     this.loadMyComments();
     this.loadPaymentMethods();
@@ -874,6 +933,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
         this.orders.set(orders);
         this.avatar = profile.avatar_url ?? null;
         this.profileName = profile.name ?? '';
+        this.profileUsername = (profile.username ?? '').trim();
         this.profilePhone = profile.phone ?? '';
         this.profileLanguage = (profile.preferred_language === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
         this.profileThemePreference = (this.theme.preference()() ?? 'system') as ThemePreference;
@@ -1165,33 +1225,64 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     this.profileError = null;
 
     const name = this.profileName.trim();
+    const username = this.profileUsername.trim();
     const phone = this.profilePhone.trim();
-    const payload = {
-      name: name ? name : null,
+    const payload: { name?: string | null; phone?: string | null; preferred_language?: string | null } = {
       phone: phone ? phone : null,
       preferred_language: this.profileLanguage
     };
+    if (name) {
+      payload.name = name;
+    }
 
     this.theme.setPreference(this.profileThemePreference);
     this.lang.setLanguage(this.profileLanguage, { syncBackend: false });
 
-    this.auth.updateProfile(payload).subscribe({
-      next: (user) => {
-        this.profile.set(user);
-        this.profileName = user.name ?? '';
-        this.profilePhone = user.phone ?? '';
-        this.profileLanguage = (user.preferred_language === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
-        this.avatar = user.avatar_url ?? this.avatar;
-        this.profileSaved = true;
-        this.toast.success('Profile saved');
-      },
-      error: (err) => {
-        const message = err?.error?.detail || 'Could not save profile.';
-        this.profileError = message;
-        this.toast.error(message);
-      },
-      complete: () => (this.savingProfile = false)
+    const current = this.profile();
+    const currentUsername = (current?.username ?? '').trim();
+
+    const maybeUpdateUsername$ =
+      username && username !== currentUsername
+        ? this.auth.updateUsername(username).pipe(map(() => null))
+        : of(null);
+
+    maybeUpdateUsername$
+      .pipe(switchMap(() => this.auth.updateProfile(payload)))
+      .subscribe({
+        next: (user) => {
+          this.profile.set(user);
+          this.profileName = user.name ?? '';
+          this.profileUsername = (user.username ?? '').trim();
+          this.profilePhone = user.phone ?? '';
+          this.profileLanguage = (user.preferred_language === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
+          this.avatar = user.avatar_url ?? this.avatar;
+          this.profileSaved = true;
+          this.toast.success('Profile saved');
+          this.loadAliases();
+        },
+        error: (err) => {
+          const message = err?.error?.detail || 'Could not save profile.';
+          this.profileError = message;
+          this.toast.error(message);
+        },
+        complete: () => (this.savingProfile = false)
+      });
+  }
+
+  loadAliases(): void {
+    if (!this.auth.isAuthenticated()) return;
+    this.aliasesLoading.set(true);
+    this.aliasesError.set(null);
+    this.auth.getAliases().subscribe({
+      next: (resp) => this.aliases.set(resp),
+      error: () => this.aliasesError.set('Could not load your username/display name history.'),
+      complete: () => this.aliasesLoading.set(false)
     });
+  }
+
+  publicIdentityLabel(user?: AuthUser | null): string {
+    const u = user ?? this.profile();
+    return formatIdentity(u, '');
   }
 
   lastOrderLabel(): string {
