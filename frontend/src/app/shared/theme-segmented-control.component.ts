@@ -89,7 +89,11 @@ type ThemeOption = {
             </svg>
           </ng-container>
         </span>
-        <span *ngIf="showLabels" class="pr-3 text-sm font-medium" [ngClass]="size === 'lg' ? 'pl-0.5' : 'pl-0'">
+        <span
+          *ngIf="showLabels"
+          class="pr-3 text-sm font-medium truncate"
+          [ngClass]="size === 'lg' ? 'pl-0.5' : 'pl-0'"
+        >
           {{ opt.labelKey | translate }}
         </span>
       </button>
@@ -129,8 +133,8 @@ export class ThemeSegmentedControlComponent {
     const isActive = this.preference === value;
     const base =
       this.size === 'lg'
-        ? 'min-h-10 px-1.5 text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/50'
-        : 'min-h-9 px-0.5 text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/50';
+        ? 'min-h-10 min-w-0 px-1.5 text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/50'
+        : 'min-h-9 min-w-0 px-0.5 text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/50';
     if (!isActive) return base;
     return `${base} bg-slate-900 text-white hover:bg-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-50`;
   }

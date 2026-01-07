@@ -32,7 +32,7 @@ export interface NavDrawerUser {
       (click)="onClose()"
     ></div>
     <aside
-      class="fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-xl border-r border-slate-200 transform transition-transform dark:bg-slate-900 dark:border-slate-700"
+      class="fixed inset-y-0 left-0 z-50 w-72 overflow-x-hidden bg-white shadow-xl border-r border-slate-200 transform transition-transform dark:bg-slate-900 dark:border-slate-700"
       [ngClass]="{ '-translate-x-full': !open, 'translate-x-0': open }"
       role="dialog"
       aria-modal="true"
