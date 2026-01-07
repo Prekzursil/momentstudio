@@ -237,7 +237,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Shop: add API-powered price bounds (min/max) so the price range UI can cap to real data without an extra list request (and optionally per-filter bounds).
 - [x] Frontend: extract repeated image placeholder-on-error handlers into a shared directive/helper for consistency.
 - [x] Pricing: show EN approx EUR/USD for RON prices (display-only; checkout remains in RON) using live FX rates.
-- [ ] Pricing: add FX rate source/TTL settings + optional admin override/fallback.
+- [x] Pricing: add FX rate source/TTL settings (backend env: `FX_RATES_URL`, `FX_RATES_CACHE_TTL_SECONDS`).
+- [ ] Pricing: add optional admin override/fallback for FX rates (store last-known rates; use when upstream is down).
 - [ ] Pricing: enforce single-currency RON across products/orders and document the policy.
 
 ## Blog & Community
