@@ -13,6 +13,13 @@ type ThemeOption = {
   selector: 'app-theme-segmented-control',
   standalone: true,
   imports: [NgClass, NgForOf, NgIf, NgSwitch, NgSwitchCase, TranslateModule],
+  styles: [
+    `
+      :host {
+        display: block;
+      }
+    `
+  ],
   template: `
     <div
       role="radiogroup"
@@ -91,7 +98,7 @@ type ThemeOption = {
         </span>
         <span
           *ngIf="showLabels"
-          class="pr-3 text-sm font-medium truncate"
+          class="pr-3 text-sm font-medium min-w-0 truncate"
           [ngClass]="size === 'lg' ? 'pl-0.5' : 'pl-0'"
         >
           {{ opt.labelKey | translate }}
