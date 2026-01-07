@@ -263,3 +263,49 @@ def test_alias_history_and_display_name_tags(test_app: Dict[str, object]) -> Non
     assert aliases2.status_code == 200, aliases2.text
     usernames = [u["username"] for u in aliases2.json()["usernames"]]
     assert usernames[:2] == ["ana1-new", "ana1"]
+
+
+def test_display_name_history_reuses_name_tag_on_revert(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    res1 = client.post(
+        "/api/v1/auth/register",
+        json={"email": "tagreuse1@example.com", "username": "tagreuse1", "password": "supersecret", "name": "Ana"},
+    )
+    assert res1.status_code == 201, res1.text
+    token = res1.json()["tokens"]["access_token"]
+    assert res1.json()["user"]["name_tag"] == 0
+
+    res2 = client.post(
+        "/api/v1/auth/register",
+        json={"email": "tagreuse2@example.com", "username": "tagreuse2", "password": "supersecret", "name": "Ana"},
+    )
+    assert res2.status_code == 201, res2.text
+    assert res2.json()["user"]["name_tag"] == 1
+
+    renamed = client.patch(
+        "/api/v1/auth/me",
+        json={"name": "Maria"},
+        headers=auth_headers(token),
+    )
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["name"] == "Maria"
+    assert renamed.json()["name_tag"] == 0
+
+    reverted = client.patch(
+        "/api/v1/auth/me",
+        json={"name": "Ana"},
+        headers=auth_headers(token),
+    )
+    assert reverted.status_code == 200, reverted.text
+    assert reverted.json()["name"] == "Ana"
+    assert reverted.json()["name_tag"] == 0
+
+    aliases = client.get("/api/v1/auth/me/aliases", headers=auth_headers(token))
+    assert aliases.status_code == 200, aliases.text
+    display_names = [(h["name"], h["name_tag"]) for h in aliases.json()["display_names"]]
+    assert display_names[0] == ("Ana", 0)
+    assert ("Maria", 0) in display_names
+
+    bad = client.patch("/api/v1/auth/me", json={"name": "   "}, headers=auth_headers(token))
+    assert bad.status_code == 400

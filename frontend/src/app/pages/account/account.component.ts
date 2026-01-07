@@ -22,6 +22,7 @@ import { TranslateModule } from '@ngx-translate/core';
 import { SkeletonComponent } from '../../shared/skeleton.component';
 import { LanguageService } from '../../core/language.service';
 import { CartStore } from '../../core/cart.store';
+import { formatIdentity } from '../../shared/user-identity';
 
 @Component({
   selector: 'app-account',
@@ -1226,7 +1227,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     const name = this.profileName.trim();
     const username = this.profileUsername.trim();
     const phone = this.profilePhone.trim();
-    const payload: { name?: string; phone?: string | null; preferred_language?: string } = {
+    const payload: { name?: string | null; phone?: string | null; preferred_language?: string | null } = {
       phone: phone ? phone : null,
       preferred_language: this.profileLanguage
     };
@@ -1281,17 +1282,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
 
   publicIdentityLabel(user?: AuthUser | null): string {
     const u = user ?? this.profile();
-    if (!u) return '';
-    const name = (u.name ?? '').trim();
-    const username = (u.username ?? '').trim();
-    const tag = u.name_tag;
-    if (name && username && typeof tag === 'number') {
-      return `${name}#${tag} (${username})`;
-    }
-    if (name && username) {
-      return `${name} (${username})`;
-    }
-    return name || username || u.email || '';
+    return formatIdentity(u, '');
   }
 
   lastOrderLabel(): string {

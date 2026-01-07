@@ -176,7 +176,15 @@ async def register(
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 
-@router.post("/login", response_model=AuthResponse)
+@router.post(
+    "/login",
+    response_model=AuthResponse,
+    summary="Login with email or username",
+    description=(
+        "Accepts an `identifier` field (email or username). For backward compatibility, an `email` field is also "
+        "accepted; if both are provided, `identifier` takes precedence."
+    ),
+)
 async def login(
     payload: LoginRequest,
     session: AsyncSession = Depends(get_session),
@@ -279,7 +287,12 @@ async def read_me(current_user: User = Depends(get_current_user)) -> UserRespons
     return UserResponse.model_validate(current_user)
 
 
-@router.get("/me/aliases", response_model=UserAliasesResponse)
+@router.get(
+    "/me/aliases",
+    response_model=UserAliasesResponse,
+    summary="Get my username and display name history",
+    description="Returns the full history of your username changes and display-name tags (name#N).",
+)
 async def read_aliases(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
@@ -294,7 +307,12 @@ async def read_aliases(
     )
 
 
-@router.patch("/me/username", response_model=UserResponse)
+@router.patch(
+    "/me/username",
+    response_model=UserResponse,
+    summary="Update my username",
+    description="Updates your unique username and stores an entry in your username history.",
+)
 async def update_username(
     payload: UsernameUpdateRequest,
     current_user: User = Depends(get_current_user),

@@ -33,6 +33,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { firstValueFrom } from 'rxjs';
 import { MarkdownService } from '../../core/markdown.service';
 import { diffLines } from 'diff';
+import { formatIdentity } from '../../shared/user-identity';
 
 @Component({
   selector: 'app-admin',
@@ -542,21 +543,27 @@ import { diffLines } from 'diff';
               <div *ngIf="userAliases" class="mt-3 grid gap-3 sm:grid-cols-2 text-sm text-slate-700 dark:text-slate-200">
                 <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
                   <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">Username history</p>
-                  <ul class="mt-2 grid gap-2">
+                  <ul *ngIf="userAliases.usernames?.length; else noAdminUsernamesTpl" class="mt-2 grid gap-2">
                     <li *ngFor="let h of userAliases.usernames" class="flex items-center justify-between gap-2">
                       <span class="font-medium text-slate-900 dark:text-slate-50 truncate">{{ h.username }}</span>
                       <span class="text-xs text-slate-500 dark:text-slate-400 shrink-0">{{ h.created_at | date: 'short' }}</span>
                     </li>
                   </ul>
+                  <ng-template #noAdminUsernamesTpl>
+                    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">No history yet.</p>
+                  </ng-template>
                 </div>
                 <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
                   <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">Display name history</p>
-                  <ul class="mt-2 grid gap-2">
+                  <ul *ngIf="userAliases.display_names?.length; else noAdminDisplayNamesTpl" class="mt-2 grid gap-2">
                     <li *ngFor="let h of userAliases.display_names" class="flex items-center justify-between gap-2">
                       <span class="font-medium text-slate-900 dark:text-slate-50 truncate">{{ h.name }}#{{ h.name_tag }}</span>
                       <span class="text-xs text-slate-500 dark:text-slate-400 shrink-0">{{ h.created_at | date: 'short' }}</span>
                     </li>
                   </ul>
+                  <ng-template #noAdminDisplayNamesTpl>
+                    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">No history yet.</p>
+                  </ng-template>
                 </div>
               </div>
             </div>
@@ -1668,29 +1675,11 @@ export class AdminComponent implements OnInit {
   }
 
   userIdentity(user: AdminUser): string {
-    const name = (user.name ?? '').trim();
-    const username = (user.username ?? '').trim();
-    const tag = user.name_tag;
-    if (name && username && typeof tag === 'number') {
-      return `${name}#${tag} (${username})`;
-    }
-    if (name && username) {
-      return `${name} (${username})`;
-    }
-    return name || username || user.email;
+    return formatIdentity(user, user.email);
   }
 
   commentAuthorLabel(author: { id: string; name?: string | null; username?: string | null; name_tag?: number | null }): string {
-    const name = (author.name ?? '').trim();
-    const username = (author.username ?? '').trim();
-    const tag = author.name_tag;
-    if (name && username && typeof tag === 'number') {
-      return `${name}#${tag} (${username})`;
-    }
-    if (name && username) {
-      return `${name} (${username})`;
-    }
-    return name || username || author.id;
+    return formatIdentity(author, author.id);
   }
 
   updateRole(): void {

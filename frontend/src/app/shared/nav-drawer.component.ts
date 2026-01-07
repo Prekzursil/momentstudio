@@ -3,6 +3,7 @@ import { NgClass, NgForOf, NgIf } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { FormsModule } from '@angular/forms';
+import { formatIdentity, initialsFromIdentity } from './user-identity';
 
 export interface NavLink {
   label: string;
@@ -169,31 +170,10 @@ export class NavDrawerComponent {
   }
 
   displayName(): string {
-    const user = this.user;
-    if (!user) return '';
-    const name = (user.name ?? '').trim();
-    const username = (user.username ?? '').trim();
-    const tag = user.name_tag;
-    if (name && username && typeof tag === 'number') {
-      return `${name}#${tag} (${username})`;
-    }
-    if (name && username) {
-      return `${name} (${username})`;
-    }
-    return name || username || user.email;
+    return formatIdentity(this.user, '');
   }
 
   initials(): string {
-    const user = this.user;
-    if (!user) return '?';
-    const name = (user.name ?? '').trim();
-    const username = (user.username ?? '').trim();
-    const src = name || username || user.email;
-    const letters = src
-      .split(/[\s._-]+/)
-      .filter(Boolean)
-      .map((p) => p[0]?.toUpperCase())
-      .filter(Boolean);
-    return (letters.slice(0, 2).join('') || src.slice(0, 1).toUpperCase()) as string;
+    return initialsFromIdentity(this.user, '?');
   }
 }

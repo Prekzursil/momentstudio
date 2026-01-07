@@ -16,6 +16,7 @@ import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { CardComponent } from '../../shared/card.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
+import { formatIdentity } from '../../shared/user-identity';
 
 @Component({
   selector: 'app-blog-post',
@@ -416,19 +417,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   }
 
   authorLabel(author: BlogComment['author'] | null | undefined): string {
-    if (!author) {
-      return this.translate.instant('blog.comments.anonymous');
-    }
-    const name = (author.name ?? '').trim();
-    const username = (author.username ?? '').trim();
-    const tag = author.name_tag;
-    if (name && username && typeof tag === 'number') {
-      return `${name}#${tag} (${username})`;
-    }
-    if (name && username) {
-      return `${name} (${username})`;
-    }
-    return name || username || this.translate.instant('blog.comments.anonymous');
+    return formatIdentity(author, this.translate.instant('blog.comments.anonymous'));
   }
 
   submitComment(event?: Event): void {
