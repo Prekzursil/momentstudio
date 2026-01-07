@@ -234,6 +234,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Recently viewed carousel.
 - [x] Localized currency display.
 - [x] SEO meta tags per product/category.
+- [ ] CMS/Home: render homepage hero from `home.hero` content block (headline/subtitle/CTA/image) with RO/EN support and sensible fallbacks.
+- [ ] CMS/Home: drive homepage section ordering from `home.sections` content block and support enabling/disabling sections.
+- [ ] CMS/Home: add a CMS-editable “Our story” teaser section via `home.story` (markdown + CTA to `/about`).
+- [ ] CMS/Site settings: manage Instagram/Facebook links (labels + URLs + optional thumbnails) via a `site.social` content block (meta JSON) and reuse in footer/contact/home.
+- [ ] CMS/Contact: render contact page copy from `page.contact` content block and source phone/email from `site.social` (or env) as a single source of truth.
 
 ## Blog & Community
 - [x] Nav: add “Blog” link between Home and Shop (header + drawer).
