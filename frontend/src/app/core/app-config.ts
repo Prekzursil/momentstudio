@@ -4,6 +4,8 @@ export interface AppConfig {
   appVersion: string;
   stripePublishableKey: string;
   sentryDsn: string;
+  fxEurPerRon: number;
+  fxUsdPerRon: number;
 }
 
 declare global {
@@ -17,7 +19,9 @@ const defaults: AppConfig = {
   appEnv: 'development',
   appVersion: '',
   stripePublishableKey: '',
-  sentryDsn: ''
+  sentryDsn: '',
+  fxEurPerRon: 0.2,
+  fxUsdPerRon: 0.22
 };
 
 export const appConfig: AppConfig = (() => {

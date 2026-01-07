@@ -84,13 +84,13 @@ import { Meta, Title } from '@angular/platform-browser';
           <div class="space-y-3">
             <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ 'shop.priceRange' | translate }}</p>
             <div class="grid gap-3">
-              <div class="grid gap-2">
+              <div class="grid gap-2 overflow-hidden">
                 <input
                   type="range"
                   [min]="priceMinBound"
                   [max]="priceMaxBound"
                   [step]="priceStep"
-                  class="w-full accent-indigo-600"
+                  class="block w-full max-w-full accent-indigo-600"
                   [(ngModel)]="filters.min_price"
                   (change)="onPriceCommit('min')"
                   aria-label="Minimum price"
@@ -100,7 +100,7 @@ import { Meta, Title } from '@angular/platform-browser';
                   [min]="priceMinBound"
                   [max]="priceMaxBound"
                   [step]="priceStep"
-                  class="w-full accent-indigo-600"
+                  class="block w-full max-w-full accent-indigo-600"
                   [(ngModel)]="filters.max_price"
                   (change)="onPriceCommit('max')"
                   aria-label="Maximum price"
@@ -236,7 +236,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   } = {
     search: '',
     category_slug: '',
-    min_price: 0,
+    min_price: 1,
     max_price: 500,
     tags: new Set<string>(),
     sort: 'newest',
@@ -244,7 +244,7 @@ export class ShopComponent implements OnInit, OnDestroy {
     limit: 12
   };
 
-  readonly priceMinBound = 0;
+  readonly priceMinBound = 1;
   priceMaxBound = 500;
   readonly priceStep = 1;
   private suppressNextQueryLoad = false;
