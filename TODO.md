@@ -424,6 +424,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin UI for editing homepage hero per language (headline, subtitle, CTA, hero image).
 - [x] Admin UI for managing Collections (named groups of products to feature).
 - [x] Drag-and-drop ordering for homepage sections (hero, collections, bestsellers, new arrivals).
+- [x] Home CMS: make storefront render homepage sections from `home.sections` (order + enabled toggles) and add a CMS-driven `home.story` section.
 - [x] Admin UI for global assets (logo, favicon, social preview image).
 - [x] SEO settings in admin to set meta title/description per page per language.
 - [x] WYSIWYG/markdown editor for About/FAQ/Shipping content with RO/EN tabs.
