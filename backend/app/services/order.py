@@ -58,7 +58,7 @@ async def build_order_from_cart(
         total_amount=total,
         tax_amount=tax,
         shipping_amount=shipping_amount,
-        currency="USD",
+        currency="RON",
         shipping_address_id=shipping_address_id,
         billing_address_id=billing_address_id,
         items=items,

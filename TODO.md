@@ -238,8 +238,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Frontend: extract repeated image placeholder-on-error handlers into a shared directive/helper for consistency.
 - [x] Pricing: show EN approx EUR/USD for RON prices (display-only; checkout remains in RON) using live FX rates.
 - [x] Pricing: add FX rate source/TTL settings (backend env: `FX_RATES_URL`, `FX_RATES_CACHE_TTL_SECONDS`).
-- [ ] Pricing: add optional admin override/fallback for FX rates (store last-known rates; use when upstream is down).
-- [ ] Pricing: enforce single-currency RON across products/orders and document the policy.
+- [x] Pricing: add optional admin override/fallback for FX rates (store last-known rates; use when upstream is down).
+- [x] Pricing: enforce single-currency RON across products/orders and document the policy.
+- [ ] Pricing: add admin UI to view/set/clear FX rate overrides and display last-known/as-of timestamps.
 
 ## Blog & Community
 - [x] Nav: add “Blog” link between Home and Shop (header + drawer).

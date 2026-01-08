@@ -54,7 +54,7 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
                 sku="FLOW-1",
                 name="Flow Product",
                 base_price=Decimal("25.00"),
-                currency="USD",
+                currency="RON",
                 stock_quantity=5,
                 images=[ProductImage(url="/media/flow.png", alt_text="flow")],
             )

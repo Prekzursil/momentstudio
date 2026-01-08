@@ -49,7 +49,7 @@ async def test_catalog_models_sqlite_memory() -> None:
             slug="white-cup",
             name="White Cup",
             base_price=15.50,
-            currency="USD",
+            currency="RON",
             stock_quantity=5,
         )
         product.variants = [ProductVariant(name="Large", additional_price_delta=2.0, stock_quantity=1)]
@@ -79,7 +79,7 @@ async def test_cart_models_sqlite_memory() -> None:
             sku="SKU-PLATE",
             name="Plate",
             base_price=20,
-            currency="USD",
+            currency="RON",
             stock_quantity=2,
         )
         session.add_all([category, product])
@@ -112,7 +112,7 @@ async def test_order_models_sqlite_memory() -> None:
             sku="SKU-ORDER",
             name="Order Cup",
             base_price=15,
-            currency="USD",
+            currency="RON",
             stock_quantity=2,
         )
         session.add_all([user, category, product])
@@ -120,7 +120,7 @@ async def test_order_models_sqlite_memory() -> None:
         await session.refresh(user)
         await session.refresh(product)
 
-        order = Order(user_id=user.id, total_amount=15, currency="USD")
+        order = Order(user_id=user.id, total_amount=15, currency="RON")
         session.add(order)
         session.add(OrderItem(order=order, product_id=product.id, quantity=1, unit_price=15, subtotal=15))
         await session.commit()

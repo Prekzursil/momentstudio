@@ -121,7 +121,7 @@ export class CartComponent implements OnInit {
   subtotal = this.cart.subtotal;
 
   get currency(): string {
-    return this.items().find((i) => i.currency)?.currency ?? 'USD';
+    return this.items().find((i) => i.currency)?.currency ?? 'RON';
   }
 
   onQuantityChange(id: string, value: number): void {

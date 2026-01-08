@@ -73,7 +73,7 @@ def seed_cart_with_product(session_factory, user_id: UUID) -> UUID:
                 sku="ORD-PROD",
                 name="Order Product",
                 base_price=Decimal("20.00"),
-                currency="USD",
+                currency="RON",
                 stock_quantity=5,
             )
             cart = Cart(user_id=user_id)

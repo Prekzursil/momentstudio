@@ -29,7 +29,7 @@ def test_catalog_service_create_and_slug():
                     slug="svc-prod",
                     name="Svc Product",
                     base_price=Decimal("5.00"),
-                    currency="USD",
+                    currency="RON",
                     stock_quantity=2,
                 ),
                 user_id=None,

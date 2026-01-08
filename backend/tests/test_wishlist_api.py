@@ -38,7 +38,7 @@ def seed_product(session_factory) -> UUID:
                 sku="SKU-BOWL",
                 name="Bowl",
                 base_price=12,
-                currency="USD",
+                currency="RON",
                 stock_quantity=10,
                 status=ProductStatus.published,
             )

@@ -25,7 +25,7 @@ def test_cart_service_add_and_totals():
                 sku="SVC-1",
                 name="Svc Product",
                 base_price=Decimal("10.00"),
-                currency="USD",
+                currency="RON",
                 stock_quantity=5,
             )
             cart = Cart(user_id=None)

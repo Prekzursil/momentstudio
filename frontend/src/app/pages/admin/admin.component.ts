@@ -77,7 +77,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
             <div class="grid md:grid-cols-3 gap-4">
               <app-card [title]="'adminUi.cards.lowStock' | translate" [subtitle]="summary()?.low_stock + ' items'"></app-card>
-              <app-card [title]="'adminUi.cards.sales30' | translate" [subtitle]="(summary()?.sales_30d || 0) | localizedCurrency : 'USD'"></app-card>
+              <app-card [title]="'adminUi.cards.sales30' | translate" [subtitle]="(summary()?.sales_30d || 0) | localizedCurrency : 'RON'"></app-card>
               <app-card [title]="'adminUi.cards.orders30' | translate" [subtitle]="summary()?.orders_30d + ' orders'"></app-card>
               <app-card title="Open orders" [subtitle]="openOrdersCount() + ' pending'"></app-card>
               <app-card title="Recent orders" [subtitle]="recentOrdersCount() + ' in last view'"></app-card>
@@ -319,7 +319,7 @@ import { formatIdentity } from '../../shared/user-identity';
                       <span *ngIf="product.tags?.includes('bestseller')" class="ml-2 text-[10px] uppercase bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Bestseller</span>
                       <span *ngIf="product.tags?.includes('highlight')" class="ml-1 text-[10px] uppercase bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">Highlight</span>
                     </td>
-                    <td>{{ product.price | localizedCurrency : product.currency || 'USD' }}</td>
+                    <td>{{ product.price | localizedCurrency : product.currency || 'RON' }}</td>
                     <td><span class="text-xs rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-800">{{ product.status }}</span></td>
                     <td>{{ product.category }}</td>
                     <td class="flex items-center gap-2">
@@ -469,7 +469,7 @@ import { formatIdentity } from '../../shared/user-identity';
                     <span class="font-semibold text-slate-900 dark:text-slate-50">Order #{{ order.id }}</span>
                     <span class="text-xs rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-800">{{ order.status }}</span>
                   </div>
-                  <p>{{ order.customer }} — {{ order.total_amount | localizedCurrency : order.currency || 'USD' }}</p>
+                  <p>{{ order.customer }} — {{ order.total_amount | localizedCurrency : order.currency || 'RON' }}</p>
                 </div>
               </div>
               <div class="rounded-lg border border-slate-200 p-4 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200" *ngIf="activeOrder">
@@ -485,7 +485,7 @@ import { formatIdentity } from '../../shared/user-identity';
                 </div>
                 <p class="text-xs text-slate-500 dark:text-slate-400">Customer: {{ activeOrder.customer }}</p>
                 <p class="text-xs text-slate-500 dark:text-slate-400">Placed: {{ activeOrder.created_at | date: 'medium' }}</p>
-                <p class="font-semibold text-slate-900 dark:text-slate-50 mt-2">{{ activeOrder.total_amount | localizedCurrency : activeOrder.currency || 'USD' }}</p>
+                <p class="font-semibold text-slate-900 dark:text-slate-50 mt-2">{{ activeOrder.total_amount | localizedCurrency : activeOrder.currency || 'RON' }}</p>
               </div>
             </div>
           </section>
@@ -1089,7 +1089,7 @@ import { formatIdentity } from '../../shared/user-identity';
                   <p class="font-semibold text-slate-900 dark:text-slate-50">{{ coupon.code }}</p>
                   <p class="text-xs text-slate-500 dark:text-slate-400">
                     <ng-container *ngIf="coupon.percentage_off">-{{ coupon.percentage_off }}%</ng-container>
-                    <ng-container *ngIf="coupon.amount_off">-{{ coupon.amount_off | localizedCurrency : coupon.currency || 'USD' }}</ng-container>
+                    <ng-container *ngIf="coupon.amount_off">-{{ coupon.amount_off | localizedCurrency : coupon.currency || 'RON' }}</ng-container>
                     <ng-container *ngIf="!coupon.percentage_off && !coupon.amount_off">{{ 'adminUi.coupons.none' | translate }}</ng-container>
                   </p>
                 </div>
@@ -1323,7 +1323,7 @@ export class AdminComponent implements OnInit {
   infoMessage: string | null = null;
   infoError: string | null = null;
   coupons: AdminCoupon[] = [];
-  newCoupon: Partial<AdminCoupon> = { code: '', percentage_off: 0, active: true, currency: 'USD' };
+  newCoupon: Partial<AdminCoupon> = { code: '', percentage_off: 0, active: true, currency: 'RON' };
   stockEdits: Record<string, number> = {};
   bulkStock: number | null = null;
 

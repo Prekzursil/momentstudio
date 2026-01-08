@@ -189,11 +189,16 @@ async def admin_create_coupon(
     code = payload.get("code")
     if not code:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="code required")
+    currency = payload.get("currency")
+    if currency:
+        currency = str(currency).strip().upper()
+        if currency != "RON":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only RON currency is supported")
     promo = PromoCode(
         code=code,
         percentage_off=payload.get("percentage_off"),
         amount_off=payload.get("amount_off"),
-        currency=payload.get("currency"),
+        currency=currency or None,
         expires_at=payload.get("expires_at"),
         max_uses=payload.get("max_uses"),
         active=payload.get("active", True),
@@ -223,9 +228,18 @@ async def admin_update_coupon(
     promo = await session.get(PromoCode, coupon_id)
     if not promo:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
-    for field in ["percentage_off", "amount_off", "currency", "expires_at", "max_uses", "active", "code"]:
+    for field in ["percentage_off", "amount_off", "expires_at", "max_uses", "active", "code"]:
         if field in payload:
             setattr(promo, field, payload[field])
+    if "currency" in payload:
+        currency = payload.get("currency")
+        if currency:
+            currency = str(currency).strip().upper()
+            if currency != "RON":
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only RON currency is supported")
+            promo.currency = currency
+        else:
+            promo.currency = None
     session.add(promo)
     await session.flush()
     await session.commit()

@@ -141,8 +141,11 @@ async def _generate_unique_sku(session: AsyncSession, base: str) -> str:
 def _validate_price_currency(base_price: float, currency: str) -> None:
     if base_price is not None and base_price < 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Base price must be non-negative")
-    if currency and len(currency.strip()) != 3:
+    cleaned = (currency or "").strip().upper()
+    if cleaned and len(cleaned) != 3:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Currency must be a 3-letter code")
+    if cleaned and cleaned != "RON":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only RON currency is supported")
 
 
 async def _log_product_action(
@@ -807,7 +810,10 @@ async def import_products_csv(session: AsyncSession, content: str, dry_run: bool
         except ValueError:
             errors.append(f"Row {idx}: invalid base_price or stock_quantity")
             continue
-        currency = (row.get("currency") or "USD").strip()
+        currency = (row.get("currency") or "RON").strip().upper()
+        if currency != "RON":
+            errors.append(f"Row {idx}: currency must be RON")
+            continue
         status_value = (row.get("status") or ProductStatus.draft.value).strip()
         try:
             status_enum = ProductStatus(status_value)

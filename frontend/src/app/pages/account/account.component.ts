@@ -626,7 +626,7 @@ import { formatIdentity } from '../../shared/user-identity';
                 </p>
               </div>
               <div class="text-right">
-                <p class="font-semibold text-slate-900 dark:text-slate-50">{{ order.total_amount | localizedCurrency : order.currency || 'USD' }}</p>
+                <p class="font-semibold text-slate-900 dark:text-slate-50">{{ order.total_amount | localizedCurrency : order.currency || 'RON' }}</p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Updated {{ order.updated_at | date: 'mediumDate' }}</p>
               </div>
             </summary>
@@ -668,7 +668,7 @@ import { formatIdentity } from '../../shared/user-identity';
                       <p class="text-xs text-slate-500 dark:text-slate-400">Qty {{ item.quantity }}</p>
                     </div>
                     <div class="text-right text-sm font-medium text-slate-900 dark:text-slate-50">
-                      {{ item.subtotal | localizedCurrency : order.currency || 'USD' }}
+                      {{ item.subtotal | localizedCurrency : order.currency || 'RON' }}
                     </div>
                   </div>
                 </div>
@@ -680,15 +680,15 @@ import { formatIdentity } from '../../shared/user-identity';
                   <div class="mt-2 grid gap-1 text-slate-700 dark:text-slate-200">
                     <div class="flex items-center justify-between">
                       <span class="text-slate-500 dark:text-slate-400">Tax</span>
-                      <span>{{ (order.tax_amount || 0) | localizedCurrency : order.currency || 'USD' }}</span>
+                      <span>{{ (order.tax_amount || 0) | localizedCurrency : order.currency || 'RON' }}</span>
                     </div>
                     <div class="flex items-center justify-between">
                       <span class="text-slate-500 dark:text-slate-400">Shipping</span>
-                      <span>{{ (order.shipping_amount || 0) | localizedCurrency : order.currency || 'USD' }}</span>
+                      <span>{{ (order.shipping_amount || 0) | localizedCurrency : order.currency || 'RON' }}</span>
                     </div>
                     <div class="flex items-center justify-between font-semibold text-slate-900 dark:text-slate-50 pt-1">
                       <span>Total</span>
-                      <span>{{ order.total_amount | localizedCurrency : order.currency || 'USD' }}</span>
+                      <span>{{ order.total_amount | localizedCurrency : order.currency || 'RON' }}</span>
                     </div>
                   </div>
                 </div>
@@ -1710,7 +1710,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private formatMoney(amount: number, currency: string): string {
     try {
-      return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD' }).format(amount);
+      return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'RON' }).format(amount);
     } catch {
       return `${amount.toFixed(2)} ${currency || ''}`.trim();
     }

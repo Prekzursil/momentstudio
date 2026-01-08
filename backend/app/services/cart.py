@@ -133,7 +133,7 @@ def _calculate_totals(
     cart: Cart,
     shipping_method: ShippingMethod | None = None,
     promo: PromoCodeRead | None = None,
-    currency: str | None = "USD",
+    currency: str | None = "RON",
 ) -> Totals:
     subtotal = sum(_to_decimal(item.unit_price_at_add) * item.quantity for item in cart.items)
     subtotal = _to_decimal(subtotal)
@@ -155,8 +155,8 @@ def calculate_totals(
     subtotal = sum(_to_decimal(item.unit_price_at_add) * item.quantity for item in cart.items)
     discount_val = _compute_discount(_to_decimal(subtotal), promo)
     currency = next(
-        (getattr(item.product, "currency", None) for item in cart.items if getattr(item, "product", None)), "USD"
-    ) or "USD"
+        (getattr(item.product, "currency", None) for item in cart.items if getattr(item, "product", None)), "RON"
+    ) or "RON"
     totals = _calculate_totals(cart, shipping_method=shipping_method, promo=promo, currency=currency)
     return totals, discount_val
 
@@ -178,8 +178,8 @@ async def serialize_cart(
     )
     hydrated = result.scalar_one()
     currency = next(
-        (getattr(item.product, "currency", None) for item in hydrated.items if getattr(item, "product", None)), "USD"
-    ) or "USD"
+        (getattr(item.product, "currency", None) for item in hydrated.items if getattr(item, "product", None)), "RON"
+    ) or "RON"
     totals = _calculate_totals(hydrated, shipping_method=shipping_method, promo=promo, currency=currency)
     return CartRead(
         id=hydrated.id,
@@ -197,7 +197,7 @@ async def serialize_cart(
                 name=item.product.name if item.product else None,
                 slug=item.product.slug if item.product else None,
                 image_url=_get_first_image(item.product),
-                currency=getattr(item.product, "currency", None) or "USD",
+                currency=getattr(item.product, "currency", None) or "RON",
             )
             for item in hydrated.items
         ],

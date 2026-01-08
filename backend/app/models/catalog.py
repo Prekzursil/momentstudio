@@ -68,7 +68,7 @@ class Product(Base):
     short_description: Mapped[str | None] = mapped_column(String(280), nullable=True)
     long_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     base_price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
-    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="USD")
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="RON")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_featured: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     stock_quantity: Mapped[int] = mapped_column(nullable=False, default=0)
