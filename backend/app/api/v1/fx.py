@@ -1,22 +1,40 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, status
 
-from app.schemas.fx import FxRatesRead
-from app.services import fx_rates
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.dependencies import require_admin
+from app.db.session import get_session
+from app.schemas.fx import FxAdminStatus, FxOverrideUpsert, FxRatesRead
+from app.services import fx_store
 
 router = APIRouter(prefix="/fx", tags=["fx"])
 
 
 @router.get("/rates", response_model=FxRatesRead)
-async def read_fx_rates() -> FxRatesRead:
-    try:
-        rates = await fx_rates.get_fx_rates()
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="FX rates unavailable") from exc
-    return FxRatesRead(
-        base=rates.base,
-        eur_per_ron=rates.eur_per_ron,
-        usd_per_ron=rates.usd_per_ron,
-        as_of=rates.as_of,
-        source=rates.source,
-        fetched_at=rates.fetched_at,
-    )
+async def read_fx_rates(session: AsyncSession = Depends(get_session)) -> FxRatesRead:
+    return await fx_store.get_effective_rates(session)
+
+
+@router.get("/admin/status", response_model=FxAdminStatus)
+async def fx_admin_status(
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin),
+) -> FxAdminStatus:
+    return await fx_store.get_admin_status(session)
+
+
+@router.put("/admin/override", response_model=FxRatesRead)
+async def set_fx_override(
+    payload: FxOverrideUpsert,
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin),
+) -> FxRatesRead:
+    return await fx_store.set_override(session, payload)
+
+
+@router.delete("/admin/override", status_code=status.HTTP_204_NO_CONTENT)
+async def clear_fx_override(
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin),
+) -> None:
+    await fx_store.clear_override(session)
