@@ -84,26 +84,33 @@ import { Meta, Title } from '@angular/platform-browser';
           <div class="space-y-3">
             <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ 'shop.priceRange' | translate }}</p>
             <div class="grid gap-3">
+              <p id="shop-price-status" class="sr-only">
+                {{ 'shop.priceRangeStatus' | translate : { min: filters.min_price, max: filters.max_price } }}
+              </p>
               <div class="grid gap-2 overflow-hidden">
                 <input
                   type="range"
                   [min]="priceMinBound"
                   [max]="priceMaxBound"
                   [step]="priceStep"
-                  class="block w-full max-w-full accent-indigo-600"
+                  class="block w-full max-w-full accent-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                   [(ngModel)]="filters.min_price"
                   (change)="onPriceCommit('min')"
-                  aria-label="Minimum price"
+                  [attr.aria-label]="'shop.ariaMinPrice' | translate"
+                  aria-describedby="shop-price-status shop-price-hint"
+                  [attr.aria-valuetext]="filters.min_price + ' RON'"
                 />
                 <input
                   type="range"
                   [min]="priceMinBound"
                   [max]="priceMaxBound"
                   [step]="priceStep"
-                  class="block w-full max-w-full accent-indigo-600"
+                  class="block w-full max-w-full accent-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                   [(ngModel)]="filters.max_price"
                   (change)="onPriceCommit('max')"
-                  aria-label="Maximum price"
+                  [attr.aria-label]="'shop.ariaMaxPrice' | translate"
+                  aria-describedby="shop-price-status shop-price-hint"
+                  [attr.aria-valuetext]="filters.max_price + ' RON'"
                 />
               </div>
               <div class="grid grid-cols-2 gap-3">
@@ -112,15 +119,25 @@ import { Meta, Title } from '@angular/platform-browser';
                   type="number"
                   [value]="filters.min_price"
                   (valueChange)="onPriceTextChange('min', $event)"
+                  [min]="priceMinBound"
+                  [max]="priceMaxBound"
+                  [step]="priceStep"
+                  inputMode="numeric"
                 ></app-input>
                 <app-input
                   [label]="'shop.max' | translate"
                   type="number"
                   [value]="filters.max_price"
                   (valueChange)="onPriceTextChange('max', $event)"
+                  [min]="priceMinBound"
+                  [max]="priceMaxBound"
+                  [step]="priceStep"
+                  inputMode="numeric"
                 ></app-input>
               </div>
-              <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'shop.priceHint' | translate }}</p>
+              <p id="shop-price-hint" class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'shop.priceHint' | translate }}
+              </p>
             </div>
           </div>
 
@@ -250,7 +267,6 @@ export class ShopComponent implements OnInit, OnDestroy {
   private filterDebounce?: ReturnType<typeof setTimeout>;
   private readonly filterDebounceMs = 350;
   private suppressNextQueryLoad = false;
-  private lastBoundsKey = '';
 
   sortOptions: { label: string; value: SortOption }[] = [
     { label: 'shop.sortNew', value: 'newest' },
@@ -310,7 +326,7 @@ export class ShopComponent implements OnInit, OnDestroy {
       this.suppressNextQueryLoad = true;
       this.updateQueryParams();
     }
-    this.loadPriceBoundsIfNeeded(() => this.fetchProducts());
+    this.fetchProducts();
   }
 
   private fetchProducts(): void {
@@ -329,6 +345,16 @@ export class ShopComponent implements OnInit, OnDestroy {
         next: (response) => {
           this.products = response.items;
           this.pageMeta = response.meta;
+          const previousMaxBound = this.priceMaxBound;
+          const max = response.bounds?.max_price;
+          if (typeof max === 'number' && Number.isFinite(max)) {
+            const rounded = Math.ceil(max / this.priceStep) * this.priceStep;
+            this.priceMaxBound = Math.max(this.priceMinBound, rounded);
+            if (this.filters.max_price === previousMaxBound) {
+              this.filters.max_price = this.priceMaxBound;
+            }
+          }
+          this.normalizePriceRange();
           if (this.filters.category_slug) {
             const cat = this.categories.find((c) => c.slug === this.filters.category_slug);
             this.crumbs = [
@@ -475,49 +501,6 @@ export class ShopComponent implements OnInit, OnDestroy {
       typeof tagParam === 'string' && tagParam.length ? tagParam.split(',') : []
     );
     this.normalizePriceRange();
-  }
-
-  private loadPriceBoundsIfNeeded(after: () => void): void {
-    const key = this.computeBoundsKey();
-    if (key === this.lastBoundsKey) {
-      after();
-      return;
-    }
-    this.lastBoundsKey = key;
-    this.loadPriceBounds(after);
-  }
-
-  private computeBoundsKey(): string {
-    const tags = Array.from(this.filters.tags).sort().join(',');
-    return `${this.filters.category_slug}|${this.filters.search}|${tags}`;
-  }
-
-  private loadPriceBounds(after: () => void): void {
-    const previousMaxBound = this.priceMaxBound;
-    this.catalog
-      .getProductPriceBounds({
-        category_slug: this.filters.category_slug || undefined,
-        search: this.filters.search || undefined,
-        tags: Array.from(this.filters.tags)
-      })
-      .subscribe({
-        next: (resp) => {
-          const max = resp.max_price;
-          if (typeof max === 'number' && Number.isFinite(max)) {
-            const rounded = Math.ceil(max / this.priceStep) * this.priceStep;
-            this.priceMaxBound = Math.max(this.priceMinBound, rounded);
-          }
-          if (this.filters.max_price === previousMaxBound) {
-            this.filters.max_price = this.priceMaxBound;
-          }
-          this.normalizePriceRange();
-          after();
-        },
-        error: () => {
-          // Keep defaults if we can't infer bounds.
-          after();
-        }
-      });
   }
 
   private parsePrice(raw: unknown): number | undefined {

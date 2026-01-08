@@ -46,6 +46,7 @@ export interface PaginationMeta {
 export interface ProductListResponse {
   items: Product[];
   meta: PaginationMeta;
+  bounds?: ProductPriceBounds;
 }
 
 export interface ProductPriceBounds {

@@ -286,6 +286,7 @@ class ProductPriceBounds(BaseModel):
 class ProductListResponse(BaseModel):
     items: list[ProductRead]
     meta: PaginationMeta
+    bounds: ProductPriceBounds | None = None
 
 
 class ImportResult(BaseModel):

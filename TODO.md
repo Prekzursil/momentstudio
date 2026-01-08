@@ -241,9 +241,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Pricing: add optional admin override/fallback for FX rates (store last-known rates; use when upstream is down).
 - [x] Pricing: enforce single-currency RON across products/orders and document the policy.
 - [x] Pricing: add admin UI to view/set/clear FX rate overrides and display last-known/as-of timestamps.
-- [ ] Shop perf: include min/max price bounds in `/catalog/products` response to avoid an extra `/price-bounds` call per filter change.
-- [ ] Pricing: add scheduled FX refresh job (background) so first-page loads never block on upstream fetch.
-- [ ] A11y: localize shop filter aria labels and improve keyboard affordances for price range inputs.
+- [x] Shop perf: include min/max price bounds in `/catalog/products` response to avoid an extra `/price-bounds` call per filter change.
+- [x] Pricing: add scheduled FX refresh job (background) so first-page loads never block on upstream fetch.
+- [x] A11y: localize shop filter aria labels and improve keyboard affordances for price range inputs.
 
 ## Blog & Community
 - [x] Nav: add “Blog” link between Home and Shop (header + drawer).

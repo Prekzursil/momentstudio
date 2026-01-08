@@ -82,13 +82,14 @@ async def get_effective_rates(session: AsyncSession) -> FxRatesRead:
     if override:
         return _row_to_read(override)
 
+    last_known = await _get_row(session, is_override=False)
+    if last_known:
+        return _row_to_read(last_known)
+
     try:
         live = await fx_rates.get_fx_rates()
     except Exception as exc:
         logger.warning("fx_rates_fetch_failed", extra={"error": str(exc)})
-        last_known = await _get_row(session, is_override=False)
-        if last_known:
-            return _row_to_read(last_known)
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="FX rates unavailable")
 
     read = FxRatesRead(
@@ -139,3 +140,21 @@ async def get_admin_status(session: AsyncSession) -> FxAdminStatus:
         override=_row_to_read(override) if override else None,
         last_known=_row_to_read(last_known) if last_known else None,
     )
+
+
+async def refresh_last_known(session: AsyncSession) -> FxRatesRead:
+    live = await fx_rates.get_fx_rates(force_refresh=True)
+    read = FxRatesRead(
+        base=live.base,
+        eur_per_ron=live.eur_per_ron,
+        usd_per_ron=live.usd_per_ron,
+        as_of=live.as_of,
+        source=live.source,
+        fetched_at=live.fetched_at,
+    )
+    try:
+        await _upsert_row(session, is_override=False, data=read)
+    except SQLAlchemyError as exc:
+        logger.warning("fx_rates_persist_failed", extra={"error": str(exc)})
+        await session.rollback()
+    return read

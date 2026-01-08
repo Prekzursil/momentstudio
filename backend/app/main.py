@@ -1,4 +1,6 @@
 from pathlib import Path
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -20,6 +22,7 @@ from app.middleware import (
     SecurityHeadersMiddleware,
 )
 from app.schemas.error import ErrorResponse
+from app.services import fx_refresh
 
 
 def get_application() -> FastAPI:
@@ -33,11 +36,19 @@ def get_application() -> FastAPI:
         {"name": "content", "description": "CMS content blocks"},
         {"name": "payments", "description": "Payment integrations"},
     ]
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        fx_refresh.start(app)
+        yield
+        await fx_refresh.stop(app)
+
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
         openapi_tags=tags_metadata,
         swagger_ui_parameters={"displayRequestDuration": True},
+        lifespan=lifespan,
     )
     app.add_middleware(
         CORSMiddleware,

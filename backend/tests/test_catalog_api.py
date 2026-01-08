@@ -122,6 +122,9 @@ def test_catalog_admin_and_public_flows(test_app: Dict[str, object]) -> None:
     body = res.json()
     assert body["meta"]["total_items"] == 2
     assert len(body["items"]) == 2
+    assert body["bounds"]["min_price"] == 10.5
+    assert body["bounds"]["max_price"] == 25.0
+    assert body["bounds"]["currency"] == "RON"
     assert body["items"][0]["slug"] == "blue-cup"
     assert body["items"][1]["slug"] == "white-cup"
 
