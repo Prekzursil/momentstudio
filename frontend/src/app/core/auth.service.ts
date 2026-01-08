@@ -94,6 +94,7 @@ export class AuthService {
     last_name: string;
     date_of_birth: string;
     phone: string;
+    preferred_language?: string;
   }): Observable<AuthResponse> {
     return this.api.post<AuthResponse>('/auth/register', payload).pipe(tap((res) => this.persist(res)));
   }

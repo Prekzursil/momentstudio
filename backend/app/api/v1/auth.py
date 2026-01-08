@@ -133,6 +133,13 @@ class ProfileUpdate(BaseModel):
             raise ValueError("Phone must be in E.164 format (e.g. +40723204204)")
         return value
 
+    @field_validator("name")
+    @classmethod
+    def _normalize_display_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip()
+
     @field_validator("first_name", "middle_name", "last_name")
     @classmethod
     def _normalize_name_parts(cls, value: str | None) -> str | None:
@@ -508,8 +515,8 @@ async def update_me(
     session: AsyncSession = Depends(get_session),
 ) -> UserResponse:
     data = payload.model_dump(exclude_unset=True)
-    if "name" in data:
-        await auth_service.update_display_name(session, current_user, payload.name or "")
+    if "name" in data and payload.name is not None:
+        await auth_service.update_display_name(session, current_user, payload.name)
     if "phone" in data:
         current_user.phone = payload.phone
     if "first_name" in data:

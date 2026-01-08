@@ -302,6 +302,7 @@ export class RegisterComponent implements OnDestroy {
   }
 
   goNext(form: NgForm): void {
+    form.form.markAllAsTouched();
     if (!form.valid) {
       this.error = this.translate.instant('validation.required');
       return;
@@ -316,6 +317,11 @@ export class RegisterComponent implements OnDestroy {
 
   onSubmit(form: NgForm): void {
     this.error = '';
+    if (this.step === 1) {
+      this.goNext(form);
+      return;
+    }
+    form.form.markAllAsTouched();
     if (!form.valid) {
       this.error = this.translate.instant('validation.required');
       return;
@@ -341,7 +347,8 @@ export class RegisterComponent implements OnDestroy {
         middle_name: this.middleName.trim() ? this.middleName.trim() : null,
         last_name: this.lastName.trim(),
         date_of_birth: dob,
-        phone: e164
+        phone: e164,
+        preferred_language: (this.translate.currentLang || '').startsWith('ro') ? 'ro' : 'en'
       })
       .subscribe({
       next: (res) => {

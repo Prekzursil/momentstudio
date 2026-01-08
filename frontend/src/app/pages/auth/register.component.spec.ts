@@ -36,6 +36,7 @@ describe('RegisterComponent', () => {
 
     const fixture = TestBed.createComponent(RegisterComponent);
     const cmp = fixture.componentInstance;
+    cmp.step = 2;
     cmp.displayName = 'Ana';
     cmp.username = 'ana2005l';
     cmp.email = 'ana@example.com';
@@ -48,7 +49,7 @@ describe('RegisterComponent', () => {
     cmp.phoneCountry = 'RO';
     cmp.phoneNational = '723204204';
 
-    cmp.onSubmit({ valid: true } as any);
+    cmp.onSubmit({ valid: true, form: { markAllAsTouched: () => {} } } as any);
 
     expect(auth.register).toHaveBeenCalledWith({
       name: 'Ana',
@@ -59,10 +60,10 @@ describe('RegisterComponent', () => {
       middle_name: null,
       last_name: 'Test',
       date_of_birth: '2000-01-01',
-      phone: '+40723204204'
+      phone: '+40723204204',
+      preferred_language: 'en'
     });
     expect(router.navigateByUrl).toHaveBeenCalledWith('/account');
     expect(toast.success).toHaveBeenCalled();
   });
 });
-
