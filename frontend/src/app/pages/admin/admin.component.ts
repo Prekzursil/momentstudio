@@ -2898,7 +2898,6 @@ export class AdminComponent implements OnInit {
             this.sectionEnabled = this.ensureAllDefaultHomeSectionsEnabled(this.sectionOrder, enabled);
             return;
           }
-          return;
         }
 
         this.applyDefaultHomeSections();

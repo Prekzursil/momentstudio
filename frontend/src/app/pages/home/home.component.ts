@@ -380,6 +380,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       .replace(/([a-z])([A-Z])/g, '$1_$2')
       .toLowerCase()
       .replace(/[\s-]+/g, '_');
+    if (this.isHomeSectionId(key)) return key;
     if (key === 'collections') return 'featured_collections';
     if (key === 'featured') return 'featured_products';
     if (key === 'bestsellers') return 'featured_products';
