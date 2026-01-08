@@ -38,8 +38,12 @@
     "title": "Contact",
     "metaTitle": "Contact | momentstudio",
     "metaDescription": "Get in touch with momentstudio for questions, custom orders, or support.",
+    "loading": "Loading contact…",
+    "errorTitle": "Could not load contact details.",
+    "errorCopy": "Please try again in a moment.",
     "intro": "Questions about an order, a custom piece, or a collaboration? We'd love to hear from you.",
     "replyTime": "We typically reply within 1–2 business days.",
+    "followUs": "Follow us",
     "phoneLabel": "Phone",
     "emailLabel": "Email"
   },
@@ -134,10 +138,22 @@
     "ctaShop": "Shop now",
     "ctaAdmin": "View admin",
     "featured": "Featured pieces",
+    "newArrivals": "New arrivals",
     "viewAll": "View all",
     "noFeatured": "No featured products right now.",
+    "newArrivalsEmpty": "No new arrivals right now.",
     "featuredError": {
       "title": "Could not load featured products.",
+      "copy": "Check your connection and retry."
+    },
+    "newArrivalsError": {
+      "title": "Could not load new arrivals.",
+      "copy": "Check your connection and retry."
+    },
+    "collections": "Featured collections",
+    "collectionsEmpty": "No featured collections right now.",
+    "collectionsError": {
+      "title": "Could not load featured collections.",
       "copy": "Check your connection and retry."
     },
     "why": "Why this starter",
@@ -197,6 +213,9 @@
     "backToShop": "Back to shop",
     "recentlyViewed": "Recently viewed",
     "notFound": "Product not found",
+    "loadErrorTitle": "Could not load product.",
+    "loadErrorCopy": "Check your connection and try again.",
+    "retry": "Retry",
     "addedTitle": "Added to cart",
     "addedBody": "{{qty}} × {{name}} added to cart",
     "metaTitle": "{{name}} | momentstudio",

@@ -38,8 +38,12 @@
     "title": "Contact",
     "metaTitle": "Contact | momentstudio",
     "metaDescription": "Contactează momentstudio pentru întrebări, comenzi personalizate sau suport.",
+    "loading": "Se încarcă pagina de contact…",
+    "errorTitle": "Nu am putut încărca detaliile de contact.",
+    "errorCopy": "Încearcă din nou în câteva momente.",
     "intro": "Ai întrebări despre o comandă, o piesă personalizată sau o colaborare? Scrie-ne și îți răspundem cu drag.",
     "replyTime": "De obicei răspundem în 1–2 zile lucrătoare.",
+    "followUs": "Urmărește-ne",
     "phoneLabel": "Telefon",
     "emailLabel": "Email"
   },
@@ -134,10 +138,22 @@
     "ctaShop": "Cumpără acum",
     "ctaAdmin": "Vezi admin",
     "featured": "Produse recomandate",
+    "newArrivals": "Cele mai noi",
     "viewAll": "Vezi toate",
     "noFeatured": "Nu există produse recomandate acum.",
+    "newArrivalsEmpty": "Nu există noutăți acum.",
     "featuredError": {
       "title": "Nu am putut încărca produsele recomandate.",
+      "copy": "Verifică conexiunea și încearcă din nou."
+    },
+    "newArrivalsError": {
+      "title": "Nu am putut încărca noutățile.",
+      "copy": "Verifică conexiunea și încearcă din nou."
+    },
+    "collections": "Colecții recomandate",
+    "collectionsEmpty": "Nu există colecții recomandate acum.",
+    "collectionsError": {
+      "title": "Nu am putut încărca colecțiile recomandate.",
       "copy": "Verifică conexiunea și încearcă din nou."
     },
     "why": "De ce acest starter",
@@ -197,6 +213,9 @@
     "backToShop": "Înapoi la magazin",
     "recentlyViewed": "Văzute recent",
     "notFound": "Produsul nu a fost găsit",
+    "loadErrorTitle": "Nu am putut încărca produsul.",
+    "loadErrorCopy": "Verifică conexiunea și încearcă din nou.",
+    "retry": "Reîncearcă",
     "addedTitle": "Adăugat în coș",
     "addedBody": "{{qty}} × {{name}} au fost adăugate în coș",
     "metaTitle": "{{name}} | momentstudio",

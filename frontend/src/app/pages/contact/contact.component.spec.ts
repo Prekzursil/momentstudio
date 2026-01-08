@@ -1,23 +1,49 @@
 import { TestBed } from '@angular/core/testing';
 import { Meta, Title } from '@angular/platform-browser';
+import { RouterTestingModule } from '@angular/router/testing';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { of } from 'rxjs';
 
+import { ApiService } from '../../core/api.service';
+import { MarkdownService } from '../../core/markdown.service';
+import { SiteSocialService } from '../../core/site-social.service';
 import { ContactComponent } from './contact.component';
 
 describe('ContactComponent', () => {
   let meta: jasmine.SpyObj<Meta>;
   let title: jasmine.SpyObj<Title>;
+  let api: jasmine.SpyObj<ApiService>;
   let translate: TranslateService;
 
   beforeEach(() => {
     meta = jasmine.createSpyObj<Meta>('Meta', ['updateTag']);
     title = jasmine.createSpyObj<Title>('Title', ['setTitle']);
+    api = jasmine.createSpyObj<ApiService>('ApiService', ['get']);
+    api.get.and.callFake((path: string, params?: Record<string, unknown>) => {
+      if (path !== '/content/pages/contact') throw new Error(`Unexpected path: ${path}`);
+      if (params?.['lang'] === 'ro') {
+        return of({ title: 'Contact RO', body_markdown: 'Salut', images: [] } as any);
+      }
+      return of({ title: 'Contact', body_markdown: 'Hello', images: [] } as any);
+    });
+    const markdown = { render: (s: string) => s } as unknown as MarkdownService;
+    const social = {
+      get: () =>
+        of({
+          contact: { phone: '+40723204204', email: 'momentstudio.ro@gmail.com' },
+          instagramPages: [],
+          facebookPages: []
+        })
+    } as unknown as SiteSocialService;
 
     TestBed.configureTestingModule({
-      imports: [ContactComponent, TranslateModule.forRoot()],
+      imports: [RouterTestingModule, ContactComponent, TranslateModule.forRoot()],
       providers: [
         { provide: Title, useValue: title },
-        { provide: Meta, useValue: meta }
+        { provide: Meta, useValue: meta },
+        { provide: ApiService, useValue: api },
+        { provide: MarkdownService, useValue: markdown },
+        { provide: SiteSocialService, useValue: social }
       ]
     });
 
@@ -41,35 +67,33 @@ describe('ContactComponent', () => {
 
   it('sets meta tags on init', () => {
     const fixture = TestBed.createComponent(ContactComponent);
-    const cmp = fixture.componentInstance;
-    cmp.ngOnInit();
+    fixture.detectChanges();
 
     expect(title.setTitle).toHaveBeenCalledWith('Contact | momentstudio');
-    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Contact desc' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:description', content: 'Contact desc' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'Contact | momentstudio' });
+    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Hello' });
+    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'og:description', content: 'Hello' });
+    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'og:title', content: 'Contact | momentstudio' });
   });
 
   it('updates meta tags when language changes', () => {
     const fixture = TestBed.createComponent(ContactComponent);
-    const cmp = fixture.componentInstance;
-    cmp.ngOnInit();
+    fixture.detectChanges();
 
     title.setTitle.calls.reset();
     meta.updateTag.calls.reset();
 
     translate.use('ro');
 
-    expect(title.setTitle).toHaveBeenCalledWith('Contact | momentstudio (RO)');
-    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Descriere contact' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:description', content: 'Descriere contact' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'Contact | momentstudio (RO)' });
+    expect(title.setTitle).toHaveBeenCalledWith('Contact RO | momentstudio');
+    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Salut' });
+    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'og:description', content: 'Salut' });
+    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'og:title', content: 'Contact RO | momentstudio' });
   });
 
   it('stops updating after destroy', () => {
     const fixture = TestBed.createComponent(ContactComponent);
     const cmp = fixture.componentInstance;
-    cmp.ngOnInit();
+    fixture.detectChanges();
     cmp.ngOnDestroy();
 
     title.setTitle.calls.reset();

@@ -36,6 +36,15 @@ export interface Product {
   variants?: ProductVariant[];
 }
 
+export interface FeaturedCollection {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string | null;
+  created_at: string;
+  products: Product[];
+}
+
 export interface PaginationMeta {
   total_items: number;
   total_pages: number;
@@ -100,5 +109,9 @@ export class CatalogService {
       is_featured: params.is_featured,
       tags: params.tags?.length ? params.tags : undefined
     });
+  }
+
+  listFeaturedCollections(): Observable<FeaturedCollection[]> {
+    return this.api.get<FeaturedCollection[]>('/catalog/collections/featured');
   }
 }

@@ -1,12 +1,16 @@
 import { NgClass, NgForOf, NgIf } from '@angular/common';
-import { Component, ElementRef, HostListener } from '@angular/core';
+import { Component, ElementRef, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
+import { Subscription } from 'rxjs';
+
+import { SiteSocialService, SiteSocialLink } from '../core/site-social.service';
+import { ImgFallbackDirective } from '../shared/img-fallback.directive';
 
 @Component({
   selector: 'app-footer',
   standalone: true,
-  imports: [NgIf, NgForOf, NgClass, RouterLink, TranslateModule],
+  imports: [NgIf, NgForOf, NgClass, RouterLink, TranslateModule, ImgFallbackDirective],
   template: `
     <footer class="border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
       <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-slate-600 dark:text-slate-300">
@@ -38,10 +42,21 @@ import { TranslateModule } from '@ngx-translate/core';
                 (click)="closeMenu()"
                 role="menuitem"
               >
-                <span class="h-8 w-8 rounded-full grid place-items-center text-xs font-semibold text-white" [ngClass]="page.avatarClass">
-                  {{ page.initials }}
-                </span>
-                <span class="truncate">{{ page.name }}</span>
+                <ng-container *ngIf="page.thumbnailUrl; else instagramAvatar">
+                  <img
+                    [src]="page.thumbnailUrl"
+                    [alt]="page.label"
+                    class="h-8 w-8 rounded-full border border-slate-200 object-cover dark:border-slate-700"
+                    appImgFallback="assets/placeholder/avatar-placeholder.svg"
+                    loading="lazy"
+                  />
+                </ng-container>
+                <ng-template #instagramAvatar>
+                  <span class="h-8 w-8 rounded-full grid place-items-center text-xs font-semibold text-white" [ngClass]="page.avatarClass">
+                    {{ page.initials }}
+                  </span>
+                </ng-template>
+                <span class="truncate">{{ page.label }}</span>
               </a>
             </div>
           </div>
@@ -71,10 +86,21 @@ import { TranslateModule } from '@ngx-translate/core';
                 (click)="closeMenu()"
                 role="menuitem"
               >
-                <span class="h-8 w-8 rounded-full grid place-items-center text-xs font-semibold text-white" [ngClass]="page.avatarClass">
-                  {{ page.initials }}
-                </span>
-                <span class="truncate">{{ page.name }}</span>
+                <ng-container *ngIf="page.thumbnailUrl; else facebookAvatar">
+                  <img
+                    [src]="page.thumbnailUrl"
+                    [alt]="page.label"
+                    class="h-8 w-8 rounded-full border border-slate-200 object-cover dark:border-slate-700"
+                    appImgFallback="assets/placeholder/avatar-placeholder.svg"
+                    loading="lazy"
+                  />
+                </ng-container>
+                <ng-template #facebookAvatar>
+                  <span class="h-8 w-8 rounded-full grid place-items-center text-xs font-semibold text-white" [ngClass]="page.avatarClass">
+                    {{ page.initials }}
+                  </span>
+                </ng-template>
+                <span class="truncate">{{ page.label }}</span>
               </a>
             </div>
           </div>
@@ -85,40 +111,55 @@ import { TranslateModule } from '@ngx-translate/core';
     </footer>
   `
 })
-export class FooterComponent {
+export class FooterComponent implements OnInit, OnDestroy {
   openMenu: 'instagram' | 'facebook' | null = null;
 
-  readonly instagramPages = [
-    {
-      name: 'Moments in Clay - Studio',
-      url: 'https://www.instagram.com/moments_in_clay_studio?igsh=ZmdnZTdudnNieDQx',
-      initials: 'MC',
-      avatarClass: 'bg-gradient-to-br from-fuchsia-500 to-rose-500'
-    },
-    {
-      name: 'momentstudio',
-      url: 'https://www.instagram.com/adrianaartizanat?igsh=ZmZmaDU1MGcxZHEy',
-      initials: 'MS',
-      avatarClass: 'bg-gradient-to-br from-amber-500 to-rose-500'
-    }
-  ];
+  instagramPages: Array<{ label: string; url: string; thumbnailUrl?: string | null; initials: string; avatarClass: string }> = [];
+  facebookPages: Array<{ label: string; url: string; thumbnailUrl?: string | null; initials: string; avatarClass: string }> = [];
 
-  readonly facebookPages = [
-    {
-      name: 'Moments in Clay - Studio',
-      url: 'https://www.facebook.com/share/17YqBmfX5x/',
-      initials: 'MC',
-      avatarClass: 'bg-gradient-to-br from-blue-600 to-sky-500'
-    },
-    {
-      name: 'momentstudio',
-      url: 'https://www.facebook.com/share/1APqKJM6Zi/',
-      initials: 'MS',
-      avatarClass: 'bg-gradient-to-br from-blue-600 to-fuchsia-500'
-    }
-  ];
+  private socialSub?: Subscription;
 
-  constructor(private elementRef: ElementRef<HTMLElement>) {}
+  constructor(
+    private elementRef: ElementRef<HTMLElement>,
+    private social: SiteSocialService
+  ) {}
+
+  ngOnInit(): void {
+    this.socialSub = this.social.get().subscribe((data) => {
+      this.instagramPages = this.toFooterPages('instagram', data.instagramPages);
+      this.facebookPages = this.toFooterPages('facebook', data.facebookPages);
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.socialSub?.unsubscribe();
+  }
+
+  private toFooterPages(
+    platform: 'instagram' | 'facebook',
+    pages: SiteSocialLink[]
+  ): Array<{ label: string; url: string; thumbnailUrl?: string | null; initials: string; avatarClass: string }> {
+    const palettes =
+      platform === 'instagram'
+        ? ['bg-gradient-to-br from-fuchsia-500 to-rose-500', 'bg-gradient-to-br from-amber-500 to-rose-500']
+        : ['bg-gradient-to-br from-blue-600 to-sky-500', 'bg-gradient-to-br from-blue-600 to-fuchsia-500'];
+    return pages.map((page, index) => ({
+      label: page.label,
+      url: page.url,
+      thumbnailUrl: page.thumbnail_url || null,
+      initials: this.initialsForLabel(page.label),
+      avatarClass: palettes[index % palettes.length]
+    }));
+  }
+
+  private initialsForLabel(label: string): string {
+    const cleaned = (label || '').trim();
+    if (!cleaned) return 'MS';
+    const parts = cleaned.split(/\s+/).filter(Boolean);
+    const first = parts[0]?.[0] ?? cleaned[0] ?? 'M';
+    const second = parts[1]?.[0] ?? parts[0]?.[1] ?? 'S';
+    return `${first}${second}`.toUpperCase();
+  }
 
   toggleMenu(menu: 'instagram' | 'facebook'): void {
     this.openMenu = this.openMenu === menu ? null : menu;

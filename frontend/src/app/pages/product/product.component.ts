@@ -49,6 +49,19 @@ import { Router } from '@angular/router';
       </ng-container>
 
       <ng-template #content>
+        <ng-container *ngIf="loadError; else maybeProduct">
+          <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
+          <div class="border border-dashed border-slate-200 rounded-2xl p-10 text-center dark:border-slate-800">
+            <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.loadErrorTitle' | translate }}</p>
+            <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ 'product.loadErrorCopy' | translate }}</p>
+            <div class="mt-6 flex items-center justify-center gap-3">
+              <app-button [label]="'product.retry' | translate" variant="ghost" (action)="retryLoad()"></app-button>
+              <app-button [label]="'product.backToShop' | translate" variant="ghost" [routerLink]="['/shop']"></app-button>
+            </div>
+          </div>
+        </ng-container>
+
+        <ng-template #maybeProduct>
         <ng-container *ngIf="product; else missing">
           <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
           <div class="grid gap-10 lg:grid-cols-2">
@@ -161,15 +174,12 @@ import { Router } from '@angular/router';
               </div>
             </div>
           </div>
-        </ng-container>
-      </ng-template>
-
-      <div *ngIf="recentlyViewed.length" class="mt-12 grid gap-4">
-        <div class="flex items-center justify-between">
-          <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.recentlyViewed' | translate }}</h3>
-          <a routerLink="/shop" class="text-sm font-medium text-indigo-600 dark:text-indigo-300">{{ 'product.backToShop' | translate }}</a>
-        </div>
-        <div class="flex gap-4 overflow-x-auto pb-2">
+	      <div *ngIf="recentlyViewed.length" class="mt-12 grid gap-4">
+	        <div class="flex items-center justify-between">
+	          <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.recentlyViewed' | translate }}</h3>
+	          <a routerLink="/shop" class="text-sm font-medium text-indigo-600 dark:text-indigo-300">{{ 'product.backToShop' | translate }}</a>
+	        </div>
+	        <div class="flex gap-4 overflow-x-auto pb-2">
           <app-button
             *ngFor="let item of recentlyViewed"
             class="min-w-[220px]"
@@ -195,11 +205,11 @@ import { Router } from '@angular/router';
               </div>
             </div>
           </app-button>
-        </div>
-      </div>
-
-      <div
-        *ngIf="previewOpen"
+	        </div>
+	      </div>
+	
+	      <div
+	        *ngIf="previewOpen"
         class="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm flex items-center justify-center p-6"
         (click)="closePreview()"
       >
@@ -222,14 +232,18 @@ import { Router } from '@angular/router';
 	            sizes="(min-width: 1024px) 960px, 100vw"
 	            [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
 	          />
-        </div>
-      </div>
+	        </div>
+	      </div>
 
-      <ng-template #missing>
-        <div class="border border-dashed border-slate-200 rounded-2xl p-10 text-center dark:border-slate-800">
-          <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.notFound' | translate }}</p>
-          <a routerLink="/shop" class="text-indigo-600 dark:text-indigo-300 font-medium">{{ 'product.backToShop' | translate }}</a>
+	      </ng-container>
+	
+	      <ng-template #missing>
+	        <div class="border border-dashed border-slate-200 rounded-2xl p-10 text-center dark:border-slate-800">
+	          <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.notFound' | translate }}</p>
+	          <a routerLink="/shop" class="text-indigo-600 dark:text-indigo-300 font-medium">{{ 'product.backToShop' | translate }}</a>
         </div>
+      </ng-template>
+      </ng-template>
       </ng-template>
     </app-container>
   `
@@ -237,6 +251,7 @@ import { Router } from '@angular/router';
 export class ProductComponent implements OnInit, OnDestroy {
   product: Product | null = null;
   loading = true;
+  loadError = false;
   selectedVariantId: string | null = null;
   quantity = 1;
   activeImageIndex = 0;
@@ -246,6 +261,7 @@ export class ProductComponent implements OnInit, OnDestroy {
   private langSub?: Subscription;
   private canonicalEl?: HTMLLinkElement;
   private document: Document = inject(DOCUMENT);
+  private slug: string | null = null;
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'nav.shop', url: '/shop' }
@@ -274,36 +290,51 @@ export class ProductComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.wishlist.ensureLoaded();
-    const slug = this.route.snapshot.paramMap.get('slug');
+    this.slug = this.route.snapshot.paramMap.get('slug');
     this.langSub = this.translate.onLangChange.subscribe(() => {
       if (this.product) {
         this.updateMeta(this.product);
       }
     });
-    if (slug) {
-      this.catalog.getProduct(slug).subscribe({
-        next: (product) => {
-          this.product = product;
-          this.selectedVariantId = product.variants?.[0]?.id ?? null;
-          this.loading = false;
-          this.crumbs = [
-            { label: 'nav.home', url: '/' },
-            { label: 'nav.shop', url: '/shop' },
-            { label: product.name, url: `/products/${product.slug}` }
-          ];
-          this.updateMeta(product);
-          this.updateStructuredData(product);
-          const updated = this.recentlyViewedService.add(product);
-          this.recentlyViewed = updated.filter((p) => p.slug !== product.slug).slice(0, 8);
-        },
-        error: () => {
-          this.product = null;
-          this.loading = false;
-        }
-      });
-    } else {
+    this.load();
+  }
+
+  retryLoad(): void {
+    this.load();
+  }
+
+  private load(): void {
+    this.loading = true;
+    this.loadError = false;
+    this.product = null;
+    const slug = this.slug;
+    if (!slug) {
       this.loading = false;
+      return;
     }
+    this.catalog.getProduct(slug).subscribe({
+      next: (product) => {
+        this.product = product;
+        this.selectedVariantId = product.variants?.[0]?.id ?? null;
+        this.loading = false;
+        this.loadError = false;
+        this.crumbs = [
+          { label: 'nav.home', url: '/' },
+          { label: 'nav.shop', url: '/shop' },
+          { label: product.name, url: `/products/${product.slug}` }
+        ];
+        this.updateMeta(product);
+        this.updateStructuredData(product);
+        const updated = this.recentlyViewedService.add(product);
+        this.recentlyViewed = updated.filter((p) => p.slug !== product.slug).slice(0, 8);
+      },
+      error: (err) => {
+        this.product = null;
+        this.loading = false;
+        const status = typeof err?.status === 'number' ? err.status : 0;
+        this.loadError = status !== 404;
+      }
+    });
   }
 
   get activeImage(): string {

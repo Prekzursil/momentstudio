@@ -13,6 +13,8 @@ from app.db.session import get_session
 from app.schemas.user import UserCreate
 from app.services.auth import create_user, issue_tokens_for_user
 from app.models.user import UserRole
+from app.services import social_thumbnails
+import httpx
 
 
 @pytest.fixture
@@ -146,3 +148,49 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     ro_public = client.get("/api/v1/content/home.hero?lang=ro")
     assert ro_public.status_code == 200
     assert ro_public.json()["title"] == "Erou"
+
+
+def test_admin_fetch_social_thumbnail(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal)
+
+    html = '<html><head><meta property="og:image" content="/img/profile.png"></head><body>ok</body></html>'
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=html, request=request)
+
+    transport = httpx.MockTransport(handler)
+    real_async_client = httpx.AsyncClient
+
+    class MockAsyncClient:
+        def __init__(self, *args, **kwargs):
+            self._client = real_async_client(
+                transport=transport,
+                follow_redirects=kwargs.get("follow_redirects", False),
+                timeout=kwargs.get("timeout"),
+                headers=kwargs.get("headers"),
+            )
+
+        async def __aenter__(self):
+            return self._client
+
+        async def __aexit__(self, exc_type, exc, tb):
+            await self._client.aclose()
+
+    monkeypatch.setattr(social_thumbnails.httpx, "AsyncClient", MockAsyncClient)
+
+    res = client.post(
+        "/api/v1/content/admin/social/thumbnail",
+        json={"url": "https://www.instagram.com/momentstudio/"},
+        headers=auth_headers(admin_token),
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["thumbnail_url"] == "https://www.instagram.com/img/profile.png"
+
+    bad = client.post(
+        "/api/v1/content/admin/social/thumbnail",
+        json={"url": "https://example.com"},
+        headers=auth_headers(admin_token),
+    )
+    assert bad.status_code == 400

@@ -103,6 +103,102 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
+          <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex items-center justify-between gap-3">
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Site settings: social + contact</h2>
+              <div class="flex items-center gap-2">
+                <app-button size="sm" variant="ghost" label="Reload" (action)="loadSocial()"></app-button>
+                <app-button size="sm" label="Save" (action)="saveSocial()"></app-button>
+              </div>
+            </div>
+            <div class="grid md:grid-cols-2 gap-3 text-sm">
+              <app-input label="Phone" [(value)]="socialForm.phone"></app-input>
+              <app-input label="Email" [(value)]="socialForm.email"></app-input>
+            </div>
+            <div class="grid md:grid-cols-2 gap-4">
+              <div class="grid gap-2">
+                <div class="flex items-center justify-between">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">Instagram pages</p>
+                  <button class="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-300" type="button" (click)="addSocialLink('instagram')">
+                    Add
+                  </button>
+                </div>
+                <div *ngFor="let page of socialForm.instagram_pages; let i = index" class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
+                  <app-input label="Label" [(value)]="page.label"></app-input>
+                  <app-input label="URL" [(value)]="page.url"></app-input>
+                  <app-input label="Thumbnail URL (optional)" [(value)]="page.thumbnail_url"></app-input>
+                  <div class="flex items-center gap-2">
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      label="Fetch thumbnail"
+                      [disabled]="socialThumbLoading[socialThumbKey('instagram', i)] || !(page.url || '').trim()"
+                      (action)="fetchSocialThumbnail('instagram', i)"
+                    ></app-button>
+                    <span *ngIf="socialThumbLoading[socialThumbKey('instagram', i)]" class="text-xs text-slate-600 dark:text-slate-300">
+                      Fetching…
+                    </span>
+                    <span *ngIf="socialThumbErrors[socialThumbKey('instagram', i)]" class="text-xs text-rose-700 dark:text-rose-300">
+                      {{ socialThumbErrors[socialThumbKey('instagram', i)] }}
+                    </span>
+                  </div>
+                  <img
+                    *ngIf="(page.thumbnail_url || '').trim()"
+                    [src]="page.thumbnail_url"
+                    [alt]="page.label"
+                    class="h-10 w-10 rounded-full border border-slate-200 object-cover dark:border-slate-800"
+                    loading="lazy"
+                  />
+                  <button class="text-xs text-rose-700 hover:underline dark:text-rose-300 justify-self-start" type="button" (click)="removeSocialLink('instagram', i)">
+                    Remove
+                  </button>
+                </div>
+              </div>
+              <div class="grid gap-2">
+                <div class="flex items-center justify-between">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">Facebook pages</p>
+                  <button class="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-300" type="button" (click)="addSocialLink('facebook')">
+                    Add
+                  </button>
+                </div>
+                <div *ngFor="let page of socialForm.facebook_pages; let i = index" class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
+                  <app-input label="Label" [(value)]="page.label"></app-input>
+                  <app-input label="URL" [(value)]="page.url"></app-input>
+                  <app-input label="Thumbnail URL (optional)" [(value)]="page.thumbnail_url"></app-input>
+                  <div class="flex items-center gap-2">
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      label="Fetch thumbnail"
+                      [disabled]="socialThumbLoading[socialThumbKey('facebook', i)] || !(page.url || '').trim()"
+                      (action)="fetchSocialThumbnail('facebook', i)"
+                    ></app-button>
+                    <span *ngIf="socialThumbLoading[socialThumbKey('facebook', i)]" class="text-xs text-slate-600 dark:text-slate-300">
+                      Fetching…
+                    </span>
+                    <span *ngIf="socialThumbErrors[socialThumbKey('facebook', i)]" class="text-xs text-rose-700 dark:text-rose-300">
+                      {{ socialThumbErrors[socialThumbKey('facebook', i)] }}
+                    </span>
+                  </div>
+                  <img
+                    *ngIf="(page.thumbnail_url || '').trim()"
+                    [src]="page.thumbnail_url"
+                    [alt]="page.label"
+                    class="h-10 w-10 rounded-full border border-slate-200 object-cover dark:border-slate-800"
+                    loading="lazy"
+                  />
+                  <button class="text-xs text-rose-700 hover:underline dark:text-rose-300 justify-self-start" type="button" (click)="removeSocialLink('facebook', i)">
+                    Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 text-sm">
+              <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="socialMessage">{{ socialMessage }}</span>
+              <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="socialError">{{ socialError }}</span>
+            </div>
+          </section>
+
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">SEO meta (per page & language)</h2>
@@ -174,6 +270,13 @@ import { formatIdentity } from '../../shared/user-identity';
               </label>
               <div class="flex gap-2">
                 <app-button size="sm" label="Save Shipping" (action)="saveInfo('page.shipping', infoForm.shipping)"></app-button>
+              </div>
+              <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
+                Contact page content
+                <textarea rows="3" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="infoForm.contact"></textarea>
+              </label>
+              <div class="flex gap-2">
+                <app-button size="sm" label="Save Contact" (action)="saveInfo('page.contact', infoForm.contact)"></app-button>
                 <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="infoMessage">{{ infoMessage }}</span>
                 <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="infoError">{{ infoError }}</span>
               </div>
@@ -221,7 +324,7 @@ import { formatIdentity } from '../../shared/user-identity';
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Homepage sections order</h2>
               <app-button size="sm" variant="ghost" label="Save order" (action)="saveSections()"></app-button>
             </div>
-            <p class="text-sm text-slate-600 dark:text-slate-300">Drag to reorder hero / collections / bestsellers / new arrivals.</p>
+            <p class="text-sm text-slate-600 dark:text-slate-300">Drag to reorder sections and toggle visibility.</p>
             <div class="grid gap-2">
               <div
                 *ngFor="let section of sectionOrder"
@@ -231,8 +334,17 @@ import { formatIdentity } from '../../shared/user-identity';
                 (dragover)="onSectionDragOver($event)"
                 (drop)="onSectionDrop(section)"
               >
-                <span class="font-semibold text-slate-900 dark:text-slate-50 capitalize">{{ section.replace('_', ' ') }}</span>
-                <span class="text-xs text-slate-500 dark:text-slate-400">drag</span>
+                <div class="grid gap-1">
+                  <span class="font-semibold text-slate-900 dark:text-slate-50">{{ sectionLabel(section) }}</span>
+                  <span class="text-[11px] text-slate-500 dark:text-slate-400">{{ section }}</span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                    <input type="checkbox" [checked]="isSectionEnabled(section)" (change)="toggleSectionEnabled(section, $event)" />
+                    Enabled
+                  </label>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">drag</span>
+                </div>
               </div>
             </div>
             <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="sectionsMessage">{{ sectionsMessage }}</span>
@@ -1332,7 +1444,8 @@ export class AdminComponent implements OnInit {
   draggingSlug: string | null = null;
   selectedIds = new Set<string>();
   allSelected = false;
-  sectionOrder: string[] = ['hero', 'collections', 'bestsellers', 'new_arrivals'];
+  sectionOrder: string[] = ['hero', 'featured_products', 'new_arrivals', 'featured_collections', 'story', 'recently_viewed', 'why'];
+  sectionEnabled: Record<string, boolean> = {};
   draggingSection: string | null = null;
   sectionsMessage = '';
 
@@ -1455,13 +1568,34 @@ export class AdminComponent implements OnInit {
   assetsForm = { logo_url: '', favicon_url: '', social_image_url: '' };
   assetsMessage: string | null = null;
   assetsError: string | null = null;
+  socialForm: {
+    phone: string;
+    email: string;
+    instagram_pages: Array<{ label: string; url: string; thumbnail_url: string }>;
+    facebook_pages: Array<{ label: string; url: string; thumbnail_url: string }>;
+  } = {
+    phone: '+40723204204',
+    email: 'momentstudio.ro@gmail.com',
+    instagram_pages: [
+      { label: 'Moments in Clay - Studio', url: 'https://www.instagram.com/moments_in_clay_studio?igsh=ZmdnZTdudnNieDQx', thumbnail_url: '' },
+      { label: 'momentstudio', url: 'https://www.instagram.com/adrianaartizanat?igsh=ZmZmaDU1MGcxZHEy', thumbnail_url: '' }
+    ],
+    facebook_pages: [
+      { label: 'Moments in Clay - Studio', url: 'https://www.facebook.com/share/17YqBmfX5x/', thumbnail_url: '' },
+      { label: 'momentstudio', url: 'https://www.facebook.com/share/1APqKJM6Zi/', thumbnail_url: '' }
+    ]
+  };
+  socialMessage: string | null = null;
+  socialError: string | null = null;
+  socialThumbLoading: Record<string, boolean> = {};
+  socialThumbErrors: Record<string, string> = {};
   seoLang: 'en' | 'ro' = 'en';
   seoPage: 'home' | 'shop' | 'product' | 'category' | 'about' = 'home';
   seoForm = { title: '', description: '' };
   seoMessage: string | null = null;
   seoError: string | null = null;
   infoLang: 'en' | 'ro' = 'en';
-  infoForm = { about: '', faq: '', shipping: '' };
+  infoForm = { about: '', faq: '', shipping: '', contact: '' };
   infoMessage: string | null = null;
   infoError: string | null = null;
   coupons: AdminCoupon[] = [];
@@ -1527,6 +1661,7 @@ export class AdminComponent implements OnInit {
     this.loadSections();
     this.loadCollections();
     this.loadAssets();
+    this.loadSocial();
     this.loadSeo();
     this.loadInfo();
     this.loadFlaggedComments();
@@ -2686,6 +2821,137 @@ export class AdminComponent implements OnInit {
     });
   }
 
+  loadSocial(): void {
+    this.socialError = null;
+    this.socialMessage = null;
+    this.admin.getContent('site.social').subscribe({
+      next: (block) => {
+        const meta = (block.meta || {}) as Record<string, any>;
+        const contact = (meta['contact'] || {}) as Record<string, any>;
+        this.socialForm.phone = String(contact['phone'] || this.socialForm.phone || '').trim();
+        this.socialForm.email = String(contact['email'] || this.socialForm.email || '').trim();
+        this.socialForm.instagram_pages = this.parseSocialPages(meta['instagram_pages'], this.socialForm.instagram_pages);
+        this.socialForm.facebook_pages = this.parseSocialPages(meta['facebook_pages'], this.socialForm.facebook_pages);
+      },
+      error: () => {
+        // Keep defaults.
+      }
+    });
+  }
+
+  addSocialLink(platform: 'instagram' | 'facebook'): void {
+    const item = { label: '', url: '', thumbnail_url: '' };
+    if (platform === 'instagram') this.socialForm.instagram_pages = [...this.socialForm.instagram_pages, item];
+    else this.socialForm.facebook_pages = [...this.socialForm.facebook_pages, item];
+  }
+
+  removeSocialLink(platform: 'instagram' | 'facebook', index: number): void {
+    if (platform === 'instagram') {
+      this.socialForm.instagram_pages = this.socialForm.instagram_pages.filter((_, i) => i !== index);
+      return;
+    }
+    this.socialForm.facebook_pages = this.socialForm.facebook_pages.filter((_, i) => i !== index);
+  }
+
+  socialThumbKey(platform: 'instagram' | 'facebook', index: number): string {
+    return `${platform}-${index}`;
+  }
+
+  fetchSocialThumbnail(platform: 'instagram' | 'facebook', index: number): void {
+    const key = this.socialThumbKey(platform, index);
+    const pages = platform === 'instagram' ? this.socialForm.instagram_pages : this.socialForm.facebook_pages;
+    const page = pages[index];
+    const url = String(page?.url || '').trim();
+    if (!url) {
+      this.socialThumbErrors[key] = 'URL is required';
+      return;
+    }
+
+    this.socialThumbErrors[key] = '';
+    this.socialThumbLoading[key] = true;
+
+    this.admin.fetchSocialThumbnail(url).subscribe({
+      next: (res) => {
+        this.socialThumbLoading[key] = false;
+        const thumb = String(res?.thumbnail_url || '').trim();
+        if (!thumb) {
+          this.socialThumbErrors[key] = 'No thumbnail found';
+          return;
+        }
+        page.thumbnail_url = thumb;
+        this.toast.success('Thumbnail updated', page.label || 'Social link');
+      },
+      error: (err) => {
+        this.socialThumbLoading[key] = false;
+        const msg = err?.error?.detail ? String(err.error.detail) : 'Could not fetch thumbnail';
+        this.socialThumbErrors[key] = msg;
+      }
+    });
+  }
+
+  saveSocial(): void {
+    this.socialMessage = null;
+    this.socialError = null;
+    const instagram_pages = this.sanitizeSocialPages(this.socialForm.instagram_pages);
+    const facebook_pages = this.sanitizeSocialPages(this.socialForm.facebook_pages);
+    const payload = {
+      title: 'Site social links',
+      body_markdown: 'Social pages and contact details used across the storefront.',
+      status: 'published',
+      meta: {
+        version: 1,
+        contact: { phone: (this.socialForm.phone || '').trim(), email: (this.socialForm.email || '').trim() },
+        instagram_pages,
+        facebook_pages
+      }
+    };
+    const onSuccess = () => {
+      this.socialMessage = 'Saved';
+      this.socialError = null;
+    };
+    this.admin.updateContentBlock('site.social', payload).subscribe({
+      next: onSuccess,
+      error: () =>
+        this.admin.createContent('site.social', payload).subscribe({
+          next: onSuccess,
+          error: () => {
+            this.socialError = 'Could not save';
+            this.socialMessage = null;
+          }
+        })
+    });
+  }
+
+  private parseSocialPages(
+    raw: unknown,
+    fallback: Array<{ label: string; url: string; thumbnail_url: string }>
+  ): Array<{ label: string; url: string; thumbnail_url: string }> {
+    if (!Array.isArray(raw)) return fallback;
+    return raw
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        const label = String((item as any).label ?? '').trim();
+        const url = String((item as any).url ?? '').trim();
+        const thumb = String((item as any).thumbnail_url ?? '').trim();
+        return { label, url, thumbnail_url: thumb };
+      })
+      .filter((x): x is { label: string; url: string; thumbnail_url: string } => !!x);
+  }
+
+  private sanitizeSocialPages(
+    pages: Array<{ label: string; url: string; thumbnail_url: string }>
+  ): Array<{ label: string; url: string; thumbnail_url?: string | null }> {
+    const out: Array<{ label: string; url: string; thumbnail_url?: string | null }> = [];
+    for (const page of pages) {
+      const label = String(page.label || '').trim();
+      const url = String(page.url || '').trim();
+      const thumb = String(page.thumbnail_url || '').trim();
+      if (!label || !url) continue;
+      out.push({ label, url, thumbnail_url: thumb || null });
+    }
+    return out;
+  }
+
   selectSeoLang(lang: 'en' | 'ro'): void {
     this.seoLang = lang;
     this.loadSeo();
@@ -2739,7 +3005,7 @@ export class AdminComponent implements OnInit {
   }
 
   loadInfo(): void {
-    const loadKey = (key: string, target: 'about' | 'faq' | 'shipping') => {
+    const loadKey = (key: string, target: 'about' | 'faq' | 'shipping' | 'contact') => {
       this.admin.getContent(key, this.infoLang).subscribe({
         next: (block) => {
           this.infoForm[target] = block.body_markdown || '';
@@ -2752,9 +3018,10 @@ export class AdminComponent implements OnInit {
     loadKey('page.about', 'about');
     loadKey('page.faq', 'faq');
     loadKey('page.shipping', 'shipping');
+    loadKey('page.contact', 'contact');
   }
 
-  saveInfo(key: 'page.about' | 'page.faq' | 'page.shipping', body: string): void {
+  saveInfo(key: 'page.about' | 'page.faq' | 'page.shipping' | 'page.contact', body: string): void {
     this.infoMessage = null;
     this.infoError = null;
     const payload = {
@@ -2852,15 +3119,113 @@ export class AdminComponent implements OnInit {
   loadSections(): void {
     this.admin.getContent('home.sections').subscribe({
       next: (block) => {
-        const order = block.meta?.['order'];
-        if (Array.isArray(order) && order.length) {
-          this.sectionOrder = order;
+        const rawSections = block.meta?.['sections'];
+        if (Array.isArray(rawSections) && rawSections.length) {
+          const order: string[] = [];
+          const enabled: Record<string, boolean> = {};
+          for (const raw of rawSections) {
+            if (!raw || typeof raw !== 'object') continue;
+            const id = (raw as { id?: unknown }).id;
+            if (typeof id !== 'string' || !id.trim()) continue;
+            const normalized = this.normalizeHomeSectionId(id);
+            if (!normalized || order.includes(normalized)) continue;
+            order.push(normalized);
+            const isEnabled = (raw as { enabled?: unknown }).enabled;
+            enabled[normalized] = isEnabled === false ? false : true;
+          }
+          if (order.length) {
+            this.sectionOrder = this.ensureAllDefaultHomeSections(order);
+            this.sectionEnabled = this.ensureAllDefaultHomeSectionsEnabled(this.sectionOrder, enabled);
+            return;
+          }
         }
+
+        const legacyOrder = block.meta?.['order'];
+        if (Array.isArray(legacyOrder) && legacyOrder.length) {
+          const normalized: string[] = [];
+          const enabled: Record<string, boolean> = {};
+          for (const id of legacyOrder) {
+            const mapped = this.normalizeHomeSectionId(id);
+            if (!mapped || normalized.includes(mapped)) continue;
+            normalized.push(mapped);
+            enabled[mapped] = true;
+          }
+          if (normalized.length) {
+            this.sectionOrder = this.ensureAllDefaultHomeSections(normalized);
+            this.sectionEnabled = this.ensureAllDefaultHomeSectionsEnabled(this.sectionOrder, enabled);
+            return;
+          }
+        }
+
+        this.applyDefaultHomeSections();
       },
       error: () => {
-        this.sectionOrder = ['hero', 'collections', 'bestsellers', 'new_arrivals'];
+        this.applyDefaultHomeSections();
       }
     });
+  }
+
+  private normalizeHomeSectionId(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const raw = value.trim();
+    if (!raw) return null;
+    const key = raw
+      .replace(/([a-z])([A-Z])/g, '$1_$2')
+      .toLowerCase()
+      .replace(/[\s-]+/g, '_');
+    if (this.defaultHomeSectionIds().includes(key)) return key;
+    if (key === 'collections') return 'featured_collections';
+    if (key === 'featured') return 'featured_products';
+    if (key === 'bestsellers') return 'featured_products';
+    if (key === 'new') return 'new_arrivals';
+    if (key === 'recent') return 'recently_viewed';
+    if (key === 'recentlyviewed') return 'recently_viewed';
+    return null;
+  }
+
+  private defaultHomeSectionIds(): string[] {
+    return ['hero', 'featured_products', 'new_arrivals', 'featured_collections', 'story', 'recently_viewed', 'why'];
+  }
+
+  private ensureAllDefaultHomeSections(order: string[]): string[] {
+    const out = [...order];
+    for (const id of this.defaultHomeSectionIds()) {
+      if (!out.includes(id)) out.push(id);
+    }
+    return out;
+  }
+
+  private ensureAllDefaultHomeSectionsEnabled(order: string[], enabled: Record<string, boolean>): Record<string, boolean> {
+    const out: Record<string, boolean> = { ...enabled };
+    for (const id of order) {
+      if (!(id in out)) out[id] = true;
+    }
+    return out;
+  }
+
+  private applyDefaultHomeSections(): void {
+    const defaults = this.defaultHomeSectionIds();
+    this.sectionOrder = defaults;
+    const enabled: Record<string, boolean> = {};
+    for (const id of defaults) enabled[id] = true;
+    this.sectionEnabled = enabled;
+  }
+
+  sectionLabel(section: string): string {
+    return section
+      .split('_')
+      .filter((s) => s.length)
+      .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
+      .join(' ');
+  }
+
+  isSectionEnabled(section: string): boolean {
+    return this.sectionEnabled[section] !== false;
+  }
+
+  toggleSectionEnabled(section: string, event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.sectionEnabled[section] = Boolean(target?.checked);
   }
 
   onSectionDragStart(section: string): void {
@@ -2887,10 +3252,11 @@ export class AdminComponent implements OnInit {
   }
 
   saveSections(): void {
+    const sections = this.sectionOrder.map((id) => ({ id, enabled: this.isSectionEnabled(id) }));
     const payload = {
       title: 'Home sections',
       body_markdown: 'Home layout order',
-      meta: { order: this.sectionOrder },
+      meta: { version: 1, sections },
       status: 'published'
     };
     this.admin.updateContent('home.sections', payload).subscribe({
