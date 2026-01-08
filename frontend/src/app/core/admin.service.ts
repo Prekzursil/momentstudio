@@ -187,6 +187,10 @@ export interface ContentSavePayload {
   sort_order?: number;
 }
 
+export interface SocialThumbnailResponse {
+  thumbnail_url: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdminService {
   constructor(private api: ApiService) {}
@@ -358,5 +362,9 @@ export class AdminService {
 
   rollbackContentVersion(key: string, version: number): Observable<ContentBlock> {
     return this.api.post<ContentBlock>(`/content/admin/${key}/versions/${version}/rollback`, {});
+  }
+
+  fetchSocialThumbnail(url: string): Observable<SocialThumbnailResponse> {
+    return this.api.post<SocialThumbnailResponse>('/content/admin/social/thumbnail', { url });
   }
 }

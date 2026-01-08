@@ -242,7 +242,7 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS/Contact: render contact page copy from `page.contact` content block and source phone/email from `site.social` (or env) as a single source of truth.
 - [x] Contact UX: use contact-specific loading/error copy (avoid reusing About strings).
 - [x] Social UX: fix `adrianaartizanat` labels in `site.social` defaults (IG/FB) and correct existing seeds.
-- [ ] Social UX: add optional “fetch thumbnail” helper (manual thumbnail URL fallback; evaluate oEmbed/Graph API + caching).
+- [x] Social UX: add optional “fetch thumbnail” helper (manual thumbnail URL fallback; evaluate oEmbed/Graph API + caching).
 - [x] Shop: add API-powered price bounds (min/max) so the price range UI can cap to real data without an extra list request (and optionally per-filter bounds).
 - [x] Frontend: extract repeated image placeholder-on-error handlers into a shared directive/helper for consistency.
 - [x] Pricing: show EN approx EUR/USD for RON prices (display-only; checkout remains in RON) using live FX rates.

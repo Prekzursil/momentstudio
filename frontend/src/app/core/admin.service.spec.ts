@@ -123,4 +123,15 @@ describe('AdminService', () => {
     expect(req.request.method).toBe('GET');
     req.flush([{ id: 'c1', code: 'SAVE10', active: true }]);
   });
+
+  it('should fetch social thumbnail', () => {
+    service.fetchSocialThumbnail('https://www.instagram.com/example/').subscribe((res) => {
+      expect(res.thumbnail_url).toBe('https://cdn.example/thumb.png');
+    });
+
+    const req = httpMock.expectOne('/api/v1/content/admin/social/thumbnail');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ url: 'https://www.instagram.com/example/' });
+    req.flush({ thumbnail_url: 'https://cdn.example/thumb.png' });
+  });
 });

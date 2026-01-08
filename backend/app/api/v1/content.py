@@ -1,3 +1,4 @@
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,7 +14,9 @@ from app.schemas.content import (
     ContentBlockVersionListItem,
     ContentBlockVersionRead,
 )
+from app.schemas.social import SocialThumbnailRequest, SocialThumbnailResponse
 from app.services import content as content_service
+from app.services import social_thumbnails
 
 router = APIRouter(prefix="/content", tags=["content"])
 
@@ -41,6 +44,20 @@ async def get_content(
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
     return block
+
+
+@router.post("/admin/social/thumbnail", response_model=SocialThumbnailResponse)
+async def admin_fetch_social_thumbnail(
+    payload: SocialThumbnailRequest,
+    _: object = Depends(require_admin),
+) -> SocialThumbnailResponse:
+    try:
+        thumbnail_url = await social_thumbnails.fetch_social_thumbnail_url(payload.url)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not fetch thumbnail") from exc
+    return SocialThumbnailResponse(thumbnail_url=thumbnail_url)
 
 
 @router.get("/admin/{key}", response_model=ContentBlockRead)

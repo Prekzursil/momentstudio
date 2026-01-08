@@ -127,6 +127,28 @@ import { formatIdentity } from '../../shared/user-identity';
                   <app-input label="Label" [(value)]="page.label"></app-input>
                   <app-input label="URL" [(value)]="page.url"></app-input>
                   <app-input label="Thumbnail URL (optional)" [(value)]="page.thumbnail_url"></app-input>
+                  <div class="flex items-center gap-2">
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      label="Fetch thumbnail"
+                      [disabled]="socialThumbLoading[socialThumbKey('instagram', i)] || !(page.url || '').trim()"
+                      (action)="fetchSocialThumbnail('instagram', i)"
+                    ></app-button>
+                    <span *ngIf="socialThumbLoading[socialThumbKey('instagram', i)]" class="text-xs text-slate-600 dark:text-slate-300">
+                      Fetching…
+                    </span>
+                    <span *ngIf="socialThumbErrors[socialThumbKey('instagram', i)]" class="text-xs text-rose-700 dark:text-rose-300">
+                      {{ socialThumbErrors[socialThumbKey('instagram', i)] }}
+                    </span>
+                  </div>
+                  <img
+                    *ngIf="(page.thumbnail_url || '').trim()"
+                    [src]="page.thumbnail_url"
+                    [alt]="page.label"
+                    class="h-10 w-10 rounded-full border border-slate-200 object-cover dark:border-slate-800"
+                    loading="lazy"
+                  />
                   <button class="text-xs text-rose-700 hover:underline dark:text-rose-300 justify-self-start" type="button" (click)="removeSocialLink('instagram', i)">
                     Remove
                   </button>
@@ -143,6 +165,28 @@ import { formatIdentity } from '../../shared/user-identity';
                   <app-input label="Label" [(value)]="page.label"></app-input>
                   <app-input label="URL" [(value)]="page.url"></app-input>
                   <app-input label="Thumbnail URL (optional)" [(value)]="page.thumbnail_url"></app-input>
+                  <div class="flex items-center gap-2">
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      label="Fetch thumbnail"
+                      [disabled]="socialThumbLoading[socialThumbKey('facebook', i)] || !(page.url || '').trim()"
+                      (action)="fetchSocialThumbnail('facebook', i)"
+                    ></app-button>
+                    <span *ngIf="socialThumbLoading[socialThumbKey('facebook', i)]" class="text-xs text-slate-600 dark:text-slate-300">
+                      Fetching…
+                    </span>
+                    <span *ngIf="socialThumbErrors[socialThumbKey('facebook', i)]" class="text-xs text-rose-700 dark:text-rose-300">
+                      {{ socialThumbErrors[socialThumbKey('facebook', i)] }}
+                    </span>
+                  </div>
+                  <img
+                    *ngIf="(page.thumbnail_url || '').trim()"
+                    [src]="page.thumbnail_url"
+                    [alt]="page.label"
+                    class="h-10 w-10 rounded-full border border-slate-200 object-cover dark:border-slate-800"
+                    loading="lazy"
+                  />
                   <button class="text-xs text-rose-700 hover:underline dark:text-rose-300 justify-self-start" type="button" (click)="removeSocialLink('facebook', i)">
                     Remove
                   </button>
@@ -1543,6 +1587,8 @@ export class AdminComponent implements OnInit {
   };
   socialMessage: string | null = null;
   socialError: string | null = null;
+  socialThumbLoading: Record<string, boolean> = {};
+  socialThumbErrors: Record<string, string> = {};
   seoLang: 'en' | 'ro' = 'en';
   seoPage: 'home' | 'shop' | 'product' | 'category' | 'about' = 'home';
   seoForm = { title: '', description: '' };
@@ -2805,6 +2851,42 @@ export class AdminComponent implements OnInit {
       return;
     }
     this.socialForm.facebook_pages = this.socialForm.facebook_pages.filter((_, i) => i !== index);
+  }
+
+  socialThumbKey(platform: 'instagram' | 'facebook', index: number): string {
+    return `${platform}-${index}`;
+  }
+
+  fetchSocialThumbnail(platform: 'instagram' | 'facebook', index: number): void {
+    const key = this.socialThumbKey(platform, index);
+    const pages = platform === 'instagram' ? this.socialForm.instagram_pages : this.socialForm.facebook_pages;
+    const page = pages[index];
+    const url = String(page?.url || '').trim();
+    if (!url) {
+      this.socialThumbErrors[key] = 'URL is required';
+      return;
+    }
+
+    this.socialThumbErrors[key] = '';
+    this.socialThumbLoading[key] = true;
+
+    this.admin.fetchSocialThumbnail(url).subscribe({
+      next: (res) => {
+        this.socialThumbLoading[key] = false;
+        const thumb = String(res?.thumbnail_url || '').trim();
+        if (!thumb) {
+          this.socialThumbErrors[key] = 'No thumbnail found';
+          return;
+        }
+        page.thumbnail_url = thumb;
+        this.toast.success('Thumbnail updated', page.label || 'Social link');
+      },
+      error: (err) => {
+        this.socialThumbLoading[key] = false;
+        const msg = err?.error?.detail ? String(err.error.detail) : 'Could not fetch thumbnail';
+        this.socialThumbErrors[key] = msg;
+      }
+    });
   }
 
   saveSocial(): void {
