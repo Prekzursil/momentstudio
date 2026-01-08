@@ -44,8 +44,8 @@ import { Meta, Title } from '@angular/platform-browser';
             <app-input
               [label]="'shop.search' | translate"
               [placeholder]="'shop.searchPlaceholder' | translate"
-              [(value)]="filters.search"
-              (ngModelChange)="onSearch()"
+              [value]="filters.search"
+              (valueChange)="onSidebarSearchChange($event)"
             >
             </app-input>
           </div>
@@ -247,6 +247,8 @@ export class ShopComponent implements OnInit, OnDestroy {
   readonly priceMinBound = 1;
   priceMaxBound = 500;
   readonly priceStep = 1;
+  private filterDebounce?: ReturnType<typeof setTimeout>;
+  private readonly filterDebounceMs = 350;
   private suppressNextQueryLoad = false;
   private lastBoundsKey = '';
 
@@ -291,6 +293,7 @@ export class ShopComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.langSub?.unsubscribe();
+    this.cancelFilterDebounce();
   }
 
   fetchCategories(): void {
@@ -360,8 +363,29 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   applyFilters(): void {
+    this.cancelFilterDebounce();
     this.filters.page = 1;
     this.loadProducts();
+  }
+
+  private scheduleFilterApply(): void {
+    this.filters.page = 1;
+    if (this.filterDebounce) clearTimeout(this.filterDebounce);
+    this.filterDebounce = setTimeout(() => {
+      this.filterDebounce = undefined;
+      this.loadProducts();
+    }, this.filterDebounceMs);
+  }
+
+  private cancelFilterDebounce(): void {
+    if (!this.filterDebounce) return;
+    clearTimeout(this.filterDebounce);
+    this.filterDebounce = undefined;
+  }
+
+  onSidebarSearchChange(raw: string | number): void {
+    this.filters.search = String(raw ?? '');
+    this.scheduleFilterApply();
   }
 
   onPriceCommit(changed: 'min' | 'max'): void {
@@ -377,7 +401,7 @@ export class ShopComponent implements OnInit, OnDestroy {
       this.filters.max_price = parsed ?? this.priceMaxBound;
     }
     this.normalizePriceRange(changed);
-    this.applyFilters();
+    this.scheduleFilterApply();
   }
 
   onSearch(): void {
@@ -385,6 +409,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   changePage(delta: number): void {
+    this.cancelFilterDebounce();
     if (!this.pageMeta) return;
     const nextPage = this.pageMeta.page + delta;
     if (nextPage < 1 || nextPage > this.pageMeta.total_pages) return;
@@ -393,6 +418,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   toggleTag(tagSlug: string): void {
+    this.cancelFilterDebounce();
     if (this.filters.tags.has(tagSlug)) {
       this.filters.tags.delete(tagSlug);
     } else {
@@ -402,6 +428,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   resetFilters(): void {
+    this.cancelFilterDebounce();
     this.filters.search = '';
     this.filters.category_slug = '';
     this.filters.min_price = this.priceMinBound;

@@ -22,11 +22,16 @@ def upgrade() -> None:
     conn = op.get_bind()
 
     def count_non_ron(table: str) -> int:
-        return int(
-            conn.execute(
-                sa.text(f"SELECT COUNT(*) FROM {table} WHERE currency IS NOT NULL AND currency <> 'RON'")
-            ).scalar_one()
-        )
+        if table == "promo_codes":
+            condition = "amount_off IS NOT NULL AND currency IS NOT NULL AND currency <> 'RON'"
+        else:
+            condition = "currency IS NOT NULL AND currency <> 'RON'"
+        return int(conn.execute(sa.text(f"SELECT COUNT(*) FROM {table} WHERE {condition}")).scalar_one())
+
+    # Normalize casing to avoid treating "ron" as a foreign currency.
+    op.execute("UPDATE products SET currency='RON' WHERE currency IS NOT NULL AND UPPER(currency)='RON'")
+    op.execute("UPDATE orders SET currency='RON' WHERE currency IS NOT NULL AND UPPER(currency)='RON'")
+    op.execute("UPDATE promo_codes SET currency='RON' WHERE currency IS NOT NULL AND UPPER(currency)='RON'")
 
     offenders = {table: count_non_ron(table) for table in ("products", "orders", "promo_codes")}
     offenders = {table: count for table, count in offenders.items() if count > 0}
