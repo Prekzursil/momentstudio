@@ -713,6 +713,8 @@ async def google_link(
     current_user.google_sub = sub
     current_user.google_email = email
     current_user.google_picture_url = picture
+    if not current_user.avatar_url and picture:
+        current_user.avatar_url = picture
     current_user.email_verified = bool(profile.get("email_verified")) or current_user.email_verified
     if not current_user.name:
         current_user.name = name

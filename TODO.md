@@ -424,7 +424,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Handle email collision: prompt linking instead of duplicate creation when email matches existing user.
 - [x] Google login when `google_sub` exists issues standard access/refresh tokens.
 - [x] Google OAuth: prompt Google-created users to complete required profile fields (DOB + phone) after first login (banner + redirect).
-- [ ] Google OAuth: optionally gate checkout/comments until profile is completed.
+- [x] Google OAuth: block app navigation until required profile fields are completed (redirect everything to Account/Profile completion).
 - [x] `/auth/google/link` for logged-in users to link Google (password confirmation).
 - [x] `/auth/google/unlink` to disconnect Google profile (must retain password).
 - [x] Validation to prevent linking a Google account already linked elsewhere.

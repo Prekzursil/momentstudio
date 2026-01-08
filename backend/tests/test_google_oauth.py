@@ -1,4 +1,5 @@
 import asyncio
+import io
 from urllib.parse import urlparse, parse_qs
 
 import httpx
@@ -11,7 +12,7 @@ from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
-from app.models.user import User
+from app.models.user import PasswordResetToken, User
 from app.services import auth as auth_service
 
 
@@ -195,6 +196,8 @@ def test_google_callback_creates_user(monkeypatch: pytest.MonkeyPatch, test_app)
     data = res.json()
     assert data["user"]["email"] == "newuser@example.com"
     assert data["user"]["google_sub"] == "new-sub"
+    assert data["user"]["google_picture_url"] == "http://example.com/pic.png"
+    assert data["user"]["avatar_url"] == "http://example.com/pic.png"
     assert data["tokens"]["access_token"]
 
     async def verify_db():
@@ -257,6 +260,15 @@ def test_google_link_and_unlink(monkeypatch: pytest.MonkeyPatch, test_app):
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["google_sub"] == "link-sub"
+    assert body["google_picture_url"] == "http://example.com/pic.png"
+    assert body["avatar_url"] == "http://example.com/pic.png"
+
+    # After linking, Google login should also work
+    state_login = _parse_state_from_start(client)
+    res = client.post("/api/v1/auth/google/callback", json={"code": "abc", "state": state_login})
+    assert res.status_code == 200, res.text
+    assert res.json()["user"]["email"] == "link@example.com"
+    assert res.json()["tokens"]["access_token"]
 
     # Unlink
     res = client.post(
@@ -266,3 +278,96 @@ def test_google_link_and_unlink(monkeypatch: pytest.MonkeyPatch, test_app):
     )
     assert res.status_code == 200, res.text
     assert res.json()["google_sub"] is None
+
+
+def test_google_created_user_can_set_password_and_login(monkeypatch: pytest.MonkeyPatch, test_app):
+    client: TestClient = test_app["client"]  # type: ignore
+    SessionLocal = test_app["session_factory"]  # type: ignore
+    monkeypatch.setattr(settings, "google_client_id", "client-id")
+    monkeypatch.setattr(settings, "google_client_secret", "client-secret")
+    monkeypatch.setattr(settings, "google_redirect_uri", "http://localhost/callback")
+
+    async def fake_exchange(code: str):
+        return {
+            "sub": "pw-sub",
+            "email": "pw@example.com",
+            "email_verified": True,
+            "name": "PW User",
+            "picture": "http://example.com/pic.png",
+        }
+
+    monkeypatch.setattr(auth_service, "exchange_google_code", fake_exchange)
+    state = _parse_state_from_start(client)
+    res = client.post("/api/v1/auth/google/callback", json={"code": "abc", "state": state})
+    assert res.status_code == 200, res.text
+    username = res.json()["user"]["username"]
+
+    # Request password reset and grab the token from DB
+    res = client.post("/api/v1/auth/password-reset/request", json={"email": "pw@example.com"})
+    assert res.status_code == 202, res.text
+
+    async def get_reset_token() -> str:
+        async with SessionLocal() as session:
+            row = (
+                (
+                    await session.execute(
+                        select(PasswordResetToken)
+                        .where(PasswordResetToken.used.is_(False))
+                        .order_by(PasswordResetToken.created_at.desc())
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            assert row is not None
+            return row.token
+
+    token = asyncio.run(get_reset_token())
+
+    res = client.post(
+        "/api/v1/auth/password-reset/confirm",
+        json={"token": token, "new_password": "newpass123"},
+    )
+    assert res.status_code == 200, res.text
+
+    # Now password login via username should work
+    res = client.post("/api/v1/auth/login", json={"identifier": username, "password": "newpass123"})
+    assert res.status_code == 200, res.text
+    assert res.json()["user"]["email"] == "pw@example.com"
+
+
+def test_upload_avatar_updates_avatar_url(monkeypatch: pytest.MonkeyPatch, tmp_path, test_app):
+    client: TestClient = test_app["client"]  # type: ignore
+    monkeypatch.setattr(settings, "media_root", str(tmp_path))
+
+    res = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "avatar@example.com",
+            "username": "avataruser",
+            "name": "Avatar User",
+            "password": "avatarpass",
+            "first_name": "Avatar",
+            "last_name": "User",
+            "date_of_birth": "2000-01-01",
+            "phone": "+40723204204",
+        },
+    )
+    assert res.status_code == 201, res.text
+    token = res.json()["tokens"]["access_token"]
+    user_id = res.json()["user"]["id"]
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGBA", (1, 1), color=(255, 0, 0, 255)).save(buf, format="PNG")
+    png_bytes = buf.getvalue()
+    res = client.post(
+        "/api/v1/auth/me/avatar",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("avatar.png", png_bytes, "image/png")},
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["avatar_url"] == f"/media/avatars/avatar-{user_id}.png"
+    assert (tmp_path / "avatars" / f"avatar-{user_id}.png").exists()
