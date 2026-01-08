@@ -35,8 +35,8 @@ export const profileCompletionGuard: CanActivateFn = (_route, state) => {
   if (!missing.length) return true;
 
   const url = state.url || '';
-  if (url.startsWith('/account')) return true;
+  if (url.startsWith('/register')) return true;
 
-  void router.navigate(['/account'], { queryParams: { complete: 1 }, fragment: 'profile' });
+  void router.navigate(['/register'], { queryParams: { complete: 1 } });
   return false;
 };

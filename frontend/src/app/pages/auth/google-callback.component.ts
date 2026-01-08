@@ -66,7 +66,7 @@ export class GoogleCallbackComponent implements OnInit {
         const missing = missingRequiredProfileFields(res.user);
         if (missing.length) {
           this.toast.info(this.translate.instant('auth.completeProfileRequiredTitle'), this.translate.instant('auth.completeProfileRequiredCopy'));
-          void this.router.navigate(['/account'], { queryParams: { complete: 1 }, fragment: 'profile' });
+          void this.router.navigate(['/register'], { queryParams: { complete: 1 } });
           return;
         }
         void this.router.navigateByUrl('/account');

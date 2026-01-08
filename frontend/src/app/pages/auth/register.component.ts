@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
@@ -9,9 +9,10 @@ import { PasswordStrengthComponent } from '../../shared/password-strength.compon
 import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { Subscription } from 'rxjs';
+import { Subscription, finalize, switchMap } from 'rxjs';
 import { type CountryCode } from 'libphonenumber-js';
-import { buildE164, listPhoneCountries, type PhoneCountryOption } from '../../shared/phone';
+import { buildE164, listPhoneCountries, splitE164, type PhoneCountryOption } from '../../shared/phone';
+import { missingRequiredProfileFields } from '../../shared/profile-requirements';
 
 @Component({
   selector: 'app-register',
@@ -29,7 +30,12 @@ import { buildE164, listPhoneCountries, type PhoneCountryOption } from '../../sh
   template: `
     <app-container classes="py-10 grid gap-6 max-w-xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'auth.registerTitle' | translate }}</h1>
+      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{
+        (completionMode ? 'account.completeProfile.title' : 'auth.registerTitle') | translate
+      }}</h1>
+      <p *ngIf="completionMode" class="text-sm text-slate-600 dark:text-slate-300">
+        {{ 'account.completeProfile.copy' | translate }}
+      </p>
       <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
         <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 dark:border-slate-800" [class.bg-slate-100]="step === 1" [class.dark:bg-slate-900]="step === 1">
           <span class="font-semibold">1</span> {{ 'auth.registerStepAccount' | translate }}
@@ -86,6 +92,8 @@ import { buildE164, listPhoneCountries, type PhoneCountryOption } from '../../sh
               class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
               required
               autocomplete="email"
+              [readOnly]="completionMode"
+              [attr.aria-readonly]="completionMode ? 'true' : null"
               [(ngModel)]="email"
             />
             <span *ngIf="emailCtrl.touched && emailCtrl.invalid" class="text-xs font-normal text-rose-700 dark:text-rose-300">
@@ -93,40 +101,42 @@ import { buildE164, listPhoneCountries, type PhoneCountryOption } from '../../sh
             </span>
           </label>
 
-          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            {{ 'auth.password' | translate }}
-            <input
-              #passwordCtrl="ngModel"
-              name="password"
-              type="password"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-              required
-              minlength="6"
-              autocomplete="new-password"
-              [(ngModel)]="password"
-            />
-            <span *ngIf="passwordCtrl.touched && passwordCtrl.invalid" class="text-xs font-normal text-rose-700 dark:text-rose-300">
-              {{ 'validation.passwordMin' | translate }}
-            </span>
-          </label>
+          <ng-container *ngIf="!completionMode">
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'auth.password' | translate }}
+              <input
+                #passwordCtrl="ngModel"
+                name="password"
+                type="password"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                required
+                minlength="6"
+                autocomplete="new-password"
+                [(ngModel)]="password"
+              />
+              <span *ngIf="passwordCtrl.touched && passwordCtrl.invalid" class="text-xs font-normal text-rose-700 dark:text-rose-300">
+                {{ 'validation.passwordMin' | translate }}
+              </span>
+            </label>
 
-          <app-password-strength [password]="password"></app-password-strength>
+            <app-password-strength [password]="password"></app-password-strength>
 
-          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            {{ 'auth.confirmPassword' | translate }}
-            <input
-              #confirmCtrl="ngModel"
-              name="confirm"
-              type="password"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-              required
-              autocomplete="new-password"
-              [(ngModel)]="confirmPassword"
-            />
-            <span *ngIf="confirmCtrl.touched && confirmCtrl.invalid" class="text-xs font-normal text-rose-700 dark:text-rose-300">
-              {{ 'validation.required' | translate }}
-            </span>
-          </label>
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'auth.confirmPassword' | translate }}
+              <input
+                #confirmCtrl="ngModel"
+                name="confirm"
+                type="password"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                required
+                autocomplete="new-password"
+                [(ngModel)]="confirmPassword"
+              />
+              <span *ngIf="confirmCtrl.touched && confirmCtrl.invalid" class="text-xs font-normal text-rose-700 dark:text-rose-300">
+                {{ 'validation.required' | translate }}
+              </span>
+            </label>
+          </ng-container>
 
           <p *ngIf="error" class="text-sm text-amber-700 dark:text-amber-300">{{ error }}</p>
 
@@ -137,12 +147,12 @@ import { buildE164, listPhoneCountries, type PhoneCountryOption } from '../../sh
             (action)="goNext(registerForm)"
           ></app-button>
 
-          <div class="border-t border-slate-200 pt-4 grid gap-2 dark:border-slate-800">
+          <div *ngIf="!completionMode" class="border-t border-slate-200 pt-4 grid gap-2 dark:border-slate-800">
             <p class="text-sm text-slate-600 dark:text-slate-300 text-center">{{ 'auth.orContinue' | translate }}</p>
             <app-button variant="ghost" [label]="'auth.googleContinue' | translate" (action)="startGoogle()"></app-button>
           </div>
 
-          <p class="text-sm text-slate-600 dark:text-slate-300">
+          <p *ngIf="!completionMode" class="text-sm text-slate-600 dark:text-slate-300">
             {{ 'auth.haveAccount' | translate }}
             <a routerLink="/login" class="text-indigo-600 dark:text-indigo-300 font-medium">{{ 'auth.login' | translate }}</a>
           </p>
@@ -237,18 +247,23 @@ import { buildE164, listPhoneCountries, type PhoneCountryOption } from '../../sh
 
           <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <app-button variant="ghost" [label]="'auth.back' | translate" type="button" (action)="step = 1"></app-button>
-            <app-button [label]="'auth.register' | translate" type="submit" [disabled]="loading"></app-button>
+            <app-button
+              [label]="(completionMode ? 'account.completeProfile.cta' : 'auth.register') | translate"
+              type="submit"
+              [disabled]="loading"
+            ></app-button>
           </div>
         </ng-container>
       </form>
     </app-container>
   `
 })
-export class RegisterComponent implements OnDestroy {
+export class RegisterComponent implements OnInit, OnDestroy {
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'auth.registerTitle' }
   ];
+  completionMode = false;
   step: 1 | 2 = 1;
   displayName = '';
   username = '';
@@ -270,12 +285,40 @@ export class RegisterComponent implements OnDestroy {
     private toast: ToastService,
     private auth: AuthService,
     private router: Router,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private route: ActivatedRoute
   ) {
     this.countries = listPhoneCountries(this.translate.currentLang || 'en');
     this.langSub = this.translate.onLangChange.subscribe((evt) => {
       this.countries = listPhoneCountries(evt.lang || 'en');
     });
+  }
+
+  ngOnInit(): void {
+    const user = this.auth.user();
+    const wantsCompletion = this.route.snapshot.queryParamMap.get('complete');
+    if (!wantsCompletion) return;
+    if (!this.auth.isAuthenticated() || !user?.google_sub) return;
+    if (!missingRequiredProfileFields(user).length) return;
+
+    this.completionMode = true;
+    this.crumbs = [
+      { label: 'nav.home', url: '/' },
+      { label: 'account.completeProfile.title' }
+    ];
+
+    this.displayName = (user.name ?? '').trim();
+    this.username = (user.username ?? '').trim();
+    this.email = user.email ?? '';
+    this.firstName = (user.first_name ?? '').trim();
+    this.middleName = (user.middle_name ?? '').trim();
+    this.lastName = (user.last_name ?? '').trim();
+    this.dateOfBirth = (user.date_of_birth ?? '').trim();
+    if (user.phone) {
+      const split = splitE164(user.phone);
+      if (split.country) this.phoneCountry = split.country;
+      if (split.nationalNumber) this.phoneNational = split.nationalNumber;
+    }
   }
 
   ngOnDestroy(): void {
@@ -307,7 +350,7 @@ export class RegisterComponent implements OnDestroy {
       this.error = this.translate.instant('validation.required');
       return;
     }
-    if (this.password !== this.confirmPassword) {
+    if (!this.completionMode && this.password !== this.confirmPassword) {
       this.error = this.translate.instant('validation.passwordMismatch');
       return;
     }
@@ -337,6 +380,41 @@ export class RegisterComponent implements OnDestroy {
       return;
     }
     this.loading = true;
+    const preferredLanguage = (this.translate.currentLang || '').startsWith('ro') ? 'ro' : 'en';
+
+    if (this.completionMode) {
+      const username = this.username.trim();
+      const payload = {
+        name: this.displayName.trim() || null,
+        phone: e164,
+        first_name: this.firstName.trim() || null,
+        middle_name: this.middleName.trim() ? this.middleName.trim() : null,
+        last_name: this.lastName.trim() || null,
+        date_of_birth: dob,
+        preferred_language: preferredLanguage
+      };
+
+      this.auth
+        .updateUsername(username)
+        .pipe(
+          switchMap(() => this.auth.updateProfile(payload)),
+          finalize(() => {
+            this.loading = false;
+          })
+        )
+        .subscribe({
+          next: () => {
+            this.toast.success(this.translate.instant('account.completeProfile.title'));
+            void this.router.navigateByUrl('/account');
+          },
+          error: (err) => {
+            const message = err?.error?.detail || this.translate.instant('auth.errorRegister');
+            this.toast.error(message);
+          }
+        });
+      return;
+    }
+
     this.auth
       .register({
         name: this.displayName.trim(),
@@ -348,20 +426,22 @@ export class RegisterComponent implements OnDestroy {
         last_name: this.lastName.trim(),
         date_of_birth: dob,
         phone: e164,
-        preferred_language: (this.translate.currentLang || '').startsWith('ro') ? 'ro' : 'en'
+        preferred_language: preferredLanguage
       })
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        })
+      )
       .subscribe({
-      next: (res) => {
-        this.toast.success(this.translate.instant('auth.successRegister'), `Welcome, ${res.user.email}`);
-        void this.router.navigateByUrl('/account');
-      },
-      error: (err) => {
-        const message = err?.error?.detail || this.translate.instant('auth.errorRegister');
-        this.toast.error(message);
-      },
-      complete: () => {
-        this.loading = false;
-      }
-    });
+        next: (res) => {
+          this.toast.success(this.translate.instant('auth.successRegister'), `Welcome, ${res.user.email}`);
+          void this.router.navigateByUrl('/account');
+        },
+        error: (err) => {
+          const message = err?.error?.detail || this.translate.instant('auth.errorRegister');
+          this.toast.error(message);
+        }
+      });
   }
 }

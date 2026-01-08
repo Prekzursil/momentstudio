@@ -50,7 +50,8 @@
   "account": {
     "completeProfile": {
       "title": "Complete your profile",
-      "copy": "To continue, please fill in the required details below."
+      "copy": "To continue, please fill in the required details below.",
+      "cta": "Save and continue"
     },
     "notifications": {
       "title": "Notifications",
