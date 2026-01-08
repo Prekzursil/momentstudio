@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 
 import { ApiService } from './api.service';
+import { captureException } from './sentry';
 
 export interface FxRatesResponse {
   base: string;
@@ -30,6 +31,7 @@ export class FxRatesService {
   private asOf?: string;
   private fetchedAt?: string;
   private source?: string;
+  private lastErrorAt = 0;
 
   constructor(private api: ApiService) {}
 
@@ -47,6 +49,7 @@ export class FxRatesService {
 
   ensureLoaded(): void {
     if (this.loaded || this.loading) return;
+    if (this.lastErrorAt && Date.now() - this.lastErrorAt < 60_000) return;
     this.loading = true;
     this.api.get<FxRatesResponse>('/fx/rates').subscribe({
       next: (resp) => {
@@ -58,10 +61,11 @@ export class FxRatesService {
         this.loaded = this.eurPerRon > 0 && this.usdPerRon > 0;
         this.loading = false;
       },
-      error: () => {
+      error: (err) => {
+        this.lastErrorAt = Date.now();
+        captureException(err);
         this.loading = false;
       }
     });
   }
 }
-

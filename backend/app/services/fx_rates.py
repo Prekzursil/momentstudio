@@ -57,8 +57,10 @@ def _parse_bnr_rates(xml_text: str) -> FxRates:
 
     ron_per_eur = rates.get("EUR")
     ron_per_usd = rates.get("USD")
-    if not ron_per_eur or not ron_per_usd:
+    if ron_per_eur is None or ron_per_usd is None:
         raise ValueError("Missing EUR/USD rates")
+    if ron_per_eur <= 0.0 or ron_per_usd <= 0.0:
+        raise ValueError("Non-positive EUR/USD rates")
 
     eur_per_ron = 1.0 / ron_per_eur
     usd_per_ron = 1.0 / ron_per_usd

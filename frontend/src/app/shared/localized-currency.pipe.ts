@@ -10,11 +10,31 @@ import { FxRatesService } from '../core/fx-rates.service';
 export class LocalizedCurrencyPipe implements PipeTransform {
   private readonly translate = inject(TranslateService, { optional: true });
   private readonly fxRates = inject(FxRatesService);
+  private readonly formatters = new Map<string, Intl.NumberFormat>();
+
+  private getFormatter(
+    locale: string,
+    currency: string,
+    minFractionDigits?: number,
+    maxFractionDigits?: number
+  ): Intl.NumberFormat {
+    const key = `${locale}|${currency}|${minFractionDigits ?? ''}|${maxFractionDigits ?? ''}`;
+    const existing = this.formatters.get(key);
+    if (existing) return existing;
+    const formatter = new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+      ...(minFractionDigits !== undefined ? { minimumFractionDigits: minFractionDigits } : {}),
+      ...(maxFractionDigits !== undefined ? { maximumFractionDigits: maxFractionDigits } : {})
+    });
+    this.formatters.set(key, formatter);
+    return formatter;
+  }
 
   transform(value: number, currency: string, locale?: string): string {
     const fromLang = this.translate?.currentLang === 'ro' ? 'ro-RO' : this.translate?.currentLang === 'en' ? 'en-US' : undefined;
     const loc = locale || fromLang || (typeof navigator !== 'undefined' ? navigator.language : 'en-US');
-    const base = new Intl.NumberFormat(loc, { style: 'currency', currency }).format(value);
+    const base = this.getFormatter(loc, currency).format(value);
 
     const shouldApproximate =
       (this.translate?.currentLang ?? '').toLowerCase() === 'en' &&
@@ -33,19 +53,9 @@ export class LocalizedCurrencyPipe implements PipeTransform {
     const eurValue = value * rates.eurPerRon;
     const usdValue = value * rates.usdPerRon;
 
-    const eur = new Intl.NumberFormat(loc, {
-      style: 'currency',
-      currency: 'EUR',
-      maximumFractionDigits: 2,
-      minimumFractionDigits: 2
-    }).format(eurValue);
+    const eur = this.getFormatter(loc, 'EUR', 2, 2).format(eurValue);
 
-    const usd = new Intl.NumberFormat(loc, {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 2,
-      minimumFractionDigits: 2
-    }).format(usdValue);
+    const usd = this.getFormatter(loc, 'USD', 2, 2).format(usdValue);
 
     return `${base} (≈${eur}, ≈${usd})`;
   }

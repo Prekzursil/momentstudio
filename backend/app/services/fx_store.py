@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.models.fx import FxRate
 from app.schemas.fx import FxAdminStatus, FxOverrideUpsert, FxRatesRead
 from app.services import fx_rates
+
+logger = logging.getLogger(__name__)
 
 
 def _row_to_read(row: FxRate) -> FxRatesRead:
@@ -81,21 +84,27 @@ async def get_effective_rates(session: AsyncSession) -> FxRatesRead:
 
     try:
         live = await fx_rates.get_fx_rates()
-        read = FxRatesRead(
-            base=live.base,
-            eur_per_ron=live.eur_per_ron,
-            usd_per_ron=live.usd_per_ron,
-            as_of=live.as_of,
-            source=live.source,
-            fetched_at=live.fetched_at,
-        )
-        await _upsert_row(session, is_override=False, data=read)
-        return read
-    except Exception:
+    except Exception as exc:
+        logger.warning("fx_rates_fetch_failed", extra={"error": str(exc)})
         last_known = await _get_row(session, is_override=False)
         if last_known:
             return _row_to_read(last_known)
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="FX rates unavailable")
+
+    read = FxRatesRead(
+        base=live.base,
+        eur_per_ron=live.eur_per_ron,
+        usd_per_ron=live.usd_per_ron,
+        as_of=live.as_of,
+        source=live.source,
+        fetched_at=live.fetched_at,
+    )
+    try:
+        await _upsert_row(session, is_override=False, data=read)
+    except SQLAlchemyError as exc:
+        logger.warning("fx_rates_persist_failed", extra={"error": str(exc)})
+        await session.rollback()
+    return read
 
 
 async def set_override(session: AsyncSession, payload: FxOverrideUpsert) -> FxRatesRead:
@@ -130,4 +139,3 @@ async def get_admin_status(session: AsyncSession) -> FxAdminStatus:
         override=_row_to_read(override) if override else None,
         last_known=_row_to_read(last_known) if last_known else None,
     )
-
