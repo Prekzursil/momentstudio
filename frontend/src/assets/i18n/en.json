@@ -48,6 +48,10 @@
     "emailLabel": "Email"
   },
   "account": {
+    "completeProfile": {
+      "title": "Complete your profile",
+      "copy": "To continue, please fill in the required details below."
+    },
     "notifications": {
       "title": "Notifications",
       "save": "Save",
@@ -324,6 +328,8 @@
     "googleFinishing": "Finishing Google sign-in...",
     "googleSigningIn": "Signing you in with Google...",
     "googleLoginSuccess": "Signed in with Google",
+    "completeProfileRequiredTitle": "Complete your profile",
+    "completeProfileRequiredCopy": "Please provide a few required details in your account before continuing.",
     "googleLinking": "Linking your Google account...",
     "googleLinkSuccess": "Google account linked",
     "googleMissingCode": "Missing Google authorization code.",

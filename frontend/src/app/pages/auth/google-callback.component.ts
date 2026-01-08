@@ -4,6 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { missingRequiredProfileFields } from '../../shared/profile-requirements';
 
 @Component({
   selector: 'app-google-callback',
@@ -62,6 +63,12 @@ export class GoogleCallbackComponent implements OnInit {
       next: (res) => {
         localStorage.removeItem('google_flow');
         this.toast.success(this.translate.instant('auth.googleLoginSuccess'), res.user.email);
+        const missing = missingRequiredProfileFields(res.user);
+        if (missing.length) {
+          this.toast.info(this.translate.instant('auth.completeProfileRequiredTitle'), this.translate.instant('auth.completeProfileRequiredCopy'));
+          void this.router.navigate(['/account'], { queryParams: { complete: 1 }, fragment: 'profile' });
+          return;
+        }
         void this.router.navigateByUrl('/account');
       },
       error: (err) => {

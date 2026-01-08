@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, AfterViewInit, OnDestroy, signal, ViewChild, ElementRef, effect, EffectRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
@@ -25,6 +25,7 @@ import { CartStore } from '../../core/cart.store';
 import { formatIdentity } from '../../shared/user-identity';
 import { type CountryCode } from 'libphonenumber-js';
 import { buildE164, listPhoneCountries, splitE164, type PhoneCountryOption } from '../../shared/phone';
+import { missingRequiredProfileFields as computeMissingRequiredProfileFields, type RequiredProfileField } from '../../shared/profile-requirements';
 
 @Component({
   selector: 'app-account',
@@ -144,6 +145,16 @@ import { buildE164, listPhoneCountries, splitE164, type PhoneCountryOption } fro
             </div>
             <app-button size="sm" variant="ghost" label="Save" [disabled]="savingProfile" (action)="saveProfile()"></app-button>
           </div>
+          <div
+            *ngIf="profileCompletionRequired()"
+            class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 text-sm grid gap-2 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+          >
+            <p class="font-semibold">{{ 'account.completeProfile.title' | translate }}</p>
+            <p class="text-xs text-amber-900/90 dark:text-amber-100/90">{{ 'account.completeProfile.copy' | translate }}</p>
+            <ul class="grid gap-1 text-xs text-amber-900/90 dark:text-amber-100/90">
+              <li *ngFor="let field of missingProfileFields()">• {{ requiredFieldLabelKey(field) | translate }}</li>
+            </ul>
+          </div>
           <div class="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
             <div class="h-2 rounded-full bg-indigo-600" [style.width.%]="profileCompleteness().percent"></div>
           </div>
@@ -169,6 +180,7 @@ import { buildE164, listPhoneCountries, splitE164, type PhoneCountryOption } fro
                 class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
                 name="profileName"
                 autocomplete="name"
+                [required]="profileCompletionRequired()"
                 [(ngModel)]="profileName"
               />
               <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
@@ -184,6 +196,7 @@ import { buildE164, listPhoneCountries, splitE164, type PhoneCountryOption } fro
                 minlength="3"
                 maxlength="30"
                 pattern="^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$"
+                [required]="profileCompletionRequired()"
                 [(ngModel)]="profileUsername"
               />
               <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
@@ -197,6 +210,7 @@ import { buildE164, listPhoneCountries, splitE164, type PhoneCountryOption } fro
                 class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
                 name="profileFirstName"
                 autocomplete="given-name"
+                [required]="profileCompletionRequired()"
                 [(ngModel)]="profileFirstName"
               />
             </label>
@@ -215,6 +229,7 @@ import { buildE164, listPhoneCountries, splitE164, type PhoneCountryOption } fro
                 class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
                 name="profileLastName"
                 autocomplete="family-name"
+                [required]="profileCompletionRequired()"
                 [(ngModel)]="profileLastName"
               />
             </label>
@@ -224,6 +239,7 @@ import { buildE164, listPhoneCountries, splitE164, type PhoneCountryOption } fro
                 class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
                 name="profileDateOfBirth"
                 type="date"
+                [required]="profileCompletionRequired()"
                 [(ngModel)]="profileDateOfBirth"
               />
             </label>
@@ -245,6 +261,7 @@ import { buildE164, listPhoneCountries, splitE164, type PhoneCountryOption } fro
                   autocomplete="tel-national"
                   pattern="^[0-9]{6,14}$"
                   placeholder="723204204"
+                  [required]="profileCompletionRequired()"
                   [(ngModel)]="profilePhoneNational"
                 />
               </div>
@@ -911,6 +928,8 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   reorderingOrderId: string | null = null;
   downloadingReceiptId: string | null = null;
 
+  private forceProfileCompletion = false;
+
   googlePassword = '';
   googleBusy = false;
   googleError: string | null = null;
@@ -943,6 +962,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     private blog: BlogService,
     private cart: CartStore,
     private router: Router,
+    private route: ActivatedRoute,
     private api: ApiService,
     public wishlist: WishlistService,
     private theme: ThemeService,
@@ -961,6 +981,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.forceProfileCompletion = this.route.snapshot.queryParamMap.get('complete') === '1';
     this.wishlist.refresh();
     this.loadData();
     this.loadAliases();
@@ -1291,6 +1312,35 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     };
   }
 
+  missingProfileFields(): RequiredProfileField[] {
+    return computeMissingRequiredProfileFields(this.profile());
+  }
+
+  profileCompletionRequired(): boolean {
+    const user = this.profile();
+    if (!user) return false;
+    const missing = computeMissingRequiredProfileFields(user);
+    if (!missing.length) return false;
+    return this.forceProfileCompletion || Boolean(user.google_sub);
+  }
+
+  requiredFieldLabelKey(field: RequiredProfileField): string {
+    switch (field) {
+      case 'name':
+        return 'auth.displayName';
+      case 'username':
+        return 'auth.username';
+      case 'first_name':
+        return 'auth.firstName';
+      case 'last_name':
+        return 'auth.lastName';
+      case 'date_of_birth':
+        return 'auth.dateOfBirth';
+      case 'phone':
+        return 'auth.phone';
+    }
+  }
+
   saveProfile(): void {
     if (!this.auth.isAuthenticated()) return;
     this.savingProfile = true;
@@ -1305,6 +1355,46 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     const dob = this.profileDateOfBirth.trim();
     const phoneNational = this.profilePhoneNational.trim();
     const phone = phoneNational ? buildE164(this.profilePhoneCountry, phoneNational) : null;
+
+    const usernameOk = /^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$/.test(username);
+    if (this.profileCompletionRequired()) {
+      if (!name) {
+        this.profileError = 'Display name is required.';
+        this.toast.error(this.profileError);
+        this.savingProfile = false;
+        return;
+      }
+      if (!username || !usernameOk) {
+        this.profileError = 'Enter a valid username.';
+        this.toast.error(this.profileError);
+        this.savingProfile = false;
+        return;
+      }
+      if (!firstName) {
+        this.profileError = 'First name is required.';
+        this.toast.error(this.profileError);
+        this.savingProfile = false;
+        return;
+      }
+      if (!lastName) {
+        this.profileError = 'Last name is required.';
+        this.toast.error(this.profileError);
+        this.savingProfile = false;
+        return;
+      }
+      if (!dob) {
+        this.profileError = 'Date of birth is required.';
+        this.toast.error(this.profileError);
+        this.savingProfile = false;
+        return;
+      }
+      if (!phoneNational || !phone) {
+        this.profileError = 'Enter a valid phone number.';
+        this.toast.error(this.profileError);
+        this.savingProfile = false;
+        return;
+      }
+    }
 
     if (phoneNational && !phone) {
       this.profileError = 'Enter a valid phone number.';
@@ -1371,6 +1461,17 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
           this.profileSaved = true;
           this.toast.success('Profile saved');
           this.loadAliases();
+
+          if (this.forceProfileCompletion && computeMissingRequiredProfileFields(user).length === 0) {
+            this.forceProfileCompletion = false;
+            void this.router.navigate([], {
+              relativeTo: this.route,
+              queryParams: { complete: null },
+              queryParamsHandling: 'merge',
+              replaceUrl: true,
+              fragment: 'profile'
+            });
+          }
         },
         error: (err) => {
           const message = err?.error?.detail || 'Could not save profile.';

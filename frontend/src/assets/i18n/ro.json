@@ -48,6 +48,10 @@
     "emailLabel": "Email"
   },
   "account": {
+    "completeProfile": {
+      "title": "Completează profilul",
+      "copy": "Pentru a continua, completează detaliile obligatorii de mai jos."
+    },
     "notifications": {
       "title": "Notificări",
       "save": "Salvează",
@@ -324,6 +328,8 @@
     "googleFinishing": "Finalizăm autentificarea cu Google...",
     "googleSigningIn": "Te conectăm cu Google...",
     "googleLoginSuccess": "Conectat cu Google",
+    "completeProfileRequiredTitle": "Completează profilul",
+    "completeProfileRequiredCopy": "Te rugăm să completezi câteva detalii obligatorii în cont înainte de a continua.",
     "googleLinking": "Asociem contul Google...",
     "googleLinkSuccess": "Contul Google a fost asociat",
     "googleMissingCode": "Lipsește codul de autorizare Google.",
