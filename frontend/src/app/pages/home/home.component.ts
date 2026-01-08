@@ -324,26 +324,36 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private parseSections(meta: ContentBlockRead['meta']): HomeSectionConfig[] {
     const configured: HomeSectionConfig[] = [];
+    const seen = new Set<HomeSectionId>();
+
+    const addSection = (rawId: unknown, enabled: boolean) => {
+      const id = this.normalizeHomeSectionId(rawId);
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      configured.push({ id, enabled });
+    };
+
     const rawSections = meta?.['sections'];
     if (Array.isArray(rawSections)) {
       for (const raw of rawSections) {
         if (!raw || typeof raw !== 'object') continue;
         const id = (raw as { id?: unknown }).id;
-        if (!this.isHomeSectionId(id)) continue;
         const enabled = (raw as { enabled?: unknown }).enabled;
-        configured.push({ id, enabled: enabled === false ? false : true });
+        addSection(id, enabled === false ? false : true);
+      }
+      if (configured.length) {
+        return configured;
       }
     }
-
-    if (configured.length) return configured;
 
     const legacyOrder = meta?.['order'];
     if (Array.isArray(legacyOrder) && legacyOrder.length) {
       for (const raw of legacyOrder) {
-        if (!this.isHomeSectionId(raw)) continue;
-        configured.push({ id: raw, enabled: true });
+        addSection(raw, true);
       }
-      if (configured.length) return configured;
+      if (configured.length) {
+        return configured;
+      }
     }
 
     return DEFAULT_SECTIONS;
@@ -359,6 +369,24 @@ export class HomeComponent implements OnInit, OnDestroy {
       value === 'recently_viewed' ||
       value === 'why'
     );
+  }
+
+  private normalizeHomeSectionId(value: unknown): HomeSectionId | null {
+    if (this.isHomeSectionId(value)) return value;
+    if (typeof value !== 'string') return null;
+    const raw = value.trim();
+    if (!raw) return null;
+    const key = raw
+      .replace(/([a-z])([A-Z])/g, '$1_$2')
+      .toLowerCase()
+      .replace(/[\s-]+/g, '_');
+    if (key === 'collections') return 'featured_collections';
+    if (key === 'featured') return 'featured_products';
+    if (key === 'bestsellers') return 'featured_products';
+    if (key === 'new') return 'new_arrivals';
+    if (key === 'recent') return 'recently_viewed';
+    if (key === 'recentlyviewed') return 'recently_viewed';
+    return null;
   }
 
   private loadSectionData(): void {
@@ -488,7 +516,13 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   heroImage(): string {
-    const meta = (this.heroBlock()?.meta ?? {}) as Record<string, unknown>;
+    const block = this.heroBlock();
+    if (!block) return '';
+    const fromImages = block.images?.[0]?.url;
+    if (typeof fromImages === 'string' && fromImages.trim()) {
+      return fromImages.trim();
+    }
+    const meta = (block.meta ?? {}) as Record<string, unknown>;
     const img = meta['image'];
     return typeof img === 'string' ? img.trim() : '';
   }

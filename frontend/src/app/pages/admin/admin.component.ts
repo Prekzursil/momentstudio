@@ -2870,25 +2870,34 @@ export class AdminComponent implements OnInit {
             if (!raw || typeof raw !== 'object') continue;
             const id = (raw as { id?: unknown }).id;
             if (typeof id !== 'string' || !id.trim()) continue;
-            order.push(id);
+            const normalized = this.normalizeHomeSectionId(id);
+            if (!normalized || order.includes(normalized)) continue;
+            order.push(normalized);
             const isEnabled = (raw as { enabled?: unknown }).enabled;
-            enabled[id] = isEnabled === false ? false : true;
+            enabled[normalized] = isEnabled === false ? false : true;
           }
           if (order.length) {
-            this.sectionOrder = order;
-            this.sectionEnabled = enabled;
+            this.sectionOrder = this.ensureAllDefaultHomeSections(order);
+            this.sectionEnabled = this.ensureAllDefaultHomeSectionsEnabled(this.sectionOrder, enabled);
             return;
           }
         }
 
         const legacyOrder = block.meta?.['order'];
         if (Array.isArray(legacyOrder) && legacyOrder.length) {
-          this.sectionOrder = legacyOrder;
+          const normalized: string[] = [];
           const enabled: Record<string, boolean> = {};
           for (const id of legacyOrder) {
-            if (typeof id === 'string' && id.trim()) enabled[id] = true;
+            const mapped = this.normalizeHomeSectionId(id);
+            if (!mapped || normalized.includes(mapped)) continue;
+            normalized.push(mapped);
+            enabled[mapped] = true;
           }
-          this.sectionEnabled = enabled;
+          if (normalized.length) {
+            this.sectionOrder = this.ensureAllDefaultHomeSections(normalized);
+            this.sectionEnabled = this.ensureAllDefaultHomeSectionsEnabled(this.sectionOrder, enabled);
+            return;
+          }
           return;
         }
 
@@ -2900,8 +2909,46 @@ export class AdminComponent implements OnInit {
     });
   }
 
+  private normalizeHomeSectionId(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const raw = value.trim();
+    if (!raw) return null;
+    const key = raw
+      .replace(/([a-z])([A-Z])/g, '$1_$2')
+      .toLowerCase()
+      .replace(/[\s-]+/g, '_');
+    if (this.defaultHomeSectionIds().includes(key)) return key;
+    if (key === 'collections') return 'featured_collections';
+    if (key === 'featured') return 'featured_products';
+    if (key === 'bestsellers') return 'featured_products';
+    if (key === 'new') return 'new_arrivals';
+    if (key === 'recent') return 'recently_viewed';
+    if (key === 'recentlyviewed') return 'recently_viewed';
+    return null;
+  }
+
+  private defaultHomeSectionIds(): string[] {
+    return ['hero', 'featured_products', 'new_arrivals', 'featured_collections', 'story', 'recently_viewed', 'why'];
+  }
+
+  private ensureAllDefaultHomeSections(order: string[]): string[] {
+    const out = [...order];
+    for (const id of this.defaultHomeSectionIds()) {
+      if (!out.includes(id)) out.push(id);
+    }
+    return out;
+  }
+
+  private ensureAllDefaultHomeSectionsEnabled(order: string[], enabled: Record<string, boolean>): Record<string, boolean> {
+    const out: Record<string, boolean> = { ...enabled };
+    for (const id of order) {
+      if (!(id in out)) out[id] = true;
+    }
+    return out;
+  }
+
   private applyDefaultHomeSections(): void {
-    const defaults = ['hero', 'featured_products', 'new_arrivals', 'featured_collections', 'story', 'recently_viewed', 'why'];
+    const defaults = this.defaultHomeSectionIds();
     this.sectionOrder = defaults;
     const enabled: Record<string, boolean> = {};
     for (const id of defaults) enabled[id] = true;
