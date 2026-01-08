@@ -31,11 +31,11 @@ const DEFAULT_SOCIAL: SiteSocialData = {
   contact: { phone: '+40723204204', email: 'momentstudio.ro@gmail.com' },
   instagramPages: [
     { label: 'Moments in Clay - Studio', url: 'https://www.instagram.com/moments_in_clay_studio?igsh=ZmdnZTdudnNieDQx' },
-    { label: 'momentstudio', url: 'https://www.instagram.com/adrianaartizanat?igsh=ZmZmaDU1MGcxZHEy' }
+    { label: 'adrianaartizanat', url: 'https://www.instagram.com/adrianaartizanat?igsh=ZmZmaDU1MGcxZHEy' }
   ],
   facebookPages: [
     { label: 'Moments in Clay - Studio', url: 'https://www.facebook.com/share/17YqBmfX5x/' },
-    { label: 'momentstudio', url: 'https://www.facebook.com/share/1APqKJM6Zi/' }
+    { label: 'adrianaartizanat', url: 'https://www.facebook.com/share/1APqKJM6Zi/' }
   ]
 };
 

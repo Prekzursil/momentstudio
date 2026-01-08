@@ -177,7 +177,7 @@ def upgrade() -> None:
                     "thumbnail_url": None,
                 },
                 {
-                    "label": "momentstudio",
+                    "label": "adrianaartizanat",
                     "url": "https://www.instagram.com/adrianaartizanat?igsh=ZmZmaDU1MGcxZHEy",
                     "thumbnail_url": None,
                 },
@@ -189,7 +189,7 @@ def upgrade() -> None:
                     "thumbnail_url": None,
                 },
                 {
-                    "label": "momentstudio",
+                    "label": "adrianaartizanat",
                     "url": "https://www.facebook.com/share/1APqKJM6Zi/",
                     "thumbnail_url": None,
                 },
@@ -209,4 +209,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Intentionally no-op: removing seeded CMS content can delete user edits.
     return
-

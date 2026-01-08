@@ -19,6 +19,10 @@ fi
 source "${VENV_DIR}/bin/activate"
 pip install -r "${BACKEND_DIR}/requirements.txt"
 
+# Migrations
+echo "Applying backend migrations"
+(cd "${BACKEND_DIR}" && alembic upgrade head)
+
 # Node deps
 if [ ! -d "${FRONTEND_DIR}/node_modules" ]; then
   (cd "${FRONTEND_DIR}" && npm ci)

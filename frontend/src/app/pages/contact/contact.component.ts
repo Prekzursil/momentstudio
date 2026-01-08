@@ -29,15 +29,15 @@ interface ContentBlock {
       <app-card>
         <div class="grid gap-5 text-slate-700 dark:text-slate-200">
           <div *ngIf="loading()" class="text-sm text-slate-600 dark:text-slate-300">
-            {{ 'about.loading' | translate }}
+            {{ 'contact.loading' | translate }}
           </div>
 
           <div *ngIf="!loading() && hasError()" class="grid gap-2">
-            <p class="font-semibold text-amber-900 dark:text-amber-100">{{ 'about.errorTitle' | translate }}</p>
-            <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'about.errorCopy' | translate }}</p>
+            <p class="font-semibold text-amber-900 dark:text-amber-100">{{ 'contact.errorTitle' | translate }}</p>
+            <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'contact.errorCopy' | translate }}</p>
           </div>
 
-          <div *ngIf="!loading() && !hasError()" class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
+          <div *ngIf="!loading()" class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
 
           <div class="grid gap-3 sm:grid-cols-2">
             <a

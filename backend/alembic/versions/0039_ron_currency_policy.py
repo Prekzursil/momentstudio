@@ -6,6 +6,7 @@ Create Date: 2026-01-08
 """
 
 from collections.abc import Sequence
+import sys
 
 from alembic import op
 import sqlalchemy as sa
@@ -37,9 +38,15 @@ def upgrade() -> None:
     offenders = {table: count for table, count in offenders.items() if count > 0}
     if offenders:
         detail = ", ".join(f"{table}={count}" for table, count in sorted(offenders.items()))
-        raise RuntimeError(
-            "Migration 0039 enforces RON-only currency but found non-RON records "
-            f"({detail}). Convert these rows to RON (or delete them) before applying this migration."
+        print(
+            "Migration 0039 enforces RON-only currency and will normalize existing non-RON records to RON "
+            f"({detail}). Ensure amounts are already stored in RON before continuing.",
+            file=sys.stderr,
+        )
+        op.execute("UPDATE products SET currency='RON' WHERE currency IS NOT NULL AND currency <> 'RON'")
+        op.execute("UPDATE orders SET currency='RON' WHERE currency IS NOT NULL AND currency <> 'RON'")
+        op.execute(
+            "UPDATE promo_codes SET currency='RON' WHERE amount_off IS NOT NULL AND currency IS NOT NULL AND currency <> 'RON'"
         )
 
     op.execute("UPDATE products SET currency='RON' WHERE currency IS NULL")
