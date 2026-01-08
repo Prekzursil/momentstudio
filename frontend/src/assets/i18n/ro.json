@@ -333,6 +333,38 @@
       "edit": "Editează",
       "refresh": "Reîncarcă"
     },
+    "fx": {
+      "title": "Curs valutar (FX)",
+      "hint": "Folosit pentru afișarea aproximativă EUR/USD; toate prețurile și plățile rămân în RON.",
+      "loading": "Se încarcă cursul valutar…",
+      "effective": "Efectiv",
+      "override": "Suprascriere",
+      "lastKnown": "Ultimul cunoscut",
+      "noOverride": "Nu există suprascriere setată.",
+      "noLastKnown": "Nu există încă un curs salvat (ultimul cunoscut).",
+      "eurPerRon": "EUR per RON",
+      "usdPerRon": "USD per RON",
+      "asOf": "Valabil la",
+      "asOfHint": "Lăsați gol pentru a folosi data de azi pe server.",
+      "fetchedAt": "Preluat la",
+      "source": "Sursă",
+      "confirmClear": "Ștergi suprascrierea cursului valutar?",
+      "actions": {
+        "set": "Setează suprascrierea",
+        "reset": "Resetează formularul",
+        "clear": "Șterge"
+      },
+      "success": {
+        "overrideSet": "Suprascrierea a fost salvată.",
+        "overrideCleared": "Suprascrierea a fost ștearsă."
+      },
+      "errors": {
+        "load": "Nu s-a putut încărca cursul valutar.",
+        "invalid": "Introduceți valori pozitive pentru EUR/USD per RON.",
+        "overrideSet": "Nu s-a putut salva suprascrierea.",
+        "overrideCleared": "Nu s-a putut șterge suprascrierea."
+      }
+    },
     "status": {
       "draft": "Ciornă",
       "published": "Publicat",
