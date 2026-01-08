@@ -1,7 +1,7 @@
 """home page builder blocks
 
-Revision ID: 0038
-Revises: 0037
+Revision ID: 0040
+Revises: 0039
 Create Date: 2026-01-07
 """
 
@@ -17,8 +17,8 @@ from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
-revision: str = "0038"
-down_revision: str | None = "0037"
+revision: str = "0040"
+down_revision: str | None = "0039"
 branch_labels: str | Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
 
@@ -180,4 +180,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Intentionally no-op: removing seeded CMS content can delete user edits.
     return
-
