@@ -273,6 +273,8 @@
   "auth": {
     "loginTitle": "Login",
     "registerTitle": "Create account",
+    "registerStepAccount": "Account",
+    "registerStepPersonal": "Personal",
     "resetRequestTitle": "Reset password",
     "resetRequestCopy": "Enter your email and we'll send a reset link.",
     "resetTitle": "Set new password",
@@ -287,12 +289,23 @@
     "strengthModerate": "Moderate",
     "strengthStrong": "Strong",
     "name": "Name",
+    "displayName": "Display name",
+    "displayNameHintEmpty": "Your public label preview will appear here (e.g. Ana#0 (ana2005l)).",
+    "displayNameHintPartial": "Enter both display name and username to preview your public label.",
+    "displayNameHint": "Public label preview: {{name}}#0 ({{username}})",
+    "firstName": "First name",
+    "middleName": "Middle name (optional)",
+    "lastName": "Last name",
+    "dateOfBirth": "Date of birth",
+    "phone": "Phone",
     "confirmPassword": "Confirm password",
     "forgot": "Forgot password?",
     "createAccount": "Create account",
     "login": "Login",
     "logout": "Logout",
     "register": "Register",
+    "next": "Next",
+    "back": "Back",
     "resetLink": "Send reset link",
     "resetLinkSent": "Reset link sent",
     "setPassword": "Set password",
@@ -328,8 +341,10 @@
   "validation": {
     "required": "This field is required.",
     "invalidEmail": "Enter a valid email address.",
+    "usernameInvalid": "Username must be 3–30 characters and may include letters, numbers, '.', '_', '-'.",
     "passwordMin": "Password must be at least 6 characters.",
-    "passwordMismatch": "Passwords do not match."
+    "passwordMismatch": "Passwords do not match.",
+    "phoneInvalid": "Enter a valid phone number."
   },
   "adminUi": {
     "nav": {

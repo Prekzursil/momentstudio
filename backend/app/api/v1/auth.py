@@ -1,13 +1,14 @@
 from pathlib import Path
 import logging
-from datetime import datetime, timedelta, timezone
+import re
+from datetime import datetime, timedelta, timezone, date
 from urllib.parse import urlencode
 
 from jose import jwt
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Response, UploadFile, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
@@ -114,7 +115,40 @@ class NotificationPreferencesUpdate(BaseModel):
 class ProfileUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=255)
     phone: str | None = Field(default=None, max_length=32)
+    first_name: str | None = Field(default=None, max_length=100)
+    middle_name: str | None = Field(default=None, max_length=100)
+    last_name: str | None = Field(default=None, max_length=100)
+    date_of_birth: date | None = None
     preferred_language: str | None = Field(default=None, pattern="^(en|ro)$")
+
+    @field_validator("phone")
+    @classmethod
+    def _normalize_phone(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if not value:
+            return None
+        if not re.fullmatch(r"^\+[1-9]\d{6,14}$", value):
+            raise ValueError("Phone must be in E.164 format (e.g. +40723204204)")
+        return value
+
+    @field_validator("first_name", "middle_name", "last_name")
+    @classmethod
+    def _normalize_name_parts(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def _validate_dob(cls, value: date | None) -> date | None:
+        if value is None:
+            return None
+        if value > date.today():
+            raise ValueError("Date of birth cannot be in the future")
+        return value
 
 
 class AccountDeletionRequest(BaseModel):
@@ -124,9 +158,47 @@ class AccountDeletionRequest(BaseModel):
 class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=30, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$")
     email: EmailStr
-    name: str = Field(min_length=1, max_length=255)
+    name: str = Field(min_length=1, max_length=255, description="Display name shown publicly")
+    first_name: str = Field(min_length=1, max_length=100)
+    middle_name: str | None = Field(default=None, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
+    date_of_birth: date
+    phone: str = Field(min_length=7, max_length=32, description="E.164 format")
     password: str = Field(min_length=6, max_length=128)
     preferred_language: str | None = Field(default=None, pattern="^(en|ro)$")
+
+    @field_validator("name", "first_name", "last_name", "username", mode="before")
+    @classmethod
+    def _strip_required_strings(cls, value: str) -> str:
+        value = (value or "").strip()
+        if not value:
+            raise ValueError("Field cannot be empty")
+        return value
+
+    @field_validator("middle_name", mode="before")
+    @classmethod
+    def _strip_optional_string(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    @field_validator("phone", mode="before")
+    @classmethod
+    def _strip_phone(cls, value: str) -> str:
+        value = (value or "").strip()
+        if not value:
+            raise ValueError("Phone is required")
+        if not re.fullmatch(r"^\+[1-9]\d{6,14}$", value):
+            raise ValueError("Phone must be in E.164 format (e.g. +40723204204)")
+        return value
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def _validate_date_of_birth(cls, value: date) -> date:
+        if value > date.today():
+            raise ValueError("Date of birth cannot be in the future")
+        return value
 
 
 class LoginRequest(BaseModel):
@@ -168,6 +240,11 @@ async def register(
             email=payload.email,
             password=payload.password,
             name=payload.name,
+            first_name=payload.first_name,
+            middle_name=payload.middle_name,
+            last_name=payload.last_name,
+            date_of_birth=payload.date_of_birth,
+            phone=payload.phone,
             preferred_language=payload.preferred_language,
         ),
     )
@@ -434,8 +511,15 @@ async def update_me(
     if "name" in data:
         await auth_service.update_display_name(session, current_user, payload.name or "")
     if "phone" in data:
-        cleaned = (payload.phone or "").strip()
-        current_user.phone = cleaned or None
+        current_user.phone = payload.phone
+    if "first_name" in data:
+        current_user.first_name = payload.first_name
+    if "middle_name" in data:
+        current_user.middle_name = payload.middle_name
+    if "last_name" in data:
+        current_user.last_name = payload.last_name
+    if "date_of_birth" in data:
+        current_user.date_of_birth = payload.date_of_birth
     if "preferred_language" in data and payload.preferred_language is not None:
         current_user.preferred_language = payload.preferred_language
     session.add(current_user)
@@ -558,6 +642,8 @@ async def google_callback(
         session,
         email=email,
         name=name,
+        first_name=str(profile.get("given_name") or "").strip() or None,
+        last_name=str(profile.get("family_name") or "").strip() or None,
         picture=picture,
         sub=sub,
         email_verified=email_verified,

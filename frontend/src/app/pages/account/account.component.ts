@@ -23,6 +23,8 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
 import { LanguageService } from '../../core/language.service';
 import { CartStore } from '../../core/cart.store';
 import { formatIdentity } from '../../shared/user-identity';
+import { type CountryCode } from 'libphonenumber-js';
+import { buildE164, listPhoneCountries, splitE164, type PhoneCountryOption } from '../../shared/phone';
 
 @Component({
   selector: 'app-account',
@@ -162,7 +164,7 @@ import { formatIdentity } from '../../shared/user-identity';
 
           <div class="grid gap-3 sm:grid-cols-2">
             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              Display name
+              {{ 'auth.displayName' | translate }}
               <input
                 class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
                 name="profileName"
@@ -188,16 +190,66 @@ import { formatIdentity } from '../../shared/user-identity';
                 Use this to sign in and as a stable handle in public activity.
               </span>
             </label>
+
             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              Phone
+              {{ 'auth.firstName' | translate }}
               <input
                 class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                name="profilePhone"
-                autocomplete="tel"
-                placeholder="+40723204204"
-                [(ngModel)]="profilePhone"
+                name="profileFirstName"
+                autocomplete="given-name"
+                [(ngModel)]="profileFirstName"
               />
             </label>
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'auth.middleName' | translate }}
+              <input
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                name="profileMiddleName"
+                autocomplete="additional-name"
+                [(ngModel)]="profileMiddleName"
+              />
+            </label>
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'auth.lastName' | translate }}
+              <input
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                name="profileLastName"
+                autocomplete="family-name"
+                [(ngModel)]="profileLastName"
+              />
+            </label>
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'auth.dateOfBirth' | translate }}
+              <input
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                name="profileDateOfBirth"
+                type="date"
+                [(ngModel)]="profileDateOfBirth"
+              />
+            </label>
+
+            <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'auth.phone' | translate }}
+              <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-2">
+                <select
+                  name="profilePhoneCountry"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="profilePhoneCountry"
+                >
+                  <option *ngFor="let c of phoneCountries" [ngValue]="c.code">{{ c.flag }} {{ c.name }} ({{ c.dial }})</option>
+                </select>
+                <input
+                  name="profilePhoneNational"
+                  type="tel"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  autocomplete="tel-national"
+                  pattern="^[0-9]{6,14}$"
+                  placeholder="723204204"
+                  [(ngModel)]="profilePhoneNational"
+                />
+              </div>
+            </div>
+
             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
               Preferred language
               <select
@@ -821,6 +873,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   private clientSecret: string | null = null;
   @ViewChild('cardHost') cardElementRef?: ElementRef<HTMLDivElement>;
   private stripeThemeEffect?: EffectRef;
+  private phoneCountriesEffect?: EffectRef;
   showAddressForm = false;
   editingAddressId: string | null = null;
   addressModel: AddressCreateRequest = {
@@ -845,7 +898,14 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   profileError: string | null = null;
   profileName = '';
   profileUsername = '';
+  profileFirstName = '';
+  profileMiddleName = '';
+  profileLastName = '';
+  profileDateOfBirth = '';
   profilePhone = '';
+  profilePhoneCountry: CountryCode = 'RO';
+  profilePhoneNational = '';
+  phoneCountries: PhoneCountryOption[] = [];
   profileLanguage: 'en' | 'ro' = 'en';
   profileThemePreference: ThemePreference = 'system';
   reorderingOrderId: string | null = null;
@@ -895,6 +955,9 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
         this.card.update({ style: this.buildStripeCardStyle(mode) });
       }
     });
+    this.phoneCountriesEffect = effect(() => {
+      this.phoneCountries = listPhoneCountries(this.lang.language());
+    });
   }
 
   ngOnInit(): void {
@@ -934,7 +997,14 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
         this.avatar = profile.avatar_url ?? null;
         this.profileName = profile.name ?? '';
         this.profileUsername = (profile.username ?? '').trim();
+        this.profileFirstName = profile.first_name ?? '';
+        this.profileMiddleName = profile.middle_name ?? '';
+        this.profileLastName = profile.last_name ?? '';
+        this.profileDateOfBirth = profile.date_of_birth ?? '';
         this.profilePhone = profile.phone ?? '';
+        const phoneSplit = splitE164(this.profilePhone);
+        this.profilePhoneCountry = phoneSplit.country ?? 'RO';
+        this.profilePhoneNational = phoneSplit.nationalNumber || '';
         this.profileLanguage = (profile.preferred_language === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
         this.profileThemePreference = (this.theme.preference()() ?? 'system') as ThemePreference;
         this.computeTotalPages();
@@ -1202,11 +1272,14 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   profileCompleteness(): { completed: number; total: number; percent: number } {
-    const total = 5;
+    const total = 8;
     let completed = 0;
 
     if (this.profileName.trim()) completed += 1;
-    if (this.profilePhone.trim()) completed += 1;
+    if (this.profileFirstName.trim()) completed += 1;
+    if (this.profileLastName.trim()) completed += 1;
+    if (this.profileDateOfBirth.trim()) completed += 1;
+    if (buildE164(this.profilePhoneCountry, this.profilePhoneNational)) completed += 1;
     if (this.avatar || this.profile()?.avatar_url) completed += 1;
     if (this.profileLanguage === 'en' || this.profileLanguage === 'ro') completed += 1;
     if (this.emailVerified()) completed += 1;
@@ -1226,14 +1299,46 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const name = this.profileName.trim();
     const username = this.profileUsername.trim();
-    const phone = this.profilePhone.trim();
-    const payload: { name?: string | null; phone?: string | null; preferred_language?: string | null } = {
-      phone: phone ? phone : null,
+    const firstName = this.profileFirstName.trim();
+    const middleName = this.profileMiddleName.trim();
+    const lastName = this.profileLastName.trim();
+    const dob = this.profileDateOfBirth.trim();
+    const phoneNational = this.profilePhoneNational.trim();
+    const phone = phoneNational ? buildE164(this.profilePhoneCountry, phoneNational) : null;
+
+    if (phoneNational && !phone) {
+      this.profileError = 'Enter a valid phone number.';
+      this.toast.error(this.profileError);
+      this.savingProfile = false;
+      return;
+    }
+    if (dob) {
+      const parsed = new Date(`${dob}T00:00:00Z`);
+      if (!Number.isNaN(parsed.valueOf()) && parsed.getTime() > Date.now()) {
+        this.profileError = 'Date of birth cannot be in the future.';
+        this.toast.error(this.profileError);
+        this.savingProfile = false;
+        return;
+      }
+    }
+
+    const payload: {
+      name?: string | null;
+      phone?: string | null;
+      first_name?: string | null;
+      middle_name?: string | null;
+      last_name?: string | null;
+      date_of_birth?: string | null;
+      preferred_language?: string | null;
+    } = {
+      name: name ? name : null,
+      phone,
+      first_name: firstName ? firstName : null,
+      middle_name: middleName ? middleName : null,
+      last_name: lastName ? lastName : null,
+      date_of_birth: dob ? dob : null,
       preferred_language: this.profileLanguage
     };
-    if (name) {
-      payload.name = name;
-    }
 
     this.theme.setPreference(this.profileThemePreference);
     this.lang.setLanguage(this.profileLanguage, { syncBackend: false });
@@ -1253,7 +1358,14 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
           this.profile.set(user);
           this.profileName = user.name ?? '';
           this.profileUsername = (user.username ?? '').trim();
+          this.profileFirstName = user.first_name ?? '';
+          this.profileMiddleName = user.middle_name ?? '';
+          this.profileLastName = user.last_name ?? '';
+          this.profileDateOfBirth = user.date_of_birth ?? '';
           this.profilePhone = user.phone ?? '';
+          const phoneSplit = splitE164(this.profilePhone);
+          this.profilePhoneCountry = phoneSplit.country ?? 'RO';
+          this.profilePhoneNational = phoneSplit.nationalNumber || '';
           this.profileLanguage = (user.preferred_language === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
           this.avatar = user.avatar_url ?? this.avatar;
           this.profileSaved = true;
@@ -1521,6 +1633,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
       this.card.destroy();
     }
     this.stripeThemeEffect?.destroy();
+    this.phoneCountriesEffect?.destroy();
     window.removeEventListener('mousemove', this.handleUserActivity);
     window.removeEventListener('keydown', this.handleUserActivity);
   }

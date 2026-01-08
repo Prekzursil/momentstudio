@@ -15,6 +15,10 @@ export interface AuthUser {
   username: string;
   name?: string | null;
   name_tag?: number;
+  first_name?: string | null;
+  middle_name?: string | null;
+  last_name?: string | null;
+  date_of_birth?: string | null;
   phone?: string | null;
   avatar_url?: string | null;
   email_verified?: boolean;
@@ -80,10 +84,18 @@ export class AuthService {
     return this.api.post<AuthResponse>('/auth/login', { identifier, password }).pipe(tap((res) => this.persist(res)));
   }
 
-  register(name: string, username: string, email: string, password: string): Observable<AuthResponse> {
-    return this.api
-      .post<AuthResponse>('/auth/register', { name, username, email, password })
-      .pipe(tap((res) => this.persist(res)));
+  register(payload: {
+    name: string;
+    username: string;
+    email: string;
+    password: string;
+    first_name: string;
+    middle_name?: string | null;
+    last_name: string;
+    date_of_birth: string;
+    phone: string;
+  }): Observable<AuthResponse> {
+    return this.api.post<AuthResponse>('/auth/register', payload).pipe(tap((res) => this.persist(res)));
   }
 
   changePassword(current: string, newPassword: string): Observable<{ detail: string }> {
@@ -140,6 +152,10 @@ export class AuthService {
   updateProfile(payload: {
     name?: string | null;
     phone?: string | null;
+    first_name?: string | null;
+    middle_name?: string | null;
+    last_name?: string | null;
+    date_of_birth?: string | null;
     preferred_language?: string | null;
   }): Observable<AuthUser> {
     if (!this.isAuthenticated()) {

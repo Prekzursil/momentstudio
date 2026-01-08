@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -15,6 +15,11 @@ class UserBase(BaseModel):
         pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$",
     )
     name: str | None = None
+    first_name: str | None = Field(default=None, max_length=100)
+    middle_name: str | None = Field(default=None, max_length=100)
+    last_name: str | None = Field(default=None, max_length=100)
+    date_of_birth: date | None = None
+    phone: str | None = Field(default=None, max_length=32)
     preferred_language: str | None = None
 
 

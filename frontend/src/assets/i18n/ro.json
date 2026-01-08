@@ -273,6 +273,8 @@
   "auth": {
     "loginTitle": "Autentificare",
     "registerTitle": "Creează cont",
+    "registerStepAccount": "Cont",
+    "registerStepPersonal": "Date personale",
     "resetRequestTitle": "Resetare parolă",
     "resetRequestCopy": "Introdu emailul și îți trimitem un link de resetare.",
     "resetTitle": "Setează parolă nouă",
@@ -287,12 +289,23 @@
     "strengthModerate": "Moderată",
     "strengthStrong": "Puternică",
     "name": "Nume",
+    "displayName": "Nume afișat",
+    "displayNameHintEmpty": "Previzualizarea etichetei publice va apărea aici (ex.: Ana#0 (ana2005l)).",
+    "displayNameHintPartial": "Introdu numele afișat și utilizatorul pentru a vedea previzualizarea.",
+    "displayNameHint": "Previzualizare etichetă publică: {{name}}#0 ({{username}})",
+    "firstName": "Prenume",
+    "middleName": "Al doilea prenume (opțional)",
+    "lastName": "Nume de familie",
+    "dateOfBirth": "Data nașterii",
+    "phone": "Telefon",
     "confirmPassword": "Confirmă parola",
     "forgot": "Ai uitat parola?",
     "createAccount": "Creează cont",
     "login": "Autentifică-te",
     "logout": "Delogare",
     "register": "Înregistrare",
+    "next": "Mai departe",
+    "back": "Înapoi",
     "resetLink": "Trimite link-ul de resetare",
     "resetLinkSent": "Link de resetare trimis",
     "setPassword": "Setează parola",
@@ -328,8 +341,10 @@
   "validation": {
     "required": "Acest câmp este obligatoriu.",
     "invalidEmail": "Introdu o adresă de email validă.",
+    "usernameInvalid": "Utilizatorul trebuie să aibă 3–30 caractere și poate conține litere, cifre, '.', '_', '-'.",
     "passwordMin": "Parola trebuie să aibă cel puțin 6 caractere.",
-    "passwordMismatch": "Parolele nu coincid."
+    "passwordMismatch": "Parolele nu coincid.",
+    "phoneInvalid": "Introdu un număr de telefon valid."
   },
   "adminUi": {
     "nav": {

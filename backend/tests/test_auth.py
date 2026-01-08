@@ -38,10 +38,37 @@ def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def make_register_payload(
+    *,
+    email: str,
+    username: str,
+    password: str = "supersecret",
+    name: str = "User",
+    first_name: str = "Test",
+    last_name: str = "User",
+    middle_name: str | None = None,
+    date_of_birth: str = "2000-01-01",
+    phone: str = "+40723204204",
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "email": email,
+        "username": username,
+        "password": password,
+        "name": name,
+        "first_name": first_name,
+        "last_name": last_name,
+        "date_of_birth": date_of_birth,
+        "phone": phone,
+    }
+    if middle_name is not None:
+        payload["middle_name"] = middle_name
+    return payload
+
+
 def test_register_and_login_flow(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 
-    register_payload = {"email": "user@example.com", "username": "user", "password": "supersecret", "name": "User"}
+    register_payload = make_register_payload(email="user@example.com", username="user", name="User")
     res = client.post("/api/v1/auth/register", json=register_payload)
     assert res.status_code == 201, res.text
     body = res.json()
@@ -69,6 +96,26 @@ def test_register_and_login_flow(test_app: Dict[str, object]) -> None:
     assert refreshed["refresh_token"]
 
 
+def test_register_rejects_invalid_phone(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    res = client.post(
+        "/api/v1/auth/register",
+        json=make_register_payload(email="badphone@example.com", username="badphone", phone="0723204204"),
+    )
+    assert res.status_code == 422, res.text
+
+
+def test_register_rejects_future_date_of_birth(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    res = client.post(
+        "/api/v1/auth/register",
+        json=make_register_payload(email="baddob@example.com", username="baddob", date_of_birth="2999-01-01"),
+    )
+    assert res.status_code == 422, res.text
+
+
 def test_invalid_login_and_refresh(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 
@@ -85,7 +132,8 @@ def test_admin_guard(test_app: Dict[str, object]) -> None:
 
     # Register user
     res = client.post(
-        "/api/v1/auth/register", json={"email": "admin@example.com", "username": "admin", "password": "adminpass", "name": "Admin"}
+        "/api/v1/auth/register",
+        json=make_register_payload(email="admin@example.com", username="admin", password="adminpass", name="Admin"),
     )
     assert res.status_code == 201
     access_token = res.json()["tokens"]["access_token"]
@@ -125,7 +173,7 @@ def test_password_reset_flow(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str
 
     res = client.post(
         "/api/v1/auth/register",
-        json={"email": "reset@example.com", "username": "reset", "password": "resetpass", "name": "Reset"},
+        json=make_register_payload(email="reset@example.com", username="reset", password="resetpass", name="Reset"),
     )
     assert res.status_code == 201
 
@@ -148,7 +196,7 @@ def test_update_profile_me(test_app: Dict[str, object]) -> None:
 
     res = client.post(
         "/api/v1/auth/register",
-        json={"email": "me@example.com", "username": "me1", "password": "supersecret", "name": "Old"},
+        json=make_register_payload(email="me@example.com", username="me1", password="supersecret", name="Old"),
     )
     assert res.status_code == 201, res.text
     token = res.json()["tokens"]["access_token"]
@@ -179,7 +227,7 @@ def test_change_password_persists_and_updates_login(test_app: Dict[str, object])
 
     res = client.post(
         "/api/v1/auth/register",
-        json={"email": "pw@example.com", "username": "pw1", "password": "oldsecret", "name": "PW"},
+        json=make_register_payload(email="pw@example.com", username="pw1", password="oldsecret", name="PW"),
     )
     assert res.status_code == 201, res.text
     token = res.json()["tokens"]["access_token"]
@@ -210,7 +258,7 @@ def test_update_notification_preferences(test_app: Dict[str, object]) -> None:
 
     res = client.post(
         "/api/v1/auth/register",
-        json={"email": "notify@example.com", "username": "notify", "password": "supersecret", "name": "N"},
+        json=make_register_payload(email="notify@example.com", username="notify", password="supersecret", name="N"),
     )
     assert res.status_code == 201, res.text
     token = res.json()["tokens"]["access_token"]
@@ -237,7 +285,7 @@ def test_alias_history_and_display_name_tags(test_app: Dict[str, object]) -> Non
 
     res1 = client.post(
         "/api/v1/auth/register",
-        json={"email": "ana1@example.com", "username": "ana1", "password": "supersecret", "name": "Ana"},
+        json=make_register_payload(email="ana1@example.com", username="ana1", password="supersecret", name="Ana"),
     )
     assert res1.status_code == 201, res1.text
     assert res1.json()["user"]["name_tag"] == 0
@@ -245,7 +293,7 @@ def test_alias_history_and_display_name_tags(test_app: Dict[str, object]) -> Non
 
     res2 = client.post(
         "/api/v1/auth/register",
-        json={"email": "ana2@example.com", "username": "ana2", "password": "supersecret", "name": "Ana"},
+        json=make_register_payload(email="ana2@example.com", username="ana2", password="supersecret", name="Ana"),
     )
     assert res2.status_code == 201, res2.text
     assert res2.json()["user"]["name_tag"] == 1
@@ -270,7 +318,7 @@ def test_display_name_history_reuses_name_tag_on_revert(test_app: Dict[str, obje
 
     res1 = client.post(
         "/api/v1/auth/register",
-        json={"email": "tagreuse1@example.com", "username": "tagreuse1", "password": "supersecret", "name": "Ana"},
+        json=make_register_payload(email="tagreuse1@example.com", username="tagreuse1", password="supersecret", name="Ana"),
     )
     assert res1.status_code == 201, res1.text
     token = res1.json()["tokens"]["access_token"]
@@ -278,7 +326,7 @@ def test_display_name_history_reuses_name_tag_on_revert(test_app: Dict[str, obje
 
     res2 = client.post(
         "/api/v1/auth/register",
-        json={"email": "tagreuse2@example.com", "username": "tagreuse2", "password": "supersecret", "name": "Ana"},
+        json=make_register_payload(email="tagreuse2@example.com", username="tagreuse2", password="supersecret", name="Ana"),
     )
     assert res2.status_code == 201, res2.text
     assert res2.json()["user"]["name_tag"] == 1

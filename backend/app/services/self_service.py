@@ -42,6 +42,10 @@ async def execute_account_deletion(session: AsyncSession, user: User) -> None:
 
     user.email = f"deleted+{user.id}@example.invalid"
     user.name = None
+    user.first_name = None
+    user.middle_name = None
+    user.last_name = None
+    user.date_of_birth = None
     user.phone = None
     user.avatar_url = None
     user.email_verified = False
@@ -112,7 +116,12 @@ async def export_user_data(session: AsyncSession, user: User) -> dict[str, Any]:
         "user": {
             "id": str(user.id),
             "email": user.email,
+            "username": user.username,
             "name": user.name,
+            "first_name": getattr(user, "first_name", None),
+            "middle_name": getattr(user, "middle_name", None),
+            "last_name": getattr(user, "last_name", None),
+            "date_of_birth": user.date_of_birth.isoformat() if user.date_of_birth else None,
             "phone": user.phone,
             "avatar_url": user.avatar_url,
             "preferred_language": user.preferred_language,
@@ -172,4 +181,3 @@ async def export_user_data(session: AsyncSession, user: User) -> dict[str, Any]:
             for c, post_key, post_title in comment_rows
         ],
     }
-

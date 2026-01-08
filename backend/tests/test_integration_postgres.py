@@ -37,7 +37,16 @@ async def test_postgres_core_flow_wishlist() -> None:
         username = f"pg{uuid.uuid4().hex[:8]}"
         register = await client.post(
             "/api/v1/auth/register",
-            json={"email": email, "username": username, "password": "supersecret", "name": "PG"},
+            json={
+                "email": email,
+                "username": username,
+                "password": "supersecret",
+                "name": "PG",
+                "first_name": "PG",
+                "last_name": "User",
+                "date_of_birth": "2000-01-01",
+                "phone": "+40723204204",
+            },
         )
         assert register.status_code == 201, register.text
         token = register.json()["tokens"]["access_token"]
@@ -89,7 +98,16 @@ async def test_postgres_blog_flow() -> None:
         username = f"pgblog{uuid.uuid4().hex[:8]}"
         register = await client.post(
             "/api/v1/auth/register",
-            json={"email": email, "username": username, "password": "supersecret", "name": "PG Blog"},
+            json={
+                "email": email,
+                "username": username,
+                "password": "supersecret",
+                "name": "PG Blog",
+                "first_name": "PG",
+                "last_name": "Blog",
+                "date_of_birth": "2000-01-01",
+                "phone": "+40723204204",
+            },
         )
         assert register.status_code == 201, register.text
         token = register.json()["tokens"]["access_token"]

@@ -220,6 +220,10 @@ def test_google_link_and_unlink(monkeypatch: pytest.MonkeyPatch, test_app):
             "username": "linkuser",
             "name": "Link User",
             "password": "linkpass",
+            "first_name": "Link",
+            "last_name": "User",
+            "date_of_birth": "2000-01-01",
+            "phone": "+40723204204",
         },
     )
     assert res.status_code == 201

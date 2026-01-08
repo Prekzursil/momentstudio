@@ -25,6 +25,10 @@ Below is a structured checklist you can turn into issues.
 - [x] JWT guard dependency + role guard for admin.
 - [x] Tests for auth flows (register/login/refresh/invalid creds).
 - [x] HTTP-only refresh token cookie issued on login/refresh and cleared on logout.
+- [x] Auth: extend user profile fields for registration (first/middle/last name, date of birth, phone) + migration.
+- [x] Auth: require phone + DOB on registration (no age enforcement) and validate phone as E.164.
+- [x] Auth: extend /auth/me profile update + response schema to include new profile fields.
+- [x] Tests: update auth + Postgres integration tests for new registration/profile fields.
 
 ## Backend - Catalog & Products
 - [x] Category model + migration.
@@ -343,6 +347,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Account UX: error/loading polish for profile sections (skeletons, empty states, avoid blocking overlays).
 - [x] Account UX: privacy/self-service (data export + account deletion flow with confirmation + cooldown).
 - [x] Account UX: community “My comments” list (links + status) and reply notification context.
+- [x] Auth UX: upgrade registration to a 2-step wizard (account + personal) with required DOB + phone country picker (default RO).
+- [x] Auth UX: add live format validation for email/username/phone and show “already used” errors only on submit (avoid enumeration).
+- [x] Account UX: extend profile editor to manage first/middle/last name, DOB, and phone with country code.
+- [x] Tests: add/update frontend unit tests for registration wizard and profile field wiring.
 
 ## Frontend - Admin Dashboard
 - [x] /admin layout with sidebar + guard.
