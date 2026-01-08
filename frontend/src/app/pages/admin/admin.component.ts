@@ -103,6 +103,58 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
+          <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex items-center justify-between gap-3">
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Site settings: social + contact</h2>
+              <div class="flex items-center gap-2">
+                <app-button size="sm" variant="ghost" label="Reload" (action)="loadSocial()"></app-button>
+                <app-button size="sm" label="Save" (action)="saveSocial()"></app-button>
+              </div>
+            </div>
+            <div class="grid md:grid-cols-2 gap-3 text-sm">
+              <app-input label="Phone" [(value)]="socialForm.phone"></app-input>
+              <app-input label="Email" [(value)]="socialForm.email"></app-input>
+            </div>
+            <div class="grid md:grid-cols-2 gap-4">
+              <div class="grid gap-2">
+                <div class="flex items-center justify-between">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">Instagram pages</p>
+                  <button class="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-300" type="button" (click)="addSocialLink('instagram')">
+                    Add
+                  </button>
+                </div>
+                <div *ngFor="let page of socialForm.instagram_pages; let i = index" class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
+                  <app-input label="Label" [(value)]="page.label"></app-input>
+                  <app-input label="URL" [(value)]="page.url"></app-input>
+                  <app-input label="Thumbnail URL (optional)" [(value)]="page.thumbnail_url"></app-input>
+                  <button class="text-xs text-rose-700 hover:underline dark:text-rose-300 justify-self-start" type="button" (click)="removeSocialLink('instagram', i)">
+                    Remove
+                  </button>
+                </div>
+              </div>
+              <div class="grid gap-2">
+                <div class="flex items-center justify-between">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">Facebook pages</p>
+                  <button class="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-300" type="button" (click)="addSocialLink('facebook')">
+                    Add
+                  </button>
+                </div>
+                <div *ngFor="let page of socialForm.facebook_pages; let i = index" class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
+                  <app-input label="Label" [(value)]="page.label"></app-input>
+                  <app-input label="URL" [(value)]="page.url"></app-input>
+                  <app-input label="Thumbnail URL (optional)" [(value)]="page.thumbnail_url"></app-input>
+                  <button class="text-xs text-rose-700 hover:underline dark:text-rose-300 justify-self-start" type="button" (click)="removeSocialLink('facebook', i)">
+                    Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 text-sm">
+              <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="socialMessage">{{ socialMessage }}</span>
+              <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="socialError">{{ socialError }}</span>
+            </div>
+          </section>
+
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">SEO meta (per page & language)</h2>
@@ -174,6 +226,13 @@ import { formatIdentity } from '../../shared/user-identity';
               </label>
               <div class="flex gap-2">
                 <app-button size="sm" label="Save Shipping" (action)="saveInfo('page.shipping', infoForm.shipping)"></app-button>
+              </div>
+              <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
+                Contact page content
+                <textarea rows="3" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="infoForm.contact"></textarea>
+              </label>
+              <div class="flex gap-2">
+                <app-button size="sm" label="Save Contact" (action)="saveInfo('page.contact', infoForm.contact)"></app-button>
                 <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="infoMessage">{{ infoMessage }}</span>
                 <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="infoError">{{ infoError }}</span>
               </div>
@@ -1465,13 +1524,32 @@ export class AdminComponent implements OnInit {
   assetsForm = { logo_url: '', favicon_url: '', social_image_url: '' };
   assetsMessage: string | null = null;
   assetsError: string | null = null;
+  socialForm: {
+    phone: string;
+    email: string;
+    instagram_pages: Array<{ label: string; url: string; thumbnail_url: string }>;
+    facebook_pages: Array<{ label: string; url: string; thumbnail_url: string }>;
+  } = {
+    phone: '+40723204204',
+    email: 'momentstudio.ro@gmail.com',
+    instagram_pages: [
+      { label: 'Moments in Clay - Studio', url: 'https://www.instagram.com/moments_in_clay_studio?igsh=ZmdnZTdudnNieDQx', thumbnail_url: '' },
+      { label: 'momentstudio', url: 'https://www.instagram.com/adrianaartizanat?igsh=ZmZmaDU1MGcxZHEy', thumbnail_url: '' }
+    ],
+    facebook_pages: [
+      { label: 'Moments in Clay - Studio', url: 'https://www.facebook.com/share/17YqBmfX5x/', thumbnail_url: '' },
+      { label: 'momentstudio', url: 'https://www.facebook.com/share/1APqKJM6Zi/', thumbnail_url: '' }
+    ]
+  };
+  socialMessage: string | null = null;
+  socialError: string | null = null;
   seoLang: 'en' | 'ro' = 'en';
   seoPage: 'home' | 'shop' | 'product' | 'category' | 'about' = 'home';
   seoForm = { title: '', description: '' };
   seoMessage: string | null = null;
   seoError: string | null = null;
   infoLang: 'en' | 'ro' = 'en';
-  infoForm = { about: '', faq: '', shipping: '' };
+  infoForm = { about: '', faq: '', shipping: '', contact: '' };
   infoMessage: string | null = null;
   infoError: string | null = null;
   coupons: AdminCoupon[] = [];
@@ -1537,6 +1615,7 @@ export class AdminComponent implements OnInit {
     this.loadSections();
     this.loadCollections();
     this.loadAssets();
+    this.loadSocial();
     this.loadSeo();
     this.loadInfo();
     this.loadFlaggedComments();
@@ -2696,6 +2775,101 @@ export class AdminComponent implements OnInit {
     });
   }
 
+  loadSocial(): void {
+    this.socialError = null;
+    this.socialMessage = null;
+    this.admin.getContent('site.social').subscribe({
+      next: (block) => {
+        const meta = (block.meta || {}) as Record<string, any>;
+        const contact = (meta['contact'] || {}) as Record<string, any>;
+        this.socialForm.phone = String(contact['phone'] || this.socialForm.phone || '').trim();
+        this.socialForm.email = String(contact['email'] || this.socialForm.email || '').trim();
+        this.socialForm.instagram_pages = this.parseSocialPages(meta['instagram_pages'], this.socialForm.instagram_pages);
+        this.socialForm.facebook_pages = this.parseSocialPages(meta['facebook_pages'], this.socialForm.facebook_pages);
+      },
+      error: () => {
+        // Keep defaults.
+      }
+    });
+  }
+
+  addSocialLink(platform: 'instagram' | 'facebook'): void {
+    const item = { label: '', url: '', thumbnail_url: '' };
+    if (platform === 'instagram') this.socialForm.instagram_pages = [...this.socialForm.instagram_pages, item];
+    else this.socialForm.facebook_pages = [...this.socialForm.facebook_pages, item];
+  }
+
+  removeSocialLink(platform: 'instagram' | 'facebook', index: number): void {
+    if (platform === 'instagram') {
+      this.socialForm.instagram_pages = this.socialForm.instagram_pages.filter((_, i) => i !== index);
+      return;
+    }
+    this.socialForm.facebook_pages = this.socialForm.facebook_pages.filter((_, i) => i !== index);
+  }
+
+  saveSocial(): void {
+    this.socialMessage = null;
+    this.socialError = null;
+    const instagram_pages = this.sanitizeSocialPages(this.socialForm.instagram_pages);
+    const facebook_pages = this.sanitizeSocialPages(this.socialForm.facebook_pages);
+    const payload = {
+      title: 'Site social links',
+      body_markdown: 'Social pages and contact details used across the storefront.',
+      status: 'published',
+      meta: {
+        version: 1,
+        contact: { phone: (this.socialForm.phone || '').trim(), email: (this.socialForm.email || '').trim() },
+        instagram_pages,
+        facebook_pages
+      }
+    };
+    const onSuccess = () => {
+      this.socialMessage = 'Saved';
+      this.socialError = null;
+    };
+    this.admin.updateContentBlock('site.social', payload).subscribe({
+      next: onSuccess,
+      error: () =>
+        this.admin.createContent('site.social', payload).subscribe({
+          next: onSuccess,
+          error: () => {
+            this.socialError = 'Could not save';
+            this.socialMessage = null;
+          }
+        })
+    });
+  }
+
+  private parseSocialPages(
+    raw: unknown,
+    fallback: Array<{ label: string; url: string; thumbnail_url: string }>
+  ): Array<{ label: string; url: string; thumbnail_url: string }> {
+    if (!Array.isArray(raw)) return fallback;
+    return raw
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        const label = String((item as any).label ?? '').trim();
+        const url = String((item as any).url ?? '').trim();
+        const thumb = String((item as any).thumbnail_url ?? '').trim();
+        return { label, url, thumbnail_url: thumb };
+      })
+      .filter((x): x is { label: string; url: string; thumbnail_url: string } => !!x);
+  }
+
+  private sanitizeSocialPages(
+    pages: Array<{ label: string; url: string; thumbnail_url: string }>
+  ): Array<{ label: string; url: string; thumbnail_url?: string | null }> {
+    const out: Array<{ label: string; url: string; thumbnail_url?: string | null }> = [];
+    for (const page of pages) {
+      const label = String(page.label || '').trim();
+      const url = String(page.url || '').trim();
+      const thumb = String(page.thumbnail_url || '').trim();
+      if (!label || !url) continue;
+      out.push({ label, url, thumbnail_url: thumb || null });
+    }
+    return out;
+  }
+
   selectSeoLang(lang: 'en' | 'ro'): void {
     this.seoLang = lang;
     this.loadSeo();
@@ -2749,7 +2923,7 @@ export class AdminComponent implements OnInit {
   }
 
   loadInfo(): void {
-    const loadKey = (key: string, target: 'about' | 'faq' | 'shipping') => {
+    const loadKey = (key: string, target: 'about' | 'faq' | 'shipping' | 'contact') => {
       this.admin.getContent(key, this.infoLang).subscribe({
         next: (block) => {
           this.infoForm[target] = block.body_markdown || '';
@@ -2762,9 +2936,10 @@ export class AdminComponent implements OnInit {
     loadKey('page.about', 'about');
     loadKey('page.faq', 'faq');
     loadKey('page.shipping', 'shipping');
+    loadKey('page.contact', 'contact');
   }
 
-  saveInfo(key: 'page.about' | 'page.faq' | 'page.shipping', body: string): void {
+  saveInfo(key: 'page.about' | 'page.faq' | 'page.shipping' | 'page.contact', body: string): void {
     this.infoMessage = null;
     this.infoError = null;
     const payload = {

@@ -237,8 +237,8 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS/Home: render homepage hero from `home.hero` content block (headline/subtitle/CTA/image) with RO/EN support and sensible fallbacks.
 - [x] CMS/Home: drive homepage section ordering from `home.sections` content block and support enabling/disabling sections.
 - [x] CMS/Home: add a CMS-editable “Our story” teaser section via `home.story` (markdown + CTA to `/about`).
-- [ ] CMS/Site settings: manage Instagram/Facebook links (labels + URLs + optional thumbnails) via a `site.social` content block (meta JSON) and reuse in footer/contact/home.
-- [ ] CMS/Contact: render contact page copy from `page.contact` content block and source phone/email from `site.social` (or env) as a single source of truth.
+- [x] CMS/Site settings: manage Instagram/Facebook links (labels + URLs + optional thumbnails) via a `site.social` content block (meta JSON) and reuse in footer/contact/home.
+- [x] CMS/Contact: render contact page copy from `page.contact` content block and source phone/email from `site.social` (or env) as a single source of truth.
 - [x] Shop: add API-powered price bounds (min/max) so the price range UI can cap to real data without an extra list request (and optionally per-filter bounds).
 - [x] Frontend: extract repeated image placeholder-on-error handlers into a shared directive/helper for consistency.
 - [x] Pricing: show EN approx EUR/USD for RON prices (display-only; checkout remains in RON) using live FX rates.
