@@ -57,5 +57,5 @@ export class SuccessComponent {
 
   items = this.cart.items;
   subtotal = this.cart.subtotal;
-  currency = 'USD';
+  currency = 'RON';
 }

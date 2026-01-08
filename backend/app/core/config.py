@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     google_redirect_uri: str | None = None
     google_allowed_domains: list[str] = []
 
+    # FX rates (used for display-only approximations; checkout remains in RON)
+    fx_rates_url: str = "https://www.bnr.ro/nbrfxrates.xml"
+    fx_rates_cache_ttl_seconds: int = 60 * 60 * 6
+    fx_refresh_enabled: bool = False
+    fx_refresh_interval_seconds: int = 60 * 60 * 6
+
 
 @lru_cache
 def get_settings() -> Settings:

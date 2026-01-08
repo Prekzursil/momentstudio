@@ -79,7 +79,7 @@ async def send_order_confirmation(to_email: str, order, items: Sequence | None =
         lines.append("Items:" if lng == "en" else "Produse:")
         for item in items:
             lines.append(f"- {getattr(item, 'product_id', '')} x {item.quantity}")
-    lines.append(f"Total: {order.total_amount} {getattr(order, 'currency', 'USD')}")
+    lines.append(f"Total: {order.total_amount} {getattr(order, 'currency', 'RON')}")
     text_body = "\n".join(lines)
     return await send_email(to_email, subject, text_body)
 

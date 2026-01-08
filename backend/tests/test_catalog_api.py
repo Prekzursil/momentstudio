@@ -87,7 +87,7 @@ def test_catalog_admin_and_public_flows(test_app: Dict[str, object]) -> None:
             "slug": "white-cup",
             "name": "White Cup",
             "base_price": 10.5,
-            "currency": "USD",
+            "currency": "RON",
             "stock_quantity": 3,
             "images": [{"url": "http://example.com/cup.jpg", "alt_text": "Cup", "sort_order": 1}],
             "variants": [{"name": "Large", "additional_price_delta": 2.5, "stock_quantity": 2}],
@@ -105,7 +105,7 @@ def test_catalog_admin_and_public_flows(test_app: Dict[str, object]) -> None:
             "slug": "blue-cup",
             "name": "Blue Cup",
             "base_price": 25.0,
-            "currency": "USD",
+            "currency": "RON",
             "stock_quantity": 10,
             "is_featured": True,
             "short_description": "Bright blue",
@@ -122,6 +122,9 @@ def test_catalog_admin_and_public_flows(test_app: Dict[str, object]) -> None:
     body = res.json()
     assert body["meta"]["total_items"] == 2
     assert len(body["items"]) == 2
+    assert body["bounds"]["min_price"] == 10.5
+    assert body["bounds"]["max_price"] == 25.0
+    assert body["bounds"]["currency"] == "RON"
     assert body["items"][0]["slug"] == "blue-cup"
     assert body["items"][1]["slug"] == "white-cup"
 
@@ -194,6 +197,83 @@ def test_catalog_admin_and_public_flows(test_app: Dict[str, object]) -> None:
     res = client.get("/api/v1/catalog/products")
     assert all(p["slug"] != "white-cup" for p in res.json()["items"])
 
+def test_product_price_bounds(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal, email="boundsadmin@example.com")
+
+    res = client.post(
+        "/api/v1/catalog/categories",
+        json={"slug": "bounds-cups", "name": "Cups"},
+        headers=auth_headers(admin_token),
+    )
+    assert res.status_code == 201
+    cup_category_id = res.json()["id"]
+
+    res = client.post(
+        "/api/v1/catalog/categories",
+        json={"slug": "bounds-plates", "name": "Plates"},
+        headers=auth_headers(admin_token),
+    )
+    assert res.status_code == 201
+    plate_category_id = res.json()["id"]
+
+    res = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": cup_category_id,
+            "slug": "cheap-cup",
+            "name": "Cheap Cup",
+            "base_price": 10,
+            "currency": "RON",
+            "stock_quantity": 10,
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert res.status_code == 201
+
+    res = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": cup_category_id,
+            "slug": "fancy-cup",
+            "name": "Fancy Cup",
+            "base_price": 25,
+            "currency": "RON",
+            "stock_quantity": 5,
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert res.status_code == 201
+
+    res = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": plate_category_id,
+            "slug": "luxury-plate",
+            "name": "Luxury Plate",
+            "base_price": 100,
+            "currency": "RON",
+            "stock_quantity": 2,
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert res.status_code == 201
+
+    all_bounds = client.get("/api/v1/catalog/products/price-bounds")
+    assert all_bounds.status_code == 200
+    data = all_bounds.json()
+    assert data["min_price"] == 10
+    assert data["max_price"] == 100
+    assert data["currency"] == "RON"
+
+    cup_bounds = client.get("/api/v1/catalog/products/price-bounds", params={"category_slug": "bounds-cups"})
+    assert cup_bounds.status_code == 200
+    data = cup_bounds.json()
+    assert data["min_price"] == 10
+    assert data["max_price"] == 25
+    assert data["currency"] == "RON"
+
 
 def test_product_image_upload_and_delete(tmp_path, test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
@@ -218,7 +298,7 @@ def test_product_image_upload_and_delete(tmp_path, test_app: Dict[str, object]) 
             "slug": "plate",
             "name": "Plate",
             "base_price": 12,
-            "currency": "USD",
+            "currency": "RON",
             "stock_quantity": 2,
         },
         headers=auth_headers(admin_token),
@@ -264,7 +344,7 @@ def test_bulk_update_and_publish(test_app: Dict[str, object]) -> None:
                 "slug": slug,
                 "name": slug.upper(),
                 "base_price": 10,
-                "currency": "USD",
+                "currency": "RON",
                 "stock_quantity": 1,
             },
             headers=auth_headers(admin_token),
@@ -308,7 +388,7 @@ def test_product_reviews_and_related(test_app: Dict[str, object]) -> None:
             "slug": "teapot",
             "name": "Teapot",
             "base_price": 40,
-            "currency": "USD",
+            "currency": "RON",
             "stock_quantity": 2,
             "tags": ["ceramic", "teaware"],
             "status": "published",
@@ -324,7 +404,7 @@ def test_product_reviews_and_related(test_app: Dict[str, object]) -> None:
             "slug": "teapot-2",
             "name": "Teapot 2",
             "base_price": 45,
-            "currency": "USD",
+            "currency": "RON",
             "stock_quantity": 2,
             "status": "published",
         },
@@ -373,7 +453,7 @@ def test_slug_history_recently_viewed_and_csv(test_app: Dict[str, object]) -> No
             "slug": "old-slug",
             "name": "Old Name",
             "base_price": 5,
-            "currency": "USD",
+            "currency": "RON",
             "stock_quantity": 1,
             "status": "draft",
         },
@@ -437,7 +517,7 @@ def test_preorder_shipping_meta_and_sort(test_app: Dict[str, object]) -> None:
             "slug": "ship-a",
             "name": "Ship A",
             "base_price": 10,
-            "currency": "USD",
+            "currency": "RON",
             "stock_quantity": 0,
             "allow_backorder": True,
             "restock_at": "2030-01-01T00:00:00Z",
@@ -466,7 +546,7 @@ def test_preorder_shipping_meta_and_sort(test_app: Dict[str, object]) -> None:
             "slug": "ship-b",
             "name": "Ship B",
             "base_price": 20,
-            "currency": "USD",
+            "currency": "RON",
             "stock_quantity": 1,
         },
         headers=auth_headers(admin_token),
@@ -484,7 +564,7 @@ def test_preorder_shipping_meta_and_sort(test_app: Dict[str, object]) -> None:
             "slug": "bad-rich",
             "name": "Bad",
             "base_price": 1,
-            "currency": "USD",
+            "currency": "RON",
             "stock_quantity": 1,
             "long_description": "<script>alert(1)</script>",
         },
@@ -513,7 +593,7 @@ def test_featured_collections_feed_and_audit(test_app: Dict[str, object]) -> Non
             "slug": "feed-slug",
             "name": "Feed Name",
             "base_price": 11.5,
-            "currency": "USD",
+            "currency": "RON",
             "stock_quantity": 1,
             "status": "published",
         },

@@ -18,6 +18,10 @@ export class ApiService {
     return this.http.post<T>(`${this.baseUrl}${path}`, body, { headers });
   }
 
+  put<T>(path: string, body: unknown, headers?: Record<string, string>): Observable<T> {
+    return this.http.put<T>(`${this.baseUrl}${path}`, body, { headers });
+  }
+
   patch<T>(path: string, body: unknown, headers?: Record<string, string>): Observable<T> {
     return this.http.patch<T>(`${this.baseUrl}${path}`, body, { headers });
   }

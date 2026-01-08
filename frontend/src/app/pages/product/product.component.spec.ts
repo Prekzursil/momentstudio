@@ -36,7 +36,7 @@ describe('ProductComponent', () => {
       slug: 'p1',
       name: 'Product',
       base_price: 25,
-      currency: 'USD',
+      currency: 'RON',
       stock_quantity: 5,
       images: [{ url: '/img.png' }],
     } as any;

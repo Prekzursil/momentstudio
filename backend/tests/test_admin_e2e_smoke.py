@@ -86,7 +86,7 @@ async def seed_data(session_factory):
             slug="painting",
             name="Painting",
             base_price=100,
-            currency="USD",
+            currency="RON",
             category_id=category.id,
             stock_quantity=10,
             status=ProductStatus.published,
@@ -110,7 +110,7 @@ async def seed_data(session_factory):
             user_id=customer.id,
             status=OrderStatus.pending,
             total_amount=100,
-            currency="USD",
+            currency="RON",
             tax_amount=0,
             shipping_amount=0,
             shipping_address_id=address.id,
@@ -207,7 +207,7 @@ def test_admin_coupon_usage_reflected(test_app: Dict[str, object]) -> None:
 
     created = client.post(
         "/api/v1/admin/dashboard/coupons",
-        json={"code": "SAVE20", "active": True, "currency": "USD"},
+        json={"code": "SAVE20", "active": True, "currency": "RON"},
         headers=headers,
     )
     assert created.status_code == 201

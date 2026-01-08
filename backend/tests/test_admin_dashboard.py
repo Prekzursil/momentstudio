@@ -84,7 +84,7 @@ async def seed_dashboard_data(session_factory):
             slug="painting",
             name="Painting",
             base_price=100,
-            currency="USD",
+            currency="RON",
             category=cat,
             stock_quantity=10,
             status=ProductStatus.published,
@@ -106,7 +106,7 @@ async def seed_dashboard_data(session_factory):
         await session.flush()
         session.add(ContentAuditLog(content_block_id=block.id, action="publish", version=1))
 
-        promo = PromoCode(code="SAVE10", percentage_off=10, currency="USD", active=True, max_uses=5)
+        promo = PromoCode(code="SAVE10", percentage_off=10, currency="RON", active=True, max_uses=5)
         session.add(promo)
 
         user = User(
@@ -124,7 +124,7 @@ async def seed_dashboard_data(session_factory):
             user_id=user.id,
             status=OrderStatus.pending,
             total_amount=50,
-            currency="USD",
+            currency="RON",
             tax_amount=0,
             shipping_amount=0,
         )

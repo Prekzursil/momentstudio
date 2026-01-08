@@ -6,13 +6,14 @@ import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { CartStore } from '../../core/cart.store';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
+import { ImgFallbackDirective } from '../../shared/img-fallback.directive';
 import { OnInit } from '@angular/core';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-cart',
   standalone: true,
-  imports: [CommonModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent, LocalizedCurrencyPipe, TranslateModule],
+  imports: [CommonModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent, LocalizedCurrencyPipe, TranslateModule, ImgFallbackDirective],
   template: `
     <app-container classes="py-10 grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -34,9 +35,10 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
           <div *ngFor="let item of items()" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex gap-4">
               <img
-                [src]="item.image ?? 'https://via.placeholder.com/120'"
+                [src]="item.image ?? 'assets/placeholder/product-placeholder.svg'"
                 [alt]="item.name"
                 class="h-24 w-24 rounded-xl object-cover border border-slate-100 dark:border-slate-800"
+                [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
               />
               <div class="flex-1 grid gap-2">
                 <div class="flex items-start justify-between">
@@ -117,7 +119,10 @@ export class CartComponent implements OnInit {
 
   items = this.cart.items;
   subtotal = this.cart.subtotal;
-  currency = 'USD';
+
+  get currency(): string {
+    return this.items().find((i) => i.currency)?.currency ?? 'RON';
+  }
 
   onQuantityChange(id: string, value: number): void {
     const qty = Number(value);

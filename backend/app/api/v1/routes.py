@@ -12,6 +12,7 @@ from app.api.v1 import admin_dashboard
 from app.api.v1 import payment_methods
 from app.api.v1 import wishlist
 from app.api.v1 import blog
+from app.api.v1 import fx
 from app.models.catalog import Product, Category
 from app.models.content import ContentBlock, ContentStatus
 from datetime import datetime, timezone
@@ -36,6 +37,7 @@ api_router.include_router(email_preview.router)
 api_router.include_router(admin_dashboard.router)
 api_router.include_router(wishlist.router)
 api_router.include_router(blog.router)
+api_router.include_router(fx.router)
 
 
 @api_router.get("/health", tags=["health"])

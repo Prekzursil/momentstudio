@@ -66,7 +66,7 @@ def seed_product(session_factory) -> UUID:
                 sku="SKU-CUP",
                 name="Cup",
                 base_price=10,
-                currency="USD",
+                currency="RON",
                 stock_quantity=5,
                 images=[ProductImage(url="/media/cup.png", alt_text="cup")],
             )
@@ -197,7 +197,7 @@ def test_cart_sync_metadata_and_totals(test_app: Dict[str, object]) -> None:
             )
             await cart_service.create_promo(
                 session,
-                PromoCodeCreate(code="SAVE5", percentage_off=5, currency="USD"),
+                PromoCodeCreate(code="SAVE5", percentage_off=5, currency="RON"),
             )
             return shipping.id
 
@@ -221,7 +221,7 @@ def test_cart_sync_metadata_and_totals(test_app: Dict[str, object]) -> None:
     assert item["name"]
     assert item["slug"]
     assert item["image_url"]
-    assert item["currency"] == "USD"
+    assert item["currency"] == "RON"
 
     totals = body["totals"]
     # subtotal 10*2=20, discount 5% =>1, taxable 19, tax 1.9, shipping 5 => total 25.9

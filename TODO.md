@@ -234,6 +234,16 @@ Below is a structured checklist you can turn into issues.
 - [x] Recently viewed carousel.
 - [x] Localized currency display.
 - [x] SEO meta tags per product/category.
+- [x] Shop: add API-powered price bounds (min/max) so the price range UI can cap to real data without an extra list request (and optionally per-filter bounds).
+- [x] Frontend: extract repeated image placeholder-on-error handlers into a shared directive/helper for consistency.
+- [x] Pricing: show EN approx EUR/USD for RON prices (display-only; checkout remains in RON) using live FX rates.
+- [x] Pricing: add FX rate source/TTL settings (backend env: `FX_RATES_URL`, `FX_RATES_CACHE_TTL_SECONDS`).
+- [x] Pricing: add optional admin override/fallback for FX rates (store last-known rates; use when upstream is down).
+- [x] Pricing: enforce single-currency RON across products/orders and document the policy.
+- [x] Pricing: add admin UI to view/set/clear FX rate overrides and display last-known/as-of timestamps.
+- [x] Shop perf: include min/max price bounds in `/catalog/products` response to avoid an extra `/price-bounds` call per filter change.
+- [x] Pricing: add scheduled FX refresh job (background) so first-page loads never block on upstream fetch.
+- [x] A11y: localize shop filter aria labels and improve keyboard affordances for price range inputs.
 
 ## Blog & Community
 - [x] Nav: add “Blog” link between Home and Shop (header + drawer).

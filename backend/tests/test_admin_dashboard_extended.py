@@ -81,7 +81,7 @@ async def seed(session_factory):
             slug="painting",
             name="Painting",
             base_price=50,
-            currency="USD",
+            currency="RON",
             category_id=category.id,
             stock_quantity=2,
             status=ProductStatus.published,
@@ -96,13 +96,13 @@ async def seed(session_factory):
             user_id=customer.id,
             status=OrderStatus.pending,
             total_amount=50,
-            currency="USD",
+            currency="RON",
             tax_amount=0,
             shipping_amount=0,
         )
         session.add(order)
 
-        promo = PromoCode(code="SAVE5", percentage_off=5, currency="USD", active=True, max_uses=10)
+        promo = PromoCode(code="SAVE5", percentage_off=5, currency="RON", active=True, max_uses=10)
         session.add(promo)
 
         block = ContentBlock(

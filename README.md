@@ -113,6 +113,13 @@ You can swap pieces later, but the initial design assumes:
 
 ---
 
+## 3.3 Currency policy (RON-only)
+
+- **Single currency**: all product prices and order totals are stored and processed in Romanian Leu (**RON**).
+- **Checkout**: Stripe PaymentIntents are created in **RON**; there is no multi-currency checkout.
+- **Display-only conversions**: when browsing in English, the UI may show an approximate **EUR** and **USD** value in parentheses for convenience. Rates are fetched from BNR via `/api/v1/fx/rates` and cached server-side (with optional admin override/fallback).
+- **Admin/import**: products and coupons must use **RON**. The API rejects other currencies.
+
 ## 3. Features Overview
 
 ### Customer‑Facing
@@ -181,7 +188,7 @@ You can swap pieces later, but the initial design assumes:
 - `long_description`
 - `category_id`
 - `base_price` (decimal)
-- `currency` (e.g., `"EUR"`, `"GBP"`)
+- `currency` (always `"RON"`)
 - `is_active` (bool)
 - `is_featured` (bool)
 - `stock_quantity` (int)
@@ -234,7 +241,7 @@ You can swap pieces later, but the initial design assumes:
   - `user_id`
   - `status` (Pending, PaymentPending, Paid, Shipped, Delivered, Cancelled)
   - `total_amount`
-  - `currency`
+  - `currency` (always `"RON"`)
   - `stripe_payment_intent_id`
   - `shipping_address_id`
   - `billing_address_id`
