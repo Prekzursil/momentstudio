@@ -11,6 +11,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
 import { ToastService } from '../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
+import { ImgFallbackDirective } from '../../shared/img-fallback.directive';
 import { Title, Meta } from '@angular/platform-browser';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
@@ -31,7 +32,8 @@ import { Router } from '@angular/router';
     SkeletonComponent,
     LocalizedCurrencyPipe,
     BreadcrumbComponent,
-    TranslateModule
+    TranslateModule,
+    ImgFallbackDirective
   ],
   template: `
     <app-container classes="py-10">
@@ -61,6 +63,7 @@ import { Router } from '@angular/router';
                   loading="lazy"
                   decoding="async"
                   sizes="(min-width: 1024px) 480px, 100vw"
+                  [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
                 />
               </div>
               <div class="flex gap-3">
@@ -79,6 +82,7 @@ import { Router } from '@angular/router';
                     height="96"
                     loading="lazy"
                     decoding="async"
+                    [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
                   />
                 </button>
               </div>
@@ -174,14 +178,15 @@ import { Router } from '@angular/router';
           >
             <div class="flex items-center gap-3 text-left">
               <img
-                [ngSrc]="item.images?.[0]?.url ?? 'https://via.placeholder.com/96'"
+                [ngSrc]="item.images?.[0]?.url ?? 'assets/placeholder/product-placeholder.svg'"
                 [alt]="item.name"
                 class="h-14 w-14 rounded-xl object-cover"
-                width="96"
-                height="96"
-                loading="lazy"
-                decoding="async"
-              />
+	                width="96"
+	                height="96"
+	                loading="lazy"
+	                decoding="async"
+	                [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
+	              />
                 <div class="grid gap-1">
                 <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ item.name }}</p>
                 <p class="text-sm text-slate-600 dark:text-slate-300">
@@ -212,10 +217,11 @@ import { Router } from '@angular/router';
             class="w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl"
             width="1600"
             height="1200"
-            loading="lazy"
-            decoding="async"
-            sizes="(min-width: 1024px) 960px, 100vw"
-          />
+	            loading="lazy"
+	            decoding="async"
+	            sizes="(min-width: 1024px) 960px, 100vw"
+	            [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
+	          />
         </div>
       </div>
 
@@ -302,7 +308,7 @@ export class ProductComponent implements OnInit, OnDestroy {
 
   get activeImage(): string {
     if (!this.product || !this.product.images?.length) {
-      return 'https://via.placeholder.com/960x960?text=Product';
+      return 'assets/placeholder/product-placeholder.svg';
     }
     return this.product.images[this.activeImageIndex]?.url ?? this.product.images[0].url;
   }

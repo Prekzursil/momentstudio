@@ -49,7 +49,7 @@ SEED_PRODUCTS: list[SeedProduct] = [
         "short_description": "Matte white glaze, comfortable handle.",
         "long_description": "Wheel-thrown stoneware with white matte glaze and speckle.",
         "base_price": Decimal("24.00"),
-        "currency": "USD",
+        "currency": "RON",
         "stock_quantity": 10,
         "is_featured": True,
         "images": [
@@ -68,7 +68,7 @@ SEED_PRODUCTS: list[SeedProduct] = [
         "short_description": "Splash glaze interior with raw exterior.",
         "long_description": "Medium bowl perfect for ramen or salads.",
         "base_price": Decimal("36.00"),
-        "currency": "USD",
+        "currency": "RON",
         "stock_quantity": 6,
         "is_featured": False,
         "images": [

@@ -25,7 +25,7 @@ def test_checkout_build_order():
                 sku="SVC-CHK",
                 name="Svc Checkout Product",
                 base_price=Decimal("12.00"),
-                currency="USD",
+                currency="RON",
                 stock_quantity=10,
             )
             cart = Cart(user_id=product.id)

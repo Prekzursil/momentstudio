@@ -259,7 +259,7 @@ async def import_data(input_path: Path) -> None:
             product_obj.short_description = p.get("short_description")
             product_obj.long_description = p.get("long_description")
             product_obj.base_price = p.get("base_price", 0)
-            product_obj.currency = p.get("currency", "USD")
+            product_obj.currency = p.get("currency", "RON")
             product_obj.is_featured = p.get("is_featured", False)
             product_obj.stock_quantity = p.get("stock_quantity", 0)
             if "status" in p and p["status"]:
@@ -337,7 +337,7 @@ async def import_data(input_path: Path) -> None:
             if o.get("status"):
                 order_obj.status = o["status"]
             order_obj.total_amount = o.get("total_amount", 0)
-            order_obj.currency = o.get("currency", "USD")
+            order_obj.currency = o.get("currency", "RON")
             order_obj.reference_code = o.get("reference_code")
             order_obj.shipping_address_id = o.get("shipping_address_id")
             order_obj.billing_address_id = o.get("billing_address_id")

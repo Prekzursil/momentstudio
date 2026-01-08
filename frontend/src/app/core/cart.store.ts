@@ -69,7 +69,7 @@ export class CartStore {
           name: res.name ?? payload.name ?? '',
           slug: res.slug ?? payload.slug ?? '',
           price: Number(res.unit_price_at_add ?? payload.price ?? 0),
-          currency: res.currency ?? payload.currency ?? 'USD',
+          currency: res.currency ?? payload.currency ?? 'RON',
           quantity: res.quantity,
           stock: res.max_quantity ?? payload.stock ?? 99,
           image: res.image_url ?? payload.image ?? ''
@@ -161,7 +161,7 @@ export class CartStore {
   }
 
   private fromApi(res: { items: any[]; totals: any }): CartItem[] {
-    const currency = res.totals?.currency ?? 'USD';
+    const currency = res.totals?.currency ?? 'RON';
     return res.items.map((i) => ({
       id: i.id,
       product_id: i.product_id,

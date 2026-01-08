@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { Product } from '../core/catalog.service';
 import { ButtonComponent } from './button.component';
 import { LocalizedCurrencyPipe } from './localized-currency.pipe';
+import { ImgFallbackDirective } from './img-fallback.directive';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { WishlistService } from '../core/wishlist.service';
 import { AuthService } from '../core/auth.service';
@@ -13,7 +14,7 @@ import { Router } from '@angular/router';
 @Component({
   selector: 'app-product-card',
   standalone: true,
-  imports: [CommonModule, RouterLink, NgOptimizedImage, LocalizedCurrencyPipe, ButtonComponent, TranslateModule],
+  imports: [CommonModule, RouterLink, NgOptimizedImage, LocalizedCurrencyPipe, ButtonComponent, TranslateModule, ImgFallbackDirective],
   template: `
     <article class="group grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm hover:-translate-y-1 hover:shadow-md transition dark:bg-slate-900 dark:border-slate-800 dark:shadow-none">
       <a [routerLink]="['/products', product.slug]" class="block overflow-hidden rounded-xl bg-slate-50 relative dark:bg-slate-800">
@@ -26,6 +27,7 @@ import { Router } from '@angular/router';
           loading="lazy"
           decoding="async"
           sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw"
+          [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
         />
         <button
           type="button"
@@ -96,7 +98,7 @@ export class ProductCardComponent {
   }
 
   get primaryImage(): string {
-    return this.product.images?.[0]?.url ?? 'https://via.placeholder.com/640x640?text=Product';
+    return this.product.images?.[0]?.url ?? 'assets/placeholder/product-placeholder.svg';
   }
 
   get stockBadge(): string | null {

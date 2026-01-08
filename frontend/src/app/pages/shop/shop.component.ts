@@ -44,8 +44,8 @@ import { Meta, Title } from '@angular/platform-browser';
             <app-input
               [label]="'shop.search' | translate"
               [placeholder]="'shop.searchPlaceholder' | translate"
-              [(value)]="filters.search"
-              (ngModelChange)="onSearch()"
+              [value]="filters.search"
+              (valueChange)="onSidebarSearchChange($event)"
             >
             </app-input>
           </div>
@@ -84,49 +84,74 @@ import { Meta, Title } from '@angular/platform-browser';
           <div class="space-y-3">
             <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ 'shop.priceRange' | translate }}</p>
             <div class="grid gap-3">
-              <div class="grid gap-2">
+              <p id="shop-price-status" class="sr-only">
+                {{ 'shop.priceRangeStatus' | translate : { min: filters.min_price, max: filters.max_price } }}
+              </p>
+              <div class="grid gap-2 overflow-hidden">
                 <input
                   type="range"
-                  min="0"
-                  max="500"
-                  step="5"
-                  class="w-full accent-indigo-600"
+                  [min]="priceMinBound"
+                  [max]="priceMaxBound"
+                  [step]="priceStep"
+                  class="block w-full max-w-full accent-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                   [(ngModel)]="filters.min_price"
-                  (change)="applyFilters()"
-                  aria-label="Minimum price"
+                  (change)="onPriceCommit('min')"
+                  [attr.aria-label]="'shop.ariaMinPrice' | translate"
+                  aria-describedby="shop-price-status shop-price-hint"
+                  [attr.aria-valuetext]="filters.min_price + ' RON'"
                 />
                 <input
                   type="range"
-                  min="0"
-                  max="500"
-                  step="5"
-                  class="w-full accent-indigo-600"
+                  [min]="priceMinBound"
+                  [max]="priceMaxBound"
+                  [step]="priceStep"
+                  class="block w-full max-w-full accent-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                   [(ngModel)]="filters.max_price"
-                  (change)="applyFilters()"
-                  aria-label="Maximum price"
+                  (change)="onPriceCommit('max')"
+                  [attr.aria-label]="'shop.ariaMaxPrice' | translate"
+                  aria-describedby="shop-price-status shop-price-hint"
+                  [attr.aria-valuetext]="filters.max_price + ' RON'"
                 />
               </div>
               <div class="grid grid-cols-2 gap-3">
-                <app-input [label]="'shop.min' | translate" type="number" [(value)]="filters.min_price" (ngModelChange)="applyFilters()">
-                </app-input>
-                <app-input [label]="'shop.max' | translate" type="number" [(value)]="filters.max_price" (ngModelChange)="applyFilters()">
-                </app-input>
+                <app-input
+                  [label]="'shop.min' | translate"
+                  type="number"
+                  [value]="filters.min_price"
+                  (valueChange)="onPriceTextChange('min', $event)"
+                  [min]="priceMinBound"
+                  [max]="priceMaxBound"
+                  [step]="priceStep"
+                  inputMode="numeric"
+                ></app-input>
+                <app-input
+                  [label]="'shop.max' | translate"
+                  type="number"
+                  [value]="filters.max_price"
+                  (valueChange)="onPriceTextChange('max', $event)"
+                  [min]="priceMinBound"
+                  [max]="priceMaxBound"
+                  [step]="priceStep"
+                  inputMode="numeric"
+                ></app-input>
               </div>
-              <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'shop.priceHint' | translate }}</p>
+              <p id="shop-price-hint" class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'shop.priceHint' | translate }}
+              </p>
             </div>
           </div>
 
-          <div class="space-y-3" *ngIf="allTags.size">
+          <div class="space-y-3" *ngIf="allTags.length">
             <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ 'shop.tags' | translate }}</p>
             <div class="flex flex-wrap gap-2">
               <button
                 type="button"
                 class="rounded-full border px-3 py-1 text-xs font-medium transition"
-                [ngClass]="filters.tags.has(tag) ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:border-slate-50' : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-slate-50'"
+                [ngClass]="filters.tags.has(tag.slug) ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:border-slate-50' : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-slate-50'"
                 *ngFor="let tag of allTags"
-                (click)="toggleTag(tag)"
+                (click)="toggleTag(tag.slug)"
               >
-                {{ tag }}
+                {{ tag.name }}
               </button>
             </div>
           </div>
@@ -207,7 +232,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   products: Product[] = [];
   categories: Category[] = [];
   pageMeta: PaginationMeta | null = null;
-  allTags = new Set<string>();
+  allTags: { slug: string; name: string }[] = [];
   loading = signal<boolean>(true);
   hasError = signal<boolean>(false);
   placeholders = Array.from({ length: 6 });
@@ -219,8 +244,8 @@ export class ShopComponent implements OnInit, OnDestroy {
   filters: {
     search: string;
     category_slug: string;
-    min_price?: number | string;
-    max_price?: number | string;
+    min_price: number;
+    max_price: number;
     tags: Set<string>;
     sort: SortOption;
     page: number;
@@ -228,11 +253,20 @@ export class ShopComponent implements OnInit, OnDestroy {
   } = {
     search: '',
     category_slug: '',
+    min_price: 1,
+    max_price: 500,
     tags: new Set<string>(),
     sort: 'newest',
     page: 1,
     limit: 12
   };
+
+  readonly priceMinBound = 1;
+  priceMaxBound = 500;
+  readonly priceStep = 1;
+  private filterDebounce?: ReturnType<typeof setTimeout>;
+  private readonly filterDebounceMs = 350;
+  private suppressNextQueryLoad = false;
 
   sortOptions: { label: string; value: SortOption }[] = [
     { label: 'shop.sortNew', value: 'newest' },
@@ -264,6 +298,10 @@ export class ShopComponent implements OnInit, OnDestroy {
       this.fetchCategories();
     }
     this.route.queryParams.subscribe((params) => {
+      if (this.suppressNextQueryLoad) {
+        this.suppressNextQueryLoad = false;
+        return;
+      }
       this.syncFiltersFromQuery(params);
       this.loadProducts(false);
     });
@@ -271,6 +309,7 @@ export class ShopComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.langSub?.unsubscribe();
+    this.cancelFilterDebounce();
   }
 
   fetchCategories(): void {
@@ -280,17 +319,23 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   loadProducts(pushQuery = true): void {
+    this.normalizePriceRange();
     this.loading.set(true);
     this.hasError.set(false);
     if (pushQuery) {
+      this.suppressNextQueryLoad = true;
       this.updateQueryParams();
     }
+    this.fetchProducts();
+  }
+
+  private fetchProducts(): void {
     this.catalog
       .listProducts({
         search: this.filters.search || undefined,
         category_slug: this.filters.category_slug || undefined,
-        min_price: this.filters.min_price ? Number(this.filters.min_price) : undefined,
-        max_price: this.filters.max_price ? Number(this.filters.max_price) : undefined,
+        min_price: this.filters.min_price > this.priceMinBound ? this.filters.min_price : undefined,
+        max_price: this.filters.max_price < this.priceMaxBound ? this.filters.max_price : undefined,
         tags: Array.from(this.filters.tags),
         sort: this.filters.sort,
         page: this.filters.page,
@@ -300,6 +345,16 @@ export class ShopComponent implements OnInit, OnDestroy {
         next: (response) => {
           this.products = response.items;
           this.pageMeta = response.meta;
+          const previousMaxBound = this.priceMaxBound;
+          const max = response.bounds?.max_price;
+          if (typeof max === 'number' && Number.isFinite(max)) {
+            const rounded = Math.ceil(max / this.priceStep) * this.priceStep;
+            this.priceMaxBound = Math.max(this.priceMinBound, rounded);
+            if (this.filters.max_price === previousMaxBound) {
+              this.filters.max_price = this.priceMaxBound;
+            }
+          }
+          this.normalizePriceRange();
           if (this.filters.category_slug) {
             const cat = this.categories.find((c) => c.slug === this.filters.category_slug);
             this.crumbs = [
@@ -313,11 +368,13 @@ export class ShopComponent implements OnInit, OnDestroy {
               { label: 'nav.shop' }
             ];
           }
-          this.allTags = new Set(
-            response.items
-              .flatMap((p) => p.tags ?? [])
-              .map((t) => ('name' in t ? t.name : String(t)))
-          );
+          const tagMap = new Map<string, string>();
+          response.items.forEach((p) => {
+            (p.tags ?? []).forEach((tag) => tagMap.set(tag.slug, tag.name));
+          });
+          this.allTags = Array.from(tagMap.entries())
+            .map(([slug, name]) => ({ slug, name }))
+            .sort((a, b) => a.name.localeCompare(b.name));
           this.setMetaTags();
           this.loading.set(false);
           this.hasError.set(false);
@@ -332,8 +389,45 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   applyFilters(): void {
+    this.cancelFilterDebounce();
     this.filters.page = 1;
     this.loadProducts();
+  }
+
+  private scheduleFilterApply(): void {
+    this.filters.page = 1;
+    if (this.filterDebounce) clearTimeout(this.filterDebounce);
+    this.filterDebounce = setTimeout(() => {
+      this.filterDebounce = undefined;
+      this.loadProducts();
+    }, this.filterDebounceMs);
+  }
+
+  private cancelFilterDebounce(): void {
+    if (!this.filterDebounce) return;
+    clearTimeout(this.filterDebounce);
+    this.filterDebounce = undefined;
+  }
+
+  onSidebarSearchChange(raw: string | number): void {
+    this.filters.search = String(raw ?? '');
+    this.scheduleFilterApply();
+  }
+
+  onPriceCommit(changed: 'min' | 'max'): void {
+    this.normalizePriceRange(changed);
+    this.applyFilters();
+  }
+
+  onPriceTextChange(changed: 'min' | 'max', raw: string | number): void {
+    const parsed = this.parsePrice(raw);
+    if (changed === 'min') {
+      this.filters.min_price = parsed ?? this.priceMinBound;
+    } else {
+      this.filters.max_price = parsed ?? this.priceMaxBound;
+    }
+    this.normalizePriceRange(changed);
+    this.scheduleFilterApply();
   }
 
   onSearch(): void {
@@ -341,6 +435,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   changePage(delta: number): void {
+    this.cancelFilterDebounce();
     if (!this.pageMeta) return;
     const nextPage = this.pageMeta.page + delta;
     if (nextPage < 1 || nextPage > this.pageMeta.total_pages) return;
@@ -348,20 +443,22 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.loadProducts();
   }
 
-  toggleTag(tag: string): void {
-    if (this.filters.tags.has(tag)) {
-      this.filters.tags.delete(tag);
+  toggleTag(tagSlug: string): void {
+    this.cancelFilterDebounce();
+    if (this.filters.tags.has(tagSlug)) {
+      this.filters.tags.delete(tagSlug);
     } else {
-      this.filters.tags.add(tag);
+      this.filters.tags.add(tagSlug);
     }
     this.applyFilters();
   }
 
   resetFilters(): void {
+    this.cancelFilterDebounce();
     this.filters.search = '';
     this.filters.category_slug = '';
-    this.filters.min_price = undefined;
-    this.filters.max_price = undefined;
+    this.filters.min_price = this.priceMinBound;
+    this.filters.max_price = this.priceMaxBound;
     this.filters.tags = new Set<string>();
     this.filters.sort = 'newest';
     this.filters.page = 1;
@@ -381,8 +478,8 @@ export class ShopComponent implements OnInit, OnDestroy {
     const params: Params = {
       q: this.filters.search || undefined,
       cat: this.filters.category_slug || undefined,
-      min: this.filters.min_price || undefined,
-      max: this.filters.max_price || undefined,
+      min: this.filters.min_price > this.priceMinBound ? this.filters.min_price : undefined,
+      max: this.filters.max_price < this.priceMaxBound ? this.filters.max_price : undefined,
       sort: this.filters.sort !== 'newest' ? this.filters.sort : undefined,
       page: this.filters.page !== 1 ? this.filters.page : undefined,
       tags: this.filters.tags.size ? Array.from(this.filters.tags).join(',') : undefined
@@ -393,13 +490,51 @@ export class ShopComponent implements OnInit, OnDestroy {
   private syncFiltersFromQuery(params: Params): void {
     this.filters.search = params['q'] ?? '';
     this.filters.category_slug = params['cat'] ?? '';
-    this.filters.min_price = params['min'] ?? undefined;
-    this.filters.max_price = params['max'] ?? undefined;
+    const min = this.parsePrice(params['min']);
+    const max = this.parsePrice(params['max']);
+    this.filters.min_price = min ?? this.priceMinBound;
+    this.filters.max_price = max ?? this.priceMaxBound;
     this.filters.sort = (params['sort'] as SortOption) ?? 'newest';
     this.filters.page = params['page'] ? Number(params['page']) : 1;
     const tagParam = params['tags'];
     this.filters.tags = new Set<string>(
       typeof tagParam === 'string' && tagParam.length ? tagParam.split(',') : []
     );
+    this.normalizePriceRange();
+  }
+
+  private parsePrice(raw: unknown): number | undefined {
+    if (raw === null || raw === undefined) return undefined;
+    if (typeof raw === 'number') {
+      if (!Number.isFinite(raw)) return undefined;
+      return raw;
+    }
+    const str = String(raw).trim();
+    if (!str.length) return undefined;
+    const n = Number(str);
+    if (!Number.isFinite(n)) return undefined;
+    return n;
+  }
+
+  private normalizePriceRange(changed?: 'min' | 'max'): void {
+    this.filters.min_price = this.clampPrice(this.filters.min_price);
+    this.filters.max_price = this.clampPrice(this.filters.max_price);
+
+    if (this.filters.max_price < this.filters.min_price) {
+      if (changed === 'min') {
+        this.filters.max_price = this.filters.min_price;
+      } else if (changed === 'max') {
+        this.filters.min_price = this.filters.max_price;
+      } else {
+        this.filters.max_price = this.filters.min_price;
+      }
+    }
+  }
+
+  private clampPrice(value: number): number {
+    if (!Number.isFinite(value)) return this.priceMinBound;
+    const clamped = Math.min(Math.max(value, this.priceMinBound), this.priceMaxBound);
+    const stepped = Math.round(clamped / this.priceStep) * this.priceStep;
+    return Math.min(Math.max(stepped, this.priceMinBound), this.priceMaxBound);
   }
 }

@@ -18,7 +18,7 @@ describe('CheckoutComponent', () => {
       name: 'Prod',
       slug: 'prod',
       price: 20,
-      currency: 'USD',
+      currency: 'RON',
       quantity: 1,
       stock: 5,
       image: '/img.png'

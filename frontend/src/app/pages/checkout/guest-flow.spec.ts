@@ -18,7 +18,7 @@ describe('Guest checkout flow (mocked e2e)', () => {
       name: 'Prod',
       slug: 'prod',
       price: 30,
-      currency: 'USD',
+      currency: 'RON',
       quantity: 2,
       stock: 5,
       image: '/img.png'

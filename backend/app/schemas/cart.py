@@ -9,7 +9,7 @@ class Totals(BaseModel):
     tax: Decimal
     shipping: Decimal
     total: Decimal
-    currency: str | None = "USD"
+    currency: str | None = "RON"
 
 
 class CartItemCreate(BaseModel):
@@ -38,7 +38,7 @@ class CartItemRead(BaseModel):
     name: str | None = None
     slug: str | None = None
     image_url: str | None = None
-    currency: str | None = "USD"
+    currency: str | None = "RON"
 
 
 class CartRead(BaseModel):

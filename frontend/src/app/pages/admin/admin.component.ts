@@ -28,6 +28,7 @@ import {
   ContentBlockVersionRead
 } from '../../core/admin.service';
 import { AdminBlogComment, BlogService } from '../../core/blog.service';
+import { FxAdminService, FxAdminStatus } from '../../core/fx-admin.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { firstValueFrom } from 'rxjs';
@@ -77,7 +78,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
             <div class="grid md:grid-cols-3 gap-4">
               <app-card [title]="'adminUi.cards.lowStock' | translate" [subtitle]="summary()?.low_stock + ' items'"></app-card>
-              <app-card [title]="'adminUi.cards.sales30' | translate" [subtitle]="(summary()?.sales_30d || 0) | localizedCurrency : 'USD'"></app-card>
+              <app-card [title]="'adminUi.cards.sales30' | translate" [subtitle]="(summary()?.sales_30d || 0) | localizedCurrency : 'RON'"></app-card>
               <app-card [title]="'adminUi.cards.orders30' | translate" [subtitle]="summary()?.orders_30d + ' orders'"></app-card>
               <app-card title="Open orders" [subtitle]="openOrdersCount() + ' pending'"></app-card>
               <app-card title="Recent orders" [subtitle]="recentOrdersCount() + ' in last view'"></app-card>
@@ -319,7 +320,7 @@ import { formatIdentity } from '../../shared/user-identity';
                       <span *ngIf="product.tags?.includes('bestseller')" class="ml-2 text-[10px] uppercase bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Bestseller</span>
                       <span *ngIf="product.tags?.includes('highlight')" class="ml-1 text-[10px] uppercase bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">Highlight</span>
                     </td>
-                    <td>{{ product.price | localizedCurrency : product.currency || 'USD' }}</td>
+                    <td>{{ product.price | localizedCurrency : product.currency || 'RON' }}</td>
                     <td><span class="text-xs rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-800">{{ product.status }}</span></td>
                     <td>{{ product.category }}</td>
                     <td class="flex items-center gap-2">
@@ -469,7 +470,7 @@ import { formatIdentity } from '../../shared/user-identity';
                     <span class="font-semibold text-slate-900 dark:text-slate-50">Order #{{ order.id }}</span>
                     <span class="text-xs rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-800">{{ order.status }}</span>
                   </div>
-                  <p>{{ order.customer }} — {{ order.total_amount | localizedCurrency : order.currency || 'USD' }}</p>
+                  <p>{{ order.customer }} — {{ order.total_amount | localizedCurrency : order.currency || 'RON' }}</p>
                 </div>
               </div>
               <div class="rounded-lg border border-slate-200 p-4 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200" *ngIf="activeOrder">
@@ -485,7 +486,7 @@ import { formatIdentity } from '../../shared/user-identity';
                 </div>
                 <p class="text-xs text-slate-500 dark:text-slate-400">Customer: {{ activeOrder.customer }}</p>
                 <p class="text-xs text-slate-500 dark:text-slate-400">Placed: {{ activeOrder.created_at | date: 'medium' }}</p>
-                <p class="font-semibold text-slate-900 dark:text-slate-50 mt-2">{{ activeOrder.total_amount | localizedCurrency : activeOrder.currency || 'USD' }}</p>
+                <p class="font-semibold text-slate-900 dark:text-slate-50 mt-2">{{ activeOrder.total_amount | localizedCurrency : activeOrder.currency || 'RON' }}</p>
               </div>
             </div>
           </section>
@@ -1089,7 +1090,7 @@ import { formatIdentity } from '../../shared/user-identity';
                   <p class="font-semibold text-slate-900 dark:text-slate-50">{{ coupon.code }}</p>
                   <p class="text-xs text-slate-500 dark:text-slate-400">
                     <ng-container *ngIf="coupon.percentage_off">-{{ coupon.percentage_off }}%</ng-container>
-                    <ng-container *ngIf="coupon.amount_off">-{{ coupon.amount_off | localizedCurrency : coupon.currency || 'USD' }}</ng-container>
+                    <ng-container *ngIf="coupon.amount_off">-{{ coupon.amount_off | localizedCurrency : coupon.currency || 'RON' }}</ng-container>
                     <ng-container *ngIf="!coupon.percentage_off && !coupon.amount_off">{{ 'adminUi.coupons.none' | translate }}</ng-container>
                   </p>
                 </div>
@@ -1102,6 +1103,147 @@ import { formatIdentity } from '../../shared/user-identity';
                 >
                   {{ coupon.active ? ('adminUi.coupons.active' | translate) : ('adminUi.coupons.inactive' | translate) }}
                 </button>
+              </div>
+            </div>
+          </section>
+
+          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div class="grid gap-0.5">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.fx.title' | translate }}</h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.fx.hint' | translate }}</p>
+              </div>
+              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadFxStatus()"></app-button>
+            </div>
+
+            <div
+              *ngIf="fxError()"
+              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+            >
+              {{ fxError() }}
+            </div>
+            <div *ngIf="fxLoading()" class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.fx.loading' | translate }}</div>
+
+            <div *ngIf="fxStatus() as fx" class="grid gap-4 md:grid-cols-3 text-sm text-slate-700 dark:text-slate-200">
+              <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.fx.effective' | translate }}
+                </p>
+                <div class="mt-2 grid gap-1">
+                  <div class="flex items-center justify-between gap-3">
+                    <span>{{ 'adminUi.fx.eurPerRon' | translate }}</span>
+                    <span class="font-medium text-slate-900 dark:text-slate-50">{{ fx.effective.eur_per_ron | number: '1.4-6' }}</span>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <span>{{ 'adminUi.fx.usdPerRon' | translate }}</span>
+                    <span class="font-medium text-slate-900 dark:text-slate-50">{{ fx.effective.usd_per_ron | number: '1.4-6' }}</span>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <span>{{ 'adminUi.fx.asOf' | translate }}</span>
+                    <span class="text-slate-600 dark:text-slate-300">{{ fx.effective.as_of }}</span>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <span>{{ 'adminUi.fx.fetchedAt' | translate }}</span>
+                    <span class="text-slate-600 dark:text-slate-300">{{ fx.effective.fetched_at | date: 'short' }}</span>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <span>{{ 'adminUi.fx.source' | translate }}</span>
+                    <span class="text-slate-600 dark:text-slate-300">{{ fx.effective.source }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.fx.override' | translate }}
+                  </p>
+                  <button
+                    *ngIf="fx.override"
+                    type="button"
+                    class="text-xs font-medium text-rose-600 hover:text-rose-700 dark:text-rose-300 dark:hover:text-rose-200"
+                    (click)="clearFxOverride()"
+                  >
+                    {{ 'adminUi.fx.actions.clear' | translate }}
+                  </button>
+                </div>
+
+                <ng-container *ngIf="fx.override; else noOverrideTpl">
+                  <div class="mt-2 grid gap-1">
+                    <div class="flex items-center justify-between gap-3">
+                      <span>{{ 'adminUi.fx.eurPerRon' | translate }}</span>
+                      <span class="font-medium text-slate-900 dark:text-slate-50">{{ fx.override?.eur_per_ron | number: '1.4-6' }}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-3">
+                      <span>{{ 'adminUi.fx.usdPerRon' | translate }}</span>
+                      <span class="font-medium text-slate-900 dark:text-slate-50">{{ fx.override?.usd_per_ron | number: '1.4-6' }}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-3">
+                      <span>{{ 'adminUi.fx.asOf' | translate }}</span>
+                      <span class="text-slate-600 dark:text-slate-300">{{ fx.override?.as_of }}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-3">
+                      <span>{{ 'adminUi.fx.fetchedAt' | translate }}</span>
+                      <span class="text-slate-600 dark:text-slate-300">{{ fx.override?.fetched_at | date: 'short' }}</span>
+                    </div>
+                  </div>
+                </ng-container>
+                <ng-template #noOverrideTpl>
+                  <p class="mt-2 text-slate-500 dark:text-slate-400">{{ 'adminUi.fx.noOverride' | translate }}</p>
+                </ng-template>
+
+                <div class="mt-4 grid gap-2 border-t border-slate-200 pt-4 dark:border-slate-800">
+                  <div class="grid gap-2 sm:grid-cols-2">
+                    <app-input [label]="'adminUi.fx.eurPerRon' | translate" type="number" [(value)]="fxOverrideForm.eur_per_ron"></app-input>
+                    <app-input [label]="'adminUi.fx.usdPerRon' | translate" type="number" [(value)]="fxOverrideForm.usd_per_ron"></app-input>
+                  </div>
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    <span>{{ 'adminUi.fx.asOf' | translate }}</span>
+                    <input
+                      type="date"
+                      class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
+                      [(ngModel)]="fxOverrideForm.as_of"
+                    />
+                    <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.fx.asOfHint' | translate }}</span>
+                  </label>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <app-button size="sm" [label]="'adminUi.fx.actions.set' | translate" (action)="saveFxOverride()"></app-button>
+                    <app-button size="sm" variant="ghost" [label]="'adminUi.fx.actions.reset' | translate" (action)="resetFxOverrideForm()"></app-button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.fx.lastKnown' | translate }}
+                </p>
+                <ng-container *ngIf="fx.last_known; else noLastKnownTpl">
+                  <div class="mt-2 grid gap-1">
+                    <div class="flex items-center justify-between gap-3">
+                      <span>{{ 'adminUi.fx.eurPerRon' | translate }}</span>
+                      <span class="font-medium text-slate-900 dark:text-slate-50">{{ fx.last_known?.eur_per_ron | number: '1.4-6' }}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-3">
+                      <span>{{ 'adminUi.fx.usdPerRon' | translate }}</span>
+                      <span class="font-medium text-slate-900 dark:text-slate-50">{{ fx.last_known?.usd_per_ron | number: '1.4-6' }}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-3">
+                      <span>{{ 'adminUi.fx.asOf' | translate }}</span>
+                      <span class="text-slate-600 dark:text-slate-300">{{ fx.last_known?.as_of }}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-3">
+                      <span>{{ 'adminUi.fx.fetchedAt' | translate }}</span>
+                      <span class="text-slate-600 dark:text-slate-300">{{ fx.last_known?.fetched_at | date: 'short' }}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-3">
+                      <span>{{ 'adminUi.fx.source' | translate }}</span>
+                      <span class="text-slate-600 dark:text-slate-300">{{ fx.last_known?.source }}</span>
+                    </div>
+                  </div>
+                </ng-container>
+                <ng-template #noLastKnownTpl>
+                  <p class="mt-2 text-slate-500 dark:text-slate-400">{{ 'adminUi.fx.noLastKnown' | translate }}</p>
+                </ng-template>
               </div>
             </div>
           </section>
@@ -1323,9 +1465,14 @@ export class AdminComponent implements OnInit {
   infoMessage: string | null = null;
   infoError: string | null = null;
   coupons: AdminCoupon[] = [];
-  newCoupon: Partial<AdminCoupon> = { code: '', percentage_off: 0, active: true, currency: 'USD' };
+  newCoupon: Partial<AdminCoupon> = { code: '', percentage_off: 0, active: true, currency: 'RON' };
   stockEdits: Record<string, number> = {};
   bulkStock: number | null = null;
+
+  fxStatus = signal<FxAdminStatus | null>(null);
+  fxLoading = signal<boolean>(false);
+  fxError = signal<string | null>(null);
+  fxOverrideForm: { eur_per_ron: number; usd_per_ron: number; as_of: string } = { eur_per_ron: 0, usd_per_ron: 0, as_of: '' };
 
   productAudit: AdminAudit['products'] = [];
   contentAudit: AdminAudit['content'] = [];
@@ -1334,6 +1481,7 @@ export class AdminComponent implements OnInit {
   constructor(
     private admin: AdminService,
     private blog: BlogService,
+    private fxAdmin: FxAdminService,
     private toast: ToastService,
     private translate: TranslateService,
     private markdown: MarkdownService
@@ -1382,6 +1530,7 @@ export class AdminComponent implements OnInit {
     this.loadSeo();
     this.loadInfo();
     this.loadFlaggedComments();
+    this.loadFxStatus();
     this.admin.getMaintenance().subscribe({
       next: (m) => {
         this.maintenanceEnabled.set(m.enabled);
@@ -1389,6 +1538,76 @@ export class AdminComponent implements OnInit {
       }
     });
     this.loading.set(false);
+  }
+
+  loadFxStatus(): void {
+    this.fxLoading.set(true);
+    this.fxError.set(null);
+    this.fxAdmin.getStatus().subscribe({
+      next: (status) => {
+        this.fxStatus.set(status);
+        const current = status.override ?? status.effective;
+        this.fxOverrideForm = {
+          eur_per_ron: Number(current.eur_per_ron) || 0,
+          usd_per_ron: Number(current.usd_per_ron) || 0,
+          as_of: current.as_of || ''
+        };
+      },
+      error: () => {
+        this.fxError.set(this.t('adminUi.fx.errors.load'));
+      },
+      complete: () => {
+        this.fxLoading.set(false);
+      }
+    });
+  }
+
+  resetFxOverrideForm(): void {
+    const status = this.fxStatus();
+    if (!status) return;
+    const current = status.override ?? status.effective;
+    this.fxOverrideForm = {
+      eur_per_ron: Number(current.eur_per_ron) || 0,
+      usd_per_ron: Number(current.usd_per_ron) || 0,
+      as_of: current.as_of || ''
+    };
+  }
+
+  saveFxOverride(): void {
+    const eur = Number(this.fxOverrideForm.eur_per_ron);
+    const usd = Number(this.fxOverrideForm.usd_per_ron);
+    const asOf = (this.fxOverrideForm.as_of || '').trim();
+    if (!(eur > 0) || !(usd > 0)) {
+      this.toast.error(this.t('adminUi.fx.errors.invalid'));
+      return;
+    }
+
+    this.fxAdmin
+      .setOverride({
+        eur_per_ron: eur,
+        usd_per_ron: usd,
+        as_of: asOf ? asOf : null
+      })
+      .subscribe({
+        next: () => {
+          this.toast.success(this.t('adminUi.fx.success.overrideSet'));
+          this.loadFxStatus();
+        },
+        error: () => this.toast.error(this.t('adminUi.fx.errors.overrideSet'))
+      });
+  }
+
+  clearFxOverride(): void {
+    const status = this.fxStatus();
+    if (!status?.override) return;
+    if (!confirm(this.t('adminUi.fx.confirmClear'))) return;
+    this.fxAdmin.clearOverride().subscribe({
+      next: () => {
+        this.toast.success(this.t('adminUi.fx.success.overrideCleared'));
+        this.loadFxStatus();
+      },
+      error: () => this.toast.error(this.t('adminUi.fx.errors.overrideCleared'))
+    });
   }
 
   startNewProduct(): void {

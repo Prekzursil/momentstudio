@@ -57,7 +57,7 @@ def test_guest_checkout_promo_and_shipping(checkout_app: Dict[str, object], monk
                 sku="CHK-1",
                 name="Checkout Product",
                 base_price=Decimal("50.00"),
-                currency="USD",
+                currency="RON",
                 stock_quantity=10,
                 images=[ProductImage(url="/media/img1.png", alt_text="img")],
             )
@@ -70,7 +70,7 @@ def test_guest_checkout_promo_and_shipping(checkout_app: Dict[str, object], monk
             )
             await cart_service.create_promo(
                 session,
-                PromoCodeCreate(code="SAVE10", percentage_off=10, currency="USD"),
+                PromoCodeCreate(code="SAVE10", percentage_off=10, currency="RON"),
             )
             session.add(cart)
             await session.commit()

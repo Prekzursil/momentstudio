@@ -141,8 +141,11 @@ async def _generate_unique_sku(session: AsyncSession, base: str) -> str:
 def _validate_price_currency(base_price: float, currency: str) -> None:
     if base_price is not None and base_price < 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Base price must be non-negative")
-    if currency and len(currency.strip()) != 3:
+    cleaned = (currency or "").strip().upper()
+    if cleaned and len(cleaned) != 3:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Currency must be a 3-letter code")
+    if cleaned and cleaned != "RON":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only RON currency is supported")
 
 
 async def _log_product_action(
@@ -460,6 +463,40 @@ def slugify(value: str) -> str:
     return "-".join(filter(None, cleaned.split("-")))
 
 
+async def get_product_price_bounds(
+    session: AsyncSession,
+    category_slug: str | None,
+    is_featured: bool | None,
+    search: str | None,
+    tags: list[str] | None,
+) -> tuple[float, float, str | None]:
+    query = select(
+        func.min(Product.base_price),
+        func.max(Product.base_price),
+        func.count(func.distinct(Product.currency)),
+        func.min(Product.currency),
+    ).where(Product.is_deleted.is_(False))
+
+    if category_slug:
+        query = query.join(Category).where(Category.slug == category_slug)
+    if is_featured is not None:
+        query = query.where(Product.is_featured == is_featured)
+    if search:
+        like = f"%{search.lower()}%"
+        query = query.where(
+            (Product.name.ilike(like)) | (Product.short_description.ilike(like)) | (Product.long_description.ilike(like))
+        )
+    if tags:
+        query = query.join(Product.tags).where(Tag.slug.in_(tags))
+
+    row = (await session.execute(query)).one()
+    min_price, max_price, currency_count, currency = row
+    min_value = float(min_price) if min_price is not None else 0.0
+    max_value = float(max_price) if max_price is not None else 0.0
+    currency_value = currency if int(currency_count or 0) == 1 else None
+    return min_value, max_value, currency_value
+
+
 async def list_products_with_filters(
     session: AsyncSession,
     category_slug: str | None,
@@ -773,7 +810,10 @@ async def import_products_csv(session: AsyncSession, content: str, dry_run: bool
         except ValueError:
             errors.append(f"Row {idx}: invalid base_price or stock_quantity")
             continue
-        currency = (row.get("currency") or "USD").strip()
+        currency = (row.get("currency") or "RON").strip().upper()
+        if currency != "RON":
+            errors.append(f"Row {idx}: currency must be RON")
+            continue
         status_value = (row.get("status") or ProductStatus.draft.value).strip()
         try:
             status_enum = ProductStatus(status_value)

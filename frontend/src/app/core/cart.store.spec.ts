@@ -19,10 +19,10 @@ describe('CartStore', () => {
         name: 'Prod',
         slug: 'prod',
         image_url: '/media/img.png',
-        currency: 'EUR'
+        currency: 'RON'
       }
     ],
-    totals: { subtotal: '20.00', tax: '2.00', shipping: '5.00', total: '27.00', currency: 'EUR' }
+    totals: { subtotal: '20.00', tax: '2.00', shipping: '5.00', total: '27.00', currency: 'RON' }
   };
 
   const mockApi = {
@@ -38,7 +38,7 @@ describe('CartStore', () => {
     const item = items[0];
     expect(item.name).toBe('Prod');
     expect(item.slug).toBe('prod');
-    expect(item.currency).toBe('EUR');
+    expect(item.currency).toBe('RON');
     expect(item.image).toBe('/media/img.png');
     expect(item.price).toBe(10);
   });
@@ -54,7 +54,7 @@ describe('CartStore', () => {
         name: 'Cup',
         slug: 'cup',
         image_url: '/img.png',
-        currency: 'USD',
+        currency: 'RON',
         max_quantity: 5
       })
     );
@@ -67,8 +67,8 @@ describe('CartStore', () => {
     } as any;
 
     const store = new CartStore(api);
-    store.addFromProduct({ product_id: 'p1', quantity: 1, name: 'Cup', slug: 'cup', stock: 5, currency: 'USD' });
-    store.addFromProduct({ product_id: 'p1', quantity: 1, name: 'Cup', slug: 'cup', stock: 5, currency: 'USD' });
+    store.addFromProduct({ product_id: 'p1', quantity: 1, name: 'Cup', slug: 'cup', stock: 5, currency: 'RON' });
+    store.addFromProduct({ product_id: 'p1', quantity: 1, name: 'Cup', slug: 'cup', stock: 5, currency: 'RON' });
     const items = store.items();
     expect(addSpy).toHaveBeenCalled();
     expect(items.length).toBe(1);

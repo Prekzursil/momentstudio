@@ -161,8 +161,11 @@
     "categories": "Categories",
     "allCategories": "All categories",
     "priceRange": "Price range",
+    "ariaMinPrice": "Minimum price",
+    "ariaMaxPrice": "Maximum price",
     "min": "Min",
     "max": "Max",
+    "priceRangeStatus": "Selected price range: {{min}} to {{max}} RON.",
     "priceHint": "Adjust sliders or inputs to refine results.",
     "tags": "Tags",
     "sort": "Sort",
@@ -332,6 +335,38 @@
       "save": "Save",
       "edit": "Edit",
       "refresh": "Refresh"
+    },
+    "fx": {
+      "title": "FX rates",
+      "hint": "Used for approximate EUR/USD display; all prices and payments remain in RON.",
+      "loading": "Loading FX rates…",
+      "effective": "Effective",
+      "override": "Override",
+      "lastKnown": "Last known",
+      "noOverride": "No override set.",
+      "noLastKnown": "No last-known snapshot stored yet.",
+      "eurPerRon": "EUR per RON",
+      "usdPerRon": "USD per RON",
+      "asOf": "As of",
+      "asOfHint": "Leave empty to use today's date on the server.",
+      "fetchedAt": "Fetched at",
+      "source": "Source",
+      "confirmClear": "Clear the FX override?",
+      "actions": {
+        "set": "Set override",
+        "reset": "Reset form",
+        "clear": "Clear"
+      },
+      "success": {
+        "overrideSet": "FX override saved.",
+        "overrideCleared": "FX override cleared."
+      },
+      "errors": {
+        "load": "Could not load FX rates.",
+        "invalid": "Enter positive EUR/USD per RON rates.",
+        "overrideSet": "Could not save FX override.",
+        "overrideCleared": "Could not clear FX override."
+      }
     },
     "status": {
       "draft": "Draft",

@@ -15,6 +15,12 @@ import { FormsModule } from '@angular/forms';
         [(ngModel)]="value"
         (ngModelChange)="valueChange.emit($event)"
         [type]="type"
+        [attr.min]="min ?? null"
+        [attr.max]="max ?? null"
+        [attr.step]="step ?? null"
+        [attr.inputmode]="inputMode || null"
+        [attr.autocomplete]="autocomplete || null"
+        [attr.aria-label]="ariaLabel || null"
       />
       <span *ngIf="hint" class="text-xs text-slate-500 dark:text-slate-400">{{ hint }}</span>
     </label>
@@ -23,8 +29,14 @@ import { FormsModule } from '@angular/forms';
 export class InputComponent {
   @Input() label = '';
   @Input() placeholder = '';
-  @Input() type: 'text' | 'email' | 'password' = 'text';
+  @Input() type: 'text' | 'email' | 'password' | 'number' | 'tel' | 'url' = 'text';
   @Input() hint = '';
   @Input() value: string | number = '';
+  @Input() min?: number;
+  @Input() max?: number;
+  @Input() step?: number;
+  @Input() inputMode = '';
+  @Input() autocomplete = '';
+  @Input() ariaLabel = '';
   @Output() valueChange = new EventEmitter<string | number>();
 }

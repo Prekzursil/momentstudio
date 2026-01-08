@@ -239,7 +239,7 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
 
   items = this.cart.items;
   subtotal = this.cart.subtotal;
-  currency = 'USD';
+  currency = 'RON';
 
   get shippingAmount(): number {
     const found = this.shippingMethods.find((m) => m.id === this.shipping);

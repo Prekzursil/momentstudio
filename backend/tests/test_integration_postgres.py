@@ -53,7 +53,7 @@ async def test_postgres_core_flow_wishlist() -> None:
                     slug=product_slug,
                     name="Postgres Product",
                     base_price=12.5,
-                    currency="USD",
+                    currency="RON",
                     stock_quantity=5,
                     status=ProductStatus.published,
                 )

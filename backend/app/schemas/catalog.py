@@ -46,7 +46,7 @@ class ProductBase(BaseModel):
     short_description: str | None = Field(default=None, max_length=280)
     long_description: str | None = None
     base_price: float = Field(ge=0)
-    currency: str = Field(min_length=3, max_length=3)
+    currency: str = Field(default="RON", min_length=3, max_length=3)
     is_active: bool = True
     is_featured: bool = False
     stock_quantity: int = Field(ge=0)
@@ -65,6 +65,14 @@ class ProductBase(BaseModel):
         if value and "<script" in value.lower():
             raise ValueError("Invalid rich text content")
         return value
+
+    @field_validator("currency")
+    @classmethod
+    def validate_currency(cls, value: str):
+        cleaned = (value or "").strip().upper()
+        if cleaned != "RON":
+            raise ValueError("Only RON currency is supported")
+        return cleaned
 
 
 class ProductImageBase(BaseModel):
@@ -198,6 +206,16 @@ class ProductUpdate(BaseModel):
     width_cm: float | None = Field(default=None, ge=0)
     height_cm: float | None = Field(default=None, ge=0)
     depth_cm: float | None = Field(default=None, ge=0)
+
+    @field_validator("currency")
+    @classmethod
+    def validate_currency(cls, value: str | None):
+        if value is None:
+            return value
+        cleaned = (value or "").strip().upper()
+        if cleaned != "RON":
+            raise ValueError("Only RON currency is supported")
+        return cleaned
     meta_title: str | None = Field(default=None, max_length=180)
     meta_description: str | None = Field(default=None, max_length=300)
 
@@ -259,9 +277,16 @@ class ProductFeedItem(BaseModel):
     tags: list[str] = []
 
 
+class ProductPriceBounds(BaseModel):
+    min_price: float
+    max_price: float
+    currency: str | None = None
+
+
 class ProductListResponse(BaseModel):
     items: list[ProductRead]
     meta: PaginationMeta
+    bounds: ProductPriceBounds | None = None
 
 
 class ImportResult(BaseModel):

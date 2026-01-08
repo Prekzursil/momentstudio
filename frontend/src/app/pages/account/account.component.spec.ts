@@ -67,7 +67,7 @@ describe('AccountComponent', () => {
       reference_code: 'REF123',
       status: 'shipped',
       total_amount: 20,
-      currency: 'USD',
+      currency: 'RON',
       tracking_number: 'TRACK1',
       created_at: '2000-01-03T00:00:00+00:00',
       updated_at: '2000-01-03T00:00:00+00:00',
@@ -126,8 +126,8 @@ describe('AccountComponent', () => {
     api.get.and.returnValue(of([]));
 
     const wishlistItems = [
-      { id: 'p1', slug: 'p1', name: 'P1', base_price: 10, currency: 'USD', stock_quantity: 5, images: [] },
-      { id: 'p2', slug: 'p2', name: 'P2', base_price: 12, currency: 'USD', stock_quantity: 1, images: [] }
+      { id: 'p1', slug: 'p1', name: 'P1', base_price: 10, currency: 'RON', stock_quantity: 5, images: [] },
+      { id: 'p2', slug: 'p2', name: 'P2', base_price: 12, currency: 'RON', stock_quantity: 1, images: [] }
     ];
     wishlist = {
       items: () => wishlistItems,
