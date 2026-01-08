@@ -10,6 +10,7 @@ import { SiteSocialLink, SiteSocialService } from '../../core/site-social.servic
 import { ContainerComponent } from '../../layout/container.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { CardComponent } from '../../shared/card.component';
+import { ImgFallbackDirective } from '../../shared/img-fallback.directive';
 
 interface ContentBlock {
   title: string;
@@ -19,7 +20,7 @@ interface ContentBlock {
 @Component({
   selector: 'app-contact',
   standalone: true,
-  imports: [CommonModule, ContainerComponent, BreadcrumbComponent, CardComponent, TranslateModule],
+  imports: [CommonModule, ContainerComponent, BreadcrumbComponent, CardComponent, TranslateModule, ImgFallbackDirective],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-3xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -73,12 +74,26 @@ interface ContentBlock {
                 <div class="mt-2 grid gap-2">
                   <a
                     *ngFor="let page of instagramPages()"
-                    class="text-sm text-indigo-700 hover:underline dark:text-indigo-300"
+                    class="flex items-center gap-3 rounded-xl px-2 py-1 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
                     [href]="page.url"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    {{ page.label }}
+                    <ng-container *ngIf="page.thumbnail_url; else instagramAvatar">
+                      <img
+                        [src]="page.thumbnail_url"
+                        [alt]="page.label"
+                        class="h-8 w-8 rounded-full border border-slate-200 object-cover dark:border-slate-700"
+                        appImgFallback="assets/placeholder/avatar-placeholder.svg"
+                        loading="lazy"
+                      />
+                    </ng-container>
+                    <ng-template #instagramAvatar>
+                      <span class="h-8 w-8 rounded-full bg-gradient-to-br from-fuchsia-500 to-rose-500 grid place-items-center text-xs font-semibold text-white">
+                        {{ initialsForLabel(page.label) }}
+                      </span>
+                    </ng-template>
+                    <span class="truncate">{{ page.label }}</span>
                   </a>
                 </div>
               </div>
@@ -87,12 +102,26 @@ interface ContentBlock {
                 <div class="mt-2 grid gap-2">
                   <a
                     *ngFor="let page of facebookPages()"
-                    class="text-sm text-indigo-700 hover:underline dark:text-indigo-300"
+                    class="flex items-center gap-3 rounded-xl px-2 py-1 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
                     [href]="page.url"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    {{ page.label }}
+                    <ng-container *ngIf="page.thumbnail_url; else facebookAvatar">
+                      <img
+                        [src]="page.thumbnail_url"
+                        [alt]="page.label"
+                        class="h-8 w-8 rounded-full border border-slate-200 object-cover dark:border-slate-700"
+                        appImgFallback="assets/placeholder/avatar-placeholder.svg"
+                        loading="lazy"
+                      />
+                    </ng-container>
+                    <ng-template #facebookAvatar>
+                      <span class="h-8 w-8 rounded-full bg-gradient-to-br from-blue-600 to-sky-500 grid place-items-center text-xs font-semibold text-white">
+                        {{ initialsForLabel(page.label) }}
+                      </span>
+                    </ng-template>
+                    <span class="truncate">{{ page.label }}</span>
                   </a>
                 </div>
               </div>
@@ -180,5 +209,14 @@ export class ContactComponent implements OnInit, OnDestroy {
       this.meta.updateTag({ name: 'og:description', content: description });
     }
     this.meta.updateTag({ name: 'og:title', content: pageTitle });
+  }
+
+  initialsForLabel(label: string): string {
+    const cleaned = (label || '').trim();
+    if (!cleaned) return 'MS';
+    const parts = cleaned.split(/\s+/).filter(Boolean);
+    const first = parts[0]?.[0] ?? cleaned[0] ?? 'M';
+    const second = parts[1]?.[0] ?? parts[0]?.[1] ?? 'S';
+    return `${first}${second}`.toUpperCase();
   }
 }
