@@ -335,6 +335,11 @@ def test_google_created_user_can_set_password_and_login(monkeypatch: pytest.Monk
     assert res.status_code == 200, res.text
     assert res.json()["user"]["email"] == "pw@example.com"
 
+    # ...and via email should also work (single identifier field)
+    res = client.post("/api/v1/auth/login", json={"identifier": "pw@example.com", "password": "newpass123"})
+    assert res.status_code == 200, res.text
+    assert res.json()["user"]["email"] == "pw@example.com"
+
 
 def test_upload_avatar_updates_avatar_url(monkeypatch: pytest.MonkeyPatch, tmp_path, test_app):
     client: TestClient = test_app["client"]  # type: ignore
