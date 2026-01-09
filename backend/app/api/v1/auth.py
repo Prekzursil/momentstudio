@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 from jose import jwt
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, Response, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, EmailStr, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -95,6 +95,10 @@ def clear_refresh_cookie(response: Response) -> None:
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
+    new_password: str = Field(min_length=6, max_length=128)
+
+
+class SetInitialPasswordRequest(BaseModel):
     new_password: str = Field(min_length=6, max_length=128)
 
 
@@ -358,6 +362,21 @@ async def change_password(
     return {"detail": "Password updated"}
 
 
+@router.post(
+    "/me/password/set",
+    response_model=UserResponse,
+    summary="Set initial password for Google-created account",
+    description="Allows Google-created users to set a password during initial profile completion (no current password required).",
+)
+async def set_initial_password(
+    payload: SetInitialPasswordRequest,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> UserResponse:
+    user = await auth_service.set_initial_password_for_google_user(session, current_user, payload.new_password)
+    return UserResponse.model_validate(user)
+
+
 @router.post("/verify/request", status_code=status.HTTP_202_ACCEPTED)
 async def request_email_verification(
     background_tasks: BackgroundTasks,
@@ -619,6 +638,21 @@ async def remove_avatar(
 @router.get("/admin/ping", response_model=dict[str, str])
 async def admin_ping(admin_user: User = Depends(require_admin)) -> dict[str, str]:
     return {"status": "admin-ok", "user": str(admin_user.id)}
+
+
+@router.post(
+    "/admin/cleanup/incomplete-google",
+    response_model=dict[str, int],
+    summary="Cleanup abandoned incomplete Google accounts",
+    description="Soft-deletes Google-created accounts that never completed required profile fields after a grace period.",
+)
+async def admin_cleanup_incomplete_google_accounts(
+    max_age_hours: int = Query(default=168, ge=1, le=24 * 365),
+    _: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, int]:
+    deleted = await self_service.cleanup_incomplete_google_accounts(session, max_age_hours=max_age_hours)
+    return {"deleted": deleted}
 
 
 @router.post("/password-reset/request", status_code=status.HTTP_202_ACCEPTED)

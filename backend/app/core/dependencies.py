@@ -6,6 +6,7 @@ from sqlalchemy.future import select
 from app.core.security import decode_token
 from app.db.session import get_session
 from app.models.user import User, UserRole
+from app.services import auth as auth_service
 from app.services import self_service
 from uuid import UUID
 
@@ -74,4 +75,10 @@ async def get_current_user_optional(
 async def require_admin(user: User = Depends(get_current_user)) -> User:
     if user.role != UserRole.admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+    return user
+
+
+async def require_complete_profile(user: User = Depends(get_current_user)) -> User:
+    if getattr(user, "google_sub", None) and not auth_service.is_profile_complete(user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Profile incomplete")
     return user

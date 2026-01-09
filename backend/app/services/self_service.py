@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any
 
 import sqlalchemy as sa
@@ -65,6 +65,42 @@ async def execute_account_deletion(session: AsyncSession, user: User) -> None:
         .values(revoked=True, revoked_reason="account_deleted")
     )
     await session.commit()
+
+
+def _is_profile_complete(user: User) -> bool:
+    return bool(
+        (user.name or "").strip()
+        and (user.username or "").strip()
+        and (getattr(user, "first_name", None) or "").strip()
+        and (getattr(user, "last_name", None) or "").strip()
+        and getattr(user, "date_of_birth", None)
+        and (getattr(user, "phone", None) or "").strip()
+    )
+
+
+async def cleanup_incomplete_google_accounts(session: AsyncSession, *, max_age_hours: int = 168) -> int:
+    """Soft-delete Google-created accounts that never completed required profile fields.
+
+    This is intended as an optional maintenance task to reduce abandoned/incomplete records.
+    """
+    threshold = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    rows = (
+        await session.execute(
+            sa.select(User).where(
+                User.google_sub.is_not(None),
+                User.deleted_at.is_(None),
+                User.created_at < threshold,
+            )
+        )
+    ).scalars().all()
+
+    deleted = 0
+    for user in rows:
+        if _is_profile_complete(user):
+            continue
+        await execute_account_deletion(session, user)
+        deleted += 1
+    return deleted
 
 
 async def export_user_data(session: AsyncSession, user: User) -> dict[str, Any]:

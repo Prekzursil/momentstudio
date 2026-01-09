@@ -429,7 +429,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Google login when `google_sub` exists issues standard access/refresh tokens.
 - [x] Google OAuth: prompt Google-created users to complete required profile fields after first login (toast + redirect to `/register?complete=1`).
 - [x] Google OAuth: block app navigation until required profile fields are completed (global guard redirects everything to `/register?complete=1`).
-- [ ] Google OAuth: add server-side enforcement (deny protected APIs until profile is complete) + optional cleanup of abandoned incomplete accounts (recommended for production hardening).
+- [x] Google OAuth: add server-side enforcement (deny protected APIs until profile is complete) + optional cleanup of abandoned incomplete accounts (recommended for production hardening).
 - [x] `/auth/google/link` for logged-in users to link Google (password confirmation).
 - [x] `/auth/google/unlink` to disconnect Google profile (must retain password).
 - [x] Validation to prevent linking a Google account already linked elsewhere.

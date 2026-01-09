@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.core.dependencies import get_current_user, require_admin
+from app.core.dependencies import require_complete_profile, require_admin
 from app.db.session import get_session
 from app.models.address import Address
 from app.models.cart import Cart
@@ -35,7 +35,7 @@ async def create_order(
     background_tasks: BackgroundTasks,
     payload: OrderCreate,
     session: AsyncSession = Depends(get_session),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_complete_profile),
 ):
     cart_result = await session.execute(
         select(Cart).options(selectinload(Cart.items)).where(Cart.user_id == current_user.id)
@@ -69,7 +69,7 @@ async def create_order(
 
 
 @router.get("", response_model=list[OrderRead])
-async def list_orders(current_user=Depends(get_current_user), session: AsyncSession = Depends(get_session)):
+async def list_orders(current_user=Depends(require_complete_profile), session: AsyncSession = Depends(get_session)):
     orders = await order_service.get_orders_for_user(session, current_user.id)
     return list(orders)
 
@@ -325,7 +325,9 @@ async def list_shipping_methods(session: AsyncSession = Depends(get_session)) ->
 
 
 @router.get("/{order_id}", response_model=OrderRead)
-async def get_order(order_id: UUID, current_user=Depends(get_current_user), session: AsyncSession = Depends(get_session)):
+async def get_order(
+    order_id: UUID, current_user=Depends(require_complete_profile), session: AsyncSession = Depends(get_session)
+):
     order = await order_service.get_order(session, current_user.id, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
@@ -335,7 +337,7 @@ async def get_order(order_id: UUID, current_user=Depends(get_current_user), sess
 @router.get("/{order_id}/receipt")
 async def download_receipt(
     order_id: UUID,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_complete_profile),
     session: AsyncSession = Depends(get_session),
 ):
     order = await order_service.get_order(session, current_user.id, order_id)
@@ -356,7 +358,7 @@ async def download_receipt(
 @router.post("/{order_id}/reorder", response_model=CartRead)
 async def reorder_order(
     order_id: UUID,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_complete_profile),
     session: AsyncSession = Depends(get_session),
 ) -> CartRead:
     cart = await cart_service.reorder_from_order(session, current_user.id, order_id)

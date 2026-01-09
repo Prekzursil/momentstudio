@@ -104,42 +104,40 @@ import { appConfig } from '../../core/app-config';
             </span>
           </label>
 
-          <ng-container *ngIf="!completionMode">
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              {{ 'auth.password' | translate }}
-              <input
-                #passwordCtrl="ngModel"
-                name="password"
-                type="password"
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                required
-                minlength="6"
-                autocomplete="new-password"
-                [(ngModel)]="password"
-              />
-              <span *ngIf="passwordCtrl.touched && passwordCtrl.invalid" class="text-xs font-normal text-rose-700 dark:text-rose-300">
-                {{ 'validation.passwordMin' | translate }}
-              </span>
-            </label>
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'auth.password' | translate }}
+            <input
+              #passwordCtrl="ngModel"
+              name="password"
+              type="password"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              required
+              minlength="6"
+              autocomplete="new-password"
+              [(ngModel)]="password"
+            />
+            <span *ngIf="passwordCtrl.touched && passwordCtrl.invalid" class="text-xs font-normal text-rose-700 dark:text-rose-300">
+              {{ 'validation.passwordMin' | translate }}
+            </span>
+          </label>
 
-            <app-password-strength [password]="password"></app-password-strength>
+          <app-password-strength [password]="password"></app-password-strength>
 
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              {{ 'auth.confirmPassword' | translate }}
-              <input
-                #confirmCtrl="ngModel"
-                name="confirm"
-                type="password"
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                required
-                autocomplete="new-password"
-                [(ngModel)]="confirmPassword"
-              />
-              <span *ngIf="confirmCtrl.touched && confirmCtrl.invalid" class="text-xs font-normal text-rose-700 dark:text-rose-300">
-                {{ 'validation.required' | translate }}
-              </span>
-            </label>
-          </ng-container>
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'auth.confirmPassword' | translate }}
+            <input
+              #confirmCtrl="ngModel"
+              name="confirm"
+              type="password"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              required
+              autocomplete="new-password"
+              [(ngModel)]="confirmPassword"
+            />
+            <span *ngIf="confirmCtrl.touched && confirmCtrl.invalid" class="text-xs font-normal text-rose-700 dark:text-rose-300">
+              {{ 'validation.required' | translate }}
+            </span>
+          </label>
 
           <p *ngIf="error" class="text-sm text-amber-700 dark:text-amber-300">{{ error }}</p>
 
@@ -362,7 +360,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
       this.error = this.translate.instant('validation.required');
       return;
     }
-    if (!this.completionMode && this.password !== this.confirmPassword) {
+    if (this.password !== this.confirmPassword) {
       this.error = this.translate.instant('validation.passwordMismatch');
       return;
     }
@@ -413,6 +411,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
       this.auth
         .updateUsername(username)
         .pipe(
+          switchMap(() => this.auth.setInitialPassword(this.password)),
           switchMap(() => this.auth.updateProfile(payload)),
           finalize(() => {
             this.loading = false;

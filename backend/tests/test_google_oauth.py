@@ -1,5 +1,6 @@
 import asyncio
 import io
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse, parse_qs
 
 import httpx
@@ -12,7 +13,7 @@ from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
-from app.models.user import PasswordResetToken, User
+from app.models.user import User, UserRole
 from app.services import auth as auth_service
 
 
@@ -284,7 +285,6 @@ def test_google_link_and_unlink(monkeypatch: pytest.MonkeyPatch, test_app):
 
 def test_google_created_user_can_set_password_and_login(monkeypatch: pytest.MonkeyPatch, test_app):
     client: TestClient = test_app["client"]  # type: ignore
-    SessionLocal = test_app["session_factory"]  # type: ignore
     monkeypatch.setattr(settings, "google_client_id", "client-id")
     monkeypatch.setattr(settings, "google_client_secret", "client-secret")
     monkeypatch.setattr(settings, "google_redirect_uri", "http://localhost/callback")
@@ -295,6 +295,8 @@ def test_google_created_user_can_set_password_and_login(monkeypatch: pytest.Monk
             "email": "pw@example.com",
             "email_verified": True,
             "name": "PW User",
+            "given_name": "PW",
+            "family_name": "User",
             "picture": "http://example.com/pic.png",
         }
 
@@ -303,32 +305,18 @@ def test_google_created_user_can_set_password_and_login(monkeypatch: pytest.Monk
     res = client.post("/api/v1/auth/google/callback", json={"code": "abc", "state": state})
     assert res.status_code == 200, res.text
     username = res.json()["user"]["username"]
+    access_token = res.json()["tokens"]["access_token"]
 
-    # Request password reset and grab the token from DB
-    res = client.post("/api/v1/auth/password-reset/request", json={"email": "pw@example.com"})
-    assert res.status_code == 202, res.text
+    # Profile is incomplete (missing phone/DOB), so protected APIs are denied.
+    denied = client.get("/api/v1/wishlist", headers={"Authorization": f"Bearer {access_token}"})
+    assert denied.status_code == 403
+    assert denied.json()["detail"] == "Profile incomplete"
 
-    async def get_reset_token() -> str:
-        async with SessionLocal() as session:
-            row = (
-                (
-                    await session.execute(
-                        select(PasswordResetToken)
-                        .where(PasswordResetToken.used.is_(False))
-                        .order_by(PasswordResetToken.created_at.desc())
-                    )
-                )
-                .scalars()
-                .first()
-            )
-            assert row is not None
-            return row.token
-
-    token = asyncio.run(get_reset_token())
-
+    # Google-created users can set a password during completion (without email reset).
     res = client.post(
-        "/api/v1/auth/password-reset/confirm",
-        json={"token": token, "new_password": "newpass123"},
+        "/api/v1/auth/me/password/set",
+        json={"new_password": "newpass123"},
+        headers={"Authorization": f"Bearer {access_token}"},
     )
     assert res.status_code == 200, res.text
 
@@ -341,6 +329,104 @@ def test_google_created_user_can_set_password_and_login(monkeypatch: pytest.Monk
     res = client.post("/api/v1/auth/login", json={"identifier": "pw@example.com", "password": "newpass123"})
     assert res.status_code == 200, res.text
     assert res.json()["user"]["email"] == "pw@example.com"
+
+    # Completing the profile lifts server-side enforcement.
+    res = client.patch(
+        "/api/v1/auth/me",
+        json={"date_of_birth": "2000-01-01", "phone": "+40723204204"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert res.status_code == 200, res.text
+
+    ok = client.get("/api/v1/wishlist", headers={"Authorization": f"Bearer {access_token}"})
+    assert ok.status_code == 200, ok.text
+
+    # Once profile is complete, the completion-only password set endpoint is disabled.
+    res = client.post(
+        "/api/v1/auth/me/password/set",
+        json={"new_password": "anotherpass123"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert res.status_code == 400
+
+
+def test_admin_cleanup_incomplete_google_accounts(monkeypatch: pytest.MonkeyPatch, test_app):
+    client: TestClient = test_app["client"]  # type: ignore
+    SessionLocal = test_app["session_factory"]  # type: ignore
+
+    # Create an admin user
+    res = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "cleanup-admin@example.com",
+            "username": "cleanupadmin",
+            "name": "Cleanup Admin",
+            "password": "adminpass",
+            "first_name": "Cleanup",
+            "last_name": "Admin",
+            "date_of_birth": "2000-01-01",
+            "phone": "+40723204204",
+        },
+    )
+    assert res.status_code == 201, res.text
+
+    async def promote_admin_and_seed() -> None:
+        async with SessionLocal() as session:
+            user = (await session.execute(select(User).where(User.email == "cleanup-admin@example.com"))).scalar_one()
+            user.role = UserRole.admin
+
+            old_user = await auth_service.create_google_user(
+                session,
+                email="old-incomplete@example.com",
+                name="Old Incomplete",
+                first_name="Old",
+                last_name="Incomplete",
+                picture=None,
+                sub="old-sub",
+                email_verified=True,
+                preferred_language="en",
+            )
+            old_user.created_at = datetime.now(timezone.utc) - timedelta(days=10)
+            session.add(old_user)
+
+            await auth_service.create_google_user(
+                session,
+                email="new-incomplete@example.com",
+                name="New Incomplete",
+                first_name="New",
+                last_name="Incomplete",
+                picture=None,
+                sub="new-sub",
+                email_verified=True,
+                preferred_language="en",
+            )
+            await session.commit()
+
+    asyncio.run(promote_admin_and_seed())
+
+    # Login again to get an admin token
+    res = client.post("/api/v1/auth/login", json={"identifier": "cleanup-admin@example.com", "password": "adminpass"})
+    assert res.status_code == 200, res.text
+    token = res.json()["tokens"]["access_token"]
+
+    res = client.post(
+        "/api/v1/auth/admin/cleanup/incomplete-google",
+        params={"max_age_hours": 1},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["deleted"] == 1
+
+    async def verify_deleted() -> None:
+        async with SessionLocal() as session:
+            old_user = await auth_service.get_user_by_email(session, "old-incomplete@example.com")
+            assert old_user is None
+
+            new_user = await auth_service.get_user_by_email(session, "new-incomplete@example.com")
+            assert new_user is not None
+            assert new_user.deleted_at is None
+
+    asyncio.run(verify_deleted())
 
 
 def test_upload_avatar_updates_avatar_url(monkeypatch: pytest.MonkeyPatch, tmp_path, test_app):

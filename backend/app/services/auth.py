@@ -59,6 +59,10 @@ def _profile_is_complete(user: User) -> bool:
     )
 
 
+def is_profile_complete(user: User) -> bool:
+    return _profile_is_complete(user)
+
+
 def _validate_username(username: str) -> str:
     cleaned = (username or "").strip()
     if not USERNAME_ALLOWED_RE.match(cleaned):
@@ -194,34 +198,43 @@ async def authenticate_user(session: AsyncSession, identifier: str, password: st
     return user
 
 
+async def set_initial_password_for_google_user(session: AsyncSession, user: User, new_password: str) -> User:
+    if not user.google_sub:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password can only be set this way for Google-created accounts.",
+        )
+    if _profile_is_complete(user):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password can only be set during initial profile completion.",
+        )
+    user.hashed_password = security.hash_password(new_password)
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
 async def update_username(session: AsyncSession, user: User, new_username: str) -> User:
     new_username = _validate_username(new_username)
     if new_username == user.username:
         return user
     if _profile_is_complete(user):
-        # Do not apply cooldown to the initial username assignment on account creation.
-        recent = (
-            (
-                await session.execute(
-                    select(UserUsernameHistory.created_at)
-                    .where(UserUsernameHistory.user_id == user.id)
-                    .order_by(UserUsernameHistory.created_at.desc())
-                    .limit(2)
-                )
-            )
-            .scalars()
-            .all()
+        last = await session.scalar(
+            select(UserUsernameHistory.created_at)
+            .where(UserUsernameHistory.user_id == user.id)
+            .order_by(UserUsernameHistory.created_at.desc())
+            .limit(1)
         )
-        if len(recent) >= 2:
-            last = recent[0]
-            if last and isinstance(last, datetime):
-                if last.tzinfo is None:
-                    last = last.replace(tzinfo=timezone.utc)
-                if datetime.now(timezone.utc) - last < USERNAME_CHANGE_COOLDOWN:
-                    raise HTTPException(
-                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                        detail="You can change your username once every 7 days.",
-                    )
+        if last and isinstance(last, datetime):
+            if last.tzinfo is None:
+                last = last.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) - last < USERNAME_CHANGE_COOLDOWN:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="You can change your username once every 7 days.",
+                )
     existing = await get_user_by_username(session, new_username)
     if existing and existing.id != user.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken")
@@ -244,29 +257,20 @@ async def update_display_name(session: AsyncSession, user: User, new_name: str) 
     reused = await _try_reuse_name_tag(session, user_id=user.id, name=cleaned)
 
     if _profile_is_complete(user) and reused is None:
-        # Do not apply cooldown to the initial display name assignment on account creation.
-        recent = (
-            (
-                await session.execute(
-                    select(UserDisplayNameHistory.created_at)
-                    .where(UserDisplayNameHistory.user_id == user.id)
-                    .order_by(UserDisplayNameHistory.created_at.desc())
-                    .limit(2)
-                    )
-            )
-            .scalars()
-            .all()
+        last = await session.scalar(
+            select(UserDisplayNameHistory.created_at)
+            .where(UserDisplayNameHistory.user_id == user.id)
+            .order_by(UserDisplayNameHistory.created_at.desc())
+            .limit(1)
         )
-        if len(recent) >= 2:
-            last = recent[0]
-            if last and isinstance(last, datetime):
-                if last.tzinfo is None:
-                    last = last.replace(tzinfo=timezone.utc)
-                if datetime.now(timezone.utc) - last < DISPLAY_NAME_CHANGE_COOLDOWN:
-                    raise HTTPException(
-                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                        detail="You can change your display name once per hour.",
-                    )
+        if last and isinstance(last, datetime):
+            if last.tzinfo is None:
+                last = last.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) - last < DISPLAY_NAME_CHANGE_COOLDOWN:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="You can change your display name once per hour.",
+                )
 
     tag = reused if reused is not None else await _allocate_name_tag(session, cleaned, exclude_user_id=user.id)
     user.name = cleaned

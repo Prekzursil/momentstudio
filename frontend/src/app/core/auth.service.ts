@@ -109,6 +109,13 @@ export class AuthService {
     });
   }
 
+  setInitialPassword(newPassword: string): Observable<AuthUser> {
+    if (!this.isAuthenticated()) {
+      return of({} as AuthUser);
+    }
+    return this.api.post<AuthUser>('/auth/me/password/set', { new_password: newPassword }).pipe(tap((user) => this.setUser(user)));
+  }
+
   startGoogleLogin(): Observable<string> {
     return this.api.get<{ auth_url: string }>('/auth/google/start').pipe(map((res) => res.auth_url));
   }

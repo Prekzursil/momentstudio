@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timedelta, timezone
 from typing import Callable, Dict
 
 import pytest
@@ -9,7 +10,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.main import app
 from app.db.base import Base
 from app.db.session import get_session
-from app.models.user import User, UserRole
+from app.models.user import User, UserRole, UserDisplayNameHistory, UserUsernameHistory
 
 
 @pytest.fixture
@@ -193,6 +194,7 @@ def test_password_reset_flow(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str
 
 def test_update_profile_me(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal: Callable = test_app["session_factory"]  # type: ignore[assignment]
 
     res = client.post(
         "/api/v1/auth/register",
@@ -203,15 +205,51 @@ def test_update_profile_me(test_app: Dict[str, object]) -> None:
 
     patch = client.patch(
         "/api/v1/auth/me",
-        json={"name": "New Name", "phone": "+40723204204", "preferred_language": "ro"},
+        json={"phone": "+40723204204", "preferred_language": "ro"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert patch.status_code == 200, patch.text
     body = patch.json()
-    assert body["name"] == "New Name"
+    assert body["name"] == "Old"
     assert body["phone"] == "+40723204204"
     assert body["preferred_language"] == "ro"
     assert body["notify_marketing"] is False
+    assert body["name_tag"] == 0
+
+    blocked = client.patch(
+        "/api/v1/auth/me",
+        json={"name": "New Name"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert blocked.status_code == 429, blocked.text
+
+    async def rewind_display_name_cooldown() -> None:
+        async with SessionLocal() as session:
+            user = (await session.execute(select(User).where(User.email == "me@example.com"))).scalar_one()
+            history = (
+                (
+                    await session.execute(
+                        select(UserDisplayNameHistory)
+                        .where(UserDisplayNameHistory.user_id == user.id)
+                        .order_by(UserDisplayNameHistory.created_at.desc())
+                        .limit(1)
+                    )
+                )
+                .scalars()
+                .one()
+            )
+            history.created_at = datetime.now(timezone.utc) - timedelta(hours=2)
+            await session.commit()
+
+    asyncio.run(rewind_display_name_cooldown())
+
+    ok = client.patch(
+        "/api/v1/auth/me",
+        json={"name": "New Name"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["name"] == "New Name"
 
     cleared = client.patch(
         "/api/v1/auth/me",
@@ -282,6 +320,7 @@ def test_update_notification_preferences(test_app: Dict[str, object]) -> None:
 
 def test_alias_history_and_display_name_tags(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal: Callable = test_app["session_factory"]  # type: ignore[assignment]
 
     res1 = client.post(
         "/api/v1/auth/register",
@@ -306,6 +345,29 @@ def test_alias_history_and_display_name_tags(test_app: Dict[str, object]) -> Non
     assert data["display_names"][0]["name_tag"] == 0
 
     update = client.patch("/api/v1/auth/me/username", json={"username": "ana1-new"}, headers=auth_headers(token))
+    assert update.status_code == 429, update.text
+
+    async def rewind_username_cooldown() -> None:
+        async with SessionLocal() as session:
+            user = (await session.execute(select(User).where(User.email == "ana1@example.com"))).scalar_one()
+            history = (
+                (
+                    await session.execute(
+                        select(UserUsernameHistory)
+                        .where(UserUsernameHistory.user_id == user.id)
+                        .order_by(UserUsernameHistory.created_at.desc())
+                        .limit(1)
+                    )
+                )
+                .scalars()
+                .one()
+            )
+            history.created_at = datetime.now(timezone.utc) - timedelta(days=8)
+            await session.commit()
+
+    asyncio.run(rewind_username_cooldown())
+
+    update = client.patch("/api/v1/auth/me/username", json={"username": "ana1-new"}, headers=auth_headers(token))
     assert update.status_code == 200, update.text
     aliases2 = client.get("/api/v1/auth/me/aliases", headers=auth_headers(token))
     assert aliases2.status_code == 200, aliases2.text
@@ -315,6 +377,7 @@ def test_alias_history_and_display_name_tags(test_app: Dict[str, object]) -> Non
 
 def test_display_name_history_reuses_name_tag_on_revert(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal: Callable = test_app["session_factory"]  # type: ignore[assignment]
 
     res1 = client.post(
         "/api/v1/auth/register",
@@ -330,6 +393,33 @@ def test_display_name_history_reuses_name_tag_on_revert(test_app: Dict[str, obje
     )
     assert res2.status_code == 201, res2.text
     assert res2.json()["user"]["name_tag"] == 1
+
+    renamed = client.patch(
+        "/api/v1/auth/me",
+        json={"name": "Maria"},
+        headers=auth_headers(token),
+    )
+    assert renamed.status_code == 429, renamed.text
+
+    async def rewind_display_name_cooldown() -> None:
+        async with SessionLocal() as session:
+            user = (await session.execute(select(User).where(User.email == "tagreuse1@example.com"))).scalar_one()
+            history = (
+                (
+                    await session.execute(
+                        select(UserDisplayNameHistory)
+                        .where(UserDisplayNameHistory.user_id == user.id)
+                        .order_by(UserDisplayNameHistory.created_at.desc())
+                        .limit(1)
+                    )
+                )
+                .scalars()
+                .one()
+            )
+            history.created_at = datetime.now(timezone.utc) - timedelta(hours=2)
+            await session.commit()
+
+    asyncio.run(rewind_display_name_cooldown())
 
     renamed = client.patch(
         "/api/v1/auth/me",
