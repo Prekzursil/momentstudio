@@ -131,7 +131,7 @@ class ProfileUpdate(BaseModel):
         value = value.strip()
         if not value:
             return None
-        if not re.fullmatch(r"^\+[1-9]\d{6,14}$", value):
+        if not re.fullmatch(r"^\+[1-9]\d{1,14}$", value):
             raise ValueError("Phone must be in E.164 format (e.g. +40723204204)")
         return value
 
@@ -199,7 +199,7 @@ class RegisterRequest(BaseModel):
         value = (value or "").strip()
         if not value:
             raise ValueError("Phone is required")
-        if not re.fullmatch(r"^\+[1-9]\d{6,14}$", value):
+        if not re.fullmatch(r"^\+[1-9]\d{1,14}$", value):
             raise ValueError("Phone must be in E.164 format (e.g. +40723204204)")
         return value
 
@@ -695,7 +695,7 @@ async def google_callback(
     _validate_google_state(payload.state, "google_state")
     profile = await auth_service.exchange_google_code(payload.code)
     sub = profile.get("sub")
-    email = profile.get("email")
+    email = str(profile.get("email") or "").strip().lower()
     name = profile.get("name")
     picture = profile.get("picture")
     email_verified = bool(profile.get("email_verified"))
@@ -791,7 +791,7 @@ class GoogleCompleteRequest(BaseModel):
         value = (value or "").strip()
         if not value:
             raise ValueError("Phone is required")
-        if not re.fullmatch(r"^\+[1-9]\d{6,14}$", value):
+        if not re.fullmatch(r"^\+[1-9]\d{1,14}$", value):
             raise ValueError("Phone must be in E.164 format (e.g. +40723204204)")
         return value
 
@@ -865,7 +865,7 @@ async def google_link(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
     profile = await auth_service.exchange_google_code(payload.code)
     sub = profile.get("sub")
-    email = profile.get("email")
+    email = str(profile.get("email") or "").strip().lower()
     name = profile.get("name")
     picture = profile.get("picture")
     if not sub or not email:
