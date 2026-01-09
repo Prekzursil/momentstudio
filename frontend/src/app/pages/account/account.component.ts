@@ -228,13 +228,14 @@ import { missingRequiredProfileFields as computeMissingRequiredProfileFields, ty
               class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
             >
               {{ 'auth.currentPassword' | translate }}
-              <input
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                name="profileUsernamePassword"
-                type="password"
-                autocomplete="current-password"
-                [(ngModel)]="profileUsernamePassword"
-              />
+	              <input
+	                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                name="profileUsernamePassword"
+	                type="password"
+	                autocomplete="current-password"
+	                required
+	                [(ngModel)]="profileUsernamePassword"
+	              />
               <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
                 Required to change your username.
               </span>
@@ -1327,6 +1328,12 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
         this.verificationStatus = 'Email verified';
         this.toast.success('Email verified');
         this.verificationToken = '';
+        this.auth.loadCurrentUser().subscribe({
+          next: (user) => {
+            this.profile.set(user);
+            this.emailVerified.set(Boolean(user.email_verified));
+          }
+        });
       },
       error: () => {
         this.verificationStatus = 'Invalid or expired token';
