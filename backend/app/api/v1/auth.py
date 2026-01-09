@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
 from app.core.config import settings
-from app.core.dependencies import get_current_user, require_admin
+from app.core.dependencies import get_current_user, require_admin, require_complete_profile
 from app.core.rate_limit import limiter, per_identifier_limiter
 from app.core.security import decode_token
 from app.db.session import get_session
@@ -822,7 +822,7 @@ class UnlinkRequest(BaseModel):
 @router.post("/google/unlink", response_model=UserResponse)
 async def google_unlink(
     payload: UnlinkRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_complete_profile),
     session: AsyncSession = Depends(get_session),
     _: None = Depends(google_rate_limit),
 ) -> UserResponse:
