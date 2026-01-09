@@ -39,6 +39,13 @@ export interface AuthResponse {
   tokens: AuthTokens;
 }
 
+export interface GoogleCallbackResponse {
+  user: AuthUser;
+  tokens?: AuthTokens | null;
+  requires_completion?: boolean;
+  completion_token?: string | null;
+}
+
 export interface UsernameHistoryItem {
   username: string;
   created_at: string;
@@ -109,19 +116,37 @@ export class AuthService {
     });
   }
 
-  setInitialPassword(newPassword: string): Observable<AuthUser> {
-    if (!this.isAuthenticated()) {
-      return of({} as AuthUser);
-    }
-    return this.api.post<AuthUser>('/auth/me/password/set', { new_password: newPassword }).pipe(tap((user) => this.setUser(user)));
-  }
-
   startGoogleLogin(): Observable<string> {
     return this.api.get<{ auth_url: string }>('/auth/google/start').pipe(map((res) => res.auth_url));
   }
 
-  completeGoogleLogin(code: string, state: string): Observable<AuthResponse> {
-    return this.api.post<AuthResponse>('/auth/google/callback', { code, state }).pipe(tap((res) => this.persist(res)));
+  completeGoogleLogin(code: string, state: string): Observable<GoogleCallbackResponse> {
+    return this.api.post<GoogleCallbackResponse>('/auth/google/callback', { code, state }).pipe(
+      tap((res) => {
+        if (res.tokens) {
+          this.persist({ user: res.user, tokens: res.tokens });
+        }
+      })
+    );
+  }
+
+  completeGoogleRegistration(
+    completionToken: string,
+    payload: {
+      username: string;
+      name: string;
+      first_name: string;
+      middle_name?: string | null;
+      last_name: string;
+      date_of_birth: string;
+      phone: string;
+      password: string;
+      preferred_language?: string;
+    }
+  ): Observable<AuthResponse> {
+    return this.api
+      .post<AuthResponse>('/auth/google/complete', payload, { Authorization: `Bearer ${completionToken}` })
+      .pipe(tap((res) => this.persist(res)));
   }
 
   startGoogleLink(): Observable<string> {

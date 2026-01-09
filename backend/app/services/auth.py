@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 import secrets
 import uuid
 import re
@@ -190,6 +190,11 @@ async def authenticate_user(session: AsyncSession, identifier: str, password: st
         user = await get_user_by_username(session, identifier)
     if not user or not security.verify_password(password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    if getattr(user, "google_sub", None) and not _profile_is_complete(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Complete your Google sign-in registration before using password login.",
+        )
     if getattr(user, "deleted_at", None) is not None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
     if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
@@ -198,21 +203,59 @@ async def authenticate_user(session: AsyncSession, identifier: str, password: st
     return user
 
 
-async def set_initial_password_for_google_user(session: AsyncSession, user: User, new_password: str) -> User:
+async def complete_google_registration(
+    session: AsyncSession,
+    user: User,
+    *,
+    username: str,
+    display_name: str,
+    first_name: str,
+    middle_name: str | None,
+    last_name: str,
+    date_of_birth: date,
+    phone: str,
+    password: str,
+    preferred_language: str | None = None,
+) -> User:
     if not user.google_sub:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password can only be set this way for Google-created accounts.",
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google account required")
     if _profile_is_complete(user):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password can only be set during initial profile completion.",
-        )
-    user.hashed_password = security.hash_password(new_password)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Profile already complete")
+
+    new_username = _validate_username(username)
+    if new_username != user.username:
+        existing = await get_user_by_username(session, new_username)
+        if existing and existing.id != user.id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken")
+        user.username = new_username
+        session.add(UserUsernameHistory(user_id=user.id, username=new_username, created_at=datetime.now(timezone.utc)))
+
+    cleaned_name = (display_name or "").strip()
+    if not cleaned_name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Display name is required")
+    cleaned_name = cleaned_name[:255]
+    if cleaned_name != (user.name or ""):
+        reused = await _try_reuse_name_tag(session, user_id=user.id, name=cleaned_name)
+        tag = reused if reused is not None else await _allocate_name_tag(session, cleaned_name, exclude_user_id=user.id)
+        user.name = cleaned_name
+        user.name_tag = tag
+        session.add(UserDisplayNameHistory(user_id=user.id, name=cleaned_name, name_tag=tag, created_at=datetime.now(timezone.utc)))
+
+    user.first_name = (first_name or "").strip() or None
+    user.middle_name = (middle_name or "").strip() or None
+    user.last_name = (last_name or "").strip() or None
+    user.date_of_birth = date_of_birth
+    user.phone = (phone or "").strip()
+    if preferred_language:
+        user.preferred_language = preferred_language
+
+    user.hashed_password = security.hash_password(password)
     session.add(user)
     await session.commit()
     await session.refresh(user)
+
+    if not _profile_is_complete(user):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Profile incomplete")
     return user
 
 

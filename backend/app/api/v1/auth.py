@@ -13,13 +13,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
 from app.core.config import settings
-from app.core.dependencies import get_current_user, require_admin, require_complete_profile
+from app.core.dependencies import get_current_user, get_google_completion_user, require_admin, require_complete_profile
 from app.core.rate_limit import limiter, per_identifier_limiter
 from app.core.security import decode_token
 from app.db.session import get_session
 from app.models.user import User
 from app.schemas.auth import (
     AuthResponse,
+    GoogleCallbackResponse,
     AccountDeletionStatus,
     EmailVerificationConfirm,
     PasswordResetConfirm,
@@ -95,10 +96,6 @@ def clear_refresh_cookie(response: Response) -> None:
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
-    new_password: str = Field(min_length=6, max_length=128)
-
-
-class SetInitialPasswordRequest(BaseModel):
     new_password: str = Field(min_length=6, max_length=128)
 
 
@@ -360,21 +357,6 @@ async def change_password(
     session.add(current_user)
     await session.commit()
     return {"detail": "Password updated"}
-
-
-@router.post(
-    "/me/password/set",
-    response_model=UserResponse,
-    summary="Set initial password for Google-created account",
-    description="Allows Google-created users to set a password during initial profile completion (no current password required).",
-)
-async def set_initial_password(
-    payload: SetInitialPasswordRequest,
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-) -> UserResponse:
-    user = await auth_service.set_initial_password_for_google_user(session, current_user, payload.new_password)
-    return UserResponse.model_validate(user)
 
 
 @router.post("/verify/request", status_code=status.HTTP_202_ACCEPTED)
@@ -695,13 +677,13 @@ async def google_start(_: None = Depends(google_rate_limit)) -> dict:
     return {"auth_url": url}
 
 
-@router.post("/google/callback", response_model=AuthResponse)
+@router.post("/google/callback", response_model=GoogleCallbackResponse)
 async def google_callback(
     payload: GoogleCallback,
     session: AsyncSession = Depends(get_session),
     response: Response = None,
     _: None = Depends(google_rate_limit),
-) -> AuthResponse:
+) -> GoogleCallbackResponse:
     _validate_google_state(payload.state, "google_state")
     profile = await auth_service.exchange_google_code(payload.code)
     sub = profile.get("sub")
@@ -722,11 +704,20 @@ async def google_callback(
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
         if getattr(existing_sub, "deleted_at", None) is not None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
-        tokens = await auth_service.issue_tokens_for_user(session, existing_sub)
-        if response:
-            set_refresh_cookie(response, tokens["refresh_token"])
-        logger.info("google_login_existing", extra={"user_id": str(existing_sub.id)})
-        return AuthResponse(user=UserResponse.model_validate(existing_sub), tokens=TokenPair(**tokens))
+        if auth_service.is_profile_complete(existing_sub):
+            tokens = await auth_service.issue_tokens_for_user(session, existing_sub)
+            if response:
+                set_refresh_cookie(response, tokens["refresh_token"])
+            logger.info("google_login_existing", extra={"user_id": str(existing_sub.id)})
+            return GoogleCallbackResponse(user=UserResponse.model_validate(existing_sub), tokens=TokenPair(**tokens))
+
+        completion_token = security.create_google_completion_token(str(existing_sub.id))
+        logger.info("google_login_needs_completion", extra={"user_id": str(existing_sub.id)})
+        return GoogleCallbackResponse(
+            user=UserResponse.model_validate(existing_sub),
+            requires_completion=True,
+            completion_token=completion_token,
+        )
 
     existing_email = await auth_service.get_user_by_email(session, email)
     if existing_email and existing_email.google_sub and existing_email.google_sub != sub:
@@ -749,6 +740,79 @@ async def google_callback(
         preferred_language="en",
     )
     logger.info("google_login_first_time", extra={"user_id": str(user.id)})
+    completion_token = security.create_google_completion_token(str(user.id))
+    return GoogleCallbackResponse(
+        user=UserResponse.model_validate(user),
+        requires_completion=True,
+        completion_token=completion_token,
+    )
+
+
+class GoogleCompleteRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=30, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$")
+    name: str = Field(min_length=1, max_length=255, description="Display name shown publicly")
+    first_name: str = Field(min_length=1, max_length=100)
+    middle_name: str | None = Field(default=None, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
+    date_of_birth: date
+    phone: str = Field(min_length=7, max_length=32, description="E.164 format")
+    password: str = Field(min_length=6, max_length=128)
+    preferred_language: str | None = Field(default=None, pattern="^(en|ro)$")
+
+    @field_validator("name", "first_name", "last_name", "username", mode="before")
+    @classmethod
+    def _strip_required_strings(cls, value: str) -> str:
+        value = (value or "").strip()
+        if not value:
+            raise ValueError("Field cannot be empty")
+        return value
+
+    @field_validator("middle_name", mode="before")
+    @classmethod
+    def _strip_optional_string(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    @field_validator("phone", mode="before")
+    @classmethod
+    def _strip_phone(cls, value: str) -> str:
+        value = (value or "").strip()
+        if not value:
+            raise ValueError("Phone is required")
+        if not re.fullmatch(r"^\+[1-9]\d{6,14}$", value):
+            raise ValueError("Phone must be in E.164 format (e.g. +40723204204)")
+        return value
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def _validate_date_of_birth(cls, value: date) -> date:
+        if value > date.today():
+            raise ValueError("Date of birth cannot be in the future")
+        return value
+
+
+@router.post("/google/complete", response_model=AuthResponse)
+async def google_complete_registration(
+    payload: GoogleCompleteRequest,
+    current_user: User = Depends(get_google_completion_user),
+    session: AsyncSession = Depends(get_session),
+    response: Response = None,
+) -> AuthResponse:
+    user = await auth_service.complete_google_registration(
+        session,
+        current_user,
+        username=payload.username,
+        display_name=payload.name,
+        first_name=payload.first_name,
+        middle_name=payload.middle_name,
+        last_name=payload.last_name,
+        date_of_birth=payload.date_of_birth,
+        phone=payload.phone,
+        password=payload.password,
+        preferred_language=payload.preferred_language,
+    )
     tokens = await auth_service.issue_tokens_for_user(session, user)
     if response:
         set_refresh_cookie(response, tokens["refresh_token"])

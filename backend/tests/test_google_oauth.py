@@ -1,6 +1,6 @@
 import asyncio
 import io
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 from urllib.parse import urlparse, parse_qs
 
 import httpx
@@ -109,6 +109,8 @@ def test_google_oauth_smoke_with_mocked_endpoints(monkeypatch: pytest.MonkeyPatc
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["user"]["email"] == "mocked@example.com"
+    assert body["requires_completion"] is True
+    assert body["completion_token"]
     assert calls == {"token": 1, "userinfo": 1}
 
 
@@ -126,6 +128,11 @@ def test_google_callback_existing_sub(monkeypatch: pytest.MonkeyPatch, test_app)
                 username="googleuser",
                 hashed_password="hashed",
                 name="G User",
+                name_tag=0,
+                first_name="G",
+                last_name="User",
+                date_of_birth=date(2000, 1, 1),
+                phone="+40723204204",
                 google_sub="sub-123",
                 google_email="google@example.com",
                 email_verified=True,
@@ -200,7 +207,8 @@ def test_google_callback_creates_user(monkeypatch: pytest.MonkeyPatch, test_app)
     assert data["user"]["google_picture_url"] == "http://example.com/pic.png"
     # Google profile photo is stored, but using it as the site avatar is opt-in.
     assert data["user"]["avatar_url"] is None
-    assert data["tokens"]["access_token"]
+    assert data["requires_completion"] is True
+    assert data["completion_token"]
 
     async def verify_db():
         async with SessionLocal() as session:
@@ -305,49 +313,39 @@ def test_google_created_user_can_set_password_and_login(monkeypatch: pytest.Monk
     res = client.post("/api/v1/auth/google/callback", json={"code": "abc", "state": state})
     assert res.status_code == 200, res.text
     username = res.json()["user"]["username"]
-    access_token = res.json()["tokens"]["access_token"]
+    completion_token = res.json()["completion_token"]
+    assert res.json()["requires_completion"] is True
 
-    # Profile is incomplete (missing phone/DOB), so protected APIs are denied.
-    denied = client.get("/api/v1/wishlist", headers={"Authorization": f"Bearer {access_token}"})
-    assert denied.status_code == 403
-    assert denied.json()["detail"] == "Profile incomplete"
-
-    # Google-created users can set a password during completion (without email reset).
+    # Completion token is exchanged for a real session only after the required profile fields are provided.
     res = client.post(
-        "/api/v1/auth/me/password/set",
-        json={"new_password": "newpass123"},
-        headers={"Authorization": f"Bearer {access_token}"},
+        "/api/v1/auth/google/complete",
+        headers={"Authorization": f"Bearer {completion_token}"},
+        json={
+            "username": username,
+            "name": "PW User",
+            "first_name": "PW",
+            "middle_name": None,
+            "last_name": "User",
+            "date_of_birth": "2000-01-01",
+            "phone": "+40723204204",
+            "password": "newpass123",
+            "preferred_language": "en",
+        },
     )
     assert res.status_code == 200, res.text
-
-    # Now password login via username should work
-    res = client.post("/api/v1/auth/login", json={"identifier": username, "password": "newpass123"})
-    assert res.status_code == 200, res.text
-    assert res.json()["user"]["email"] == "pw@example.com"
-
-    # ...and via email should also work (single identifier field)
-    res = client.post("/api/v1/auth/login", json={"identifier": "pw@example.com", "password": "newpass123"})
-    assert res.status_code == 200, res.text
-    assert res.json()["user"]["email"] == "pw@example.com"
-
-    # Completing the profile lifts server-side enforcement.
-    res = client.patch(
-        "/api/v1/auth/me",
-        json={"date_of_birth": "2000-01-01", "phone": "+40723204204"},
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-    assert res.status_code == 200, res.text
+    access_token = res.json()["tokens"]["access_token"]
 
     ok = client.get("/api/v1/wishlist", headers={"Authorization": f"Bearer {access_token}"})
     assert ok.status_code == 200, ok.text
 
-    # Once profile is complete, the completion-only password set endpoint is disabled.
-    res = client.post(
-        "/api/v1/auth/me/password/set",
-        json={"new_password": "anotherpass123"},
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-    assert res.status_code == 400
+    # Password login works after registration completion.
+    res = client.post("/api/v1/auth/login", json={"identifier": username, "password": "newpass123"})
+    assert res.status_code == 200, res.text
+    assert res.json()["user"]["email"] == "pw@example.com"
+
+    res = client.post("/api/v1/auth/login", json={"identifier": "pw@example.com", "password": "newpass123"})
+    assert res.status_code == 200, res.text
+    assert res.json()["user"]["email"] == "pw@example.com"
 
 
 def test_admin_cleanup_incomplete_google_accounts(monkeypatch: pytest.MonkeyPatch, test_app):

@@ -4,7 +4,6 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { missingRequiredProfileFields } from '../../shared/profile-requirements';
 
 @Component({
   selector: 'app-google-callback',
@@ -62,17 +61,27 @@ export class GoogleCallbackComponent implements OnInit {
     this.auth.completeGoogleLogin(code, state).subscribe({
       next: (res) => {
         localStorage.removeItem('google_flow');
-        this.toast.success(this.translate.instant('auth.googleLoginSuccess'), res.user.email);
-        const missing = missingRequiredProfileFields(res.user);
-        if (missing.length) {
-          this.toast.info(this.translate.instant('auth.completeProfileRequiredTitle'), this.translate.instant('auth.completeProfileRequiredCopy'));
+        if (res.requires_completion || res.completion_token) {
+          if (typeof sessionStorage !== 'undefined' && res.completion_token) {
+            sessionStorage.setItem('google_completion_token', res.completion_token);
+            sessionStorage.setItem('google_completion_user', JSON.stringify(res.user));
+          }
+          this.toast.info(
+            this.translate.instant('auth.completeProfileRequiredTitle'),
+            this.translate.instant('auth.completeProfileRequiredCopy')
+          );
           void this.router.navigate(['/register'], { queryParams: { complete: 1 } });
           return;
         }
+        this.toast.success(this.translate.instant('auth.googleLoginSuccess'), res.user.email);
         void this.router.navigateByUrl('/account');
       },
       error: (err) => {
         localStorage.removeItem('google_flow');
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.removeItem('google_completion_token');
+          sessionStorage.removeItem('google_completion_user');
+        }
         const message = err?.error?.detail || this.translate.instant('auth.googleError');
         this.error.set(message);
         this.toast.error(message);

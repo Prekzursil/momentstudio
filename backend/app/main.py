@@ -22,7 +22,7 @@ from app.middleware import (
     SecurityHeadersMiddleware,
 )
 from app.schemas.error import ErrorResponse
-from app.services import fx_refresh
+from app.services import fx_refresh, google_cleanup
 
 
 def get_application() -> FastAPI:
@@ -40,8 +40,10 @@ def get_application() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         fx_refresh.start(app)
+        google_cleanup.start(app)
         yield
         await fx_refresh.stop(app)
+        await google_cleanup.stop(app)
 
     app = FastAPI(
         title=settings.app_name,

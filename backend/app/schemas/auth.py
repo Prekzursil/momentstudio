@@ -54,6 +54,13 @@ class AuthResponse(BaseModel):
     tokens: TokenPair
 
 
+class GoogleCallbackResponse(BaseModel):
+    user: UserResponse
+    tokens: TokenPair | None = None
+    requires_completion: bool = False
+    completion_token: str | None = None
+
+
 class PasswordResetRequest(BaseModel):
     email: EmailStr
 

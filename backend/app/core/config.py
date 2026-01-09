@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     google_client_secret: str | None = None
     google_redirect_uri: str | None = None
     google_allowed_domains: list[str] = []
+    google_completion_token_exp_minutes: int = 30
+    google_cleanup_enabled: bool = False
+    google_cleanup_interval_seconds: int = 60 * 60 * 24
+    google_cleanup_max_age_hours: int = 24 * 7
 
     # CAPTCHA (login/register only; Google OAuth is exempt)
     captcha_enabled: bool = False

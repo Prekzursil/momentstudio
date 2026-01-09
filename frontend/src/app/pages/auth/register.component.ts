@@ -10,7 +10,7 @@ import { PasswordStrengthComponent } from '../../shared/password-strength.compon
 import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { Subscription, finalize, switchMap } from 'rxjs';
+import { Subscription, finalize } from 'rxjs';
 import { type CountryCode } from 'libphonenumber-js';
 import { buildE164, listPhoneCountries, splitE164, type PhoneCountryOption } from '../../shared/phone';
 import { missingRequiredProfileFields } from '../../shared/profile-requirements';
@@ -289,6 +289,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
   countries: PhoneCountryOption[] = [];
   error = '';
   loading = false;
+  private googleCompletionToken: string | null = null;
   private langSub?: Subscription;
 
   constructor(
@@ -305,13 +306,22 @@ export class RegisterComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    const user = this.auth.user();
     const wantsCompletion = this.route.snapshot.queryParamMap.get('complete');
     if (!wantsCompletion) return;
-    if (!this.auth.isAuthenticated() || !user?.google_sub) return;
+    const token = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('google_completion_token') : null;
+    const rawUser = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('google_completion_user') : null;
+    if (!token || !rawUser) return;
+    let user: any = null;
+    try {
+      user = JSON.parse(rawUser);
+    } catch {
+      return;
+    }
+    if (!user?.google_sub) return;
     if (!missingRequiredProfileFields(user).length) return;
 
     this.completionMode = true;
+    this.googleCompletionToken = token;
     this.crumbs = [
       { label: 'nav.home', url: '/' },
       { label: 'account.completeProfile.title' }
@@ -397,28 +407,35 @@ export class RegisterComponent implements OnInit, OnDestroy {
     const preferredLanguage = (this.translate.currentLang || '').startsWith('ro') ? 'ro' : 'en';
 
     if (this.completionMode) {
-      const username = this.username.trim();
-      const payload = {
-        name: this.displayName.trim() || null,
-        phone: e164,
-        first_name: this.firstName.trim() || null,
-        middle_name: this.middleName.trim() ? this.middleName.trim() : null,
-        last_name: this.lastName.trim() || null,
-        date_of_birth: dob,
-        preferred_language: preferredLanguage
-      };
+      if (!this.googleCompletionToken) {
+        this.loading = false;
+        this.toast.error(this.translate.instant('auth.googleError'));
+        return;
+      }
 
       this.auth
-        .updateUsername(username)
+        .completeGoogleRegistration(this.googleCompletionToken, {
+          username: this.username.trim(),
+          name: this.displayName.trim(),
+          first_name: this.firstName.trim(),
+          middle_name: this.middleName.trim() ? this.middleName.trim() : null,
+          last_name: this.lastName.trim(),
+          date_of_birth: dob,
+          phone: e164,
+          password: this.password,
+          preferred_language: preferredLanguage
+        })
         .pipe(
-          switchMap(() => this.auth.setInitialPassword(this.password)),
-          switchMap(() => this.auth.updateProfile(payload)),
           finalize(() => {
             this.loading = false;
           })
         )
         .subscribe({
           next: () => {
+            if (typeof sessionStorage !== 'undefined') {
+              sessionStorage.removeItem('google_completion_token');
+              sessionStorage.removeItem('google_completion_user');
+            }
             this.toast.success(this.translate.instant('account.completeProfile.title'));
             void this.router.navigateByUrl('/account');
           },
