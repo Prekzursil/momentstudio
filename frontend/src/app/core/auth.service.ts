@@ -223,11 +223,11 @@ export class AuthService {
     return this.api.patch<AuthUser>('/auth/me', payload).pipe(tap((user) => this.setUser(user)));
   }
 
-  updateUsername(username: string): Observable<AuthUser> {
+  updateUsername(username: string, password: string): Observable<AuthUser> {
     if (!this.isAuthenticated()) {
       return of({} as AuthUser);
     }
-    return this.api.patch<AuthUser>('/auth/me/username', { username }).pipe(tap((user) => this.setUser(user)));
+    return this.api.patch<AuthUser>('/auth/me/username', { username, password }).pipe(tap((user) => this.setUser(user)));
   }
 
   updateEmail(email: string, password: string): Observable<AuthUser> {

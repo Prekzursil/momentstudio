@@ -53,14 +53,50 @@ def create_user_token(session_factory, email="buyer@example.com", admin: bool = 
     async def create_and_token():
         async with session_factory() as session:
             user = await create_user(session, UserCreate(email=email, password="orderpass", name="Buyer"))
+            user.email_verified = True
             if admin:
                 user.role = UserRole.admin
-                await session.commit()
-                await session.refresh(user)
+            await session.commit()
+            await session.refresh(user)
             tokens = await issue_tokens_for_user(session, user)
             return tokens["access_token"], user.id
 
     return asyncio.run(create_and_token())
+
+
+def test_order_create_requires_verified_email(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    async def create_unverified_user():
+        async with SessionLocal() as session:
+            user = await create_user(session, UserCreate(email="unverified@example.com", password="orderpass", name="Buyer"))
+            # Ensure user is not verified
+            user.email_verified = False
+            await session.commit()
+            await session.refresh(user)
+            tokens = await issue_tokens_for_user(session, user)
+            return tokens["access_token"], user.id
+
+    token, user_id = asyncio.run(create_unverified_user())
+    seed_cart_with_product(SessionLocal, user_id)
+
+    async def seed_shipping():
+        async with SessionLocal() as session:
+            method = await order_service.create_shipping_method(
+                session, ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0)
+            )
+            return method.id
+
+    shipping_method_id = asyncio.run(seed_shipping())
+
+    res = client.post(
+        "/api/v1/orders",
+        json={"shipping_method_id": str(shipping_method_id)},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 403, res.text
+    assert res.json().get("detail") == "Email verification required"
 
 
 def seed_cart_with_product(session_factory, user_id: UUID) -> UUID:

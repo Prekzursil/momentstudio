@@ -344,7 +344,11 @@ def test_alias_history_and_display_name_tags(test_app: Dict[str, object]) -> Non
     assert data["display_names"][0]["name"] == "Ana"
     assert data["display_names"][0]["name_tag"] == 0
 
-    update = client.patch("/api/v1/auth/me/username", json={"username": "ana1-new"}, headers=auth_headers(token))
+    update = client.patch(
+        "/api/v1/auth/me/username",
+        json={"username": "ana1-new", "password": "supersecret"},
+        headers=auth_headers(token),
+    )
     assert update.status_code == 429, update.text
 
     async def rewind_username_cooldown() -> None:
@@ -367,7 +371,11 @@ def test_alias_history_and_display_name_tags(test_app: Dict[str, object]) -> Non
 
     asyncio.run(rewind_username_cooldown())
 
-    update = client.patch("/api/v1/auth/me/username", json={"username": "ana1-new"}, headers=auth_headers(token))
+    update = client.patch(
+        "/api/v1/auth/me/username",
+        json={"username": "ana1-new", "password": "supersecret"},
+        headers=auth_headers(token),
+    )
     assert update.status_code == 200, update.text
     aliases2 = client.get("/api/v1/auth/me/aliases", headers=auth_headers(token))
     assert aliases2.status_code == 200, aliases2.text

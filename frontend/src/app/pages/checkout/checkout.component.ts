@@ -13,42 +13,36 @@ import { ApiService } from '../../core/api.service';
 import { appConfig } from '../../core/app-config';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ThemeMode, ThemeService } from '../../core/theme.service';
-
-type ShippingMethod = { id: string; label: string; amount: number; eta: string };
+import { AuthService } from '../../core/auth.service';
 
 @Component({
   selector: 'app-checkout',
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent, LocalizedCurrencyPipe, TranslateModule],
   template: `
-    <app-container classes="py-10 grid gap-6">
-      <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-      <div class="grid lg:grid-cols-[2fr_1fr] gap-6 items-start">
-        <section class="grid gap-4">
-          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'checkout.title' | translate }}</h1>
-          <div
-            *ngIf="errorMessage"
+	    <app-container classes="py-10 grid gap-6">
+	      <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
+	      <div class="grid lg:grid-cols-[2fr_1fr] gap-6 items-start" *ngIf="auth.isAuthenticated(); else authRequiredTpl">
+	        <section class="grid gap-4">
+	          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'checkout.title' | translate }}</h1>
+	          <div
+	            *ngIf="errorMessage"
             class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex items-start justify-between gap-3 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
-          >
-            <span>{{ errorMessage }}</span>
-            <app-button size="sm" variant="ghost" [label]="'checkout.retry' | translate" (action)="retryValidation()"></app-button>
-          </div>
-          <form #checkoutForm="ngForm" class="grid gap-4" (ngSubmit)="placeOrder(checkoutForm)">
-            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step1' | translate }}</p>
-              <label class="flex items-center gap-2 text-sm">
-                <input type="radio" name="checkoutMode" value="guest" [(ngModel)]="mode" required />
-                {{ 'checkout.guest' | translate }}
-              </label>
-              <label class="flex items-center gap-2 text-sm">
-                <input type="radio" name="checkoutMode" value="create" [(ngModel)]="mode" required />
-                {{ 'checkout.createAccount' | translate }}
-              </label>
-            </div>
-
-            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step2' | translate }}</p>
-              <div class="grid sm:grid-cols-2 gap-3">
+	          >
+	            <span>{{ errorMessage }}</span>
+	            <app-button size="sm" variant="ghost" [label]="'checkout.retry' | translate" (action)="retryValidation()"></app-button>
+	          </div>
+	          <div
+	            *ngIf="auth.isAuthenticated() && !emailVerified()"
+	            class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex items-start justify-between gap-3 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+	          >
+	            <span>{{ 'auth.emailVerificationNeeded' | translate }}</span>
+	            <app-button size="sm" variant="ghost" [label]="'auth.emailVerificationConfirm' | translate" routerLink="/account"></app-button>
+	          </div>
+	          <form #checkoutForm="ngForm" class="grid gap-4" (ngSubmit)="placeOrder(checkoutForm)">
+	            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step2' | translate }}</p>
+	              <div class="grid sm:grid-cols-2 gap-3">
                 <label class="text-sm grid gap-1">
                   {{ 'checkout.name' | translate }}
                   <input class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400" name="name" [(ngModel)]="address.name" required />
@@ -81,30 +75,12 @@ type ShippingMethod = { id: string; label: string; amount: number; eta: string }
                 <input type="checkbox" [(ngModel)]="saveAddress" name="saveAddress" />
                 {{ 'checkout.saveAddress' | translate }}
               </label>
-              <p *ngIf="addressError" class="text-sm text-amber-700 dark:text-amber-300">{{ addressError }}</p>
-            </div>
+	              <p *ngIf="addressError" class="text-sm text-amber-700 dark:text-amber-300">{{ addressError }}</p>
+	            </div>
 
-            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step3' | translate }}</p>
-              <label
-                *ngFor="let method of shippingMethods"
-                class="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950/30"
-                [ngClass]="shipping === method.id ? 'border-slate-900 dark:border-slate-50' : ''"
-              >
-                <span class="flex flex-col">
-                  <span class="font-semibold text-slate-900 dark:text-slate-50">{{ method.label }}</span>
-                  <span class="text-slate-500 dark:text-slate-400">{{ method.eta }}</span>
-                </span>
-                <span class="flex items-center gap-3">
-                  <span class="font-semibold text-slate-900 dark:text-slate-50">{{ method.amount | localizedCurrency : currency }}</span>
-                  <input type="radio" name="shipping" [value]="method.id" [(ngModel)]="shipping" required />
-                </span>
-              </label>
-            </div>
-
-            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step4' | translate }}</p>
-              <div class="flex gap-3">
+	            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step4' | translate }}</p>
+	              <div class="flex gap-3">
                 <input
                   class="rounded-lg border border-slate-200 bg-white px-3 py-2 flex-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
                   [(ngModel)]="promo"
@@ -158,10 +134,10 @@ type ShippingMethod = { id: string; label: string; amount: number; eta: string }
             <span>{{ 'checkout.subtotal' | translate }}</span>
             <span>{{ subtotal() | localizedCurrency : currency }}</span>
           </div>
-          <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
-            <span>{{ 'checkout.shipping' | translate }}</span>
-            <span>{{ shippingAmount | localizedCurrency : currency }}</span>
-          </div>
+	          <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
+	            <span>{{ 'checkout.shipping' | translate }}</span>
+	            <span>{{ 0 | localizedCurrency : currency }}</span>
+	          </div>
           <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
             <span>{{ 'checkout.promo' | translate }}</span>
             <span class="text-emerald-700 dark:text-emerald-300">-{{ discount | localizedCurrency : currency }}</span>
@@ -170,10 +146,20 @@ type ShippingMethod = { id: string; label: string; amount: number; eta: string }
             <span>{{ 'checkout.estimatedTotal' | translate }}</span>
             <span>{{ total | localizedCurrency : currency }}</span>
           </div>
-        </aside>
-      </div>
-    </app-container>
-  `
+	        </aside>
+	      </div>
+	      <ng-template #authRequiredTpl>
+	        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+	          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'checkout.title' | translate }}</h1>
+	          <p class="text-sm text-slate-700 dark:text-slate-200">{{ 'auth.haveAccount' | translate }}</p>
+	          <div class="flex flex-wrap gap-3">
+	            <app-button [label]="'auth.login' | translate" routerLink="/login"></app-button>
+	            <app-button variant="ghost" [label]="'auth.register' | translate" routerLink="/register"></app-button>
+	          </div>
+	        </section>
+	      </ng-template>
+	    </app-container>
+	  `
 })
 export class CheckoutComponent implements AfterViewInit, OnDestroy {
   crumbs = [
@@ -181,14 +167,8 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
     { label: 'nav.cart', url: '/cart' },
     { label: 'checkout.title' }
   ];
-  mode: 'guest' | 'create' = 'guest';
-  shipping: string = 'standard';
   promo = '';
   promoMessage = '';
-  shippingMethods: ShippingMethod[] = [
-    { id: 'standard', label: 'Standard', amount: 8, eta: '3-5 business days' },
-    { id: 'express', label: 'Express', amount: 15, eta: '1-2 business days' }
-  ];
   countries = ['US', 'GB', 'RO', 'DE', 'FR', 'CA'];
   addressError = '';
   errorMessage = '';
@@ -223,7 +203,8 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
     private cartApi: CartApi,
     private api: ApiService,
     private translate: TranslateService,
-    private theme: ThemeService
+    private theme: ThemeService,
+    public auth: AuthService
   ) {
     const saved = this.loadSavedAddress();
     if (saved) {
@@ -241,13 +222,12 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
   subtotal = this.cart.subtotal;
   currency = 'RON';
 
-  get shippingAmount(): number {
-    const found = this.shippingMethods.find((m) => m.id === this.shipping);
-    return found ? found.amount : 0;
+  emailVerified(): boolean {
+    return Boolean(this.auth.user()?.email_verified);
   }
 
   get total(): number {
-    return this.subtotal() + this.shippingAmount - this.discount;
+    return this.subtotal() - this.discount;
   }
 
   applyPromo(): void {
@@ -265,29 +245,18 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.addressError = '';
+    if (!this.emailVerified()) {
+      this.errorMessage = this.translate.instant('auth.emailVerificationNeeded');
+      return;
+    }
     const validation = this.validateCart();
     if (validation) {
       this.errorMessage = validation;
       return;
     }
-    if (!this.clientSecret) {
-      this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-      return;
-    }
     this.errorMessage = '';
     this.placing = true;
-    this.confirmPayment()
-      .then((paymentOk) => {
-        if (!paymentOk) {
-          this.placing = false;
-          return;
-        }
-        this.submitCheckout();
-      })
-      .catch(() => {
-        this.errorMessage = this.translate.instant('checkout.paymentFailed');
-        this.placing = false;
-      });
+    this.submitCheckout();
   }
 
   retryValidation(): void {
@@ -336,7 +305,6 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
   async ngAfterViewInit(): Promise<void> {
     await this.setupStripe();
     this.syncBackendCart(this.items());
-    this.loadPaymentIntent();
   }
 
   ngOnDestroy(): void {
@@ -394,23 +362,12 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
     return appConfig.stripePublishableKey || null;
   }
 
-  private loadPaymentIntent(): void {
-    this.cartApi.paymentIntent().subscribe({
-      next: (res) => {
-        this.clientSecret = res.client_secret;
-      },
-      error: () => {
-        this.errorMessage = 'Could not start payment';
-      }
-    });
-  }
-
-  private async confirmPayment(): Promise<boolean> {
-    if (!this.stripe || !this.card || !this.clientSecret) {
+  private async confirmPayment(clientSecret: string): Promise<boolean> {
+    if (!this.stripe || !this.card) {
       this.cardError = 'Payment form not ready';
       return false;
     }
-    const result = await this.stripe.confirmCardPayment(this.clientSecret, {
+    const result = await this.stripe.confirmCardPayment(clientSecret, {
       payment_method: { card: this.card, billing_details: { name: this.address.name, email: this.address.email } }
     });
     if (result.error) {
@@ -443,30 +400,38 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
 
   private submitCheckout(): void {
     const body = {
-      name: this.address.name,
-      email: this.address.email,
-      password: this.mode === 'create' ? this.address.password || undefined : undefined,
-      create_account: this.mode === 'create',
       line1: this.address.line1,
       line2: this.address.line2,
       city: this.address.city,
       region: this.address.region,
       postal_code: this.address.postal,
       country: this.address.country || 'US',
-      shipping_method_id: this.shipping || null,
+      shipping_method_id: null,
       promo_code: this.promo || null,
       save_address: this.saveAddress
     };
     this.api
       .post<{ order_id: string; reference_code?: string; client_secret: string }>(
-        '/orders/guest-checkout',
+        '/orders/checkout',
         body,
         this.cartApi.headers()
       )
       .subscribe({
-        next: () => {
-          if (this.saveAddress) this.persistAddress();
-          void this.router.navigate(['/checkout/success']);
+        next: (res) => {
+          this.clientSecret = res.client_secret;
+          this.confirmPayment(res.client_secret)
+            .then((paymentOk) => {
+              if (!paymentOk) {
+                this.placing = false;
+                return;
+              }
+              if (this.saveAddress) this.persistAddress();
+              void this.router.navigate(['/checkout/success']);
+            })
+            .catch(() => {
+              this.errorMessage = this.translate.instant('checkout.paymentFailed');
+              this.placing = false;
+            });
         },
         error: (err) => {
           this.errorMessage = err?.error?.detail || 'Checkout failed';

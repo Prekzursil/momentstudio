@@ -1,6 +1,7 @@
 import asyncio
 from decimal import Decimal
 from typing import Dict
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,6 +13,7 @@ from app.db.session import get_session
 from app.main import app
 from app.models.catalog import Category, Product, ProductImage
 from app.models.order import Order
+from app.models.user import User
 from app.schemas.order import ShippingMethodCreate
 from app.services import payments
 from app.services import email as email_service
@@ -97,6 +99,17 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
     )
     assert reg.status_code == 201, reg.text
     token = reg.json()["tokens"]["access_token"]
+    user_id = reg.json()["user"]["id"]
+
+    async def mark_verified() -> None:
+        async with SessionLocal() as session:
+            user = await session.get(User, UUID(user_id))
+            assert user is not None
+            user.email_verified = True
+            session.add(user)
+            await session.commit()
+
+    asyncio.run(mark_verified())
 
     # Add to cart
     add_res = client.post(
@@ -106,14 +119,9 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
     )
     assert add_res.status_code in (200, 201), add_res.text
 
-    # Create PaymentIntent (mocked)
-    intent_res = client.post("/api/v1/payments/intent", headers={"Authorization": f"Bearer {token}"})
-    assert intent_res.status_code == 200, intent_res.text
-    assert intent_res.json().get("client_secret")
-
-    # Checkout as authenticated user
+    # Checkout as authenticated user (returns order_id + client_secret)
     order_res = client.post(
-        "/api/v1/orders",
+        "/api/v1/orders/checkout",
         headers={"Authorization": f"Bearer {token}"},
         json={
             "shipping_method_id": str(seeded["shipping_id"]),
@@ -128,18 +136,19 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
     )
     assert order_res.status_code == 201, order_res.text
     body = order_res.json()
-    assert body["id"]
+    assert body["order_id"]
+    assert body["client_secret"]
     assert captured.get("email_sent") is True
 
     # Verify order is visible via API endpoints
     list_res = client.get("/api/v1/orders", headers={"Authorization": f"Bearer {token}"})
     assert list_res.status_code == 200, list_res.text
     ids = {o["id"] for o in list_res.json()}
-    assert body["id"] in ids
+    assert body["order_id"] in ids
 
-    detail_res = client.get(f"/api/v1/orders/{body['id']}", headers={"Authorization": f"Bearer {token}"})
+    detail_res = client.get(f"/api/v1/orders/{body['order_id']}", headers={"Authorization": f"Bearer {token}"})
     assert detail_res.status_code == 200, detail_res.text
-    assert detail_res.json()["id"] == body["id"]
+    assert detail_res.json()["id"] == body["order_id"]
 
     # Verify order persisted and tied to user
     async def fetch_order():

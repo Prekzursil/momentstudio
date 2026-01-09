@@ -305,6 +305,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Cart mini-icon badge with item count.
 - [x] Edge cases: out-of-stock and price changes during checkout.
 - [x] Checkout totals driven by backend shipping/promo validation (no hardcoded amounts).
+- [x] Checkout: require signed-in + verified email before placing an order (guest checkout disabled for now).
+- [ ] Checkout: decide whether to re-enable guest checkout with email verification (and update tests/e2e accordingly).
 - [x] Send set-password email flow for guest checkouts that create an account.
 - [x] Frontend cart/checkout tests (unit + e2e) against backend cart/payment intent APIs.
 - [x] Ensure frontend CI runs with Angular toolchain/Chrome to cover cart/checkout flows.
@@ -342,6 +344,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Client/session idle-timeout handling (auto logout + messaging).
 - [x] Replace address prompt UX with form/modal wired to address CRUD APIs.
 - [x] Integrate Stripe Elements card entry UI instead of manual payment_method prompts.
+- [x] Account: show a verification-needed banner near email with resend/confirm UI and hide it once verified.
+- [x] Security: require current password to change username (backend + UI).
 - [x] Account UX: account overview landing with summary cards (Orders, Addresses, Wishlist, Notifications, Security) and “last order status” + “default address” summaries.
 - [x] Account UX: profile basics editor (avatar, display name, phone, preferred language + theme) with optional profile completeness indicator.
 - [x] Account UX: orders UI improvements (status chips, expandable details, tracking link, invoice/receipt download, and “Reorder”).

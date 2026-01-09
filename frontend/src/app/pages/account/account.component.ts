@@ -18,7 +18,7 @@ import { appConfig } from '../../core/app-config';
 import { WishlistService } from '../../core/wishlist.service';
 import { ProductCardComponent } from '../../shared/product-card.component';
 import { ThemeMode, ThemePreference, ThemeService } from '../../core/theme.service';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { SkeletonComponent } from '../../shared/skeleton.component';
 import { LanguageService } from '../../core/language.service';
 import { CartStore } from '../../core/cart.store';
@@ -51,28 +51,31 @@ import { missingRequiredProfileFields as computeMissingRequiredProfileFields, ty
           {{ error() }}
         </div>
         <div class="grid gap-6" *ngIf="!error()">
-        <div *ngIf="!emailVerified()" class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 text-sm grid gap-3 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
-          <div class="flex items-start justify-between gap-3">
-            <span>Verify your email to secure your account and receive updates.</span>
-            <app-button size="sm" variant="ghost" label="Resend link" (action)="resendVerification()"></app-button>
-          </div>
-          <form class="flex gap-2 items-center" (ngSubmit)="submitVerification()">
-            <input
-              [(ngModel)]="verificationToken"
-              name="verificationToken"
-              type="text"
-              placeholder="Enter verification token"
-              class="border border-amber-300 bg-white rounded-lg px-3 py-2 text-sm flex-1 text-slate-900 dark:border-amber-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
-              required
-            />
-            <app-button size="sm" label="Confirm" type="submit"></app-button>
-          </form>
-          <p *ngIf="verificationStatus" class="text-xs text-amber-800 dark:text-amber-200">{{ verificationStatus }}</p>
-        </div>
         <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div class="min-w-0">
             <p class="text-sm text-slate-500 dark:text-slate-400">Signed in as</p>
             <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50 truncate">{{ profile()?.email || '...' }}</h1>
+            <div
+              *ngIf="!emailVerified()"
+              class="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 text-sm grid gap-3 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <span>{{ 'auth.emailVerificationNeeded' | translate }}</span>
+                <app-button size="sm" variant="ghost" [label]="'auth.emailVerificationResend' | translate" (action)="resendVerification()"></app-button>
+              </div>
+              <form class="flex gap-2 items-center" (ngSubmit)="submitVerification()">
+                <input
+                  [(ngModel)]="verificationToken"
+                  name="verificationToken"
+                  type="text"
+                  [placeholder]="'auth.emailVerificationTokenPlaceholder' | translate"
+                  class="border border-amber-300 bg-white rounded-lg px-3 py-2 text-sm flex-1 text-slate-900 dark:border-amber-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  required
+                />
+                <app-button size="sm" [label]="'auth.emailVerificationConfirm' | translate" type="submit"></app-button>
+              </form>
+              <p *ngIf="verificationStatus" class="text-xs text-amber-800 dark:text-amber-200">{{ verificationStatus }}</p>
+            </div>
           </div>
           <div class="flex flex-wrap items-center gap-2">
             <app-button routerLink="/account/password" variant="ghost" label="Change password"></app-button>
@@ -217,6 +220,24 @@ import { missingRequiredProfileFields as computeMissingRequiredProfileFields, ty
               />
               <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
                 Use this to sign in and as a stable handle in public activity.
+              </span>
+            </label>
+
+            <label
+              *ngIf="usernameChanged()"
+              class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
+            >
+              {{ 'auth.currentPassword' | translate }}
+	              <input
+	                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                name="profileUsernamePassword"
+	                type="password"
+	                autocomplete="current-password"
+	                required
+	                [(ngModel)]="profileUsernamePassword"
+	              />
+              <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+                Required to change your username.
               </span>
             </label>
 
@@ -974,6 +995,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   profileError: string | null = null;
   profileName = '';
   profileUsername = '';
+  profileUsernamePassword = '';
   profileFirstName = '';
   profileMiddleName = '';
   profileLastName = '';
@@ -1031,7 +1053,8 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     private api: ApiService,
     public wishlist: WishlistService,
     private theme: ThemeService,
-    private lang: LanguageService
+    private lang: LanguageService,
+    private translate: TranslateService
   ) {
     this.computeTotalPages();
     this.stripeThemeEffect = effect(() => {
@@ -1305,6 +1328,12 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
         this.verificationStatus = 'Email verified';
         this.toast.success('Email verified');
         this.verificationToken = '';
+        this.auth.loadCurrentUser().subscribe({
+          next: (user) => {
+            this.profile.set(user);
+            this.emailVerified.set(Boolean(user.email_verified));
+          }
+        });
       },
       error: () => {
         this.verificationStatus = 'Invalid or expired token';
@@ -1427,6 +1456,12 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.forceProfileCompletion || Boolean(user.google_sub);
   }
 
+  usernameChanged(): boolean {
+    const current = (this.profile()?.username ?? '').trim();
+    const next = this.profileUsername.trim();
+    return Boolean(next && next !== current);
+  }
+
   requiredFieldLabelKey(field: RequiredProfileField): string {
     switch (field) {
       case 'name':
@@ -1539,10 +1574,18 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     const current = this.profile();
     const currentUsername = (current?.username ?? '').trim();
 
-    const maybeUpdateUsername$ =
-      username && username !== currentUsername
-        ? this.auth.updateUsername(username).pipe(map(() => null))
-        : of(null);
+    const usernameNeedsUpdate = Boolean(username && username !== currentUsername);
+    if (usernameNeedsUpdate && !this.profileUsernamePassword.trim()) {
+      const msg = this.translate.instant('auth.currentPasswordRequired');
+      this.profileError = msg;
+      this.toast.error(msg);
+      this.savingProfile = false;
+      return;
+    }
+
+    const maybeUpdateUsername$ = usernameNeedsUpdate
+      ? this.auth.updateUsername(username, this.profileUsernamePassword).pipe(map(() => null))
+      : of(null);
 
     maybeUpdateUsername$
       .pipe(switchMap(() => this.auth.updateProfile(payload)))
@@ -1561,6 +1604,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
           this.profilePhoneNational = phoneSplit.nationalNumber || '';
           this.profileLanguage = (user.preferred_language === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
           this.avatar = user.avatar_url ?? this.avatar;
+          this.profileUsernamePassword = '';
           this.profileSaved = true;
           this.toast.success('Profile saved');
           this.loadAliases();

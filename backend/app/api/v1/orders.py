@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.core.dependencies import require_complete_profile, require_admin
+from app.core.dependencies import require_complete_profile, require_verified_email, require_admin
 from app.db.session import get_session
 from app.models.address import Address
 from app.models.cart import Cart
@@ -18,13 +18,10 @@ from app.schemas.order import OrderRead, OrderCreate, OrderUpdate, ShippingMetho
 from app.services import cart as cart_service
 from app.services import order as order_service
 from app.services import email as email_service
-from app.schemas.checkout import GuestCheckoutRequest, GuestCheckoutResponse
-from app.schemas.user import UserCreate
+from app.schemas.checkout import GuestCheckoutRequest, GuestCheckoutResponse, CheckoutRequest
 from app.schemas.address import AddressCreate
-from app.services import auth as auth_service
 from app.services import payments
 from app.services import address as address_service
-import secrets
 from app.api.v1 import cart as cart_api
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -35,7 +32,7 @@ async def create_order(
     background_tasks: BackgroundTasks,
     payload: OrderCreate,
     session: AsyncSession = Depends(get_session),
-    current_user=Depends(require_complete_profile),
+    current_user=Depends(require_verified_email),
 ):
     cart_result = await session.execute(
         select(Cart).options(selectinload(Cart.items)).where(Cart.user_id == current_user.id)
@@ -68,6 +65,59 @@ async def create_order(
     return order
 
 
+@router.post("/checkout", response_model=GuestCheckoutResponse, status_code=status.HTTP_201_CREATED)
+async def checkout(
+    payload: CheckoutRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(require_verified_email),
+) -> GuestCheckoutResponse:
+    user_cart = await cart_service.get_cart(session, current_user.id, None)
+    if not user_cart.items:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
+
+    shipping_method = None
+    if payload.shipping_method_id:
+        shipping_method = await order_service.get_shipping_method(session, payload.shipping_method_id)
+        if not shipping_method:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
+
+    promo = None
+    if payload.promo_code:
+        promo = await cart_service.validate_promo(session, payload.promo_code, currency=None)
+
+    shipping_addr = await address_service.create_address(
+        session,
+        current_user.id,
+        AddressCreate(
+            label="Checkout",
+            line1=payload.line1,
+            line2=payload.line2,
+            city=payload.city,
+            region=payload.region,
+            postal_code=payload.postal_code,
+            country=payload.country,
+            is_default_shipping=payload.save_address,
+            is_default_billing=payload.save_address,
+        ),
+    )
+
+    totals, discount_val = cart_service.calculate_totals(user_cart, shipping_method=shipping_method, promo=promo)
+    intent = await payments.create_payment_intent(session, user_cart, amount_cents=int(totals.total * 100))
+    order = await order_service.build_order_from_cart(
+        session,
+        current_user.id,
+        user_cart,
+        shipping_addr.id,
+        shipping_addr.id,
+        shipping_method=shipping_method,
+        payment_intent_id=intent["intent_id"],
+        discount=discount_val,
+    )
+    background_tasks.add_task(email_service.send_order_confirmation, current_user.email, order, order.items)
+    return GuestCheckoutResponse(order_id=order.id, reference_code=order.reference_code, client_secret=intent["client_secret"])
+
+
 @router.get("", response_model=list[OrderRead])
 async def list_orders(current_user=Depends(require_complete_profile), session: AsyncSession = Depends(get_session)):
     orders = await order_service.get_orders_for_user(session, current_user.id)
@@ -86,72 +136,12 @@ async def admin_list_orders(
 
 @router.post("/guest-checkout", response_model=GuestCheckoutResponse, status_code=status.HTTP_201_CREATED)
 async def guest_checkout(
-    payload: GuestCheckoutRequest,
-    background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session),
-    session_id: str | None = Depends(cart_api.session_header),
+    _payload: GuestCheckoutRequest,
+    _background_tasks: BackgroundTasks,
+    _session: AsyncSession = Depends(get_session),
+    _session_id: str | None = Depends(cart_api.session_header),
 ):
-    # ensure cart exists
-    guest_cart = await cart_service.get_cart(session, None, session_id)
-    if not guest_cart.items:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
-
-    # require new email
-    existing_user = await auth_service.get_user_by_email(session, payload.email)
-    if existing_user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered; please log in")
-
-    password = payload.password or secrets.token_urlsafe(12)
-    user = await auth_service.create_user(session, UserCreate(email=payload.email, password=password, name=payload.name))
-
-    # merge guest cart into user cart
-    user_cart = await cart_service.get_cart(session, user.id, None)
-    user_cart = await cart_service.merge_guest_cart(session, user_cart, guest_cart.session_id)
-
-    # create shipping address
-    shipping_addr = await address_service.create_address(
-        session,
-        user.id,
-        AddressCreate(
-            label="Shipping",
-            line1=payload.line1,
-            line2=payload.line2,
-            city=payload.city,
-            region=payload.region,
-            postal_code=payload.postal_code,
-            country=payload.country,
-            is_default_shipping=True,
-            is_default_billing=True,
-        ),
-    )
-
-    shipping_method = None
-    if payload.shipping_method_id:
-        shipping_method = await order_service.get_shipping_method(session, payload.shipping_method_id)
-        if not shipping_method:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
-
-    promo = None
-    if payload.promo_code:
-        promo = await cart_service.validate_promo(session, payload.promo_code, currency=None)
-
-    totals, discount_val = cart_service.calculate_totals(user_cart, shipping_method=shipping_method, promo=promo)
-
-    intent = await payments.create_payment_intent(session, user_cart, amount_cents=int(totals.total * 100))
-    order = await order_service.build_order_from_cart(
-        session,
-        user.id,
-        user_cart,
-        shipping_addr.id,
-        shipping_addr.id,
-        shipping_method=shipping_method,
-        payment_intent_id=intent["intent_id"],
-        discount=discount_val,
-    )
-    if not payload.create_account:
-        reset_token = await auth_service.create_reset_token(session, payload.email)
-        background_tasks.add_task(email_service.send_password_reset, payload.email, reset_token.token)
-    return GuestCheckoutResponse(order_id=order.id, reference_code=order.reference_code, client_secret=intent["client_secret"])
+    raise HTTPException(status_code=status.HTTP_410_GONE, detail="Guest checkout disabled; please sign in")
 
 
 @router.patch("/admin/{order_id}", response_model=OrderRead)
