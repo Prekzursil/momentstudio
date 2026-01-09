@@ -336,7 +336,11 @@
     "googleMissingCode": "Missing Google authorization code.",
     "googleLinkPasswordMissing": "Password required to link Google account.",
     "languageNotSaved": "Language not saved",
-    "languageNotSavedDetail": "Could not update your preferred language. Please try again."
+    "languageNotSavedDetail": "Could not update your preferred language. Please try again.",
+    "captchaRequired": "Please complete the CAPTCHA.",
+    "captchaUnavailable": "CAPTCHA unavailable.",
+    "captchaFailedTryAgain": "CAPTCHA failed. Please try again.",
+    "captchaFailedLoad": "CAPTCHA failed to load."
   },
   "theme": {
     "switched": "Theme updated",

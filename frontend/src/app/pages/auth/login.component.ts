@@ -5,14 +5,25 @@ import { Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
+import { CaptchaTurnstileComponent } from '../../shared/captcha-turnstile.component';
 import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { appConfig } from '../../core/app-config';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent, TranslateModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    ContainerComponent,
+    ButtonComponent,
+    BreadcrumbComponent,
+    CaptchaTurnstileComponent,
+    TranslateModule
+  ],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -39,6 +50,11 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
             [(ngModel)]="password"
           />
         </label>
+        <app-captcha-turnstile
+          *ngIf="captchaEnabled"
+          [siteKey]="captchaSiteKey"
+          (tokenChange)="captchaToken = $event"
+        ></app-captcha-turnstile>
         <div class="flex items-center justify-between text-sm">
           <a routerLink="/password-reset" class="text-indigo-600 dark:text-indigo-300 font-medium">{{ 'auth.forgot' | translate }}</a>
           <a routerLink="/register" class="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-50">{{ 'auth.createAccount' | translate }}</a>
@@ -59,7 +75,10 @@ export class LoginComponent {
   ];
   identifier = '';
   password = '';
+  captchaToken: string | null = null;
   loading = false;
+  captchaSiteKey = appConfig.captchaSiteKey || '';
+  captchaEnabled = Boolean(this.captchaSiteKey);
 
   constructor(private toast: ToastService, private auth: AuthService, private router: Router, private translate: TranslateService) {}
 
@@ -78,8 +97,12 @@ export class LoginComponent {
 
   onSubmit(form: NgForm): void {
     if (!form.valid) return;
+    if (this.captchaEnabled && !this.captchaToken) {
+      this.toast.error(this.translate.instant('auth.captchaRequired'));
+      return;
+    }
     this.loading = true;
-    this.auth.login(this.identifier, this.password).subscribe({
+    this.auth.login(this.identifier, this.password, this.captchaToken ?? undefined).subscribe({
       next: (res) => {
         this.toast.success(this.translate.instant('auth.successLogin'), res.user.email);
         void this.router.navigateByUrl('/account');

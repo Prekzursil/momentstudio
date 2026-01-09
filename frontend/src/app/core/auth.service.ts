@@ -80,8 +80,10 @@ export class AuthService {
     return this.tokens?.refresh_token ?? null;
   }
 
-  login(identifier: string, password: string): Observable<AuthResponse> {
-    return this.api.post<AuthResponse>('/auth/login', { identifier, password }).pipe(tap((res) => this.persist(res)));
+  login(identifier: string, password: string, captchaToken?: string): Observable<AuthResponse> {
+    return this.api
+      .post<AuthResponse>('/auth/login', { identifier, password, captcha_token: captchaToken ?? null })
+      .pipe(tap((res) => this.persist(res)));
   }
 
   register(payload: {
@@ -95,6 +97,7 @@ export class AuthService {
     date_of_birth: string;
     phone: string;
     preferred_language?: string;
+    captcha_token?: string | null;
   }): Observable<AuthResponse> {
     return this.api.post<AuthResponse>('/auth/register', payload).pipe(tap((res) => this.persist(res)));
   }
@@ -126,6 +129,29 @@ export class AuthService {
 
   unlinkGoogle(password: string): Observable<AuthUser> {
     return this.api.post<AuthUser>('/auth/google/unlink', { password }).pipe(tap((user) => this.setUser(user)));
+  }
+
+  uploadAvatar(file: File): Observable<AuthUser> {
+    if (!this.isAuthenticated()) {
+      return of({} as AuthUser);
+    }
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.api.post<AuthUser>('/auth/me/avatar', formData).pipe(tap((user) => this.setUser(user)));
+  }
+
+  useGoogleAvatar(): Observable<AuthUser> {
+    if (!this.isAuthenticated()) {
+      return of({} as AuthUser);
+    }
+    return this.api.post<AuthUser>('/auth/me/avatar/use-google', {}).pipe(tap((user) => this.setUser(user)));
+  }
+
+  removeAvatar(): Observable<AuthUser> {
+    if (!this.isAuthenticated()) {
+      return of({} as AuthUser);
+    }
+    return this.api.delete<AuthUser>('/auth/me/avatar').pipe(tap((user) => this.setUser(user)));
   }
 
   updatePreferredLanguage(lang: string): Observable<AuthUser> {
@@ -170,6 +196,13 @@ export class AuthService {
       return of({} as AuthUser);
     }
     return this.api.patch<AuthUser>('/auth/me/username', { username }).pipe(tap((user) => this.setUser(user)));
+  }
+
+  updateEmail(email: string, password: string): Observable<AuthUser> {
+    if (!this.isAuthenticated()) {
+      return of({} as AuthUser);
+    }
+    return this.api.patch<AuthUser>('/auth/me/email', { email, password }).pipe(tap((user) => this.setUser(user)));
   }
 
   getAliases(): Observable<UserAliasesResponse> {

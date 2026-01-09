@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 from jose import jwt
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, EmailStr, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,6 +30,7 @@ from app.schemas.auth import (
 )
 from app.schemas.user import UserCreate
 from app.services import auth as auth_service
+from app.services import captcha as captcha_service
 from app.services import email as email_service
 from app.services import self_service
 from app.services import storage
@@ -173,6 +174,7 @@ class RegisterRequest(BaseModel):
     phone: str = Field(min_length=7, max_length=32, description="E.164 format")
     password: str = Field(min_length=6, max_length=128)
     preferred_language: str | None = Field(default=None, pattern="^(en|ro)$")
+    captcha_token: str | None = Field(default=None, description="CAPTCHA token (required when CAPTCHA is enabled)")
 
     @field_validator("name", "first_name", "last_name", "username", mode="before")
     @classmethod
@@ -212,10 +214,16 @@ class LoginRequest(BaseModel):
     identifier: str | None = None
     email: str | None = None
     password: str = Field(min_length=1, max_length=128)
+    captcha_token: str | None = None
 
 
 class UsernameUpdateRequest(BaseModel):
     username: str = Field(min_length=3, max_length=30, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$")
+
+
+class EmailUpdateRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=128)
 
 
 class UsernameHistoryItem(BaseModel):
@@ -237,9 +245,11 @@ class UserAliasesResponse(BaseModel):
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=AuthResponse)
 async def register(
     payload: RegisterRequest,
+    request: Request,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(register_rate_limit),
 ) -> AuthResponse:
+    await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
     user = await auth_service.create_user(
         session,
         UserCreate(
@@ -271,10 +281,12 @@ async def register(
 )
 async def login(
     payload: LoginRequest,
+    request: Request,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(login_rate_limit),
     response: Response = None,
 ) -> AuthResponse:
+    await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
     identifier = (payload.identifier or payload.email or "").strip()
     if not identifier:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Identifier is required")
@@ -403,6 +415,26 @@ async def update_username(
     session: AsyncSession = Depends(get_session),
 ) -> UserResponse:
     user = await auth_service.update_username(session, current_user, payload.username)
+    return UserResponse.model_validate(user)
+
+
+@router.patch(
+    "/me/email",
+    response_model=UserResponse,
+    summary="Update my email address",
+    description="Updates your email (password required) and sends a new verification token. Disabled while Google is linked.",
+)
+async def update_email(
+    payload: EmailUpdateRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+    user = await auth_service.update_email(session, current_user, str(payload.email))
+    record = await auth_service.create_email_verification(session, user)
+    background_tasks.add_task(email_service.send_verification_email, user.email, record.token)
     return UserResponse.model_validate(user)
 
 
@@ -552,6 +584,32 @@ async def upload_avatar(
         max_bytes=5 * 1024 * 1024,
     )
     current_user.avatar_url = url_path
+    session.add(current_user)
+    await session.commit()
+    await session.refresh(current_user)
+    return UserResponse.model_validate(current_user)
+
+
+@router.post("/me/avatar/use-google", response_model=UserResponse)
+async def use_google_avatar(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    if not current_user.google_picture_url:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No Google profile picture available")
+    current_user.avatar_url = current_user.google_picture_url
+    session.add(current_user)
+    await session.commit()
+    await session.refresh(current_user)
+    return UserResponse.model_validate(current_user)
+
+
+@router.delete("/me/avatar", response_model=UserResponse)
+async def remove_avatar(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    current_user.avatar_url = None
     session.add(current_user)
     await session.commit()
     await session.refresh(current_user)
@@ -713,8 +771,6 @@ async def google_link(
     current_user.google_sub = sub
     current_user.google_email = email
     current_user.google_picture_url = picture
-    if not current_user.avatar_url and picture:
-        current_user.avatar_url = picture
     current_user.email_verified = bool(profile.get("email_verified")) or current_user.email_verified
     if not current_user.name:
         current_user.name = name
@@ -738,6 +794,8 @@ async def google_unlink(
 ) -> UserResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+    if current_user.google_picture_url and current_user.avatar_url == current_user.google_picture_url:
+        current_user.avatar_url = None
     current_user.google_sub = None
     current_user.google_email = None
     current_user.google_picture_url = None

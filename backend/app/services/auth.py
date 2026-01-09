@@ -19,13 +19,15 @@ from app.models.user import (
     User,
     UserUsernameHistory,
     UserDisplayNameHistory,
+    UserEmailHistory,
 )
 from app.schemas.user import UserCreate
 from app.services import self_service
 
 
 async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
-    result = await session.execute(select(User).where(User.email == email))
+    email = (email or "").strip().lower()
+    result = await session.execute(select(User).where(func.lower(User.email) == email))
     return result.scalar_one_or_none()
 
 
@@ -40,6 +42,21 @@ async def get_user_by_google_sub(session: AsyncSession, google_sub: str) -> User
 
 
 USERNAME_ALLOWED_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$")
+
+USERNAME_CHANGE_COOLDOWN = timedelta(days=7)
+DISPLAY_NAME_CHANGE_COOLDOWN = timedelta(hours=1)
+EMAIL_CHANGE_COOLDOWN = timedelta(days=30)
+
+
+def _profile_is_complete(user: User) -> bool:
+    return bool(
+        (user.name or "").strip()
+        and (user.username or "").strip()
+        and (user.first_name or "").strip()
+        and (user.last_name or "").strip()
+        and user.date_of_birth
+        and (user.phone or "").strip()
+    )
 
 
 def _validate_username(username: str) -> str:
@@ -83,11 +100,15 @@ async def _generate_unique_username(session: AsyncSession, email: str) -> str:
 
 
 async def _allocate_name_tag(session: AsyncSession, name: str, *, exclude_user_id: uuid.UUID | None = None) -> int:
-    q = select(func.max(User.name_tag)).where(User.name == name)
+    q = select(User.name_tag).where(User.name == name)
     if exclude_user_id:
         q = q.where(User.id != exclude_user_id)
-    max_tag = await session.scalar(q)
-    return int(max_tag if max_tag is not None else -1) + 1
+    rows = (await session.execute(q)).scalars().all()
+    used = {int(x) for x in rows if x is not None}
+    tag = 0
+    while tag in used:
+        tag += 1
+    return tag
 
 
 async def _try_reuse_name_tag(
@@ -116,11 +137,16 @@ async def _try_reuse_name_tag(
 
 
 async def create_user(session: AsyncSession, user_in: UserCreate) -> User:
-    existing = await get_user_by_email(session, user_in.email)
+    normalized_email = (user_in.email or "").strip().lower()
+    existing = await get_user_by_email(session, normalized_email)
     if existing:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
 
-    username = _validate_username(user_in.username) if user_in.username else await _generate_unique_username(session, user_in.email)
+    username = (
+        _validate_username(user_in.username)
+        if user_in.username
+        else await _generate_unique_username(session, normalized_email)
+    )
     if await get_user_by_username(session, username):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken")
 
@@ -129,7 +155,7 @@ async def create_user(session: AsyncSession, user_in: UserCreate) -> User:
     name_tag = await _allocate_name_tag(session, display_name)
 
     db_user = User(
-        email=user_in.email,
+        email=normalized_email,
         username=username,
         hashed_password=security.hash_password(user_in.password),
         name=display_name,
@@ -146,6 +172,7 @@ async def create_user(session: AsyncSession, user_in: UserCreate) -> User:
     now = datetime.now(timezone.utc)
     session.add(UserUsernameHistory(user_id=db_user.id, username=username, created_at=now))
     session.add(UserDisplayNameHistory(user_id=db_user.id, name=display_name, name_tag=name_tag, created_at=now))
+    session.add(UserEmailHistory(user_id=db_user.id, email=db_user.email, created_at=now))
     await session.commit()
     await session.refresh(db_user)
     return db_user
@@ -171,6 +198,30 @@ async def update_username(session: AsyncSession, user: User, new_username: str) 
     new_username = _validate_username(new_username)
     if new_username == user.username:
         return user
+    if _profile_is_complete(user):
+        # Do not apply cooldown to the initial username assignment on account creation.
+        recent = (
+            (
+                await session.execute(
+                    select(UserUsernameHistory.created_at)
+                    .where(UserUsernameHistory.user_id == user.id)
+                    .order_by(UserUsernameHistory.created_at.desc())
+                    .limit(2)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if len(recent) >= 2:
+            last = recent[0]
+            if last and isinstance(last, datetime):
+                if last.tzinfo is None:
+                    last = last.replace(tzinfo=timezone.utc)
+                if datetime.now(timezone.utc) - last < USERNAME_CHANGE_COOLDOWN:
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail="You can change your username once every 7 days.",
+                    )
     existing = await get_user_by_username(session, new_username)
     if existing and existing.id != user.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken")
@@ -189,8 +240,34 @@ async def update_display_name(session: AsyncSession, user: User, new_name: str) 
     cleaned = cleaned[:255]
     if cleaned == (user.name or ""):
         return user
-
+    # If the user is reverting to a previously used display name, allow it even inside the cooldown window.
     reused = await _try_reuse_name_tag(session, user_id=user.id, name=cleaned)
+
+    if _profile_is_complete(user) and reused is None:
+        # Do not apply cooldown to the initial display name assignment on account creation.
+        recent = (
+            (
+                await session.execute(
+                    select(UserDisplayNameHistory.created_at)
+                    .where(UserDisplayNameHistory.user_id == user.id)
+                    .order_by(UserDisplayNameHistory.created_at.desc())
+                    .limit(2)
+                    )
+            )
+            .scalars()
+            .all()
+        )
+        if len(recent) >= 2:
+            last = recent[0]
+            if last and isinstance(last, datetime):
+                if last.tzinfo is None:
+                    last = last.replace(tzinfo=timezone.utc)
+                if datetime.now(timezone.utc) - last < DISPLAY_NAME_CHANGE_COOLDOWN:
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail="You can change your display name once per hour.",
+                    )
+
     tag = reused if reused is not None else await _allocate_name_tag(session, cleaned, exclude_user_id=user.id)
     user.name = cleaned
     user.name_tag = tag
@@ -231,6 +308,7 @@ async def create_google_user(
     email_verified: bool,
     preferred_language: str = "en",
 ) -> User:
+    email = (email or "").strip().lower()
     username = await _generate_unique_username(session, email)
     display_name = (name or "").strip() or username
     display_name = display_name[:255]
@@ -245,7 +323,6 @@ async def create_google_user(
         name_tag=name_tag,
         first_name=(first_name or "").strip() or None,
         last_name=(last_name or "").strip() or None,
-        avatar_url=picture,
         google_sub=sub,
         google_email=email,
         google_picture_url=picture,
@@ -257,6 +334,48 @@ async def create_google_user(
     now = datetime.now(timezone.utc)
     session.add(UserUsernameHistory(user_id=user.id, username=username, created_at=now))
     session.add(UserDisplayNameHistory(user_id=user.id, name=display_name, name_tag=name_tag, created_at=now))
+    session.add(UserEmailHistory(user_id=user.id, email=user.email, created_at=now))
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
+async def update_email(session: AsyncSession, user: User, new_email: str) -> User:
+    cleaned = (new_email or "").strip().lower()
+    if not cleaned:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email is required")
+    if user.google_sub:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email cannot be changed while Google is linked. Unlink Google first.",
+        )
+    if cleaned == (user.email or "").strip().lower():
+        return user
+
+    last = await session.scalar(
+        select(UserEmailHistory.created_at)
+        .where(UserEmailHistory.user_id == user.id)
+        .order_by(UserEmailHistory.created_at.desc())
+        .limit(1)
+    )
+    if last and isinstance(last, datetime):
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) - last < EMAIL_CHANGE_COOLDOWN:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="You can change your email once every 30 days.",
+            )
+
+    existing = await get_user_by_email(session, cleaned)
+    if existing and existing.id != user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+
+    user.email = cleaned
+    user.email_verified = False
+    now = datetime.now(timezone.utc)
+    session.add(user)
+    session.add(UserEmailHistory(user_id=user.id, email=cleaned, created_at=now))
     await session.commit()
     await session.refresh(user)
     return user

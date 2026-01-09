@@ -336,7 +336,11 @@
     "googleMissingCode": "Lipsește codul de autorizare Google.",
     "googleLinkPasswordMissing": "Este necesară parola pentru a asocia contul Google.",
     "languageNotSaved": "Limbajul nu a fost salvat",
-    "languageNotSavedDetail": "Nu am putut actualiza limba preferată. Încearcă din nou."
+    "languageNotSavedDetail": "Nu am putut actualiza limba preferată. Încearcă din nou.",
+    "captchaRequired": "Te rugăm să completezi CAPTCHA.",
+    "captchaUnavailable": "CAPTCHA nu este disponibilă.",
+    "captchaFailedTryAgain": "CAPTCHA a eșuat. Încearcă din nou.",
+    "captchaFailedLoad": "CAPTCHA nu a putut fi încărcată."
   },
   "theme": {
     "switched": "Tema a fost schimbată",

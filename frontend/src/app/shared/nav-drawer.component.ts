@@ -3,7 +3,7 @@ import { NgClass, NgForOf, NgIf } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { FormsModule } from '@angular/forms';
-import { formatIdentity, initialsFromIdentity } from './user-identity';
+import { formatIdentity } from './user-identity';
 import { ThemePreference } from '../core/theme.service';
 import { ThemeSegmentedControlComponent } from './theme-segmented-control.component';
 
@@ -18,7 +18,6 @@ export interface NavDrawerUser {
   name?: string | null;
   name_tag?: number | null;
   avatar_url?: string | null;
-  google_picture_url?: string | null;
 }
 
 @Component({
@@ -50,20 +49,13 @@ export interface NavDrawerUser {
       <div *ngIf="user" class="p-4 border-b border-slate-200 dark:border-slate-700">
         <div class="flex items-center gap-3">
           <img
-            *ngIf="avatarUrl() as src"
+            *ngIf="avatarSrc() as src"
             class="h-10 w-10 rounded-full object-cover border border-slate-200 dark:border-slate-800 shrink-0"
             [src]="src"
-            alt=""
+            alt="User avatar"
             loading="lazy"
             referrerpolicy="no-referrer"
           />
-          <div
-            *ngIf="!avatarUrl()"
-            class="h-10 w-10 rounded-full bg-slate-200 text-slate-700 grid place-items-center font-semibold dark:bg-slate-800 dark:text-slate-200 shrink-0"
-            aria-hidden="true"
-          >
-            {{ initials() }}
-          </div>
           <div class="min-w-0">
             <div class="font-semibold text-slate-900 dark:text-slate-50 truncate">
               {{ displayName() }}
@@ -139,6 +131,7 @@ export class NavDrawerComponent {
   @Input() language = 'en';
   @Output() languageChange = new EventEmitter<string>();
   @Output() closed = new EventEmitter<void>();
+  placeholderAvatar = 'assets/placeholder/avatar-placeholder.svg';
 
   onClose(): void {
     this.closed.emit();
@@ -160,14 +153,14 @@ export class NavDrawerComponent {
   avatarUrl(): string | null {
     const user = this.user;
     if (!user) return null;
-    return user.avatar_url || user.google_picture_url || null;
+    return user.avatar_url || null;
+  }
+
+  avatarSrc(): string | null {
+    return this.avatarUrl() || this.placeholderAvatar;
   }
 
   displayName(): string {
     return formatIdentity(this.user, '');
-  }
-
-  initials(): string {
-    return initialsFromIdentity(this.user, '?');
   }
 }

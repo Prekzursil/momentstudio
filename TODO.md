@@ -29,6 +29,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Auth: require phone + DOB on registration (no age enforcement) and validate phone as E.164.
 - [x] Auth: extend /auth/me profile update + response schema to include new profile fields.
 - [x] Tests: update auth + Postgres integration tests for new registration/profile fields.
+- [x] Auth: add optional CAPTCHA verification for login/register (Cloudflare Turnstile) via env config (backend + frontend).
+- [x] Auth/Profile: add email change endpoint with 30-day cooldown + history tracking (disabled while Google is linked).
+- [x] Auth/Profile: enforce username (7d) + display name (1h) change cooldowns and reuse display name tags when reverting.
+- [x] Profile: add “use Google photo” + “remove avatar” endpoints; default to local placeholder avatar (Google photo opt-in).
 
 ## Backend - Catalog & Products
 - [x] Category model + migration.
@@ -423,9 +427,9 @@ Below is a structured checklist you can turn into issues.
 - [x] `/auth/google/callback` exchanges code, fetches profile, maps to local user.
 - [x] Handle email collision: prompt linking instead of duplicate creation when email matches existing user.
 - [x] Google login when `google_sub` exists issues standard access/refresh tokens.
-- [x] Google OAuth: prompt Google-created users to complete required profile fields (DOB + phone) after first login (banner + redirect).
-- [x] Google OAuth: block app navigation until required profile fields are completed (redirect everything to Account/Profile completion).
-- [ ] Google OAuth: add server-side enforcement (deny protected APIs until profile is complete) + optional cleanup of abandoned incomplete accounts.
+- [x] Google OAuth: prompt Google-created users to complete required profile fields after first login (toast + redirect to `/register?complete=1`).
+- [x] Google OAuth: block app navigation until required profile fields are completed (global guard redirects everything to `/register?complete=1`).
+- [ ] Google OAuth: add server-side enforcement (deny protected APIs until profile is complete) + optional cleanup of abandoned incomplete accounts (recommended for production hardening).
 - [x] `/auth/google/link` for logged-in users to link Google (password confirmation).
 - [x] `/auth/google/unlink` to disconnect Google profile (must retain password).
 - [x] Validation to prevent linking a Google account already linked elsewhere.

@@ -71,6 +71,9 @@ class User(Base):
     display_name_history: Mapped[list["UserDisplayNameHistory"]] = relationship(
         "UserDisplayNameHistory", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
     )
+    email_history: Mapped[list["UserEmailHistory"]] = relationship(
+        "UserEmailHistory", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
+    )
 
 
 class UserUsernameHistory(Base):
@@ -94,6 +97,19 @@ class UserDisplayNameHistory(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     user: Mapped[User] = relationship("User", back_populates="display_name_history")
+
+
+class UserEmailHistory(Base):
+    __tablename__ = "user_email_history"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user: Mapped[User] = relationship("User", back_populates="email_history")
 
 
 class PasswordResetToken(Base):

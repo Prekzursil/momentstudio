@@ -5,6 +5,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
+import { CaptchaTurnstileComponent } from '../../shared/captcha-turnstile.component';
 import { PasswordStrengthComponent } from '../../shared/password-strength.component';
 import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
@@ -13,6 +14,7 @@ import { Subscription, finalize, switchMap } from 'rxjs';
 import { type CountryCode } from 'libphonenumber-js';
 import { buildE164, listPhoneCountries, splitE164, type PhoneCountryOption } from '../../shared/phone';
 import { missingRequiredProfileFields } from '../../shared/profile-requirements';
+import { appConfig } from '../../core/app-config';
 
 @Component({
   selector: 'app-register',
@@ -24,6 +26,7 @@ import { missingRequiredProfileFields } from '../../shared/profile-requirements'
     ContainerComponent,
     ButtonComponent,
     BreadcrumbComponent,
+    CaptchaTurnstileComponent,
     PasswordStrengthComponent,
     TranslateModule
   ],
@@ -243,6 +246,12 @@ import { missingRequiredProfileFields } from '../../shared/profile-requirements'
             </span>
           </div>
 
+          <app-captcha-turnstile
+            *ngIf="!completionMode && captchaEnabled"
+            [siteKey]="captchaSiteKey"
+            (tokenChange)="captchaToken = $event"
+          ></app-captcha-turnstile>
+
           <p *ngIf="error" class="text-sm text-amber-700 dark:text-amber-300">{{ error }}</p>
 
           <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -270,6 +279,9 @@ export class RegisterComponent implements OnInit, OnDestroy {
   email = '';
   password = '';
   confirmPassword = '';
+  captchaToken: string | null = null;
+  captchaSiteKey = appConfig.captchaSiteKey || '';
+  captchaEnabled = Boolean(this.captchaSiteKey);
   firstName = '';
   middleName = '';
   lastName = '';
@@ -379,6 +391,10 @@ export class RegisterComponent implements OnInit, OnDestroy {
       this.error = this.translate.instant('validation.phoneInvalid');
       return;
     }
+    if (!this.completionMode && this.captchaEnabled && !this.captchaToken) {
+      this.error = this.translate.instant('auth.captchaRequired');
+      return;
+    }
     this.loading = true;
     const preferredLanguage = (this.translate.currentLang || '').startsWith('ro') ? 'ro' : 'en';
 
@@ -426,7 +442,8 @@ export class RegisterComponent implements OnInit, OnDestroy {
         last_name: this.lastName.trim(),
         date_of_birth: dob,
         phone: e164,
-        preferred_language: preferredLanguage
+        preferred_language: preferredLanguage,
+        ...(this.captchaToken ? { captcha_token: this.captchaToken } : {})
       })
       .pipe(
         finalize(() => {

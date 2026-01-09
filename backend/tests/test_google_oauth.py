@@ -197,7 +197,8 @@ def test_google_callback_creates_user(monkeypatch: pytest.MonkeyPatch, test_app)
     assert data["user"]["email"] == "newuser@example.com"
     assert data["user"]["google_sub"] == "new-sub"
     assert data["user"]["google_picture_url"] == "http://example.com/pic.png"
-    assert data["user"]["avatar_url"] == "http://example.com/pic.png"
+    # Google profile photo is stored, but using it as the site avatar is opt-in.
+    assert data["user"]["avatar_url"] is None
     assert data["tokens"]["access_token"]
 
     async def verify_db():
@@ -261,7 +262,8 @@ def test_google_link_and_unlink(monkeypatch: pytest.MonkeyPatch, test_app):
     body = res.json()
     assert body["google_sub"] == "link-sub"
     assert body["google_picture_url"] == "http://example.com/pic.png"
-    assert body["avatar_url"] == "http://example.com/pic.png"
+    # Linking Google stores google_picture_url but does not override the site avatar unless user opts in.
+    assert body["avatar_url"] is None
 
     # After linking, Google login should also work
     state_login = _parse_state_from_start(client)
@@ -376,3 +378,82 @@ def test_upload_avatar_updates_avatar_url(monkeypatch: pytest.MonkeyPatch, tmp_p
     body = res.json()
     assert body["avatar_url"] == f"/media/avatars/avatar-{user_id}.png"
     assert (tmp_path / "avatars" / f"avatar-{user_id}.png").exists()
+
+
+def test_google_avatar_opt_in_and_cleanup(monkeypatch: pytest.MonkeyPatch, test_app):
+    client: TestClient = test_app["client"]  # type: ignore
+    SessionLocal = test_app["session_factory"]  # type: ignore
+    monkeypatch.setattr(settings, "google_client_id", "client-id")
+    monkeypatch.setattr(settings, "google_client_secret", "client-secret")
+    monkeypatch.setattr(settings, "google_redirect_uri", "http://localhost/callback")
+
+    res = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "avatar-google@example.com",
+            "username": "avatargoogle",
+            "name": "Avatar Google",
+            "password": "avatarpass",
+            "first_name": "Avatar",
+            "last_name": "Google",
+            "date_of_birth": "2000-01-01",
+            "phone": "+40723204204",
+        },
+    )
+    assert res.status_code == 201, res.text
+    token = res.json()["tokens"]["access_token"]
+
+    async def fake_exchange(code: str):
+        return {
+            "sub": "avatar-sub",
+            "email": "avatar-google@example.com",
+            "email_verified": True,
+            "name": "Avatar Google",
+            "picture": "http://example.com/pic.png",
+        }
+
+    monkeypatch.setattr(auth_service, "exchange_google_code", fake_exchange)
+
+    async def get_user_id():
+        async with SessionLocal() as session:
+            result = await session.execute(select(User).where(User.email == "avatar-google@example.com"))
+            return str(result.scalar_one().id)
+
+    uid = asyncio.run(get_user_id())
+    from app.api.v1.auth import _build_google_state  # type: ignore
+
+    state = _build_google_state("google_link", uid)
+    res = client.post(
+        "/api/v1/auth/google/link",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"code": "abc", "state": state, "password": "avatarpass"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["google_picture_url"] == "http://example.com/pic.png"
+    assert res.json()["avatar_url"] is None
+
+    # Opt into using the Google picture as the site avatar.
+    res = client.post("/api/v1/auth/me/avatar/use-google", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 200, res.text
+    assert res.json()["avatar_url"] == "http://example.com/pic.png"
+
+    # Explicit removal clears avatar_url without affecting google_picture_url.
+    res = client.delete("/api/v1/auth/me/avatar", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 200, res.text
+    assert res.json()["avatar_url"] is None
+    assert res.json()["google_picture_url"] == "http://example.com/pic.png"
+
+    # If the user opts in again, unlinking should also clear avatar_url.
+    res = client.post("/api/v1/auth/me/avatar/use-google", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 200, res.text
+    assert res.json()["avatar_url"] == "http://example.com/pic.png"
+
+    res = client.post(
+        "/api/v1/auth/google/unlink",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"password": "avatarpass"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["google_sub"] is None
+    assert res.json()["google_picture_url"] is None
+    assert res.json()["avatar_url"] is None

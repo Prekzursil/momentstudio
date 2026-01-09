@@ -169,6 +169,22 @@ import { missingRequiredProfileFields as computeMissingRequiredProfileFields, ty
                 Upload avatar
                 <input type="file" class="hidden" accept="image/*" (change)="onAvatarChange($event)" />
               </label>
+              <app-button
+                *ngIf="googlePicture() && (profile()?.avatar_url || '') !== (googlePicture() || '')"
+                size="sm"
+                variant="ghost"
+                label="Use Google photo"
+                [disabled]="avatarBusy"
+                (action)="useGoogleAvatar()"
+              ></app-button>
+              <app-button
+                *ngIf="profile()?.avatar_url"
+                size="sm"
+                variant="ghost"
+                label="Remove"
+                [disabled]="avatarBusy"
+                (action)="removeAvatar()"
+              ></app-button>
               <span class="text-xs text-slate-500 dark:text-slate-400">JPG/PNG/WebP up to 5MB</span>
             </div>
           </div>
@@ -416,6 +432,48 @@ import { missingRequiredProfileFields as computeMissingRequiredProfileFields, ty
               <p class="text-xs text-slate-500 dark:text-slate-400">Manage password and connected accounts.</p>
             </div>
             <app-button routerLink="/account/password" size="sm" variant="ghost" label="Change password"></app-button>
+          </div>
+
+          <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-3">
+            <div class="grid gap-1">
+              <p class="font-semibold text-slate-900 dark:text-slate-50">Email</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Update your email address (max once every 30 days). Disabled while Google is linked.
+              </p>
+            </div>
+            <div class="grid gap-2 sm:grid-cols-[2fr_1fr_auto] sm:items-end">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                New email
+                <input
+                  name="emailChange"
+                  type="email"
+                  autocomplete="email"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  [disabled]="!!googleEmail() || emailChanging"
+                  [(ngModel)]="emailChangeEmail"
+                />
+              </label>
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                Confirm password
+                <input
+                  name="emailChangePassword"
+                  type="password"
+                  autocomplete="current-password"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  [disabled]="!!googleEmail() || emailChanging"
+                  [(ngModel)]="emailChangePassword"
+                />
+              </label>
+              <app-button
+                size="sm"
+                variant="ghost"
+                label="Update email"
+                [disabled]="!!googleEmail() || emailChanging || !emailChangeEmail.trim() || !emailChangePassword"
+                (action)="updateEmail()"
+              ></app-button>
+            </div>
+            <p *ngIf="emailChangeError" class="text-xs text-rose-700 dark:text-rose-300">{{ emailChangeError }}</p>
+            <p *ngIf="emailChangeSuccess" class="text-xs text-emerald-700 dark:text-emerald-300">{{ emailChangeSuccess }}</p>
           </div>
 
           <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-2">
@@ -864,6 +922,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   emailVerified = signal<boolean>(false);
   addresses = signal<Address[]>([]);
   avatar: string | null = null;
+  avatarBusy = false;
   placeholderAvatar = 'assets/placeholder/avatar-placeholder.svg';
   verificationToken = '';
   verificationStatus: string | null = null;
@@ -933,6 +992,12 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   googlePassword = '';
   googleBusy = false;
   googleError: string | null = null;
+
+  emailChanging = false;
+  emailChangeEmail = '';
+  emailChangePassword = '';
+  emailChangeError: string | null = null;
+  emailChangeSuccess: string | null = null;
 
   exportingData = false;
   exportError: string | null = null;
@@ -1252,16 +1317,54 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
-    const formData = new FormData();
-    formData.append('file', file);
-    this.api.post<{ avatar_url?: string }>('/auth/me/avatar', formData).subscribe({
-      next: (res) => {
-        this.avatar = res.avatar_url || null;
+    this.auth.uploadAvatar(file).subscribe({
+      next: (user) => {
+        this.profile.set(user);
+        this.avatar = user.avatar_url ?? null;
         this.toast.success('Avatar updated');
       },
       error: (err) => {
         const message = err?.error?.detail || 'Could not upload avatar.';
         this.toast.error(message);
+      }
+    });
+  }
+
+  useGoogleAvatar(): void {
+    if (this.avatarBusy) return;
+    this.avatarBusy = true;
+    this.auth.useGoogleAvatar().subscribe({
+      next: (user) => {
+        this.profile.set(user);
+        this.avatar = user.avatar_url ?? null;
+        this.toast.success('Avatar updated');
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Could not use Google photo.';
+        this.toast.error(message);
+      },
+      complete: () => {
+        this.avatarBusy = false;
+      }
+    });
+  }
+
+  removeAvatar(): void {
+    if (this.avatarBusy) return;
+    if (!confirm('Remove your avatar?')) return;
+    this.avatarBusy = true;
+    this.auth.removeAvatar().subscribe({
+      next: (user) => {
+        this.profile.set(user);
+        this.avatar = user.avatar_url ?? null;
+        this.toast.success('Avatar removed');
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Could not remove avatar.';
+        this.toast.error(message);
+      },
+      complete: () => {
+        this.avatarBusy = false;
       }
     });
   }
@@ -1856,6 +1959,48 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
         this.paymentMethods = this.paymentMethods.filter((pm) => pm.id !== id);
       },
       error: () => this.toast.error('Could not remove payment method')
+    });
+  }
+
+  updateEmail(): void {
+    if (this.emailChanging) return;
+    if (this.googleEmail()) {
+      this.emailChangeError = 'Unlink Google before changing your email.';
+      this.toast.error(this.emailChangeError);
+      return;
+    }
+    const email = this.emailChangeEmail.trim();
+    const password = this.emailChangePassword;
+    this.emailChangeError = null;
+    this.emailChangeSuccess = null;
+    if (!email) {
+      this.emailChangeError = 'Enter a new email.';
+      this.toast.error(this.emailChangeError);
+      return;
+    }
+    if (!password) {
+      this.emailChangeError = 'Confirm your password to change email.';
+      this.toast.error(this.emailChangeError);
+      return;
+    }
+    this.emailChanging = true;
+    this.auth.updateEmail(email, password).subscribe({
+      next: (user) => {
+        this.profile.set(user);
+        this.emailVerified.set(Boolean(user.email_verified));
+        this.emailChangeEmail = '';
+        this.emailChangePassword = '';
+        this.emailChangeSuccess = 'Email updated. Please verify your new email.';
+        this.toast.success('Email updated');
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Could not change email.';
+        this.emailChangeError = message;
+        this.toast.error(message);
+      },
+      complete: () => {
+        this.emailChanging = false;
+      }
     });
   }
 
