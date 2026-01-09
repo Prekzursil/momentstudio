@@ -430,7 +430,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Google OAuth: require registration completion (incl. password) before issuing session tokens (redirect to `/register?complete=1`).
 - [x] Google OAuth: use a short-lived completion token so users aren’t “logged in” until required profile fields are saved.
 - [x] Google OAuth: add server-side enforcement (deny protected APIs until profile is complete) + optional cleanup of abandoned incomplete accounts (recommended for production hardening).
-- [x] Google OAuth: add a scheduled job/cron to run incomplete-account cleanup automatically (opt-in via env).
+- [x] Google OAuth: opportunistically clean up abandoned incomplete accounts (e.g., >30 days old) during Google callback handling (no cron/env needed).
 - [x] `/auth/google/link` for logged-in users to link Google (password confirmation).
 - [x] `/auth/google/unlink` to disconnect Google profile (must retain password).
 - [x] Validation to prevent linking a Google account already linked elsewhere.

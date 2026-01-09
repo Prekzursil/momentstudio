@@ -10,9 +10,12 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const token = auth.getAccessToken();
 
+  const hasAuthHeader = req.headers.has('Authorization');
   const authReq = req.clone({
     withCredentials: true,
-    setHeaders: token ? { Authorization: `Bearer ${token}` } : {}
+    // Allow callers to explicitly set Authorization (e.g. Google completion token)
+    // without it being overwritten by the normal access token.
+    setHeaders: token && !hasAuthHeader ? { Authorization: `Bearer ${token}` } : {}
   });
 
   return next(authReq).pipe(

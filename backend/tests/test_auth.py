@@ -256,8 +256,8 @@ def test_update_profile_me(test_app: Dict[str, object]) -> None:
         json={"phone": "   "},
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert cleared.status_code == 200
-    assert cleared.json()["phone"] is None
+    assert cleared.status_code == 400, cleared.text
+    assert cleared.json()["detail"] == "Phone is required"
 
 
 def test_change_password_persists_and_updates_login(test_app: Dict[str, object]) -> None:

@@ -2,7 +2,6 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { ToastService } from './toast.service';
 import { AuthService } from './auth.service';
-import { missingRequiredProfileFields } from '../shared/profile-requirements';
 
 export const authGuard: CanActivateFn = () => {
   const router = inject(Router);
@@ -21,22 +20,5 @@ export const adminGuard: CanActivateFn = () => {
   if (auth.isAuthenticated() && auth.role() === 'admin') return true;
   toast.error('Admin access required.');
   void router.navigateByUrl('/');
-  return false;
-};
-
-export const profileCompletionGuard: CanActivateFn = (_route, state) => {
-  const router = inject(Router);
-  const auth = inject(AuthService);
-  const user = auth.user();
-
-  if (!auth.isAuthenticated() || !user?.google_sub) return true;
-
-  const missing = missingRequiredProfileFields(user);
-  if (!missing.length) return true;
-
-  const url = state.url || '';
-  if (url.startsWith('/register')) return true;
-
-  void router.navigate(['/register'], { queryParams: { complete: 1 } });
   return false;
 };

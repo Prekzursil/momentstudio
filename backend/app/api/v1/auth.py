@@ -548,6 +548,14 @@ async def update_me(
     session: AsyncSession = Depends(get_session),
 ) -> UserResponse:
     data = payload.model_dump(exclude_unset=True)
+    if "phone" in data and payload.phone is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phone is required")
+    if "first_name" in data and payload.first_name is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="First name is required")
+    if "last_name" in data and payload.last_name is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Last name is required")
+    if "date_of_birth" in data and payload.date_of_birth is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Date of birth is required")
     if "name" in data and payload.name is not None:
         await auth_service.update_display_name(session, current_user, payload.name)
     if "phone" in data:
