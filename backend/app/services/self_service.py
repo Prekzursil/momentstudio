@@ -78,7 +78,7 @@ def _is_profile_complete(user: User) -> bool:
     )
 
 
-async def cleanup_incomplete_google_accounts(session: AsyncSession, *, max_age_hours: int = 168) -> int:
+async def cleanup_incomplete_google_accounts(session: AsyncSession, *, max_age_hours: int = 24 * 30) -> int:
     """Soft-delete Google-created accounts that never completed required profile fields.
 
     This is intended as an optional maintenance task to reduce abandoned/incomplete records.
@@ -101,6 +101,22 @@ async def cleanup_incomplete_google_accounts(session: AsyncSession, *, max_age_h
         await execute_account_deletion(session, user)
         deleted += 1
     return deleted
+
+
+_last_incomplete_google_cleanup_at: datetime | None = None
+
+
+async def maybe_cleanup_incomplete_google_accounts(session: AsyncSession) -> int:
+    """Opportunistically clean abandoned incomplete Google signups.
+
+    Runs at most once per 24h per process and uses a fixed 30-day grace period.
+    """
+    global _last_incomplete_google_cleanup_at
+    now = datetime.now(timezone.utc)
+    if _last_incomplete_google_cleanup_at and now - _last_incomplete_google_cleanup_at < timedelta(hours=24):
+        return 0
+    _last_incomplete_google_cleanup_at = now
+    return await cleanup_incomplete_google_accounts(session, max_age_hours=24 * 30)
 
 
 async def export_user_data(session: AsyncSession, user: User) -> dict[str, Any]:

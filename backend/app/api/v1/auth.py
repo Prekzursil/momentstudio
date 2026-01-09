@@ -697,6 +697,8 @@ async def google_callback(
     if settings.google_allowed_domains and domain not in settings.google_allowed_domains:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email domain not allowed")
 
+    await self_service.maybe_cleanup_incomplete_google_accounts(session)
+
     existing_sub = await auth_service.get_user_by_google_sub(session, sub)
     if existing_sub:
         if getattr(existing_sub, "deletion_scheduled_for", None) and self_service.is_deletion_due(existing_sub):
