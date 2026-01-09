@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -30,6 +30,10 @@ class UserResponse(BaseModel):
     username: str
     name: str | None = None
     name_tag: int = 0
+    first_name: str | None = None
+    middle_name: str | None = None
+    last_name: str | None = None
+    date_of_birth: date | None = None
     phone: str | None = None
     avatar_url: str | None = None
     preferred_language: str | None = None
@@ -48,6 +52,13 @@ class UserResponse(BaseModel):
 class AuthResponse(BaseModel):
     user: UserResponse
     tokens: TokenPair
+
+
+class GoogleCallbackResponse(BaseModel):
+    user: UserResponse
+    tokens: TokenPair | None = None
+    requires_completion: bool = False
+    completion_token: str | None = None
 
 
 class PasswordResetRequest(BaseModel):

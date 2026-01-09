@@ -1,24 +1,26 @@
 from pathlib import Path
 import logging
-from datetime import datetime, timedelta, timezone
+import re
+from datetime import datetime, timedelta, timezone, date
 from urllib.parse import urlencode
 
 from jose import jwt
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
 from app.core.config import settings
-from app.core.dependencies import get_current_user, require_admin
+from app.core.dependencies import get_current_user, get_google_completion_user, require_admin, require_complete_profile
 from app.core.rate_limit import limiter, per_identifier_limiter
 from app.core.security import decode_token
 from app.db.session import get_session
 from app.models.user import User
 from app.schemas.auth import (
     AuthResponse,
+    GoogleCallbackResponse,
     AccountDeletionStatus,
     EmailVerificationConfirm,
     PasswordResetConfirm,
@@ -29,6 +31,7 @@ from app.schemas.auth import (
 )
 from app.schemas.user import UserCreate
 from app.services import auth as auth_service
+from app.services import captcha as captcha_service
 from app.services import email as email_service
 from app.services import self_service
 from app.services import storage
@@ -114,7 +117,47 @@ class NotificationPreferencesUpdate(BaseModel):
 class ProfileUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=255)
     phone: str | None = Field(default=None, max_length=32)
+    first_name: str | None = Field(default=None, max_length=100)
+    middle_name: str | None = Field(default=None, max_length=100)
+    last_name: str | None = Field(default=None, max_length=100)
+    date_of_birth: date | None = None
     preferred_language: str | None = Field(default=None, pattern="^(en|ro)$")
+
+    @field_validator("phone")
+    @classmethod
+    def _normalize_phone(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if not value:
+            return None
+        if not re.fullmatch(r"^\+[1-9]\d{1,14}$", value):
+            raise ValueError("Phone must be in E.164 format (e.g. +40723204204)")
+        return value
+
+    @field_validator("name")
+    @classmethod
+    def _normalize_display_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip()
+
+    @field_validator("first_name", "middle_name", "last_name")
+    @classmethod
+    def _normalize_name_parts(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def _validate_dob(cls, value: date | None) -> date | None:
+        if value is None:
+            return None
+        if value > date.today():
+            raise ValueError("Date of birth cannot be in the future")
+        return value
 
 
 class AccountDeletionRequest(BaseModel):
@@ -124,19 +167,64 @@ class AccountDeletionRequest(BaseModel):
 class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=30, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$")
     email: EmailStr
-    name: str = Field(min_length=1, max_length=255)
+    name: str = Field(min_length=1, max_length=255, description="Display name shown publicly")
+    first_name: str = Field(min_length=1, max_length=100)
+    middle_name: str | None = Field(default=None, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
+    date_of_birth: date
+    phone: str = Field(min_length=7, max_length=32, description="E.164 format")
     password: str = Field(min_length=6, max_length=128)
     preferred_language: str | None = Field(default=None, pattern="^(en|ro)$")
+    captcha_token: str | None = Field(default=None, description="CAPTCHA token (required when CAPTCHA is enabled)")
+
+    @field_validator("name", "first_name", "last_name", "username", mode="before")
+    @classmethod
+    def _strip_required_strings(cls, value: str) -> str:
+        value = (value or "").strip()
+        if not value:
+            raise ValueError("Field cannot be empty")
+        return value
+
+    @field_validator("middle_name", mode="before")
+    @classmethod
+    def _strip_optional_string(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    @field_validator("phone", mode="before")
+    @classmethod
+    def _strip_phone(cls, value: str) -> str:
+        value = (value or "").strip()
+        if not value:
+            raise ValueError("Phone is required")
+        if not re.fullmatch(r"^\+[1-9]\d{1,14}$", value):
+            raise ValueError("Phone must be in E.164 format (e.g. +40723204204)")
+        return value
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def _validate_date_of_birth(cls, value: date) -> date:
+        if value > date.today():
+            raise ValueError("Date of birth cannot be in the future")
+        return value
 
 
 class LoginRequest(BaseModel):
     identifier: str | None = None
     email: str | None = None
     password: str = Field(min_length=1, max_length=128)
+    captcha_token: str | None = None
 
 
 class UsernameUpdateRequest(BaseModel):
     username: str = Field(min_length=3, max_length=30, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$")
+
+
+class EmailUpdateRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=128)
 
 
 class UsernameHistoryItem(BaseModel):
@@ -158,9 +246,11 @@ class UserAliasesResponse(BaseModel):
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=AuthResponse)
 async def register(
     payload: RegisterRequest,
+    request: Request,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(register_rate_limit),
 ) -> AuthResponse:
+    await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
     user = await auth_service.create_user(
         session,
         UserCreate(
@@ -168,6 +258,11 @@ async def register(
             email=payload.email,
             password=payload.password,
             name=payload.name,
+            first_name=payload.first_name,
+            middle_name=payload.middle_name,
+            last_name=payload.last_name,
+            date_of_birth=payload.date_of_birth,
+            phone=payload.phone,
             preferred_language=payload.preferred_language,
         ),
     )
@@ -187,10 +282,12 @@ async def register(
 )
 async def login(
     payload: LoginRequest,
+    request: Request,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(login_rate_limit),
     response: Response = None,
 ) -> AuthResponse:
+    await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
     identifier = (payload.identifier or payload.email or "").strip()
     if not identifier:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Identifier is required")
@@ -322,6 +419,26 @@ async def update_username(
     return UserResponse.model_validate(user)
 
 
+@router.patch(
+    "/me/email",
+    response_model=UserResponse,
+    summary="Update my email address",
+    description="Updates your email (password required) and sends a new verification token. Disabled while Google is linked.",
+)
+async def update_email(
+    payload: EmailUpdateRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+    user = await auth_service.update_email(session, current_user, str(payload.email))
+    record = await auth_service.create_email_verification(session, user)
+    background_tasks.add_task(email_service.send_verification_email, user.email, record.token)
+    return UserResponse.model_validate(user)
+
+
 @router.get("/me/export")
 async def export_me(
     current_user: User = Depends(get_current_user),
@@ -431,11 +548,26 @@ async def update_me(
     session: AsyncSession = Depends(get_session),
 ) -> UserResponse:
     data = payload.model_dump(exclude_unset=True)
-    if "name" in data:
-        await auth_service.update_display_name(session, current_user, payload.name or "")
+    if "phone" in data and payload.phone is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phone is required")
+    if "first_name" in data and payload.first_name is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="First name is required")
+    if "last_name" in data and payload.last_name is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Last name is required")
+    if "date_of_birth" in data and payload.date_of_birth is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Date of birth is required")
+    if "name" in data and payload.name is not None:
+        await auth_service.update_display_name(session, current_user, payload.name)
     if "phone" in data:
-        cleaned = (payload.phone or "").strip()
-        current_user.phone = cleaned or None
+        current_user.phone = payload.phone
+    if "first_name" in data:
+        current_user.first_name = payload.first_name
+    if "middle_name" in data:
+        current_user.middle_name = payload.middle_name
+    if "last_name" in data:
+        current_user.last_name = payload.last_name
+    if "date_of_birth" in data:
+        current_user.date_of_birth = payload.date_of_birth
     if "preferred_language" in data and payload.preferred_language is not None:
         current_user.preferred_language = payload.preferred_language
     session.add(current_user)
@@ -467,9 +599,50 @@ async def upload_avatar(
     return UserResponse.model_validate(current_user)
 
 
+@router.post("/me/avatar/use-google", response_model=UserResponse)
+async def use_google_avatar(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    if not current_user.google_picture_url:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No Google profile picture available")
+    current_user.avatar_url = current_user.google_picture_url
+    session.add(current_user)
+    await session.commit()
+    await session.refresh(current_user)
+    return UserResponse.model_validate(current_user)
+
+
+@router.delete("/me/avatar", response_model=UserResponse)
+async def remove_avatar(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    current_user.avatar_url = None
+    session.add(current_user)
+    await session.commit()
+    await session.refresh(current_user)
+    return UserResponse.model_validate(current_user)
+
+
 @router.get("/admin/ping", response_model=dict[str, str])
 async def admin_ping(admin_user: User = Depends(require_admin)) -> dict[str, str]:
     return {"status": "admin-ok", "user": str(admin_user.id)}
+
+
+@router.post(
+    "/admin/cleanup/incomplete-google",
+    response_model=dict[str, int],
+    summary="Cleanup abandoned incomplete Google accounts",
+    description="Soft-deletes Google-created accounts that never completed required profile fields after a grace period.",
+)
+async def admin_cleanup_incomplete_google_accounts(
+    max_age_hours: int = Query(default=168, ge=1, le=24 * 365),
+    _: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, int]:
+    deleted = await self_service.cleanup_incomplete_google_accounts(session, max_age_hours=max_age_hours)
+    return {"deleted": deleted}
 
 
 @router.post("/password-reset/request", status_code=status.HTTP_202_ACCEPTED)
@@ -512,17 +685,17 @@ async def google_start(_: None = Depends(google_rate_limit)) -> dict:
     return {"auth_url": url}
 
 
-@router.post("/google/callback", response_model=AuthResponse)
+@router.post("/google/callback", response_model=GoogleCallbackResponse)
 async def google_callback(
     payload: GoogleCallback,
     session: AsyncSession = Depends(get_session),
     response: Response = None,
     _: None = Depends(google_rate_limit),
-) -> AuthResponse:
+) -> GoogleCallbackResponse:
     _validate_google_state(payload.state, "google_state")
     profile = await auth_service.exchange_google_code(payload.code)
     sub = profile.get("sub")
-    email = profile.get("email")
+    email = str(profile.get("email") or "").strip().lower()
     name = profile.get("name")
     picture = profile.get("picture")
     email_verified = bool(profile.get("email_verified"))
@@ -532,6 +705,8 @@ async def google_callback(
     if settings.google_allowed_domains and domain not in settings.google_allowed_domains:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email domain not allowed")
 
+    await self_service.maybe_cleanup_incomplete_google_accounts(session)
+
     existing_sub = await auth_service.get_user_by_google_sub(session, sub)
     if existing_sub:
         if getattr(existing_sub, "deletion_scheduled_for", None) and self_service.is_deletion_due(existing_sub):
@@ -539,11 +714,20 @@ async def google_callback(
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
         if getattr(existing_sub, "deleted_at", None) is not None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
-        tokens = await auth_service.issue_tokens_for_user(session, existing_sub)
-        if response:
-            set_refresh_cookie(response, tokens["refresh_token"])
-        logger.info("google_login_existing", extra={"user_id": str(existing_sub.id)})
-        return AuthResponse(user=UserResponse.model_validate(existing_sub), tokens=TokenPair(**tokens))
+        if auth_service.is_profile_complete(existing_sub):
+            tokens = await auth_service.issue_tokens_for_user(session, existing_sub)
+            if response:
+                set_refresh_cookie(response, tokens["refresh_token"])
+            logger.info("google_login_existing", extra={"user_id": str(existing_sub.id)})
+            return GoogleCallbackResponse(user=UserResponse.model_validate(existing_sub), tokens=TokenPair(**tokens))
+
+        completion_token = security.create_google_completion_token(str(existing_sub.id))
+        logger.info("google_login_needs_completion", extra={"user_id": str(existing_sub.id)})
+        return GoogleCallbackResponse(
+            user=UserResponse.model_validate(existing_sub),
+            requires_completion=True,
+            completion_token=completion_token,
+        )
 
     existing_email = await auth_service.get_user_by_email(session, email)
     if existing_email and existing_email.google_sub and existing_email.google_sub != sub:
@@ -558,12 +742,87 @@ async def google_callback(
         session,
         email=email,
         name=name,
+        first_name=str(profile.get("given_name") or "").strip() or None,
+        last_name=str(profile.get("family_name") or "").strip() or None,
         picture=picture,
         sub=sub,
         email_verified=email_verified,
         preferred_language="en",
     )
     logger.info("google_login_first_time", extra={"user_id": str(user.id)})
+    completion_token = security.create_google_completion_token(str(user.id))
+    return GoogleCallbackResponse(
+        user=UserResponse.model_validate(user),
+        requires_completion=True,
+        completion_token=completion_token,
+    )
+
+
+class GoogleCompleteRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=30, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$")
+    name: str = Field(min_length=1, max_length=255, description="Display name shown publicly")
+    first_name: str = Field(min_length=1, max_length=100)
+    middle_name: str | None = Field(default=None, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
+    date_of_birth: date
+    phone: str = Field(min_length=7, max_length=32, description="E.164 format")
+    password: str = Field(min_length=6, max_length=128)
+    preferred_language: str | None = Field(default=None, pattern="^(en|ro)$")
+
+    @field_validator("name", "first_name", "last_name", "username", mode="before")
+    @classmethod
+    def _strip_required_strings(cls, value: str) -> str:
+        value = (value or "").strip()
+        if not value:
+            raise ValueError("Field cannot be empty")
+        return value
+
+    @field_validator("middle_name", mode="before")
+    @classmethod
+    def _strip_optional_string(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    @field_validator("phone", mode="before")
+    @classmethod
+    def _strip_phone(cls, value: str) -> str:
+        value = (value or "").strip()
+        if not value:
+            raise ValueError("Phone is required")
+        if not re.fullmatch(r"^\+[1-9]\d{1,14}$", value):
+            raise ValueError("Phone must be in E.164 format (e.g. +40723204204)")
+        return value
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def _validate_date_of_birth(cls, value: date) -> date:
+        if value > date.today():
+            raise ValueError("Date of birth cannot be in the future")
+        return value
+
+
+@router.post("/google/complete", response_model=AuthResponse)
+async def google_complete_registration(
+    payload: GoogleCompleteRequest,
+    current_user: User = Depends(get_google_completion_user),
+    session: AsyncSession = Depends(get_session),
+    response: Response = None,
+) -> AuthResponse:
+    user = await auth_service.complete_google_registration(
+        session,
+        current_user,
+        username=payload.username,
+        display_name=payload.name,
+        first_name=payload.first_name,
+        middle_name=payload.middle_name,
+        last_name=payload.last_name,
+        date_of_birth=payload.date_of_birth,
+        phone=payload.phone,
+        password=payload.password,
+        preferred_language=payload.preferred_language,
+    )
     tokens = await auth_service.issue_tokens_for_user(session, user)
     if response:
         set_refresh_cookie(response, tokens["refresh_token"])
@@ -606,7 +865,7 @@ async def google_link(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
     profile = await auth_service.exchange_google_code(payload.code)
     sub = profile.get("sub")
-    email = profile.get("email")
+    email = str(profile.get("email") or "").strip().lower()
     name = profile.get("name")
     picture = profile.get("picture")
     if not sub or not email:
@@ -637,12 +896,14 @@ class UnlinkRequest(BaseModel):
 @router.post("/google/unlink", response_model=UserResponse)
 async def google_unlink(
     payload: UnlinkRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_complete_profile),
     session: AsyncSession = Depends(get_session),
     _: None = Depends(google_rate_limit),
 ) -> UserResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+    if current_user.google_picture_url and current_user.avatar_url == current_user.google_picture_url:
+        current_user.avatar_url = None
     current_user.google_sub = None
     current_user.google_email = None
     current_user.google_picture_url = None

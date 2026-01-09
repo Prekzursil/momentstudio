@@ -51,7 +51,16 @@ def rate_limit_app() -> Dict[str, object]:
 
 def test_login_rate_limiter(rate_limit_app: Dict[str, object]) -> None:
     client: TestClient = rate_limit_app["client"]  # type: ignore[assignment]
-    payload = {"email": "limited@example.com", "username": "limiter", "password": "pass12345", "name": "Limiter"}
+    payload = {
+        "email": "limited@example.com",
+        "username": "limiter",
+        "password": "pass12345",
+        "name": "Limiter",
+        "first_name": "Limiter",
+        "last_name": "User",
+        "date_of_birth": "2000-01-01",
+        "phone": "+40723204204",
+    }
     res = client.post("/api/v1/auth/register", json=payload)
     assert res.status_code == 201, res.text
 

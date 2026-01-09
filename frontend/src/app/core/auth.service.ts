@@ -15,6 +15,10 @@ export interface AuthUser {
   username: string;
   name?: string | null;
   name_tag?: number;
+  first_name?: string | null;
+  middle_name?: string | null;
+  last_name?: string | null;
+  date_of_birth?: string | null;
   phone?: string | null;
   avatar_url?: string | null;
   email_verified?: boolean;
@@ -33,6 +37,13 @@ export interface AuthUser {
 export interface AuthResponse {
   user: AuthUser;
   tokens: AuthTokens;
+}
+
+export interface GoogleCallbackResponse {
+  user: AuthUser;
+  tokens?: AuthTokens | null;
+  requires_completion?: boolean;
+  completion_token?: string | null;
 }
 
 export interface UsernameHistoryItem {
@@ -76,14 +87,26 @@ export class AuthService {
     return this.tokens?.refresh_token ?? null;
   }
 
-  login(identifier: string, password: string): Observable<AuthResponse> {
-    return this.api.post<AuthResponse>('/auth/login', { identifier, password }).pipe(tap((res) => this.persist(res)));
+  login(identifier: string, password: string, captchaToken?: string): Observable<AuthResponse> {
+    return this.api
+      .post<AuthResponse>('/auth/login', { identifier, password, captcha_token: captchaToken ?? null })
+      .pipe(tap((res) => this.persist(res)));
   }
 
-  register(name: string, username: string, email: string, password: string): Observable<AuthResponse> {
-    return this.api
-      .post<AuthResponse>('/auth/register', { name, username, email, password })
-      .pipe(tap((res) => this.persist(res)));
+  register(payload: {
+    name: string;
+    username: string;
+    email: string;
+    password: string;
+    first_name: string;
+    middle_name?: string | null;
+    last_name: string;
+    date_of_birth: string;
+    phone: string;
+    preferred_language?: string;
+    captcha_token?: string | null;
+  }): Observable<AuthResponse> {
+    return this.api.post<AuthResponse>('/auth/register', payload).pipe(tap((res) => this.persist(res)));
   }
 
   changePassword(current: string, newPassword: string): Observable<{ detail: string }> {
@@ -97,8 +120,33 @@ export class AuthService {
     return this.api.get<{ auth_url: string }>('/auth/google/start').pipe(map((res) => res.auth_url));
   }
 
-  completeGoogleLogin(code: string, state: string): Observable<AuthResponse> {
-    return this.api.post<AuthResponse>('/auth/google/callback', { code, state }).pipe(tap((res) => this.persist(res)));
+  completeGoogleLogin(code: string, state: string): Observable<GoogleCallbackResponse> {
+    return this.api.post<GoogleCallbackResponse>('/auth/google/callback', { code, state }).pipe(
+      tap((res) => {
+        if (res.tokens) {
+          this.persist({ user: res.user, tokens: res.tokens });
+        }
+      })
+    );
+  }
+
+  completeGoogleRegistration(
+    completionToken: string,
+    payload: {
+      username: string;
+      name: string;
+      first_name: string;
+      middle_name?: string | null;
+      last_name: string;
+      date_of_birth: string;
+      phone: string;
+      password: string;
+      preferred_language?: string;
+    }
+  ): Observable<AuthResponse> {
+    return this.api
+      .post<AuthResponse>('/auth/google/complete', payload, { Authorization: `Bearer ${completionToken}` })
+      .pipe(tap((res) => this.persist(res)));
   }
 
   startGoogleLink(): Observable<string> {
@@ -113,6 +161,29 @@ export class AuthService {
 
   unlinkGoogle(password: string): Observable<AuthUser> {
     return this.api.post<AuthUser>('/auth/google/unlink', { password }).pipe(tap((user) => this.setUser(user)));
+  }
+
+  uploadAvatar(file: File): Observable<AuthUser> {
+    if (!this.isAuthenticated()) {
+      return of({} as AuthUser);
+    }
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.api.post<AuthUser>('/auth/me/avatar', formData).pipe(tap((user) => this.setUser(user)));
+  }
+
+  useGoogleAvatar(): Observable<AuthUser> {
+    if (!this.isAuthenticated()) {
+      return of({} as AuthUser);
+    }
+    return this.api.post<AuthUser>('/auth/me/avatar/use-google', {}).pipe(tap((user) => this.setUser(user)));
+  }
+
+  removeAvatar(): Observable<AuthUser> {
+    if (!this.isAuthenticated()) {
+      return of({} as AuthUser);
+    }
+    return this.api.delete<AuthUser>('/auth/me/avatar').pipe(tap((user) => this.setUser(user)));
   }
 
   updatePreferredLanguage(lang: string): Observable<AuthUser> {
@@ -140,6 +211,10 @@ export class AuthService {
   updateProfile(payload: {
     name?: string | null;
     phone?: string | null;
+    first_name?: string | null;
+    middle_name?: string | null;
+    last_name?: string | null;
+    date_of_birth?: string | null;
     preferred_language?: string | null;
   }): Observable<AuthUser> {
     if (!this.isAuthenticated()) {
@@ -153,6 +228,13 @@ export class AuthService {
       return of({} as AuthUser);
     }
     return this.api.patch<AuthUser>('/auth/me/username', { username }).pipe(tap((user) => this.setUser(user)));
+  }
+
+  updateEmail(email: string, password: string): Observable<AuthUser> {
+    if (!this.isAuthenticated()) {
+      return of({} as AuthUser);
+    }
+    return this.api.patch<AuthUser>('/auth/me/email', { email, password }).pipe(tap((user) => this.setUser(user)));
   }
 
   getAliases(): Observable<UserAliasesResponse> {

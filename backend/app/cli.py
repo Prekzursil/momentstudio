@@ -3,6 +3,7 @@ import asyncio
 import json
 import re
 import uuid
+from datetime import date
 from pathlib import Path
 from typing import Any, Dict
 
@@ -62,6 +63,11 @@ async def export_data(output: Path) -> None:
                 "username": u.username,
                 "name": u.name,
                 "name_tag": u.name_tag,
+                "first_name": getattr(u, "first_name", None),
+                "middle_name": getattr(u, "middle_name", None),
+                "last_name": getattr(u, "last_name", None),
+                "date_of_birth": u.date_of_birth.isoformat() if u.date_of_birth else None,
+                "phone": u.phone,
                 "avatar_url": u.avatar_url,
                 "preferred_language": u.preferred_language,
                 "email_verified": u.email_verified,
@@ -188,6 +194,8 @@ async def import_data(input_path: Path) -> None:
                 display_name = str(u.get("name") or "").strip() or username
                 name_tag = next_tag_by_name.get(display_name, 0)
                 next_tag_by_name[display_name] = name_tag + 1
+                dob_raw = u.get("date_of_birth")
+                dob = date.fromisoformat(dob_raw) if isinstance(dob_raw, str) and dob_raw else None
                 user_obj = User(
                     id=user_id,
                     email=email,
@@ -195,6 +203,11 @@ async def import_data(input_path: Path) -> None:
                     hashed_password=security.hash_password("placeholder"),
                     name=display_name,
                     name_tag=name_tag,
+                    first_name=str(u.get("first_name") or "").strip() or None,
+                    middle_name=str(u.get("middle_name") or "").strip() or None,
+                    last_name=str(u.get("last_name") or "").strip() or None,
+                    date_of_birth=dob,
+                    phone=str(u.get("phone") or "").strip() or None,
                     role=UserRole.customer,
                 )
                 session.add(user_obj)

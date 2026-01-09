@@ -65,6 +65,12 @@ class Settings(BaseSettings):
     google_client_secret: str | None = None
     google_redirect_uri: str | None = None
     google_allowed_domains: list[str] = []
+    google_completion_token_exp_minutes: int = 30
+
+    # CAPTCHA (login/register only; Google OAuth is exempt)
+    captcha_enabled: bool = False
+    captcha_provider: str = "turnstile"
+    turnstile_secret_key: str | None = None
 
     # FX rates (used for display-only approximations; checkout remains in RON)
     fx_rates_url: str = "https://www.bnr.ro/nbrfxrates.xml"

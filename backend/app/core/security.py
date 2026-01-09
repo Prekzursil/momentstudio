@@ -35,6 +35,10 @@ def create_refresh_token(subject: str, jti: str, expires_at: datetime | None = N
     return _create_token(subject, "refresh", delta, jti=jti)
 
 
+def create_google_completion_token(subject: str) -> str:
+    return _create_token(subject, "google_completion", timedelta(minutes=settings.google_completion_token_exp_minutes))
+
+
 def decode_token(token: str) -> Optional[dict[str, Any]]:
     try:
         return jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])

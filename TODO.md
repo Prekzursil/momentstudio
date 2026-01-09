@@ -25,6 +25,14 @@ Below is a structured checklist you can turn into issues.
 - [x] JWT guard dependency + role guard for admin.
 - [x] Tests for auth flows (register/login/refresh/invalid creds).
 - [x] HTTP-only refresh token cookie issued on login/refresh and cleared on logout.
+- [x] Auth: extend user profile fields for registration (first/middle/last name, date of birth, phone) + migration.
+- [x] Auth: require phone + DOB on registration (no age enforcement) and validate phone as E.164.
+- [x] Auth: extend /auth/me profile update + response schema to include new profile fields.
+- [x] Tests: update auth + Postgres integration tests for new registration/profile fields.
+- [x] Auth: add optional CAPTCHA verification for login/register (Cloudflare Turnstile) via env config (backend + frontend).
+- [x] Auth/Profile: add email change endpoint with 30-day cooldown + history tracking (disabled while Google is linked).
+- [x] Auth/Profile: enforce username (7d) + display name (1h) change cooldowns and reuse display name tags when reverting.
+- [x] Profile: add “use Google photo” + “remove avatar” endpoints; default to local placeholder avatar (Google photo opt-in).
 
 ## Backend - Catalog & Products
 - [x] Category model + migration.
@@ -343,6 +351,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Account UX: error/loading polish for profile sections (skeletons, empty states, avoid blocking overlays).
 - [x] Account UX: privacy/self-service (data export + account deletion flow with confirmation + cooldown).
 - [x] Account UX: community “My comments” list (links + status) and reply notification context.
+- [x] Auth UX: upgrade registration to a 2-step wizard (account + personal) with required DOB + phone country picker (default RO).
+- [x] Auth UX: add live format validation for email/username/phone and show “already used” errors only on submit (avoid enumeration).
+- [x] Account UX: extend profile editor to manage first/middle/last name, DOB, and phone with country code.
+- [x] Tests: add/update frontend unit tests for registration wizard and profile field wiring.
 
 ## Frontend - Admin Dashboard
 - [x] /admin layout with sidebar + guard.
@@ -415,6 +427,10 @@ Below is a structured checklist you can turn into issues.
 - [x] `/auth/google/callback` exchanges code, fetches profile, maps to local user.
 - [x] Handle email collision: prompt linking instead of duplicate creation when email matches existing user.
 - [x] Google login when `google_sub` exists issues standard access/refresh tokens.
+- [x] Google OAuth: require registration completion (incl. password) before issuing session tokens (redirect to `/register?complete=1`).
+- [x] Google OAuth: use a short-lived completion token so users aren’t “logged in” until required profile fields are saved.
+- [x] Google OAuth: add server-side enforcement (deny protected APIs until profile is complete) + optional cleanup of abandoned incomplete accounts (recommended for production hardening).
+- [x] Google OAuth: opportunistically clean up abandoned incomplete accounts (e.g., >30 days old) during Google callback handling (no cron/env needed).
 - [x] `/auth/google/link` for logged-in users to link Google (password confirmation).
 - [x] `/auth/google/unlink` to disconnect Google profile (must retain password).
 - [x] Validation to prevent linking a Google account already linked elsewhere.

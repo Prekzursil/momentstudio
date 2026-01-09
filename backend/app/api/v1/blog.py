@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
-from app.core.dependencies import get_current_user, require_admin
+from app.core.dependencies import require_complete_profile, require_admin
 from app.core.security import create_content_preview_token, decode_content_preview_token
 from app.db.session import get_session
 from app.models.blog import BlogComment
@@ -158,7 +158,7 @@ async def list_blog_comments(
 
 @router.get("/me/comments", response_model=BlogMyCommentListResponse)
 async def list_my_blog_comments(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_complete_profile),
     session: AsyncSession = Depends(get_session),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
     page: int = Query(default=1, ge=1),
@@ -179,7 +179,7 @@ async def create_blog_comment(
     slug: str,
     payload: BlogCommentCreate,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_complete_profile),
     session: AsyncSession = Depends(get_session),
 ) -> BlogCommentRead:
     post = await blog_service.get_published_post(session, slug=slug, lang=None)
@@ -244,7 +244,7 @@ async def create_blog_comment(
 @router.delete("/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_blog_comment(
     comment_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_complete_profile),
     session: AsyncSession = Depends(get_session),
 ) -> None:
     await blog_service.soft_delete_comment(session, comment_id=comment_id, actor=current_user)
@@ -255,7 +255,7 @@ async def delete_blog_comment(
 async def flag_blog_comment(
     comment_id: uuid.UUID,
     payload: BlogCommentFlagCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_complete_profile),
     session: AsyncSession = Depends(get_session),
 ) -> BlogCommentFlagRead:
     flag = await blog_service.flag_comment(session, comment_id=comment_id, actor=current_user, reason=payload.reason)

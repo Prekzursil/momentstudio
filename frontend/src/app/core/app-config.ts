@@ -4,6 +4,7 @@ export interface AppConfig {
   appVersion: string;
   stripePublishableKey: string;
   sentryDsn: string;
+  captchaSiteKey: string;
 }
 
 declare global {
@@ -17,7 +18,8 @@ const defaults: AppConfig = {
   appEnv: 'development',
   appVersion: '',
   stripePublishableKey: '',
-  sentryDsn: ''
+  sentryDsn: '',
+  captchaSiteKey: ''
 };
 
 export const appConfig: AppConfig = (() => {
