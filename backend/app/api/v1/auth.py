@@ -220,6 +220,7 @@ class LoginRequest(BaseModel):
 
 class UsernameUpdateRequest(BaseModel):
     username: str = Field(min_length=3, max_length=30, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$")
+    password: str = Field(min_length=1, max_length=128)
 
 
 class EmailUpdateRequest(BaseModel):
@@ -415,6 +416,8 @@ async def update_username(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> UserResponse:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
     user = await auth_service.update_username(session, current_user, payload.username)
     return UserResponse.model_validate(user)
 

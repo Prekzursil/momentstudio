@@ -2,14 +2,15 @@ import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { CheckoutComponent } from './checkout.component';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
-import { Router } from '@angular/router';
 import { CartStore } from '../../core/cart.store';
 import { CartApi } from '../../core/cart.api';
 import { ApiService } from '../../core/api.service';
 import { ActivatedRoute } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
+import { AuthService } from '../../core/auth.service';
+import { RouterTestingModule } from '@angular/router/testing';
 
-describe('Guest checkout flow (mocked e2e)', () => {
+describe('Checkout auth gating', () => {
   const itemsSignal = signal([
     {
       id: 'line1',
@@ -28,61 +29,44 @@ describe('Guest checkout flow (mocked e2e)', () => {
 
   let cartApi: any;
   let apiService: any;
-  let router: any;
+  let auth: any;
 
   beforeEach(() => {
-    cartApi = jasmine.createSpyObj('CartApi', ['sync', 'paymentIntent', 'headers'], {
-      headers: () => ({ 'X-Session-Id': 'guest-test' })
-    });
+    cartApi = jasmine.createSpyObj('CartApi', ['sync', 'headers']);
     cartApi.sync.and.returnValue(of({}));
-    cartApi.paymentIntent.and.returnValue(of({ client_secret: 'pi_secret', intent_id: 'pi_1' }));
+    cartApi.headers.and.returnValue({});
 
     apiService = jasmine.createSpyObj('ApiService', ['post']);
     apiService.post.and.returnValue(of({ order_id: 'order1', reference_code: 'REF', client_secret: 'pi_secret' }));
 
-    router = jasmine.createSpyObj('Router', ['navigate']);
+    auth = jasmine.createSpyObj('AuthService', ['isAuthenticated', 'user']);
+    auth.isAuthenticated.and.returnValue(false);
+    auth.user.and.returnValue(null);
 
     TestBed.configureTestingModule({
-      imports: [CheckoutComponent, TranslateModule.forRoot()],
+      imports: [RouterTestingModule, CheckoutComponent, TranslateModule.forRoot()],
       providers: [
-        { provide: Router, useValue: router },
         { provide: CartStore, useValue: { items: itemsSignal, subtotal: subtotalSignal } },
         { provide: CartApi, useValue: cartApi },
         { provide: ApiService, useValue: apiService },
+        { provide: AuthService, useValue: auth },
         { provide: ActivatedRoute, useValue: { snapshot: { params: {} } } }
       ]
     });
   });
 
-  it('runs guest checkout with promo and shipping', fakeAsync(() => {
+  it('renders login/register actions when signed out', fakeAsync(() => {
+    spyOn(CheckoutComponent.prototype, 'ngAfterViewInit').and.returnValue(Promise.resolve());
     const fixture = TestBed.createComponent(CheckoutComponent);
-    const cmp = fixture.componentInstance;
-    cmp.mode = 'guest';
-    cmp.shipping = 'ship123';
-    cmp.promo = 'SAVE';
-    cmp.address = {
-      name: 'Guest',
-      email: 'guest@example.com',
-      line1: '123',
-      city: 'City',
-      postal: '12345',
-      country: 'US'
-    } as any;
-    (cmp as any).stripe = {
-      confirmCardPayment: () => Promise.resolve({ error: null })
-    } as any;
-    (cmp as any).card = { destroy: () => {} } as any;
-    (cmp as any).clientSecret = 'pi_secret';
-
-    cmp.placeOrder({ valid: true } as any);
+    fixture.detectChanges();
     tick();
 
-    expect(cartApi.sync).toHaveBeenCalled();
-    expect(apiService.post).toHaveBeenCalled();
-    const payload = apiService.post.calls.mostRecent().args[1];
-    expect(payload.shipping_method_id).toBe('ship123');
-    expect(payload.promo_code).toBe('SAVE');
-    expect(payload.create_account).toBeFalse();
-    expect(router.navigate).toHaveBeenCalledWith(['/checkout/success']);
+    const links = Array.from(fixture.nativeElement.querySelectorAll('a')) as HTMLAnchorElement[];
+    const routes = links
+      .map((el) => el.getAttribute('ng-reflect-router-link'))
+      .filter((v): v is string => Boolean(v));
+    expect(routes).toContain('/login');
+    expect(routes).toContain('/register');
+    expect(apiService.post).not.toHaveBeenCalled();
   }));
 });

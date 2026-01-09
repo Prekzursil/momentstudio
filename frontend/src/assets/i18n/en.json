@@ -289,6 +289,11 @@
     "email": "Email",
     "username": "Username",
     "password": "Password",
+    "emailVerificationNeeded": "Email verification needed to place orders.",
+    "emailVerificationResend": "Resend link",
+    "emailVerificationTokenPlaceholder": "Enter verification token",
+    "emailVerificationConfirm": "Confirm",
+    "currentPassword": "Current password",
     "passwordStrength": "Password strength",
     "strengthWeak": "Weak",
     "strengthModerate": "Moderate",
@@ -340,7 +345,8 @@
     "captchaRequired": "Please complete the CAPTCHA.",
     "captchaUnavailable": "CAPTCHA unavailable.",
     "captchaFailedTryAgain": "CAPTCHA failed. Please try again.",
-    "captchaFailedLoad": "CAPTCHA failed to load."
+    "captchaFailedLoad": "CAPTCHA failed to load.",
+    "currentPasswordRequired": "Current password is required to change your username."
   },
   "theme": {
     "switched": "Theme updated",

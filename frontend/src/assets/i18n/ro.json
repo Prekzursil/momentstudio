@@ -289,6 +289,11 @@
     "email": "Email",
     "username": "Utilizator",
     "password": "Parolă",
+    "emailVerificationNeeded": "Este necesară verificarea emailului pentru a plasa comenzi.",
+    "emailVerificationResend": "Retrimite link-ul",
+    "emailVerificationTokenPlaceholder": "Introdu codul de verificare",
+    "emailVerificationConfirm": "Confirmă",
+    "currentPassword": "Parola curentă",
     "passwordStrength": "Forța parolei",
     "strengthWeak": "Slabă",
     "strengthModerate": "Moderată",
@@ -340,7 +345,8 @@
     "captchaRequired": "Te rugăm să completezi CAPTCHA.",
     "captchaUnavailable": "CAPTCHA nu este disponibilă.",
     "captchaFailedTryAgain": "CAPTCHA a eșuat. Încearcă din nou.",
-    "captchaFailedLoad": "CAPTCHA nu a putut fi încărcată."
+    "captchaFailedLoad": "CAPTCHA nu a putut fi încărcată.",
+    "currentPasswordRequired": "Parola curentă este necesară pentru a schimba numele de utilizator."
   },
   "theme": {
     "switched": "Tema a fost schimbată",

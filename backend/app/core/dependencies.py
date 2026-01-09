@@ -117,3 +117,9 @@ async def require_complete_profile(user: User = Depends(get_current_user)) -> Us
     if getattr(user, "google_sub", None) and not auth_service.is_profile_complete(user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Profile incomplete")
     return user
+
+
+async def require_verified_email(user: User = Depends(require_complete_profile)) -> User:
+    if not getattr(user, "email_verified", False):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email verification required")
+    return user
