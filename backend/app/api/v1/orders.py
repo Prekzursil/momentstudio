@@ -27,6 +27,7 @@ from app.services import payments
 from app.services import address as address_service
 from app.api.v1 import cart as cart_api
 from app.schemas.order_admin import AdminOrderListItem, AdminOrderListResponse, AdminOrderRead, AdminPaginationMeta
+from app.services import notifications as notification_service
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -64,6 +65,14 @@ async def create_order(
         payload.shipping_address_id,
         payload.billing_address_id,
         shipping_method,
+    )
+    await notification_service.create_notification(
+        session,
+        user_id=current_user.id,
+        type="order",
+        title="Order placed" if (current_user.preferred_language or "en") != "ro" else "Comandă plasată",
+        body=f"Reference {order.reference_code}" if order.reference_code else None,
+        url="/account",
     )
     background_tasks.add_task(email_service.send_order_confirmation, current_user.email, order, order.items)
     owner = await auth_service.get_owner_user(session)
@@ -127,6 +136,14 @@ async def checkout(
         shipping_method=shipping_method,
         payment_intent_id=intent["intent_id"],
         discount=discount_val,
+    )
+    await notification_service.create_notification(
+        session,
+        user_id=current_user.id,
+        type="order",
+        title="Order placed" if (current_user.preferred_language or "en") != "ro" else "Comandă plasată",
+        body=f"Reference {order.reference_code}" if order.reference_code else None,
+        url="/account",
     )
     background_tasks.add_task(email_service.send_order_confirmation, current_user.email, order, order.items)
     owner = await auth_service.get_owner_user(session)
@@ -267,6 +284,14 @@ async def admin_update_order(
     if previous_status != updated.status and updated.status == OrderStatus.shipped and updated.user and updated.user.email:
         background_tasks.add_task(
             email_service.send_shipping_update, updated.user.email, updated, updated.tracking_number
+        )
+        await notification_service.create_notification(
+            session,
+            user_id=updated.user.id,
+            type="order",
+            title="Order shipped" if (updated.user.preferred_language or "en") != "ro" else "Comandă expediată",
+            body=f"Reference {updated.reference_code}" if updated.reference_code else None,
+            url="/account",
         )
     full = await order_service.get_order_by_id_admin(session, order_id)
     if not full:

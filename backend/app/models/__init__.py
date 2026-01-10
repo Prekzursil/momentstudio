@@ -31,6 +31,7 @@ from app.models.wishlist import WishlistItem  # noqa: F401
 from app.models.webhook import StripeWebhookEvent  # noqa: F401
 from app.models.blog import BlogComment, BlogCommentFlag  # noqa: F401
 from app.models.fx import FxRate  # noqa: F401
+from app.models.notification import UserNotification  # noqa: F401
 
 __all__ = [
     "Base",
@@ -72,4 +73,5 @@ __all__ = [
     "BlogComment",
     "BlogCommentFlag",
     "FxRate",
+    "UserNotification",
 ]

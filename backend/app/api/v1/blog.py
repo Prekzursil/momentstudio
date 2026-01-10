@@ -32,6 +32,7 @@ from app.schemas.catalog import PaginationMeta
 from app.services import blog as blog_service
 from app.services import content as content_service
 from app.services import email as email_service
+from app.services import notifications as notification_service
 from app.services import og_images
 
 router = APIRouter(prefix="/blog", tags=["blog"])
@@ -237,6 +238,18 @@ async def create_blog_comment(
                     replier_name=current_user.name or current_user.email,
                     comment_body=snippet,
                     lang=recipient.preferred_language,
+                )
+                await notification_service.create_notification(
+                    session,
+                    user_id=recipient.id,
+                    type="blog_reply",
+                    title=(
+                        "New reply to your comment"
+                        if (recipient.preferred_language or "en") != "ro"
+                        else "Răspuns nou la comentariul tău"
+                    ),
+                    body=post.title,
+                    url=f"/blog/{slug}",
                 )
     return BlogCommentRead.model_validate(blog_service.to_comment_read(comment))
 
