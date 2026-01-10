@@ -480,7 +480,7 @@ async def soft_delete_comment(
     comment = await session.get(BlogComment, comment_id)
     if not comment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
-    if actor.role != UserRole.admin and comment.user_id != actor.id:
+    if actor.role not in (UserRole.admin, UserRole.owner) and comment.user_id != actor.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
     if comment.is_deleted:
         return
@@ -651,7 +651,7 @@ async def set_comment_hidden(
     hidden: bool,
     reason: str | None = None,
 ) -> BlogComment:
-    if actor.role != UserRole.admin:
+    if actor.role not in (UserRole.admin, UserRole.owner):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
 
     comment = await session.get(BlogComment, comment_id)
@@ -683,7 +683,7 @@ async def set_comment_hidden(
 
 
 async def resolve_comment_flags(session: AsyncSession, *, comment_id: UUID, actor: User) -> int:
-    if actor.role != UserRole.admin:
+    if actor.role not in (UserRole.admin, UserRole.owner):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
     now = datetime.now(timezone.utc)
     result = await session.execute(

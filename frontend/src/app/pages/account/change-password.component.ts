@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { TranslateModule } from '@ngx-translate/core';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
@@ -12,7 +13,16 @@ import { AuthService } from '../../core/auth.service';
 @Component({
   selector: 'app-change-password',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent, PasswordStrengthComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    TranslateModule,
+    ContainerComponent,
+    ButtonComponent,
+    BreadcrumbComponent,
+    PasswordStrengthComponent
+  ],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -20,35 +30,68 @@ import { AuthService } from '../../core/auth.service';
       <form #changeForm="ngForm" class="grid gap-4" (ngSubmit)="onSubmit(changeForm)">
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           Current password
-          <input
-            name="current"
-            type="password"
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-            required
-            [(ngModel)]="current"
-          />
+          <div class="relative">
+            <input
+              name="current"
+              [type]="showCurrent ? 'text' : 'password'"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              required
+              autocomplete="current-password"
+              [(ngModel)]="current"
+            />
+            <button
+              type="button"
+              class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
+              (click)="showCurrent = !showCurrent"
+              [attr.aria-label]="(showCurrent ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+            >
+              {{ (showCurrent ? 'auth.hide' : 'auth.show') | translate }}
+            </button>
+          </div>
         </label>
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           New password
-          <input
-            name="password"
-            type="password"
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-            required
-            minlength="6"
-            [(ngModel)]="password"
-          />
+          <div class="relative">
+            <input
+              name="password"
+              [type]="showNew ? 'text' : 'password'"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              required
+              minlength="6"
+              autocomplete="new-password"
+              [(ngModel)]="password"
+            />
+            <button
+              type="button"
+              class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
+              (click)="showNew = !showNew"
+              [attr.aria-label]="(showNew ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+            >
+              {{ (showNew ? 'auth.hide' : 'auth.show') | translate }}
+            </button>
+          </div>
         </label>
         <app-password-strength [password]="password"></app-password-strength>
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           Confirm new password
-          <input
-            name="confirm"
-            type="password"
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-            required
-            [(ngModel)]="confirm"
-          />
+          <div class="relative">
+            <input
+              name="confirm"
+              [type]="showConfirm ? 'text' : 'password'"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              required
+              autocomplete="new-password"
+              [(ngModel)]="confirm"
+            />
+            <button
+              type="button"
+              class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
+              (click)="showConfirm = !showConfirm"
+              [attr.aria-label]="(showConfirm ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+            >
+              {{ (showConfirm ? 'auth.hide' : 'auth.show') | translate }}
+            </button>
+          </div>
         </label>
         <p *ngIf="error" class="text-sm text-amber-700 dark:text-amber-300">{{ error }}</p>
         <app-button label="Update password" type="submit"></app-button>
@@ -68,6 +111,9 @@ export class ChangePasswordComponent {
   password = '';
   confirm = '';
   error = '';
+  showCurrent = false;
+  showNew = false;
+  showConfirm = false;
 
   constructor(private toast: ToastService, private auth: AuthService) {}
 

@@ -9,6 +9,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import require_complete_profile, require_verified_email, require_admin
+from app.core.config import settings
 from app.db.session import get_session
 from app.models.address import Address
 from app.models.cart import Cart
@@ -18,6 +19,7 @@ from app.schemas.order import OrderRead, OrderCreate, OrderUpdate, ShippingMetho
 from app.services import cart as cart_service
 from app.services import order as order_service
 from app.services import email as email_service
+from app.services import auth as auth_service
 from app.schemas.checkout import GuestCheckoutRequest, GuestCheckoutResponse, CheckoutRequest
 from app.schemas.address import AddressCreate
 from app.services import payments
@@ -62,6 +64,16 @@ async def create_order(
         shipping_method,
     )
     background_tasks.add_task(email_service.send_order_confirmation, current_user.email, order, order.items)
+    owner = await auth_service.get_owner_user(session)
+    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+    if admin_to:
+        background_tasks.add_task(
+            email_service.send_new_order_notification,
+            admin_to,
+            order,
+            current_user.email,
+            owner.preferred_language if owner else None,
+        )
     return order
 
 
@@ -115,6 +127,16 @@ async def checkout(
         discount=discount_val,
     )
     background_tasks.add_task(email_service.send_order_confirmation, current_user.email, order, order.items)
+    owner = await auth_service.get_owner_user(session)
+    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+    if admin_to:
+        background_tasks.add_task(
+            email_service.send_new_order_notification,
+            admin_to,
+            order,
+            current_user.email,
+            owner.preferred_language if owner else None,
+        )
     return GuestCheckoutResponse(order_id=order.id, reference_code=order.reference_code, client_secret=intent["client_secret"])
 
 

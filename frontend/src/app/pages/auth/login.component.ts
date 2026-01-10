@@ -46,7 +46,7 @@ import { appConfig } from '../../core/app-config';
             type="password"
             class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
             required
-            minlength="6"
+            autocomplete="current-password"
             [(ngModel)]="password"
           />
         </label>
@@ -96,7 +96,10 @@ export class LoginComponent {
   }
 
   onSubmit(form: NgForm): void {
-    if (!form.valid) return;
+    if (!form.valid) {
+      this.toast.error(this.translate.instant('auth.completeForm'));
+      return;
+    }
     if (this.captchaEnabled && !this.captchaToken) {
       this.toast.error(this.translate.instant('auth.captchaRequired'));
       return;
@@ -108,6 +111,10 @@ export class LoginComponent {
         void this.router.navigateByUrl('/account');
       },
       error: (err) => {
+        if (err?.status === 401) {
+          this.toast.error(this.translate.instant('auth.invalidCredentials'));
+          return;
+        }
         const message = err?.error?.detail || this.translate.instant('auth.errorLogin');
         this.toast.error(message);
       },

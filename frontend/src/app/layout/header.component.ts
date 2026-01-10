@@ -192,7 +192,7 @@ export class HeaderComponent {
       links.push({ label: 'nav.signIn', path: '/login' });
       links.push({ label: 'nav.register', path: '/register' });
     }
-    if (this.auth.role() === 'admin') {
+    if (this.auth.isAdmin()) {
       links.push({ label: 'nav.admin', path: '/admin' });
     }
     return links;

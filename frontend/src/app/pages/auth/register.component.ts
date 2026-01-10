@@ -106,16 +106,26 @@ import { appConfig } from '../../core/app-config';
 
           <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
             {{ 'auth.password' | translate }}
-            <input
-              #passwordCtrl="ngModel"
-              name="password"
-              type="password"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-              required
-              minlength="6"
-              autocomplete="new-password"
-              [(ngModel)]="password"
-            />
+            <div class="relative">
+              <input
+                #passwordCtrl="ngModel"
+                name="password"
+                [type]="showPassword ? 'text' : 'password'"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                required
+                minlength="6"
+                autocomplete="new-password"
+                [(ngModel)]="password"
+              />
+              <button
+                type="button"
+                class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
+                (click)="showPassword = !showPassword"
+                [attr.aria-label]="(showPassword ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+              >
+                {{ (showPassword ? 'auth.hide' : 'auth.show') | translate }}
+              </button>
+            </div>
             <span *ngIf="passwordCtrl.touched && passwordCtrl.invalid" class="text-xs font-normal text-rose-700 dark:text-rose-300">
               {{ 'validation.passwordMin' | translate }}
             </span>
@@ -125,15 +135,25 @@ import { appConfig } from '../../core/app-config';
 
           <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
             {{ 'auth.confirmPassword' | translate }}
-            <input
-              #confirmCtrl="ngModel"
-              name="confirm"
-              type="password"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-              required
-              autocomplete="new-password"
-              [(ngModel)]="confirmPassword"
-            />
+            <div class="relative">
+              <input
+                #confirmCtrl="ngModel"
+                name="confirm"
+                [type]="showConfirmPassword ? 'text' : 'password'"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                required
+                autocomplete="new-password"
+                [(ngModel)]="confirmPassword"
+              />
+              <button
+                type="button"
+                class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
+                (click)="showConfirmPassword = !showConfirmPassword"
+                [attr.aria-label]="(showConfirmPassword ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+              >
+                {{ (showConfirmPassword ? 'auth.hide' : 'auth.show') | translate }}
+              </button>
+            </div>
             <span *ngIf="confirmCtrl.touched && confirmCtrl.invalid" class="text-xs font-normal text-rose-700 dark:text-rose-300">
               {{ 'validation.required' | translate }}
             </span>
@@ -277,6 +297,8 @@ export class RegisterComponent implements OnInit, OnDestroy {
   email = '';
   password = '';
   confirmPassword = '';
+  showPassword = false;
+  showConfirmPassword = false;
   captchaToken: string | null = null;
   captchaSiteKey = appConfig.captchaSiteKey || '';
   captchaEnabled = Boolean(this.captchaSiteKey);

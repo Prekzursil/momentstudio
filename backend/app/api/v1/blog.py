@@ -198,7 +198,7 @@ async def create_blog_comment(
         snippet = (snippet[:400] + "…") if len(snippet) > 400 else snippet
 
         admins = await session.execute(
-            sa.select(User).where(User.role == UserRole.admin, User.notify_blog_comments.is_(True))
+            sa.select(User).where(User.role.in_([UserRole.admin, UserRole.owner]), User.notify_blog_comments.is_(True))
         )
         for admin in admins.scalars().all():
             if not admin.email:

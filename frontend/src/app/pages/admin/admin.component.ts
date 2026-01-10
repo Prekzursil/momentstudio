@@ -611,7 +611,7 @@ import { formatIdentity } from '../../shared/user-identity';
                   size="sm"
                   variant="ghost"
                   [label]="'adminUi.users.setRole' | translate"
-                  [disabled]="!selectedUserId || !selectedUserRole"
+                  [disabled]="!selectedUserId || !selectedUserRole || selectedUserRole === 'owner'"
                   (action)="updateRole()"
                 ></app-button>
                 <app-button
@@ -631,9 +631,15 @@ import { formatIdentity } from '../../shared/user-identity';
                 </div>
                 <div class="flex items-center gap-2 text-xs">
                   <input type="radio" name="userSelect" [value]="user.id" [(ngModel)]="selectedUserId" (ngModelChange)="onSelectedUserIdChange($event)" />
-                  <select class="rounded border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [ngModel]="user.role" (ngModelChange)="selectUser(user.id, $event)">
+                  <select
+                    class="rounded border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [ngModel]="user.role"
+                    (ngModelChange)="selectUser(user.id, $event)"
+                    [disabled]="user.role === 'owner'"
+                  >
                     <option value="customer">{{ 'adminUi.users.roles.customer' | translate }}</option>
                     <option value="admin">{{ 'adminUi.users.roles.admin' | translate }}</option>
+                    <option *ngIf="user.role === 'owner'" value="owner">{{ 'adminUi.users.roles.owner' | translate }}</option>
                   </select>
                 </div>
               </div>

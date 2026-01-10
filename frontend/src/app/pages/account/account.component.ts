@@ -1421,7 +1421,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   isAdmin(): boolean {
-    return this.auth.role() === 'admin' || this.profile()?.role === 'admin';
+    return this.auth.isAdmin();
   }
 
   profileCompleteness(): { completed: number; total: number; percent: number } {

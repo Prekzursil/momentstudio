@@ -18,7 +18,7 @@ describe('HomeComponent', () => {
     const api = jasmine.createSpyObj<ApiService>('ApiService', ['get']);
     const catalog = jasmine.createSpyObj<CatalogService>('CatalogService', ['listProducts', 'listFeaturedCollections']);
     const recentlyViewed = jasmine.createSpyObj<RecentlyViewedService>('RecentlyViewedService', ['list']);
-    const auth = { isAuthenticated: () => false, role: () => 'user' } as unknown as AuthService;
+    const auth = { isAuthenticated: () => false, isAdmin: () => false } as unknown as AuthService;
     const markdown = { render: (s: string) => s } as unknown as MarkdownService;
 
     api.get.and.callFake(<T>(url: string, _params?: unknown, _headers?: Record<string, string>) => {
@@ -102,7 +102,7 @@ describe('HomeComponent', () => {
     const api = jasmine.createSpyObj<ApiService>('ApiService', ['get']);
     const catalog = jasmine.createSpyObj<CatalogService>('CatalogService', ['listProducts', 'listFeaturedCollections']);
     const recentlyViewed = jasmine.createSpyObj<RecentlyViewedService>('RecentlyViewedService', ['list']);
-    const auth = { isAuthenticated: () => false, role: () => 'user' } as unknown as AuthService;
+    const auth = { isAuthenticated: () => false, isAdmin: () => false } as unknown as AuthService;
     const markdown = { render: (s: string) => s } as unknown as MarkdownService;
 
     api.get.and.callFake(<T>(url: string, params?: unknown) => {

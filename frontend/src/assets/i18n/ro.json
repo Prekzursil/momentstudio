@@ -289,6 +289,10 @@
     "email": "Email",
     "username": "Utilizator",
     "password": "Parolă",
+    "show": "Arată",
+    "hide": "Ascunde",
+    "showPassword": "Arată parola",
+    "hidePassword": "Ascunde parola",
     "emailVerificationNeeded": "Este necesară verificarea emailului pentru a plasa comenzi.",
     "emailVerificationResend": "Retrimite link-ul",
     "emailVerificationTokenPlaceholder": "Introdu codul de verificare",
@@ -325,6 +329,8 @@
     "successLogin": "Bine ai revenit",
     "successRegister": "Cont creat",
     "successReset": "Parolă actualizată",
+    "invalidCredentials": "Email/utilizator sau parola sunt incorecte.",
+    "completeForm": "Te rugăm să completezi formularul.",
     "errorLogin": "Autentificare eșuată. Încearcă din nou.",
     "errorRegister": "Nu am putut crea contul. Încearcă din nou.",
     "errorReset": "Nu am putut reseta parola. Încearcă din nou.",
@@ -506,7 +512,8 @@
       "forceLogout": "Deconectează selectatul",
       "roles": {
         "customer": "Client",
-        "admin": "Administrator"
+        "admin": "Administrator",
+        "owner": "Proprietar"
       },
       "success": {
         "revoke": "Sesiuni revocate",

@@ -56,12 +56,40 @@ async def seed_admin(session_factory):
         await session.commit()
 
 
+async def seed_owner(session_factory):
+    settings.maintenance_mode = False
+    async with session_factory() as session:
+        await session.execute(delete(User).where(User.email == "owner@example.com"))
+        owner = User(
+            email="owner@example.com",
+            username="owner",
+            hashed_password=security.hash_password("Password123"),
+            name="Owner",
+            role=UserRole.owner,
+        )
+        session.add(owner)
+        await session.commit()
+
+
 def auth_headers(client: TestClient, session_factory) -> dict:
     asyncio.run(seed_admin(session_factory))
     common_headers = {"X-Maintenance-Bypass": settings.maintenance_bypass_token}
     resp = client.post(
         "/api/v1/auth/login",
-        json={"email": "admin@example.com", "password": "Password123", "name": "Admin"},
+        json={"email": "admin@example.com", "password": "Password123"},
+        headers=common_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    token = resp.json()["tokens"]["access_token"]
+    return {"Authorization": f"Bearer {token}", "X-Maintenance-Bypass": settings.maintenance_bypass_token}
+
+
+def owner_headers(client: TestClient, session_factory) -> dict:
+    asyncio.run(seed_owner(session_factory))
+    common_headers = {"X-Maintenance-Bypass": settings.maintenance_bypass_token}
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={"email": "owner@example.com", "password": "Password123"},
         headers=common_headers,
     )
     assert resp.status_code == 200, resp.text
@@ -268,3 +296,74 @@ def test_revoke_sessions_and_update_role(test_app: Dict[str, object]) -> None:
             return all(flags) if flags else False
 
     assert asyncio.run(_check_revoked())
+
+
+def test_owner_can_access_admin_dashboard(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]
+    engine = test_app["engine"]
+    asyncio.run(reset_db(engine))
+    headers = owner_headers(client, session_factory)
+
+    resp = client.get("/api/v1/admin/dashboard/summary", headers=headers)
+    assert resp.status_code == 200, resp.text
+
+
+def test_owner_role_cannot_be_changed_via_admin_role_endpoint(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]
+    engine = test_app["engine"]
+    asyncio.run(reset_db(engine))
+    headers = owner_headers(client, session_factory)
+
+    async def _owner_id() -> str:
+        async with session_factory() as session:
+            owner = (await session.execute(select(User).where(User.email == "owner@example.com"))).scalar_one()
+            return str(owner.id)
+
+    owner_id = asyncio.run(_owner_id())
+    update = client.patch(
+        f"/api/v1/admin/dashboard/users/{owner_id}/role",
+        headers=headers,
+        json={"role": UserRole.customer.value},
+    )
+    assert update.status_code == 400
+
+
+def test_owner_can_transfer_ownership(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]
+    engine = test_app["engine"]
+    asyncio.run(reset_db(engine))
+    headers = owner_headers(client, session_factory)
+
+    async def _seed_target() -> None:
+        async with session_factory() as session:
+            user = User(
+                email="target@example.com",
+                username="target",
+                hashed_password=security.hash_password("Password123"),
+                name="Target",
+                role=UserRole.customer,
+            )
+            session.add(user)
+            await session.commit()
+
+    asyncio.run(_seed_target())
+
+    transfer = client.post(
+        "/api/v1/admin/dashboard/owner/transfer",
+        headers=headers,
+        json={"identifier": "target"},
+    )
+    assert transfer.status_code == 200, transfer.text
+
+    async def _roles() -> tuple[UserRole, UserRole]:
+        async with session_factory() as session:
+            owner = (await session.execute(select(User).where(User.email == "owner@example.com"))).scalar_one()
+            target = (await session.execute(select(User).where(User.email == "target@example.com"))).scalar_one()
+            return owner.role, target.role
+
+    old_role, new_role = asyncio.run(_roles())
+    assert old_role == UserRole.admin
+    assert new_role == UserRole.owner

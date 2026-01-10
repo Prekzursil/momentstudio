@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.dependencies import require_admin
+from app.core.dependencies import require_admin, require_owner
 from app.db.session import get_session
 from app.models.catalog import Product, ProductAuditLog, Category
 from app.models.content import ContentBlock, ContentAuditLog
@@ -322,6 +322,8 @@ async def update_user_role(
     user = await session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user.role == UserRole.owner:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Owner role can only be transferred")
     role = payload.get("role")
     if role not in (UserRole.admin.value, UserRole.customer.value):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role")
@@ -337,6 +339,46 @@ async def update_user_role(
         "name_tag": user.name_tag,
         "role": user.role,
         "created_at": user.created_at,
+    }
+
+
+@router.post("/owner/transfer")
+async def transfer_owner(
+    payload: dict,
+    session: AsyncSession = Depends(get_session),
+    current_owner: User = Depends(require_owner),
+) -> dict:
+    identifier = str(payload.get("identifier") or "").strip()
+    if not identifier:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Identifier is required")
+
+    if "@" in identifier:
+        target = await auth_service.get_user_by_email(session, identifier)
+    else:
+        target = await auth_service.get_user_by_username(session, identifier)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if target.id == current_owner.id:
+        return {"old_owner_id": str(current_owner.id), "new_owner_id": str(target.id)}
+
+    current_owner.role = UserRole.admin
+    session.add(current_owner)
+    await session.flush()
+
+    target.role = UserRole.owner
+    session.add(target)
+    await session.commit()
+    await session.refresh(target)
+
+    return {
+        "old_owner_id": str(current_owner.id),
+        "new_owner_id": str(target.id),
+        "email": target.email,
+        "username": target.username,
+        "name": target.name,
+        "name_tag": target.name_tag,
+        "role": target.role,
     }
 
 
