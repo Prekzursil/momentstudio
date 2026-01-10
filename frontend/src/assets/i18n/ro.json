@@ -371,6 +371,7 @@
   },
   "adminUi": {
     "nav": {
+      "title": "Administrare",
       "dashboard": "Panou",
       "products": "Produse",
       "orders": "Comenzi",
@@ -492,7 +493,46 @@
     },
     "orders": {
       "title": "Comenzi",
+      "hint": "Caută după referință, ID, email sau utilizator.",
+      "export": "Exportă CSV",
+      "search": "Caută",
       "statusFilter": "Status",
+      "from": "De la",
+      "to": "Până la",
+      "empty": "Nu există comenzi pentru aceste filtre.",
+      "view": "Vezi",
+      "guest": "Vizitator",
+      "detailTitle": "Comandă",
+      "backToList": "Înapoi la comenzi",
+      "tracking": "Tracking",
+      "updateStatus": "Actualizează status",
+      "trackingNumber": "Număr tracking",
+      "save": "Salvează modificările",
+      "saveHint": "Actualizează statusul și tracking-ul; emailul se trimite la expediere.",
+      "itemsTitle": "Produse",
+      "addressesTitle": "Adrese",
+      "shippingAddress": "Adresă livrare",
+      "billingAddress": "Adresă facturare",
+      "noAddress": "Nu există adresă disponibilă.",
+      "timelineTitle": "Istoric",
+      "timelineEmpty": "Nu există evenimente înregistrate încă.",
+      "notFound": "Comanda nu a fost găsită.",
+      "table": {
+        "reference": "Referință",
+        "customer": "Client",
+        "status": "Status",
+        "total": "Total",
+        "created": "Creată"
+      },
+      "items": {
+        "product": "Produs",
+        "qty": "Cant.",
+        "unit": "Preț",
+        "subtotal": "Subtotal"
+      },
+      "pagination": "Pagina {{page}} din {{total_pages}} · {{total_items}} total",
+      "prev": "Anterior",
+      "next": "Următor",
       "all": "Toate",
       "pending": "În așteptare",
       "paid": "Plătită",
@@ -503,6 +543,8 @@
         "status": "Statusul comenzii a fost actualizat"
       },
       "errors": {
+        "load": "Nu am putut încărca comenzile.",
+        "export": "Nu am putut exporta comenzile.",
         "status": "Nu am putut actualiza statusul comenzii"
       }
     },

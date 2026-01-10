@@ -371,6 +371,7 @@
   },
   "adminUi": {
     "nav": {
+      "title": "Admin",
       "dashboard": "Dashboard",
       "products": "Products",
       "orders": "Orders",
@@ -492,7 +493,46 @@
     },
     "orders": {
       "title": "Orders",
+      "hint": "Search by reference, id, email, or username.",
+      "export": "Export CSV",
+      "search": "Search",
       "statusFilter": "Status",
+      "from": "From",
+      "to": "To",
+      "empty": "No orders match these filters.",
+      "view": "View",
+      "guest": "Guest",
+      "detailTitle": "Order",
+      "backToList": "Back to orders",
+      "tracking": "Tracking",
+      "updateStatus": "Update status",
+      "trackingNumber": "Tracking number",
+      "save": "Save changes",
+      "saveHint": "Updates status and tracking; emails send on shipped.",
+      "itemsTitle": "Items",
+      "addressesTitle": "Addresses",
+      "shippingAddress": "Shipping address",
+      "billingAddress": "Billing address",
+      "noAddress": "No address on file.",
+      "timelineTitle": "Timeline",
+      "timelineEmpty": "No events recorded yet.",
+      "notFound": "Order not found.",
+      "table": {
+        "reference": "Reference",
+        "customer": "Customer",
+        "status": "Status",
+        "total": "Total",
+        "created": "Created"
+      },
+      "items": {
+        "product": "Product",
+        "qty": "Qty",
+        "unit": "Unit",
+        "subtotal": "Subtotal"
+      },
+      "pagination": "Page {{page}} of {{total_pages}} · {{total_items}} total",
+      "prev": "Prev",
+      "next": "Next",
       "all": "All",
       "pending": "Pending",
       "paid": "Paid",
@@ -503,6 +543,8 @@
         "status": "Order status updated"
       },
       "errors": {
+        "load": "Could not load orders.",
+        "export": "Could not export orders.",
         "status": "Failed to update order status"
       }
     },

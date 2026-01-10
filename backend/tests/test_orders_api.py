@@ -11,6 +11,7 @@ from sqlalchemy.future import select
 from app.main import app
 from app.db.base import Base
 from app.db.session import get_session
+from app.models.address import Address
 from app.models.catalog import Category, Product
 from app.models.cart import Cart, CartItem
 from app.models.order import Order
@@ -122,6 +123,104 @@ def seed_cart_with_product(session_factory, user_id: UUID) -> UUID:
             return cart.id
 
     return asyncio.run(seed())
+
+
+def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    async def fake_email(*_args, **_kwargs):
+        return True
+
+    monkeypatch.setattr(email_service, "send_order_confirmation", fake_email)
+    monkeypatch.setattr(email_service, "send_new_order_notification", fake_email)
+
+    token, user_id = create_user_token(SessionLocal, email="buyer@example.com")
+    admin_token, _ = create_user_token(SessionLocal, email="admin@example.com", admin=True)
+    seed_cart_with_product(SessionLocal, user_id)
+
+    async def seed_addresses() -> tuple[UUID, UUID]:
+        async with SessionLocal() as session:
+            shipping = Address(
+                user_id=user_id,
+                label="Shipping",
+                line1="123 Main",
+                city="Bucharest",
+                country="RO",
+                postal_code="000000",
+            )
+            billing = Address(
+                user_id=user_id,
+                label="Billing",
+                line1="456 Billing",
+                city="Bucharest",
+                country="RO",
+                postal_code="000000",
+            )
+            session.add(shipping)
+            session.add(billing)
+            await session.commit()
+            await session.refresh(shipping)
+            await session.refresh(billing)
+            return shipping.id, billing.id
+
+    shipping_address_id, billing_address_id = asyncio.run(seed_addresses())
+
+    async def seed_shipping():
+        async with SessionLocal() as session:
+            method = await order_service.create_shipping_method(
+                session, ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0)
+            )
+            return method.id
+
+    shipping_method_id = asyncio.run(seed_shipping())
+
+    create = client.post(
+        "/api/v1/orders",
+        json={
+            "shipping_address_id": str(shipping_address_id),
+            "billing_address_id": str(billing_address_id),
+            "shipping_method_id": str(shipping_method_id),
+        },
+        headers=auth_headers(token),
+    )
+    assert create.status_code == 201, create.text
+    order = create.json()
+    order_id = order["id"]
+    ref = order["reference_code"]
+
+    forbidden = client.get("/api/v1/orders/admin/search", headers=auth_headers(token))
+    assert forbidden.status_code == 403
+
+    search = client.get(
+        "/api/v1/orders/admin/search",
+        params={"q": ref, "page": 1, "limit": 10},
+        headers=auth_headers(admin_token),
+    )
+    assert search.status_code == 200, search.text
+    payload = search.json()
+    assert payload["meta"]["total_items"] >= 1
+    assert any(item["id"] == order_id for item in payload["items"])
+
+    detail = client.get(f"/api/v1/orders/admin/{order_id}", headers=auth_headers(admin_token))
+    assert detail.status_code == 200, detail.text
+    data = detail.json()
+    assert data["customer_email"] == "buyer@example.com"
+    assert data["customer_username"] == "buyer"
+    assert data["shipping_address"]["line1"] == "123 Main"
+    assert data["billing_address"]["line1"] == "456 Billing"
+
+    updated = client.patch(
+        f"/api/v1/orders/admin/{order_id}",
+        json={"status": "paid", "tracking_number": "TRACK999"},
+        headers=auth_headers(admin_token),
+    )
+    assert updated.status_code == 200, updated.text
+    updated_data = updated.json()
+    assert updated_data["status"] == "paid"
+    assert updated_data["tracking_number"] == "TRACK999"
+    assert updated_data["customer_email"] == "buyer@example.com"
+    assert updated_data["shipping_address"]["line1"] == "123 Main"
 
 
 def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:

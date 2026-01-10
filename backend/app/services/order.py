@@ -5,6 +5,7 @@ import random
 import string
 
 from fastapi import HTTPException, status
+from sqlalchemy import String, cast, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -128,6 +129,85 @@ async def list_orders(session: AsyncSession, status: OrderStatus | None = None, 
         query = query.where(Order.user_id == user_id)
     result = await session.execute(query)
     return list(result.scalars().unique())
+
+
+async def admin_search_orders(
+    session: AsyncSession,
+    *,
+    q: str | None = None,
+    status: OrderStatus | None = None,
+    from_dt=None,
+    to_dt=None,
+    page: int = 1,
+    limit: int = 20,
+) -> tuple[list[tuple[Order, str | None, str | None]], int]:
+    """Paginated order search for the admin UI.
+
+    Returns rows of (Order, customer_email, customer_username) plus total_items.
+    """
+    from app.models.user import User
+
+    cleaned_q = (q or "").strip()
+    page = max(1, int(page or 1))
+    limit = max(1, min(100, int(limit or 20)))
+    offset = (page - 1) * limit
+
+    filters = []
+    if status:
+        filters.append(Order.status == status)
+    if from_dt:
+        filters.append(Order.created_at >= from_dt)
+    if to_dt:
+        filters.append(Order.created_at <= to_dt)
+    if cleaned_q:
+        filters.append(
+            or_(
+                cast(Order.id, String).ilike(f"%{cleaned_q}%"),
+                Order.reference_code.ilike(f"%{cleaned_q}%"),
+                func.lower(User.email).ilike(f"%{cleaned_q.lower()}%"),
+                User.username.ilike(f"%{cleaned_q}%"),
+            )
+        )
+
+    count_stmt = select(func.count()).select_from(Order).join(User, Order.user_id == User.id, isouter=True)
+    if filters:
+        count_stmt = count_stmt.where(*filters)
+    total_items = int((await session.execute(count_stmt)).scalar_one() or 0)
+
+    stmt = (
+        select(Order, User.email, User.username)
+        .join(User, Order.user_id == User.id, isouter=True)
+        .order_by(Order.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    if filters:
+        stmt = stmt.where(*filters)
+
+    result = await session.execute(stmt)
+    raw_rows = result.all()
+    rows: list[tuple[Order, str | None, str | None]] = [
+        (order, email, username) for (order, email, username) in raw_rows
+    ]
+    return rows, total_items
+
+
+async def get_order_by_id_admin(session: AsyncSession, order_id: UUID) -> Order | None:
+    """Admin read: includes addresses plus items/events/user."""
+    result = await session.execute(
+        select(Order)
+        .execution_options(populate_existing=True)
+        .options(
+            selectinload(Order.items).selectinload(OrderItem.product),
+            selectinload(Order.shipping_method),
+            selectinload(Order.events),
+            selectinload(Order.user),
+            selectinload(Order.shipping_address),
+            selectinload(Order.billing_address),
+        )
+        .where(Order.id == order_id)
+    )
+    return result.scalar_one_or_none()
 
 
 ALLOWED_TRANSITIONS = {

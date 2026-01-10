@@ -68,8 +68,26 @@ export const routes: Routes = [
   {
     path: 'admin',
     canActivate: [adminGuard],
-    loadComponent: () => import('./pages/admin/admin.component').then((m) => m.AdminComponent),
-    title: 'Admin'
+    loadComponent: () => import('./pages/admin/admin-layout.component').then((m) => m.AdminLayoutComponent),
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'orders' },
+      {
+        path: 'dashboard',
+        loadComponent: () => import('./pages/admin/admin.component').then((m) => m.AdminComponent),
+        title: 'Admin | momentstudio'
+      },
+      {
+        path: 'orders',
+        loadComponent: () => import('./pages/admin/orders/admin-orders.component').then((m) => m.AdminOrdersComponent),
+        title: 'Orders | Admin | momentstudio'
+      },
+      {
+        path: 'orders/:orderId',
+        loadComponent: () =>
+          import('./pages/admin/orders/admin-order-detail.component').then((m) => m.AdminOrderDetailComponent),
+        title: 'Order | Admin | momentstudio'
+      }
+    ]
   },
   { path: 'error', component: ErrorComponent, title: 'Something went wrong' },
   { path: '**', component: NotFoundComponent, title: 'Not Found' }

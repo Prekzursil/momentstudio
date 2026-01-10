@@ -3,7 +3,6 @@ import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
-import { ContainerComponent } from '../../layout/container.component';
 import { CardComponent } from '../../shared/card.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { InputComponent } from '../../shared/input.component';
@@ -43,7 +42,6 @@ import { formatIdentity } from '../../shared/user-identity';
     CommonModule,
     FormsModule,
     RouterLink,
-    ContainerComponent,
     BreadcrumbComponent,
     CardComponent,
     ButtonComponent,
@@ -54,21 +52,12 @@ import { formatIdentity } from '../../shared/user-identity';
     TranslateModule
   ],
  template: `
-    <app-container classes="py-8 grid gap-6">
+    <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
       <div *ngIf="error()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
         {{ error() }}
       </div>
-      <div class="grid lg:grid-cols-[260px_1fr] gap-6">
-        <aside class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
-          <a class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.nav.dashboard' | translate }}</a>
-          <a class="hover:text-slate-900 text-slate-700 dark:text-slate-200 dark:hover:text-white">{{ 'adminUi.nav.products' | translate }}</a>
-          <a class="hover:text-slate-900 text-slate-700 dark:text-slate-200 dark:hover:text-white">{{ 'adminUi.nav.orders' | translate }}</a>
-          <a class="hover:text-slate-900 text-slate-700 dark:text-slate-200 dark:hover:text-white">{{ 'adminUi.nav.users' | translate }}</a>
-          <a class="hover:text-slate-900 text-slate-700 dark:text-slate-200 dark:hover:text-white">{{ 'adminUi.nav.content' | translate }}</a>
-        </aside>
-
-        <div class="grid gap-6" *ngIf="!loading(); else loadingTpl">
+      <div class="grid gap-6" *ngIf="!loading(); else loadingTpl">
           <section class="grid gap-3">
             <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboardTitle' | translate }}</h1>
             <div class="grid md:grid-cols-3 gap-4">
@@ -1422,14 +1411,13 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
         </div>
-        <ng-template #loadingTpl>
-          <div class="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-            <app-skeleton [rows]="6"></app-skeleton>
-          </div>
-        </ng-template>
-      </div>
-    </app-container>
-  `
+	        <ng-template #loadingTpl>
+	          <div class="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	            <app-skeleton [rows]="6"></app-skeleton>
+	          </div>
+	        </ng-template>
+	      </div>
+	  `
 })
 export class AdminComponent implements OnInit {
   crumbs = [

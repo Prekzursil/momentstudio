@@ -1,5 +1,6 @@
 import csv
 import io
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
@@ -25,6 +26,7 @@ from app.schemas.address import AddressCreate
 from app.services import payments
 from app.services import address as address_service
 from app.api.v1 import cart as cart_api
+from app.schemas.order_admin import AdminOrderListItem, AdminOrderListResponse, AdminOrderRead, AdminPaginationMeta
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -156,6 +158,84 @@ async def admin_list_orders(
     return await order_service.list_orders(session, status=status, user_id=user_id)
 
 
+@router.get("/admin/search", response_model=AdminOrderListResponse)
+async def admin_search_orders(
+    q: str | None = Query(default=None, max_length=200),
+    status: OrderStatus | None = Query(default=None),
+    from_dt: datetime | None = Query(default=None, alias="from"),
+    to_dt: datetime | None = Query(default=None, alias="to"),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> AdminOrderListResponse:
+    rows, total_items = await order_service.admin_search_orders(
+        session, q=q, status=status, from_dt=from_dt, to_dt=to_dt, page=page, limit=limit
+    )
+    items = [
+        AdminOrderListItem(
+            id=order.id,
+            reference_code=order.reference_code,
+            status=order.status,
+            total_amount=float(order.total_amount),
+            currency=order.currency,
+            created_at=order.created_at,
+            customer_email=email,
+            customer_username=username,
+        )
+        for (order, email, username) in rows
+    ]
+    total_pages = max(1, (int(total_items) + limit - 1) // limit)
+    meta = AdminPaginationMeta(total_items=int(total_items), total_pages=total_pages, page=page, limit=limit)
+    return AdminOrderListResponse(items=items, meta=meta)
+
+
+@router.get("/admin/export")
+async def admin_export_orders(
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+):
+    orders = await order_service.list_orders(session)
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["id", "reference_code", "status", "total_amount", "currency", "user_id", "created_at"])
+    for order in orders:
+        writer.writerow(
+            [
+                order.id,
+                order.reference_code,
+                order.status.value,
+                order.total_amount,
+                order.currency,
+                order.user_id,
+                order.created_at,
+            ]
+        )
+    buffer.seek(0)
+    headers = {"Content-Disposition": "attachment; filename=orders.csv"}
+    return StreamingResponse(iter([buffer.getvalue()]), media_type="text/csv", headers=headers)
+
+
+@router.get("/admin/{order_id}", response_model=AdminOrderRead)
+async def admin_get_order(
+    order_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> AdminOrderRead:
+    order = await order_service.get_order_by_id_admin(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    base = OrderRead.model_validate(order).model_dump()
+    return AdminOrderRead(
+        **base,
+        customer_email=getattr(order.user, "email", None) if getattr(order, "user", None) else None,
+        customer_username=getattr(order.user, "username", None) if getattr(order, "user", None) else None,
+        shipping_address=order.shipping_address,
+        billing_address=order.billing_address,
+    )
+
+
 @router.post("/guest-checkout", response_model=GuestCheckoutResponse, status_code=status.HTTP_201_CREATED)
 async def guest_checkout(
     _payload: GuestCheckoutRequest,
@@ -166,13 +246,13 @@ async def guest_checkout(
     raise HTTPException(status_code=status.HTTP_410_GONE, detail="Guest checkout disabled; please sign in")
 
 
-@router.patch("/admin/{order_id}", response_model=OrderRead)
+@router.patch("/admin/{order_id}", response_model=AdminOrderRead)
 async def admin_update_order(
     background_tasks: BackgroundTasks,
     order_id: UUID,
     payload: OrderUpdate,
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    _: str = Depends(require_admin),
 ):
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -188,7 +268,17 @@ async def admin_update_order(
         background_tasks.add_task(
             email_service.send_shipping_update, updated.user.email, updated, updated.tracking_number
         )
-    return updated
+    full = await order_service.get_order_by_id_admin(session, order_id)
+    if not full:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    base = OrderRead.model_validate(full).model_dump()
+    return AdminOrderRead(
+        **base,
+        customer_email=getattr(full.user, "email", None) if getattr(full, "user", None) else None,
+        customer_username=getattr(full.user, "username", None) if getattr(full, "user", None) else None,
+        shipping_address=full.shipping_address,
+        billing_address=full.billing_address,
+    )
 
 
 @router.post("/admin/{order_id}/retry-payment", response_model=OrderRead)
@@ -294,32 +384,6 @@ async def admin_void_payment(
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
     return await order_service.void_payment(session, order, intent_id=intent_id)
-
-
-@router.get("/admin/export")
-async def admin_export_orders(
-    session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
-):
-    orders = await order_service.list_orders(session)
-    buffer = io.StringIO()
-    writer = csv.writer(buffer)
-    writer.writerow(["id", "reference_code", "status", "total_amount", "currency", "user_id", "created_at"])
-    for order in orders:
-        writer.writerow(
-            [
-                order.id,
-                order.reference_code,
-                order.status.value,
-                order.total_amount,
-                order.currency,
-                order.user_id,
-                order.created_at,
-            ]
-        )
-    buffer.seek(0)
-    headers = {"Content-Disposition": "attachment; filename=orders.csv"}
-    return StreamingResponse(iter([buffer.getvalue()]), media_type="text/csv", headers=headers)
 
 
 @router.post("/shipping-methods", response_model=ShippingMethodRead, status_code=status.HTTP_201_CREATED)
