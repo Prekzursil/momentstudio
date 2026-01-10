@@ -1,12 +1,15 @@
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.core.dependencies import get_current_user_optional
 from app.db.session import get_session
 from app.models.cart import Cart
 from app.services import payments
+from app.services import auth as auth_service
+from app.services import email as email_service
 from app.api.v1 import cart as cart_api
 
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -34,10 +37,40 @@ async def create_payment_intent(
 @router.post("/webhook", status_code=status.HTTP_200_OK)
 async def stripe_webhook(
     request: Request,
+    background_tasks: BackgroundTasks,
     stripe_signature: str | None = Header(default=None),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     payload = await request.body()
-    event = await payments.handle_webhook_event(session, payload, stripe_signature)
+    event, inserted = await payments.handle_webhook_event(session, payload, stripe_signature)
+
+    event_type = str(event.get("type") or "")
+    if inserted and event_type.startswith("charge.dispute."):
+        data = event.get("data")
+        obj = data.get("object") if isinstance(data, dict) else None
+        get = obj.get if hasattr(obj, "get") else None  # type: ignore[assignment]
+        dispute_id = get("id") if callable(get) else None
+        charge_id = get("charge") if callable(get) else None
+        amount = get("amount") if callable(get) else None
+        currency = get("currency") if callable(get) else None
+        reason = get("reason") if callable(get) else None
+        dispute_status = get("status") if callable(get) else None
+
+        owner = await auth_service.get_owner_user(session)
+        admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+        if admin_to:
+            background_tasks.add_task(
+                email_service.send_stripe_dispute_notification,
+                admin_to,
+                event_type=event_type,
+                dispute_id=str(dispute_id) if dispute_id else None,
+                charge_id=str(charge_id) if charge_id else None,
+                amount=int(amount) if isinstance(amount, (int, float)) else None,
+                currency=str(currency) if currency else None,
+                reason=str(reason) if reason else None,
+                dispute_status=str(dispute_status) if dispute_status else None,
+                lang=owner.preferred_language if owner else None,
+            )
+
     # Order status updates would occur here based on event["type"]
     return {"received": True, "type": event.get("type")}

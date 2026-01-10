@@ -120,6 +120,19 @@ You can swap pieces later, but the initial design assumes:
 - **Display-only conversions**: when browsing in English, the UI may show an approximate **EUR** and **USD** value in parentheses for convenience. Rates are fetched from BNR via `/api/v1/fx/rates` and cached server-side (with optional admin override/fallback).
 - **Admin/import**: products and coupons must use **RON**. The API rejects other currencies.
 
+## 3.4 Operational notifications (owner inbox)
+
+- **Owner role**: the app has a unique `owner` role (admin-equivalent) that receives operational notifications.
+- **Routing**: if an owner exists, notifications are sent to `owner.email`; otherwise they fall back to `ADMIN_ALERT_EMAIL`.
+- **Covers**: new order alerts, low stock alerts, refund requests, and Stripe dispute webhooks (plus any future support/contact flows).
+
+Bootstrap/transfer the owner account:
+
+```bash
+cd backend
+python -m app.cli bootstrap-owner --email owner@example.com --password 'ChangeMe123' --username owner --display-name 'Owner'
+```
+
 ## 3. Features Overview
 
 ### Customer‑Facing

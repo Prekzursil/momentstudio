@@ -15,7 +15,7 @@ from app.models.address import Address
 from app.models.catalog import Category, Product
 from app.models.cart import Cart, CartItem
 from app.models.order import Order
-from app.models.user import UserRole
+from app.models.user import User, UserRole
 from app.services.auth import create_user, issue_tokens_for_user
 from app.schemas.user import UserCreate
 from app.services import order as order_service
@@ -229,6 +229,18 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
 
     token, user_id = create_user_token(SessionLocal)
     admin_token, _ = create_user_token(SessionLocal, email="admin@example.com", admin=True)
+    _, owner_id = create_user_token(SessionLocal, email="owner@example.com", admin=True)
+
+    async def promote_owner() -> None:
+        async with SessionLocal() as session:
+            owner = (await session.execute(select(User).where(User.id == owner_id))).scalar_one()
+            owner.role = UserRole.owner
+            owner.email_verified = True
+            owner.preferred_language = "en"
+            session.add(owner)
+            await session.commit()
+
+    asyncio.run(promote_owner())
     seed_cart_with_product(SessionLocal, user_id)
 
     async def seed_shipping():
@@ -240,7 +252,8 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
 
     shipping_method_id = asyncio.run(seed_shipping())
 
-    sent = {"count": 0, "shipped": 0, "delivered": 0}
+    sent = {"count": 0, "shipped": 0, "delivered": 0, "refund": 0}
+    refund_meta: dict[str, str | None] = {"to": None, "requested_by": None, "note": None}
 
     async def fake_send_order_confirmation(to_email, order, items=None):
         sent["count"] += 1
@@ -254,9 +267,19 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
         sent["delivered"] += 1
         return True
 
+    async def fake_send_refund_requested_notification(
+        to_email, order, customer_email=None, requested_by_email=None, note=None, lang=None
+    ):
+        sent["refund"] += 1
+        refund_meta["to"] = to_email
+        refund_meta["requested_by"] = requested_by_email
+        refund_meta["note"] = note
+        return True
+
     email_service.send_order_confirmation = fake_send_order_confirmation  # type: ignore[assignment]
     email_service.send_shipping_update = fake_send_shipping_update  # type: ignore[assignment]
     email_service.send_delivery_confirmation = fake_send_delivery_confirmation  # type: ignore[assignment]
+    email_service.send_refund_requested_notification = fake_send_refund_requested_notification  # type: ignore[assignment]
 
     res = client.post(
         "/api/v1/orders",
@@ -322,6 +345,10 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     assert refund.status_code == 200
     assert refund.json()["status"] == "refunded"
     assert any(evt["event"] == "refund_requested" for evt in refund.json()["events"])
+    assert sent["refund"] == 1
+    assert refund_meta["to"] == "owner@example.com"
+    assert refund_meta["requested_by"] == "admin@example.com"
+    assert refund_meta["note"] == "Customer requested refund"
 
     events = client.get(f"/api/v1/orders/admin/{order_id}/events", headers=auth_headers(admin_token))
     assert events.status_code == 200

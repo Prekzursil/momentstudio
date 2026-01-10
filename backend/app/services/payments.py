@@ -48,7 +48,7 @@ async def create_payment_intent(session: AsyncSession, cart: Cart, amount_cents:
     return {"client_secret": str(client_secret), "intent_id": str(intent_id)}
 
 
-async def handle_webhook_event(session: AsyncSession, payload: bytes, sig_header: str | None) -> dict:
+async def handle_webhook_event(session: AsyncSession, payload: bytes, sig_header: str | None) -> tuple[dict, bool]:
     if not settings.stripe_webhook_secret:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Webhook secret not set")
     init_stripe()
@@ -58,6 +58,7 @@ async def handle_webhook_event(session: AsyncSession, payload: bytes, sig_header
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload") from exc
 
     event_id = event.get("id")
+    inserted = False
     if event_id:
         record = StripeWebhookEvent(
             stripe_event_id=str(event_id),
@@ -66,9 +67,10 @@ async def handle_webhook_event(session: AsyncSession, payload: bytes, sig_header
         session.add(record)
         try:
             await session.commit()
+            inserted = True
         except IntegrityError:
             await session.rollback()
-    return event
+    return event, inserted
 
 
 async def capture_payment_intent(intent_id: str) -> dict:

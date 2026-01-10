@@ -295,15 +295,29 @@ async def admin_retry_payment(
 
 @router.post("/admin/{order_id}/refund", response_model=OrderRead)
 async def admin_refund_order(
+    background_tasks: BackgroundTasks,
     order_id: UUID,
     note: str | None = None,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    admin_user=Depends(require_admin),
 ):
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    return await order_service.refund_order(session, order, note=note)
+    updated = await order_service.refund_order(session, order, note=note)
+    owner = await auth_service.get_owner_user(session)
+    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+    if admin_to:
+        background_tasks.add_task(
+            email_service.send_refund_requested_notification,
+            admin_to,
+            updated,
+            customer_email=(updated.user.email if updated.user and updated.user.email else None),
+            requested_by_email=getattr(admin_user, "email", None),
+            note=note,
+            lang=owner.preferred_language if owner else None,
+        )
+    return updated
 
 
 @router.post("/admin/{order_id}/delivery-email", response_model=OrderRead)
