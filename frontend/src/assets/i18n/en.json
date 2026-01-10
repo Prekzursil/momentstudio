@@ -23,6 +23,13 @@
     "theme": "Theme",
     "language": "Language"
   },
+  "notifications": {
+    "title": "Notifications",
+    "loading": "Loading…",
+    "empty": "No notifications yet.",
+    "markRead": "Mark read",
+    "dismiss": "Dismiss"
+  },
   "footer": {
     "tagline": "Handcrafted Art",
     "instagram": "Instagram",

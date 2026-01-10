@@ -23,6 +23,13 @@
     "theme": "Temă",
     "language": "Limbă"
   },
+  "notifications": {
+    "title": "Notificări",
+    "loading": "Se încarcă…",
+    "empty": "Nu ai notificări încă.",
+    "markRead": "Marchează ca citit",
+    "dismiss": "Ascunde"
+  },
   "footer": {
     "tagline": "Artă Realizată Manual",
     "instagram": "Instagram",
