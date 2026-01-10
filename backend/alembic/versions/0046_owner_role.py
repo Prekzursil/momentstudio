@@ -24,6 +24,9 @@ def upgrade() -> None:
         # referenced in subsequent DDL (e.g. partial index predicates).
         with op.get_context().autocommit_block():
             op.execute("ALTER TYPE userrole ADD VALUE IF NOT EXISTS 'owner'")
+    else:
+        # SQLite stores SQLAlchemy enums as strings and doesn't require enum DDL.
+        pass
 
     op.create_index(
         "uq_users_single_owner_role",
@@ -36,10 +39,16 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    bind = op.get_bind()
-    if bind.dialect.name == "postgresql":
-        op.execute("UPDATE users SET role = 'admin' WHERE role = 'owner'")
-    else:
-        op.execute("UPDATE users SET role = 'admin' WHERE role = 'owner'")
+    # NOTE:
+    # PostgreSQL does not support removing enum values with a simple
+    # "ALTER TYPE ... DROP VALUE" statement. This downgrade therefore only:
+    #   1) Remaps any existing users with role 'owner' back to 'admin'.
+    #   2) Drops the unique index that enforced a single owner.
+    #
+    # The 'owner' value remains present in the underlying "userrole" enum
+    # type after downgrade. This is safe with respect to re-running the
+    # upgrade, because the upgrade uses:
+    #     ALTER TYPE userrole ADD VALUE IF NOT EXISTS 'owner'
+    op.execute("UPDATE users SET role = 'admin' WHERE role = 'owner'")
 
     op.drop_index("uq_users_single_owner_role", table_name="users")

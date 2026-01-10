@@ -86,10 +86,11 @@ async def bootstrap_owner(*, email: str, password: str, username: str, display_n
         ).scalar_one_or_none()
 
         # Prevent a unique-owner-role violation during flush/commit.
-        if existing_owner and (not existing_email_user or existing_owner.id != existing_email_user.id):
-            existing_owner.role = UserRole.admin
-            session.add(existing_owner)
-            await session.flush()
+        if existing_owner:
+            if not existing_email_user or existing_owner.id != existing_email_user.id:
+                existing_owner.role = UserRole.admin
+                session.add(existing_owner)
+                await session.flush()
 
         now = datetime.now(timezone.utc)
 
