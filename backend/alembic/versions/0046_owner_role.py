@@ -20,7 +20,10 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
-        op.execute("ALTER TYPE userrole ADD VALUE IF NOT EXISTS 'owner'")
+        # Postgres requires the new enum value to be committed before it can be
+        # referenced in subsequent DDL (e.g. partial index predicates).
+        with op.get_context().autocommit_block():
+            op.execute("ALTER TYPE userrole ADD VALUE IF NOT EXISTS 'owner'")
 
     op.create_index(
         "uq_users_single_owner_role",
@@ -40,4 +43,3 @@ def downgrade() -> None:
         op.execute("UPDATE users SET role = 'admin' WHERE role = 'owner'")
 
     op.drop_index("uq_users_single_owner_role", table_name="users")
-
