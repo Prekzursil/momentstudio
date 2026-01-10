@@ -329,6 +329,8 @@
     "successLogin": "Bine ai revenit",
     "successRegister": "Cont creat",
     "successReset": "Parolă actualizată",
+    "invalidCredentials": "Email/utilizator sau parola sunt incorecte.",
+    "completeForm": "Te rugăm să completezi formularul.",
     "errorLogin": "Autentificare eșuată. Încearcă din nou.",
     "errorRegister": "Nu am putut crea contul. Încearcă din nou.",
     "errorReset": "Nu am putut reseta parola. Încearcă din nou.",

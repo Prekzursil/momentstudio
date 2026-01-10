@@ -329,6 +329,8 @@
     "successLogin": "Welcome back",
     "successRegister": "Account created",
     "successReset": "Password updated",
+    "invalidCredentials": "Email/username or password is incorrect.",
+    "completeForm": "Please complete the form.",
     "errorLogin": "Unable to login. Please try again.",
     "errorRegister": "Unable to register. Please try again.",
     "errorReset": "Unable to reset password. Please try again.",
