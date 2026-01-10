@@ -602,9 +602,35 @@
       "title": "Jurnal audit",
       "products": "Modificări produse",
       "content": "Modificări conținut",
+      "security": "Securitate",
+      "actor": "Actor:",
+      "subject": "Țintă:",
       "productId": "ID produs:",
       "blockId": "ID bloc:",
-      "at": "La:"
+      "at": "La:",
+      "securityActions": {
+        "owner_transfer": "Transfer proprietar"
+      },
+      "errors": {
+        "loadTitle": "Nu am putut încărca jurnalul de audit",
+        "loadCopy": "Încearcă din nou."
+      }
+    },
+    "ownerTransfer": {
+      "title": "Transfer proprietar",
+      "description": "Transferă rolul de proprietar către un alt utilizator. Această acțiune este disponibilă doar proprietarului și necesită confirmare cu parola.",
+      "identifier": "Identificator țintă (email sau username)",
+      "identifierPlaceholder": "email@example.com sau username",
+      "confirmLabel": "Tastează pentru confirmare",
+      "confirmPlaceholder": "TRANSFER",
+      "confirmHint": "Tastează TRANSFER pentru confirmare.",
+      "action": "Transferă",
+      "successTitle": "Proprietar transferat",
+      "successCopy": "Proprietatea a fost transferată cu succes.",
+      "errors": {
+        "identifier": "Identificatorul țintă este obligatoriu.",
+        "generic": "Nu am putut transfera proprietatea."
+      }
     },
     "maintenance": {
       "title": "Mentenanță & feed-uri",

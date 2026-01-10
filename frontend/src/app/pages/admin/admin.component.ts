@@ -32,6 +32,7 @@ import { ToastService } from '../../core/toast.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { firstValueFrom } from 'rxjs';
 import { MarkdownService } from '../../core/markdown.service';
+import { AuthService } from '../../core/auth.service';
 import { diffLines } from 'diff';
 import { formatIdentity } from '../../shared/user-identity';
 
@@ -72,6 +73,49 @@ import { formatIdentity } from '../../shared/user-identity';
               <app-card title="Open orders" [subtitle]="openOrdersCount() + ' pending'"></app-card>
               <app-card title="Recent orders" [subtitle]="recentOrdersCount() + ' in last view'"></app-card>
               <app-card title="Low stock items" [subtitle]="(lowStock?.length || 0) + ' tracked'"></app-card>
+            </div>
+          </section>
+
+          <section
+            *ngIf="isOwner()"
+            class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+          >
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ownerTransfer.title' | translate }}</h2>
+            </div>
+            <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.ownerTransfer.description' | translate }}</p>
+
+            <div class="grid gap-3 md:grid-cols-3 items-end text-sm">
+              <app-input
+                [label]="'adminUi.ownerTransfer.identifier' | translate"
+                [(value)]="ownerTransferIdentifier"
+                [placeholder]="'adminUi.ownerTransfer.identifierPlaceholder' | translate"
+              ></app-input>
+              <app-input
+                [label]="'adminUi.ownerTransfer.confirmLabel' | translate"
+                [(value)]="ownerTransferConfirm"
+                [placeholder]="'adminUi.ownerTransfer.confirmPlaceholder' | translate"
+                [hint]="'adminUi.ownerTransfer.confirmHint' | translate"
+              ></app-input>
+              <app-input
+                [label]="'auth.currentPassword' | translate"
+                type="password"
+                autocomplete="current-password"
+                [(value)]="ownerTransferPassword"
+              ></app-input>
+            </div>
+
+            <div *ngIf="ownerTransferError" class="text-sm text-rose-700 dark:text-rose-300">
+              {{ ownerTransferError }}
+            </div>
+
+            <div class="flex justify-end">
+              <app-button
+                size="sm"
+                [disabled]="ownerTransferLoading"
+                [label]="'adminUi.ownerTransfer.action' | translate"
+                (action)="submitOwnerTransfer()"
+              ></app-button>
             </div>
           </section>
 
@@ -1360,7 +1404,7 @@ import { formatIdentity } from '../../shared/user-identity';
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.audit.title' | translate }}</h2>
               <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadAudit()"></app-button>
             </div>
-            <div class="grid md:grid-cols-2 gap-4 text-sm text-slate-700 dark:text-slate-200">
+            <div class="grid md:grid-cols-3 gap-4 text-sm text-slate-700 dark:text-slate-200">
               <div class="grid gap-2">
                 <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.audit.products' | translate }}</p>
                 <div *ngFor="let log of productAudit" class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
@@ -1374,6 +1418,19 @@ import { formatIdentity } from '../../shared/user-identity';
                 <div *ngFor="let log of contentAudit" class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
                   <p class="font-semibold text-slate-900 dark:text-slate-50">{{ log.action }}</p>
                   <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.audit.blockId' | translate }} {{ log.block_id }}</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.audit.at' | translate }} {{ log.created_at | date: 'short' }}</p>
+                </div>
+              </div>
+              <div class="grid gap-2">
+                <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.audit.security' | translate }}</p>
+                <div *ngFor="let log of securityAudit" class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                  <p class="font-semibold text-slate-900 dark:text-slate-50">{{ ('adminUi.audit.securityActions.' + log.action) | translate }}</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.audit.actor' | translate }} {{ log.actor_email || log.actor_user_id }}
+                  </p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.audit.subject' | translate }} {{ log.subject_email || log.data?.identifier || log.subject_user_id }}
+                  </p>
                   <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.audit.at' | translate }} {{ log.created_at | date: 'short' }}</p>
                 </div>
               </div>
@@ -1604,12 +1661,20 @@ export class AdminComponent implements OnInit {
 
   productAudit: AdminAudit['products'] = [];
   contentAudit: AdminAudit['content'] = [];
+  securityAudit: NonNullable<AdminAudit['security']> = [];
   lowStock: LowStockItem[] = [];
+
+  ownerTransferIdentifier = '';
+  ownerTransferConfirm = '';
+  ownerTransferPassword = '';
+  ownerTransferLoading = false;
+  ownerTransferError: string | null = null;
 
   constructor(
     private admin: AdminService,
     private blog: BlogService,
     private fxAdmin: FxAdminService,
+    private auth: AuthService,
     private toast: ToastService,
     private translate: TranslateService,
     private markdown: MarkdownService
@@ -1617,6 +1682,10 @@ export class AdminComponent implements OnInit {
 
   private t(key: string, params?: Record<string, unknown>): string {
     return this.translate.instant(key, params);
+  }
+
+  isOwner(): boolean {
+    return this.auth.role() === 'owner';
   }
 
   ngOnInit(): void {
@@ -1642,6 +1711,7 @@ export class AdminComponent implements OnInit {
       next: (logs) => {
         this.productAudit = logs.products;
         this.contentAudit = logs.content;
+        this.securityAudit = logs.security ?? [];
       }
     });
     this.admin.getCategories().subscribe({
@@ -1667,6 +1737,50 @@ export class AdminComponent implements OnInit {
       }
     });
     this.loading.set(false);
+  }
+
+  loadAudit(): void {
+    this.admin.audit().subscribe({
+      next: (logs) => {
+        this.productAudit = logs.products;
+        this.contentAudit = logs.content;
+        this.securityAudit = logs.security ?? [];
+      },
+      error: () => {
+        this.toast.error(this.t('adminUi.audit.errors.loadTitle'), this.t('adminUi.audit.errors.loadCopy'));
+      }
+    });
+  }
+
+  submitOwnerTransfer(): void {
+    if (!this.isOwner()) return;
+    this.ownerTransferError = null;
+    const identifier = this.ownerTransferIdentifier.trim();
+    const confirm = this.ownerTransferConfirm.trim();
+    const password = this.ownerTransferPassword;
+    if (!identifier) {
+      this.ownerTransferError = this.t('adminUi.ownerTransfer.errors.identifier');
+      return;
+    }
+    this.ownerTransferLoading = true;
+    this.admin.transferOwner({ identifier, confirm, password }).subscribe({
+      next: () => {
+        this.toast.success(this.t('adminUi.ownerTransfer.successTitle'), this.t('adminUi.ownerTransfer.successCopy'));
+        this.ownerTransferPassword = '';
+        this.ownerTransferConfirm = '';
+        this.ownerTransferIdentifier = '';
+        this.auth.loadCurrentUser().subscribe();
+        this.loadAudit();
+      },
+      error: (err) => {
+        const detail = err?.error?.detail;
+        this.ownerTransferError = typeof detail === 'string' && detail ? detail : this.t('adminUi.ownerTransfer.errors.generic');
+        this.ownerTransferLoading = false;
+      },
+      complete: () => {
+        this.ownerTransferLoading = false;
+      }
+    });
   }
 
   loadFxStatus(): void {

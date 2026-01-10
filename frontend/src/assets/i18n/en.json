@@ -602,9 +602,35 @@
       "title": "Audit log",
       "products": "Product changes",
       "content": "Content changes",
+      "security": "Security",
+      "actor": "Actor:",
+      "subject": "Subject:",
       "productId": "Product ID:",
       "blockId": "Block ID:",
-      "at": "At:"
+      "at": "At:",
+      "securityActions": {
+        "owner_transfer": "Ownership transfer"
+      },
+      "errors": {
+        "loadTitle": "Could not load audit log",
+        "loadCopy": "Please try again."
+      }
+    },
+    "ownerTransfer": {
+      "title": "Transfer ownership",
+      "description": "Transfer the owner role to another user. This action is owner-only and requires password confirmation.",
+      "identifier": "Target identifier (email or username)",
+      "identifierPlaceholder": "email@example.com or username",
+      "confirmLabel": "Type to confirm",
+      "confirmPlaceholder": "TRANSFER",
+      "confirmHint": "Type TRANSFER to confirm.",
+      "action": "Transfer",
+      "successTitle": "Ownership transferred",
+      "successCopy": "Ownership was transferred successfully.",
+      "errors": {
+        "identifier": "Target identifier is required.",
+        "generic": "Could not transfer ownership."
+      }
     },
     "maintenance": {
       "title": "Maintenance & feeds",

@@ -3,8 +3,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
+from sqlalchemy.orm import aliased
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import security
 from app.core.config import settings
 from app.core.dependencies import require_admin, require_owner
 from app.db.session import get_session
@@ -12,7 +14,7 @@ from app.models.catalog import Product, ProductAuditLog, Category
 from app.models.content import ContentBlock, ContentAuditLog
 from app.services import exporter as exporter_service
 from app.models.order import Order
-from app.models.user import User, RefreshSession, UserRole
+from app.models.user import AdminAuditLog, User, RefreshSession, UserRole
 from app.models.promo import PromoCode
 from app.services import auth as auth_service
 
@@ -265,8 +267,18 @@ async def admin_audit(session: AsyncSession = Depends(get_session), _: str = Dep
         .limit(20)
     )
     content_audit_stmt = select(ContentAuditLog).order_by(ContentAuditLog.created_at.desc()).limit(20)
+    actor = aliased(User)
+    subject = aliased(User)
+    security_audit_stmt = (
+        select(AdminAuditLog, actor.email, subject.email)
+        .join(actor, AdminAuditLog.actor_user_id == actor.id, isouter=True)
+        .join(subject, AdminAuditLog.subject_user_id == subject.id, isouter=True)
+        .order_by(AdminAuditLog.created_at.desc())
+        .limit(20)
+    )
     prod_logs = (await session.execute(product_audit_stmt)).scalars().all()
     content_logs = (await session.execute(content_audit_stmt)).scalars().all()
+    security_rows = (await session.execute(security_audit_stmt)).all()
     return {
         "products": [
             {
@@ -288,6 +300,19 @@ async def admin_audit(session: AsyncSession = Depends(get_session), _: str = Dep
                 "created_at": log.created_at,
             }
             for log in content_logs
+        ],
+        "security": [
+            {
+                "id": str(log.id),
+                "action": log.action,
+                "actor_user_id": str(log.actor_user_id) if log.actor_user_id else None,
+                "actor_email": actor_email,
+                "subject_user_id": str(log.subject_user_id) if log.subject_user_id else None,
+                "subject_email": subject_email,
+                "data": log.data,
+                "created_at": log.created_at,
+            }
+            for log, actor_email, subject_email in security_rows
         ],
     }
 
@@ -352,6 +377,16 @@ async def transfer_owner(
     if not identifier:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Identifier is required")
 
+    confirm = str(payload.get("confirm") or "").strip()
+    if confirm.upper() != "TRANSFER":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Type "TRANSFER" to confirm')
+
+    password = str(payload.get("password") or "")
+    if not password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password is required")
+    if not security.verify_password(password, current_owner.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+
     if "@" in identifier:
         target = await auth_service.get_user_by_email(session, identifier)
     else:
@@ -368,6 +403,14 @@ async def transfer_owner(
 
     target.role = UserRole.owner
     session.add(target)
+    session.add(
+        AdminAuditLog(
+            action="owner_transfer",
+            actor_user_id=current_owner.id,
+            subject_user_id=target.id,
+            data={"identifier": identifier, "old_owner_id": str(current_owner.id), "new_owner_id": str(target.id)},
+        )
+    )
     await session.commit()
     await session.refresh(target)
 
