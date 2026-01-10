@@ -17,7 +17,7 @@ export const adminGuard: CanActivateFn = () => {
   const router = inject(Router);
   const toast = inject(ToastService);
   const auth = inject(AuthService);
-  if (auth.isAuthenticated() && auth.role() === 'admin') return true;
+  if (auth.isAuthenticated() && auth.isAdmin()) return true;
   toast.error('Admin access required.');
   void router.navigateByUrl('/');
   return false;

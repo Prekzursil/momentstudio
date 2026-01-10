@@ -79,6 +79,11 @@ export class AuthService {
     return this.userSignal()?.role ?? null;
   }
 
+  isAdmin(): boolean {
+    const role = this.role();
+    return role === 'admin' || role === 'owner';
+  }
+
   getAccessToken(): string | null {
     return this.tokens?.access_token ?? null;
   }

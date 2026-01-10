@@ -42,6 +42,7 @@ from app.schemas.catalog import (
 )
 from app.services.storage import delete_file
 from app.services import email as email_service
+from app.services import auth as auth_service
 from app.core.config import settings
 
 
@@ -272,7 +273,7 @@ async def update_product(
         await session.commit()
         await session.refresh(product)
         await _log_product_action(session, product.id, "update", user_id, data)
-        await _maybe_alert_low_stock(product)
+        await _maybe_alert_low_stock(session, product)
     else:
         await session.flush()
     return product
@@ -896,6 +897,14 @@ async def notify_back_in_stock(emails: list[str], product_name: str) -> int:
     return sent
 
 
-async def _maybe_alert_low_stock(product: Product, threshold: int = 2) -> None:
-    if product.stock_quantity is not None and product.stock_quantity <= threshold and settings.admin_alert_email:
-        await email_service.send_low_stock_alert(settings.admin_alert_email, product.name, product.stock_quantity)
+async def _maybe_alert_low_stock(session: AsyncSession, product: Product, threshold: int = 2) -> None:
+    if product.stock_quantity is None or product.stock_quantity > threshold:
+        return
+
+    to_email = await auth_service.get_owner_email(session)
+    if not to_email:
+        to_email = settings.admin_alert_email
+    if not to_email:
+        return
+
+    await email_service.send_low_stock_alert(to_email, product.name, product.stock_quantity)

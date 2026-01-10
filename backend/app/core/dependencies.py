@@ -108,8 +108,14 @@ async def get_google_completion_user(
 
 
 async def require_admin(user: User = Depends(get_current_user)) -> User:
-    if user.role != UserRole.admin:
+    if user.role not in (UserRole.admin, UserRole.owner):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+    return user
+
+
+async def require_owner(user: User = Depends(get_current_user)) -> User:
+    if user.role != UserRole.owner:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner access required")
     return user
 
 

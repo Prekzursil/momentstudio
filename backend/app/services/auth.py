@@ -17,6 +17,7 @@ from app.models.user import (
     PasswordResetToken,
     RefreshSession,
     User,
+    UserRole,
     UserUsernameHistory,
     UserDisplayNameHistory,
     UserEmailHistory,
@@ -39,6 +40,15 @@ async def get_user_by_username(session: AsyncSession, username: str) -> User | N
 async def get_user_by_google_sub(session: AsyncSession, google_sub: str) -> User | None:
     result = await session.execute(select(User).where(User.google_sub == google_sub))
     return result.scalar_one_or_none()
+
+
+async def get_owner_user(session: AsyncSession) -> User | None:
+    return (await session.execute(select(User).where(User.role == UserRole.owner))).scalar_one_or_none()
+
+
+async def get_owner_email(session: AsyncSession) -> str | None:
+    owner = await get_owner_user(session)
+    return owner.email if owner and owner.email else None
 
 
 USERNAME_ALLOWED_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$")

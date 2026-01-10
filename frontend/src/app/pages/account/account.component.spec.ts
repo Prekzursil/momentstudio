@@ -91,10 +91,12 @@ describe('AccountComponent', () => {
       'updateNotificationPreferences',
       'logout',
       'role',
+      'isAdmin',
       'getAliases'
     ]);
     auth.isAuthenticated.and.returnValue(true);
     auth.role.and.returnValue('customer');
+    auth.isAdmin.and.returnValue(false);
     auth.updateNotificationPreferences.and.returnValue(of({ ...profile, notify_marketing: true } as any));
     auth.logout.and.returnValue(of(void 0));
     auth.getAliases.and.returnValue(of({ usernames: [], display_names: [] } as any));

@@ -400,7 +400,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     if (comment.is_deleted) return false;
     const current = this.auth.user();
     if (!current) return false;
-    return current.role === 'admin' || current.id === comment.author.id;
+    return current.role === 'admin' || current.role === 'owner' || current.id === comment.author.id;
   }
 
   canReply(comment: BlogComment): boolean {

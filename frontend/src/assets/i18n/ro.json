@@ -289,6 +289,10 @@
     "email": "Email",
     "username": "Utilizator",
     "password": "Parolă",
+    "show": "Arată",
+    "hide": "Ascunde",
+    "showPassword": "Arată parola",
+    "hidePassword": "Ascunde parola",
     "emailVerificationNeeded": "Este necesară verificarea emailului pentru a plasa comenzi.",
     "emailVerificationResend": "Retrimite link-ul",
     "emailVerificationTokenPlaceholder": "Introdu codul de verificare",
@@ -506,7 +510,8 @@
       "forceLogout": "Deconectează selectatul",
       "roles": {
         "customer": "Client",
-        "admin": "Administrator"
+        "admin": "Administrator",
+        "owner": "Proprietar"
       },
       "success": {
         "revoke": "Sesiuni revocate",

@@ -84,6 +84,27 @@ async def send_order_confirmation(to_email: str, order, items: Sequence | None =
     return await send_email(to_email, subject, text_body)
 
 
+async def send_new_order_notification(
+    to_email: str, order, customer_email: str | None = None, lang: str | None = None
+) -> bool:
+    lng = _lang_or_default(lang)
+    subject = (
+        f"New order received {order.reference_code or order.id}"
+        if lng == "en"
+        else f"Comandă nouă primită {order.reference_code or order.id}"
+    )
+    lines = [
+        f"A new order was placed: {order.reference_code or order.id}"
+        if lng == "en"
+        else f"O comandă nouă a fost plasată: {order.reference_code or order.id}"
+    ]
+    if customer_email:
+        lines.append(f"Customer: {customer_email}" if lng == "en" else f"Client: {customer_email}")
+    lines.append(f"Total: {order.total_amount} {getattr(order, 'currency', 'RON')}")
+    text_body = "\n".join(lines)
+    return await send_email(to_email, subject, text_body)
+
+
 async def send_password_reset(to_email: str, token: str, lang: str | None = None) -> bool:
     lng = _lang_or_default(lang)
     subject = "Password reset" if lng == "en" else "Resetare parolă"

@@ -12,6 +12,7 @@ from app.db.base import Base
 class UserRole(str, enum.Enum):
     customer = "customer"
     admin = "admin"
+    owner = "owner"
 
 
 class User(Base):

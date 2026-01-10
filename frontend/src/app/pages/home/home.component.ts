@@ -278,7 +278,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   recentlyViewed: Product[] = [];
 
   skeletons = Array.from({ length: 3 });
-  readonly isAdmin = computed(() => this.auth.role() === 'admin');
+  readonly isAdmin = computed(() => this.auth.isAdmin());
   readonly enabledSections = computed(() => this.sections().filter((s) => s.enabled));
 
   private langSub?: Subscription;

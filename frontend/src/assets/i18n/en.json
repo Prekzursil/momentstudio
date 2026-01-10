@@ -289,6 +289,10 @@
     "email": "Email",
     "username": "Username",
     "password": "Password",
+    "show": "Show",
+    "hide": "Hide",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "emailVerificationNeeded": "Email verification needed to place orders.",
     "emailVerificationResend": "Resend link",
     "emailVerificationTokenPlaceholder": "Enter verification token",
@@ -506,7 +510,8 @@
       "forceLogout": "Force logout selected",
       "roles": {
         "customer": "Customer",
-        "admin": "Admin"
+        "admin": "Admin",
+        "owner": "Owner"
       },
       "success": {
         "revoke": "Sessions revoked",

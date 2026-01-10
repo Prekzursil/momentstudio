@@ -3,7 +3,7 @@ import asyncio
 import json
 import re
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 
@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 
 from app.db.session import SessionLocal
 from app.core import security
-from app.models.user import User, UserDisplayNameHistory, UserRole, UserUsernameHistory
+from app.models.user import User, UserDisplayNameHistory, UserEmailHistory, UserRole, UserUsernameHistory
 from app.models.address import Address
 from app.models.catalog import Category, Product, ProductImage, ProductOption, ProductVariant, Tag
 from app.models.order import Order, OrderItem, ShippingMethod
@@ -50,6 +50,94 @@ def _make_unique_username(base: str, used: set[str]) -> str:
             used.add(candidate)
             return candidate
         suffix_num += 1
+
+
+async def _allocate_name_tag(session, *, name: str, exclude_user_id: uuid.UUID | None = None) -> int:
+    stmt = select(User.name_tag).where(User.name == name)
+    if exclude_user_id:
+        stmt = stmt.where(User.id != exclude_user_id)
+    used = {int(x) for x in (await session.execute(stmt)).scalars().all() if x is not None}
+    tag = 0
+    while tag in used:
+        tag += 1
+    return tag
+
+
+async def bootstrap_owner(*, email: str, password: str, username: str, display_name: str) -> None:
+    email_norm = (email or "").strip().lower()
+    username_norm = (username or "").strip()
+    display_name_norm = (display_name or "").strip() or username_norm
+
+    if not email_norm or "@" not in email_norm:
+        raise SystemExit("Invalid email")
+    if not username_norm:
+        raise SystemExit("Username is required")
+    if len(password) < 6:
+        print("WARNING: creating owner with a password shorter than 6 characters; change it immediately.")
+
+    async with SessionLocal() as session:
+        existing_owner = (await session.execute(select(User).where(User.role == UserRole.owner))).scalar_one_or_none()
+
+        existing_email_user = (
+            await session.execute(select(User).where(func.lower(User.email) == email_norm))
+        ).scalar_one_or_none()
+        existing_username_user = (
+            await session.execute(select(User).where(User.username == username_norm))
+        ).scalar_one_or_none()
+
+        # Prevent a unique-owner-role violation during flush/commit.
+        if existing_owner and (not existing_email_user or existing_owner.id != existing_email_user.id):
+            existing_owner.role = UserRole.admin
+            session.add(existing_owner)
+            await session.flush()
+
+        now = datetime.now(timezone.utc)
+
+        if not existing_email_user:
+            if existing_username_user:
+                raise SystemExit(f"Username already taken: {username_norm}")
+
+            name_tag = await _allocate_name_tag(session, name=display_name_norm)
+            user = User(
+                email=email_norm,
+                username=username_norm,
+                hashed_password=security.hash_password(password),
+                name=display_name_norm,
+                name_tag=name_tag,
+                email_verified=True,
+                role=UserRole.owner,
+            )
+            session.add(user)
+            await session.flush()
+            session.add(UserUsernameHistory(user_id=user.id, username=username_norm, created_at=now))
+            session.add(UserDisplayNameHistory(user_id=user.id, name=display_name_norm, name_tag=name_tag, created_at=now))
+            session.add(UserEmailHistory(user_id=user.id, email=email_norm, created_at=now))
+            await session.commit()
+            await session.refresh(user)
+            print(f"Owner created: {user.email} ({user.username}) id={user.id}")
+            return
+
+        user = existing_email_user
+        if existing_username_user and existing_username_user.id != user.id:
+            raise SystemExit(f"Username already taken: {username_norm}")
+
+        if user.username != username_norm:
+            user.username = username_norm
+            session.add(UserUsernameHistory(user_id=user.id, username=username_norm, created_at=now))
+
+        if (user.name or "") != display_name_norm:
+            tag = await _allocate_name_tag(session, name=display_name_norm, exclude_user_id=user.id)
+            user.name = display_name_norm
+            user.name_tag = tag
+            session.add(UserDisplayNameHistory(user_id=user.id, name=display_name_norm, name_tag=tag, created_at=now))
+
+        user.hashed_password = security.hash_password(password)
+        user.email_verified = True
+        user.role = UserRole.owner
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+        print(f"Owner set: {user.email} ({user.username}) id={user.id}")
 
 
 async def export_data(output: Path) -> None:
@@ -380,12 +468,26 @@ def main():
     exp.add_argument("--output", default="export.json", help="Output JSON path")
     imp = sub.add_parser("import-data", help="Import data from JSON")
     imp.add_argument("--input", required=True, help="Input JSON path")
+    owner = sub.add_parser("bootstrap-owner", help="Create or transfer the unique owner account")
+    owner.add_argument("--email", required=True, help="Owner email")
+    owner.add_argument("--password", required=True, help="Owner password")
+    owner.add_argument("--username", required=True, help="Owner username")
+    owner.add_argument("--display-name", required=True, help="Owner display name")
     args = parser.parse_args()
 
     if args.command == "export-data":
         asyncio.run(export_data(Path(args.output)))
     elif args.command == "import-data":
         asyncio.run(import_data(Path(args.input)))
+    elif args.command == "bootstrap-owner":
+        asyncio.run(
+            bootstrap_owner(
+                email=args.email,
+                password=args.password,
+                username=args.username,
+                display_name=args.display_name,
+            )
+        )
     else:
         parser.print_help()
 
