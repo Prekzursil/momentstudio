@@ -84,13 +84,40 @@ import { ThemeSegmentedControlComponent } from '../shared/theme-segmented-contro
             >
               {{ 'nav.signIn' | translate }}
             </a>
-            <a
-              *ngIf="isAuthenticated()"
-              routerLink="/account"
-              class="text-sm font-medium text-slate-700 hover:text-slate-900 hidden sm:inline dark:text-slate-200 dark:hover:text-white"
-            >
-              {{ 'nav.account' | translate }}
-            </a>
+            <div *ngIf="isAuthenticated()" class="relative hidden sm:block">
+              <button
+                type="button"
+                class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200 dark:hover:text-white"
+                (click)="toggleUserMenu()"
+                aria-haspopup="menu"
+                [attr.aria-expanded]="userMenuOpen"
+              >
+                <span class="truncate max-w-[160px]">{{ currentUser()?.username }}</span>
+                <span class="text-slate-500 dark:text-slate-300">▾</span>
+              </button>
+              <div
+                *ngIf="userMenuOpen"
+                class="absolute right-0 mt-2 w-48 rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900 z-50"
+                role="menu"
+              >
+                <a
+                  routerLink="/account"
+                  role="menuitem"
+                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                  (click)="closeUserMenu()"
+                >
+                  {{ 'nav.myProfile' | translate }}
+                </a>
+                <button
+                  type="button"
+                  role="menuitem"
+                  class="w-full text-left rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                  (click)="signOut()"
+                >
+                  {{ 'nav.signOut' | translate }}
+                </button>
+              </div>
+            </div>
             <div class="hidden lg:flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-2 py-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/70">
               <app-theme-segmented-control
                 [preference]="themePreference"
@@ -122,9 +149,17 @@ import { ThemeSegmentedControlComponent } from '../shared/theme-segmented-contro
           <a routerLink="/shop" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.shop' | translate }}</a>
           <a routerLink="/about" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.about' | translate }}</a>
           <a routerLink="/contact" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.contact' | translate }}</a>
+          <a
+            *ngIf="isAdmin()"
+            routerLink="/admin"
+            class="hover:text-slate-900 dark:hover:text-white"
+          >
+            {{ 'nav.viewAdmin' | translate }}
+          </a>
         </nav>
       </div>
     </header>
+    <div *ngIf="userMenuOpen" class="fixed inset-0 z-40" (click)="closeUserMenu()"></div>
     <div *ngIf="searchOpen" class="fixed inset-0 z-50" (click)="closeSearch()">
       <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm dark:bg-black/60"></div>
       <div
@@ -172,10 +207,12 @@ export class HeaderComponent {
   @Output() languageChange = new EventEmitter<string>();
   drawerOpen = false;
   searchOpen = false;
+  userMenuOpen = false;
   searchQuery = '';
 
   readonly isAuthenticated = computed(() => Boolean(this.auth.user()));
   readonly currentUser = computed(() => this.auth.user());
+  readonly isAdmin = computed(() => this.auth.isAdmin());
 
   readonly navLinks = computed<NavLink[]>(() => {
     const authenticated = this.isAuthenticated();
@@ -214,6 +251,7 @@ export class HeaderComponent {
     this.drawerOpen = !this.drawerOpen;
     if (this.drawerOpen) {
       this.searchOpen = false;
+      this.userMenuOpen = false;
     }
   }
 
@@ -224,10 +262,23 @@ export class HeaderComponent {
   openSearch(): void {
     this.searchOpen = true;
     this.drawerOpen = false;
+    this.userMenuOpen = false;
   }
 
   closeSearch(): void {
     this.searchOpen = false;
+  }
+
+  toggleUserMenu(): void {
+    this.userMenuOpen = !this.userMenuOpen;
+    if (this.userMenuOpen) {
+      this.searchOpen = false;
+      this.drawerOpen = false;
+    }
+  }
+
+  closeUserMenu(): void {
+    this.userMenuOpen = false;
   }
 
   submitSearch(event: Event): void {
@@ -239,6 +290,7 @@ export class HeaderComponent {
   signOut(): void {
     this.drawerOpen = false;
     this.searchOpen = false;
+    this.userMenuOpen = false;
     this.auth.logout().subscribe();
   }
 }

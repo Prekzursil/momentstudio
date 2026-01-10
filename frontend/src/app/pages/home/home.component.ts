@@ -72,12 +72,6 @@ const DEFAULT_SECTIONS: HomeSectionConfig[] = [
                 </p>
                 <div class="flex flex-wrap gap-3">
                   <app-button [label]="heroCtaLabel() || ('home.ctaShop' | translate)" [routerLink]="[heroCtaUrl() || '/shop']"></app-button>
-                  <app-button
-                    *ngIf="isAdmin()"
-                    [label]="'home.ctaAdmin' | translate"
-                    variant="ghost"
-                    [routerLink]="['/admin']"
-                  ></app-button>
                 </div>
               </div>
               <div class="relative">
