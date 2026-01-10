@@ -27,8 +27,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin: prevent modifying owner via role endpoint; add owner transfer API endpoint.
 - [x] Notifications: route new order + low-stock alerts to owner email (fallback to ADMIN_ALERT_EMAIL).
 - [x] Ops: add `python -m app.cli bootstrap-owner` to create/transfer the owner account (sets username/display name, verifies email).
-- [ ] Admin UX: add an owner-only “Transfer ownership” control in the admin dashboard (type-to-confirm + current password + audit log entry).
-- [ ] Notifications: route support/dispute/refund/contact notifications to the owner email and document the policy.
+- [x] Admin UX: add an owner-only “Transfer ownership” control in the admin dashboard (type-to-confirm + current password + audit log entry).
+- [x] Notifications: route support/dispute/refund/contact notifications to the owner email and document the policy.
 - [x] Tests for auth flows (register/login/refresh/invalid creds).
 - [x] HTTP-only refresh token cookie issued on login/refresh and cleared on logout.
 - [x] Auth: extend user profile fields for registration (first/middle/last name, date of birth, phone) + migration.
