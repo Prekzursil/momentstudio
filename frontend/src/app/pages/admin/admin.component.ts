@@ -59,22 +59,46 @@ import { formatIdentity } from '../../shared/user-identity';
         {{ error() }}
       </div>
       <div class="grid gap-6" *ngIf="!loading(); else loadingTpl">
-          <section class="grid gap-3">
-            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboardTitle' | translate }}</h1>
-            <div class="grid md:grid-cols-3 gap-4">
-              <app-card [title]="'adminUi.cards.products' | translate" [subtitle]="summary()?.products + ' total'"></app-card>
-              <app-card [title]="'adminUi.cards.orders' | translate" [subtitle]="summary()?.orders + ' total'"></app-card>
-              <app-card [title]="'adminUi.cards.users' | translate" [subtitle]="summary()?.users + ' total'"></app-card>
-            </div>
-            <div class="grid md:grid-cols-3 gap-4">
-              <app-card [title]="'adminUi.cards.lowStock' | translate" [subtitle]="summary()?.low_stock + ' items'"></app-card>
-              <app-card [title]="'adminUi.cards.sales30' | translate" [subtitle]="(summary()?.sales_30d || 0) | localizedCurrency : 'RON'"></app-card>
-              <app-card [title]="'adminUi.cards.orders30' | translate" [subtitle]="summary()?.orders_30d + ' orders'"></app-card>
-              <app-card title="Open orders" [subtitle]="openOrdersCount() + ' pending'"></app-card>
-              <app-card title="Recent orders" [subtitle]="recentOrdersCount() + ' in last view'"></app-card>
-              <app-card title="Low stock items" [subtitle]="(lowStock?.length || 0) + ' tracked'"></app-card>
-            </div>
-          </section>
+	          <section class="grid gap-3">
+	            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboardTitle' | translate }}</h1>
+	            <div class="grid md:grid-cols-3 gap-4">
+	              <app-card
+                  [title]="'adminUi.cards.products' | translate"
+                  [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.products || 0 }"
+                ></app-card>
+	              <app-card
+                  [title]="'adminUi.cards.orders' | translate"
+                  [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.orders || 0 }"
+                ></app-card>
+	              <app-card
+                  [title]="'adminUi.cards.users' | translate"
+                  [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.users || 0 }"
+                ></app-card>
+	            </div>
+	            <div class="grid md:grid-cols-3 gap-4">
+	              <app-card
+                  [title]="'adminUi.cards.lowStock' | translate"
+                  [subtitle]="'adminUi.cards.countItems' | translate: { count: summary()?.low_stock || 0 }"
+                ></app-card>
+	              <app-card [title]="'adminUi.cards.sales30' | translate" [subtitle]="(summary()?.sales_30d || 0) | localizedCurrency : 'RON'"></app-card>
+	              <app-card
+                  [title]="'adminUi.cards.orders30' | translate"
+                  [subtitle]="'adminUi.cards.countOrders' | translate: { count: summary()?.orders_30d || 0 }"
+                ></app-card>
+	              <app-card
+                  [title]="'adminUi.cards.openOrders' | translate"
+                  [subtitle]="'adminUi.cards.openOrdersSubtitle' | translate: { count: openOrdersCount() }"
+                ></app-card>
+	              <app-card
+                  [title]="'adminUi.cards.recentOrders' | translate"
+                  [subtitle]="'adminUi.cards.recentOrdersSubtitle' | translate: { count: recentOrdersCount() }"
+                ></app-card>
+	              <app-card
+                  [title]="'adminUi.cards.lowStockTracked' | translate"
+                  [subtitle]="'adminUi.cards.lowStockTrackedSubtitle' | translate: { count: lowStock?.length || 0 }"
+                ></app-card>
+	            </div>
+	          </section>
 
           <section
             *ngIf="isOwner()"

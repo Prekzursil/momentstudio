@@ -394,7 +394,16 @@
       "users": "Utilizatori",
       "lowStock": "Stoc redus",
       "sales30": "Vânzări (30z)",
-      "orders30": "Comenzi (30z)"
+      "orders30": "Comenzi (30z)",
+      "openOrders": "Comenzi deschise",
+      "recentOrders": "Comenzi recente",
+      "lowStockTracked": "Stoc redus urmărit",
+      "countTotal": "{{count}} total",
+      "countItems": "{{count}} produse",
+      "countOrders": "{{count}} comenzi",
+      "openOrdersSubtitle": "{{count}} în așteptare",
+      "recentOrdersSubtitle": "{{count}} în vizualizare",
+      "lowStockTrackedSubtitle": "{{count}} urmărite"
     },
     "actions": {
       "reset": "Resetează",
@@ -518,6 +527,22 @@
       "trackingNumber": "Număr tracking",
       "save": "Salvează modificările",
       "saveHint": "Actualizează statusul și tracking-ul; emailul se trimite la expediere.",
+      "actionsTitle": "Acțiuni",
+      "paymentTitle": "Plată",
+      "customerCommsTitle": "Client",
+      "paymentIntent": "Intent plată",
+      "refundNote": "Notă rambursare (opțional)",
+      "refundNotePlaceholder": "Adaugă o notă pentru audit/email (opțional)",
+      "refundHint": "Rambursarea este manuală; se înregistrează un eveniment și se notifică inbox-ul proprietarului.",
+      "confirmRefund": "Soliciți rambursarea acestei comenzi?",
+      "actions": {
+        "retryPayment": "Reîncearcă plata",
+        "capturePayment": "Capturează plata",
+        "voidPayment": "Anulează plata",
+        "deliveryEmail": "Trimite email de livrare",
+        "packingSlip": "Descarcă packing slip",
+        "refund": "Solicită rambursare"
+      },
       "itemsTitle": "Produse",
       "addressesTitle": "Adrese",
       "shippingAddress": "Adresă livrare",
@@ -549,12 +574,23 @@
       "cancelled": "Anulată",
       "refunded": "Rambursată",
       "success": {
-        "status": "Statusul comenzii a fost actualizat"
+        "status": "Comanda a fost actualizată",
+        "retry": "Reîncercarea plății a fost pornită",
+        "capture": "Plata a fost capturată",
+        "void": "Plata a fost anulată",
+        "refund": "Rambursarea a fost solicitată",
+        "deliveryEmail": "Emailul de livrare a fost trimis"
       },
       "errors": {
         "load": "Nu am putut încărca comenzile.",
         "export": "Nu am putut exporta comenzile.",
-        "status": "Nu am putut actualiza statusul comenzii"
+        "status": "Nu am putut actualiza comanda",
+        "retry": "Nu am putut reîncerca plata.",
+        "capture": "Nu am putut captura plata.",
+        "void": "Nu am putut anula plata.",
+        "refund": "Nu am putut solicita rambursarea.",
+        "deliveryEmail": "Nu am putut trimite emailul de livrare.",
+        "packingSlip": "Nu am putut descărca packing slip-ul."
       }
     },
     "users": {

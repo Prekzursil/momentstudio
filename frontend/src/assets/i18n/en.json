@@ -394,7 +394,16 @@
       "users": "Users",
       "lowStock": "Low stock",
       "sales30": "Sales (30d)",
-      "orders30": "Orders (30d)"
+      "orders30": "Orders (30d)",
+      "openOrders": "Open orders",
+      "recentOrders": "Recent orders",
+      "lowStockTracked": "Low stock tracked",
+      "countTotal": "{{count}} total",
+      "countItems": "{{count}} items",
+      "countOrders": "{{count}} orders",
+      "openOrdersSubtitle": "{{count}} pending",
+      "recentOrdersSubtitle": "{{count}} in view",
+      "lowStockTrackedSubtitle": "{{count}} tracked"
     },
     "actions": {
       "reset": "Reset",
@@ -518,6 +527,22 @@
       "trackingNumber": "Tracking number",
       "save": "Save changes",
       "saveHint": "Updates status and tracking; emails send on shipped.",
+      "actionsTitle": "Actions",
+      "paymentTitle": "Payment",
+      "customerCommsTitle": "Customer",
+      "paymentIntent": "Payment intent",
+      "refundNote": "Refund note (optional)",
+      "refundNotePlaceholder": "Add a note for audit/email (optional)",
+      "refundHint": "Refund is manual; this records an event and notifies the owner inbox.",
+      "confirmRefund": "Request a refund for this order?",
+      "actions": {
+        "retryPayment": "Retry payment",
+        "capturePayment": "Capture payment",
+        "voidPayment": "Void payment",
+        "deliveryEmail": "Send delivery email",
+        "packingSlip": "Download packing slip",
+        "refund": "Request refund"
+      },
       "itemsTitle": "Items",
       "addressesTitle": "Addresses",
       "shippingAddress": "Shipping address",
@@ -549,12 +574,23 @@
       "cancelled": "Cancelled",
       "refunded": "Refunded",
       "success": {
-        "status": "Order status updated"
+        "status": "Order updated",
+        "retry": "Payment retry started",
+        "capture": "Payment captured",
+        "void": "Payment voided",
+        "refund": "Refund requested",
+        "deliveryEmail": "Delivery email sent"
       },
       "errors": {
         "load": "Could not load orders.",
         "export": "Could not export orders.",
-        "status": "Failed to update order status"
+        "status": "Failed to update order",
+        "retry": "Could not retry payment.",
+        "capture": "Could not capture payment.",
+        "void": "Could not void payment.",
+        "refund": "Could not request refund.",
+        "deliveryEmail": "Could not send delivery email.",
+        "packingSlip": "Could not download packing slip."
       }
     },
     "users": {

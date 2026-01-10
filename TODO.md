@@ -14,6 +14,7 @@ Below is a structured checklist you can turn into issues.
 - [x] ARCHITECTURE.md with high-level design and data flow.
 - [x] DX: run `alembic upgrade head` in `start.sh` before starting the backend to avoid schema drift.
 - [x] CI: add deployment/release job (e.g., container build + push) once runtime code lands.
+- [ ] E2E: add real browser tests (Playwright) for checkout + admin flows and wire them into CI (Docker-backed).
 
 ## Backend - Core & Auth
 - [x] Scaffold FastAPI app with versioned `/api/v1` router.
@@ -29,6 +30,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Ops: add `python -m app.cli bootstrap-owner` to create/transfer the owner account (sets username/display name, verifies email).
 - [x] Admin UX: add an owner-only “Transfer ownership” control in the admin dashboard (type-to-confirm + current password + audit log entry).
 - [x] Notifications: route support/dispute/refund/contact notifications to the owner email and document the policy.
+- [x] Notifications: add in-app notifications (list/unread-count/mark read/dismiss) and show them in the header (auto-hide read after 3 days).
 - [x] Tests for auth flows (register/login/refresh/invalid creds).
 - [x] HTTP-only refresh token cookie issued on login/refresh and cleared on logout.
 - [x] Auth: extend user profile fields for registration (first/middle/last name, date of birth, phone) + migration.
@@ -192,6 +194,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Header: avoid search/nav overlap on medium screens (use nav drawer + show search on wide screens).
 - [x] Header: keep product search accessible on windowed/small screens (show search at `lg`, provide a search overlay below `lg`).
 - [x] UI: hide admin CTA/nav items unless the signed-in user is an admin.
+- [x] Header: move “View admin” into the nav bar (after Contact) and hide it unless the user is admin/owner.
+- [x] Header: replace “Account” label with a username dropdown (My profile + Sign out).
+- [x] Header: add notifications bell dropdown (unread badge, mark read/dismiss; read auto-hides after 3 days).
 - [x] Branding: rebrand AdrianaArt → momentstudio across UI/docs/meta and backend app name.
 - [x] Branding: update header branding (flower mark + momentstudio wordmark).
 - [x] Header: add descriptive alt text for the flower brand mark.
@@ -215,7 +220,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Respect system `prefers-color-scheme` by default and keep theme state in localStorage (light/dark/system).
 - [x] Add header theme switcher (light/dark/system) that updates the document root class and tokens in real time.
 - [x] Audit shared components/layout for dark-mode contrast (backgrounds, borders, text, cards, inputs, modals, toasts) and fix any hardcoded light colors.
-- [x] Add unit/e2e checks for theme switching (default follows system; toggle persists across reloads).
+- [x] Add unit checks for theme switching (default follows system; toggle persists across reloads).
 - [x] Form validation utilities (error messages, async validation).
 - [x] Toast/snackbar service and global overlay.
 - [x] Loading spinner/skeleton components.
@@ -312,7 +317,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Edge cases: out-of-stock and price changes during checkout.
 - [x] Checkout totals driven by backend shipping/promo validation (no hardcoded amounts).
 - [x] Checkout: require signed-in + verified email before placing an order (guest checkout disabled for now).
-- [ ] Checkout: decide whether to re-enable guest checkout (with email verification) and update tests accordingly.
+- [ ] Checkout: reintroduce guest checkout with an email verification step and optional “create account” toggle (without weakening the verified-email policy) + update tests.
 - [x] Frontend cart/checkout tests (unit/integration-style) against backend cart/payment intent/order APIs.
 - [x] Ensure frontend CI runs with Angular toolchain/Chrome to cover cart/checkout flows.
 - [x] Wire cart state to backend cart APIs (load/add/update/remove) instead of local-only.
@@ -369,6 +374,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Product list table (sort/search).
 - [x] Product create/edit form (slug, category, price, stock, description, images, variants).
 - [x] Admin orders list with filters + order detail/status update.
+- [x] Admin orders: add actions (retry/capture/void/refund note, delivery email, packing slip download).
 - [x] Content editor for hero and static pages.
 - [x] Basic user list (view customers, promote/demote admins).
 - [x] Admin UX: treat `owner` as admin and prevent editing owner role.
@@ -390,6 +396,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Frontend tests: AdminService/admin component for order status, coupon add/toggle, category reorder drag/drop, maintenance toggle (mock HTTP).
 - [x] Backend tests: admin filters/coupons/audit/image reorder/low-stock with sqlite override.
 - [x] Frontend tests: AdminService + admin component flows (sessions revoke, role update, low-stock, coupons, maintenance get/set, category reorder drag-drop).
+- [ ] Admin i18n: localize remaining hardcoded strings in admin pages (assets/social/SEO/info) and ensure RO/EN parity.
 
 ## UX, Performance, SEO & Accessibility
 - [x] Mobile-first responsive design across pages(full mobile compatibility).

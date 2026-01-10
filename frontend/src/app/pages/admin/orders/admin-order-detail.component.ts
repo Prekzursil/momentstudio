@@ -12,6 +12,7 @@ import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { AdminOrderDetail, AdminOrdersService } from '../../../core/admin-orders.service';
 
 type OrderStatus = 'pending' | 'paid' | 'shipped' | 'cancelled' | 'refunded';
+type OrderAction = 'save' | 'retry' | 'capture' | 'void' | 'refund' | 'deliveryEmail' | 'packingSlip';
 
 @Component({
   selector: 'app-admin-order-detail',
@@ -95,17 +96,98 @@ type OrderStatus = 'pending' | 'paid' | 'shipped' | 'cancelled' | 'refunded';
               <app-input [label]="'adminUi.orders.trackingNumber' | translate" [(value)]="trackingNumber"></app-input>
             </div>
 
-	            <div class="flex items-center gap-2">
-	              <app-button size="sm" [label]="'adminUi.orders.save' | translate" (action)="save()"></app-button>
-	              <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.saveHint' | translate }}</span>
-	            </div>
-	          </section>
+            <div class="flex items-center gap-2">
+              <app-button
+                size="sm"
+                [label]="'adminUi.orders.save' | translate"
+                [disabled]="action() !== null"
+                (action)="save()"
+              ></app-button>
+              <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.saveHint' | translate }}</span>
+            </div>
 
-	          <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
-	            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.addressesTitle' | translate }}</h2>
-	            <div class="grid gap-3 md:grid-cols-2">
-	              <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-	                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.shippingAddress' | translate }}</div>
+            <div class="grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
+              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.actionsTitle' | translate }}</div>
+
+              <div class="grid gap-3 md:grid-cols-2">
+                <div class="grid gap-2">
+                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.orders.paymentTitle' | translate }}
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.orders.actions.retryPayment' | translate"
+                      [disabled]="action() !== null"
+                      (action)="retryPayment()"
+                    ></app-button>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.orders.actions.capturePayment' | translate"
+                      [disabled]="action() !== null"
+                      (action)="capturePayment()"
+                    ></app-button>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.orders.actions.voidPayment' | translate"
+                      [disabled]="action() !== null"
+                      (action)="voidPayment()"
+                    ></app-button>
+                  </div>
+                  <div *ngIf="order()!.stripe_payment_intent_id" class="text-xs text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.orders.paymentIntent' | translate }}: {{ order()!.stripe_payment_intent_id }}
+                  </div>
+                </div>
+
+                <div class="grid gap-2">
+                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.orders.customerCommsTitle' | translate }}
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.orders.actions.deliveryEmail' | translate"
+                      [disabled]="action() !== null"
+                      (action)="sendDeliveryEmail()"
+                    ></app-button>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.orders.actions.packingSlip' | translate"
+                      [disabled]="action() !== null"
+                      (action)="downloadPackingSlip()"
+                    ></app-button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
+                <app-input
+                  [label]="'adminUi.orders.refundNote' | translate"
+                  [placeholder]="'adminUi.orders.refundNotePlaceholder' | translate"
+                  [(value)]="refundNote"
+                ></app-input>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.orders.actions.refund' | translate"
+                  [disabled]="action() !== null"
+                  (action)="requestRefund()"
+                ></app-button>
+              </div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.refundHint' | translate }}</div>
+            </div>
+          </section>
+
+          <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.addressesTitle' | translate }}</h2>
+            <div class="grid gap-3 md:grid-cols-2">
+              <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.shippingAddress' | translate }}</div>
 	                <div *ngIf="order()!.shipping_address; else noShipping" class="mt-2 grid gap-1 text-sm text-slate-700 dark:text-slate-200">
 	                  <div class="font-semibold text-slate-900 dark:text-slate-50" *ngIf="order()!.shipping_address?.label">
 	                    {{ order()!.shipping_address?.label }}
@@ -210,9 +292,13 @@ export class AdminOrderDetailComponent implements OnInit {
   loading = signal(true);
   error = signal<string | null>(null);
   order = signal<AdminOrderDetail | null>(null);
+  action = signal<OrderAction | null>(null);
 
   statusValue: OrderStatus = 'pending';
   trackingNumber = '';
+  refundNote = '';
+
+  private orderId: string | null = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -228,6 +314,7 @@ export class AdminOrderDetailComponent implements OnInit {
       this.loading.set(false);
       return;
     }
+    this.orderId = id;
     this.load(id);
   }
 
@@ -259,6 +346,7 @@ export class AdminOrderDetailComponent implements OnInit {
   save(): void {
     const orderId = this.order()?.id;
     if (!orderId) return;
+    this.action.set('save');
     this.api
       .update(orderId, { status: this.statusValue, tracking_number: this.trackingNumber.trim() || null })
       .subscribe({
@@ -266,10 +354,122 @@ export class AdminOrderDetailComponent implements OnInit {
           this.order.set(o);
           this.statusValue = (o.status as OrderStatus) || 'pending';
           this.trackingNumber = o.tracking_number ?? '';
+          this.action.set(null);
           this.toast.success(this.translate.instant('adminUi.orders.success.status'));
         },
-        error: () => this.toast.error(this.translate.instant('adminUi.orders.errors.status'))
+        error: () => {
+          this.action.set(null);
+          this.toast.error(this.translate.instant('adminUi.orders.errors.status'));
+        }
       });
+  }
+
+  retryPayment(): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    this.action.set('retry');
+    this.api.retryPayment(orderId).subscribe({
+      next: () => {
+        this.toast.success(this.translate.instant('adminUi.orders.success.retry'));
+        this.load(orderId);
+        this.action.set(null);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.orders.errors.retry'));
+        this.action.set(null);
+      }
+    });
+  }
+
+  capturePayment(): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    this.action.set('capture');
+    this.api.capturePayment(orderId).subscribe({
+      next: () => {
+        this.toast.success(this.translate.instant('adminUi.orders.success.capture'));
+        this.load(orderId);
+        this.action.set(null);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.orders.errors.capture'));
+        this.action.set(null);
+      }
+    });
+  }
+
+  voidPayment(): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    this.action.set('void');
+    this.api.voidPayment(orderId).subscribe({
+      next: () => {
+        this.toast.success(this.translate.instant('adminUi.orders.success.void'));
+        this.load(orderId);
+        this.action.set(null);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.orders.errors.void'));
+        this.action.set(null);
+      }
+    });
+  }
+
+  requestRefund(): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    if (!confirm(this.translate.instant('adminUi.orders.confirmRefund'))) return;
+    this.action.set('refund');
+    const note = this.refundNote.trim();
+    this.api.requestRefund(orderId, note ? note : null).subscribe({
+      next: () => {
+        this.toast.success(this.translate.instant('adminUi.orders.success.refund'));
+        this.refundNote = '';
+        this.load(orderId);
+        this.action.set(null);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.orders.errors.refund'));
+        this.action.set(null);
+      }
+    });
+  }
+
+  sendDeliveryEmail(): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    this.action.set('deliveryEmail');
+    this.api.sendDeliveryEmail(orderId).subscribe({
+      next: () => {
+        this.toast.success(this.translate.instant('adminUi.orders.success.deliveryEmail'));
+        this.action.set(null);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.orders.errors.deliveryEmail'));
+        this.action.set(null);
+      }
+    });
+  }
+
+  downloadPackingSlip(): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    this.action.set('packingSlip');
+    this.api.downloadPackingSlip(orderId).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `order-${this.orderRef() || orderId}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.action.set(null);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.orders.errors.packingSlip'));
+        this.action.set(null);
+      }
+    });
   }
 
   private load(orderId: string): void {

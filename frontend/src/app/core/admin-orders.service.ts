@@ -67,8 +67,32 @@ export class AdminOrdersService {
     return this.api.patch<AdminOrderDetail>(`/orders/admin/${orderId}`, payload);
   }
 
+  retryPayment(orderId: string): Observable<Order> {
+    return this.api.post<Order>(`/orders/admin/${orderId}/retry-payment`, {});
+  }
+
+  capturePayment(orderId: string): Observable<Order> {
+    return this.api.post<Order>(`/orders/admin/${orderId}/capture-payment`, {});
+  }
+
+  voidPayment(orderId: string): Observable<Order> {
+    return this.api.post<Order>(`/orders/admin/${orderId}/void-payment`, {});
+  }
+
+  requestRefund(orderId: string, note?: string | null): Observable<Order> {
+    const suffix = note ? `?note=${encodeURIComponent(note)}` : '';
+    return this.api.post<Order>(`/orders/admin/${orderId}/refund${suffix}`, {});
+  }
+
+  sendDeliveryEmail(orderId: string): Observable<Order> {
+    return this.api.post<Order>(`/orders/admin/${orderId}/delivery-email`, {});
+  }
+
+  downloadPackingSlip(orderId: string): Observable<Blob> {
+    return this.api.getBlob(`/orders/admin/${orderId}/packing-slip`);
+  }
+
   downloadExport(): Observable<Blob> {
     return this.api.getBlob('/orders/admin/export');
   }
 }
-
