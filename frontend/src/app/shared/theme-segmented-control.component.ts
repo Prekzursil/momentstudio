@@ -25,7 +25,7 @@ type ThemeSegmentedLayout = 'horizontal' | 'stacked';
   template: `
     <div
       role="radiogroup"
-      class="inline-flex items-center rounded-full"
+      class="items-center rounded-full min-w-0 max-w-full overflow-hidden"
       [ngClass]="rootClass()"
       [attr.aria-label]="ariaLabel"
     >
@@ -126,13 +126,14 @@ export class ThemeSegmentedControlComponent {
   ];
 
   rootClass(): string {
+    const display = this.stretch ? 'flex' : 'inline-flex';
     const chrome =
       this.variant === 'standalone'
         ? 'border border-slate-200 bg-white/70 p-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/70'
         : 'p-0';
     const gap = this.size === 'lg' ? 'gap-1' : 'gap-0.5';
     const width = this.stretch ? 'w-full' : '';
-    return [chrome, gap, width].filter(Boolean).join(' ');
+    return [display, chrome, gap, width].filter(Boolean).join(' ');
   }
 
   setPreference(pref: ThemePreference): void {

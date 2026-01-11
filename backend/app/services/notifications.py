@@ -44,10 +44,7 @@ async def list_notifications(session: AsyncSession, *, user_id: UUID, limit: int
         .where(
             UserNotification.user_id == user_id,
             UserNotification.dismissed_at.is_(None),
-            or_(
-                UserNotification.read_at.is_(None),
-                UserNotification.read_at >= cutoff,
-            ),
+            or_(UserNotification.read_at.is_(None), UserNotification.read_at >= cutoff),
         )
         .order_by(UserNotification.created_at.desc())
         .limit(limit)
