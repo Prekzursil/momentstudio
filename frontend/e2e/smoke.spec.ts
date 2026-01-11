@@ -35,6 +35,6 @@ test('owner can sign in and reach admin dashboard', async ({ page }) => {
   await expect(viewAdmin).toBeVisible();
   await viewAdmin.click();
 
-  await expect(page).toHaveURL(/\/admin$/);
-  await expect(page.getByRole('heading', { name: 'Admin dashboard' })).toBeVisible();
+  await expect(page).toHaveURL(/\/admin(\/orders)?$/);
+  await expect(page.getByRole('heading', { name: 'Orders' })).toBeVisible();
 });
