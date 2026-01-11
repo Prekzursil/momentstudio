@@ -14,6 +14,7 @@ Below is a structured checklist you can turn into issues.
 - [x] ARCHITECTURE.md with high-level design and data flow.
 - [x] DX: run `alembic upgrade head` in `start.sh` before starting the backend to avoid schema drift.
 - [x] CI: add deployment/release job (e.g., container build + push) once runtime code lands.
+- [x] E2E: add real browser tests (Playwright) for checkout + admin flows and wire them into CI (Docker-backed).
 
 ## Backend - Core & Auth
 - [x] Scaffold FastAPI app with versioned `/api/v1` router.
@@ -27,8 +28,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin: prevent modifying owner via role endpoint; add owner transfer API endpoint.
 - [x] Notifications: route new order + low-stock alerts to owner email (fallback to ADMIN_ALERT_EMAIL).
 - [x] Ops: add `python -m app.cli bootstrap-owner` to create/transfer the owner account (sets username/display name, verifies email).
-- [ ] Admin UX: add an owner-only “Transfer ownership” control in the admin dashboard (with confirmation + audit log entry).
-- [ ] Notifications: route support/dispute/refund/contact notifications to the owner email and document the policy.
+- [x] Admin UX: add an owner-only “Transfer ownership” control in the admin dashboard (type-to-confirm + current password + audit log entry).
+- [x] Notifications: route support/dispute/refund/contact notifications to the owner email and document the policy.
+- [x] Notifications: add in-app notifications (list/unread-count/mark read/dismiss) and show them in the header (auto-hide read after 3 days).
 - [x] Tests for auth flows (register/login/refresh/invalid creds).
 - [x] HTTP-only refresh token cookie issued on login/refresh and cleared on logout.
 - [x] Auth: extend user profile fields for registration (first/middle/last name, date of birth, phone) + migration.
@@ -192,6 +194,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Header: avoid search/nav overlap on medium screens (use nav drawer + show search on wide screens).
 - [x] Header: keep product search accessible on windowed/small screens (show search at `lg`, provide a search overlay below `lg`).
 - [x] UI: hide admin CTA/nav items unless the signed-in user is an admin.
+- [x] Header: move “View admin” into the nav bar (after Contact) and hide it unless the user is admin/owner.
+- [x] Header: replace “Account” label with a username dropdown (My profile + Sign out).
+- [x] Header: add notifications bell dropdown (unread badge, mark read/dismiss; read auto-hides after 3 days).
 - [x] Branding: rebrand AdrianaArt → momentstudio across UI/docs/meta and backend app name.
 - [x] Branding: update header branding (flower mark + momentstudio wordmark).
 - [x] Header: add descriptive alt text for the flower brand mark.
@@ -215,7 +220,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Respect system `prefers-color-scheme` by default and keep theme state in localStorage (light/dark/system).
 - [x] Add header theme switcher (light/dark/system) that updates the document root class and tokens in real time.
 - [x] Audit shared components/layout for dark-mode contrast (backgrounds, borders, text, cards, inputs, modals, toasts) and fix any hardcoded light colors.
-- [x] Add unit/e2e checks for theme switching (default follows system; toggle persists across reloads).
+- [x] Add unit checks for theme switching (default follows system; toggle persists across reloads).
 - [x] Form validation utilities (error messages, async validation).
 - [x] Toast/snackbar service and global overlay.
 - [x] Loading spinner/skeleton components.
@@ -297,7 +302,7 @@ Below is a structured checklist you can turn into issues.
 ## Frontend - Cart & Checkout
 - [x] Cart page/drawer with quantities and totals.
 - [x] Update quantity/remove items; stock error messaging.
-- [x] Checkout stepper: login/guest, shipping address, payment (Stripe).
+- [x] Checkout steps: shipping address, promo, payment (Stripe).
 - [x] Order summary during checkout.
 - [x] Success page with order summary + continue shopping.
 - [x] Guest cart persistence in localStorage.
@@ -311,24 +316,20 @@ Below is a structured checklist you can turn into issues.
 - [x] Cart mini-icon badge with item count.
 - [x] Edge cases: out-of-stock and price changes during checkout.
 - [x] Checkout totals driven by backend shipping/promo validation (no hardcoded amounts).
-- [x] Checkout: require signed-in + verified email before placing an order (guest checkout disabled for now).
-- [ ] Checkout: decide whether to re-enable guest checkout with email verification (and update tests/e2e accordingly).
-- [x] Send set-password email flow for guest checkouts that create an account.
-- [x] Frontend cart/checkout tests (unit + e2e) against backend cart/payment intent APIs.
+- [x] Checkout: require verified email before placing an order (signed-in or guest).
+- [x] Checkout: reintroduce guest checkout with an email verification step and optional “create account” toggle (without weakening the verified-email policy) + update tests.
+- [x] Frontend cart/checkout tests (unit/integration-style) against backend cart/payment intent/order APIs.
 - [x] Ensure frontend CI runs with Angular toolchain/Chrome to cover cart/checkout flows.
 - [x] Wire cart state to backend cart APIs (load/add/update/remove) instead of local-only.
 - [x] Replace checkout payment placeholder with Stripe Elements + PaymentIntent from backend.
 - [x] Submit checkout to backend to create order, validate stock/pricing, and handle failures.
 - [x] Use backend shipping methods and promo validation instead of hardcoded values.
 - [x] Persist/save checkout address via backend (guest or user) and reuse on account.
-- [x] Add guest checkout API (session-based cart, guest address capture, optional account creation).
-- [x] Tests: guest checkout with promo + shipping validates PaymentIntent amount and queues set-password email.
 - [x] Tests: cart sync returns product metadata (name/slug/image/currency) and totals reflect shipping/promo.
 - [x] Tests: payment intent amount derived from backend totals (seeded cart).
-- [x] Frontend test: Checkout component calls /cart/sync, /payments/intent, /orders/guest-checkout with shipping_method_id/promo/create_account and handles errors/retry.
+- [x] Frontend test: Checkout component calls `/cart/sync`, `/payments/intent`, `/orders/checkout` and handles errors/retry.
 - [x] Frontend test: CartStore add/remove via backend merges quantities and is resilient to errors.
 - [x] Frontend test: ProductComponent “Add to cart” posts to backend and shows toast (mock CartStore).
-- [x] E2E: guest checkout (add cart → sync → apply promo/shipping → mock pay → confirm order) with CHROME_BIN headless and --no-sandbox.
 
 ## Frontend - Auth & Account
 - [x] Login page with validation.
@@ -369,9 +370,11 @@ Below is a structured checklist you can turn into issues.
 
 ## Frontend - Admin Dashboard
 - [x] /admin layout with sidebar + guard.
+- [x] Admin UX: refactor `/admin` to a route-based layout (Option B) with dedicated pages (start with Orders).
 - [x] Product list table (sort/search).
 - [x] Product create/edit form (slug, category, price, stock, description, images, variants).
 - [x] Admin orders list with filters + order detail/status update.
+- [x] Admin orders: add actions (retry/capture/void/refund note, delivery email, packing slip download).
 - [x] Content editor for hero and static pages.
 - [x] Basic user list (view customers, promote/demote admins).
 - [x] Admin UX: treat `owner` as admin and prevent editing owner role.
@@ -384,17 +387,16 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin activity audit view.
 - [x] Admin login session management (force logout).
 - [x] Inventory low-stock dashboard.
-- [x] Sales analytics dashboard (GMV, AOV).
+- [x] Sales analytics: sales last 30d (GMV) on dashboard.
 - [x] Wire admin dashboard widgets to backend (products/orders/users/content/coupons) and remove mock data.
 - [x] Connect admin audit log to backend audit endpoints.
 - [x] Connect admin session force-logout to backend session management.
 - [x] Calculate low-stock and sales analytics from real backend metrics instead of mock data.
 - [x] Backend tests: admin dashboard endpoints (summary, lists, audit, maintenance, category reorder, sitemap/robots/feed, session revoke, user role, image reorder).
 - [x] Frontend tests: AdminService/admin component for order status, coupon add/toggle, category reorder drag/drop, maintenance toggle (mock HTTP).
-- [x] E2E smoke: admin login → dashboard → change order status → toggle maintenance → reorder category → upload/delete product image.
 - [x] Backend tests: admin filters/coupons/audit/image reorder/low-stock with sqlite override.
 - [x] Frontend tests: AdminService + admin component flows (sessions revoke, role update, low-stock, coupons, maintenance get/set, category reorder drag-drop).
-- [x] E2E: admin flow create coupon → apply to order (mock payment) + verify dashboard reflects coupon usage.
+- [x] Admin i18n: localize remaining hardcoded strings in admin pages (assets/social/SEO/info) and ensure RO/EN parity.
 
 ## UX, Performance, SEO & Accessibility
 - [x] Mobile-first responsive design across pages(full mobile compatibility).
@@ -507,29 +509,3 @@ Below is a structured checklist you can turn into issues.
 - [x] Perf: fix account idle-timer event listener cleanup (avoid leaking listeners with `.bind(this)`).
 - [x] Follow-up: set `<meta name="theme-color">` dynamically based on selected theme (mobile address bar).
 - [x] Follow-up: add early theme bootstrap in `frontend/src/index.html` to avoid flash of incorrect theme on load.
-
-## Backlog (New ideas inspired by Event Link)
-
-### High priority
-- [x] Docker: add `frontend/Dockerfile` + `frontend/.dockerignore` and make `infra/docker-compose.yml` work out of the box.
-- [x] Frontend: generate runtime config from env (API_BASE_URL/STRIPE_PUBLISHABLE_KEY/APP_ENV) and remove hardcoded API base URL.
-- [x] Frontend: add Angular dev-server proxy configuration (`proxy.conf.json`) for `/api` and `/media` in local dev.
-- [x] Docs: document Docker-based local dev flow in `infra/README.md` (ports, URLs, CORS expectations, Stripe webhook tunnelling).
-- [x] DX: introduce `pre-commit` config (Black/Ruff + Prettier/ESLint) and reference it in CONTRIBUTING.md.
-- [x] DX: add top-level `Makefile` shortcuts (`make dev`, `make test`, `make lint`, `make docker-up`).
-- [x] CI: add Docker Compose build + smoke test (backend health/readiness + frontend HTTP 200).
-- [x] DX: ignore runtime/generated artifacts (`uploads/`, `backend/uploads/`, `frontend/src/assets/app-config.js`, `*:Zone.Identifier`) to keep the working tree clean.
-- [x] Tests: extend full checkout flow test to verify orders can be fetched via `/orders` and `/orders/{id}` after checkout.
-
-### Medium priority
-- [x] Backend: replace deprecated `imghdr` usage with Pillow-based file type detection and add tests.
-- [x] Payments: add tests for Stripe webhook signature validation (STRIPE_WEBHOOK_SECRET), including invalid signatures.
-- [x] Payments: add webhook idempotency (store processed event IDs) to avoid double-processing.
-- [x] Infra: add docker-compose healthchecks and `depends_on` conditions (db → backend → frontend).
-- [x] Frontend: add Wishlist UI (product list/detail + account) and wire it to the backend wishlist endpoints.
-- [x] Testing: run core API flows against Postgres (Docker) in CI to catch SQL dialect issues.
-
-### Low priority
-- [x] Docs: reconcile `README.md` and `start.sh`/`start.bat` with the actual tooling (pip/npm), env vars, and docker-compose location.
-- [x] Observability: add optional Sentry wiring (backend + frontend) gated by env vars.
-- [x] Performance: add ETag/Cache-Control guidance for catalog endpoints and media assets (CDN-friendly).

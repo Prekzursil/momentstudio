@@ -4,7 +4,7 @@ from typing import Dict
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, func
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core import security
@@ -16,7 +16,7 @@ from app.models.catalog import Category, Product, ProductImage, ProductAuditLog,
 from app.models.content import ContentAuditLog, ContentBlock, ContentStatus
 from app.models.order import Order, OrderStatus
 from app.models.promo import PromoCode
-from app.models.user import RefreshSession, User, UserRole
+from app.models.user import AdminAuditLog, RefreshSession, User, UserRole
 
 
 @pytest.fixture(scope="module")
@@ -155,6 +155,8 @@ async def seed_dashboard_data(session_factory):
             currency="RON",
             tax_amount=0,
             shipping_amount=0,
+            customer_email=user.email,
+            customer_name=user.name or user.email,
         )
         session.add(order)
         await session.commit()
@@ -354,7 +356,7 @@ def test_owner_can_transfer_ownership(test_app: Dict[str, object]) -> None:
     transfer = client.post(
         "/api/v1/admin/dashboard/owner/transfer",
         headers=headers,
-        json={"identifier": "target"},
+        json={"identifier": "target", "confirm": "TRANSFER", "password": "Password123"},
     )
     assert transfer.status_code == 200, transfer.text
 
@@ -367,3 +369,15 @@ def test_owner_can_transfer_ownership(test_app: Dict[str, object]) -> None:
     old_role, new_role = asyncio.run(_roles())
     assert old_role == UserRole.admin
     assert new_role == UserRole.owner
+
+    audit = client.get("/api/v1/admin/dashboard/audit", headers=headers)
+    assert audit.status_code == 200, audit.text
+    assert any(item.get("action") == "owner_transfer" for item in audit.json().get("security", []))
+
+    async def _audit_count() -> int:
+        async with session_factory() as session:
+            return int(
+                await session.scalar(select(func.count()).select_from(AdminAuditLog).where(AdminAuditLog.action == "owner_transfer"))
+            )
+
+    assert asyncio.run(_audit_count()) == 1

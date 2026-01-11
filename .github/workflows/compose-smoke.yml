@@ -13,6 +13,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend deps (for Playwright)
+        run: |
+          cd frontend
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci
+          npx playwright install --with-deps chromium
+
       - name: Build and start stack
         run: |
           docker compose -f infra/docker-compose.yml up -d --build
@@ -41,6 +53,18 @@ jobs:
             sleep 2
           done
           curl -fsS http://localhost:4200 >/dev/null
+
+      - name: Prepare DB (migrations + seeds + owner)
+        run: |
+          set -euo pipefail
+          docker compose -f infra/docker-compose.yml exec -T backend alembic upgrade head
+          docker compose -f infra/docker-compose.yml exec -T backend python -m app.seeds
+          docker compose -f infra/docker-compose.yml exec -T backend python -m app.cli bootstrap-owner --email owner@example.com --password Password123 --username owner --display-name Owner
+
+      - name: Playwright E2E (checkout + admin)
+        run: |
+          cd frontend
+          E2E_BASE_URL=http://localhost:4200 npm run e2e
 
       - name: Logs (on failure)
         if: failure()

@@ -113,6 +113,8 @@ async def seed_data(session_factory):
             currency="RON",
             tax_amount=0,
             shipping_amount=0,
+            customer_email=customer.email,
+            customer_name=customer.name or customer.email,
             shipping_address_id=address.id,
         )
         session.add(order)

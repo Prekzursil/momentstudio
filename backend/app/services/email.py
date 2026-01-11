@@ -159,6 +159,36 @@ async def send_delivery_confirmation(to_email: str, order, lang: str | None = No
     return await send_email(to_email, subject, text_body)
 
 
+async def send_refund_requested_notification(
+    to_email: str,
+    order,
+    *,
+    customer_email: str | None = None,
+    requested_by_email: str | None = None,
+    note: str | None = None,
+    lang: str | None = None,
+) -> bool:
+    lng = _lang_or_default(lang)
+    subject = (
+        f"Refund requested for order {order.reference_code or order.id}"
+        if lng == "en"
+        else f"Solicitare rambursare pentru comanda {order.reference_code or order.id}"
+    )
+    lines = [
+        f"A refund was requested for order: {order.reference_code or order.id}"
+        if lng == "en"
+        else f"A fost solicitată o rambursare pentru comanda: {order.reference_code or order.id}"
+    ]
+    if customer_email:
+        lines.append(f"Customer: {customer_email}" if lng == "en" else f"Client: {customer_email}")
+    if requested_by_email:
+        lines.append(f"Requested by: {requested_by_email}" if lng == "en" else f"Cerut de: {requested_by_email}")
+    if note:
+        lines.append(f"Note: {note}" if lng == "en" else f"Notă: {note}")
+    lines.append(f"Total: {order.total_amount} {getattr(order, 'currency', 'RON')}")
+    return await send_email(to_email, subject, "\n".join(lines))
+
+
 async def send_cart_abandonment(to_email: str) -> bool:
     subject = "Still thinking it over?"
     text_body, html_body = render_template("cart_abandonment.txt.j2", {})
@@ -181,6 +211,41 @@ async def send_error_alert(to_email: str, message: str) -> bool:
     subject = "Critical error alert"
     text_body = message
     return await send_email(to_email, subject, text_body)
+
+
+async def send_stripe_dispute_notification(
+    to_email: str,
+    *,
+    event_type: str,
+    dispute_id: str | None = None,
+    charge_id: str | None = None,
+    amount: int | None = None,
+    currency: str | None = None,
+    reason: str | None = None,
+    dispute_status: str | None = None,
+    lang: str | None = None,
+) -> bool:
+    lng = _lang_or_default(lang)
+    subject = (
+        f"Stripe dispute: {event_type}"
+        if lng == "en"
+        else f"Dispută Stripe: {event_type}"
+    )
+    lines = [
+        ("A Stripe dispute event was received." if lng == "en" else "A fost primit un eveniment de dispută Stripe."),
+        f"Event: {event_type}",
+    ]
+    if dispute_id:
+        lines.append(f"Dispute: {dispute_id}")
+    if charge_id:
+        lines.append(f"Charge: {charge_id}")
+    if amount is not None and currency:
+        lines.append(f"Amount: {amount / 100:.2f} {currency.upper()}")
+    if reason:
+        lines.append(f"Reason: {reason}" if lng == "en" else f"Motiv: {reason}")
+    if dispute_status:
+        lines.append(f"Status: {dispute_status}" if lng == "en" else f"Stare: {dispute_status}")
+    return await send_email(to_email, subject, "\n".join(lines))
 
 
 async def send_blog_comment_admin_notification(

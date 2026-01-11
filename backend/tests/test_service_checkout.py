@@ -28,7 +28,7 @@ def test_checkout_build_order():
                 currency="RON",
                 stock_quantity=10,
             )
-            cart = Cart(user_id=product.id)
+            cart = Cart(user_id=None)
             cart.items = [CartItem(product=product, quantity=1, unit_price_at_add=Decimal("12.00"))]
             session.add(cart)
             await session.commit()
@@ -38,8 +38,16 @@ def test_checkout_build_order():
                 session, ShippingMethodCreate(name="Svc Ship", rate_flat=2.0, rate_per_kg=0)
             )
             order = await order_service.build_order_from_cart(
-                session, user_id=product.id, cart=cart, shipping_address_id=None, billing_address_id=None, shipping_method=method
+                session,
+                None,
+                customer_email="buyer@example.com",
+                customer_name="Buyer",
+                cart=cart,
+                shipping_address_id=None,
+                billing_address_id=None,
+                shipping_method=method,
             )
-            assert order.total_amount == order.tax_amount + order.shipping_amount + Decimal("12.00")
+            expected_total = Decimal("12.00") + Decimal(str(order.tax_amount)) + Decimal(str(order.shipping_amount))
+            assert Decimal(str(order.total_amount)) == expected_total
 
     asyncio.run(run_flow())

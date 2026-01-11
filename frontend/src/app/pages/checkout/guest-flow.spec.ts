@@ -5,7 +5,7 @@ import { of } from 'rxjs';
 import { CartStore } from '../../core/cart.store';
 import { CartApi } from '../../core/cart.api';
 import { ApiService } from '../../core/api.service';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { AuthService } from '../../core/auth.service';
 import { RouterTestingModule } from '@angular/router/testing';
@@ -68,5 +68,38 @@ describe('Checkout auth gating', () => {
     expect(routes).toContain('/login');
     expect(routes).toContain('/register');
     expect(apiService.post).not.toHaveBeenCalled();
+  }));
+
+  it('submits guest checkout via /orders/guest-checkout when verified', fakeAsync(() => {
+    spyOn(CheckoutComponent.prototype, 'ngAfterViewInit').and.returnValue(Promise.resolve());
+    const router = TestBed.inject(Router);
+    spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
+    const fixture = TestBed.createComponent(CheckoutComponent);
+    const cmp = fixture.componentInstance;
+    cmp.address = {
+      name: 'Guest',
+      email: 'guest@example.com',
+      line1: '123 St',
+      city: 'City',
+      postal: '12345',
+      country: 'RO',
+      region: '',
+      line2: ''
+    } as any;
+    cmp.guestEmailVerified = true;
+    (cmp as any).stripe = {
+      confirmCardPayment: () => Promise.resolve({ error: null })
+    } as any;
+    (cmp as any).card = { destroy: () => {}, update: () => {} } as any;
+
+    fixture.detectChanges();
+    tick();
+
+    cmp.placeOrder({ valid: true } as any);
+    tick();
+
+    expect(apiService.post).toHaveBeenCalled();
+    const url = apiService.post.calls.mostRecent().args[0];
+    expect(url).toBe('/orders/guest-checkout');
   }));
 });

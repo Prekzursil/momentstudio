@@ -302,6 +302,9 @@ import { missingRequiredProfileFields as computeMissingRequiredProfileFields, ty
                   [(ngModel)]="profilePhoneNational"
                 />
               </div>
+              <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+                {{ 'auth.phoneHint' | translate }}
+              </span>
             </div>
 
             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">

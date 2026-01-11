@@ -11,7 +11,9 @@
     "about": "Our story",
     "contact": "Contact",
     "admin": "Admin",
+    "viewAdmin": "View admin",
     "account": "Account",
+    "myProfile": "My profile",
     "cart": "Cart",
     "signIn": "Sign in",
     "register": "Register",
@@ -20,6 +22,13 @@
     "preferences": "Preferences",
     "theme": "Theme",
     "language": "Language"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "loading": "Loading…",
+    "empty": "No notifications yet.",
+    "markRead": "Mark read",
+    "dismiss": "Dismiss"
   },
   "footer": {
     "tagline": "Handcrafted Art",
@@ -250,23 +259,25 @@
     "paymentNotReady": "Payment not initialized yet. Please wait.",
     "paymentFailed": "Payment failed.",
     "paymentConfirmError": "Payment confirmation failed. Please try again.",
-    "step1": "Step 1 · Who's checking out?",
+    "step1": "Account (optional)",
     "guest": "Checkout as guest",
     "createAccount": "Create account during checkout",
-    "step2": "Step 1 · Shipping address",
+    "step2": "Shipping address",
     "name": "Full name",
     "email": "Email",
+    "emailVerifySend": "Send code",
+    "emailVerifyResend": "Resend code",
+    "emailVerifyVerified": "Verified",
     "line1": "Address line",
     "city": "City",
     "postal": "Postal code",
     "country": "Country",
     "countrySelect": "Select a country",
     "saveAddress": "Save this address for next time",
-    "step3": "Step 3 · Shipping method",
-    "step4": "Step 2 · Promo code",
+    "step3": "Promo code",
     "promoPlaceholder": "Enter code",
     "apply": "Apply",
-    "step5": "Step 3 · Payment",
+    "step4": "Payment",
     "placeOrder": "Place order",
     "backToCart": "Back to cart",
     "summary": "Order summary",
@@ -312,6 +323,7 @@
     "lastName": "Last name",
     "dateOfBirth": "Date of birth",
     "phone": "Phone",
+    "phoneHint": "Enter digits only (no spaces); we’ll add the country code automatically.",
     "confirmPassword": "Confirm password",
     "forgot": "Forgot password?",
     "createAccount": "Create account",
@@ -371,6 +383,7 @@
   },
   "adminUi": {
     "nav": {
+      "title": "Admin",
       "dashboard": "Dashboard",
       "products": "Products",
       "orders": "Orders",
@@ -384,14 +397,88 @@
       "users": "Users",
       "lowStock": "Low stock",
       "sales30": "Sales (30d)",
-      "orders30": "Orders (30d)"
+      "orders30": "Orders (30d)",
+      "openOrders": "Open orders",
+      "recentOrders": "Recent orders",
+      "lowStockTracked": "Low stock tracked",
+      "countTotal": "{{count}} total",
+      "countItems": "{{count}} items",
+      "countOrders": "{{count}} orders",
+      "openOrdersSubtitle": "{{count}} pending",
+      "recentOrdersSubtitle": "{{count}} in view",
+      "lowStockTrackedSubtitle": "{{count}} tracked"
     },
     "actions": {
+      "add": "Add",
       "reset": "Reset",
       "delete": "Delete",
+      "remove": "Remove",
       "save": "Save",
       "edit": "Edit",
       "refresh": "Refresh"
+    },
+    "site": {
+      "assets": {
+        "title": "Site assets",
+        "logoUrl": "Logo URL",
+        "faviconUrl": "Favicon URL",
+        "socialImageUrl": "Social image URL",
+        "save": "Save assets",
+        "success": { "save": "Assets saved." },
+        "errors": { "save": "Could not save assets." }
+      },
+      "social": {
+        "title": "Social & contact",
+        "phone": "Phone",
+        "email": "Email",
+        "instagramPages": "Instagram pages",
+        "facebookPages": "Facebook pages",
+        "label": "Label",
+        "url": "URL",
+        "thumbnailUrlOptional": "Thumbnail URL (optional)",
+        "fetchThumbnail": "Fetch thumbnail",
+        "fetching": "Fetching…",
+        "socialLink": "Social link",
+        "success": {
+          "save": "Saved.",
+          "thumbnailUpdated": "Thumbnail updated"
+        },
+        "errors": {
+          "save": "Could not save.",
+          "urlRequired": "URL is required.",
+          "noThumbnail": "No thumbnail found.",
+          "fetchFailed": "Could not fetch thumbnail."
+        }
+      },
+      "seo": {
+        "title": "SEO meta",
+        "page": "Page",
+        "pages": {
+          "home": "Home",
+          "shop": "Shop",
+          "product": "Product",
+          "category": "Category",
+          "about": "Our story"
+        },
+        "metaTitle": "Meta title",
+        "metaDescription": "Meta description",
+        "save": "Save SEO",
+        "success": { "save": "SEO saved." },
+        "errors": { "save": "Could not save SEO." }
+      },
+      "pages": {
+        "title": "Static pages",
+        "aboutLabel": "Our story (About)",
+        "saveAbout": "Save about",
+        "faqLabel": "FAQ",
+        "saveFaq": "Save FAQ",
+        "shippingLabel": "Shipping",
+        "saveShipping": "Save shipping",
+        "contactLabel": "Contact",
+        "saveContact": "Save contact",
+        "success": { "save": "Content saved." },
+        "errors": { "save": "Could not save content." }
+      }
     },
     "fx": {
       "title": "FX rates",
@@ -492,7 +579,62 @@
     },
     "orders": {
       "title": "Orders",
+      "hint": "Search by reference, id, email, or username.",
+      "export": "Export CSV",
+      "search": "Search",
       "statusFilter": "Status",
+      "from": "From",
+      "to": "To",
+      "empty": "No orders match these filters.",
+      "view": "View",
+      "guest": "Guest",
+      "detailTitle": "Order",
+      "backToList": "Back to orders",
+      "tracking": "Tracking",
+      "updateStatus": "Update status",
+      "trackingNumber": "Tracking number",
+      "save": "Save changes",
+      "saveHint": "Updates status and tracking; emails send on shipped.",
+      "actionsTitle": "Actions",
+      "paymentTitle": "Payment",
+      "customerCommsTitle": "Customer",
+      "paymentIntent": "Payment intent",
+      "refundNote": "Refund note (optional)",
+      "refundNotePlaceholder": "Add a note for audit/email (optional)",
+      "refundHint": "Refund is manual; this records an event and notifies the owner inbox.",
+      "confirmRefund": "Request a refund for this order?",
+      "actions": {
+        "retryPayment": "Retry payment",
+        "capturePayment": "Capture payment",
+        "voidPayment": "Void payment",
+        "deliveryEmail": "Send delivery email",
+        "packingSlip": "Download packing slip",
+        "refund": "Request refund"
+      },
+      "itemsTitle": "Items",
+      "addressesTitle": "Addresses",
+      "shippingAddress": "Shipping address",
+      "billingAddress": "Billing address",
+      "noAddress": "No address on file.",
+      "timelineTitle": "Timeline",
+      "timelineEmpty": "No events recorded yet.",
+      "notFound": "Order not found.",
+      "table": {
+        "reference": "Reference",
+        "customer": "Customer",
+        "status": "Status",
+        "total": "Total",
+        "created": "Created"
+      },
+      "items": {
+        "product": "Product",
+        "qty": "Qty",
+        "unit": "Unit",
+        "subtotal": "Subtotal"
+      },
+      "pagination": "Page {{page}} of {{total_pages}} · {{total_items}} total",
+      "prev": "Prev",
+      "next": "Next",
       "all": "All",
       "pending": "Pending",
       "paid": "Paid",
@@ -500,10 +642,23 @@
       "cancelled": "Cancelled",
       "refunded": "Refunded",
       "success": {
-        "status": "Order status updated"
+        "status": "Order updated",
+        "retry": "Payment retry started",
+        "capture": "Payment captured",
+        "void": "Payment voided",
+        "refund": "Refund requested",
+        "deliveryEmail": "Delivery email sent"
       },
       "errors": {
-        "status": "Failed to update order status"
+        "load": "Could not load orders.",
+        "export": "Could not export orders.",
+        "status": "Failed to update order",
+        "retry": "Could not retry payment.",
+        "capture": "Could not capture payment.",
+        "void": "Could not void payment.",
+        "refund": "Could not request refund.",
+        "deliveryEmail": "Could not send delivery email.",
+        "packingSlip": "Could not download packing slip."
       }
     },
     "users": {
@@ -560,9 +715,35 @@
       "title": "Audit log",
       "products": "Product changes",
       "content": "Content changes",
+      "security": "Security",
+      "actor": "Actor:",
+      "subject": "Subject:",
       "productId": "Product ID:",
       "blockId": "Block ID:",
-      "at": "At:"
+      "at": "At:",
+      "securityActions": {
+        "owner_transfer": "Ownership transfer"
+      },
+      "errors": {
+        "loadTitle": "Could not load audit log",
+        "loadCopy": "Please try again."
+      }
+    },
+    "ownerTransfer": {
+      "title": "Transfer ownership",
+      "description": "Transfer the owner role to another user. This action is owner-only and requires password confirmation.",
+      "identifier": "Target identifier (email or username)",
+      "identifierPlaceholder": "email@example.com or username",
+      "confirmLabel": "Type to confirm",
+      "confirmPlaceholder": "TRANSFER",
+      "confirmHint": "Type TRANSFER to confirm.",
+      "action": "Transfer",
+      "successTitle": "Ownership transferred",
+      "successCopy": "Ownership was transferred successfully.",
+      "errors": {
+        "identifier": "Target identifier is required.",
+        "generic": "Could not transfer ownership."
+      }
     },
     "maintenance": {
       "title": "Maintenance & feeds",

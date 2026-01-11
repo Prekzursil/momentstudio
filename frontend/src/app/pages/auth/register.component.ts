@@ -259,6 +259,9 @@ import { appConfig } from '../../core/app-config';
                 [(ngModel)]="phoneNational"
               />
             </div>
+            <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+              {{ 'auth.phoneHint' | translate }}
+            </span>
             <span *ngIf="phoneCtrl.touched && phoneCtrl.invalid" class="text-xs font-normal text-rose-700 dark:text-rose-300">
               {{ 'validation.phoneInvalid' | translate }}
             </span>

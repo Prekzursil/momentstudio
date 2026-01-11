@@ -3,6 +3,5 @@
   "compilerOptions": {
     "types": ["jasmine", "node"]
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "e2e/**/*.ts", "playwright.config.ts"]
 }
-

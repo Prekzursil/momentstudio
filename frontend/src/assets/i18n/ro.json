@@ -11,7 +11,9 @@
     "about": "Povestea noastră",
     "contact": "Contact",
     "admin": "Admin",
+    "viewAdmin": "Vezi admin",
     "account": "Cont",
+    "myProfile": "Profilul meu",
     "cart": "Coș",
     "signIn": "Autentificare",
     "register": "Înregistrare",
@@ -20,6 +22,13 @@
     "preferences": "Preferințe",
     "theme": "Temă",
     "language": "Limbă"
+  },
+  "notifications": {
+    "title": "Notificări",
+    "loading": "Se încarcă…",
+    "empty": "Nu ai notificări încă.",
+    "markRead": "Marchează ca citit",
+    "dismiss": "Ascunde"
   },
   "footer": {
     "tagline": "Artă Realizată Manual",
@@ -250,23 +259,25 @@
     "paymentNotReady": "Plata nu este încă inițializată. Așteaptă puțin.",
     "paymentFailed": "Plata a eșuat.",
     "paymentConfirmError": "Confirmarea plății a eșuat. Încearcă din nou.",
-    "step1": "Pasul 1 · Cine plasează comanda?",
+    "step1": "Cont (opțional)",
     "guest": "Continuă ca invitat",
     "createAccount": "Creează cont în timpul checkout-ului",
-    "step2": "Pasul 1 · Adresă de livrare",
+    "step2": "Adresă de livrare",
     "name": "Nume complet",
     "email": "Email",
+    "emailVerifySend": "Trimite cod",
+    "emailVerifyResend": "Retrimite codul",
+    "emailVerifyVerified": "Verificat",
     "line1": "Adresă",
     "city": "Oraș",
     "postal": "Cod poștal",
     "country": "Țară",
     "countrySelect": "Selectează țara",
     "saveAddress": "Salvează această adresă pentru data viitoare",
-    "step3": "Pasul 3 · Metodă de livrare",
-    "step4": "Pasul 2 · Cod promoțional",
+    "step3": "Cod promoțional",
     "promoPlaceholder": "Introdu codul",
     "apply": "Aplică",
-    "step5": "Pasul 3 · Plată",
+    "step4": "Plată",
     "placeOrder": "Plasează comanda",
     "backToCart": "Înapoi la coș",
     "summary": "Sumar comandă",
@@ -312,6 +323,7 @@
     "lastName": "Nume de familie",
     "dateOfBirth": "Data nașterii",
     "phone": "Telefon",
+    "phoneHint": "Introdu doar cifre (fără spații); codul de țară se adaugă automat.",
     "confirmPassword": "Confirmă parola",
     "forgot": "Ai uitat parola?",
     "createAccount": "Creează cont",
@@ -371,6 +383,7 @@
   },
   "adminUi": {
     "nav": {
+      "title": "Administrare",
       "dashboard": "Panou",
       "products": "Produse",
       "orders": "Comenzi",
@@ -384,14 +397,88 @@
       "users": "Utilizatori",
       "lowStock": "Stoc redus",
       "sales30": "Vânzări (30z)",
-      "orders30": "Comenzi (30z)"
+      "orders30": "Comenzi (30z)",
+      "openOrders": "Comenzi deschise",
+      "recentOrders": "Comenzi recente",
+      "lowStockTracked": "Stoc redus urmărit",
+      "countTotal": "{{count}} total",
+      "countItems": "{{count}} produse",
+      "countOrders": "{{count}} comenzi",
+      "openOrdersSubtitle": "{{count}} în așteptare",
+      "recentOrdersSubtitle": "{{count}} în vizualizare",
+      "lowStockTrackedSubtitle": "{{count}} urmărite"
     },
     "actions": {
+      "add": "Adaugă",
       "reset": "Resetează",
       "delete": "Șterge",
+      "remove": "Elimină",
       "save": "Salvează",
       "edit": "Editează",
       "refresh": "Reîncarcă"
+    },
+    "site": {
+      "assets": {
+        "title": "Resurse site",
+        "logoUrl": "URL logo",
+        "faviconUrl": "URL favicon",
+        "socialImageUrl": "URL imagine socială",
+        "save": "Salvează resursele",
+        "success": { "save": "Resurse salvate." },
+        "errors": { "save": "Nu am putut salva resursele." }
+      },
+      "social": {
+        "title": "Rețele sociale și contact",
+        "phone": "Telefon",
+        "email": "Email",
+        "instagramPages": "Pagini Instagram",
+        "facebookPages": "Pagini Facebook",
+        "label": "Etichetă",
+        "url": "URL",
+        "thumbnailUrlOptional": "URL miniatură (opțional)",
+        "fetchThumbnail": "Preia miniatura",
+        "fetching": "Se preia…",
+        "socialLink": "Link social",
+        "success": {
+          "save": "Salvat.",
+          "thumbnailUpdated": "Miniatură actualizată"
+        },
+        "errors": {
+          "save": "Nu am putut salva.",
+          "urlRequired": "URL-ul este obligatoriu.",
+          "noThumbnail": "Nu s-a găsit nicio miniatură.",
+          "fetchFailed": "Nu s-a putut prelua miniatura."
+        }
+      },
+      "seo": {
+        "title": "Meta SEO",
+        "page": "Pagină",
+        "pages": {
+          "home": "Acasă",
+          "shop": "Magazin",
+          "product": "Produs",
+          "category": "Categorie",
+          "about": "Povestea noastră"
+        },
+        "metaTitle": "Titlu meta",
+        "metaDescription": "Descriere meta",
+        "save": "Salvează SEO",
+        "success": { "save": "SEO salvat." },
+        "errors": { "save": "Nu am putut salva SEO." }
+      },
+      "pages": {
+        "title": "Pagini statice",
+        "aboutLabel": "Povestea noastră",
+        "saveAbout": "Salvează povestea",
+        "faqLabel": "Întrebări frecvente",
+        "saveFaq": "Salvează FAQ",
+        "shippingLabel": "Livrare",
+        "saveShipping": "Salvează livrarea",
+        "contactLabel": "Contact",
+        "saveContact": "Salvează contactul",
+        "success": { "save": "Conținut salvat." },
+        "errors": { "save": "Nu am putut salva conținutul." }
+      }
     },
     "fx": {
       "title": "Curs valutar (FX)",
@@ -492,7 +579,62 @@
     },
     "orders": {
       "title": "Comenzi",
+      "hint": "Caută după referință, ID, email sau utilizator.",
+      "export": "Exportă CSV",
+      "search": "Caută",
       "statusFilter": "Status",
+      "from": "De la",
+      "to": "Până la",
+      "empty": "Nu există comenzi pentru aceste filtre.",
+      "view": "Vezi",
+      "guest": "Vizitator",
+      "detailTitle": "Comandă",
+      "backToList": "Înapoi la comenzi",
+      "tracking": "Tracking",
+      "updateStatus": "Actualizează status",
+      "trackingNumber": "Număr tracking",
+      "save": "Salvează modificările",
+      "saveHint": "Actualizează statusul și tracking-ul; emailul se trimite la expediere.",
+      "actionsTitle": "Acțiuni",
+      "paymentTitle": "Plată",
+      "customerCommsTitle": "Client",
+      "paymentIntent": "Intent plată",
+      "refundNote": "Notă rambursare (opțional)",
+      "refundNotePlaceholder": "Adaugă o notă pentru audit/email (opțional)",
+      "refundHint": "Rambursarea este manuală; se înregistrează un eveniment și se notifică inbox-ul proprietarului.",
+      "confirmRefund": "Soliciți rambursarea acestei comenzi?",
+      "actions": {
+        "retryPayment": "Reîncearcă plata",
+        "capturePayment": "Capturează plata",
+        "voidPayment": "Anulează plata",
+        "deliveryEmail": "Trimite email de livrare",
+        "packingSlip": "Descarcă packing slip",
+        "refund": "Solicită rambursare"
+      },
+      "itemsTitle": "Produse",
+      "addressesTitle": "Adrese",
+      "shippingAddress": "Adresă livrare",
+      "billingAddress": "Adresă facturare",
+      "noAddress": "Nu există adresă disponibilă.",
+      "timelineTitle": "Istoric",
+      "timelineEmpty": "Nu există evenimente înregistrate încă.",
+      "notFound": "Comanda nu a fost găsită.",
+      "table": {
+        "reference": "Referință",
+        "customer": "Client",
+        "status": "Status",
+        "total": "Total",
+        "created": "Creată"
+      },
+      "items": {
+        "product": "Produs",
+        "qty": "Cant.",
+        "unit": "Preț",
+        "subtotal": "Subtotal"
+      },
+      "pagination": "Pagina {{page}} din {{total_pages}} · {{total_items}} total",
+      "prev": "Anterior",
+      "next": "Următor",
       "all": "Toate",
       "pending": "În așteptare",
       "paid": "Plătită",
@@ -500,10 +642,23 @@
       "cancelled": "Anulată",
       "refunded": "Rambursată",
       "success": {
-        "status": "Statusul comenzii a fost actualizat"
+        "status": "Comanda a fost actualizată",
+        "retry": "Reîncercarea plății a fost pornită",
+        "capture": "Plata a fost capturată",
+        "void": "Plata a fost anulată",
+        "refund": "Rambursarea a fost solicitată",
+        "deliveryEmail": "Emailul de livrare a fost trimis"
       },
       "errors": {
-        "status": "Nu am putut actualiza statusul comenzii"
+        "load": "Nu am putut încărca comenzile.",
+        "export": "Nu am putut exporta comenzile.",
+        "status": "Nu am putut actualiza comanda",
+        "retry": "Nu am putut reîncerca plata.",
+        "capture": "Nu am putut captura plata.",
+        "void": "Nu am putut anula plata.",
+        "refund": "Nu am putut solicita rambursarea.",
+        "deliveryEmail": "Nu am putut trimite emailul de livrare.",
+        "packingSlip": "Nu am putut descărca packing slip-ul."
       }
     },
     "users": {
@@ -560,9 +715,35 @@
       "title": "Jurnal audit",
       "products": "Modificări produse",
       "content": "Modificări conținut",
+      "security": "Securitate",
+      "actor": "Actor:",
+      "subject": "Țintă:",
       "productId": "ID produs:",
       "blockId": "ID bloc:",
-      "at": "La:"
+      "at": "La:",
+      "securityActions": {
+        "owner_transfer": "Transfer proprietar"
+      },
+      "errors": {
+        "loadTitle": "Nu am putut încărca jurnalul de audit",
+        "loadCopy": "Încearcă din nou."
+      }
+    },
+    "ownerTransfer": {
+      "title": "Transfer proprietar",
+      "description": "Transferă rolul de proprietar către un alt utilizator. Această acțiune este disponibilă doar proprietarului și necesită confirmare cu parola.",
+      "identifier": "Identificator țintă (email sau username)",
+      "identifierPlaceholder": "email@example.com sau username",
+      "confirmLabel": "Tastează pentru confirmare",
+      "confirmPlaceholder": "TRANSFER",
+      "confirmHint": "Tastează TRANSFER pentru confirmare.",
+      "action": "Transferă",
+      "successTitle": "Proprietar transferat",
+      "successCopy": "Proprietatea a fost transferată cu succes.",
+      "errors": {
+        "identifier": "Identificatorul țintă este obligatoriu.",
+        "generic": "Nu am putut transfera proprietatea."
+      }
     },
     "maintenance": {
       "title": "Mentenanță & feed-uri",

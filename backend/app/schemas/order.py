@@ -48,7 +48,7 @@ class OrderRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    user_id: UUID
+    user_id: UUID | None = None
     reference_code: str | None = None
     status: OrderStatus
     payment_retry_count: int

@@ -11,6 +11,10 @@ dist/
 .angular/
 frontend/src/assets/app-config.js
 
+# Playwright
+frontend/playwright-report/
+frontend/test-results/
+
 # Env files
 .env
 .env.*

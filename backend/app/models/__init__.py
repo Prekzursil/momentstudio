@@ -1,5 +1,12 @@
 from app.db.base import Base  # noqa: F401
-from app.models.user import User, PasswordResetToken, RefreshSession, UserUsernameHistory, UserDisplayNameHistory  # noqa: F401
+from app.models.user import (
+    User,
+    PasswordResetToken,
+    RefreshSession,
+    UserUsernameHistory,
+    UserDisplayNameHistory,
+    AdminAuditLog,
+)  # noqa: F401
 from app.models.catalog import (
     Category,
     Product,
@@ -24,6 +31,7 @@ from app.models.wishlist import WishlistItem  # noqa: F401
 from app.models.webhook import StripeWebhookEvent  # noqa: F401
 from app.models.blog import BlogComment, BlogCommentFlag  # noqa: F401
 from app.models.fx import FxRate  # noqa: F401
+from app.models.notification import UserNotification  # noqa: F401
 
 __all__ = [
     "Base",
@@ -32,6 +40,7 @@ __all__ = [
     "RefreshSession",
     "UserUsernameHistory",
     "UserDisplayNameHistory",
+    "AdminAuditLog",
     "Category",
     "Product",
     "ProductImage",
@@ -64,4 +73,5 @@ __all__ = [
     "BlogComment",
     "BlogCommentFlag",
     "FxRate",
+    "UserNotification",
 ]

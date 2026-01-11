@@ -115,6 +115,7 @@ export interface AdminProductDetail extends AdminProduct {
 export interface AdminAudit {
   products: AdminAuditItem[];
   content: AdminAuditItem[];
+  security?: AdminSecurityAuditItem[];
 }
 
 export interface AdminAuditItem {
@@ -124,6 +125,17 @@ export interface AdminAuditItem {
   action: string;
   version?: number;
   user_id?: string | null;
+  created_at: string;
+}
+
+export interface AdminSecurityAuditItem {
+  id: string;
+  action: string;
+  actor_user_id?: string | null;
+  actor_email?: string | null;
+  subject_user_id?: string | null;
+  subject_email?: string | null;
+  data?: Record<string, any> | null;
   created_at: string;
 }
 
@@ -191,6 +203,16 @@ export interface SocialThumbnailResponse {
   thumbnail_url: string | null;
 }
 
+export interface OwnerTransferResponse {
+  old_owner_id: string;
+  new_owner_id: string;
+  email?: string;
+  username?: string;
+  name?: string | null;
+  name_tag?: number;
+  role?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdminService {
   constructor(private api: ApiService) {}
@@ -233,6 +255,10 @@ export class AdminService {
 
   audit(): Observable<AdminAudit> {
     return this.api.get<AdminAudit>('/admin/dashboard/audit');
+  }
+
+  transferOwner(payload: { identifier: string; confirm: string; password: string }): Observable<OwnerTransferResponse> {
+    return this.api.post<OwnerTransferResponse>('/admin/dashboard/owner/transfer', payload);
   }
 
   revokeSessions(userId: string): Observable<void> {
