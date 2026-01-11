@@ -48,6 +48,8 @@ def _normalize_email(email: str) -> str:
 def _generate_guest_email_token() -> str:
     return str(secrets.randbelow(1_000_000)).zfill(6)
 
+GUEST_EMAIL_TOKEN_MAX_ATTEMPTS = 10
+
 
 @router.post("", response_model=OrderRead, status_code=status.HTTP_201_CREATED)
 async def create_order(
@@ -302,6 +304,8 @@ async def request_guest_email_verification(
     cart.guest_email_verification_token = token
     cart.guest_email_verification_expires_at = now + timedelta(minutes=30)
     cart.guest_email_verified_at = None
+    cart.guest_email_verification_attempts = 0
+    cart.guest_email_verification_last_attempt_at = None
     session.add(cart)
     await session.commit()
 
@@ -320,20 +324,33 @@ async def confirm_guest_email_verification(
     cart = await cart_service.get_cart(session, None, session_id)
     email = _normalize_email(str(payload.email))
     token = (payload.token or "").strip()
+    now = datetime.now(timezone.utc)
 
     if not cart.guest_email or _normalize_email(cart.guest_email) != email:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email mismatch")
-    if not cart.guest_email_verification_token or cart.guest_email_verification_token != token:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
+
     expires = cart.guest_email_verification_expires_at
     if expires and expires.tzinfo is None:
         expires = expires.replace(tzinfo=timezone.utc)
-    if not expires or expires < datetime.now(timezone.utc):
+    if not cart.guest_email_verification_token or not expires or expires < now:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
 
-    cart.guest_email_verified_at = datetime.now(timezone.utc)
+    attempts = int(getattr(cart, "guest_email_verification_attempts", 0) or 0)
+    if attempts >= GUEST_EMAIL_TOKEN_MAX_ATTEMPTS:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many attempts; request a new code.")
+
+    if cart.guest_email_verification_token != token:
+        cart.guest_email_verification_attempts = attempts + 1
+        cart.guest_email_verification_last_attempt_at = now
+        session.add(cart)
+        await session.commit()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
+
+    cart.guest_email_verified_at = now
     cart.guest_email_verification_token = None
     cart.guest_email_verification_expires_at = None
+    cart.guest_email_verification_attempts = 0
+    cart.guest_email_verification_last_attempt_at = None
     session.add(cart)
     await session.commit()
     await session.refresh(cart)

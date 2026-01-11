@@ -27,6 +27,8 @@ def upgrade() -> None:
         batch.add_column(sa.Column("guest_email_verification_token", sa.String(length=64), nullable=True))
         batch.add_column(sa.Column("guest_email_verification_expires_at", sa.DateTime(timezone=True), nullable=True))
         batch.add_column(sa.Column("guest_email_verified_at", sa.DateTime(timezone=True), nullable=True))
+        batch.add_column(sa.Column("guest_email_verification_attempts", sa.Integer(), nullable=False, server_default="0"))
+        batch.add_column(sa.Column("guest_email_verification_last_attempt_at", sa.DateTime(timezone=True), nullable=True))
 
     with op.batch_alter_table("addresses") as batch:
         batch.alter_column("user_id", existing_type=postgresql.UUID(as_uuid=True), nullable=True)
@@ -47,12 +49,40 @@ def upgrade() -> None:
             WHERE orders.user_id = u.id
             """
         )
+        op.execute(
+            """
+            UPDATE orders
+            SET customer_email = 'unknown+' || orders.id::text || '@invalid.local'
+            WHERE customer_email IS NULL
+            """
+        )
+        op.execute(
+            """
+            UPDATE orders
+            SET customer_name = 'Unknown'
+            WHERE customer_name IS NULL
+            """
+        )
     else:
         op.execute(
             """
             UPDATE orders
             SET customer_email = (SELECT email FROM users WHERE users.id = orders.user_id),
                 customer_name = COALESCE((SELECT name FROM users WHERE users.id = orders.user_id), (SELECT email FROM users WHERE users.id = orders.user_id))
+            """
+        )
+        op.execute(
+            """
+            UPDATE orders
+            SET customer_email = 'unknown+' || orders.id || '@invalid.local'
+            WHERE customer_email IS NULL
+            """
+        )
+        op.execute(
+            """
+            UPDATE orders
+            SET customer_name = 'Unknown'
+            WHERE customer_name IS NULL
             """
         )
 
@@ -71,8 +101,9 @@ def downgrade() -> None:
         batch.alter_column("user_id", existing_type=postgresql.UUID(as_uuid=True), nullable=False)
 
     with op.batch_alter_table("carts") as batch:
+        batch.drop_column("guest_email_verification_last_attempt_at")
+        batch.drop_column("guest_email_verification_attempts")
         batch.drop_column("guest_email_verified_at")
         batch.drop_column("guest_email_verification_expires_at")
         batch.drop_column("guest_email_verification_token")
         batch.drop_column("guest_email")
-
