@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, TypedDict
 
@@ -6,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.future import select
 
 from app.core.config import settings
-from app.models.catalog import Category, Product, ProductImage, ProductVariant
+from app.models.catalog import Category, Product, ProductImage, ProductStatus, ProductVariant
 
 
 class SeedImage(TypedDict):
@@ -106,6 +107,8 @@ async def seed(session: AsyncSession) -> None:
             base_price=prod["base_price"],
             currency=prod["currency"],
             is_active=True,
+            status=ProductStatus.published,
+            publish_at=datetime.now(timezone.utc),
             is_featured=prod["is_featured"],
             stock_quantity=prod["stock_quantity"],
         )

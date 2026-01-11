@@ -547,6 +547,8 @@
       "form": {
         "slug": "Slug",
         "sku": "SKU",
+        "shortDescription": "Short description",
+        "shortDescriptionHint": "Shown in product cards and listings (max 280 characters).",
         "imageUrl": "Image URL",
         "description": "Description",
         "save": "Save product",
@@ -555,6 +557,8 @@
         "image": "Image",
         "active": "Active",
         "featured": "Featured",
+        "bestseller": "Bestseller",
+        "highlight": "Highlight",
         "publishAt": "Publish at",
         "noImages": "No images yet."
       },

@@ -532,7 +532,7 @@
       "active": "Activ",
       "inactive": "Inactiv",
       "pagination": "Pagina {{page}} din {{total_pages}} · {{total_items}} total",
-      "prev": "Înapoi",
+      "prev": "Anterior",
       "next": "Înainte",
       "table": {
         "name": "Nume",
@@ -547,6 +547,8 @@
       "form": {
         "slug": "Slug",
         "sku": "SKU",
+        "shortDescription": "Descriere scurtă",
+        "shortDescriptionHint": "Apare în carduri și liste (max 280 caractere).",
         "imageUrl": "URL imagine",
         "description": "Descriere",
         "save": "Salvează produsul",
@@ -555,6 +557,8 @@
         "image": "Imagine",
         "active": "Activ",
         "featured": "Recomandat",
+        "bestseller": "Cel mai vândut",
+        "highlight": "Evidențiat",
         "publishAt": "Publică la",
         "noImages": "Nu există imagini."
       },

@@ -24,6 +24,7 @@ type ProductForm = {
   is_active: boolean;
   is_featured: boolean;
   sku: string;
+  short_description: string;
   long_description: string;
   publish_at: string;
   is_bestseller: boolean;
@@ -236,14 +237,27 @@ type ProductForm = {
 
           <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
             <input type="checkbox" [(ngModel)]="form.is_bestseller" />
-            Bestseller
+            {{ 'adminUi.products.form.bestseller' | translate }}
           </label>
 
           <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
             <input type="checkbox" [(ngModel)]="form.is_highlight" />
-            Highlight
+            {{ 'adminUi.products.form.highlight' | translate }}
           </label>
         </div>
+
+        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+          {{ 'adminUi.products.form.shortDescription' | translate }}
+          <textarea
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            rows="2"
+            maxlength="280"
+            [(ngModel)]="form.short_description"
+          ></textarea>
+          <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+            {{ 'adminUi.products.form.shortDescriptionHint' | translate }}
+          </span>
+        </label>
 
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           {{ 'adminUi.products.form.description' | translate }}
@@ -384,6 +398,7 @@ export class AdminProductsComponent implements OnInit {
           is_active: prod.is_active !== false,
           is_featured: !!prod.is_featured,
           sku: (prod.sku || '').toString(),
+          short_description: (prod.short_description || '').toString(),
           long_description: (prod.long_description || '').toString(),
           publish_at: prod.publish_at ? this.toLocalDateTime(prod.publish_at) : '',
           is_bestseller: Array.isArray(prod.tags) ? prod.tags.includes('bestseller') : false,
@@ -407,7 +422,7 @@ export class AdminProductsComponent implements OnInit {
       is_featured: this.form.is_featured,
       sku: this.form.sku || null,
       long_description: this.form.long_description || null,
-      short_description: this.form.long_description || null,
+      short_description: this.form.short_description.trim() ? this.form.short_description.trim().slice(0, 280) : null,
       publish_at: this.form.publish_at ? new Date(this.form.publish_at).toISOString() : null,
       tags: this.buildTags()
     };
@@ -516,6 +531,7 @@ export class AdminProductsComponent implements OnInit {
       is_active: true,
       is_featured: false,
       sku: '',
+      short_description: '',
       long_description: '',
       publish_at: '',
       is_bestseller: false,
