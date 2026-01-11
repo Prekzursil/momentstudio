@@ -403,6 +403,9 @@ async def create_review(
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    is_admin = current_user is not None and getattr(current_user, "role", None) in (UserRole.admin, UserRole.owner)
+    if not is_admin and (not product.is_active or product.status != ProductStatus.published):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     review = await catalog_service.add_review(session, product, payload, getattr(current_user, "id", None) if current_user else None)
     return review
 
@@ -428,11 +431,18 @@ async def approve_review(
 
 
 @router.get("/products/{slug}/related", response_model=list[ProductRead])
-async def related_products(slug: str, session: AsyncSession = Depends(get_session)) -> list[Product]:
+async def related_products(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user_optional),
+) -> list[Product]:
     product = await catalog_service.get_product_by_slug(
         session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
     )
     if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    is_admin = current_user is not None and getattr(current_user, "role", None) in (UserRole.admin, UserRole.owner)
+    if not is_admin and (not product.is_active or product.status != ProductStatus.published):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     related = await catalog_service.get_related_products(session, product, limit=4)
     return related

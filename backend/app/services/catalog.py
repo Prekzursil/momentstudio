@@ -367,16 +367,19 @@ async def get_featured_collection_by_slug(session: AsyncSession, slug: str) -> F
 
 async def list_featured_collections(session: AsyncSession) -> list[FeaturedCollection]:
     result = await session.execute(
-        select(FeaturedCollection).options(selectinload(FeaturedCollection.products)).order_by(FeaturedCollection.created_at.desc())
+        select(FeaturedCollection)
+        .options(
+            selectinload(
+                FeaturedCollection.products.and_(
+                    Product.is_deleted.is_(False),
+                    Product.is_active.is_(True),
+                    Product.status == ProductStatus.published,
+                )
+            )
+        )
+        .order_by(FeaturedCollection.created_at.desc())
     )
-    collections = list(result.scalars().unique())
-    for collection in collections:
-        collection.products = [
-            product
-            for product in collection.products
-            if not product.is_deleted and product.is_active and product.status == ProductStatus.published
-        ]
-    return collections
+    return list(result.scalars().unique())
 
 
 async def _load_products_by_ids(session: AsyncSession, product_ids: list[uuid.UUID]) -> list[Product]:
