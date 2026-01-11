@@ -9,7 +9,8 @@
     "build": "ng build",
     "pretest": "node scripts/generate-config.mjs",
     "test": "ng test",
-    "lint": "eslint . --ext .ts"
+    "lint": "eslint . --ext .ts",
+    "e2e": "playwright test"
   },
   "private": true,
   "dependencies": {
@@ -37,6 +38,7 @@
     "@angular-devkit/build-angular": "^18.0.0",
     "@angular/cli": "^18.0.0",
     "@angular/compiler-cli": "^18.0.0",
+    "@playwright/test": "^1.55.0",
     "@types/jasmine": "~5.1.0",
     "@types/node": "^20.11.30",
     "@types/uuid": "^9.0.7",

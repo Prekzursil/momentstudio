@@ -37,7 +37,7 @@ jobs:
         if: steps.detect.outputs.missing != 'true'
         run: |
           cd frontend
-          npm ci
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci
 
       - name: Run tests
         if: steps.detect.outputs.missing != 'true'
