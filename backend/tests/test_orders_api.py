@@ -263,7 +263,7 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
         sent["shipped"] += 1
         return True
 
-    async def fake_send_delivery_confirmation(to_email, order):
+    async def fake_send_delivery_confirmation(to_email, order, lang=None):
         sent["delivered"] += 1
         return True
 

@@ -18,7 +18,10 @@ from app.services import payments
 
 async def build_order_from_cart(
     session: AsyncSession,
-    user_id: UUID,
+    user_id: UUID | None,
+    *,
+    customer_email: str,
+    customer_name: str,
     cart: Cart,
     shipping_address_id: UUID | None,
     billing_address_id: UUID | None,
@@ -56,6 +59,8 @@ async def build_order_from_cart(
     order = Order(
         user_id=user_id,
         reference_code=ref,
+        customer_email=customer_email,
+        customer_name=customer_name,
         total_amount=total,
         tax_amount=tax,
         shipping_amount=shipping_amount,
@@ -164,7 +169,8 @@ async def admin_search_orders(
             or_(
                 cast(Order.id, String).ilike(f"%{cleaned_q}%"),
                 Order.reference_code.ilike(f"%{cleaned_q}%"),
-                func.lower(User.email).ilike(f"%{cleaned_q.lower()}%"),
+                func.lower(Order.customer_email).ilike(f"%{cleaned_q.lower()}%"),
+                func.lower(Order.customer_name).ilike(f"%{cleaned_q.lower()}%"),
                 User.username.ilike(f"%{cleaned_q}%"),
             )
         )
@@ -175,7 +181,7 @@ async def admin_search_orders(
     total_items = int((await session.execute(count_stmt)).scalar_one() or 0)
 
     stmt = (
-        select(Order, User.email, User.username)
+        select(Order, Order.customer_email, User.username)
         .join(User, Order.user_id == User.id, isouter=True)
         .order_by(Order.created_at.desc())
         .offset(offset)

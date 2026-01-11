@@ -24,9 +24,11 @@ class Order(Base):
     __tablename__ = "orders"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), nullable=False, default=OrderStatus.pending)
     reference_code: Mapped[str | None] = mapped_column(String(20), unique=True, nullable=True)
+    customer_email: Mapped[str] = mapped_column(String(255), nullable=False)
+    customer_name: Mapped[str] = mapped_column(String(255), nullable=False)
     shipping_method_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("shipping_methods.id"), nullable=True)
     tracking_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
     tax_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
@@ -48,7 +50,7 @@ class Order(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    user: Mapped[User] = relationship("User")
+    user: Mapped[User | None] = relationship("User")
     shipping_address: Mapped[Address | None] = relationship("Address", foreign_keys=[shipping_address_id])
     billing_address: Mapped[Address | None] = relationship("Address", foreign_keys=[billing_address_id])
     items: Mapped[list["OrderItem"]] = relationship(

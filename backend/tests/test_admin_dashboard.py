@@ -155,6 +155,8 @@ async def seed_dashboard_data(session_factory):
             currency="RON",
             tax_amount=0,
             shipping_amount=0,
+            customer_email=user.email,
+            customer_name=user.name or user.email,
         )
         session.add(order)
         await session.commit()

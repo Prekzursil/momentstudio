@@ -241,6 +241,8 @@ async def export_data(output: Path) -> None:
                     "total_amount": float(o.total_amount),
                     "currency": o.currency,
                     "reference_code": o.reference_code,
+                    "customer_email": getattr(o, "customer_email", None),
+                    "customer_name": getattr(o, "customer_name", None),
                     "shipping_address_id": str(o.shipping_address_id) if o.shipping_address_id else None,
                     "billing_address_id": str(o.billing_address_id) if o.billing_address_id else None,
                     "items": [
@@ -432,10 +434,30 @@ async def import_data(input_path: Path) -> None:
         await session.flush()
         # orders
         for o in payload.get("orders", []):
-            order_obj: Order | None = await session.get(Order, o["id"])
+            order_id = uuid.UUID(str(o["id"]))
+            order_obj: Order | None = await session.get(Order, order_id)
+            order_user_id: uuid.UUID | None = uuid.UUID(str(o["user_id"])) if o.get("user_id") else None
+            customer_email = o.get("customer_email")
+            customer_name = o.get("customer_name")
+            if not customer_email or not customer_name:
+                if order_user_id:
+                    order_user_obj: User | None = await session.get(User, order_user_id)
+                    if order_user_obj:
+                        customer_email = customer_email or order_user_obj.email
+                        customer_name = customer_name or (order_user_obj.name or order_user_obj.email)
+            if not customer_email or not customer_name:
+                raise SystemExit(f"Order {o.get('id')} missing customer_email/customer_name")
             if not order_obj:
-                order_obj = Order(id=o["id"], user_id=o.get("user_id"), status=o.get("status"))
-            order_obj.user_id = o.get("user_id")
+                order_obj = Order(
+                    id=order_id,
+                    user_id=order_user_id,
+                    customer_email=customer_email,
+                    customer_name=customer_name,
+                    status=o.get("status"),
+                )
+            order_obj.user_id = order_user_id
+            order_obj.customer_email = customer_email
+            order_obj.customer_name = customer_name
             if o.get("status"):
                 order_obj.status = o["status"]
             order_obj.total_amount = o.get("total_amount", 0)

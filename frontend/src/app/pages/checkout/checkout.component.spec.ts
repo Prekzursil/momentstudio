@@ -75,7 +75,7 @@ describe('CheckoutComponent', () => {
     (cmp as any).stripe = {
       confirmCardPayment: () => Promise.resolve({ error: null })
     } as any;
-    (cmp as any).card = { destroy: () => {} } as any;
+    (cmp as any).card = { destroy: () => {}, update: () => {} } as any;
 
     cmp.placeOrder({ valid: true } as any);
     tick();

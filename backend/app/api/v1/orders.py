@@ -1,6 +1,7 @@
 import csv
 import io
-from datetime import datetime
+import secrets
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
@@ -21,7 +22,15 @@ from app.services import cart as cart_service
 from app.services import order as order_service
 from app.services import email as email_service
 from app.services import auth as auth_service
-from app.schemas.checkout import GuestCheckoutRequest, GuestCheckoutResponse, CheckoutRequest
+from app.schemas.checkout import (
+    CheckoutRequest,
+    GuestCheckoutRequest,
+    GuestCheckoutResponse,
+    GuestEmailVerificationConfirmRequest,
+    GuestEmailVerificationRequest,
+    GuestEmailVerificationStatus,
+)
+from app.schemas.user import UserCreate
 from app.schemas.address import AddressCreate
 from app.services import payments
 from app.services import address as address_service
@@ -30,6 +39,14 @@ from app.schemas.order_admin import AdminOrderListItem, AdminOrderListResponse, 
 from app.services import notifications as notification_service
 
 router = APIRouter(prefix="/orders", tags=["orders"])
+
+
+def _normalize_email(email: str) -> str:
+    return (email or "").strip().lower()
+
+
+def _generate_guest_email_token() -> str:
+    return str(secrets.randbelow(1_000_000)).zfill(6)
 
 
 @router.post("", response_model=OrderRead, status_code=status.HTTP_201_CREATED)
@@ -61,10 +78,12 @@ async def create_order(
     order = await order_service.build_order_from_cart(
         session,
         current_user.id,
-        cart,
-        payload.shipping_address_id,
-        payload.billing_address_id,
-        shipping_method,
+        customer_email=current_user.email,
+        customer_name=getattr(current_user, "name", None) or current_user.email,
+        cart=cart,
+        shipping_address_id=payload.shipping_address_id,
+        billing_address_id=payload.billing_address_id,
+        shipping_method=shipping_method,
     )
     await notification_service.create_notification(
         session,
@@ -130,9 +149,11 @@ async def checkout(
     order = await order_service.build_order_from_cart(
         session,
         current_user.id,
-        user_cart,
-        shipping_addr.id,
-        shipping_addr.id,
+        customer_email=current_user.email,
+        customer_name=getattr(current_user, "name", None) or current_user.email,
+        cart=user_cart,
+        shipping_address_id=shipping_addr.id,
+        billing_address_id=shipping_addr.id,
         shipping_method=shipping_method,
         payment_intent_id=intent["intent_id"],
         discount=discount_val,
@@ -246,21 +267,208 @@ async def admin_get_order(
     base = OrderRead.model_validate(order).model_dump()
     return AdminOrderRead(
         **base,
-        customer_email=getattr(order.user, "email", None) if getattr(order, "user", None) else None,
+        customer_email=getattr(order, "customer_email", None)
+        or (getattr(order.user, "email", None) if getattr(order, "user", None) else None),
         customer_username=getattr(order.user, "username", None) if getattr(order, "user", None) else None,
         shipping_address=order.shipping_address,
         billing_address=order.billing_address,
     )
 
 
+@router.post("/guest-checkout/email/request", status_code=status.HTTP_204_NO_CONTENT)
+async def request_guest_email_verification(
+    payload: GuestEmailVerificationRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    session_id: str | None = Depends(cart_api.session_header),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+) -> None:
+    if not session_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing guest session id")
+
+    email = _normalize_email(str(payload.email))
+    existing = await auth_service.get_user_by_email(session, email)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered; please sign in to checkout.",
+        )
+
+    cart = await cart_service.get_cart(session, None, session_id)
+    token = _generate_guest_email_token()
+    now = datetime.now(timezone.utc)
+
+    cart.guest_email = email
+    cart.guest_email_verification_token = token
+    cart.guest_email_verification_expires_at = now + timedelta(minutes=30)
+    cart.guest_email_verified_at = None
+    session.add(cart)
+    await session.commit()
+
+    background_tasks.add_task(email_service.send_verification_email, email, token, lang)
+
+
+@router.post("/guest-checkout/email/confirm", response_model=GuestEmailVerificationStatus)
+async def confirm_guest_email_verification(
+    payload: GuestEmailVerificationConfirmRequest,
+    session: AsyncSession = Depends(get_session),
+    session_id: str | None = Depends(cart_api.session_header),
+) -> GuestEmailVerificationStatus:
+    if not session_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing guest session id")
+
+    cart = await cart_service.get_cart(session, None, session_id)
+    email = _normalize_email(str(payload.email))
+    token = (payload.token or "").strip()
+
+    if not cart.guest_email or _normalize_email(cart.guest_email) != email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email mismatch")
+    if not cart.guest_email_verification_token or cart.guest_email_verification_token != token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
+    expires = cart.guest_email_verification_expires_at
+    if expires and expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if not expires or expires < datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
+
+    cart.guest_email_verified_at = datetime.now(timezone.utc)
+    cart.guest_email_verification_token = None
+    cart.guest_email_verification_expires_at = None
+    session.add(cart)
+    await session.commit()
+    await session.refresh(cart)
+    return GuestEmailVerificationStatus(email=cart.guest_email, verified=True)
+
+
+@router.get("/guest-checkout/email/status", response_model=GuestEmailVerificationStatus)
+async def guest_email_verification_status(
+    session: AsyncSession = Depends(get_session),
+    session_id: str | None = Depends(cart_api.session_header),
+) -> GuestEmailVerificationStatus:
+    if not session_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing guest session id")
+    cart = await cart_service.get_cart(session, None, session_id)
+    return GuestEmailVerificationStatus(email=cart.guest_email, verified=cart.guest_email_verified_at is not None)
+
+
 @router.post("/guest-checkout", response_model=GuestCheckoutResponse, status_code=status.HTTP_201_CREATED)
 async def guest_checkout(
-    _payload: GuestCheckoutRequest,
-    _background_tasks: BackgroundTasks,
-    _session: AsyncSession = Depends(get_session),
-    _session_id: str | None = Depends(cart_api.session_header),
+    payload: GuestCheckoutRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    session_id: str | None = Depends(cart_api.session_header),
 ):
-    raise HTTPException(status_code=status.HTTP_410_GONE, detail="Guest checkout disabled; please sign in")
+    if not session_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing guest session id")
+
+    email = _normalize_email(str(payload.email))
+    existing = await auth_service.get_user_by_email(session, email)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered; please sign in to checkout.",
+        )
+
+    cart = await cart_service.get_cart(session, None, session_id)
+    if not cart.items:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
+    if not cart.guest_email_verified_at or _normalize_email(cart.guest_email or "") != email:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email verification required")
+
+    user_id = None
+    customer_name = (payload.name or "").strip()
+    if not customer_name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Name is required")
+
+    if payload.create_account:
+        if not payload.password:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password is required")
+        if not payload.username:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username is required")
+        if not payload.first_name:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="First name is required")
+        if not payload.last_name:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Last name is required")
+        if not payload.date_of_birth:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Date of birth is required")
+        if not payload.phone:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phone is required")
+
+        user = await auth_service.create_user(
+            session,
+            UserCreate(
+                email=email,
+                username=payload.username,
+                password=payload.password,
+                name=customer_name,
+                first_name=payload.first_name,
+                middle_name=payload.middle_name,
+                last_name=payload.last_name,
+                date_of_birth=payload.date_of_birth,
+                phone=payload.phone,
+                preferred_language=payload.preferred_language or "en",
+            ),
+        )
+        user.email_verified = True
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+        user_id = user.id
+
+    shipping_method = None
+    if payload.shipping_method_id:
+        shipping_method = await order_service.get_shipping_method(session, payload.shipping_method_id)
+        if not shipping_method:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
+
+    promo = None
+    if payload.promo_code:
+        promo = await cart_service.validate_promo(session, payload.promo_code, currency=None)
+
+    shipping_addr = await address_service.create_address(
+        session,
+        user_id,
+        AddressCreate(
+            label="Guest Checkout" if not payload.create_account else "Checkout",
+            line1=payload.line1,
+            line2=payload.line2,
+            city=payload.city,
+            region=payload.region,
+            postal_code=payload.postal_code,
+            country=payload.country,
+            is_default_shipping=bool(payload.save_address and payload.create_account),
+            is_default_billing=bool(payload.save_address and payload.create_account),
+        ),
+    )
+
+    totals, discount_val = cart_service.calculate_totals(cart, shipping_method=shipping_method, promo=promo)
+    intent = await payments.create_payment_intent(session, cart, amount_cents=int(totals.total * 100))
+    order = await order_service.build_order_from_cart(
+        session,
+        user_id,
+        customer_email=email,
+        customer_name=customer_name,
+        cart=cart,
+        shipping_address_id=shipping_addr.id,
+        billing_address_id=shipping_addr.id,
+        shipping_method=shipping_method,
+        payment_intent_id=intent["intent_id"],
+        discount=discount_val,
+    )
+
+    background_tasks.add_task(email_service.send_order_confirmation, email, order, order.items)
+    owner = await auth_service.get_owner_user(session)
+    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+    if admin_to:
+        background_tasks.add_task(
+            email_service.send_new_order_notification,
+            admin_to,
+            order,
+            email,
+            owner.preferred_language if owner else None,
+        )
+
+    return GuestCheckoutResponse(order_id=order.id, reference_code=order.reference_code, client_secret=intent["client_secret"])
 
 
 @router.patch("/admin/{order_id}", response_model=AdminOrderRead)
@@ -281,25 +489,30 @@ async def admin_update_order(
         if not shipping_method:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
     updated = await order_service.update_order(session, order, payload, shipping_method=shipping_method)
-    if previous_status != updated.status and updated.status == OrderStatus.shipped and updated.user and updated.user.email:
-        background_tasks.add_task(
-            email_service.send_shipping_update, updated.user.email, updated, updated.tracking_number
+    if previous_status != updated.status and updated.status == OrderStatus.shipped:
+        shipping_to = (
+            updated.user.email
+            if updated.user and updated.user.email
+            else getattr(updated, "customer_email", None)
         )
-        await notification_service.create_notification(
-            session,
-            user_id=updated.user.id,
-            type="order",
-            title="Order shipped" if (updated.user.preferred_language or "en") != "ro" else "Comandă expediată",
-            body=f"Reference {updated.reference_code}" if updated.reference_code else None,
-            url="/account",
-        )
+        if shipping_to:
+            background_tasks.add_task(email_service.send_shipping_update, shipping_to, updated, updated.tracking_number)
+        if updated.user and updated.user.id:
+            await notification_service.create_notification(
+                session,
+                user_id=updated.user.id,
+                type="order",
+                title="Order shipped" if (updated.user.preferred_language or "en") != "ro" else "Comandă expediată",
+                body=f"Reference {updated.reference_code}" if updated.reference_code else None,
+                url="/account",
+            )
     full = await order_service.get_order_by_id_admin(session, order_id)
     if not full:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
     base = OrderRead.model_validate(full).model_dump()
     return AdminOrderRead(
         **base,
-        customer_email=getattr(full.user, "email", None) if getattr(full, "user", None) else None,
+        customer_email=getattr(full, "customer_email", None) or (getattr(full.user, "email", None) if getattr(full, "user", None) else None),
         customer_username=getattr(full.user, "username", None) if getattr(full, "user", None) else None,
         shipping_address=full.shipping_address,
         billing_address=full.billing_address,
@@ -337,7 +550,7 @@ async def admin_refund_order(
             email_service.send_refund_requested_notification,
             admin_to,
             updated,
-            customer_email=(updated.user.email if updated.user and updated.user.email else None),
+            customer_email=getattr(updated, "customer_email", None) or (updated.user.email if updated.user and updated.user.email else None),
             requested_by_email=getattr(admin_user, "email", None),
             note=note,
             lang=owner.preferred_language if owner else None,
@@ -354,9 +567,10 @@ async def admin_send_delivery_email(
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    if not order.user or not order.user.email:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order user email missing")
-    await email_service.send_delivery_confirmation(order.user.email, order)
+    to_email = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
+    if not to_email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order customer email missing")
+    await email_service.send_delivery_confirmation(to_email, order, getattr(order.user, "preferred_language", None) if order.user else None)
     return order
 
 

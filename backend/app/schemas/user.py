@@ -1,7 +1,8 @@
+import re
 from datetime import datetime, date
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.models.user import UserRole
 
@@ -21,6 +22,18 @@ class UserBase(BaseModel):
     date_of_birth: date | None = None
     phone: str | None = Field(default=None, max_length=32)
     preferred_language: str | None = None
+
+    @field_validator("phone")
+    @classmethod
+    def _normalize_phone(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if not value:
+            return None
+        if not re.fullmatch(r"^\+[1-9]\d{1,14}$", value):
+            raise ValueError("Phone must be in E.164 format (e.g. +40723204204)")
+        return value
 
 
 class UserCreate(UserBase):

@@ -14,6 +14,7 @@ import { appConfig } from '../../core/app-config';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ThemeMode, ThemeService } from '../../core/theme.service';
 import { AuthService } from '../../core/auth.service';
+import { buildE164, listPhoneCountries, PhoneCountryOption } from '../../shared/phone';
 
 @Component({
   selector: 'app-checkout',
@@ -22,7 +23,7 @@ import { AuthService } from '../../core/auth.service';
   template: `
 	    <app-container classes="py-10 grid gap-6">
 	      <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-	      <div class="grid lg:grid-cols-[2fr_1fr] gap-6 items-start" *ngIf="auth.isAuthenticated(); else authRequiredTpl">
+	      <div class="grid lg:grid-cols-[2fr_1fr] gap-6 items-start">
 	        <section class="grid gap-4">
 	          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'checkout.title' | translate }}</h1>
 	          <div
@@ -33,6 +34,16 @@ import { AuthService } from '../../core/auth.service';
 	            <app-button size="sm" variant="ghost" [label]="'checkout.retry' | translate" (action)="retryValidation()"></app-button>
 	          </div>
 	          <div
+	            *ngIf="!auth.isAuthenticated()"
+	            class="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-800 flex flex-wrap items-center justify-between gap-3 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+	          >
+	            <span class="font-medium">{{ 'checkout.guest' | translate }}</span>
+	            <div class="flex flex-wrap gap-2">
+	              <app-button size="sm" variant="ghost" [label]="'auth.login' | translate" routerLink="/login"></app-button>
+	              <app-button size="sm" variant="ghost" [label]="'auth.register' | translate" routerLink="/register"></app-button>
+	            </div>
+	          </div>
+	          <div
 	            *ngIf="auth.isAuthenticated() && !emailVerified()"
 	            class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex items-start justify-between gap-3 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
 	          >
@@ -40,6 +51,137 @@ import { AuthService } from '../../core/auth.service';
 	            <app-button size="sm" variant="ghost" [label]="'auth.emailVerificationConfirm' | translate" routerLink="/account"></app-button>
 	          </div>
 	          <form #checkoutForm="ngForm" class="grid gap-4" (ngSubmit)="placeOrder(checkoutForm)">
+	            <div
+	              *ngIf="!auth.isAuthenticated()"
+	              class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+	            >
+	              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step1' | translate }}</p>
+	              <label class="flex items-center gap-2 text-sm">
+	                <input type="checkbox" [(ngModel)]="guestCreateAccount" name="guestCreateAccount" />
+	                {{ 'checkout.createAccount' | translate }}
+	              </label>
+	              <div *ngIf="guestCreateAccount" class="grid sm:grid-cols-2 gap-3">
+	                <label class="text-sm grid gap-1">
+	                  {{ 'auth.username' | translate }}
+	                  <input
+	                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                    name="guestUsername"
+	                    [(ngModel)]="guestUsername"
+	                    autocomplete="username"
+	                    required
+	                    minlength="3"
+	                    maxlength="30"
+	                    pattern="^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$"
+	                  />
+	                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'auth.usernameInvalid' | translate }}</span>
+	                </label>
+	                <div class="grid gap-1 text-sm">
+	                  <span class="font-medium text-slate-700 dark:text-slate-200">{{ 'auth.password' | translate }}</span>
+	                  <div class="grid grid-cols-[1fr_auto] gap-2 items-center">
+	                    <input
+	                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                      name="guestPassword"
+	                      [type]="guestShowPassword ? 'text' : 'password'"
+	                      [(ngModel)]="guestPassword"
+	                      autocomplete="new-password"
+	                      required
+	                      minlength="6"
+	                      maxlength="128"
+	                    />
+	                    <app-button size="sm" variant="ghost" [label]="guestShowPassword ? ('auth.hide' | translate) : ('auth.show' | translate)" (action)="toggleGuestPassword()"></app-button>
+	                  </div>
+	                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'auth.passwordMin' | translate }}</span>
+	                </div>
+	                <div class="grid gap-1 text-sm">
+	                  <span class="font-medium text-slate-700 dark:text-slate-200">{{ 'auth.confirmPassword' | translate }}</span>
+	                  <div class="grid grid-cols-[1fr_auto] gap-2 items-center">
+	                    <input
+	                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                      name="guestPasswordConfirm"
+	                      [type]="guestShowPasswordConfirm ? 'text' : 'password'"
+	                      [(ngModel)]="guestPasswordConfirm"
+	                      autocomplete="new-password"
+	                      required
+	                      minlength="6"
+	                      maxlength="128"
+	                    />
+	                    <app-button
+	                      size="sm"
+	                      variant="ghost"
+	                      [label]="guestShowPasswordConfirm ? ('auth.hide' | translate) : ('auth.show' | translate)"
+	                      (action)="toggleGuestPasswordConfirm()"
+	                    ></app-button>
+	                  </div>
+	                  <span *ngIf="guestPasswordConfirm && guestPasswordConfirm !== guestPassword" class="text-xs text-amber-700 dark:text-amber-300">
+	                    {{ 'auth.passwordMismatch' | translate }}
+	                  </span>
+	                </div>
+	                <label class="text-sm grid gap-1">
+	                  {{ 'auth.firstName' | translate }}
+	                  <input
+	                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                    name="guestFirstName"
+	                    [(ngModel)]="guestFirstName"
+	                    autocomplete="given-name"
+	                    required
+	                  />
+	                </label>
+	                <label class="text-sm grid gap-1">
+	                  {{ 'auth.middleName' | translate }}
+	                  <input
+	                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                    name="guestMiddleName"
+	                    [(ngModel)]="guestMiddleName"
+	                    autocomplete="additional-name"
+	                  />
+	                </label>
+	                <label class="text-sm grid gap-1">
+	                  {{ 'auth.lastName' | translate }}
+	                  <input
+	                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                    name="guestLastName"
+	                    [(ngModel)]="guestLastName"
+	                    autocomplete="family-name"
+	                    required
+	                  />
+	                </label>
+	                <label class="text-sm grid gap-1">
+	                  {{ 'auth.dateOfBirth' | translate }}
+	                  <input
+	                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                    name="guestDob"
+	                    type="date"
+	                    [(ngModel)]="guestDob"
+	                    required
+	                  />
+	                </label>
+	                <div class="grid gap-1 text-sm sm:col-span-2">
+	                  <span class="font-medium text-slate-700 dark:text-slate-200">{{ 'auth.phone' | translate }}</span>
+	                  <div class="grid grid-cols-[auto_1fr] gap-2">
+	                    <select
+	                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                      name="guestPhoneCountry"
+	                      [(ngModel)]="guestPhoneCountry"
+	                      required
+	                    >
+	                      <option *ngFor="let c of phoneCountries" [value]="c.code">{{ c.flag }} {{ c.dial }} {{ c.name }}</option>
+	                    </select>
+	                    <input
+	                      type="tel"
+	                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                      name="guestPhoneNational"
+	                      [(ngModel)]="guestPhoneNational"
+	                      autocomplete="tel-national"
+	                      required
+	                      pattern="^[0-9]{6,14}$"
+	                    />
+	                  </div>
+	                  <span *ngIf="guestPhoneNational && !guestPhoneE164()" class="text-xs text-amber-700 dark:text-amber-300">
+	                    {{ 'auth.phoneInvalid' | translate }}
+	                  </span>
+	                </div>
+	              </div>
+	            </div>
 	            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
 	              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step2' | translate }}</p>
 	              <div class="grid sm:grid-cols-2 gap-3">
@@ -49,7 +191,43 @@ import { AuthService } from '../../core/auth.service';
                 </label>
                 <label class="text-sm grid gap-1">
                   {{ 'checkout.email' | translate }}
-                  <input class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400" name="email" [(ngModel)]="address.email" type="email" required />
+                  <input class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400" name="email" [(ngModel)]="address.email" type="email" required (ngModelChange)="onEmailChanged()" />
+                  <div *ngIf="!auth.isAuthenticated()" class="flex flex-wrap items-center gap-2">
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="
+                        guestEmailVerified
+                          ? ('checkout.emailVerifyVerified' | translate)
+                          : guestVerificationSent
+                            ? ('checkout.emailVerifyResend' | translate)
+                            : ('checkout.emailVerifySend' | translate)
+                      "
+                      (action)="requestGuestEmailVerification()"
+                      [disabled]="guestSendingCode || !address.email || guestEmailVerified"
+                    ></app-button>
+                    <span *ngIf="guestEmailVerified" class="text-xs font-medium text-emerald-700 dark:text-emerald-300">✓</span>
+                  </div>
+                  <div *ngIf="!auth.isAuthenticated() && guestVerificationSent && !guestEmailVerified" class="grid gap-2">
+                    <div class="grid grid-cols-[1fr_auto] gap-2 items-center">
+                      <input
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                        name="guestEmailToken"
+                        [(ngModel)]="guestVerificationToken"
+                        [placeholder]="'auth.emailVerificationTokenPlaceholder' | translate"
+                        inputmode="numeric"
+                        maxlength="6"
+                        pattern="^[0-9]{6}$"
+                      />
+                      <app-button
+                        size="sm"
+                        [label]="'auth.emailVerificationConfirm' | translate"
+                        (action)="confirmGuestEmailVerification()"
+                        [disabled]="guestConfirmingCode || guestVerificationToken.trim().length < 6"
+                      ></app-button>
+                    </div>
+                    <p *ngIf="guestEmailError" class="text-xs text-amber-700 dark:text-amber-300">{{ guestEmailError }}</p>
+                  </div>
                 </label>
                 <label class="text-sm grid gap-1 sm:col-span-2">
                   {{ 'checkout.line1' | translate }}
@@ -79,7 +257,7 @@ import { AuthService } from '../../core/auth.service';
 	            </div>
 
 	            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-	              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step4' | translate }}</p>
+	              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step3' | translate }}</p>
 	              <div class="flex gap-3">
                 <input
                   class="rounded-lg border border-slate-200 bg-white px-3 py-2 flex-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
@@ -105,7 +283,7 @@ import { AuthService } from '../../core/auth.service';
             </div>
 
             <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step5' | translate }}</p>
+              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step4' | translate }}</p>
               <div class="border border-dashed border-slate-200 rounded-lg p-3 text-sm dark:border-slate-700">
                 <div #cardHost class="min-h-[48px]"></div>
                 <p *ngIf="cardError" class="text-rose-700 dark:text-rose-300 text-xs mt-2">{{ cardError }}</p>
@@ -148,16 +326,6 @@ import { AuthService } from '../../core/auth.service';
           </div>
 	        </aside>
 	      </div>
-	      <ng-template #authRequiredTpl>
-	        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
-	          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'checkout.title' | translate }}</h1>
-	          <p class="text-sm text-slate-700 dark:text-slate-200">{{ 'auth.haveAccount' | translate }}</p>
-	          <div class="flex flex-wrap gap-3">
-	            <app-button [label]="'auth.login' | translate" routerLink="/login"></app-button>
-	            <app-button variant="ghost" [label]="'auth.register' | translate" routerLink="/register"></app-button>
-	          </div>
-	        </section>
-	      </ng-template>
 	    </app-container>
 	  `
 })
@@ -174,6 +342,27 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
   errorMessage = '';
   pricesRefreshed = false;
   saveAddress = true;
+  guestCreateAccount = false;
+  guestUsername = '';
+  guestPassword = '';
+  guestPasswordConfirm = '';
+  guestShowPassword = false;
+  guestShowPasswordConfirm = false;
+  guestFirstName = '';
+  guestMiddleName = '';
+  guestLastName = '';
+  guestDob = '';
+  phoneCountries: PhoneCountryOption[] = [];
+  guestPhoneCountry = 'RO';
+  guestPhoneNational = '';
+  guestVerificationToken = '';
+  guestVerificationSent = false;
+  guestEmailVerified = false;
+  guestSendingCode = false;
+  guestConfirmingCode = false;
+  guestEmailError = '';
+  private lastGuestEmailRequested: string | null = null;
+  private lastGuestEmailVerified: string | null = null;
   address: { name: string; email: string; line1: string; line2?: string; city: string; region?: string; postal: string; country: string; password?: string } = {
     name: '',
     email: '',
@@ -210,6 +399,7 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
     if (saved) {
       this.address = saved;
     }
+    this.phoneCountries = listPhoneCountries(this.translate.currentLang || 'en');
     this.stripeThemeEffect = effect(() => {
       const mode = this.theme.mode()();
       if (this.card) {
@@ -224,6 +414,34 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
 
   emailVerified(): boolean {
     return Boolean(this.auth.user()?.email_verified);
+  }
+
+  onEmailChanged(): void {
+    if (this.auth.isAuthenticated()) return;
+    const normalized = (this.address.email || '').trim().toLowerCase();
+    if (this.lastGuestEmailVerified && normalized !== this.lastGuestEmailVerified) {
+      this.guestEmailVerified = false;
+      this.lastGuestEmailVerified = null;
+    }
+    if (this.lastGuestEmailRequested && normalized !== this.lastGuestEmailRequested) {
+      this.guestVerificationSent = false;
+      this.guestVerificationToken = '';
+      this.guestEmailError = '';
+      this.lastGuestEmailRequested = null;
+    }
+  }
+
+  toggleGuestPassword(): void {
+    this.guestShowPassword = !this.guestShowPassword;
+  }
+
+  toggleGuestPasswordConfirm(): void {
+    this.guestShowPasswordConfirm = !this.guestShowPasswordConfirm;
+  }
+
+  guestPhoneE164(): string | null {
+    const country = (this.guestPhoneCountry || 'RO') as any;
+    return buildE164(country, this.guestPhoneNational);
   }
 
   get total(): number {
@@ -245,9 +463,27 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.addressError = '';
-    if (!this.emailVerified()) {
+    if (this.auth.isAuthenticated() && !this.emailVerified()) {
       this.errorMessage = this.translate.instant('auth.emailVerificationNeeded');
       return;
+    }
+    if (!this.auth.isAuthenticated() && !this.guestEmailVerified) {
+      this.errorMessage = this.translate.instant('auth.emailVerificationNeeded');
+      return;
+    }
+    if (!this.auth.isAuthenticated() && this.guestCreateAccount) {
+      if (this.guestPassword.length < 6) {
+        this.errorMessage = this.translate.instant('auth.passwordMin');
+        return;
+      }
+      if (this.guestPassword !== this.guestPasswordConfirm) {
+        this.errorMessage = this.translate.instant('auth.passwordMismatch');
+        return;
+      }
+      if (!this.guestPhoneE164()) {
+        this.errorMessage = this.translate.instant('auth.phoneInvalid');
+        return;
+      }
     }
     const validation = this.validateCart();
     if (validation) {
@@ -256,7 +492,11 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
     }
     this.errorMessage = '';
     this.placing = true;
-    this.submitCheckout();
+    if (this.auth.isAuthenticated()) {
+      this.submitCheckout();
+    } else {
+      this.submitGuestCheckout();
+    }
   }
 
   retryValidation(): void {
@@ -305,6 +545,7 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
   async ngAfterViewInit(): Promise<void> {
     await this.setupStripe();
     this.syncBackendCart(this.items());
+    this.loadGuestEmailVerificationStatus();
   }
 
   ngOnDestroy(): void {
@@ -414,6 +655,150 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
       .post<{ order_id: string; reference_code?: string; client_secret: string }>(
         '/orders/checkout',
         body,
+        this.cartApi.headers()
+      )
+      .subscribe({
+        next: (res) => {
+          this.clientSecret = res.client_secret;
+          this.confirmPayment(res.client_secret)
+            .then((paymentOk) => {
+              if (!paymentOk) {
+                this.placing = false;
+                return;
+              }
+              if (this.saveAddress) this.persistAddress();
+              void this.router.navigate(['/checkout/success']);
+            })
+            .catch(() => {
+              this.errorMessage = this.translate.instant('checkout.paymentFailed');
+              this.placing = false;
+            });
+        },
+        error: (err) => {
+          this.errorMessage = err?.error?.detail || 'Checkout failed';
+          this.placing = false;
+        }
+      });
+  }
+
+  requestGuestEmailVerification(): void {
+    if (this.auth.isAuthenticated()) return;
+    this.guestEmailError = '';
+    const email = (this.address.email || '').trim();
+    if (!email) {
+      this.guestEmailError = this.translate.instant('checkout.addressRequired');
+      return;
+    }
+    this.guestSendingCode = true;
+    const lang = (this.translate.currentLang || 'en') === 'ro' ? 'ro' : 'en';
+    const url = `/orders/guest-checkout/email/request?lang=${lang}`;
+    this.api.post<void>(url, { email }, this.cartApi.headers()).subscribe({
+      next: () => {
+        this.guestSendingCode = false;
+        this.guestVerificationSent = true;
+        this.guestEmailVerified = false;
+        this.lastGuestEmailRequested = email.trim().toLowerCase();
+        this.lastGuestEmailVerified = null;
+      },
+      error: (err) => {
+        this.guestSendingCode = false;
+        this.guestEmailError = err?.error?.detail || 'Could not send verification code';
+      }
+    });
+  }
+
+  confirmGuestEmailVerification(): void {
+    if (this.auth.isAuthenticated()) return;
+    this.guestEmailError = '';
+    const email = (this.address.email || '').trim();
+    const token = (this.guestVerificationToken || '').trim();
+    if (!email || !token) {
+      this.guestEmailError = this.translate.instant('checkout.addressRequired');
+      return;
+    }
+    this.guestConfirmingCode = true;
+    this.api
+      .post<{ email: string | null; verified: boolean }>(
+        '/orders/guest-checkout/email/confirm',
+        { email, token },
+        this.cartApi.headers()
+      )
+      .subscribe({
+        next: (res) => {
+          this.guestConfirmingCode = false;
+          this.guestEmailVerified = Boolean(res?.verified);
+          this.lastGuestEmailVerified = (res?.email || email).trim().toLowerCase();
+          this.guestVerificationToken = '';
+        },
+        error: (err) => {
+          this.guestConfirmingCode = false;
+          this.guestEmailError = err?.error?.detail || 'Invalid code';
+        }
+      });
+  }
+
+  private loadGuestEmailVerificationStatus(): void {
+    if (this.auth.isAuthenticated()) return;
+    this.api
+      .get<{ email: string | null; verified: boolean }>(
+        '/orders/guest-checkout/email/status',
+        undefined,
+        this.cartApi.headers()
+      )
+      .subscribe({
+        next: (res) => {
+          if (!res) return;
+          this.guestEmailVerified = Boolean(res.verified);
+          const email = (res.email || '').trim();
+          if (email) {
+            if (!this.address.email) {
+              this.address.email = email;
+            }
+            this.lastGuestEmailVerified = email.toLowerCase();
+          }
+          if (!this.guestEmailVerified && email) {
+            this.lastGuestEmailRequested = email.toLowerCase();
+            this.guestVerificationSent = true;
+          }
+        },
+        error: () => {
+          // Best-effort; allow checkout UI to function even if status lookup fails.
+        }
+      });
+  }
+
+  private submitGuestCheckout(): void {
+    const preferredLanguage = (this.translate.currentLang || 'en') === 'ro' ? 'ro' : 'en';
+    const payload: Record<string, unknown> = {
+      name: this.address.name,
+      email: this.address.email,
+      line1: this.address.line1,
+      line2: this.address.line2 || null,
+      city: this.address.city,
+      region: this.address.region || null,
+      postal_code: this.address.postal,
+      country: this.address.country || 'RO',
+      shipping_method_id: null,
+      promo_code: this.promo || null,
+      save_address: this.saveAddress,
+      create_account: this.guestCreateAccount
+    };
+
+    if (this.guestCreateAccount) {
+      payload['username'] = this.guestUsername;
+      payload['password'] = this.guestPassword;
+      payload['first_name'] = this.guestFirstName;
+      payload['middle_name'] = this.guestMiddleName || null;
+      payload['last_name'] = this.guestLastName;
+      payload['date_of_birth'] = this.guestDob;
+      payload['phone'] = this.guestPhoneE164();
+      payload['preferred_language'] = preferredLanguage;
+    }
+
+    this.api
+      .post<{ order_id: string; reference_code?: string; client_secret: string }>(
+        '/orders/guest-checkout',
+        payload,
         this.cartApi.headers()
       )
       .subscribe({

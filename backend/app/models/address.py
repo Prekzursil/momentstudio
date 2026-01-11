@@ -13,7 +13,7 @@ class Address(Base):
     __tablename__ = "addresses"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     label: Mapped[str | None] = mapped_column(String(50), nullable=True)
     line1: Mapped[str] = mapped_column(String(200), nullable=False)
     line2: Mapped[str | None] = mapped_column(String(200), nullable=True)
@@ -30,4 +30,4 @@ class Address(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    user: Mapped[User] = relationship("User")
+    user: Mapped[User | None] = relationship("User")
