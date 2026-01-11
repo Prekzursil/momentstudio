@@ -369,7 +369,14 @@ async def list_featured_collections(session: AsyncSession) -> list[FeaturedColle
     result = await session.execute(
         select(FeaturedCollection).options(selectinload(FeaturedCollection.products)).order_by(FeaturedCollection.created_at.desc())
     )
-    return list(result.scalars().unique())
+    collections = list(result.scalars().unique())
+    for collection in collections:
+        collection.products = [
+            product
+            for product in collection.products
+            if not product.is_deleted and product.is_active and product.status == ProductStatus.published
+        ]
+    return collections
 
 
 async def _load_products_by_ids(session: AsyncSession, product_ids: list[uuid.UUID]) -> list[Product]:
@@ -417,7 +424,11 @@ async def get_product_feed(session: AsyncSession, lang: str | None = None) -> li
             selectinload(Product.translations) if lang else selectinload(Product.category),
             selectinload(Product.category).selectinload(Category.translations) if lang else selectinload(Product.category),
         )
-        .where(Product.is_deleted.is_(False), Product.status == ProductStatus.published)
+        .where(
+            Product.is_deleted.is_(False),
+            Product.is_active.is_(True),
+            Product.status == ProductStatus.published,
+        )
         .order_by(Product.created_at.desc())
     )
     products = result.scalars().unique().all()
@@ -476,7 +487,11 @@ async def get_product_price_bounds(
         func.max(Product.base_price),
         func.count(func.distinct(Product.currency)),
         func.min(Product.currency),
-    ).where(Product.is_deleted.is_(False))
+    ).where(
+        Product.is_deleted.is_(False),
+        Product.is_active.is_(True),
+        Product.status == ProductStatus.published,
+    )
 
     if category_slug:
         query = query.join(Category).where(Category.slug == category_slug)
@@ -520,7 +535,11 @@ async def list_products_with_filters(
         options.append(selectinload(Product.category).selectinload(Category.translations))
     else:
         options.append(selectinload(Product.category))
-    base_query = select(Product).options(*options).where(Product.is_deleted.is_(False))
+    base_query = (
+        select(Product)
+        .options(*options)
+        .where(Product.is_deleted.is_(False), Product.is_active.is_(True), Product.status == ProductStatus.published)
+    )
     if category_slug:
         base_query = base_query.join(Category).where(Category.slug == category_slug)
     if is_featured is not None:
@@ -679,6 +698,7 @@ async def get_related_products(session: AsyncSession, product: Product, limit: i
             Product.category_id == product.category_id,
             Product.id != product.id,
             Product.is_deleted.is_(False),
+            Product.is_active.is_(True),
             Product.status == ProductStatus.published,
         )
         .order_by(Product.is_featured.desc(), Product.created_at.desc())
@@ -734,7 +754,11 @@ async def get_recently_viewed(
         .options(selectinload(RecentlyViewedProduct.product).selectinload(Product.images))
         .where(
             RecentlyViewedProduct.product.has(
-                and_(Product.is_deleted.is_(False), Product.status == ProductStatus.published)
+                and_(
+                    Product.is_deleted.is_(False),
+                    Product.is_active.is_(True),
+                    Product.status == ProductStatus.published,
+                )
             )
         )
     )

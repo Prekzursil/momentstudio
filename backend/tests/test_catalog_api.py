@@ -116,17 +116,16 @@ def test_catalog_admin_and_public_flows(test_app: Dict[str, object]) -> None:
     assert second.status_code == 201, second.text
     assert second.json()["status"] == "published"
 
-    # Public list
+    # Public list should only include published + active products
     res = client.get("/api/v1/catalog/products?sort=name_asc")
     assert res.status_code == 200
     body = res.json()
-    assert body["meta"]["total_items"] == 2
-    assert len(body["items"]) == 2
-    assert body["bounds"]["min_price"] == 10.5
+    assert body["meta"]["total_items"] == 1
+    assert len(body["items"]) == 1
+    assert body["bounds"]["min_price"] == 25.0
     assert body["bounds"]["max_price"] == 25.0
     assert body["bounds"]["currency"] == "RON"
     assert body["items"][0]["slug"] == "blue-cup"
-    assert body["items"][1]["slug"] == "white-cup"
 
     # Add translations directly
     async def add_translations():
@@ -153,7 +152,35 @@ def test_catalog_admin_and_public_flows(test_app: Dict[str, object]) -> None:
     assert ro_items[0]["name"] == "Cană Albastră"
     assert ro_items[0]["category"]["name"] == "Căni"
 
-    # Public detail
+    # Draft is not visible publicly, but visible to admins
+    res = client.get("/api/v1/catalog/products/white-cup")
+    assert res.status_code == 404
+
+    admin_detail = client.get("/api/v1/catalog/products/white-cup", headers=auth_headers(admin_token))
+    assert admin_detail.status_code == 200
+    assert admin_detail.json()["slug"] == "white-cup"
+
+    # Publish the draft so it becomes publicly visible
+    publish = client.patch(
+        "/api/v1/catalog/products/white-cup",
+        json={"status": "published"},
+        headers=auth_headers(admin_token),
+    )
+    assert publish.status_code == 200
+    assert publish.json()["status"] == "published"
+
+    # Public list now includes both
+    res = client.get("/api/v1/catalog/products?sort=name_asc")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["meta"]["total_items"] == 2
+    assert len(body["items"]) == 2
+    assert body["bounds"]["min_price"] == 10.5
+    assert body["bounds"]["max_price"] == 25.0
+    assert body["items"][0]["slug"] == "blue-cup"
+    assert body["items"][1]["slug"] == "white-cup"
+
+    # Public detail (published)
     res = client.get("/api/v1/catalog/products/white-cup")
     assert res.status_code == 200
     assert res.json()["slug"] == "white-cup"
@@ -227,6 +254,7 @@ def test_product_price_bounds(test_app: Dict[str, object]) -> None:
             "base_price": 10,
             "currency": "RON",
             "stock_quantity": 10,
+            "status": "published",
         },
         headers=auth_headers(admin_token),
     )
@@ -241,6 +269,7 @@ def test_product_price_bounds(test_app: Dict[str, object]) -> None:
             "base_price": 25,
             "currency": "RON",
             "stock_quantity": 5,
+            "status": "published",
         },
         headers=auth_headers(admin_token),
     )
@@ -255,6 +284,7 @@ def test_product_price_bounds(test_app: Dict[str, object]) -> None:
             "base_price": 100,
             "currency": "RON",
             "stock_quantity": 2,
+            "status": "published",
         },
         headers=auth_headers(admin_token),
     )
@@ -527,6 +557,7 @@ def test_preorder_shipping_meta_and_sort(test_app: Dict[str, object]) -> None:
             "depth_cm": 3.0,
             "meta_title": "Meta A",
             "meta_description": "Meta desc",
+            "status": "published",
         },
         headers=auth_headers(admin_token),
     )
@@ -548,6 +579,7 @@ def test_preorder_shipping_meta_and_sort(test_app: Dict[str, object]) -> None:
             "base_price": 20,
             "currency": "RON",
             "stock_quantity": 1,
+            "status": "published",
         },
         headers=auth_headers(admin_token),
     )

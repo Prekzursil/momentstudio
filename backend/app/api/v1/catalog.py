@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.core.dependencies import require_admin, get_current_user_optional
 from app.db.session import get_session
 from app.models.catalog import Category, Product, ProductReview, ProductStatus
+from app.models.user import UserRole
 from app.schemas.catalog import (
     CategoryCreate,
     CategoryRead,
@@ -347,7 +348,10 @@ async def get_product(
     )
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    if product.status == ProductStatus.published:
+    is_admin = current_user is not None and getattr(current_user, "role", None) in (UserRole.admin, UserRole.owner)
+    if not is_admin and (not product.is_active or product.status != ProductStatus.published):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    if product.is_active and product.status == ProductStatus.published:
         await catalog_service.record_recently_viewed(
             session, product, getattr(current_user, "id", None) if current_user else None, session_id
         )

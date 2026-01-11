@@ -6,15 +6,9 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from app.models.order import OrderStatus
+from app.schemas.admin_common import AdminPaginationMeta
 from app.schemas.address import AddressRead
 from app.schemas.order import OrderRead
-
-
-class AdminPaginationMeta(BaseModel):
-    total_items: int
-    total_pages: int
-    page: int
-    limit: int
 
 
 class AdminOrderListItem(BaseModel):
@@ -38,4 +32,3 @@ class AdminOrderRead(OrderRead):
     customer_username: str | None = None
     shipping_address: AddressRead | None = None
     billing_address: AddressRead | None = None
-
