@@ -259,23 +259,25 @@
     "paymentNotReady": "Payment not initialized yet. Please wait.",
     "paymentFailed": "Payment failed.",
     "paymentConfirmError": "Payment confirmation failed. Please try again.",
-    "step1": "Step 1 · Who's checking out?",
+    "step1": "Account (optional)",
     "guest": "Checkout as guest",
     "createAccount": "Create account during checkout",
-    "step2": "Step 1 · Shipping address",
+    "step2": "Shipping address",
     "name": "Full name",
     "email": "Email",
+    "emailVerifySend": "Send code",
+    "emailVerifyResend": "Resend code",
+    "emailVerifyVerified": "Verified",
     "line1": "Address line",
     "city": "City",
     "postal": "Postal code",
     "country": "Country",
     "countrySelect": "Select a country",
     "saveAddress": "Save this address for next time",
-    "step3": "Step 3 · Shipping method",
-    "step4": "Step 2 · Promo code",
+    "step3": "Promo code",
     "promoPlaceholder": "Enter code",
     "apply": "Apply",
-    "step5": "Step 3 · Payment",
+    "step4": "Payment",
     "placeOrder": "Place order",
     "backToCart": "Back to cart",
     "summary": "Order summary",
@@ -406,11 +408,76 @@
       "lowStockTrackedSubtitle": "{{count}} tracked"
     },
     "actions": {
+      "add": "Add",
       "reset": "Reset",
       "delete": "Delete",
+      "remove": "Remove",
       "save": "Save",
       "edit": "Edit",
       "refresh": "Refresh"
+    },
+    "site": {
+      "assets": {
+        "title": "Site assets",
+        "logoUrl": "Logo URL",
+        "faviconUrl": "Favicon URL",
+        "socialImageUrl": "Social image URL",
+        "save": "Save assets",
+        "success": { "save": "Assets saved." },
+        "errors": { "save": "Could not save assets." }
+      },
+      "social": {
+        "title": "Social & contact",
+        "phone": "Phone",
+        "email": "Email",
+        "instagramPages": "Instagram pages",
+        "facebookPages": "Facebook pages",
+        "label": "Label",
+        "url": "URL",
+        "thumbnailUrlOptional": "Thumbnail URL (optional)",
+        "fetchThumbnail": "Fetch thumbnail",
+        "fetching": "Fetching…",
+        "socialLink": "Social link",
+        "success": {
+          "save": "Saved.",
+          "thumbnailUpdated": "Thumbnail updated"
+        },
+        "errors": {
+          "save": "Could not save.",
+          "urlRequired": "URL is required.",
+          "noThumbnail": "No thumbnail found.",
+          "fetchFailed": "Could not fetch thumbnail."
+        }
+      },
+      "seo": {
+        "title": "SEO meta",
+        "page": "Page",
+        "pages": {
+          "home": "Home",
+          "shop": "Shop",
+          "product": "Product",
+          "category": "Category",
+          "about": "Our story"
+        },
+        "metaTitle": "Meta title",
+        "metaDescription": "Meta description",
+        "save": "Save SEO",
+        "success": { "save": "SEO saved." },
+        "errors": { "save": "Could not save SEO." }
+      },
+      "pages": {
+        "title": "Static pages",
+        "aboutLabel": "Our story (About)",
+        "saveAbout": "Save about",
+        "faqLabel": "FAQ",
+        "saveFaq": "Save FAQ",
+        "shippingLabel": "Shipping",
+        "saveShipping": "Save shipping",
+        "contactLabel": "Contact",
+        "saveContact": "Save contact",
+        "success": { "save": "Content saved." },
+        "errors": { "save": "Could not save content." }
+      }
     },
     "fx": {
       "title": "FX rates",

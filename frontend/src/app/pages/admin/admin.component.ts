@@ -143,57 +143,57 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Global assets</h2>
-              <app-button size="sm" variant="ghost" label="Reload" (action)="loadAssets()"></app-button>
-            </div>
-            <div class="grid md:grid-cols-3 gap-3 text-sm">
-              <app-input label="Logo URL" [(value)]="assetsForm.logo_url"></app-input>
-              <app-input label="Favicon URL" [(value)]="assetsForm.favicon_url"></app-input>
-              <app-input label="Social preview image URL" [(value)]="assetsForm.social_image_url"></app-input>
+	          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	            <div class="flex items-center justify-between">
+	              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.assets.title' | translate }}</h2>
+	              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadAssets()"></app-button>
+	            </div>
+	            <div class="grid md:grid-cols-3 gap-3 text-sm">
+	              <app-input [label]="'adminUi.site.assets.logoUrl' | translate" [(value)]="assetsForm.logo_url"></app-input>
+	              <app-input [label]="'adminUi.site.assets.faviconUrl' | translate" [(value)]="assetsForm.favicon_url"></app-input>
+	              <app-input [label]="'adminUi.site.assets.socialImageUrl' | translate" [(value)]="assetsForm.social_image_url"></app-input>
             </div>
             <div class="flex items-center gap-2 text-sm">
-              <app-button size="sm" label="Save assets" (action)="saveAssets()"></app-button>
+              <app-button size="sm" [label]="'adminUi.site.assets.save' | translate" (action)="saveAssets()"></app-button>
               <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="assetsMessage">{{ assetsMessage }}</span>
               <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="assetsError">{{ assetsError }}</span>
             </div>
           </section>
 
-          <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-            <div class="flex items-center justify-between gap-3">
-              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Site settings: social + contact</h2>
-              <div class="flex items-center gap-2">
-                <app-button size="sm" variant="ghost" label="Reload" (action)="loadSocial()"></app-button>
-                <app-button size="sm" label="Save" (action)="saveSocial()"></app-button>
-              </div>
-            </div>
+	          <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	            <div class="flex items-center justify-between gap-3">
+	              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.social.title' | translate }}</h2>
+	              <div class="flex items-center gap-2">
+	                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadSocial()"></app-button>
+	                <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="saveSocial()"></app-button>
+	              </div>
+	            </div>
             <div class="grid md:grid-cols-2 gap-3 text-sm">
-              <app-input label="Phone" [(value)]="socialForm.phone"></app-input>
-              <app-input label="Email" [(value)]="socialForm.email"></app-input>
+              <app-input [label]="'adminUi.site.social.phone' | translate" [(value)]="socialForm.phone"></app-input>
+              <app-input [label]="'adminUi.site.social.email' | translate" [(value)]="socialForm.email"></app-input>
             </div>
             <div class="grid md:grid-cols-2 gap-4">
               <div class="grid gap-2">
                 <div class="flex items-center justify-between">
-                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">Instagram pages</p>
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.social.instagramPages' | translate }}</p>
                   <button class="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-300" type="button" (click)="addSocialLink('instagram')">
-                    Add
+                    {{ 'adminUi.actions.add' | translate }}
                   </button>
                 </div>
                 <div *ngFor="let page of socialForm.instagram_pages; let i = index" class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
-                  <app-input label="Label" [(value)]="page.label"></app-input>
-                  <app-input label="URL" [(value)]="page.url"></app-input>
-                  <app-input label="Thumbnail URL (optional)" [(value)]="page.thumbnail_url"></app-input>
+                  <app-input [label]="'adminUi.site.social.label' | translate" [(value)]="page.label"></app-input>
+                  <app-input [label]="'adminUi.site.social.url' | translate" [(value)]="page.url"></app-input>
+                  <app-input [label]="'adminUi.site.social.thumbnailUrlOptional' | translate" [(value)]="page.thumbnail_url"></app-input>
                   <div class="flex items-center gap-2">
                     <app-button
                       size="sm"
                       variant="ghost"
-                      label="Fetch thumbnail"
+                      [label]="'adminUi.site.social.fetchThumbnail' | translate"
                       [disabled]="socialThumbLoading[socialThumbKey('instagram', i)] || !(page.url || '').trim()"
                       (action)="fetchSocialThumbnail('instagram', i)"
                     ></app-button>
                     <span *ngIf="socialThumbLoading[socialThumbKey('instagram', i)]" class="text-xs text-slate-600 dark:text-slate-300">
-                      Fetching…
+                      {{ 'adminUi.site.social.fetching' | translate }}
                     </span>
                     <span *ngIf="socialThumbErrors[socialThumbKey('instagram', i)]" class="text-xs text-rose-700 dark:text-rose-300">
                       {{ socialThumbErrors[socialThumbKey('instagram', i)] }}
@@ -207,31 +207,31 @@ import { formatIdentity } from '../../shared/user-identity';
                     loading="lazy"
                   />
                   <button class="text-xs text-rose-700 hover:underline dark:text-rose-300 justify-self-start" type="button" (click)="removeSocialLink('instagram', i)">
-                    Remove
+                    {{ 'adminUi.actions.remove' | translate }}
                   </button>
                 </div>
               </div>
               <div class="grid gap-2">
                 <div class="flex items-center justify-between">
-                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">Facebook pages</p>
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.social.facebookPages' | translate }}</p>
                   <button class="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-300" type="button" (click)="addSocialLink('facebook')">
-                    Add
+                    {{ 'adminUi.actions.add' | translate }}
                   </button>
                 </div>
                 <div *ngFor="let page of socialForm.facebook_pages; let i = index" class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
-                  <app-input label="Label" [(value)]="page.label"></app-input>
-                  <app-input label="URL" [(value)]="page.url"></app-input>
-                  <app-input label="Thumbnail URL (optional)" [(value)]="page.thumbnail_url"></app-input>
+                  <app-input [label]="'adminUi.site.social.label' | translate" [(value)]="page.label"></app-input>
+                  <app-input [label]="'adminUi.site.social.url' | translate" [(value)]="page.url"></app-input>
+                  <app-input [label]="'adminUi.site.social.thumbnailUrlOptional' | translate" [(value)]="page.thumbnail_url"></app-input>
                   <div class="flex items-center gap-2">
                     <app-button
                       size="sm"
                       variant="ghost"
-                      label="Fetch thumbnail"
+                      [label]="'adminUi.site.social.fetchThumbnail' | translate"
                       [disabled]="socialThumbLoading[socialThumbKey('facebook', i)] || !(page.url || '').trim()"
                       (action)="fetchSocialThumbnail('facebook', i)"
                     ></app-button>
                     <span *ngIf="socialThumbLoading[socialThumbKey('facebook', i)]" class="text-xs text-slate-600 dark:text-slate-300">
-                      Fetching…
+                      {{ 'adminUi.site.social.fetching' | translate }}
                     </span>
                     <span *ngIf="socialThumbErrors[socialThumbKey('facebook', i)]" class="text-xs text-rose-700 dark:text-rose-300">
                       {{ socialThumbErrors[socialThumbKey('facebook', i)] }}
@@ -245,7 +245,7 @@ import { formatIdentity } from '../../shared/user-identity';
                     loading="lazy"
                   />
                   <button class="text-xs text-rose-700 hover:underline dark:text-rose-300 justify-self-start" type="button" (click)="removeSocialLink('facebook', i)">
-                    Remove
+                    {{ 'adminUi.actions.remove' | translate }}
                   </button>
                 </div>
               </div>
@@ -258,37 +258,55 @@ import { formatIdentity } from '../../shared/user-identity';
 
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">SEO meta (per page & language)</h2>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.seo.title' | translate }}</h2>
               <div class="flex gap-2 text-sm">
                 <label class="flex items-center gap-2">
-                  Page
-                  <select class="rounded border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="seoPage" (ngModelChange)="loadSeo()">
-                    <option value="home">Home</option>
-                    <option value="shop">Shop</option>
-                    <option value="product">Product</option>
-                    <option value="category">Category</option>
-                    <option value="about">About</option>
+                  {{ 'adminUi.site.seo.page' | translate }}
+                  <select
+                    class="rounded border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="seoPage"
+                    (ngModelChange)="loadSeo()"
+                  >
+                    <option value="home">{{ 'adminUi.site.seo.pages.home' | translate }}</option>
+                    <option value="shop">{{ 'adminUi.site.seo.pages.shop' | translate }}</option>
+                    <option value="product">{{ 'adminUi.site.seo.pages.product' | translate }}</option>
+                    <option value="category">{{ 'adminUi.site.seo.pages.category' | translate }}</option>
+                    <option value="about">{{ 'adminUi.site.seo.pages.about' | translate }}</option>
                   </select>
                 </label>
                 <div class="flex items-center gap-2">
-                  <button class="px-3 py-1 rounded border" [class.bg-slate-900]="seoLang === 'en'" [class.text-white]="seoLang === 'en'" (click)="selectSeoLang('en')">
+                  <button
+                    class="px-3 py-1 rounded border"
+                    [class.bg-slate-900]="seoLang === 'en'"
+                    [class.text-white]="seoLang === 'en'"
+                    (click)="selectSeoLang('en')"
+                  >
                     EN
                   </button>
-                  <button class="px-3 py-1 rounded border" [class.bg-slate-900]="seoLang === 'ro'" [class.text-white]="seoLang === 'ro'" (click)="selectSeoLang('ro')">
+                  <button
+                    class="px-3 py-1 rounded border"
+                    [class.bg-slate-900]="seoLang === 'ro'"
+                    [class.text-white]="seoLang === 'ro'"
+                    (click)="selectSeoLang('ro')"
+                  >
                     RO
                   </button>
                 </div>
               </div>
             </div>
             <div class="grid md:grid-cols-2 gap-3 text-sm">
-              <app-input label="Meta title" [(value)]="seoForm.title"></app-input>
+              <app-input [label]="'adminUi.site.seo.metaTitle' | translate" [(value)]="seoForm.title"></app-input>
               <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                Meta description
-                <textarea rows="2" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="seoForm.description"></textarea>
+                {{ 'adminUi.site.seo.metaDescription' | translate }}
+                <textarea
+                  rows="2"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="seoForm.description"
+                ></textarea>
               </label>
             </div>
             <div class="flex items-center gap-2 text-sm">
-              <app-button size="sm" label="Save SEO" (action)="saveSeo()"></app-button>
+              <app-button size="sm" [label]="'adminUi.site.seo.save' | translate" (action)="saveSeo()"></app-button>
               <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="seoMessage">{{ seoMessage }}</span>
               <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="seoError">{{ seoError }}</span>
             </div>
@@ -296,44 +314,70 @@ import { formatIdentity } from '../../shared/user-identity';
 
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Static pages (RO/EN)</h2>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.pages.title' | translate }}</h2>
               <div class="flex gap-2 text-sm">
-                <button class="px-3 py-1 rounded border" [class.bg-slate-900]="infoLang === 'en'" [class.text-white]="infoLang === 'en'" (click)="selectInfoLang('en')">
+                <button
+                  class="px-3 py-1 rounded border"
+                  [class.bg-slate-900]="infoLang === 'en'"
+                  [class.text-white]="infoLang === 'en'"
+                  (click)="selectInfoLang('en')"
+                >
                   EN
                 </button>
-                <button class="px-3 py-1 rounded border" [class.bg-slate-900]="infoLang === 'ro'" [class.text-white]="infoLang === 'ro'" (click)="selectInfoLang('ro')">
+                <button
+                  class="px-3 py-1 rounded border"
+                  [class.bg-slate-900]="infoLang === 'ro'"
+                  [class.text-white]="infoLang === 'ro'"
+                  (click)="selectInfoLang('ro')"
+                >
                   RO
                 </button>
               </div>
             </div>
             <div class="grid gap-3 text-sm">
               <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
-                About content
-                <textarea rows="3" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="infoForm.about"></textarea>
+                {{ 'adminUi.site.pages.aboutLabel' | translate }}
+                <textarea
+                  rows="3"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="infoForm.about"
+                ></textarea>
               </label>
               <div class="flex gap-2">
-                <app-button size="sm" label="Save About" (action)="saveInfo('page.about', infoForm.about)"></app-button>
+                <app-button size="sm" [label]="'adminUi.site.pages.saveAbout' | translate" (action)="saveInfo('page.about', infoForm.about)"></app-button>
               </div>
               <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
-                FAQ content
-                <textarea rows="3" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="infoForm.faq"></textarea>
+                {{ 'adminUi.site.pages.faqLabel' | translate }}
+                <textarea
+                  rows="3"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="infoForm.faq"
+                ></textarea>
               </label>
               <div class="flex gap-2">
-                <app-button size="sm" label="Save FAQ" (action)="saveInfo('page.faq', infoForm.faq)"></app-button>
+                <app-button size="sm" [label]="'adminUi.site.pages.saveFaq' | translate" (action)="saveInfo('page.faq', infoForm.faq)"></app-button>
               </div>
               <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
-                Shipping/Returns content
-                <textarea rows="3" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="infoForm.shipping"></textarea>
+                {{ 'adminUi.site.pages.shippingLabel' | translate }}
+                <textarea
+                  rows="3"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="infoForm.shipping"
+                ></textarea>
               </label>
               <div class="flex gap-2">
-                <app-button size="sm" label="Save Shipping" (action)="saveInfo('page.shipping', infoForm.shipping)"></app-button>
+                <app-button size="sm" [label]="'adminUi.site.pages.saveShipping' | translate" (action)="saveInfo('page.shipping', infoForm.shipping)"></app-button>
               </div>
               <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
-                Contact page content
-                <textarea rows="3" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="infoForm.contact"></textarea>
+                {{ 'adminUi.site.pages.contactLabel' | translate }}
+                <textarea
+                  rows="3"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="infoForm.contact"
+                ></textarea>
               </label>
               <div class="flex gap-2">
-                <app-button size="sm" label="Save Contact" (action)="saveInfo('page.contact', infoForm.contact)"></app-button>
+                <app-button size="sm" [label]="'adminUi.site.pages.saveContact' | translate" (action)="saveInfo('page.contact', infoForm.contact)"></app-button>
                 <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="infoMessage">{{ infoMessage }}</span>
                 <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="infoError">{{ infoError }}</span>
               </div>
@@ -2930,28 +2974,28 @@ export class AdminComponent implements OnInit {
     });
   }
 
-  saveAssets(): void {
-    const payload = {
-      title: 'Site assets',
-      status: 'published',
-      meta: { ...this.assetsForm }
-    };
-    const onSuccess = () => {
-      this.assetsMessage = 'Assets saved';
-      this.assetsError = null;
-    };
-    this.admin.updateContentBlock('site.assets', payload).subscribe({
-      next: onSuccess,
-      error: () =>
-        this.admin.createContent('site.assets', payload).subscribe({
-          next: onSuccess,
-          error: () => {
-            this.assetsError = 'Could not save assets';
-            this.assetsMessage = null;
-          }
-        })
-    });
-  }
+	  saveAssets(): void {
+	    const payload = {
+	      title: 'Site assets',
+	      status: 'published',
+	      meta: { ...this.assetsForm }
+	    };
+	    const onSuccess = () => {
+	      this.assetsMessage = this.t('adminUi.site.assets.success.save');
+	      this.assetsError = null;
+	    };
+	    this.admin.updateContentBlock('site.assets', payload).subscribe({
+	      next: onSuccess,
+	      error: () =>
+	        this.admin.createContent('site.assets', payload).subscribe({
+	          next: onSuccess,
+	          error: () => {
+	            this.assetsError = this.t('adminUi.site.assets.errors.save');
+	            this.assetsMessage = null;
+	          }
+	        })
+	    });
+	  }
 
   loadSocial(): void {
     this.socialError = null;
@@ -2989,43 +3033,48 @@ export class AdminComponent implements OnInit {
     return `${platform}-${index}`;
   }
 
-  fetchSocialThumbnail(platform: 'instagram' | 'facebook', index: number): void {
-    const key = this.socialThumbKey(platform, index);
-    const pages = platform === 'instagram' ? this.socialForm.instagram_pages : this.socialForm.facebook_pages;
-    const page = pages[index];
-    const url = String(page?.url || '').trim();
-    if (!url) {
-      this.socialThumbErrors[key] = 'URL is required';
-      return;
-    }
+	  fetchSocialThumbnail(platform: 'instagram' | 'facebook', index: number): void {
+	    const key = this.socialThumbKey(platform, index);
+	    const pages = platform === 'instagram' ? this.socialForm.instagram_pages : this.socialForm.facebook_pages;
+	    const page = pages[index];
+	    const url = String(page?.url || '').trim();
+	    if (!url) {
+	      this.socialThumbErrors[key] = this.t('adminUi.site.social.errors.urlRequired');
+	      return;
+	    }
 
     this.socialThumbErrors[key] = '';
     this.socialThumbLoading[key] = true;
 
-    this.admin.fetchSocialThumbnail(url).subscribe({
-      next: (res) => {
-        this.socialThumbLoading[key] = false;
-        const thumb = String(res?.thumbnail_url || '').trim();
-        if (!thumb) {
-          this.socialThumbErrors[key] = 'No thumbnail found';
-          return;
-        }
-        page.thumbnail_url = thumb;
-        this.toast.success('Thumbnail updated', page.label || 'Social link');
-      },
-      error: (err) => {
-        this.socialThumbLoading[key] = false;
-        const msg = err?.error?.detail ? String(err.error.detail) : 'Could not fetch thumbnail';
-        this.socialThumbErrors[key] = msg;
-      }
-    });
-  }
+	    this.admin.fetchSocialThumbnail(url).subscribe({
+	      next: (res) => {
+	        this.socialThumbLoading[key] = false;
+	        const thumb = String(res?.thumbnail_url || '').trim();
+	        if (!thumb) {
+	          this.socialThumbErrors[key] = this.t('adminUi.site.social.errors.noThumbnail');
+	          return;
+	        }
+	        page.thumbnail_url = thumb;
+	        this.toast.success(
+	          this.t('adminUi.site.social.success.thumbnailUpdated'),
+	          (page.label || '').trim() || (page.url || '').trim() || this.t('adminUi.site.social.socialLink')
+	        );
+	      },
+	      error: (err) => {
+	        this.socialThumbLoading[key] = false;
+	        const msg = err?.error?.detail
+	          ? String(err.error.detail)
+	          : this.t('adminUi.site.social.errors.fetchFailed');
+	        this.socialThumbErrors[key] = msg;
+	      }
+	    });
+	  }
 
-  saveSocial(): void {
-    this.socialMessage = null;
-    this.socialError = null;
-    const instagram_pages = this.sanitizeSocialPages(this.socialForm.instagram_pages);
-    const facebook_pages = this.sanitizeSocialPages(this.socialForm.facebook_pages);
+	  saveSocial(): void {
+	    this.socialMessage = null;
+	    this.socialError = null;
+	    const instagram_pages = this.sanitizeSocialPages(this.socialForm.instagram_pages);
+	    const facebook_pages = this.sanitizeSocialPages(this.socialForm.facebook_pages);
     const payload = {
       title: 'Site social links',
       body_markdown: 'Social pages and contact details used across the storefront.',
@@ -3036,23 +3085,23 @@ export class AdminComponent implements OnInit {
         instagram_pages,
         facebook_pages
       }
-    };
-    const onSuccess = () => {
-      this.socialMessage = 'Saved';
-      this.socialError = null;
-    };
-    this.admin.updateContentBlock('site.social', payload).subscribe({
-      next: onSuccess,
-      error: () =>
-        this.admin.createContent('site.social', payload).subscribe({
-          next: onSuccess,
-          error: () => {
-            this.socialError = 'Could not save';
-            this.socialMessage = null;
-          }
-        })
-    });
-  }
+	    };
+	    const onSuccess = () => {
+	      this.socialMessage = this.t('adminUi.site.social.success.save');
+	      this.socialError = null;
+	    };
+	    this.admin.updateContentBlock('site.social', payload).subscribe({
+	      next: onSuccess,
+	      error: () =>
+	        this.admin.createContent('site.social', payload).subscribe({
+	          next: onSuccess,
+	          error: () => {
+	            this.socialError = this.t('adminUi.site.social.errors.save');
+	            this.socialMessage = null;
+	          }
+	        })
+	    });
+	  }
 
   private parseSocialPages(
     raw: unknown,
@@ -3106,30 +3155,30 @@ export class AdminComponent implements OnInit {
     });
   }
 
-  saveSeo(): void {
+	  saveSeo(): void {
     const payload = {
       title: this.seoForm.title,
       status: 'published',
       lang: this.seoLang,
       meta: { description: this.seoForm.description }
     };
-    const key = `seo.${this.seoPage}`;
-    const onSuccess = () => {
-      this.seoMessage = 'SEO saved';
-      this.seoError = null;
-    };
-    this.admin.updateContentBlock(key, payload).subscribe({
-      next: onSuccess,
-      error: () =>
-        this.admin.createContent(key, payload).subscribe({
-          next: onSuccess,
-          error: () => {
-            this.seoError = 'Could not save SEO';
-            this.seoMessage = null;
-          }
-        })
-    });
-  }
+	    const key = `seo.${this.seoPage}`;
+	    const onSuccess = () => {
+	      this.seoMessage = this.t('adminUi.site.seo.success.save');
+	      this.seoError = null;
+	    };
+	    this.admin.updateContentBlock(key, payload).subscribe({
+	      next: onSuccess,
+	      error: () =>
+	        this.admin.createContent(key, payload).subscribe({
+	          next: onSuccess,
+	          error: () => {
+	            this.seoError = this.t('adminUi.site.seo.errors.save');
+	            this.seoMessage = null;
+	          }
+	        })
+	    });
+	  }
 
   selectInfoLang(lang: 'en' | 'ro'): void {
     this.infoLang = lang;
@@ -3153,7 +3202,7 @@ export class AdminComponent implements OnInit {
     loadKey('page.contact', 'contact');
   }
 
-  saveInfo(key: 'page.about' | 'page.faq' | 'page.shipping' | 'page.contact', body: string): void {
+	  saveInfo(key: 'page.about' | 'page.faq' | 'page.shipping' | 'page.contact', body: string): void {
     this.infoMessage = null;
     this.infoError = null;
     const payload = {
@@ -3161,23 +3210,23 @@ export class AdminComponent implements OnInit {
       body_markdown: body,
       status: 'published',
       lang: this.infoLang
-    };
-    const onSuccess = () => {
-      this.infoMessage = 'Content saved';
-      this.infoError = null;
-    };
-    this.admin.updateContentBlock(key, payload).subscribe({
-      next: onSuccess,
-      error: () =>
-        this.admin.createContent(key, payload).subscribe({
-          next: onSuccess,
-          error: () => {
-            this.infoError = 'Could not save content';
-            this.infoMessage = null;
-          }
-        })
-    });
-  }
+	    };
+	    const onSuccess = () => {
+	      this.infoMessage = this.t('adminUi.site.pages.success.save');
+	      this.infoError = null;
+	    };
+	    this.admin.updateContentBlock(key, payload).subscribe({
+	      next: onSuccess,
+	      error: () =>
+	        this.admin.createContent(key, payload).subscribe({
+	          next: onSuccess,
+	          error: () => {
+	            this.infoError = this.t('adminUi.site.pages.errors.save');
+	            this.infoMessage = null;
+	          }
+	        })
+	    });
+	  }
 
   // Homepage hero
   selectHeroLang(lang: string): void {
