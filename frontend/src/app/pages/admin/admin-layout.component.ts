@@ -44,6 +44,8 @@ type AdminNavItem = {
 export class AdminLayoutComponent {
   readonly navItems: AdminNavItem[] = [
     { path: '/admin/dashboard', labelKey: 'adminUi.nav.dashboard', exact: true },
-    { path: '/admin/orders', labelKey: 'adminUi.nav.orders' }
+    { path: '/admin/products', labelKey: 'adminUi.nav.products' },
+    { path: '/admin/orders', labelKey: 'adminUi.nav.orders' },
+    { path: '/admin/users', labelKey: 'adminUi.nav.users' }
   ];
 }

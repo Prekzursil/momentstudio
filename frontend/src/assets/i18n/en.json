@@ -519,26 +519,48 @@
     },
     "products": {
       "title": "Products",
+      "hint": "Search by name, slug, or SKU.",
       "new": "New",
       "delete": "Delete",
       "edit": "Edit product",
       "create": "Create product",
+      "selectCategory": "Select category",
+      "search": "Search",
+      "all": "All statuses",
+      "allCategories": "All categories",
+      "empty": "No products match these filters.",
+      "active": "Active",
+      "inactive": "Inactive",
+      "pagination": "Page {{page}} of {{total_pages}} · {{total_items}} total",
+      "prev": "Prev",
+      "next": "Next",
       "table": {
         "name": "Name",
         "price": "Price",
         "status": "Status",
         "category": "Category",
-        "stock": "Stock"
+        "stock": "Stock",
+        "active": "Active",
+        "updated": "Updated",
+        "actions": "Actions"
       },
       "form": {
         "slug": "Slug",
         "sku": "SKU",
+        "shortDescription": "Short description",
+        "shortDescriptionHint": "Shown in product cards and listings (max 280 characters).",
         "imageUrl": "Image URL",
         "description": "Description",
         "save": "Save product",
         "upload": "Upload image",
         "images": "Images",
-        "image": "Image"
+        "image": "Image",
+        "active": "Active",
+        "featured": "Featured",
+        "bestseller": "Bestseller",
+        "highlight": "Highlight",
+        "publishAt": "Publish at",
+        "noImages": "No images yet."
       },
       "success": {
         "save": "Product saved",
@@ -547,6 +569,7 @@
         "imageDelete": "Image deleted"
       },
       "errors": {
+        "loadList": "Could not load products.",
         "load": "Unable to load product",
         "save": "Failed to save product",
         "delete": "Failed to delete product",
@@ -663,8 +686,36 @@
     },
     "users": {
       "title": "Users",
+      "hint": "Search by email, username, or display name.",
       "setRole": "Set role",
       "forceLogout": "Force logout selected",
+      "search": "Search",
+      "roleFilter": "Role",
+      "all": "All",
+      "empty": "No users match these filters.",
+      "manage": "Manage",
+      "verified": "Verified",
+      "unverified": "Unverified",
+      "pagination": "Page {{page}} of {{total_pages}} · {{total_items}} total",
+      "prev": "Prev",
+      "next": "Next",
+      "detailTitle": "User details",
+      "selectHint": "Select a user to manage role, sessions, and aliases.",
+      "role": "Role",
+      "ownerLocked": "Owner role can only be transferred.",
+      "aliasHistory": "Alias history",
+      "loadingAliases": "Loading history…",
+      "usernameHistory": "Username history",
+      "displayNameHistory": "Display name history",
+      "noHistory": "No history yet.",
+      "table": {
+        "identity": "Identity",
+        "email": "Email",
+        "role": "Role",
+        "verified": "Verified",
+        "created": "Created",
+        "actions": "Actions"
+      },
       "roles": {
         "customer": "Customer",
         "admin": "Admin",
@@ -675,6 +726,8 @@
         "role": "Role updated"
       },
       "errors": {
+        "load": "Could not load users.",
+        "aliases": "Could not load alias history.",
         "revoke": "Failed to revoke sessions",
         "role": "Failed to update role"
       }

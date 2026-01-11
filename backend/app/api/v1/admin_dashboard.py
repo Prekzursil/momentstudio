@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import aliased
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,13 +10,15 @@ from app.core import security
 from app.core.config import settings
 from app.core.dependencies import require_admin, require_owner
 from app.db.session import get_session
-from app.models.catalog import Product, ProductAuditLog, Category
+from app.models.catalog import Product, ProductAuditLog, Category, ProductStatus
 from app.models.content import ContentBlock, ContentAuditLog
+from app.schemas.catalog_admin import AdminProductListItem, AdminProductListResponse
 from app.services import exporter as exporter_service
 from app.models.order import Order
 from app.models.user import AdminAuditLog, User, RefreshSession, UserRole
 from app.models.promo import PromoCode
 from app.services import auth as auth_service
+from app.schemas.user_admin import AdminUserListItem, AdminUserListResponse
 
 router = APIRouter(prefix="/admin/dashboard", tags=["admin"])
 
@@ -78,6 +80,64 @@ async def admin_products(session: AsyncSession = Depends(get_session), _: str = 
     ]
 
 
+@router.get("/products/search", response_model=AdminProductListResponse)
+async def search_products(
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+    q: str | None = Query(default=None),
+    status: ProductStatus | None = Query(default=None),
+    category_slug: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=25, ge=1, le=100),
+) -> AdminProductListResponse:
+    offset = (page - 1) * limit
+    stmt = select(Product, Category).join(Category, Product.category_id == Category.id).where(Product.is_deleted.is_(False))
+    if q:
+        like = f"%{q.strip().lower()}%"
+        stmt = stmt.where(
+            Product.name.ilike(like)
+            | Product.slug.ilike(like)
+            | Product.sku.ilike(like)
+        )
+    if status is not None:
+        stmt = stmt.where(Product.status == status)
+    if category_slug:
+        stmt = stmt.where(Category.slug == category_slug)
+
+    total = await session.scalar(stmt.with_only_columns(func.count(func.distinct(Product.id))).order_by(None))
+    total_items = int(total or 0)
+    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
+
+    rows = (
+        await session.execute(
+            stmt.order_by(Product.updated_at.desc()).limit(limit).offset(offset)
+        )
+    ).all()
+    items = [
+        AdminProductListItem(
+            id=prod.id,
+            slug=prod.slug,
+            sku=prod.sku,
+            name=prod.name,
+            base_price=float(prod.base_price),
+            currency=prod.currency,
+            status=prod.status,
+            is_active=prod.is_active,
+            is_featured=prod.is_featured,
+            stock_quantity=prod.stock_quantity,
+            category_slug=cat.slug,
+            category_name=cat.name,
+            updated_at=prod.updated_at,
+            publish_at=prod.publish_at,
+        )
+        for prod, cat in rows
+    ]
+    return AdminProductListResponse(
+        items=items,
+        meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
+    )
+
+
 @router.get("/orders")
 async def admin_orders(session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)) -> list[dict]:
     stmt = (
@@ -117,6 +177,54 @@ async def admin_users(session: AsyncSession = Depends(get_session), _: str = Dep
         }
         for u in users
     ]
+
+
+@router.get("/users/search", response_model=AdminUserListResponse)
+async def search_users(
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+    q: str | None = Query(default=None),
+    role: UserRole | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=25, ge=1, le=100),
+) -> AdminUserListResponse:
+    offset = (page - 1) * limit
+    stmt = select(User).where(User.deleted_at.is_(None))
+
+    if q:
+        like = f"%{q.strip().lower()}%"
+        stmt = stmt.where(
+            func.lower(User.email).ilike(like)
+            | func.lower(User.username).ilike(like)
+            | func.lower(User.name).ilike(like)
+        )
+
+    if role is not None:
+        stmt = stmt.where(User.role == role)
+
+    total = await session.scalar(stmt.with_only_columns(func.count(func.distinct(User.id))).order_by(None))
+    total_items = int(total or 0)
+    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
+
+    rows = (await session.execute(stmt.order_by(User.created_at.desc()).limit(limit).offset(offset))).scalars().all()
+    items = [
+        AdminUserListItem(
+            id=u.id,
+            email=u.email,
+            username=u.username,
+            name=u.name,
+            name_tag=u.name_tag,
+            role=u.role,
+            email_verified=bool(u.email_verified),
+            created_at=u.created_at,
+        )
+        for u in rows
+    ]
+
+    return AdminUserListResponse(
+        items=items,
+        meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
+    )
 
 
 @router.get("/users/{user_id}/aliases")
