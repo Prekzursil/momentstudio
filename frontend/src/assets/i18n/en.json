@@ -414,6 +414,7 @@
       "delete": "Delete",
       "remove": "Remove",
       "save": "Save",
+      "cancel": "Cancel",
       "edit": "Edit",
       "refresh": "Refresh"
     },
@@ -478,6 +479,195 @@
         "saveContact": "Save contact",
         "success": { "save": "Content saved." },
         "errors": { "save": "Could not save content." }
+      }
+    },
+    "home": {
+      "hero": {
+        "title": "Homepage hero (per language)",
+        "headline": "Headline",
+        "subtitle": "Subtitle",
+        "ctaLabel": "CTA label",
+        "ctaUrl": "CTA URL",
+        "imageUrl": "Hero image URL",
+        "success": {
+          "saved": "Hero saved.",
+          "created": "Hero created."
+        },
+        "errors": {
+          "load": "Could not load hero content.",
+          "save": "Could not save hero content."
+        }
+      },
+      "sections": {
+        "title": "Homepage sections order",
+        "hint": "Drag to reorder sections and toggle visibility.",
+        "enabled": "Enabled",
+        "drag": "drag",
+        "success": {
+          "save": "Sections order saved."
+        },
+        "errors": {
+          "save": "Could not save sections order."
+        }
+      },
+      "collections": {
+        "title": "Featured collections",
+        "slug": "Slug",
+        "name": "Name",
+        "description": "Description",
+        "products": "Products (hold Ctrl/Cmd to multi-select)",
+        "create": "Create collection",
+        "update": "Update collection",
+        "success": {
+          "saved": "Saved."
+        },
+        "errors": {
+          "required": "Slug and name are required.",
+          "save": "Could not save collection."
+        }
+      }
+    },
+    "blog": {
+      "title": "Blog",
+      "empty": "No blog posts yet.",
+      "actions": {
+        "newPost": "New post",
+        "closeEditor": "Close editor",
+        "view": "View",
+        "createPost": "Create post",
+        "previewLink": "Preview link",
+        "copy": "Copy",
+        "image": "Image"
+      },
+      "fields": {
+        "slug": "Slug",
+        "slugPlaceholder": "e.g. my-first-post",
+        "baseLanguage": "Base language",
+        "status": "Status",
+        "publishAtOptional": "Publish at (optional)",
+        "publishAtHint": "Set a future time to schedule publishing.",
+        "title": "Title",
+        "summaryOptional": "Summary (optional)",
+        "tags": "Tags (comma-separated)",
+        "tagsPlaceholder": "e.g. ceramics, studio, news",
+        "coverImageUrlOptional": "Cover image URL (optional)",
+        "coverImagePlaceholder": "https://…",
+        "readingTimeOptional": "Reading time minutes (optional)",
+        "body": "Body"
+      },
+      "create": {
+        "title": "Create blog post",
+        "addTranslation": "Add optional translation",
+        "translationHint": "Translation language: {{lang}} (leave blank to skip).",
+        "translationTitle": "Translated title",
+        "translationBody": "Translated body (Markdown)"
+      },
+      "editing": {
+        "title": "Editing",
+        "languages": "Base language: {{base}} · Editing: {{edit}}",
+        "statusBaseOnly": "Status (base only)",
+        "publishAtBaseOnlyOptional": "Publish at (base only) (optional)",
+        "publishAtBaseOnlyHint": "If this is in the future and status is published, the post will go live at that time.",
+        "summaryOptional": "Summary ({{lang}}) (optional)",
+        "summaryHint": "Used for the blog list excerpt and SEO description.",
+        "richEditor": "Rich editor",
+        "livePreview": "Live preview",
+        "previewEmpty": "Nothing to preview yet.",
+        "toolbarTip": "Tip: Use the toolbar to format markdown and insert images (uploads go to the post's content images)."
+      },
+      "toolbar": {
+        "link": "Link",
+        "code": "Code",
+        "list": "List"
+      },
+      "images": {
+        "title": "Images",
+        "insertMarkdown": "Insert markdown",
+        "success": {
+          "uploaded": "Image uploaded",
+          "insertedMarkdown": "Inserted image markdown"
+        },
+        "errors": {
+          "upload": "Could not upload image"
+        }
+      },
+      "preview": {
+        "title": "Preview link",
+        "expires": "Expires",
+        "success": {
+          "ready": "Preview link ready",
+          "copied": "Copied to clipboard"
+        },
+        "errors": {
+          "generate": "Could not generate preview link",
+          "copy": "Could not copy to clipboard"
+        }
+      },
+      "revisions": {
+        "title": "Revisions",
+        "empty": "No revisions loaded yet.",
+        "diff": "Diff",
+        "rollback": "Rollback",
+        "diffVsCurrent": "Diff vs current (v{{version}})",
+        "confirms": {
+          "rollback": "Rollback to version {{version}}? This will overwrite the current draft."
+        },
+        "success": {
+          "rolledBack": "Rolled back"
+        },
+        "errors": {
+          "load": "Could not load revisions",
+          "loadVersion": "Could not load version",
+          "rollback": "Could not rollback"
+        }
+      },
+      "moderation": {
+        "title": "Blog comment moderation",
+        "loading": "Loading flagged comments…",
+        "empty": "No flagged comments right now.",
+        "flagsCount": "{{count}} flags",
+        "flagsTitle": "Flags",
+        "deletedBody": "(deleted)",
+        "actions": {
+          "resolve": "Resolve",
+          "hide": "Hide",
+          "unhide": "Unhide"
+        },
+        "prompts": {
+          "hideReason": "Hide reason (optional):"
+        },
+        "confirms": {
+          "deleteComment": "Delete this comment? This removes its body for everyone."
+        },
+        "success": {
+          "flagsResolved": "Flags resolved",
+          "commentUnhidden": "Comment unhidden",
+          "commentHidden": "Comment hidden",
+          "commentDeleted": "Comment deleted"
+        },
+        "errors": {
+          "load": "Could not load flagged comments.",
+          "resolveFlags": "Could not resolve flags",
+          "unhide": "Could not unhide comment",
+          "hide": "Could not hide comment",
+          "delete": "Could not delete comment"
+        }
+      },
+      "success": {
+        "created": "Blog post created",
+        "saved": "Saved",
+        "translationSaved": "Saved translation"
+      },
+      "errors": {
+        "slugRequiredTitle": "Slug is required",
+        "slugRequiredCopy": "Use letters/numbers/dashes, e.g. \"my-first-post\".",
+        "titleBodyRequired": "Title and body are required",
+        "create": "Could not create blog post",
+        "loadContent": "Could not load blog post content",
+        "save": "Could not save blog post",
+        "translationSave": "Could not save translation",
+        "translationMetaSave": "Saved translation, but could not save metadata",
+        "loadPost": "Could not load blog post"
       }
     },
     "fx": {
@@ -565,6 +755,7 @@
       "success": {
         "save": "Product saved",
         "delete": "Product deleted",
+        "duplicate": "Product duplicated as draft",
         "imageUpload": "Image uploaded",
         "imageDelete": "Image deleted"
       },
@@ -576,6 +767,7 @@
         "required": "Category name and slug are required",
         "image": "Image upload failed",
         "deleteImage": "Failed to delete image",
+        "duplicate": "Could not duplicate product",
         "saveFirst": "Save product before uploading images"
       },
       "actions": {
@@ -738,6 +930,8 @@
       "titleLabel": "Title",
       "status": "Status",
       "body": "Body",
+      "livePreview": "Live preview",
+      "previewEmpty": "Nothing to preview yet.",
       "save": "Save content",
       "errors": {
         "update": "Failed to update content"

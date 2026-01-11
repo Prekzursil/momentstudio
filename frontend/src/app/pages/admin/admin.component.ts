@@ -386,7 +386,7 @@ import { formatIdentity } from '../../shared/user-identity';
 
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Homepage hero (per language)</h2>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.home.hero.title' | translate }}</h2>
               <div class="flex gap-2 text-sm">
                 <button
                   class="px-3 py-1 rounded border"
@@ -407,14 +407,14 @@ import { formatIdentity } from '../../shared/user-identity';
               </div>
             </div>
             <div class="grid md:grid-cols-2 gap-3 text-sm">
-              <app-input label="Headline" [(value)]="heroForm.title"></app-input>
-              <app-input label="Subtitle" [(value)]="heroForm.subtitle"></app-input>
-              <app-input label="CTA label" [(value)]="heroForm.cta_label"></app-input>
-              <app-input label="CTA URL" [(value)]="heroForm.cta_url"></app-input>
-              <app-input label="Hero image URL" [(value)]="heroForm.image"></app-input>
+              <app-input [label]="'adminUi.home.hero.headline' | translate" [(value)]="heroForm.title"></app-input>
+              <app-input [label]="'adminUi.home.hero.subtitle' | translate" [(value)]="heroForm.subtitle"></app-input>
+              <app-input [label]="'adminUi.home.hero.ctaLabel' | translate" [(value)]="heroForm.cta_label"></app-input>
+              <app-input [label]="'adminUi.home.hero.ctaUrl' | translate" [(value)]="heroForm.cta_url"></app-input>
+              <app-input [label]="'adminUi.home.hero.imageUrl' | translate" [(value)]="heroForm.image"></app-input>
             </div>
             <div class="flex gap-2">
-              <app-button label="Save hero" (action)="saveHero()"></app-button>
+              <app-button [label]="'adminUi.actions.save' | translate" (action)="saveHero()"></app-button>
               <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="heroMessage()">{{ heroMessage() }}</span>
               <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="heroError()">{{ heroError() }}</span>
             </div>
@@ -422,10 +422,10 @@ import { formatIdentity } from '../../shared/user-identity';
 
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Homepage sections order</h2>
-              <app-button size="sm" variant="ghost" label="Save order" (action)="saveSections()"></app-button>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.home.sections.title' | translate }}</h2>
+              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.save' | translate" (action)="saveSections()"></app-button>
             </div>
-            <p class="text-sm text-slate-600 dark:text-slate-300">Drag to reorder sections and toggle visibility.</p>
+            <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.home.sections.hint' | translate }}</p>
             <div class="grid gap-2">
               <div
                 *ngFor="let section of sectionOrder"
@@ -442,9 +442,9 @@ import { formatIdentity } from '../../shared/user-identity';
                 <div class="flex items-center gap-3">
                   <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                     <input type="checkbox" [checked]="isSectionEnabled(section)" (change)="toggleSectionEnabled(section, $event)" />
-                    Enabled
+                    {{ 'adminUi.home.sections.enabled' | translate }}
                   </label>
-                  <span class="text-xs text-slate-500 dark:text-slate-400">drag</span>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.drag' | translate }}</span>
                 </div>
               </div>
             </div>
@@ -453,25 +453,28 @@ import { formatIdentity } from '../../shared/user-identity';
 
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Featured collections</h2>
-              <app-button size="sm" variant="ghost" label="Reset" (action)="resetCollectionForm()"></app-button>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.home.collections.title' | translate }}</h2>
+              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.reset' | translate" (action)="resetCollectionForm()"></app-button>
             </div>
             <div class="grid md:grid-cols-2 gap-3 text-sm">
-              <app-input label="Slug" [(value)]="collectionForm.slug"></app-input>
-              <app-input label="Name" [(value)]="collectionForm.name"></app-input>
+              <app-input [label]="'adminUi.home.collections.slug' | translate" [(value)]="collectionForm.slug"></app-input>
+              <app-input [label]="'adminUi.home.collections.name' | translate" [(value)]="collectionForm.name"></app-input>
               <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                Description
+                {{ 'adminUi.home.collections.description' | translate }}
                 <textarea class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" rows="2" [(ngModel)]="collectionForm.description"></textarea>
               </label>
               <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                Products (hold Ctrl/Cmd to multi-select)
+                {{ 'adminUi.home.collections.products' | translate }}
                 <select multiple class="rounded-lg border border-slate-200 bg-white px-3 py-2 min-h-[120px] text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="collectionForm.product_ids">
                   <option *ngFor="let p of products" [value]="p.id">{{ p.name }} ({{ p.slug }})</option>
                 </select>
               </label>
             </div>
             <div class="flex gap-2">
-              <app-button [label]="editingCollection ? 'Update collection' : 'Create collection'" (action)="saveCollection()"></app-button>
+              <app-button
+                [label]="editingCollection ? ('adminUi.home.collections.update' | translate) : ('adminUi.home.collections.create' | translate)"
+                (action)="saveCollection()"
+              ></app-button>
               <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="collectionMessage">{{ collectionMessage }}</span>
             </div>
             <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
@@ -480,7 +483,7 @@ import { formatIdentity } from '../../shared/user-identity';
                   <p class="font-semibold text-slate-900 dark:text-slate-50">{{ col.name }}</p>
                   <p class="text-xs text-slate-500 dark:text-slate-400">{{ col.slug }} · {{ col.description }}</p>
                 </div>
-                <app-button size="sm" variant="ghost" label="Edit" (action)="editCollection(col)"></app-button>
+                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.edit' | translate" (action)="editCollection(col)"></app-button>
               </div>
             </div>
           </section>
@@ -791,14 +794,14 @@ import { formatIdentity } from '../../shared/user-identity';
 
           <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Blog posts</h2>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.blog.title' | translate }}</h2>
               <div class="flex items-center gap-2">
-                <app-button size="sm" variant="ghost" label="New post" (action)="startBlogCreate()"></app-button>
+                <app-button size="sm" variant="ghost" [label]="'adminUi.blog.actions.newPost' | translate" (action)="startBlogCreate()"></app-button>
                 <app-button
                   *ngIf="selectedBlogKey"
                   size="sm"
                   variant="ghost"
-                  label="Close editor"
+                  [label]="'adminUi.blog.actions.closeEditor' | translate"
                   (action)="closeBlogEditor()"
                 ></app-button>
               </div>
@@ -806,7 +809,7 @@ import { formatIdentity } from '../../shared/user-identity';
 
             <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
               <div *ngIf="blogPosts().length === 0" class="text-sm text-slate-500 dark:text-slate-400">
-                No posts yet. Create the first one to populate /blog.
+                {{ 'adminUi.blog.empty' | translate }}
               </div>
               <div
                 *ngFor="let post of blogPosts()"
@@ -826,19 +829,23 @@ import { formatIdentity } from '../../shared/user-identity';
                     rel="noopener"
                     (click)="$event.stopPropagation()"
                   >
-                    View
+                    {{ 'adminUi.blog.actions.view' | translate }}
                   </a>
-                  <app-button size="sm" variant="ghost" label="Edit" (action)="selectBlogPost(post)"></app-button>
+                  <app-button size="sm" variant="ghost" [label]="'adminUi.actions.edit' | translate" (action)="selectBlogPost(post)"></app-button>
                 </div>
               </div>
             </div>
 
             <div *ngIf="showBlogCreate" class="grid gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
-              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">Create blog post</p>
+              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.blog.create.title' | translate }}</p>
               <div class="grid md:grid-cols-2 gap-3 text-sm">
-                <app-input label="Slug" [(value)]="blogCreate.slug" placeholder="e.g. my-first-post"></app-input>
+                <app-input
+                  [label]="'adminUi.blog.fields.slug' | translate"
+                  [(value)]="blogCreate.slug"
+                  [placeholder]="'adminUi.blog.fields.slugPlaceholder' | translate"
+                ></app-input>
                 <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Base language
+                  {{ 'adminUi.blog.fields.baseLanguage' | translate }}
                   <select
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="blogCreate.baseLang"
@@ -848,43 +855,49 @@ import { formatIdentity } from '../../shared/user-identity';
                   </select>
                 </label>
                 <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Status
+                  {{ 'adminUi.blog.fields.status' | translate }}
                   <select
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="blogCreate.status"
                   >
-                    <option value="draft">draft</option>
-                    <option value="published">published</option>
+                    <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+                    <option value="published">{{ 'adminUi.status.published' | translate }}</option>
                   </select>
                 </label>
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Publish at (optional)
+                  {{ 'adminUi.blog.fields.publishAtOptional' | translate }}
                   <input
                     type="datetime-local"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="blogCreate.published_at"
                   />
-                  <span class="text-xs text-slate-500 dark:text-slate-400">Set a future time to schedule publishing.</span>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.blog.fields.publishAtHint' | translate }}
+                  </span>
                 </label>
                 <div class="md:col-span-2">
-                  <app-input label="Title" [(value)]="blogCreate.title"></app-input>
+                  <app-input [label]="'adminUi.blog.fields.title' | translate" [(value)]="blogCreate.title"></app-input>
                 </div>
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                  Summary (optional)
+                  {{ 'adminUi.blog.fields.summaryOptional' | translate }}
                   <textarea
                     rows="3"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="blogCreate.summary"
                   ></textarea>
                 </label>
-                <app-input label="Tags (comma-separated)" [(value)]="blogCreate.tags" placeholder="e.g. ceramics, studio, news"></app-input>
                 <app-input
-                  label="Cover image URL (optional)"
+                  [label]="'adminUi.blog.fields.tags' | translate"
+                  [(value)]="blogCreate.tags"
+                  [placeholder]="'adminUi.blog.fields.tagsPlaceholder' | translate"
+                ></app-input>
+                <app-input
+                  [label]="'adminUi.blog.fields.coverImageUrlOptional' | translate"
                   [(value)]="blogCreate.cover_image_url"
-                  placeholder="https://..."
+                  [placeholder]="'adminUi.blog.fields.coverImagePlaceholder' | translate"
                 ></app-input>
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Reading time minutes (optional)
+                  {{ 'adminUi.blog.fields.readingTimeOptional' | translate }}
                   <input
                     type="number"
                     min="1"
@@ -893,7 +906,7 @@ import { formatIdentity } from '../../shared/user-identity';
                   />
                 </label>
                 <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                  Body
+                  {{ 'adminUi.blog.fields.body' | translate }}
                   <app-rich-editor
                     [(value)]="blogCreate.body_markdown"
                     [initialEditType]="'wysiwyg'"
@@ -903,16 +916,17 @@ import { formatIdentity } from '../../shared/user-identity';
               </div>
 
               <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <input type="checkbox" [(ngModel)]="blogCreate.includeTranslation" /> Add optional translation
+                <input type="checkbox" [(ngModel)]="blogCreate.includeTranslation" />
+                {{ 'adminUi.blog.create.addTranslation' | translate }}
               </label>
 
               <div *ngIf="blogCreate.includeTranslation" class="grid md:grid-cols-2 gap-3 text-sm">
                 <p class="md:col-span-2 text-xs text-slate-500 dark:text-slate-400">
-                  Translation language: {{ blogCreate.baseLang === 'en' ? 'RO' : 'EN' }} (leave blank to skip).
+                  {{ 'adminUi.blog.create.translationHint' | translate: { lang: blogCreate.baseLang === 'en' ? 'RO' : 'EN' } }}
                 </p>
-                <app-input label="Translated title" [(value)]="blogCreate.translationTitle"></app-input>
+                <app-input [label]="'adminUi.blog.create.translationTitle' | translate" [(value)]="blogCreate.translationTitle"></app-input>
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                  Translated body (Markdown)
+                  {{ 'adminUi.blog.create.translationBody' | translate }}
                   <textarea
                     rows="5"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
@@ -922,8 +936,8 @@ import { formatIdentity } from '../../shared/user-identity';
               </div>
 
               <div class="flex gap-2">
-                <app-button label="Create post" (action)="createBlogPost()"></app-button>
-                <app-button size="sm" variant="ghost" label="Cancel" (action)="cancelBlogCreate()"></app-button>
+                <app-button [label]="'adminUi.blog.actions.createPost' | translate" (action)="createBlogPost()"></app-button>
+                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.cancel' | translate" (action)="cancelBlogCreate()"></app-button>
               </div>
             </div>
 
@@ -931,10 +945,10 @@ import { formatIdentity } from '../../shared/user-identity';
               <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="grid gap-1">
                   <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                    Editing: {{ selectedBlogKey }}
+                    {{ 'adminUi.blog.editing.title' | translate }}: {{ selectedBlogKey }}
                   </p>
                   <p class="text-xs text-slate-500 dark:text-slate-400">
-                    Base language: {{ blogBaseLang.toUpperCase() }} · Editing: {{ blogEditLang.toUpperCase() }}
+                    {{ 'adminUi.blog.editing.languages' | translate: { base: blogBaseLang.toUpperCase(), edit: blogEditLang.toUpperCase() } }}
                   </p>
                 </div>
                 <div class="flex items-center gap-2">
@@ -956,20 +970,20 @@ import { formatIdentity } from '../../shared/user-identity';
               </div>
 
               <div class="grid md:grid-cols-2 gap-3 text-sm">
-                <app-input label="Title" [(value)]="blogForm.title"></app-input>
+                <app-input [label]="'adminUi.blog.fields.title' | translate" [(value)]="blogForm.title"></app-input>
                 <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Status (base only)
+                  {{ 'adminUi.blog.editing.statusBaseOnly' | translate }}
                   <select
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="blogForm.status"
                     [disabled]="blogEditLang !== blogBaseLang"
                   >
-                    <option value="draft">draft</option>
-                    <option value="published">published</option>
+                    <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+                    <option value="published">{{ 'adminUi.status.published' | translate }}</option>
                   </select>
                 </label>
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                  Publish at (base only) (optional)
+                  {{ 'adminUi.blog.editing.publishAtBaseOnlyOptional' | translate }}
                   <input
                     type="datetime-local"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
@@ -977,22 +991,32 @@ import { formatIdentity } from '../../shared/user-identity';
                     [disabled]="blogEditLang !== blogBaseLang"
                   />
                   <span class="text-xs text-slate-500 dark:text-slate-400">
-                    If this is in the future and status is published, the post will go live at that time.
+                    {{ 'adminUi.blog.editing.publishAtBaseOnlyHint' | translate }}
                   </span>
                 </label>
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                  Summary ({{ blogEditLang.toUpperCase() }}) (optional)
+                  {{ 'adminUi.blog.editing.summaryOptional' | translate: { lang: blogEditLang.toUpperCase() } }}
                   <textarea
                     rows="3"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="blogForm.summary"
                   ></textarea>
-                  <span class="text-xs text-slate-500 dark:text-slate-400">Used for the blog list excerpt and SEO description.</span>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.blog.editing.summaryHint' | translate }}
+                  </span>
                 </label>
-                <app-input label="Tags (comma-separated)" [(value)]="blogForm.tags" placeholder="e.g. ceramics, studio, news"></app-input>
-                <app-input label="Cover image URL (optional)" [(value)]="blogForm.cover_image_url" placeholder="https://..."></app-input>
+                <app-input
+                  [label]="'adminUi.blog.fields.tags' | translate"
+                  [(value)]="blogForm.tags"
+                  [placeholder]="'adminUi.blog.fields.tagsPlaceholder' | translate"
+                ></app-input>
+                <app-input
+                  [label]="'adminUi.blog.fields.coverImageUrlOptional' | translate"
+                  [(value)]="blogForm.cover_image_url"
+                  [placeholder]="'adminUi.blog.fields.coverImagePlaceholder' | translate"
+                ></app-input>
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Reading time minutes (optional)
+                  {{ 'adminUi.blog.fields.readingTimeOptional' | translate }}
                   <input
                     type="number"
                     min="1"
@@ -1002,13 +1026,15 @@ import { formatIdentity } from '../../shared/user-identity';
                 </label>
                 <div class="grid gap-2 md:col-span-2">
                   <div class="flex flex-wrap items-center justify-between gap-2">
-                    <p class="text-sm font-medium text-slate-700 dark:text-slate-200">Body</p>
+                    <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ 'adminUi.blog.fields.body' | translate }}</p>
                     <div class="flex flex-wrap items-center gap-3">
                       <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                        <input type="checkbox" [(ngModel)]="useRichBlogEditor" /> Rich editor
+                        <input type="checkbox" [(ngModel)]="useRichBlogEditor" />
+                        {{ 'adminUi.blog.editing.richEditor' | translate }}
                       </label>
                       <label *ngIf="!useRichBlogEditor" class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                        <input type="checkbox" [(ngModel)]="showBlogPreview" /> Live preview
+                        <input type="checkbox" [(ngModel)]="showBlogPreview" />
+                        {{ 'adminUi.blog.editing.livePreview' | translate }}
                       </label>
                     </div>
                   </div>
@@ -1020,7 +1046,7 @@ import { formatIdentity } from '../../shared/user-identity';
                         class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
                         (click)="blogImageInputRich.click()"
                       >
-                        Image
+                        {{ 'adminUi.blog.actions.image' | translate }}
                       </button>
                       <input
                         #blogImageInputRich
@@ -1074,28 +1100,28 @@ import { formatIdentity } from '../../shared/user-identity';
                         class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
                         (click)="insertBlogLink(blogBody)"
                       >
-                        Link
+                        {{ 'adminUi.blog.toolbar.link' | translate }}
                       </button>
                       <button
                         type="button"
                         class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
                         (click)="insertBlogCodeBlock(blogBody)"
                       >
-                        Code
+                        {{ 'adminUi.blog.toolbar.code' | translate }}
                       </button>
                       <button
                         type="button"
                         class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
                         (click)="applyBlogList(blogBody)"
                       >
-                        List
+                        {{ 'adminUi.blog.toolbar.list' | translate }}
                       </button>
                       <button
                         type="button"
                         class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
                         (click)="blogImageInput.click()"
                       >
-                        Image
+                        {{ 'adminUi.blog.actions.image' | translate }}
                       </button>
                       <input #blogImageInput type="file" accept="image/*" class="hidden" (change)="uploadAndInsertBlogImage(blogBody, $event)" />
                     </div>
@@ -1110,7 +1136,7 @@ import { formatIdentity } from '../../shared/user-identity';
                     <div
                       *ngIf="showBlogPreview"
                       class="markdown rounded-lg border border-slate-200 p-3 bg-slate-50 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200"
-                      [innerHTML]="renderMarkdown(blogForm.body_markdown || 'Nothing to preview yet.')"
+                      [innerHTML]="renderMarkdown(blogForm.body_markdown || ('adminUi.blog.editing.previewEmpty' | translate))"
                     ></div>
                   </ng-template>
                 </div>
@@ -1118,7 +1144,7 @@ import { formatIdentity } from '../../shared/user-identity';
 
               <div class="grid gap-2">
                 <div *ngIf="blogImages.length" class="grid gap-2">
-                  <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Images</p>
+                  <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.blog.images.title' | translate }}</p>
                   <div *ngFor="let img of blogImages" class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
                     <a class="text-xs text-indigo-600 dark:text-indigo-300 hover:underline truncate" [href]="img.url" target="_blank" rel="noopener">
                       {{ img.url }}
@@ -1126,7 +1152,7 @@ import { formatIdentity } from '../../shared/user-identity';
                     <app-button
                       size="sm"
                       variant="ghost"
-                      label="Insert markdown"
+                      [label]="'adminUi.blog.images.insertMarkdown' | translate"
                       (action)="insertBlogImageMarkdown(img.url, img.alt_text)"
                     ></app-button>
                   </div>
@@ -1134,38 +1160,38 @@ import { formatIdentity } from '../../shared/user-identity';
               </div>
 
               <div class="flex flex-wrap gap-2">
-                <app-button label="Save" (action)="saveBlogPost()"></app-button>
-                <app-button size="sm" variant="ghost" label="Preview link" (action)="generateBlogPreviewLink()"></app-button>
+                <app-button [label]="'adminUi.actions.save' | translate" (action)="saveBlogPost()"></app-button>
+                <app-button size="sm" variant="ghost" [label]="'adminUi.blog.actions.previewLink' | translate" (action)="generateBlogPreviewLink()"></app-button>
                 <a
                   class="inline-flex items-center justify-center rounded-full font-semibold transition px-3 py-2 text-sm bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-slate-800 dark:text-slate-50 dark:border-slate-700 dark:hover:border-slate-600"
                   [attr.href]="'/blog/' + currentBlogSlug()"
                   target="_blank"
                   rel="noopener"
                 >
-                  View
+                  {{ 'adminUi.blog.actions.view' | translate }}
                 </a>
               </div>
               <div *ngIf="blogPreviewUrl" class="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-950/30">
-                <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Preview link</p>
+                <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.blog.preview.title' | translate }}</p>
                 <div class="flex items-center gap-2">
                   <input
                     class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [value]="blogPreviewUrl"
                     readonly
                   />
-                  <app-button size="sm" variant="ghost" label="Copy" (action)="copyBlogPreviewLink()"></app-button>
+                  <app-button size="sm" variant="ghost" [label]="'adminUi.blog.actions.copy' | translate" (action)="copyBlogPreviewLink()"></app-button>
                 </div>
                 <p *ngIf="blogPreviewExpiresAt" class="text-xs text-slate-500 dark:text-slate-400">
-                  Expires {{ blogPreviewExpiresAt | date: 'short' }}
+                  {{ 'adminUi.blog.preview.expires' | translate }} {{ blogPreviewExpiresAt | date: 'short' }}
                 </p>
               </div>
               <div class="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-900">
                 <div class="flex items-center justify-between gap-2">
-                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">Revisions</p>
-                  <app-button size="sm" variant="ghost" label="Refresh" (action)="loadBlogVersions()"></app-button>
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.blog.revisions.title' | translate }}</p>
+                  <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadBlogVersions()"></app-button>
                 </div>
                 <div *ngIf="blogVersions.length === 0" class="text-xs text-slate-500 dark:text-slate-400">
-                  No revisions loaded yet.
+                  {{ 'adminUi.blog.revisions.empty' | translate }}
                 </div>
                 <div *ngFor="let v of blogVersions" class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
                   <div>
@@ -1173,14 +1199,14 @@ import { formatIdentity } from '../../shared/user-identity';
                     <p class="text-xs text-slate-500 dark:text-slate-400">{{ v.status }}</p>
                   </div>
                   <div class="flex items-center gap-2">
-                    <app-button size="sm" variant="ghost" label="Diff" (action)="selectBlogVersion(v.version)"></app-button>
-                    <app-button size="sm" variant="ghost" label="Rollback" (action)="rollbackBlogVersion(v.version)"></app-button>
+                    <app-button size="sm" variant="ghost" [label]="'adminUi.blog.revisions.diff' | translate" (action)="selectBlogVersion(v.version)"></app-button>
+                    <app-button size="sm" variant="ghost" [label]="'adminUi.blog.revisions.rollback' | translate" (action)="rollbackBlogVersion(v.version)"></app-button>
                   </div>
                 </div>
 
                 <div *ngIf="blogVersionDetail" class="grid gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                   <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-                    Diff vs current (v{{ blogVersionDetail.version }})
+                    {{ 'adminUi.blog.revisions.diffVsCurrent' | translate: { version: blogVersionDetail.version } }}
                   </p>
                   <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-xs whitespace-pre-wrap text-slate-900 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-100">
                     <ng-container *ngFor="let part of blogDiffParts">
@@ -1192,16 +1218,14 @@ import { formatIdentity } from '../../shared/user-identity';
                   </div>
                 </div>
               </div>
-              <p class="text-xs text-slate-500 dark:text-slate-400">
-                Tip: Use the toolbar to format markdown and insert images (uploads go to the post's content images).
-              </p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.blog.editing.toolbarTip' | translate }}</p>
 	            </div>
 	          </section>
 
 	          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
 	            <div class="flex items-center justify-between">
-	              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Blog comment moderation</h2>
-	              <app-button size="sm" variant="ghost" label="Refresh" (action)="loadFlaggedComments()"></app-button>
+	              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.blog.moderation.title' | translate }}</h2>
+	              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadFlaggedComments()"></app-button>
 	            </div>
 	            <div
 	              *ngIf="flaggedCommentsError"
@@ -1209,12 +1233,12 @@ import { formatIdentity } from '../../shared/user-identity';
 	            >
 	              {{ flaggedCommentsError }}
 	            </div>
-	            <div *ngIf="flaggedCommentsLoading()" class="text-sm text-slate-600 dark:text-slate-300">Loading flagged comments…</div>
+	            <div *ngIf="flaggedCommentsLoading()" class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.blog.moderation.loading' | translate }}</div>
 	            <div
 	              *ngIf="!flaggedCommentsLoading() && !flaggedCommentsError && flaggedComments().length === 0"
 	              class="text-sm text-slate-500 dark:text-slate-400"
 	            >
-	              No flagged comments right now.
+	              {{ 'adminUi.blog.moderation.empty' | translate }}
 	            </div>
 	            <div *ngIf="!flaggedCommentsLoading() && flaggedComments().length" class="grid gap-3">
 	              <div *ngFor="let c of flaggedComments()" class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
@@ -1222,7 +1246,7 @@ import { formatIdentity } from '../../shared/user-identity';
 	                  <div class="grid gap-0.5">
 	                    <p class="font-semibold text-slate-900 dark:text-slate-50">{{ commentAuthorLabel(c.author) }}</p>
 	                    <p class="text-xs text-slate-500 dark:text-slate-400">
-	                      /blog/{{ c.post_slug }} · {{ c.created_at | date: 'short' }} · {{ c.flag_count }} flags
+	                      /blog/{{ c.post_slug }} · {{ c.created_at | date: 'short' }} · {{ 'adminUi.blog.moderation.flagsCount' | translate: { count: c.flag_count } }}
 	                    </p>
 	                  </div>
 	                  <div class="flex items-center gap-2">
@@ -1233,18 +1257,18 @@ import { formatIdentity } from '../../shared/user-identity';
 	                      rel="noopener"
 	                      (click)="$event.stopPropagation()"
 	                    >
-	                      View
+	                      {{ 'adminUi.blog.actions.view' | translate }}
 	                    </a>
-	                    <app-button size="sm" variant="ghost" label="Resolve" (action)="resolveFlags(c)"></app-button>
-	                    <app-button size="sm" variant="ghost" [label]="c.is_hidden ? 'Unhide' : 'Hide'" (action)="toggleHide(c)"></app-button>
-	                    <app-button size="sm" variant="ghost" label="Delete" (action)="adminDeleteComment(c)"></app-button>
+	                    <app-button size="sm" variant="ghost" [label]="'adminUi.blog.moderation.actions.resolve' | translate" (action)="resolveFlags(c)"></app-button>
+	                    <app-button size="sm" variant="ghost" [label]="c.is_hidden ? ('adminUi.blog.moderation.actions.unhide' | translate) : ('adminUi.blog.moderation.actions.hide' | translate)" (action)="toggleHide(c)"></app-button>
+	                    <app-button size="sm" variant="ghost" [label]="'adminUi.actions.delete' | translate" (action)="adminDeleteComment(c)"></app-button>
 	                  </div>
 	                </div>
 	                <p class="mt-2 text-sm whitespace-pre-line text-slate-700 dark:text-slate-200">
-	                  {{ c.body || '(deleted)' }}
+	                  {{ c.body || ('adminUi.blog.moderation.deletedBody' | translate) }}
 	                </p>
 	                <div *ngIf="c.flags?.length" class="mt-2 grid gap-1 text-xs text-slate-600 dark:text-slate-300">
-	                  <p class="font-semibold text-slate-900 dark:text-slate-50">Flags</p>
+	                  <p class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.blog.moderation.flagsTitle' | translate }}</p>
 	                  <div *ngFor="let f of c.flags" class="flex items-center justify-between gap-2">
 	                    <span>{{ f.reason || '—' }}</span>
 	                    <span class="text-slate-500 dark:text-slate-400">{{ f.created_at | date: 'short' }}</span>
@@ -1285,11 +1309,11 @@ import { formatIdentity } from '../../shared/user-identity';
                 <app-button size="sm" [label]="'adminUi.content.save' | translate" (action)="saveContent()"></app-button>
                 <app-button size="sm" variant="ghost" [label]="'adminUi.actions.cancel' | translate" (action)="cancelContent()"></app-button>
                 <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                  <input type="checkbox" [(ngModel)]="showContentPreview" /> Live preview
+                  <input type="checkbox" [(ngModel)]="showContentPreview" /> {{ 'adminUi.content.livePreview' | translate }}
                 </label>
               </div>
               <div *ngIf="showContentPreview" class="rounded-lg border border-slate-200 p-3 bg-slate-50 text-sm text-slate-800 whitespace-pre-line dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200">
-                {{ contentForm.body_markdown || 'Nothing to preview yet.' }}
+                {{ contentForm.body_markdown || ('adminUi.content.previewEmpty' | translate) }}
               </div>
             </div>
           </section>
@@ -2038,11 +2062,11 @@ export class AdminComponent implements OnInit {
   duplicateProduct(slug: string): void {
     this.admin.duplicateProduct(slug).subscribe({
       next: (prod) => {
-        this.toast.success('Product duplicated as draft');
+        this.toast.success(this.t('adminUi.products.success.duplicate'));
         this.loadAll();
         this.loadProduct(prod.slug);
       },
-      error: () => this.toast.error('Could not duplicate product')
+      error: () => this.toast.error(this.t('adminUi.products.errors.duplicate'))
     });
   }
 
@@ -2393,11 +2417,11 @@ export class AdminComponent implements OnInit {
   async createBlogPost(): Promise<void> {
     const slug = this.normalizeBlogSlug(this.blogCreate.slug);
     if (!slug) {
-      this.toast.error('Slug is required', 'Use letters/numbers/dashes, e.g. "my-first-post".');
+      this.toast.error(this.t('adminUi.blog.errors.slugRequiredTitle'), this.t('adminUi.blog.errors.slugRequiredCopy'));
       return;
     }
     if (!this.blogCreate.title.trim() || !this.blogCreate.body_markdown.trim()) {
-      this.toast.error('Title and body are required');
+      this.toast.error(this.t('adminUi.blog.errors.titleBodyRequired'));
       return;
     }
 
@@ -2449,12 +2473,12 @@ export class AdminComponent implements OnInit {
         }
       }
 
-      this.toast.success('Blog post created');
+      this.toast.success(this.t('adminUi.blog.success.created'));
       this.showBlogCreate = false;
       this.reloadContentBlocks();
       this.loadBlogEditor(key);
     } catch {
-      this.toast.error('Could not create blog post');
+      this.toast.error(this.t('adminUi.blog.errors.create'));
     }
   }
 
@@ -2479,14 +2503,14 @@ export class AdminComponent implements OnInit {
         this.blogMeta = block.meta || this.blogMeta || {};
         this.syncBlogMetaToForm(lang);
       },
-      error: () => this.toast.error('Could not load blog post content')
+      error: () => this.toast.error(this.t('adminUi.blog.errors.loadContent'))
     });
   }
 
   saveBlogPost(): void {
     if (!this.selectedBlogKey) return;
     if (!this.blogForm.title.trim() || !this.blogForm.body_markdown.trim()) {
-      this.toast.error('Title and body are required');
+      this.toast.error(this.t('adminUi.blog.errors.titleBodyRequired'));
       return;
     }
 
@@ -2511,11 +2535,11 @@ export class AdminComponent implements OnInit {
         .subscribe({
           next: () => {
             this.blogMeta = nextMeta;
-            this.toast.success('Saved');
+            this.toast.success(this.t('adminUi.blog.success.saved'));
             this.reloadContentBlocks();
             this.loadBlogEditor(key);
           },
-          error: () => this.toast.error('Could not save blog post')
+          error: () => this.toast.error(this.t('adminUi.blog.errors.save'))
         });
       return;
     }
@@ -2529,7 +2553,7 @@ export class AdminComponent implements OnInit {
       .subscribe({
         next: () => {
           const onDone = () => {
-            this.toast.success('Saved translation');
+            this.toast.success(this.t('adminUi.blog.success.translationSaved'));
             this.reloadContentBlocks();
             this.setBlogEditLang(this.blogEditLang);
           };
@@ -2543,12 +2567,12 @@ export class AdminComponent implements OnInit {
               onDone();
             },
             error: () => {
-              this.toast.error('Saved translation, but could not save metadata');
+              this.toast.error(this.t('adminUi.blog.errors.translationMetaSave'));
               onDone();
             }
           });
         },
-        error: () => this.toast.error('Could not save translation')
+        error: () => this.toast.error(this.t('adminUi.blog.errors.translationSave'))
       });
   }
 
@@ -2559,20 +2583,20 @@ export class AdminComponent implements OnInit {
       next: (resp) => {
         this.blogPreviewUrl = resp.url;
         this.blogPreviewExpiresAt = resp.expires_at;
-        this.toast.success('Preview link ready');
+        this.toast.success(this.t('adminUi.blog.preview.success.ready'));
         void this.copyToClipboard(resp.url).then((ok) => {
-          if (ok) this.toast.info('Copied to clipboard');
+          if (ok) this.toast.info(this.t('adminUi.blog.preview.success.copied'));
         });
       },
-      error: () => this.toast.error('Could not generate preview link')
+      error: () => this.toast.error(this.t('adminUi.blog.preview.errors.generate'))
     });
   }
 
   copyBlogPreviewLink(): void {
     if (!this.blogPreviewUrl) return;
     void this.copyToClipboard(this.blogPreviewUrl).then((ok) => {
-      if (ok) this.toast.info('Copied to clipboard');
-      else this.toast.error('Could not copy to clipboard');
+      if (ok) this.toast.info(this.t('adminUi.blog.preview.success.copied'));
+      else this.toast.error(this.t('adminUi.blog.preview.errors.copy'));
     });
   }
 
@@ -2584,7 +2608,7 @@ export class AdminComponent implements OnInit {
         this.blogVersionDetail = null;
         this.blogDiffParts = [];
       },
-      error: () => this.toast.error('Could not load revisions')
+      error: () => this.toast.error(this.t('adminUi.blog.revisions.errors.load'))
     });
   }
 
@@ -2597,7 +2621,7 @@ export class AdminComponent implements OnInit {
       },
       error: () => {
         this.flaggedComments.set([]);
-        this.flaggedCommentsError = 'Could not load flagged comments.';
+        this.flaggedCommentsError = this.t('adminUi.blog.moderation.errors.load');
       },
       complete: () => this.flaggedCommentsLoading.set(false)
     });
@@ -2606,10 +2630,10 @@ export class AdminComponent implements OnInit {
   resolveFlags(comment: AdminBlogComment): void {
     this.blog.resolveCommentFlagsAdmin(comment.id).subscribe({
       next: () => {
-        this.toast.success('Flags resolved');
+        this.toast.success(this.t('adminUi.blog.moderation.success.flagsResolved'));
         this.loadFlaggedComments();
       },
-      error: () => this.toast.error('Could not resolve flags')
+      error: () => this.toast.error(this.t('adminUi.blog.moderation.errors.resolveFlags'))
     });
   }
 
@@ -2617,32 +2641,32 @@ export class AdminComponent implements OnInit {
     if (comment.is_hidden) {
       this.blog.unhideCommentAdmin(comment.id).subscribe({
         next: () => {
-          this.toast.success('Comment unhidden');
+          this.toast.success(this.t('adminUi.blog.moderation.success.commentUnhidden'));
           this.loadFlaggedComments();
         },
-        error: () => this.toast.error('Could not unhide comment')
+        error: () => this.toast.error(this.t('adminUi.blog.moderation.errors.unhide'))
       });
       return;
     }
-    const reason = prompt('Hide reason (optional):') || '';
+    const reason = prompt(this.t('adminUi.blog.moderation.prompts.hideReason')) || '';
     this.blog.hideCommentAdmin(comment.id, { reason: reason.trim() || null }).subscribe({
       next: () => {
-        this.toast.success('Comment hidden');
+        this.toast.success(this.t('adminUi.blog.moderation.success.commentHidden'));
         this.loadFlaggedComments();
       },
-      error: () => this.toast.error('Could not hide comment')
+      error: () => this.toast.error(this.t('adminUi.blog.moderation.errors.hide'))
     });
   }
 
   adminDeleteComment(comment: AdminBlogComment): void {
-    const ok = confirm('Delete this comment? This removes its body for everyone.');
+    const ok = confirm(this.t('adminUi.blog.moderation.confirms.deleteComment'));
     if (!ok) return;
     this.blog.deleteComment(comment.id).subscribe({
       next: () => {
-        this.toast.success('Comment deleted');
+        this.toast.success(this.t('adminUi.blog.moderation.success.commentDeleted'));
         this.loadFlaggedComments();
       },
-      error: () => this.toast.error('Could not delete comment')
+      error: () => this.toast.error(this.t('adminUi.blog.moderation.errors.delete'))
     });
   }
 
@@ -2653,23 +2677,23 @@ export class AdminComponent implements OnInit {
         this.blogVersionDetail = v;
         this.blogDiffParts = diffLines(v.body_markdown || '', this.blogForm.body_markdown || '');
       },
-      error: () => this.toast.error('Could not load version')
+      error: () => this.toast.error(this.t('adminUi.blog.revisions.errors.loadVersion'))
     });
   }
 
   rollbackBlogVersion(version: number): void {
     if (!this.selectedBlogKey) return;
-    const ok = confirm(`Rollback to version ${version}? This will overwrite the current draft.`);
+    const ok = confirm(this.t('adminUi.blog.revisions.confirms.rollback', { version }));
     if (!ok) return;
     const key = this.selectedBlogKey;
     this.admin.rollbackContentVersion(key, version).subscribe({
       next: () => {
-        this.toast.success('Rolled back');
+        this.toast.success(this.t('adminUi.blog.revisions.success.rolledBack'));
         this.reloadContentBlocks();
         this.loadBlogEditor(key);
         this.loadBlogVersions();
       },
-      error: () => this.toast.error('Could not rollback')
+      error: () => this.toast.error(this.t('adminUi.blog.revisions.errors.rollback'))
     });
   }
 
@@ -2756,7 +2780,7 @@ export class AdminComponent implements OnInit {
           .map((img) => ({ id: img.id, url: img.url, alt_text: img.alt_text, sort_order: img.sort_order ?? 0 }))
           .sort((a, b) => a.sort_order - b.sort_order);
         this.blogImages = images.map((img) => ({ id: img.id, url: img.url, alt_text: img.alt_text }));
-        this.toast.success('Image uploaded');
+        this.toast.success(this.t('adminUi.blog.images.success.uploaded'));
         const inserted = images[images.length - 1];
         if (inserted?.url) {
           const alt = file.name.replace(/\.[^.]+$/, '').replace(/[\r\n]+/g, ' ').trim() || 'image';
@@ -2766,11 +2790,11 @@ export class AdminComponent implements OnInit {
           } else {
             target.insertMarkdown(snippet);
           }
-          this.toast.info('Inserted image markdown');
+          this.toast.info(this.t('adminUi.blog.images.success.insertedMarkdown'));
         }
         input.value = '';
       },
-      error: () => this.toast.error('Could not upload image')
+      error: () => this.toast.error(this.t('adminUi.blog.images.errors.upload'))
     });
   }
 
@@ -2778,7 +2802,7 @@ export class AdminComponent implements OnInit {
     const alt = (altText || 'image').replace(/[\r\n]+/g, ' ').trim();
     const snippet = `\n\n![${alt}](${url})\n`;
     this.blogForm.body_markdown = (this.blogForm.body_markdown || '').trimEnd() + snippet;
-    this.toast.info('Inserted image markdown');
+    this.toast.info(this.t('adminUi.blog.images.success.insertedMarkdown'));
   }
 
   private prefixBlogLines(textarea: HTMLTextAreaElement, prefix: string): void {
@@ -2847,7 +2871,7 @@ export class AdminComponent implements OnInit {
         this.blogImages = (block.images || []).map((img) => ({ id: img.id, url: img.url, alt_text: img.alt_text }));
         this.loadBlogVersions();
       },
-      error: () => this.toast.error('Could not load blog post')
+      error: () => this.toast.error(this.t('adminUi.blog.errors.loadPost'))
     });
   }
 
@@ -3254,7 +3278,7 @@ export class AdminComponent implements OnInit {
           this.heroForm = { title: '', subtitle: '', cta_label: '', cta_url: '', image: '' };
           return;
         }
-        this.heroError.set('Could not load hero content');
+        this.heroError.set(this.t('adminUi.home.hero.errors.load'));
       }
     });
   }
@@ -3272,19 +3296,19 @@ export class AdminComponent implements OnInit {
       lang: this.heroLang
     };
     const handleError = () => {
-      this.heroError.set('Could not save hero content');
+      this.heroError.set(this.t('adminUi.home.hero.errors.save'));
       this.heroMessage.set(null);
     };
     this.admin.updateContent('home.hero', payload).subscribe({
       next: () => {
-        this.heroMessage.set('Hero saved');
+        this.heroMessage.set(this.t('adminUi.home.hero.success.saved'));
         this.heroError.set(null);
       },
       error: (err) => {
         if (err?.status === 404) {
           this.admin.createContent('home.hero', payload).subscribe({
             next: () => {
-              this.heroMessage.set('Hero created');
+              this.heroMessage.set(this.t('adminUi.home.hero.success.created'));
               this.heroError.set(null);
             },
             error: handleError
@@ -3440,16 +3464,18 @@ export class AdminComponent implements OnInit {
       meta: { version: 1, sections },
       status: 'published'
     };
+    const ok = this.t('adminUi.home.sections.success.save');
+    const errMsg = this.t('adminUi.home.sections.errors.save');
     this.admin.updateContent('home.sections', payload).subscribe({
-      next: () => (this.sectionsMessage = 'Sections order saved'),
+      next: () => (this.sectionsMessage = ok),
       error: (err) => {
         if (err?.status === 404) {
           this.admin.createContent('home.sections', payload).subscribe({
-            next: () => (this.sectionsMessage = 'Sections order saved'),
-            error: () => (this.sectionsMessage = 'Could not save sections order')
+            next: () => (this.sectionsMessage = ok),
+            error: () => (this.sectionsMessage = errMsg)
           });
         } else {
-          this.sectionsMessage = 'Could not save sections order';
+          this.sectionsMessage = errMsg;
         }
       }
     });
@@ -3481,7 +3507,7 @@ export class AdminComponent implements OnInit {
 
   saveCollection(): void {
     if (!this.collectionForm.slug || !this.collectionForm.name) {
-      this.toast.error('Slug and name are required');
+      this.toast.error(this.t('adminUi.home.collections.errors.required'));
       return;
     }
     const payload = {
@@ -3501,10 +3527,10 @@ export class AdminComponent implements OnInit {
         } else {
           this.featuredCollections = [col, ...this.featuredCollections];
         }
-        this.collectionMessage = 'Saved';
+        this.collectionMessage = this.t('adminUi.home.collections.success.saved');
         this.editingCollection = null;
       },
-      error: () => this.toast.error('Could not save collection')
+      error: () => this.toast.error(this.t('adminUi.home.collections.errors.save'))
     });
   }
 
