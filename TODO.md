@@ -14,7 +14,7 @@ Below is a structured checklist you can turn into issues.
 - [x] ARCHITECTURE.md with high-level design and data flow.
 - [x] DX: run `alembic upgrade head` in `start.sh` before starting the backend to avoid schema drift.
 - [x] CI: add deployment/release job (e.g., container build + push) once runtime code lands.
-- [ ] E2E: add real browser tests (Playwright) for checkout + admin flows and wire them into CI (Docker-backed).
+- [x] E2E: add real browser tests (Playwright) for checkout + admin flows and wire them into CI (Docker-backed).
 
 ## Backend - Core & Auth
 - [x] Scaffold FastAPI app with versioned `/api/v1` router.
@@ -316,8 +316,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Cart mini-icon badge with item count.
 - [x] Edge cases: out-of-stock and price changes during checkout.
 - [x] Checkout totals driven by backend shipping/promo validation (no hardcoded amounts).
-- [x] Checkout: require signed-in + verified email before placing an order (guest checkout disabled for now).
-- [ ] Checkout: reintroduce guest checkout with an email verification step and optional “create account” toggle (without weakening the verified-email policy) + update tests.
+- [x] Checkout: require verified email before placing an order (signed-in or guest).
+- [x] Checkout: reintroduce guest checkout with an email verification step and optional “create account” toggle (without weakening the verified-email policy) + update tests.
 - [x] Frontend cart/checkout tests (unit/integration-style) against backend cart/payment intent/order APIs.
 - [x] Ensure frontend CI runs with Angular toolchain/Chrome to cover cart/checkout flows.
 - [x] Wire cart state to backend cart APIs (load/add/update/remove) instead of local-only.
@@ -396,7 +396,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Frontend tests: AdminService/admin component for order status, coupon add/toggle, category reorder drag/drop, maintenance toggle (mock HTTP).
 - [x] Backend tests: admin filters/coupons/audit/image reorder/low-stock with sqlite override.
 - [x] Frontend tests: AdminService + admin component flows (sessions revoke, role update, low-stock, coupons, maintenance get/set, category reorder drag-drop).
-- [ ] Admin i18n: localize remaining hardcoded strings in admin pages (assets/social/SEO/info) and ensure RO/EN parity.
+- [x] Admin i18n: localize remaining hardcoded strings in admin pages (assets/social/SEO/info) and ensure RO/EN parity.
 
 ## UX, Performance, SEO & Accessibility
 - [x] Mobile-first responsive design across pages(full mobile compatibility).
