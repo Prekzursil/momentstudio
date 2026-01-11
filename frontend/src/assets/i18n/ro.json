@@ -519,16 +519,30 @@
     },
     "products": {
       "title": "Produse",
+      "hint": "Caută după nume, slug sau SKU.",
       "new": "Nou",
       "delete": "Șterge",
       "edit": "Editează produs",
       "create": "Creează produs",
+      "selectCategory": "Selectează categoria",
+      "search": "Caută",
+      "all": "Toate stările",
+      "allCategories": "Toate categoriile",
+      "empty": "Nu există produse pentru aceste filtre.",
+      "active": "Activ",
+      "inactive": "Inactiv",
+      "pagination": "Pagina {{page}} din {{total_pages}} · {{total_items}} total",
+      "prev": "Înapoi",
+      "next": "Înainte",
       "table": {
         "name": "Nume",
         "price": "Preț",
         "status": "Status",
         "category": "Categorie",
-        "stock": "Stoc"
+        "stock": "Stoc",
+        "active": "Activ",
+        "updated": "Actualizat",
+        "actions": "Acțiuni"
       },
       "form": {
         "slug": "Slug",
@@ -538,7 +552,11 @@
         "save": "Salvează produsul",
         "upload": "Încarcă imagine",
         "images": "Imagini",
-        "image": "Imagine"
+        "image": "Imagine",
+        "active": "Activ",
+        "featured": "Recomandat",
+        "publishAt": "Publică la",
+        "noImages": "Nu există imagini."
       },
       "success": {
         "save": "Produs salvat",
@@ -547,6 +565,7 @@
         "imageDelete": "Imagine ștearsă"
       },
       "errors": {
+        "loadList": "Nu am putut încărca produsele.",
         "load": "Nu am putut încărca produsul",
         "save": "Nu am putut salva produsul",
         "delete": "Nu am putut șterge produsul",
@@ -663,8 +682,36 @@
     },
     "users": {
       "title": "Utilizatori",
+      "hint": "Caută după email, utilizator sau nume afișat.",
       "setRole": "Setează rol",
       "forceLogout": "Deconectează selectatul",
+      "search": "Caută",
+      "roleFilter": "Rol",
+      "all": "Toate",
+      "empty": "Nu există utilizatori pentru aceste filtre.",
+      "manage": "Gestionează",
+      "verified": "Verificat",
+      "unverified": "Neverificat",
+      "pagination": "Pagina {{page}} din {{total_pages}} · {{total_items}} total",
+      "prev": "Anterior",
+      "next": "Următor",
+      "detailTitle": "Detalii utilizator",
+      "selectHint": "Selectează un utilizator pentru a gestiona rolul, sesiunile și istoricul.",
+      "role": "Rol",
+      "ownerLocked": "Rolul de proprietar poate fi doar transferat.",
+      "aliasHistory": "Istoric alias-uri",
+      "loadingAliases": "Se încarcă istoricul…",
+      "usernameHistory": "Istoric utilizatori",
+      "displayNameHistory": "Istoric nume afișat",
+      "noHistory": "Nu există istoric încă.",
+      "table": {
+        "identity": "Identitate",
+        "email": "Email",
+        "role": "Rol",
+        "verified": "Verificat",
+        "created": "Creat",
+        "actions": "Acțiuni"
+      },
       "roles": {
         "customer": "Client",
         "admin": "Administrator",
@@ -675,6 +722,8 @@
         "role": "Rol actualizat"
       },
       "errors": {
+        "load": "Nu am putut încărca utilizatorii.",
+        "aliases": "Nu am putut încărca istoricul.",
         "revoke": "Nu am putut revoca sesiunile",
         "role": "Nu am putut actualiza rolul"
       }

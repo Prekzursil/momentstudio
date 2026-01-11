@@ -80,6 +80,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Price and currency validation helpers.
 - [x] Product feed (JSON/CSV) for marketing channels.
 - [x] Featured collection endpoints.
+- [x] Catalog: restrict public product list/detail/bounds/feed to published + active only (admin can still access drafts/archived).
 
 ## Backend - Cart & Checkout
 - [x] Cart + CartItem models + migrations.
@@ -371,6 +372,8 @@ Below is a structured checklist you can turn into issues.
 ## Frontend - Admin Dashboard
 - [x] /admin layout with sidebar + guard.
 - [x] Admin UX: refactor `/admin` to a route-based layout (Option B) with dedicated pages (start with Orders).
+- [x] Admin UX: add `/admin/products` page (catalog workflows) and wire it into the admin sidebar.
+- [x] Admin UX: add `/admin/users` page (users + security workflows) and wire it into the admin sidebar.
 - [x] Product list table (sort/search).
 - [x] Product create/edit form (slug, category, price, stock, description, images, variants).
 - [x] Admin orders list with filters + order detail/status update.

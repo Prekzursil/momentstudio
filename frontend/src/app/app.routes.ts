@@ -86,6 +86,16 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./pages/admin/orders/admin-order-detail.component').then((m) => m.AdminOrderDetailComponent),
         title: 'Order | Admin | momentstudio'
+      },
+      {
+        path: 'products',
+        loadComponent: () => import('./pages/admin/products/admin-products.component').then((m) => m.AdminProductsComponent),
+        title: 'Products | Admin | momentstudio'
+      },
+      {
+        path: 'users',
+        loadComponent: () => import('./pages/admin/users/admin-users.component').then((m) => m.AdminUsersComponent),
+        title: 'Users | Admin | momentstudio'
       }
     ]
   },
