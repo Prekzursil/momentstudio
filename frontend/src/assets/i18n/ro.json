@@ -323,6 +323,7 @@
     "lastName": "Nume de familie",
     "dateOfBirth": "Data nașterii",
     "phone": "Telefon",
+    "phoneHint": "Introdu doar cifre (fără spații); codul de țară se adaugă automat.",
     "confirmPassword": "Confirmă parola",
     "forgot": "Ai uitat parola?",
     "createAccount": "Creează cont",

@@ -323,6 +323,7 @@
     "lastName": "Last name",
     "dateOfBirth": "Date of birth",
     "phone": "Phone",
+    "phoneHint": "Enter digits only (no spaces); we’ll add the country code automatically.",
     "confirmPassword": "Confirm password",
     "forgot": "Forgot password?",
     "createAccount": "Create account",

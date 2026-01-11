@@ -236,6 +236,94 @@ def test_guest_checkout_email_verification_and_create_account(
     assert user.username == "guest2"
 
 
+def test_guest_checkout_email_verification_rate_limited(
+    checkout_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client: TestClient = checkout_app["client"]  # type: ignore[assignment]
+    SessionLocal = checkout_app["session_factory"]  # type: ignore[assignment]
+
+    async def seed() -> str:
+        async with SessionLocal() as session:
+            category = Category(slug="guest3", name="Guest3")
+            product = Product(
+                category=category,
+                slug="guest3-prod",
+                sku="GUEST-3",
+                name="Guest Product 3",
+                base_price=Decimal("10.00"),
+                currency="RON",
+                stock_quantity=10,
+                images=[ProductImage(url="/media/img1.png", alt_text="img")],
+            )
+            session.add(product)
+            await session.commit()
+            await session.refresh(product)
+            return str(product.id)
+
+    product_id = asyncio.run(seed())
+
+    add = client.post(
+        "/api/v1/cart/items",
+        headers={"X-Session-Id": "guest-ghi"},
+        json={"product_id": product_id, "quantity": 1},
+    )
+    assert add.status_code in (200, 201), add.text
+
+    async def fake_send_verification_email(to_email, token, lang=None):
+        return True
+
+    monkeypatch.setattr(email_service, "send_verification_email", fake_send_verification_email)
+
+    req = client.post(
+        "/api/v1/orders/guest-checkout/email/request",
+        headers={"X-Session-Id": "guest-ghi"},
+        json={"email": "guest3@example.com"},
+    )
+    assert req.status_code == 204, req.text
+
+    async def fetch_token() -> str:
+        async with SessionLocal() as session:
+            cart = (await session.execute(select(Cart).where(Cart.session_id == "guest-ghi"))).scalar_one()
+            assert cart.guest_email_verification_token
+            return cart.guest_email_verification_token
+
+    token = asyncio.run(fetch_token())
+    wrong_token = "000000" if token != "000000" else "111111"
+
+    # Allow up to 10 failed attempts; the next attempt should be blocked.
+    for _ in range(10):
+        confirm = client.post(
+            "/api/v1/orders/guest-checkout/email/confirm",
+            headers={"X-Session-Id": "guest-ghi"},
+            json={"email": "guest3@example.com", "token": wrong_token},
+        )
+        assert confirm.status_code == 400, confirm.text
+
+    blocked = client.post(
+        "/api/v1/orders/guest-checkout/email/confirm",
+        headers={"X-Session-Id": "guest-ghi"},
+        json={"email": "guest3@example.com", "token": wrong_token},
+    )
+    assert blocked.status_code == 429, blocked.text
+
+    # Requesting a new code should reset the attempt counter.
+    req2 = client.post(
+        "/api/v1/orders/guest-checkout/email/request",
+        headers={"X-Session-Id": "guest-ghi"},
+        json={"email": "guest3@example.com"},
+    )
+    assert req2.status_code == 204, req2.text
+
+    token2 = asyncio.run(fetch_token())
+    confirm2 = client.post(
+        "/api/v1/orders/guest-checkout/email/confirm",
+        headers={"X-Session-Id": "guest-ghi"},
+        json={"email": "guest3@example.com", "token": token2},
+    )
+    assert confirm2.status_code == 200, confirm2.text
+    assert confirm2.json()["verified"] is True
+
+
 def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch) -> None:
     client: TestClient = checkout_app["client"]  # type: ignore[assignment]
     SessionLocal = checkout_app["session_factory"]  # type: ignore[assignment]

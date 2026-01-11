@@ -73,7 +73,7 @@ import { buildE164, listPhoneCountries, PhoneCountryOption } from '../../shared/
 	                    maxlength="30"
 	                    pattern="^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$"
 	                  />
-	                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'auth.usernameInvalid' | translate }}</span>
+	                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'validation.usernameInvalid' | translate }}</span>
 	                </label>
 	                <div class="grid gap-1 text-sm">
 	                  <span class="font-medium text-slate-700 dark:text-slate-200">{{ 'auth.password' | translate }}</span>
@@ -90,7 +90,7 @@ import { buildE164, listPhoneCountries, PhoneCountryOption } from '../../shared/
 	                    />
 	                    <app-button size="sm" variant="ghost" [label]="guestShowPassword ? ('auth.hide' | translate) : ('auth.show' | translate)" (action)="toggleGuestPassword()"></app-button>
 	                  </div>
-	                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'auth.passwordMin' | translate }}</span>
+	                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'validation.passwordMin' | translate }}</span>
 	                </div>
 	                <div class="grid gap-1 text-sm">
 	                  <span class="font-medium text-slate-700 dark:text-slate-200">{{ 'auth.confirmPassword' | translate }}</span>
@@ -113,7 +113,7 @@ import { buildE164, listPhoneCountries, PhoneCountryOption } from '../../shared/
 	                    ></app-button>
 	                  </div>
 	                  <span *ngIf="guestPasswordConfirm && guestPasswordConfirm !== guestPassword" class="text-xs text-amber-700 dark:text-amber-300">
-	                    {{ 'auth.passwordMismatch' | translate }}
+	                    {{ 'validation.passwordMismatch' | translate }}
 	                  </span>
 	                </div>
 	                <label class="text-sm grid gap-1">
@@ -176,8 +176,9 @@ import { buildE164, listPhoneCountries, PhoneCountryOption } from '../../shared/
 	                      pattern="^[0-9]{6,14}$"
 	                    />
 	                  </div>
+	                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'auth.phoneHint' | translate }}</span>
 	                  <span *ngIf="guestPhoneNational && !guestPhoneE164()" class="text-xs text-amber-700 dark:text-amber-300">
-	                    {{ 'auth.phoneInvalid' | translate }}
+	                    {{ 'validation.phoneInvalid' | translate }}
 	                  </span>
 	                </div>
 	              </div>
@@ -473,15 +474,15 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
     }
     if (!this.auth.isAuthenticated() && this.guestCreateAccount) {
       if (this.guestPassword.length < 6) {
-        this.errorMessage = this.translate.instant('auth.passwordMin');
+        this.errorMessage = this.translate.instant('validation.passwordMin');
         return;
       }
       if (this.guestPassword !== this.guestPasswordConfirm) {
-        this.errorMessage = this.translate.instant('auth.passwordMismatch');
+        this.errorMessage = this.translate.instant('validation.passwordMismatch');
         return;
       }
       if (!this.guestPhoneE164()) {
-        this.errorMessage = this.translate.instant('auth.phoneInvalid');
+        this.errorMessage = this.translate.instant('validation.phoneInvalid');
         return;
       }
     }
