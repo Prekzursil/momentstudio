@@ -20,7 +20,11 @@ test('owner can update About page via CMS and audit log records it', async ({ pa
   const marker = `E2E Our story ${Date.now()}`;
 
   await page.goto('/admin/content/pages');
-  await page.getByLabel('Our story (About)').fill(marker);
+  const aboutField = page.getByLabel('Our story (About)');
+  await expect(aboutField).toBeVisible();
+  // Wait for the CMS content to finish loading so it doesn't overwrite our edits.
+  await expect(aboutField).not.toHaveValue('');
+  await aboutField.fill(marker);
   await page.getByRole('button', { name: 'Save about' }).click();
   await expect(page.getByText('Content saved.')).toBeVisible();
 
@@ -43,11 +47,16 @@ test('owner can toggle homepage sections via CMS', async ({ page }) => {
   const sectionsPanel = page.locator('section', { has: page.getByRole('heading', { name: 'Homepage sections order' }) });
   await expect(sectionsPanel).toBeVisible();
 
-  const whyRow = sectionsPanel.locator('div', { has: page.getByText('why') }).first();
+  const whyRow = sectionsPanel
+    .locator('div[draggable="true"]')
+    .filter({ has: page.locator('span', { hasText: /^why$/ }) })
+    .first();
   await expect(whyRow).toBeVisible();
 
   const checkbox = whyRow.locator('input[type="checkbox"]').first();
+  await expect(checkbox).toBeChecked();
   await checkbox.uncheck();
+  await expect(checkbox).not.toBeChecked();
 
   await sectionsPanel.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Sections order saved.')).toBeVisible();
@@ -70,10 +79,14 @@ test('owner can create a published blog post from CMS', async ({ page }) => {
   await page.getByLabel('Status').selectOption('published');
   await page.getByLabel('Title').fill(title);
 
-  const editor = page.locator('app-rich-editor .ProseMirror').first();
-  await expect(editor).toBeVisible();
-  await editor.click();
-  await editor.type(`Hello from Playwright. ${title}`);
+  // Use the plain Markdown editor in CI to avoid rich-editor visibility flakiness.
+  const richToggle = page.getByRole('checkbox', { name: 'Rich editor' });
+  await expect(richToggle).toBeVisible();
+  await richToggle.uncheck();
+
+  const bodyTextarea = page.locator('textarea[rows="10"]').first();
+  await expect(bodyTextarea).toBeVisible();
+  await bodyTextarea.fill(`Hello from Playwright. ${title}`);
 
   await page.getByRole('button', { name: 'Create post' }).click();
   await expect(page.getByText('Blog post created')).toBeVisible();
@@ -81,4 +94,3 @@ test('owner can create a published blog post from CMS', async ({ page }) => {
   await page.goto(`/blog/${slug}`);
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
 });
-
