@@ -414,6 +414,7 @@
       "delete": "Șterge",
       "remove": "Elimină",
       "save": "Salvează",
+      "cancel": "Anulează",
       "edit": "Editează",
       "refresh": "Reîncarcă"
     },
@@ -478,6 +479,195 @@
         "saveContact": "Salvează contactul",
         "success": { "save": "Conținut salvat." },
         "errors": { "save": "Nu am putut salva conținutul." }
+      }
+    },
+    "home": {
+      "hero": {
+        "title": "Erou homepage (pe limbă)",
+        "headline": "Titlu",
+        "subtitle": "Subtitlu",
+        "ctaLabel": "Etichetă CTA",
+        "ctaUrl": "URL CTA",
+        "imageUrl": "URL imagine erou",
+        "success": {
+          "saved": "Erou salvat.",
+          "created": "Erou creat."
+        },
+        "errors": {
+          "load": "Nu am putut încărca eroul.",
+          "save": "Nu am putut salva eroul."
+        }
+      },
+      "sections": {
+        "title": "Ordinea secțiunilor de pe homepage",
+        "hint": "Trage pentru a reordona secțiunile și a comuta vizibilitatea.",
+        "enabled": "Activată",
+        "drag": "trage",
+        "success": {
+          "save": "Ordinea secțiunilor a fost salvată."
+        },
+        "errors": {
+          "save": "Nu am putut salva ordinea secțiunilor."
+        }
+      },
+      "collections": {
+        "title": "Colecții recomandate",
+        "slug": "Slug",
+        "name": "Nume",
+        "description": "Descriere",
+        "products": "Produse (ține Ctrl/Cmd pentru selecție multiplă)",
+        "create": "Creează colecție",
+        "update": "Actualizează colecție",
+        "success": {
+          "saved": "Salvat."
+        },
+        "errors": {
+          "required": "Slug și nume sunt obligatorii.",
+          "save": "Nu am putut salva colecția."
+        }
+      }
+    },
+    "blog": {
+      "title": "Blog",
+      "empty": "Nu există articole pe blog încă.",
+      "actions": {
+        "newPost": "Articol nou",
+        "closeEditor": "Închide editorul",
+        "view": "Vezi",
+        "createPost": "Creează articol",
+        "previewLink": "Link previzualizare",
+        "copy": "Copiază",
+        "image": "Imagine"
+      },
+      "fields": {
+        "slug": "Slug",
+        "slugPlaceholder": "ex. primul-meu-articol",
+        "baseLanguage": "Limba de bază",
+        "status": "Stare",
+        "publishAtOptional": "Publică la (opțional)",
+        "publishAtHint": "Setează o dată în viitor pentru publicare programată.",
+        "title": "Titlu",
+        "summaryOptional": "Rezumat (opțional)",
+        "tags": "Etichete (separate prin virgulă)",
+        "tagsPlaceholder": "ex. ceramică, atelier, noutăți",
+        "coverImageUrlOptional": "URL imagine copertă (opțional)",
+        "coverImagePlaceholder": "https://…",
+        "readingTimeOptional": "Timp de citire (minute) (opțional)",
+        "body": "Conținut"
+      },
+      "create": {
+        "title": "Creează articol de blog",
+        "addTranslation": "Adaugă traducere opțională",
+        "translationHint": "Limba traducerii: {{lang}} (lasă gol pentru a omite).",
+        "translationTitle": "Titlu tradus",
+        "translationBody": "Conținut tradus (Markdown)"
+      },
+      "editing": {
+        "title": "Editezi",
+        "languages": "Limba de bază: {{base}} · Editezi: {{edit}}",
+        "statusBaseOnly": "Stare (doar limba de bază)",
+        "publishAtBaseOnlyOptional": "Publică la (doar limba de bază) (opțional)",
+        "publishAtBaseOnlyHint": "Dacă este în viitor și starea este Publicat, articolul va apărea atunci.",
+        "summaryOptional": "Rezumat ({{lang}}) (opțional)",
+        "summaryHint": "Folosit pentru excerpt în listă și descrierea SEO.",
+        "richEditor": "Editor bogat",
+        "livePreview": "Previzualizare live",
+        "previewEmpty": "Nimic de previzualizat încă.",
+        "toolbarTip": "Sfat: Folosește bara de instrumente pentru a formata markdown și a insera imagini (încărcările merg în imaginile de conținut ale articolului)."
+      },
+      "toolbar": {
+        "link": "Link",
+        "code": "Cod",
+        "list": "Listă"
+      },
+      "images": {
+        "title": "Imagini",
+        "insertMarkdown": "Inserează markdown",
+        "success": {
+          "uploaded": "Imagine încărcată",
+          "insertedMarkdown": "Markdown pentru imagine inserat"
+        },
+        "errors": {
+          "upload": "Nu s-a putut încărca imaginea"
+        }
+      },
+      "preview": {
+        "title": "Link previzualizare",
+        "expires": "Expiră",
+        "success": {
+          "ready": "Link de previzualizare pregătit",
+          "copied": "Copiat în clipboard"
+        },
+        "errors": {
+          "generate": "Nu s-a putut genera linkul de previzualizare",
+          "copy": "Nu s-a putut copia în clipboard"
+        }
+      },
+      "revisions": {
+        "title": "Revizii",
+        "empty": "Nu există revizii încărcate.",
+        "diff": "Diff",
+        "rollback": "Rollback",
+        "diffVsCurrent": "Diff vs versiunea curentă (v{{version}})",
+        "confirms": {
+          "rollback": "Revii la versiunea {{version}}? Acest lucru va suprascrie ciorna curentă."
+        },
+        "success": {
+          "rolledBack": "S-a revenit"
+        },
+        "errors": {
+          "load": "Nu am putut încărca reviziile",
+          "loadVersion": "Nu am putut încărca versiunea",
+          "rollback": "Nu am putut reveni"
+        }
+      },
+      "moderation": {
+        "title": "Moderare comentarii blog",
+        "loading": "Se încarcă comentariile semnalate…",
+        "empty": "Nu există comentarii semnalate acum.",
+        "flagsCount": "{{count}} semnalări",
+        "flagsTitle": "Semnalări",
+        "deletedBody": "(șters)",
+        "actions": {
+          "resolve": "Rezolvă",
+          "hide": "Ascunde",
+          "unhide": "Afișează"
+        },
+        "prompts": {
+          "hideReason": "Motiv ascundere (opțional):"
+        },
+        "confirms": {
+          "deleteComment": "Ștergi acest comentariu? Conținutul va fi eliminat pentru toți."
+        },
+        "success": {
+          "flagsResolved": "Semnalări rezolvate",
+          "commentUnhidden": "Comentariu afișat",
+          "commentHidden": "Comentariu ascuns",
+          "commentDeleted": "Comentariu șters"
+        },
+        "errors": {
+          "load": "Nu am putut încărca comentariile semnalate.",
+          "resolveFlags": "Nu am putut rezolva semnalările",
+          "unhide": "Nu am putut afișa comentariul",
+          "hide": "Nu am putut ascunde comentariul",
+          "delete": "Nu am putut șterge comentariul"
+        }
+      },
+      "success": {
+        "created": "Articol creat",
+        "saved": "Salvat",
+        "translationSaved": "Traducere salvată"
+      },
+      "errors": {
+        "slugRequiredTitle": "Slug-ul este obligatoriu",
+        "slugRequiredCopy": "Folosește litere/cifre/cratime, ex. \"primul-meu-articol\".",
+        "titleBodyRequired": "Titlul și conținutul sunt obligatorii",
+        "create": "Nu am putut crea articolul",
+        "loadContent": "Nu am putut încărca conținutul articolului",
+        "save": "Nu am putut salva articolul",
+        "translationSave": "Nu am putut salva traducerea",
+        "translationMetaSave": "Traducerea a fost salvată, dar nu am putut salva metadatele",
+        "loadPost": "Nu am putut încărca articolul"
       }
     },
     "fx": {
@@ -565,6 +755,7 @@
       "success": {
         "save": "Produs salvat",
         "delete": "Produs șters",
+        "duplicate": "Produs duplicat ca ciornă",
         "imageUpload": "Imagine încărcată",
         "imageDelete": "Imagine ștearsă"
       },
@@ -576,6 +767,7 @@
         "required": "Numele și slug-ul categoriei sunt obligatorii",
         "image": "Încărcarea imaginii a eșuat",
         "deleteImage": "Nu am putut șterge imaginea",
+        "duplicate": "Nu am putut duplica produsul",
         "saveFirst": "Salvează produsul înainte de a încărca imagini"
       },
       "actions": {
@@ -738,6 +930,8 @@
       "titleLabel": "Titlu",
       "status": "Status",
       "body": "Conținut",
+      "livePreview": "Previzualizare live",
+      "previewEmpty": "Nimic de previzualizat încă.",
       "save": "Salvează conținutul",
       "errors": {
         "update": "Nu am putut actualiza conținutul"

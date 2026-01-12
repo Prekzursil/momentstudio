@@ -459,6 +459,8 @@ Below is a structured checklist you can turn into issues.
 
 ## Admin Dashboard – CMS & UX Enhancements
 - [x] Admin UI for editing homepage hero per language (headline, subtitle, CTA, hero image).
+- [x] Admin sidebar: add a dedicated `/admin/content` entry/route for CMS + blog tooling.
+- [x] Admin i18n: localize blog/CMS admin UI strings (RO/EN) to avoid hardcoded English.
 - [x] Admin UI for managing Collections (named groups of products to feature).
 - [x] Drag-and-drop ordering for homepage sections (hero, collections, bestsellers, new arrivals).
 - [x] Home CMS: make storefront render homepage sections from `home.sections` (order + enabled toggles) and add a CMS-driven `home.story` section.
