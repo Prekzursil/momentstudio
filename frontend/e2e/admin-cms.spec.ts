@@ -81,7 +81,7 @@ test('owner can create a published blog post from CMS', async ({ page }) => {
 
   const editorRoot = page.locator('app-rich-editor .toastui-editor-defaultUI').first();
   await expect(editorRoot).toBeVisible();
-  const editorBody = editorRoot.locator('.ProseMirror').first();
+  const editorBody = editorRoot.locator('.ProseMirror:visible').first();
   await expect(editorBody).toBeVisible();
   await editorBody.fill(`Hello from Playwright. ${title}`);
 
