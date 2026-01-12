@@ -1,0 +1,41 @@
+<h2 style="margin: 0 0 12px 0;">
+  {% if lang == "ro" %}Cerere de retur creată{% else %}Return request created{% endif %}
+</h2>
+
+<p style="margin: 0 0 8px 0;">
+  <strong>{% if lang == "ro" %}Comandă{% else %}Order{% endif %}:</strong>
+  {{ order_reference }}
+</p>
+
+{% if customer_name %}
+  <p style="margin: 0 0 8px 0;">
+    <strong>{% if lang == "ro" %}Client{% else %}Customer{% endif %}:</strong>
+    {{ customer_name }}
+  </p>
+{% endif %}
+
+<p style="margin: 0 0 6px 0;"><strong>{% if lang == "ro" %}Articole{% else %}Items{% endif %}:</strong></p>
+<ul style="margin: 0 0 12px 18px; padding: 0;">
+  {% for item in items %}
+    <li>{{ item.name }} ×{{ item.quantity }}</li>
+  {% endfor %}
+</ul>
+
+{% if reason %}
+  <p style="margin: 0 0 8px 0;">
+    <strong>{% if lang == "ro" %}Motiv{% else %}Reason{% endif %}:</strong>
+    {{ reason }}
+  </p>
+{% endif %}
+
+{% if customer_message %}
+  <p style="margin: 0 0 12px 0;">
+    <strong>{% if lang == "ro" %}Mesaj{% else %}Message{% endif %}:</strong><br />
+    {{ customer_message }}
+  </p>
+{% endif %}
+
+<p style="margin: 0;">
+  <a href="{{ account_url }}">{% if lang == "ro" %}Deschide contul{% else %}Open account{% endif %}</a>
+</p>
+

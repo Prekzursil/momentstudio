@@ -54,7 +54,26 @@
     "replyTime": "De obicei răspundem în 1–2 zile lucrătoare.",
     "followUs": "Urmărește-ne",
     "phoneLabel": "Telefon",
-    "emailLabel": "Email"
+    "emailLabel": "Email",
+    "form": {
+      "title": "Trimite un mesaj",
+      "topicLabel": "Subiect",
+      "topicContact": "General",
+      "topicSupport": "Suport",
+      "topicRefund": "Rambursare",
+      "topicDispute": "Dispută",
+      "nameLabel": "Nume",
+      "emailLabel": "Email",
+      "orderLabel": "Referință comandă (opțional)",
+      "orderPlaceholder": "ex. MS-12345",
+      "messageLabel": "Mesaj",
+      "messagePlaceholder": "Spune-ne cu ce te putem ajuta…",
+      "submit": "Trimite",
+      "sending": "Se trimite…",
+      "successTitle": "Mesaj trimis",
+      "successCopy": "Mulțumim! Revenim cu un răspuns cât de curând.",
+      "error": "Nu am putut trimite mesajul. Încearcă din nou."
+    }
   },
   "account": {
     "completeProfile": {
@@ -390,7 +409,9 @@
       "dashboard": "Panou",
       "products": "Produse",
       "orders": "Comenzi",
+      "returns": "Retururi",
       "users": "Utilizatori",
+      "support": "Suport",
       "content": "Conținut"
     },
     "dashboardTitle": "Panou administrare",
@@ -420,6 +441,124 @@
       "cancel": "Anulează",
       "edit": "Editează",
       "refresh": "Reîncarcă"
+    },
+    "support": {
+      "title": "Inbox suport",
+      "subtitle": "Mesaje trimise din formularul de contact.",
+      "filters": {
+        "search": "Caută",
+        "searchPlaceholder": "Email, nume, mesaj, referință…",
+        "topic": "Subiect",
+        "topicAll": "Toate",
+        "status": "Stare",
+        "statusAll": "Toate",
+        "apply": "Aplică"
+      },
+      "topics": {
+        "contact": "General",
+        "support": "Suport",
+        "refund": "Rambursare",
+        "dispute": "Dispută"
+      },
+      "status": {
+        "new": "Nou",
+        "triaged": "Triat",
+        "resolved": "Rezolvat"
+      },
+      "table": {
+        "date": "Data",
+        "topic": "Subiect",
+        "status": "Stare",
+        "from": "De la",
+        "order": "Comandă"
+      },
+      "empty": "Nu există mesaje.",
+      "pagination": "Pagina {{page}} din {{total}} · {{count}} total",
+      "prev": "Înapoi",
+      "next": "Înainte",
+      "detail": {
+        "title": "Mesaj",
+        "empty": "Selectează un mesaj pentru detalii.",
+        "meta": "Detalii",
+        "order": "Comandă",
+        "message": "Mesaj",
+        "statusLabel": "Stare",
+        "adminNote": "Notă admin",
+        "adminNotePlaceholder": "Notițe interne (nu sunt vizibile pentru client)…",
+        "save": "Salvează"
+      },
+      "success": {
+        "saved": "Salvat."
+      },
+      "errors": {
+        "load": "Nu am putut încărca mesajele.",
+        "loadDetail": "Nu am putut încărca detaliile mesajului.",
+        "save": "Nu am putut salva modificările."
+      }
+    },
+    "returns": {
+      "title": "Retururi",
+      "filters": {
+        "search": "Caută",
+        "searchPh": "Referință comandă, email, nume…",
+        "status": "Stare",
+        "statusAll": "Toate",
+        "apply": "Aplică"
+      },
+      "status": {
+        "requested": "Solicitat",
+        "approved": "Aprobat",
+        "rejected": "Respins",
+        "received": "Primit",
+        "refunded": "Rambursat",
+        "closed": "Închis"
+      },
+      "table": {
+        "date": "Data",
+        "status": "Stare",
+        "order": "Comandă",
+        "customer": "Client"
+      },
+      "empty": "Nu există cereri de retur.",
+      "pagination": "Pagina {{page}} din {{total}} · {{count}} total",
+      "prev": "Înapoi",
+      "next": "Înainte",
+      "detail": {
+        "title": "Cerere de retur",
+        "empty": "Selectează o cerere de retur pentru detalii.",
+        "order": "Comandă",
+        "status": "Stare",
+        "reason": "Motiv",
+        "customerMessage": "Mesaj client",
+        "items": "Produse",
+        "adminNote": "Notă admin",
+        "adminNotePh": "Notițe interne (vizibile doar staff-ului)…",
+        "save": "Salvează"
+      },
+      "success": {
+        "saved": "Salvat."
+      },
+      "errors": {
+        "load": "Nu am putut încărca cererile de retur.",
+        "loadDetail": "Nu am putut încărca cererea de retur.",
+        "save": "Nu am putut salva modificările."
+      },
+      "viewAllForOrder": "Vezi toate retururile pentru această comandă",
+      "create": {
+        "open": "Creează retur",
+        "title": "Creează cerere de retur",
+        "hint": "Selectează cantitățile și motivele. Clientul va primi un email.",
+        "reasonPh": "De ce dorește clientul returul?",
+        "customerMessagePh": "Mesaj de la client (opțional)…",
+        "qtyLabel": "Cantitate retur",
+        "reasonRequired": "Motivul este obligatoriu.",
+        "itemsRequired": "Selectează cel puțin un produs pentru retur.",
+        "create": "Creează",
+        "success": "Cerere de retur creată.",
+        "errors": {
+          "create": "Nu am putut crea cererea de retur."
+        }
+      }
     },
     "site": {
       "assets": {
@@ -811,6 +950,16 @@
       "tracking": "Tracking",
       "updateStatus": "Actualizează status",
       "trackingNumber": "Număr tracking",
+      "trackingUrl": "Link tracking",
+      "trackingUrlPlaceholder": "https://tracking.example/...",
+      "shippingLabel": "Etichetă de livrare",
+      "shippingLabelChoose": "Alege fișier",
+      "shippingLabelNoFile": "Niciun fișier selectat",
+      "shippingLabelNone": "Nu există încă o etichetă încărcată.",
+      "shippingLabelUpload": "Încarcă",
+      "shippingLabelDownload": "Descarcă",
+      "shippingLabelDelete": "Șterge",
+      "confirmDeleteLabel": "Ștergi eticheta de livrare pentru această comandă?",
       "save": "Salvează modificările",
       "saveHint": "Actualizează statusul și tracking-ul; emailul se trimite la expediere.",
       "actionsTitle": "Acțiuni",
@@ -865,7 +1014,9 @@
         "capture": "Plata a fost capturată",
         "void": "Plata a fost anulată",
         "refund": "Rambursarea a fost solicitată",
-        "deliveryEmail": "Emailul de livrare a fost trimis"
+        "deliveryEmail": "Emailul de livrare a fost trimis",
+        "shippingLabelUpload": "Eticheta a fost încărcată",
+        "shippingLabelDelete": "Eticheta a fost ștearsă"
       },
       "errors": {
         "load": "Nu am putut încărca comenzile.",
@@ -876,7 +1027,10 @@
         "void": "Nu am putut anula plata.",
         "refund": "Nu am putut solicita rambursarea.",
         "deliveryEmail": "Nu am putut trimite emailul de livrare.",
-        "packingSlip": "Nu am putut descărca packing slip-ul."
+        "packingSlip": "Nu am putut descărca packing slip-ul.",
+        "shippingLabelUpload": "Nu am putut încărca eticheta.",
+        "shippingLabelDownload": "Nu am putut descărca eticheta.",
+        "shippingLabelDelete": "Nu am putut șterge eticheta."
       }
     },
     "users": {

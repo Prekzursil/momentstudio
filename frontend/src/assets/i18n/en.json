@@ -54,7 +54,26 @@
     "replyTime": "We typically reply within 1–2 business days.",
     "followUs": "Follow us",
     "phoneLabel": "Phone",
-    "emailLabel": "Email"
+    "emailLabel": "Email",
+    "form": {
+      "title": "Send a message",
+      "topicLabel": "Topic",
+      "topicContact": "General",
+      "topicSupport": "Support",
+      "topicRefund": "Refund",
+      "topicDispute": "Dispute",
+      "nameLabel": "Name",
+      "emailLabel": "Email",
+      "orderLabel": "Order reference (optional)",
+      "orderPlaceholder": "e.g. MS-12345",
+      "messageLabel": "Message",
+      "messagePlaceholder": "Tell us how we can help…",
+      "submit": "Send",
+      "sending": "Sending…",
+      "successTitle": "Message sent",
+      "successCopy": "Thanks for reaching out. We'll get back to you soon.",
+      "error": "Could not send your message. Please try again."
+    }
   },
   "account": {
     "completeProfile": {
@@ -390,7 +409,9 @@
       "dashboard": "Dashboard",
       "products": "Products",
       "orders": "Orders",
+      "returns": "Returns",
       "users": "Users",
+      "support": "Support",
       "content": "Content"
     },
     "dashboardTitle": "Admin dashboard",
@@ -420,6 +441,124 @@
       "cancel": "Cancel",
       "edit": "Edit",
       "refresh": "Refresh"
+    },
+    "support": {
+      "title": "Support inbox",
+      "subtitle": "Contact form submissions from customers.",
+      "filters": {
+        "search": "Search",
+        "searchPlaceholder": "Email, name, message, order ref…",
+        "topic": "Topic",
+        "topicAll": "All topics",
+        "status": "Status",
+        "statusAll": "All statuses",
+        "apply": "Apply"
+      },
+      "topics": {
+        "contact": "General",
+        "support": "Support",
+        "refund": "Refund",
+        "dispute": "Dispute"
+      },
+      "status": {
+        "new": "New",
+        "triaged": "Triaged",
+        "resolved": "Resolved"
+      },
+      "table": {
+        "date": "Date",
+        "topic": "Topic",
+        "status": "Status",
+        "from": "From",
+        "order": "Order"
+      },
+      "empty": "No submissions found.",
+      "pagination": "Page {{page}} of {{total}} · {{count}} total",
+      "prev": "Prev",
+      "next": "Next",
+      "detail": {
+        "title": "Submission",
+        "empty": "Select a message to view details.",
+        "meta": "Details",
+        "order": "Order",
+        "message": "Message",
+        "statusLabel": "Status",
+        "adminNote": "Admin note",
+        "adminNotePlaceholder": "Internal notes (not visible to customer)…",
+        "save": "Save"
+      },
+      "success": {
+        "saved": "Saved."
+      },
+      "errors": {
+        "load": "Could not load submissions.",
+        "loadDetail": "Could not load submission details.",
+        "save": "Could not save changes."
+      }
+    },
+    "returns": {
+      "title": "Returns",
+      "filters": {
+        "search": "Search",
+        "searchPh": "Order ref, email, name…",
+        "status": "Status",
+        "statusAll": "All statuses",
+        "apply": "Apply"
+      },
+      "status": {
+        "requested": "Requested",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "received": "Received",
+        "refunded": "Refunded",
+        "closed": "Closed"
+      },
+      "table": {
+        "date": "Date",
+        "status": "Status",
+        "order": "Order",
+        "customer": "Customer"
+      },
+      "empty": "No return requests found.",
+      "pagination": "Page {{page}} of {{total}} · {{count}} total",
+      "prev": "Prev",
+      "next": "Next",
+      "detail": {
+        "title": "Return request",
+        "empty": "Select a return request to view details.",
+        "order": "Order",
+        "status": "Status",
+        "reason": "Reason",
+        "customerMessage": "Customer message",
+        "items": "Items",
+        "adminNote": "Admin note",
+        "adminNotePh": "Internal notes (visible only to staff)…",
+        "save": "Save"
+      },
+      "success": {
+        "saved": "Saved."
+      },
+      "errors": {
+        "load": "Could not load return requests.",
+        "loadDetail": "Could not load return request.",
+        "save": "Could not save changes."
+      },
+      "viewAllForOrder": "View all returns for this order",
+      "create": {
+        "open": "Create return",
+        "title": "Create return request",
+        "hint": "Select quantities and capture the reason. The customer will receive an email.",
+        "reasonPh": "Why is the customer returning these items?",
+        "customerMessagePh": "Message from the customer (optional)…",
+        "qtyLabel": "Return quantity",
+        "reasonRequired": "Reason is required.",
+        "itemsRequired": "Select at least one item to return.",
+        "create": "Create",
+        "success": "Return request created.",
+        "errors": {
+          "create": "Could not create return request."
+        }
+      }
     },
     "site": {
       "assets": {
@@ -811,6 +950,16 @@
       "tracking": "Tracking",
       "updateStatus": "Update status",
       "trackingNumber": "Tracking number",
+      "trackingUrl": "Tracking URL",
+      "trackingUrlPlaceholder": "https://tracking.example/...",
+      "shippingLabel": "Shipping label",
+      "shippingLabelChoose": "Choose file",
+      "shippingLabelNoFile": "No file selected",
+      "shippingLabelNone": "No shipping label uploaded yet.",
+      "shippingLabelUpload": "Upload",
+      "shippingLabelDownload": "Download",
+      "shippingLabelDelete": "Delete",
+      "confirmDeleteLabel": "Delete the shipping label for this order?",
       "save": "Save changes",
       "saveHint": "Updates status and tracking; emails send on shipped.",
       "actionsTitle": "Actions",
@@ -865,7 +1014,9 @@
         "capture": "Payment captured",
         "void": "Payment voided",
         "refund": "Refund requested",
-        "deliveryEmail": "Delivery email sent"
+        "deliveryEmail": "Delivery email sent",
+        "shippingLabelUpload": "Shipping label uploaded",
+        "shippingLabelDelete": "Shipping label deleted"
       },
       "errors": {
         "load": "Could not load orders.",
@@ -876,7 +1027,10 @@
         "void": "Could not void payment.",
         "refund": "Could not request refund.",
         "deliveryEmail": "Could not send delivery email.",
-        "packingSlip": "Could not download packing slip."
+        "packingSlip": "Could not download packing slip.",
+        "shippingLabelUpload": "Could not upload shipping label.",
+        "shippingLabelDownload": "Could not download shipping label.",
+        "shippingLabelDelete": "Could not delete shipping label."
       }
     },
     "users": {

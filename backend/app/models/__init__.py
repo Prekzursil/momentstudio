@@ -32,6 +32,8 @@ from app.models.webhook import StripeWebhookEvent  # noqa: F401
 from app.models.blog import BlogComment, BlogCommentFlag  # noqa: F401
 from app.models.fx import FxRate  # noqa: F401
 from app.models.notification import UserNotification  # noqa: F401
+from app.models.support import ContactSubmission, ContactSubmissionStatus, ContactSubmissionTopic  # noqa: F401
+from app.models.returns import ReturnRequest, ReturnRequestItem, ReturnRequestStatus  # noqa: F401
 
 __all__ = [
     "Base",
@@ -74,4 +76,10 @@ __all__ = [
     "BlogCommentFlag",
     "FxRate",
     "UserNotification",
+    "ContactSubmission",
+    "ContactSubmissionStatus",
+    "ContactSubmissionTopic",
+    "ReturnRequest",
+    "ReturnRequestItem",
+    "ReturnRequestStatus",
 ]

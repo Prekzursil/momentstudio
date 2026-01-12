@@ -1,0 +1,32 @@
+<h2 style="margin: 0 0 12px 0;">
+  {% if lang == "ro" %}Actualizare cerere de retur{% else %}Return request update{% endif %}
+</h2>
+
+<p style="margin: 0 0 8px 0;">
+  <strong>{% if lang == "ro" %}Comandă{% else %}Order{% endif %}:</strong>
+  {{ order_reference }}
+</p>
+
+{% if customer_name %}
+  <p style="margin: 0 0 8px 0;">
+    <strong>{% if lang == "ro" %}Client{% else %}Customer{% endif %}:</strong>
+    {{ customer_name }}
+  </p>
+{% endif %}
+
+<p style="margin: 0 0 12px 0;">
+  <strong>{% if lang == "ro" %}Status{% else %}Status{% endif %}:</strong>
+  {{ previous_status }} → {{ status }}
+</p>
+
+{% if admin_note %}
+  <p style="margin: 0 0 12px 0;">
+    <strong>{% if lang == "ro" %}Notă{% else %}Note{% endif %}:</strong><br />
+    {{ admin_note }}
+  </p>
+{% endif %}
+
+<p style="margin: 0;">
+  <a href="{{ account_url }}">{% if lang == "ro" %}Deschide contul{% else %}Open account{% endif %}</a>
+</p>
+

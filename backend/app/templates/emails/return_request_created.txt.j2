@@ -1,0 +1,45 @@
+{% if lang == "ro" -%}
+Cerere de retur creată pentru comanda: {{ order_reference }}
+{% else -%}
+Return request created for order: {{ order_reference }}
+{% endif %}
+
+{% if customer_name -%}
+{% if lang == "ro" -%}
+Client: {{ customer_name }}
+{% else -%}
+Customer: {{ customer_name }}
+{% endif %}
+{% endif %}
+
+{% if lang == "ro" -%}
+Articole:
+{% else -%}
+Items:
+{% endif %}
+{% for item in items -%}
+- {{ item.name }} ×{{ item.quantity }}
+{% endfor %}
+
+{% if reason -%}
+{% if lang == "ro" -%}
+Motiv: {{ reason }}
+{% else -%}
+Reason: {{ reason }}
+{% endif %}
+{% endif %}
+
+{% if customer_message -%}
+{% if lang == "ro" -%}
+Mesaj: {{ customer_message }}
+{% else -%}
+Message: {{ customer_message }}
+{% endif %}
+{% endif %}
+
+{% if lang == "ro" -%}
+Poți vedea detaliile contului aici: {{ account_url }}
+{% else -%}
+You can view your account here: {{ account_url }}
+{% endif %}
+

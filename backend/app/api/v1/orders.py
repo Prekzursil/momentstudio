@@ -1,11 +1,13 @@
 import csv
 import io
+import mimetypes
 import secrets
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, UploadFile, File
+from fastapi.responses import PlainTextResponse, StreamingResponse, FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -15,13 +17,14 @@ from app.core.config import settings
 from app.db.session import get_session
 from app.models.address import Address
 from app.models.cart import Cart
-from app.models.order import OrderStatus
+from app.models.order import OrderStatus, OrderEvent
 from app.schemas.cart import CartRead
 from app.schemas.order import OrderRead, OrderCreate, OrderUpdate, ShippingMethodCreate, ShippingMethodRead, OrderEventRead
 from app.services import cart as cart_service
 from app.services import order as order_service
 from app.services import email as email_service
 from app.services import auth as auth_service
+from app.services import private_storage
 from app.schemas.checkout import (
     CheckoutRequest,
     GuestCheckoutRequest,
@@ -49,6 +52,13 @@ def _generate_guest_email_token() -> str:
     return str(secrets.randbelow(1_000_000)).zfill(6)
 
 GUEST_EMAIL_TOKEN_MAX_ATTEMPTS = 10
+
+
+def _sanitize_filename(value: str | None) -> str:
+    name = Path(value or "").name.strip()
+    if not name:
+        return "shipping-label"
+    return name[:255]
 
 
 @router.post("", response_model=OrderRead, status_code=status.HTTP_201_CREATED)
@@ -274,6 +284,10 @@ async def admin_get_order(
         customer_username=getattr(order.user, "username", None) if getattr(order, "user", None) else None,
         shipping_address=order.shipping_address,
         billing_address=order.billing_address,
+        tracking_url=getattr(order, "tracking_url", None),
+        shipping_label_filename=getattr(order, "shipping_label_filename", None),
+        shipping_label_uploaded_at=getattr(order, "shipping_label_uploaded_at", None),
+        has_shipping_label=bool(getattr(order, "shipping_label_path", None)),
     )
 
 
@@ -533,7 +547,102 @@ async def admin_update_order(
         customer_username=getattr(full.user, "username", None) if getattr(full, "user", None) else None,
         shipping_address=full.shipping_address,
         billing_address=full.billing_address,
+        tracking_url=getattr(full, "tracking_url", None),
+        shipping_label_filename=getattr(full, "shipping_label_filename", None),
+        shipping_label_uploaded_at=getattr(full, "shipping_label_uploaded_at", None),
+        has_shipping_label=bool(getattr(full, "shipping_label_path", None)),
     )
+
+
+@router.post("/admin/{order_id}/shipping-label", response_model=AdminOrderRead)
+async def admin_upload_shipping_label(
+    order_id: UUID,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> AdminOrderRead:
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    old_path = getattr(order, "shipping_label_path", None)
+    rel_path, original_name = private_storage.save_private_upload(
+        file,
+        subdir=f"shipping-labels/{order_id}",
+        allowed_content_types=("application/pdf", "image/png", "image/jpeg", "image/webp"),
+        max_bytes=10 * 1024 * 1024,
+    )
+    now = datetime.now(timezone.utc)
+    order.shipping_label_path = rel_path
+    order.shipping_label_filename = _sanitize_filename(original_name)
+    order.shipping_label_uploaded_at = now
+    session.add(order)
+    session.add(OrderEvent(order_id=order.id, event="shipping_label_uploaded", note=order.shipping_label_filename))
+    await session.commit()
+
+    if old_path and old_path != rel_path:
+        private_storage.delete_private_file(old_path)
+
+    full = await order_service.get_order_by_id_admin(session, order_id)
+    if not full:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    base = OrderRead.model_validate(full).model_dump()
+    return AdminOrderRead(
+        **base,
+        customer_email=getattr(full, "customer_email", None) or (getattr(full.user, "email", None) if getattr(full, "user", None) else None),
+        customer_username=getattr(full.user, "username", None) if getattr(full, "user", None) else None,
+        shipping_address=full.shipping_address,
+        billing_address=full.billing_address,
+        tracking_url=getattr(full, "tracking_url", None),
+        shipping_label_filename=getattr(full, "shipping_label_filename", None),
+        shipping_label_uploaded_at=getattr(full, "shipping_label_uploaded_at", None),
+        has_shipping_label=bool(getattr(full, "shipping_label_path", None)),
+    )
+
+
+@router.get("/admin/{order_id}/shipping-label")
+async def admin_download_shipping_label(
+    order_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> FileResponse:
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    rel = getattr(order, "shipping_label_path", None)
+    if not rel:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping label not found")
+    path = private_storage.resolve_private_path(rel)
+    if not path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping label not found")
+
+    filename = _sanitize_filename(getattr(order, "shipping_label_filename", None) or path.name)
+    media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    headers = {"Cache-Control": "no-store"}
+    return FileResponse(path, media_type=media_type, filename=filename, headers=headers)
+
+
+@router.delete("/admin/{order_id}/shipping-label", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_delete_shipping_label(
+    order_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> None:
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    rel = getattr(order, "shipping_label_path", None)
+    if not rel:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping label not found")
+
+    filename = getattr(order, "shipping_label_filename", None)
+    order.shipping_label_path = None
+    order.shipping_label_filename = None
+    order.shipping_label_uploaded_at = None
+    session.add(order)
+    session.add(OrderEvent(order_id=order.id, event="shipping_label_deleted", note=_sanitize_filename(filename)))
+    await session.commit()
+    private_storage.delete_private_file(rel)
 
 
 @router.post("/admin/{order_id}/retry-payment", response_model=OrderRead)

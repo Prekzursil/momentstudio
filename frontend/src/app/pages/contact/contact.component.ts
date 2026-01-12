@@ -1,12 +1,15 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Meta, Title } from '@angular/platform-browser';
 import { Subscription } from 'rxjs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../core/api.service';
+import { AuthService } from '../../core/auth.service';
 import { MarkdownService } from '../../core/markdown.service';
 import { SiteSocialLink, SiteSocialService } from '../../core/site-social.service';
+import { ContactSubmissionTopic, SupportService } from '../../core/support.service';
 import { ContainerComponent } from '../../layout/container.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { CardComponent } from '../../shared/card.component';
@@ -20,7 +23,15 @@ interface ContentBlock {
 @Component({
   selector: 'app-contact',
   standalone: true,
-  imports: [CommonModule, ContainerComponent, BreadcrumbComponent, CardComponent, TranslateModule, ImgFallbackDirective],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ContainerComponent,
+    BreadcrumbComponent,
+    CardComponent,
+    TranslateModule,
+    ImgFallbackDirective
+  ],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-3xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -127,6 +138,97 @@ interface ContentBlock {
               </div>
             </div>
           </div>
+
+          <div class="border-t border-slate-200 pt-6 grid gap-4 dark:border-slate-800">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'contact.form.title' | translate }}</h2>
+
+            <div *ngIf="submitSuccess()" class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-100">
+              {{ 'contact.form.success' | translate }}
+            </div>
+
+            <div *ngIf="submitError()" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+              {{ submitError() }}
+            </div>
+
+            <form class="grid gap-4" (ngSubmit)="submit()" #contactForm="ngForm">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'contact.form.topicLabel' | translate }}
+                <select
+                  class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
+                  name="topic"
+                  [(ngModel)]="formTopic"
+                  required
+                >
+                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="contact">{{ 'contact.form.topicContact' | translate }}</option>
+                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="support">{{ 'contact.form.topicSupport' | translate }}</option>
+                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="refund">{{ 'contact.form.topicRefund' | translate }}</option>
+                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="dispute">{{ 'contact.form.topicDispute' | translate }}</option>
+                </select>
+              </label>
+
+              <div class="grid gap-4 sm:grid-cols-2">
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'contact.form.nameLabel' | translate }}
+                  <input
+                    class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                    name="name"
+                    [(ngModel)]="formName"
+                    required
+                    minlength="1"
+                    maxlength="255"
+                    autocomplete="name"
+                  />
+                </label>
+
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'contact.form.emailLabel' | translate }}
+                  <input
+                    class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                    name="email"
+                    [(ngModel)]="formEmail"
+                    required
+                    maxlength="255"
+                    autocomplete="email"
+                    type="email"
+                  />
+                </label>
+              </div>
+
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'contact.form.orderLabel' | translate }}
+                <input
+                  class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  name="order_reference"
+                  [(ngModel)]="formOrderRef"
+                  maxlength="50"
+                  [placeholder]="'contact.form.orderPlaceholder' | translate"
+                />
+              </label>
+
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'contact.form.messageLabel' | translate }}
+                <textarea
+                  class="min-h-[140px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  name="message"
+                  [(ngModel)]="formMessage"
+                  required
+                  minlength="1"
+                  maxlength="10000"
+                  [placeholder]="'contact.form.messagePlaceholder' | translate"
+                ></textarea>
+              </label>
+
+              <div class="flex items-center justify-end gap-3">
+                <button
+                  type="submit"
+                  class="h-11 px-5 rounded-xl bg-slate-900 text-white font-semibold shadow-sm hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+                  [disabled]="submitting() || !contactForm.form.valid"
+                >
+                  {{ submitting() ? ('contact.form.sending' | translate) : ('contact.form.submit' | translate) }}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </app-card>
     </app-container>
@@ -148,6 +250,16 @@ export class ContactComponent implements OnInit, OnDestroy {
   instagramPages = signal<SiteSocialLink[]>([]);
   facebookPages = signal<SiteSocialLink[]>([]);
 
+  submitting = signal<boolean>(false);
+  submitSuccess = signal<boolean>(false);
+  submitError = signal<string>('');
+
+  formTopic: ContactSubmissionTopic = 'contact';
+  formName = '';
+  formEmail = '';
+  formOrderRef = '';
+  formMessage = '';
+
   private langSub?: Subscription;
   private socialSub?: Subscription;
 
@@ -157,7 +269,9 @@ export class ContactComponent implements OnInit, OnDestroy {
     private title: Title,
     private meta: Meta,
     private markdown: MarkdownService,
-    private social: SiteSocialService
+    private social: SiteSocialService,
+    private auth: AuthService,
+    private support: SupportService
   ) {}
 
   ngOnInit(): void {
@@ -169,6 +283,11 @@ export class ContactComponent implements OnInit, OnDestroy {
       this.instagramPages.set(data.instagramPages);
       this.facebookPages.set(data.facebookPages);
     });
+    const current = this.auth.user();
+    if (current) {
+      this.formEmail = (current.email || '').trim();
+      this.formName = (current.name || '').trim() || this.formEmail;
+    }
   }
 
   ngOnDestroy(): void {
@@ -218,5 +337,32 @@ export class ContactComponent implements OnInit, OnDestroy {
     const first = parts[0]?.[0] ?? cleaned[0] ?? 'M';
     const second = parts[1]?.[0] ?? parts[0]?.[1] ?? 'S';
     return `${first}${second}`.toUpperCase();
+  }
+
+  submit(): void {
+    if (this.submitting()) return;
+    this.submitError.set('');
+    this.submitSuccess.set(false);
+
+    const payload = {
+      topic: this.formTopic,
+      name: this.formName.trim(),
+      email: this.formEmail.trim(),
+      message: this.formMessage.trim(),
+      order_reference: this.formOrderRef.trim() ? this.formOrderRef.trim() : null
+    };
+    this.submitting.set(true);
+    this.support.submitContact(payload).subscribe({
+      next: () => {
+        this.submitSuccess.set(true);
+        this.formMessage = '';
+        this.formOrderRef = '';
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('contact.form.error');
+        this.submitError.set(msg);
+      },
+      complete: () => this.submitting.set(false)
+    });
   }
 }

@@ -14,7 +14,7 @@ from app.db.session import get_session
 from app.models.address import Address
 from app.models.catalog import Category, Product
 from app.models.cart import Cart, CartItem
-from app.models.order import Order
+from app.models.order import Order, OrderStatus
 from app.models.user import User, UserRole
 from app.services.auth import create_user, issue_tokens_for_user
 from app.schemas.user import UserCreate
@@ -22,6 +22,7 @@ from app.services import order as order_service
 from app.services import payments as payments_service
 from app.services import email as email_service
 from app.schemas.order import ShippingMethodCreate
+from app.core.config import settings
 
 
 @pytest.fixture
@@ -449,3 +450,93 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
     assert reorder_resp.status_code == 200
     assert len(reorder_resp.json()["items"]) == 1
     assert reorder_resp.json()["items"][0]["product_id"]
+
+
+def test_admin_shipping_label_upload_download_and_delete(
+    test_app: Dict[str, object], tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    monkeypatch.setattr(settings, "private_media_root", str(tmp_path / "private_uploads"))
+
+    token, user_id = create_user_token(SessionLocal, email="buyer2@example.com")
+    admin_token, _ = create_user_token(SessionLocal, email="admin2@example.com", admin=True)
+
+    async def seed_order() -> UUID:
+        async with SessionLocal() as session:
+            order = Order(
+                user_id=user_id,
+                status=OrderStatus.pending,
+                reference_code="SHIPLABEL",
+                customer_email="buyer2@example.com",
+                customer_name="Buyer Two",
+                total_amount=Decimal("10.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+            )
+            session.add(order)
+            await session.commit()
+            await session.refresh(order)
+            return order.id
+
+    order_id = asyncio.run(seed_order())
+
+    forbidden = client.post(
+        f"/api/v1/orders/admin/{order_id}/shipping-label",
+        headers=auth_headers(token),
+        files={"file": ("label.pdf", b"%PDF-1.4 test", "application/pdf")},
+    )
+    assert forbidden.status_code == 403
+
+    upload = client.post(
+        f"/api/v1/orders/admin/{order_id}/shipping-label",
+        headers=auth_headers(admin_token),
+        files={"file": ("label.pdf", b"%PDF-1.4 test", "application/pdf")},
+    )
+    assert upload.status_code == 200, upload.text
+    body = upload.json()
+    assert body["has_shipping_label"] is True
+    assert body["shipping_label_filename"] == "label.pdf"
+    assert body["shipping_label_uploaded_at"]
+
+    async def get_label_path() -> str:
+        async with SessionLocal() as session:
+            o = (await session.execute(select(Order).where(Order.id == order_id))).scalar_one()
+            assert o.shipping_label_path
+            return str(o.shipping_label_path)
+
+    first_path = asyncio.run(get_label_path())
+    assert (tmp_path / "private_uploads" / first_path).exists()
+
+    download = client.get(
+        f"/api/v1/orders/admin/{order_id}/shipping-label",
+        headers=auth_headers(admin_token),
+    )
+    assert download.status_code == 200, download.text
+    assert download.content.startswith(b"%PDF")
+
+    upload2 = client.post(
+        f"/api/v1/orders/admin/{order_id}/shipping-label",
+        headers=auth_headers(admin_token),
+        files={"file": ("label2.pdf", b"%PDF-1.7 test2", "application/pdf")},
+    )
+    assert upload2.status_code == 200, upload2.text
+    second_path = asyncio.run(get_label_path())
+    assert second_path != first_path
+    assert not (tmp_path / "private_uploads" / first_path).exists()
+    assert (tmp_path / "private_uploads" / second_path).exists()
+
+    delete = client.delete(
+        f"/api/v1/orders/admin/{order_id}/shipping-label",
+        headers=auth_headers(admin_token),
+    )
+    assert delete.status_code == 204, delete.text
+    assert not (tmp_path / "private_uploads" / second_path).exists()
+
+    missing = client.get(
+        f"/api/v1/orders/admin/{order_id}/shipping-label",
+        headers=auth_headers(admin_token),
+    )
+    assert missing.status_code == 404

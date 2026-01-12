@@ -1,0 +1,40 @@
+{% if lang == "ro" -%}
+Mesaj nou de contact
+{% else -%}
+New contact submission
+{% endif %}
+
+{% if topic -%}
+{% if lang == "ro" -%}
+Tip: {{ topic }}
+{% else -%}
+Topic: {{ topic }}
+{% endif %}
+{% endif %}
+
+{% if lang == "ro" -%}
+De la: {{ from_name }} <{{ from_email }}>
+{% else -%}
+From: {{ from_name }} <{{ from_email }}>
+{% endif %}
+
+{% if order_reference -%}
+{% if lang == "ro" -%}
+Comandă: {{ order_reference }}
+{% else -%}
+Order: {{ order_reference }}
+{% endif %}
+{% endif %}
+
+---
+
+{{ message }}
+
+{% if admin_url -%}
+
+{% if lang == "ro" -%}
+Vezi în admin: {{ admin_url }}
+{% else -%}
+View in admin: {{ admin_url }}
+{% endif %}
+{% endif %}

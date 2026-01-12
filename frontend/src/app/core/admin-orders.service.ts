@@ -40,6 +40,10 @@ export interface AdminOrderDetail extends Order {
   customer_username?: string | null;
   shipping_address?: Address | null;
   billing_address?: Address | null;
+  tracking_url?: string | null;
+  shipping_label_filename?: string | null;
+  shipping_label_uploaded_at?: string | null;
+  has_shipping_label?: boolean;
   events?: AdminOrderEvent[];
   items: OrderItem[];
 }
@@ -63,8 +67,22 @@ export class AdminOrdersService {
     return this.api.get<AdminOrderDetail>(`/orders/admin/${orderId}`);
   }
 
-  update(orderId: string, payload: { status?: string; tracking_number?: string | null }): Observable<AdminOrderDetail> {
+  update(orderId: string, payload: { status?: string; tracking_number?: string | null; tracking_url?: string | null }): Observable<AdminOrderDetail> {
     return this.api.patch<AdminOrderDetail>(`/orders/admin/${orderId}`, payload);
+  }
+
+  uploadShippingLabel(orderId: string, file: File): Observable<AdminOrderDetail> {
+    const data = new FormData();
+    data.append('file', file);
+    return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/shipping-label`, data);
+  }
+
+  downloadShippingLabel(orderId: string): Observable<Blob> {
+    return this.api.getBlob(`/orders/admin/${orderId}/shipping-label`);
+  }
+
+  deleteShippingLabel(orderId: string): Observable<void> {
+    return this.api.delete<void>(`/orders/admin/${orderId}/shipping-label`);
   }
 
   retryPayment(orderId: string): Observable<Order> {
