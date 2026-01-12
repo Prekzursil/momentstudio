@@ -1,8 +1,10 @@
+import csv
+import io
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy import String, Text, cast, func, literal, or_, select, union_all
 from sqlalchemy.orm import aliased
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -423,6 +425,225 @@ async def admin_audit(session: AsyncSession = Depends(get_session), _: str = Dep
             for log, actor_email, subject_email in security_rows
         ],
     }
+
+
+def _audit_union_subquery() -> object:
+    prod_actor = aliased(User)
+    prod = aliased(Product)
+    products_q = (
+        select(
+            literal("product").label("entity"),
+            cast(ProductAuditLog.id, String()).label("id"),
+            ProductAuditLog.action.label("action"),
+            ProductAuditLog.created_at.label("created_at"),
+            cast(ProductAuditLog.user_id, String()).label("actor_user_id"),
+            prod_actor.email.label("actor_email"),
+            prod_actor.username.label("actor_username"),
+            cast(literal(None), String()).label("subject_user_id"),
+            cast(literal(None), String()).label("subject_email"),
+            cast(literal(None), String()).label("subject_username"),
+            cast(ProductAuditLog.product_id, String()).label("ref_id"),
+            prod.slug.label("ref_key"),
+            cast(ProductAuditLog.payload, Text()).label("data"),
+        )
+        .select_from(ProductAuditLog)
+        .join(prod_actor, ProductAuditLog.user_id == prod_actor.id, isouter=True)
+        .join(prod, ProductAuditLog.product_id == prod.id, isouter=True)
+    )
+
+    content_actor = aliased(User)
+    block = aliased(ContentBlock)
+    content_q = (
+        select(
+            literal("content").label("entity"),
+            cast(ContentAuditLog.id, String()).label("id"),
+            ContentAuditLog.action.label("action"),
+            ContentAuditLog.created_at.label("created_at"),
+            cast(ContentAuditLog.user_id, String()).label("actor_user_id"),
+            content_actor.email.label("actor_email"),
+            content_actor.username.label("actor_username"),
+            cast(literal(None), String()).label("subject_user_id"),
+            cast(literal(None), String()).label("subject_email"),
+            cast(literal(None), String()).label("subject_username"),
+            cast(ContentAuditLog.content_block_id, String()).label("ref_id"),
+            block.key.label("ref_key"),
+            cast(literal(None), Text()).label("data"),
+        )
+        .select_from(ContentAuditLog)
+        .join(content_actor, ContentAuditLog.user_id == content_actor.id, isouter=True)
+        .join(block, ContentAuditLog.content_block_id == block.id, isouter=True)
+    )
+
+    actor = aliased(User)
+    subject = aliased(User)
+    security_q = (
+        select(
+            literal("security").label("entity"),
+            cast(AdminAuditLog.id, String()).label("id"),
+            AdminAuditLog.action.label("action"),
+            AdminAuditLog.created_at.label("created_at"),
+            cast(AdminAuditLog.actor_user_id, String()).label("actor_user_id"),
+            actor.email.label("actor_email"),
+            actor.username.label("actor_username"),
+            cast(AdminAuditLog.subject_user_id, String()).label("subject_user_id"),
+            subject.email.label("subject_email"),
+            subject.username.label("subject_username"),
+            cast(literal(None), String()).label("ref_id"),
+            cast(literal(None), String()).label("ref_key"),
+            cast(AdminAuditLog.data, Text()).label("data"),
+        )
+        .select_from(AdminAuditLog)
+        .join(actor, AdminAuditLog.actor_user_id == actor.id, isouter=True)
+        .join(subject, AdminAuditLog.subject_user_id == subject.id, isouter=True)
+    )
+
+    return union_all(products_q, content_q, security_q).subquery()
+
+
+def _audit_filters(
+    audit: object,
+    *,
+    entity: str | None,
+    action: str | None,
+    user: str | None,
+) -> list:
+    filters: list = []
+
+    if entity:
+        normalized = entity.strip().lower()
+        if normalized and normalized != "all":
+            filters.append(getattr(audit.c, "entity") == normalized)  # type: ignore[attr-defined]
+
+    if action:
+        needle = action.strip().lower()
+        if needle:
+            filters.append(func.lower(getattr(audit.c, "action")).like(f"%{needle}%"))  # type: ignore[attr-defined]
+
+    if user:
+        needle = user.strip().lower()
+        if needle:
+            actor_email = func.lower(func.coalesce(getattr(audit.c, "actor_email"), ""))  # type: ignore[attr-defined]
+            actor_username = func.lower(func.coalesce(getattr(audit.c, "actor_username"), ""))  # type: ignore[attr-defined]
+            subject_email = func.lower(func.coalesce(getattr(audit.c, "subject_email"), ""))  # type: ignore[attr-defined]
+            subject_username = func.lower(func.coalesce(getattr(audit.c, "subject_username"), ""))  # type: ignore[attr-defined]
+            actor_user_id = func.lower(func.coalesce(getattr(audit.c, "actor_user_id"), ""))  # type: ignore[attr-defined]
+            subject_user_id = func.lower(func.coalesce(getattr(audit.c, "subject_user_id"), ""))  # type: ignore[attr-defined]
+            filters.append(
+                or_(
+                    actor_email.like(f"%{needle}%"),
+                    actor_username.like(f"%{needle}%"),
+                    subject_email.like(f"%{needle}%"),
+                    subject_username.like(f"%{needle}%"),
+                    actor_user_id.like(f"%{needle}%"),
+                    subject_user_id.like(f"%{needle}%"),
+                )
+            )
+
+    return filters
+
+
+@router.get("/audit/entries")
+async def admin_audit_entries(
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+    entity: str | None = Query(default="all", pattern="^(all|product|content|security)$"),
+    action: str | None = Query(default=None, max_length=120),
+    user: str | None = Query(default=None, max_length=255),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+) -> dict:
+    audit = _audit_union_subquery()
+    filters = _audit_filters(audit, entity=entity, action=action, user=user)
+    total = await session.scalar(select(func.count()).select_from(audit).where(*filters))
+    total_items = int(total or 0)
+    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
+
+    offset = (page - 1) * limit
+    q = select(audit).where(*filters).order_by(getattr(audit.c, "created_at").desc()).offset(offset).limit(limit)  # type: ignore[attr-defined]
+    rows = (await session.execute(q)).mappings().all()
+    items = [
+        {
+            "entity": row.get("entity"),
+            "id": row.get("id"),
+            "action": row.get("action"),
+            "created_at": row.get("created_at"),
+            "actor_user_id": row.get("actor_user_id"),
+            "actor_email": row.get("actor_email"),
+            "subject_user_id": row.get("subject_user_id"),
+            "subject_email": row.get("subject_email"),
+            "ref_id": row.get("ref_id"),
+            "ref_key": row.get("ref_key"),
+            "data": row.get("data"),
+        }
+        for row in rows
+    ]
+
+    return {
+        "items": items,
+        "meta": {
+            "page": page,
+            "limit": limit,
+            "total_items": total_items,
+            "total_pages": total_pages,
+        },
+    }
+
+
+@router.get("/audit/export.csv")
+async def admin_audit_export_csv(
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+    entity: str | None = Query(default="all", pattern="^(all|product|content|security)$"),
+    action: str | None = Query(default=None, max_length=120),
+    user: str | None = Query(default=None, max_length=255),
+) -> Response:
+    audit = _audit_union_subquery()
+    filters = _audit_filters(audit, entity=entity, action=action, user=user)
+
+    q = select(audit).where(*filters).order_by(getattr(audit.c, "created_at").desc()).limit(5000)  # type: ignore[attr-defined]
+    rows = (await session.execute(q)).mappings().all()
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        [
+            "created_at",
+            "entity",
+            "action",
+            "actor_email",
+            "subject_email",
+            "ref_key",
+            "ref_id",
+            "actor_user_id",
+            "subject_user_id",
+            "data",
+        ]
+    )
+    for row in rows:
+        created_at = row.get("created_at")
+        writer.writerow(
+            [
+                created_at.isoformat() if isinstance(created_at, datetime) else "",
+                row.get("entity") or "",
+                row.get("action") or "",
+                row.get("actor_email") or "",
+                row.get("subject_email") or "",
+                row.get("ref_key") or "",
+                row.get("ref_id") or "",
+                row.get("actor_user_id") or "",
+                row.get("subject_user_id") or "",
+                (row.get("data") or "").replace("\n", " ").replace("\r", " "),
+            ]
+        )
+
+    filename = f"audit-{(entity or 'all').strip().lower()}-{datetime.now(timezone.utc).date().isoformat()}.csv"
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
 
 
 @router.post("/sessions/{user_id}/revoke", status_code=status.HTTP_204_NO_CONTENT)

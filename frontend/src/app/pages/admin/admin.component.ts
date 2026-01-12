@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { CardComponent } from '../../shared/card.component';
 import { ButtonComponent } from '../../shared/button.component';
@@ -30,11 +30,13 @@ import { AdminBlogComment, BlogService } from '../../core/blog.service';
 import { FxAdminService, FxAdminStatus } from '../../core/fx-admin.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Subscription } from 'rxjs';
 import { MarkdownService } from '../../core/markdown.service';
 import { AuthService } from '../../core/auth.service';
 import { diffLines } from 'diff';
 import { formatIdentity } from '../../shared/user-identity';
+
+type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
 
 @Component({
   selector: 'app-admin',
@@ -59,91 +61,7 @@ import { formatIdentity } from '../../shared/user-identity';
         {{ error() }}
       </div>
       <div class="grid gap-6" *ngIf="!loading(); else loadingTpl">
-	          <section class="grid gap-3">
-	            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboardTitle' | translate }}</h1>
-	            <div class="grid md:grid-cols-3 gap-4">
-	              <app-card
-                  [title]="'adminUi.cards.products' | translate"
-                  [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.products || 0 }"
-                ></app-card>
-	              <app-card
-                  [title]="'adminUi.cards.orders' | translate"
-                  [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.orders || 0 }"
-                ></app-card>
-	              <app-card
-                  [title]="'adminUi.cards.users' | translate"
-                  [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.users || 0 }"
-                ></app-card>
-	            </div>
-	            <div class="grid md:grid-cols-3 gap-4">
-	              <app-card
-                  [title]="'adminUi.cards.lowStock' | translate"
-                  [subtitle]="'adminUi.cards.countItems' | translate: { count: summary()?.low_stock || 0 }"
-                ></app-card>
-	              <app-card [title]="'adminUi.cards.sales30' | translate" [subtitle]="(summary()?.sales_30d || 0) | localizedCurrency : 'RON'"></app-card>
-	              <app-card
-                  [title]="'adminUi.cards.orders30' | translate"
-                  [subtitle]="'adminUi.cards.countOrders' | translate: { count: summary()?.orders_30d || 0 }"
-                ></app-card>
-	              <app-card
-                  [title]="'adminUi.cards.openOrders' | translate"
-                  [subtitle]="'adminUi.cards.openOrdersSubtitle' | translate: { count: openOrdersCount() }"
-                ></app-card>
-	              <app-card
-                  [title]="'adminUi.cards.recentOrders' | translate"
-                  [subtitle]="'adminUi.cards.recentOrdersSubtitle' | translate: { count: recentOrdersCount() }"
-                ></app-card>
-	              <app-card
-                  [title]="'adminUi.cards.lowStockTracked' | translate"
-                  [subtitle]="'adminUi.cards.lowStockTrackedSubtitle' | translate: { count: lowStock?.length || 0 }"
-                ></app-card>
-	            </div>
-	          </section>
-
-          <section
-            *ngIf="isOwner()"
-            class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-          >
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ownerTransfer.title' | translate }}</h2>
-            </div>
-            <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.ownerTransfer.description' | translate }}</p>
-
-            <div class="grid gap-3 md:grid-cols-3 items-end text-sm">
-              <app-input
-                [label]="'adminUi.ownerTransfer.identifier' | translate"
-                [(value)]="ownerTransferIdentifier"
-                [placeholder]="'adminUi.ownerTransfer.identifierPlaceholder' | translate"
-              ></app-input>
-              <app-input
-                [label]="'adminUi.ownerTransfer.confirmLabel' | translate"
-                [(value)]="ownerTransferConfirm"
-                [placeholder]="'adminUi.ownerTransfer.confirmPlaceholder' | translate"
-                [hint]="'adminUi.ownerTransfer.confirmHint' | translate"
-              ></app-input>
-              <app-input
-                [label]="'auth.currentPassword' | translate"
-                type="password"
-                autocomplete="current-password"
-                [(value)]="ownerTransferPassword"
-              ></app-input>
-            </div>
-
-            <div *ngIf="ownerTransferError" class="text-sm text-rose-700 dark:text-rose-300">
-              {{ ownerTransferError }}
-            </div>
-
-            <div class="flex justify-end">
-              <app-button
-                size="sm"
-                [disabled]="ownerTransferLoading"
-                [label]="'adminUi.ownerTransfer.action' | translate"
-                (action)="submitOwnerTransfer()"
-              ></app-button>
-            </div>
-          </section>
-
-	          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
 	            <div class="flex items-center justify-between">
 	              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.assets.title' | translate }}</h2>
 	              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadAssets()"></app-button>
@@ -160,7 +78,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-	          <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	          <section *ngIf="section() === 'settings'" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
 	            <div class="flex items-center justify-between gap-3">
 	              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.social.title' | translate }}</h2>
 	              <div class="flex items-center gap-2">
@@ -256,7 +174,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.seo.title' | translate }}</h2>
               <div class="flex gap-2 text-sm">
@@ -312,7 +230,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'pages'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.pages.title' | translate }}</h2>
               <div class="flex gap-2 text-sm">
@@ -384,7 +302,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'home'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.home.hero.title' | translate }}</h2>
               <div class="flex gap-2 text-sm">
@@ -420,7 +338,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'home'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.home.sections.title' | translate }}</h2>
               <app-button size="sm" variant="ghost" [label]="'adminUi.actions.save' | translate" (action)="saveSections()"></app-button>
@@ -451,7 +369,7 @@ import { formatIdentity } from '../../shared/user-identity';
             <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="sectionsMessage">{{ sectionsMessage }}</span>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'home'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.home.collections.title' | translate }}</h2>
               <app-button size="sm" variant="ghost" [label]="'adminUi.actions.reset' | translate" (action)="resetCollectionForm()"></app-button>
@@ -488,7 +406,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="false" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.products.title' | translate }}</h2>
               <div class="flex gap-2">
@@ -569,7 +487,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="false" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
                 {{ editingId ? ('adminUi.products.edit' | translate) : ('adminUi.products.create' | translate) }}
@@ -634,7 +552,7 @@ import { formatIdentity } from '../../shared/user-identity';
             <p *ngIf="formMessage" class="text-sm text-emerald-700 dark:text-emerald-300">{{ formMessage }}</p>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.categories.title' | translate }}</h2>
             </div>
@@ -665,7 +583,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="false" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.title' | translate }}</h2>
               <label class="text-sm text-slate-700 dark:text-slate-200">
@@ -707,7 +625,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="false" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.users.title' | translate }}</h2>
               <div class="flex gap-2">
@@ -792,7 +710,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'blog'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.blog.title' | translate }}</h2>
               <div class="flex items-center gap-2">
@@ -1222,7 +1140,7 @@ import { formatIdentity } from '../../shared/user-identity';
 	            </div>
 	          </section>
 
-	          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	          <section *ngIf="section() === 'blog'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
 	            <div class="flex items-center justify-between">
 	              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.blog.moderation.title' | translate }}</h2>
 	              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadFlaggedComments()"></app-button>
@@ -1278,7 +1196,7 @@ import { formatIdentity } from '../../shared/user-identity';
 	            </div>
 	          </section>
 
-	          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
 	            <div class="flex items-center justify-between">
 	              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.content.title' | translate }}</h2>
 	            </div>
@@ -1318,7 +1236,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.coupons.title' | translate }}</h2>
             </div>
@@ -1350,7 +1268,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="grid gap-0.5">
                 <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.fx.title' | translate }}</h2>
@@ -1491,7 +1409,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.audit.title' | translate }}</h2>
               <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadAudit()"></app-button>
@@ -1529,7 +1447,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.maintenance.title' | translate }}</h2>
               <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="saveMaintenance()"></app-button>
@@ -1544,7 +1462,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.lowStock.title' | translate }}</h2>
               <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.lowStock.hint' | translate }}</span>
@@ -1568,11 +1486,16 @@ import { formatIdentity } from '../../shared/user-identity';
 	      </div>
 	  `
 })
-export class AdminComponent implements OnInit {
+export class AdminComponent implements OnInit, OnDestroy {
   crumbs = [
-    { label: 'nav.home', url: '/' },
-    { label: 'nav.admin' }
+    { label: 'adminUi.nav.content', url: '/admin/content' },
+    { label: 'adminUi.content.nav.home' }
   ];
+
+  section = signal<AdminContentSection>('home');
+
+  private readonly contentVersions: Record<string, number> = {};
+  private routeSub?: Subscription;
 
   summary = signal<AdminSummary | null>(null);
   loading = signal<boolean>(true);
@@ -1763,6 +1686,7 @@ export class AdminComponent implements OnInit {
   ownerTransferError: string | null = null;
 
   constructor(
+    private route: ActivatedRoute,
     private admin: AdminService,
     private blog: BlogService,
     private fxAdmin: FxAdminService,
@@ -1776,51 +1700,136 @@ export class AdminComponent implements OnInit {
     return this.translate.instant(key, params);
   }
 
+  private rememberContentVersion(key: string, block: { version?: number } | null | undefined): void {
+    const version = block?.version;
+    if (typeof version === 'number' && Number.isFinite(version) && version > 0) {
+      this.contentVersions[key] = version;
+    }
+  }
+
+  private expectedVersion(key: string): number | undefined {
+    const version = this.contentVersions[key];
+    return typeof version === 'number' && Number.isFinite(version) && version > 0 ? version : undefined;
+  }
+
+  private withExpectedVersion<T extends Record<string, unknown>>(key: string, payload: T): T & { expected_version?: number } {
+    const expected = this.expectedVersion(key);
+    return expected ? { ...payload, expected_version: expected } : payload;
+  }
+
+  private handleContentConflict(err: any, key: string, reload: () => void): boolean {
+    if (err?.status !== 409) return false;
+    this.toast.error(this.t('adminUi.content.errors.conflictTitle'), this.t('adminUi.content.errors.conflictCopy'));
+    delete this.contentVersions[key];
+    reload();
+    return true;
+  }
+
   isOwner(): boolean {
     return this.auth.role() === 'owner';
   }
 
   ngOnInit(): void {
-    this.loadAll();
+    this.routeSub = this.route.data.subscribe((data) => {
+      const next = this.normalizeSection(data['section']);
+      this.applySection(next);
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.routeSub?.unsubscribe();
+    this.routeSub = undefined;
+    for (const key of Object.keys(this.contentVersions)) {
+      delete this.contentVersions[key];
+    }
   }
 
   loadAll(): void {
+    this.loadForSection(this.section());
+  }
+
+  private normalizeSection(value: unknown): AdminContentSection {
+    if (value === 'home' || value === 'pages' || value === 'blog' || value === 'settings') return value;
+    return 'home';
+  }
+
+  private applySection(next: AdminContentSection): void {
+    if (this.section() === next) {
+      this.loadForSection(next);
+      return;
+    }
+    this.section.set(next);
+    this.crumbs = [
+      { label: 'adminUi.nav.content', url: '/admin/content' },
+      { label: `adminUi.content.nav.${next}` }
+    ];
+    this.resetSectionState(next);
+    this.loadForSection(next);
+  }
+
+  private resetSectionState(next: AdminContentSection): void {
+    this.error.set(null);
+    if (next !== 'blog') {
+      this.closeBlogEditor();
+      this.showBlogCreate = false;
+      this.flaggedComments.set([]);
+      this.flaggedCommentsError = null;
+    }
+    if (next !== 'settings') {
+      this.selectedContent = null;
+      this.showContentPreview = false;
+    }
+  }
+
+  private loadForSection(section: AdminContentSection): void {
     this.loading.set(true);
     this.error.set(null);
-    this.admin.summary().subscribe({ next: (s) => this.summary.set(s) });
-    this.admin.products().subscribe({ next: (p) => (this.products = p) });
-    this.admin.orders().subscribe({
-      next: (o) => {
-        this.orders = o;
-        this.activeOrder = o[0] || null;
-      }
-    });
-    this.admin.users().subscribe({ next: (u) => (this.users = u) });
-    this.admin.content().subscribe({ next: (c) => (this.contentBlocks = c) });
-    this.admin.coupons().subscribe({ next: (c) => (this.coupons = c) });
-    this.admin.lowStock().subscribe({ next: (items) => (this.lowStock = items) });
+
+    if (section === 'home') {
+      this.admin.products().subscribe({ next: (p) => (this.products = p), error: () => (this.products = []) });
+      this.loadHero(this.heroLang);
+      this.loadSections();
+      this.loadCollections();
+      this.loading.set(false);
+      return;
+    }
+
+    if (section === 'pages') {
+      this.loadInfo();
+      this.loading.set(false);
+      return;
+    }
+
+    if (section === 'blog') {
+      this.admin.content().subscribe({ next: (c) => (this.contentBlocks = c), error: () => (this.contentBlocks = []) });
+      this.loadFlaggedComments();
+      this.loading.set(false);
+      return;
+    }
+
+    // settings
+    this.admin.content().subscribe({ next: (c) => (this.contentBlocks = c), error: () => (this.contentBlocks = []) });
+    this.admin.coupons().subscribe({ next: (c) => (this.coupons = c), error: () => (this.coupons = []) });
+    this.admin.lowStock().subscribe({ next: (items) => (this.lowStock = items), error: () => (this.lowStock = []) });
     this.admin.audit().subscribe({
       next: (logs) => {
         this.productAudit = logs.products;
         this.contentAudit = logs.content;
         this.securityAudit = logs.security ?? [];
-      }
+      },
+      error: () => this.toast.error(this.t('adminUi.audit.errors.loadTitle'), this.t('adminUi.audit.errors.loadCopy'))
     });
     this.admin.getCategories().subscribe({
       next: (cats) => {
         this.categories = cats
           .map((c) => ({ ...c, sort_order: c.sort_order ?? 0 }))
           .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-      }
+      },
+      error: () => (this.categories = [])
     });
-    this.loadHero(this.heroLang);
-    this.loadSections();
-    this.loadCollections();
     this.loadAssets();
     this.loadSocial();
     this.loadSeo();
-    this.loadInfo();
-    this.loadFlaggedComments();
     this.loadFxStatus();
     this.admin.getMaintenance().subscribe({
       next: (m) => {
@@ -2334,6 +2343,7 @@ export class AdminComponent implements OnInit {
     this.contentForm = { title: content.title, body_markdown: '', status: 'draft' };
     this.admin.getContent(content.key).subscribe({
       next: (block) => {
+        this.rememberContentVersion(content.key, block);
         this.contentForm = {
           title: block.title,
           body_markdown: block.body_markdown,
@@ -2346,20 +2356,24 @@ export class AdminComponent implements OnInit {
 
   saveContent(): void {
     if (!this.selectedContent) return;
-    this.admin
-      .updateContent(this.selectedContent.key, {
-        title: this.contentForm.title,
-        body_markdown: this.contentForm.body_markdown,
-        status: this.contentForm.status as any
-      })
-      .subscribe({
-        next: (updated) => {
-          this.contentBlocks = this.contentBlocks.map((c) => (c.key === updated.key ? updated : c));
-          this.toast.success(this.t('adminUi.content.success.update'));
-          this.selectedContent = null;
-        },
-        error: () => this.toast.error(this.t('adminUi.content.errors.update'))
-      });
+    const key = this.selectedContent.key;
+    const payload = this.withExpectedVersion(key, {
+      title: this.contentForm.title,
+      body_markdown: this.contentForm.body_markdown,
+      status: this.contentForm.status as any
+    });
+    this.admin.updateContentBlock(key, payload).subscribe({
+      next: (block) => {
+        this.rememberContentVersion(key, block);
+        this.toast.success(this.t('adminUi.content.success.update'));
+        this.reloadContentBlocks();
+        this.selectedContent = null;
+      },
+      error: (err) => {
+        if (this.handleContentConflict(err, key, () => this.selectContent(this.selectedContent!))) return;
+        this.toast.error(this.t('adminUi.content.errors.update'));
+      }
+    });
   }
 
   cancelContent(): void {
@@ -2448,7 +2462,7 @@ export class AdminComponent implements OnInit {
     const published_at = this.blogCreate.published_at ? new Date(this.blogCreate.published_at).toISOString() : undefined;
 
     try {
-      await firstValueFrom(
+      const created = await firstValueFrom(
         this.admin.createContent(key, {
           title: this.blogCreate.title.trim(),
           body_markdown: this.blogCreate.body_markdown,
@@ -2458,17 +2472,21 @@ export class AdminComponent implements OnInit {
           meta: Object.keys(meta).length ? meta : undefined
         })
       );
+      this.rememberContentVersion(key, created);
 
       if (this.blogCreate.includeTranslation) {
         const tTitle = this.blogCreate.translationTitle.trim();
         const tBody = this.blogCreate.translationBody.trim();
         if (tTitle || tBody) {
           await firstValueFrom(
-            this.admin.updateContentBlock(key, {
-              title: tTitle || this.blogCreate.title.trim(),
-              body_markdown: tBody || this.blogCreate.body_markdown,
-              lang: translationLang
-            })
+            this.admin.updateContentBlock(
+              key,
+              this.withExpectedVersion(key, {
+                title: tTitle || this.blogCreate.title.trim(),
+                body_markdown: tBody || this.blogCreate.body_markdown,
+                lang: translationLang
+              })
+            )
           );
         }
       }
@@ -2494,6 +2512,7 @@ export class AdminComponent implements OnInit {
     const wantsBase = lang === this.blogBaseLang;
     this.admin.getContent(key, wantsBase ? undefined : lang).subscribe({
       next: (block) => {
+        this.rememberContentVersion(key, block);
         this.blogForm.title = block.title;
         this.blogForm.body_markdown = block.body_markdown;
         if (wantsBase) {
@@ -2524,56 +2543,66 @@ export class AdminComponent implements OnInit {
         : null
       : undefined;
     if (isBase) {
-      this.admin
-        .updateContent(key, {
-          title: this.blogForm.title.trim(),
-          body_markdown: this.blogForm.body_markdown,
-          status: this.blogForm.status as any,
-          published_at,
-          meta: nextMeta
-        })
-        .subscribe({
-          next: () => {
-            this.blogMeta = nextMeta;
-            this.toast.success(this.t('adminUi.blog.success.saved'));
-            this.reloadContentBlocks();
-            this.loadBlogEditor(key);
-          },
-          error: () => this.toast.error(this.t('adminUi.blog.errors.save'))
-        });
+      const payload = this.withExpectedVersion(key, {
+        title: this.blogForm.title.trim(),
+        body_markdown: this.blogForm.body_markdown,
+        status: this.blogForm.status as any,
+        published_at,
+        meta: nextMeta
+      });
+      this.admin.updateContentBlock(key, payload).subscribe({
+        next: (block) => {
+          this.rememberContentVersion(key, block);
+          this.blogMeta = nextMeta;
+          this.toast.success(this.t('adminUi.blog.success.saved'));
+          this.reloadContentBlocks();
+          this.loadBlogEditor(key);
+        },
+        error: (err) => {
+          if (this.handleContentConflict(err, key, () => this.loadBlogEditor(key))) return;
+          this.toast.error(this.t('adminUi.blog.errors.save'));
+        }
+      });
       return;
     }
 
-    this.admin
-      .updateContentBlock(key, {
+    this.admin.updateContentBlock(
+      key,
+      this.withExpectedVersion(key, {
         title: this.blogForm.title.trim(),
         body_markdown: this.blogForm.body_markdown,
         lang: this.blogEditLang
       })
-      .subscribe({
-        next: () => {
-          const onDone = () => {
-            this.toast.success(this.t('adminUi.blog.success.translationSaved'));
-            this.reloadContentBlocks();
-            this.setBlogEditLang(this.blogEditLang);
-          };
-          if (!metaChanged) {
+    ).subscribe({
+      next: (block) => {
+        this.rememberContentVersion(key, block);
+        const onDone = () => {
+          this.toast.success(this.t('adminUi.blog.success.translationSaved'));
+          this.reloadContentBlocks();
+          this.setBlogEditLang(this.blogEditLang);
+        };
+        if (!metaChanged) {
+          onDone();
+          return;
+        }
+        this.admin.updateContentBlock(key, this.withExpectedVersion(key, { meta: nextMeta })).subscribe({
+          next: (metaBlock) => {
+            this.rememberContentVersion(key, metaBlock);
+            this.blogMeta = nextMeta;
             onDone();
-            return;
+          },
+          error: (err) => {
+            if (this.handleContentConflict(err, key, () => this.setBlogEditLang(this.blogEditLang))) return;
+            this.toast.error(this.t('adminUi.blog.errors.translationMetaSave'));
+            onDone();
           }
-          this.admin.updateContent(key, { meta: nextMeta }).subscribe({
-            next: () => {
-              this.blogMeta = nextMeta;
-              onDone();
-            },
-            error: () => {
-              this.toast.error(this.t('adminUi.blog.errors.translationMetaSave'));
-              onDone();
-            }
-          });
-        },
-        error: () => this.toast.error(this.t('adminUi.blog.errors.translationSave'))
-      });
+        });
+      },
+      error: (err) => {
+        if (this.handleContentConflict(err, key, () => this.setBlogEditLang(this.blogEditLang))) return;
+        this.toast.error(this.t('adminUi.blog.errors.translationSave'));
+      }
+    });
   }
 
   generateBlogPreviewLink(): void {
@@ -2854,6 +2883,7 @@ export class AdminComponent implements OnInit {
     this.blogDiffParts = [];
     this.admin.getContent(key).subscribe({
       next: (block) => {
+        this.rememberContentVersion(key, block);
         this.blogBaseLang = (block.lang === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
         this.blogEditLang = this.blogBaseLang;
         this.blogMeta = block.meta || {};
@@ -2985,6 +3015,7 @@ export class AdminComponent implements OnInit {
     this.assetsMessage = null;
     this.admin.getContent('site.assets').subscribe({
       next: (block) => {
+        this.rememberContentVersion('site.assets', block);
         this.assetsForm = {
           logo_url: block.meta?.['logo_url'] || '',
           favicon_url: block.meta?.['favicon_url'] || '',
@@ -2993,6 +3024,7 @@ export class AdminComponent implements OnInit {
         this.assetsMessage = null;
       },
       error: () => {
+        delete this.contentVersions['site.assets'];
         this.assetsForm = { logo_url: '', favicon_url: '', social_image_url: '' };
       }
     });
@@ -3004,20 +3036,27 @@ export class AdminComponent implements OnInit {
 	      status: 'published',
 	      meta: { ...this.assetsForm }
 	    };
-	    const onSuccess = () => {
+	    const onSuccess = (block?: { version?: number } | null) => {
+        this.rememberContentVersion('site.assets', block);
 	      this.assetsMessage = this.t('adminUi.site.assets.success.save');
 	      this.assetsError = null;
 	    };
-	    this.admin.updateContentBlock('site.assets', payload).subscribe({
-	      next: onSuccess,
-	      error: () =>
+	    this.admin.updateContentBlock('site.assets', this.withExpectedVersion('site.assets', payload)).subscribe({
+	      next: (block) => onSuccess(block),
+	      error: (err) => {
+          if (this.handleContentConflict(err, 'site.assets', () => this.loadAssets())) {
+            this.assetsError = this.t('adminUi.site.assets.errors.save');
+            this.assetsMessage = null;
+            return;
+          }
 	        this.admin.createContent('site.assets', payload).subscribe({
-	          next: onSuccess,
+	          next: (created) => onSuccess(created),
 	          error: () => {
 	            this.assetsError = this.t('adminUi.site.assets.errors.save');
 	            this.assetsMessage = null;
 	          }
 	        })
+        }
 	    });
 	  }
 
@@ -3026,6 +3065,7 @@ export class AdminComponent implements OnInit {
     this.socialMessage = null;
     this.admin.getContent('site.social').subscribe({
       next: (block) => {
+        this.rememberContentVersion('site.social', block);
         const meta = (block.meta || {}) as Record<string, any>;
         const contact = (meta['contact'] || {}) as Record<string, any>;
         this.socialForm.phone = String(contact['phone'] || this.socialForm.phone || '').trim();
@@ -3034,6 +3074,7 @@ export class AdminComponent implements OnInit {
         this.socialForm.facebook_pages = this.parseSocialPages(meta['facebook_pages'], this.socialForm.facebook_pages);
       },
       error: () => {
+        delete this.contentVersions['site.social'];
         // Keep defaults.
       }
     });
@@ -3110,20 +3151,27 @@ export class AdminComponent implements OnInit {
         facebook_pages
       }
 	    };
-	    const onSuccess = () => {
+	    const onSuccess = (block?: { version?: number } | null) => {
+        this.rememberContentVersion('site.social', block);
 	      this.socialMessage = this.t('adminUi.site.social.success.save');
 	      this.socialError = null;
 	    };
-	    this.admin.updateContentBlock('site.social', payload).subscribe({
-	      next: onSuccess,
-	      error: () =>
+	    this.admin.updateContentBlock('site.social', this.withExpectedVersion('site.social', payload)).subscribe({
+	      next: (block) => onSuccess(block),
+	      error: (err) => {
+          if (this.handleContentConflict(err, 'site.social', () => this.loadSocial())) {
+            this.socialError = this.t('adminUi.site.social.errors.save');
+            this.socialMessage = null;
+            return;
+          }
 	        this.admin.createContent('site.social', payload).subscribe({
-	          next: onSuccess,
+	          next: (created) => onSuccess(created),
 	          error: () => {
 	            this.socialError = this.t('adminUi.site.social.errors.save');
 	            this.socialMessage = null;
 	          }
 	        })
+        }
 	    });
 	  }
 
@@ -3167,6 +3215,7 @@ export class AdminComponent implements OnInit {
     this.seoError = null;
     this.admin.getContent(`seo.${this.seoPage}`, this.seoLang).subscribe({
       next: (block) => {
+        this.rememberContentVersion(`seo.${this.seoPage}`, block);
         this.seoForm = {
           title: block.title || '',
           description: block.meta?.['description'] || ''
@@ -3174,6 +3223,7 @@ export class AdminComponent implements OnInit {
         this.seoMessage = null;
       },
       error: () => {
+        delete this.contentVersions[`seo.${this.seoPage}`];
         this.seoForm = { title: '', description: '' };
       }
     });
@@ -3191,16 +3241,28 @@ export class AdminComponent implements OnInit {
 	      this.seoMessage = this.t('adminUi.site.seo.success.save');
 	      this.seoError = null;
 	    };
-	    this.admin.updateContentBlock(key, payload).subscribe({
-	      next: onSuccess,
-	      error: () =>
+	    this.admin.updateContentBlock(key, this.withExpectedVersion(key, payload)).subscribe({
+	      next: (block) => {
+          this.rememberContentVersion(key, block);
+          onSuccess();
+        },
+	      error: (err) => {
+          if (this.handleContentConflict(err, key, () => this.loadSeo())) {
+            this.seoError = this.t('adminUi.site.seo.errors.save');
+            this.seoMessage = null;
+            return;
+          }
 	        this.admin.createContent(key, payload).subscribe({
-	          next: onSuccess,
+	          next: (created) => {
+              this.rememberContentVersion(key, created);
+              onSuccess();
+            },
 	          error: () => {
 	            this.seoError = this.t('adminUi.site.seo.errors.save');
 	            this.seoMessage = null;
 	          }
 	        })
+        }
 	    });
 	  }
 
@@ -3213,9 +3275,11 @@ export class AdminComponent implements OnInit {
     const loadKey = (key: string, target: 'about' | 'faq' | 'shipping' | 'contact') => {
       this.admin.getContent(key, this.infoLang).subscribe({
         next: (block) => {
+          this.rememberContentVersion(key, block);
           this.infoForm[target] = block.body_markdown || '';
         },
         error: () => {
+          delete this.contentVersions[key];
           this.infoForm[target] = '';
         }
       });
@@ -3235,20 +3299,27 @@ export class AdminComponent implements OnInit {
       status: 'published',
       lang: this.infoLang
 	    };
-	    const onSuccess = () => {
+	    const onSuccess = (block?: { version?: number } | null) => {
+        this.rememberContentVersion(key, block);
 	      this.infoMessage = this.t('adminUi.site.pages.success.save');
 	      this.infoError = null;
 	    };
-	    this.admin.updateContentBlock(key, payload).subscribe({
-	      next: onSuccess,
-	      error: () =>
+	    this.admin.updateContentBlock(key, this.withExpectedVersion(key, payload)).subscribe({
+	      next: (block) => onSuccess(block),
+	      error: (err) => {
+          if (this.handleContentConflict(err, key, () => this.loadInfo())) {
+            this.infoError = this.t('adminUi.site.pages.errors.save');
+            this.infoMessage = null;
+            return;
+          }
 	        this.admin.createContent(key, payload).subscribe({
-	          next: onSuccess,
+	          next: (created) => onSuccess(created),
 	          error: () => {
 	            this.infoError = this.t('adminUi.site.pages.errors.save');
 	            this.infoMessage = null;
 	          }
 	        })
+        }
 	    });
 	  }
 
@@ -3264,6 +3335,7 @@ export class AdminComponent implements OnInit {
     this.heroError.set(null);
     this.admin.getContent('home.hero', lang).subscribe({
       next: (block) => {
+        this.rememberContentVersion('home.hero', block);
         const meta = block.meta || {};
         this.heroForm = {
           title: block.title,
@@ -3275,6 +3347,7 @@ export class AdminComponent implements OnInit {
       },
       error: (err) => {
         if (err?.status === 404) {
+          delete this.contentVersions['home.hero'];
           this.heroForm = { title: '', subtitle: '', cta_label: '', cta_url: '', image: '' };
           return;
         }
@@ -3299,15 +3372,18 @@ export class AdminComponent implements OnInit {
       this.heroError.set(this.t('adminUi.home.hero.errors.save'));
       this.heroMessage.set(null);
     };
-    this.admin.updateContent('home.hero', payload).subscribe({
-      next: () => {
+    this.admin.updateContentBlock('home.hero', this.withExpectedVersion('home.hero', payload)).subscribe({
+      next: (block) => {
+        this.rememberContentVersion('home.hero', block);
         this.heroMessage.set(this.t('adminUi.home.hero.success.saved'));
         this.heroError.set(null);
       },
       error: (err) => {
+        if (this.handleContentConflict(err, 'home.hero', () => this.loadHero(this.heroLang))) return;
         if (err?.status === 404) {
           this.admin.createContent('home.hero', payload).subscribe({
-            next: () => {
+            next: (created) => {
+              this.rememberContentVersion('home.hero', created);
               this.heroMessage.set(this.t('adminUi.home.hero.success.created'));
               this.heroError.set(null);
             },
@@ -3324,6 +3400,7 @@ export class AdminComponent implements OnInit {
   loadSections(): void {
     this.admin.getContent('home.sections').subscribe({
       next: (block) => {
+        this.rememberContentVersion('home.sections', block);
         const rawSections = block.meta?.['sections'];
         if (Array.isArray(rawSections) && rawSections.length) {
           const order: string[] = [];
@@ -3365,6 +3442,7 @@ export class AdminComponent implements OnInit {
         this.applyDefaultHomeSections();
       },
       error: () => {
+        delete this.contentVersions['home.sections'];
         this.applyDefaultHomeSections();
       }
     });
@@ -3466,12 +3544,22 @@ export class AdminComponent implements OnInit {
     };
     const ok = this.t('adminUi.home.sections.success.save');
     const errMsg = this.t('adminUi.home.sections.errors.save');
-    this.admin.updateContent('home.sections', payload).subscribe({
-      next: () => (this.sectionsMessage = ok),
+    this.admin.updateContentBlock('home.sections', this.withExpectedVersion('home.sections', payload)).subscribe({
+      next: (block) => {
+        this.rememberContentVersion('home.sections', block);
+        this.sectionsMessage = ok;
+      },
       error: (err) => {
+        if (this.handleContentConflict(err, 'home.sections', () => this.loadSections())) {
+          this.sectionsMessage = errMsg;
+          return;
+        }
         if (err?.status === 404) {
           this.admin.createContent('home.sections', payload).subscribe({
-            next: () => (this.sectionsMessage = ok),
+            next: (created) => {
+              this.rememberContentVersion('home.sections', created);
+              this.sectionsMessage = ok;
+            },
             error: () => (this.sectionsMessage = errMsg)
           });
         } else {

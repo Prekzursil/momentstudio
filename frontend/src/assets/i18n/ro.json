@@ -382,6 +382,9 @@
     "phoneInvalid": "Introdu un număr de telefon valid."
   },
   "adminUi": {
+    "errors": {
+      "generic": "A apărut o problemă. Încearcă din nou."
+    },
     "nav": {
       "title": "Administrare",
       "dashboard": "Panou",
@@ -926,6 +929,12 @@
     },
     "content": {
       "title": "Conținut",
+      "nav": {
+        "home": "Acasă",
+        "pages": "Pagini",
+        "blog": "Blog",
+        "settings": "Setări"
+      },
       "editing": "Se editează",
       "titleLabel": "Titlu",
       "status": "Status",
@@ -934,6 +943,8 @@
       "previewEmpty": "Nimic de previzualizat încă.",
       "save": "Salvează conținutul",
       "errors": {
+        "conflictTitle": "Conflict de editare",
+        "conflictCopy": "Conținutul s-a schimbat în altă parte. Reîncarcă și încearcă din nou.",
         "update": "Nu am putut actualiza conținutul"
       },
       "success": {
@@ -968,6 +979,22 @@
       "productId": "ID produs:",
       "blockId": "ID bloc:",
       "at": "La:",
+      "reference": "Referință",
+      "entityAll": "Toate",
+      "export": "Export CSV",
+      "exportLimitNote": "Limitare: 5.000 intrări",
+      "filters": {
+        "entity": "Entitate",
+        "action": "Acțiune conține",
+        "actionPlaceholder": "ex: publish, update, owner_transfer",
+        "user": "Utilizator conține",
+        "userPlaceholder": "email, username sau id utilizator",
+        "apply": "Aplică"
+      },
+      "pagination": "Pagina {{page}} din {{total}}",
+      "prev": "Anterior",
+      "next": "Următor",
+      "empty": "Nu există intrări de audit.",
       "securityActions": {
         "owner_transfer": "Transfer proprietar"
       },

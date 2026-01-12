@@ -92,6 +92,22 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert update.json()["body_markdown"] == "Updated body"
     assert update.json()["sort_order"] == 5
 
+    # Optimistic locking rejects stale writes
+    stale = client.patch(
+        "/api/v1/content/admin/home.hero",
+        json={"body_markdown": "Stale write", "expected_version": 1},
+        headers=auth_headers(admin_token),
+    )
+    assert stale.status_code == 409, stale.text
+
+    ok_lock = client.patch(
+        "/api/v1/content/admin/home.hero",
+        json={"body_markdown": "Fresh write", "expected_version": 2},
+        headers=auth_headers(admin_token),
+    )
+    assert ok_lock.status_code == 200, ok_lock.text
+    assert ok_lock.json()["version"] == 3
+
     # Validation rejects script
     bad = client.patch(
         "/api/v1/content/admin/home.hero",

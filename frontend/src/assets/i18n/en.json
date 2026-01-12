@@ -382,6 +382,9 @@
     "phoneInvalid": "Enter a valid phone number."
   },
   "adminUi": {
+    "errors": {
+      "generic": "Something went wrong. Please try again."
+    },
     "nav": {
       "title": "Admin",
       "dashboard": "Dashboard",
@@ -926,6 +929,12 @@
     },
     "content": {
       "title": "Content",
+      "nav": {
+        "home": "Home",
+        "pages": "Pages",
+        "blog": "Blog",
+        "settings": "Settings"
+      },
       "editing": "Editing",
       "titleLabel": "Title",
       "status": "Status",
@@ -934,6 +943,8 @@
       "previewEmpty": "Nothing to preview yet.",
       "save": "Save content",
       "errors": {
+        "conflictTitle": "Edit conflict",
+        "conflictCopy": "This content changed elsewhere. Reload and try again.",
         "update": "Failed to update content"
       },
       "success": {
@@ -968,6 +979,22 @@
       "productId": "Product ID:",
       "blockId": "Block ID:",
       "at": "At:",
+      "reference": "Reference",
+      "entityAll": "All",
+      "export": "Export CSV",
+      "exportLimitNote": "Limited to 5,000 entries",
+      "filters": {
+        "entity": "Entity",
+        "action": "Action contains",
+        "actionPlaceholder": "e.g. publish, update, owner_transfer",
+        "user": "User contains",
+        "userPlaceholder": "email, username, or user id",
+        "apply": "Apply"
+      },
+      "pagination": "Page {{page}} of {{total}}",
+      "prev": "Prev",
+      "next": "Next",
+      "empty": "No audit entries found.",
       "securityActions": {
         "owner_transfer": "Ownership transfer"
       },

@@ -73,13 +73,40 @@ export const routes: Routes = [
       { path: '', pathMatch: 'full', redirectTo: 'orders' },
       {
         path: 'dashboard',
-        loadComponent: () => import('./pages/admin/admin.component').then((m) => m.AdminComponent),
+        loadComponent: () => import('./pages/admin/dashboard/admin-dashboard.component').then((m) => m.AdminDashboardComponent),
         title: 'Admin | momentstudio'
       },
       {
         path: 'content',
-        loadComponent: () => import('./pages/admin/admin.component').then((m) => m.AdminComponent),
-        title: 'Content | Admin | momentstudio'
+        loadComponent: () =>
+          import('./pages/admin/content/admin-content-layout.component').then((m) => m.AdminContentLayoutComponent),
+        children: [
+          { path: '', pathMatch: 'full', redirectTo: 'home' },
+          {
+            path: 'home',
+            loadComponent: () => import('./pages/admin/admin.component').then((m) => m.AdminComponent),
+            data: { section: 'home' },
+            title: 'Content · Home | Admin | momentstudio'
+          },
+          {
+            path: 'pages',
+            loadComponent: () => import('./pages/admin/admin.component').then((m) => m.AdminComponent),
+            data: { section: 'pages' },
+            title: 'Content · Pages | Admin | momentstudio'
+          },
+          {
+            path: 'blog',
+            loadComponent: () => import('./pages/admin/admin.component').then((m) => m.AdminComponent),
+            data: { section: 'blog' },
+            title: 'Content · Blog | Admin | momentstudio'
+          },
+          {
+            path: 'settings',
+            loadComponent: () => import('./pages/admin/admin.component').then((m) => m.AdminComponent),
+            data: { section: 'settings' },
+            title: 'Content · Settings | Admin | momentstudio'
+          }
+        ]
       },
       {
         path: 'orders',
