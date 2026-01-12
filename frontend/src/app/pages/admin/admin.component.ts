@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { CardComponent } from '../../shared/card.component';
 import { ButtonComponent } from '../../shared/button.component';
@@ -36,6 +36,8 @@ import { AuthService } from '../../core/auth.service';
 import { diffLines } from 'diff';
 import { formatIdentity } from '../../shared/user-identity';
 
+type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
+
 @Component({
   selector: 'app-admin',
   standalone: true,
@@ -59,91 +61,7 @@ import { formatIdentity } from '../../shared/user-identity';
         {{ error() }}
       </div>
       <div class="grid gap-6" *ngIf="!loading(); else loadingTpl">
-	          <section class="grid gap-3">
-	            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboardTitle' | translate }}</h1>
-	            <div class="grid md:grid-cols-3 gap-4">
-	              <app-card
-                  [title]="'adminUi.cards.products' | translate"
-                  [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.products || 0 }"
-                ></app-card>
-	              <app-card
-                  [title]="'adminUi.cards.orders' | translate"
-                  [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.orders || 0 }"
-                ></app-card>
-	              <app-card
-                  [title]="'adminUi.cards.users' | translate"
-                  [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.users || 0 }"
-                ></app-card>
-	            </div>
-	            <div class="grid md:grid-cols-3 gap-4">
-	              <app-card
-                  [title]="'adminUi.cards.lowStock' | translate"
-                  [subtitle]="'adminUi.cards.countItems' | translate: { count: summary()?.low_stock || 0 }"
-                ></app-card>
-	              <app-card [title]="'adminUi.cards.sales30' | translate" [subtitle]="(summary()?.sales_30d || 0) | localizedCurrency : 'RON'"></app-card>
-	              <app-card
-                  [title]="'adminUi.cards.orders30' | translate"
-                  [subtitle]="'adminUi.cards.countOrders' | translate: { count: summary()?.orders_30d || 0 }"
-                ></app-card>
-	              <app-card
-                  [title]="'adminUi.cards.openOrders' | translate"
-                  [subtitle]="'adminUi.cards.openOrdersSubtitle' | translate: { count: openOrdersCount() }"
-                ></app-card>
-	              <app-card
-                  [title]="'adminUi.cards.recentOrders' | translate"
-                  [subtitle]="'adminUi.cards.recentOrdersSubtitle' | translate: { count: recentOrdersCount() }"
-                ></app-card>
-	              <app-card
-                  [title]="'adminUi.cards.lowStockTracked' | translate"
-                  [subtitle]="'adminUi.cards.lowStockTrackedSubtitle' | translate: { count: lowStock?.length || 0 }"
-                ></app-card>
-	            </div>
-	          </section>
-
-          <section
-            *ngIf="isOwner()"
-            class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-          >
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ownerTransfer.title' | translate }}</h2>
-            </div>
-            <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.ownerTransfer.description' | translate }}</p>
-
-            <div class="grid gap-3 md:grid-cols-3 items-end text-sm">
-              <app-input
-                [label]="'adminUi.ownerTransfer.identifier' | translate"
-                [(value)]="ownerTransferIdentifier"
-                [placeholder]="'adminUi.ownerTransfer.identifierPlaceholder' | translate"
-              ></app-input>
-              <app-input
-                [label]="'adminUi.ownerTransfer.confirmLabel' | translate"
-                [(value)]="ownerTransferConfirm"
-                [placeholder]="'adminUi.ownerTransfer.confirmPlaceholder' | translate"
-                [hint]="'adminUi.ownerTransfer.confirmHint' | translate"
-              ></app-input>
-              <app-input
-                [label]="'auth.currentPassword' | translate"
-                type="password"
-                autocomplete="current-password"
-                [(value)]="ownerTransferPassword"
-              ></app-input>
-            </div>
-
-            <div *ngIf="ownerTransferError" class="text-sm text-rose-700 dark:text-rose-300">
-              {{ ownerTransferError }}
-            </div>
-
-            <div class="flex justify-end">
-              <app-button
-                size="sm"
-                [disabled]="ownerTransferLoading"
-                [label]="'adminUi.ownerTransfer.action' | translate"
-                (action)="submitOwnerTransfer()"
-              ></app-button>
-            </div>
-          </section>
-
-	          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
 	            <div class="flex items-center justify-between">
 	              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.assets.title' | translate }}</h2>
 	              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadAssets()"></app-button>
@@ -160,7 +78,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-	          <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	          <section *ngIf="section() === 'settings'" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
 	            <div class="flex items-center justify-between gap-3">
 	              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.social.title' | translate }}</h2>
 	              <div class="flex items-center gap-2">
@@ -256,7 +174,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.seo.title' | translate }}</h2>
               <div class="flex gap-2 text-sm">
@@ -312,7 +230,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'pages'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.pages.title' | translate }}</h2>
               <div class="flex gap-2 text-sm">
@@ -384,7 +302,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'home'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.home.hero.title' | translate }}</h2>
               <div class="flex gap-2 text-sm">
@@ -420,7 +338,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'home'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.home.sections.title' | translate }}</h2>
               <app-button size="sm" variant="ghost" [label]="'adminUi.actions.save' | translate" (action)="saveSections()"></app-button>
@@ -451,7 +369,7 @@ import { formatIdentity } from '../../shared/user-identity';
             <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="sectionsMessage">{{ sectionsMessage }}</span>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'home'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.home.collections.title' | translate }}</h2>
               <app-button size="sm" variant="ghost" [label]="'adminUi.actions.reset' | translate" (action)="resetCollectionForm()"></app-button>
@@ -488,7 +406,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="false" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.products.title' | translate }}</h2>
               <div class="flex gap-2">
@@ -569,7 +487,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="false" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
                 {{ editingId ? ('adminUi.products.edit' | translate) : ('adminUi.products.create' | translate) }}
@@ -634,7 +552,7 @@ import { formatIdentity } from '../../shared/user-identity';
             <p *ngIf="formMessage" class="text-sm text-emerald-700 dark:text-emerald-300">{{ formMessage }}</p>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.categories.title' | translate }}</h2>
             </div>
@@ -665,7 +583,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="false" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.title' | translate }}</h2>
               <label class="text-sm text-slate-700 dark:text-slate-200">
@@ -707,7 +625,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="false" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.users.title' | translate }}</h2>
               <div class="flex gap-2">
@@ -792,7 +710,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'blog'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.blog.title' | translate }}</h2>
               <div class="flex items-center gap-2">
@@ -1222,7 +1140,7 @@ import { formatIdentity } from '../../shared/user-identity';
 	            </div>
 	          </section>
 
-	          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	          <section *ngIf="section() === 'blog'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
 	            <div class="flex items-center justify-between">
 	              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.blog.moderation.title' | translate }}</h2>
 	              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadFlaggedComments()"></app-button>
@@ -1278,7 +1196,7 @@ import { formatIdentity } from '../../shared/user-identity';
 	            </div>
 	          </section>
 
-	          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
 	            <div class="flex items-center justify-between">
 	              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.content.title' | translate }}</h2>
 	            </div>
@@ -1318,7 +1236,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.coupons.title' | translate }}</h2>
             </div>
@@ -1350,7 +1268,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="grid gap-0.5">
                 <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.fx.title' | translate }}</h2>
@@ -1491,7 +1409,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.audit.title' | translate }}</h2>
               <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadAudit()"></app-button>
@@ -1529,7 +1447,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.maintenance.title' | translate }}</h2>
               <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="saveMaintenance()"></app-button>
@@ -1544,7 +1462,7 @@ import { formatIdentity } from '../../shared/user-identity';
             </div>
           </section>
 
-          <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.lowStock.title' | translate }}</h2>
               <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.lowStock.hint' | translate }}</span>
@@ -1570,9 +1488,11 @@ import { formatIdentity } from '../../shared/user-identity';
 })
 export class AdminComponent implements OnInit {
   crumbs = [
-    { label: 'nav.home', url: '/' },
-    { label: 'nav.admin' }
+    { label: 'adminUi.nav.content', url: '/admin/content' },
+    { label: 'adminUi.content.nav.home' }
   ];
+
+  section = signal<AdminContentSection>('home');
 
   summary = signal<AdminSummary | null>(null);
   loading = signal<boolean>(true);
@@ -1763,6 +1683,7 @@ export class AdminComponent implements OnInit {
   ownerTransferError: string | null = null;
 
   constructor(
+    private route: ActivatedRoute,
     private admin: AdminService,
     private blog: BlogService,
     private fxAdmin: FxAdminService,
@@ -1781,46 +1702,98 @@ export class AdminComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.loadAll();
+    this.route.data.subscribe((data) => {
+      const next = this.normalizeSection(data['section']);
+      this.applySection(next);
+    });
   }
 
   loadAll(): void {
+    this.loadForSection(this.section());
+  }
+
+  private normalizeSection(value: unknown): AdminContentSection {
+    if (value === 'home' || value === 'pages' || value === 'blog' || value === 'settings') return value;
+    return 'home';
+  }
+
+  private applySection(next: AdminContentSection): void {
+    if (this.section() === next) {
+      this.loadForSection(next);
+      return;
+    }
+    this.section.set(next);
+    this.crumbs = [
+      { label: 'adminUi.nav.content', url: '/admin/content' },
+      { label: `adminUi.content.nav.${next}` }
+    ];
+    this.resetSectionState(next);
+    this.loadForSection(next);
+  }
+
+  private resetSectionState(next: AdminContentSection): void {
+    this.error.set(null);
+    if (next !== 'blog') {
+      this.closeBlogEditor();
+      this.showBlogCreate = false;
+      this.flaggedComments.set([]);
+      this.flaggedCommentsError = null;
+    }
+    if (next !== 'settings') {
+      this.selectedContent = null;
+      this.showContentPreview = false;
+    }
+  }
+
+  private loadForSection(section: AdminContentSection): void {
     this.loading.set(true);
     this.error.set(null);
-    this.admin.summary().subscribe({ next: (s) => this.summary.set(s) });
-    this.admin.products().subscribe({ next: (p) => (this.products = p) });
-    this.admin.orders().subscribe({
-      next: (o) => {
-        this.orders = o;
-        this.activeOrder = o[0] || null;
-      }
-    });
-    this.admin.users().subscribe({ next: (u) => (this.users = u) });
-    this.admin.content().subscribe({ next: (c) => (this.contentBlocks = c) });
-    this.admin.coupons().subscribe({ next: (c) => (this.coupons = c) });
-    this.admin.lowStock().subscribe({ next: (items) => (this.lowStock = items) });
+
+    if (section === 'home') {
+      this.admin.products().subscribe({ next: (p) => (this.products = p), error: () => (this.products = []) });
+      this.loadHero(this.heroLang);
+      this.loadSections();
+      this.loadCollections();
+      this.loading.set(false);
+      return;
+    }
+
+    if (section === 'pages') {
+      this.loadInfo();
+      this.loading.set(false);
+      return;
+    }
+
+    if (section === 'blog') {
+      this.admin.content().subscribe({ next: (c) => (this.contentBlocks = c), error: () => (this.contentBlocks = []) });
+      this.loadFlaggedComments();
+      this.loading.set(false);
+      return;
+    }
+
+    // settings
+    this.admin.content().subscribe({ next: (c) => (this.contentBlocks = c), error: () => (this.contentBlocks = []) });
+    this.admin.coupons().subscribe({ next: (c) => (this.coupons = c), error: () => (this.coupons = []) });
+    this.admin.lowStock().subscribe({ next: (items) => (this.lowStock = items), error: () => (this.lowStock = []) });
     this.admin.audit().subscribe({
       next: (logs) => {
         this.productAudit = logs.products;
         this.contentAudit = logs.content;
         this.securityAudit = logs.security ?? [];
-      }
+      },
+      error: () => this.toast.error(this.t('adminUi.audit.errors.loadTitle'), this.t('adminUi.audit.errors.loadCopy'))
     });
     this.admin.getCategories().subscribe({
       next: (cats) => {
         this.categories = cats
           .map((c) => ({ ...c, sort_order: c.sort_order ?? 0 }))
           .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-      }
+      },
+      error: () => (this.categories = [])
     });
-    this.loadHero(this.heroLang);
-    this.loadSections();
-    this.loadCollections();
     this.loadAssets();
     this.loadSocial();
     this.loadSeo();
-    this.loadInfo();
-    this.loadFlaggedComments();
     this.loadFxStatus();
     this.admin.getMaintenance().subscribe({
       next: (m) => {

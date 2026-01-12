@@ -382,6 +382,9 @@
     "phoneInvalid": "Enter a valid phone number."
   },
   "adminUi": {
+    "errors": {
+      "generic": "Something went wrong. Please try again."
+    },
     "nav": {
       "title": "Admin",
       "dashboard": "Dashboard",
@@ -926,6 +929,12 @@
     },
     "content": {
       "title": "Content",
+      "nav": {
+        "home": "Home",
+        "pages": "Pages",
+        "blog": "Blog",
+        "settings": "Settings"
+      },
       "editing": "Editing",
       "titleLabel": "Title",
       "status": "Status",

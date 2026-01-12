@@ -382,6 +382,9 @@
     "phoneInvalid": "Introdu un număr de telefon valid."
   },
   "adminUi": {
+    "errors": {
+      "generic": "A apărut o problemă. Încearcă din nou."
+    },
     "nav": {
       "title": "Administrare",
       "dashboard": "Panou",
@@ -926,6 +929,12 @@
     },
     "content": {
       "title": "Conținut",
+      "nav": {
+        "home": "Acasă",
+        "pages": "Pagini",
+        "blog": "Blog",
+        "settings": "Setări"
+      },
       "editing": "Se editează",
       "titleLabel": "Titlu",
       "status": "Status",
