@@ -943,6 +943,8 @@
       "previewEmpty": "Nothing to preview yet.",
       "save": "Save content",
       "errors": {
+        "conflictTitle": "Edit conflict",
+        "conflictCopy": "This content changed elsewhere. Reload and try again.",
         "update": "Failed to update content"
       },
       "success": {

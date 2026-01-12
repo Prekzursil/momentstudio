@@ -29,6 +29,7 @@ class ContentBlockCreate(ContentBlockBase):
 
 
 class ContentBlockUpdate(BaseModel):
+    expected_version: int | None = Field(default=None, ge=1)
     title: str | None = Field(default=None, max_length=200)
     body_markdown: str | None = Field(default=None)
     status: ContentStatus | None = None

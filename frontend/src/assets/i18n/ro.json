@@ -943,6 +943,8 @@
       "previewEmpty": "Nimic de previzualizat încă.",
       "save": "Salvează conținutul",
       "errors": {
+        "conflictTitle": "Conflict de editare",
+        "conflictCopy": "Conținutul s-a schimbat în altă parte. Reîncarcă și încearcă din nou.",
         "update": "Nu am putut actualiza conținutul"
       },
       "success": {

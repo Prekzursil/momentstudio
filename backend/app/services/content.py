@@ -83,6 +83,7 @@ async def upsert_block(
     block = await get_block_by_key(session, key)
     now = datetime.now(timezone.utc)
     data = payload.model_dump(exclude_unset=True)
+    expected_version = data.pop("expected_version", None)
     if "body_markdown" in data and data["body_markdown"] is not None:
         _sanitize_markdown(data["body_markdown"])
     lang = data.get("lang")
@@ -123,6 +124,11 @@ async def upsert_block(
 
     if not data:
         return block
+    if expected_version is not None and block.version != expected_version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Content has changed (expected version {expected_version}, found {block.version})",
+        )
     # If lang is provided, upsert translation instead of touching the base content
     if lang:
         await session.refresh(block, attribute_names=["translations"])

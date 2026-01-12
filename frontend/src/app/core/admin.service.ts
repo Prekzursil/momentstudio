@@ -161,6 +161,7 @@ export interface ContentBlock {
   title: string;
   body_markdown: string;
   status: string;
+  version: number;
   meta?: Record<string, any> | null;
   lang?: string | null;
   sort_order?: number;
@@ -191,12 +192,14 @@ export interface ContentBlockVersionRead extends ContentBlockVersionListItem {
 }
 
 export interface ContentSavePayload {
-  title: string;
+  title?: string;
   body_markdown?: string;
   status?: string;
   meta?: Record<string, any>;
   lang?: string | null;
   sort_order?: number;
+  published_at?: string | null;
+  expected_version?: number;
 }
 
 export interface SocialThumbnailResponse {
@@ -239,10 +242,6 @@ export class AdminService {
 
   content(): Observable<AdminContent[]> {
     return this.api.get<AdminContent[]>('/admin/dashboard/content');
-  }
-
-  updateContent(key: string, payload: Partial<AdminContent>): Observable<AdminContent> {
-    return this.api.patch<AdminContent>(`/content/admin/${key}`, payload);
   }
 
   updateContentBlock(key: string, payload: ContentSavePayload): Observable<ContentBlock> {
