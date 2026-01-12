@@ -24,6 +24,8 @@ frontend/test-results/
 # Runtime uploads
 uploads/
 backend/uploads/
+private_uploads/
+backend/private_uploads/
 
 # Windows download metadata
 *:Zone.Identifier
