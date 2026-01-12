@@ -128,6 +128,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Seed default blocks (home hero, about, FAQ, shipping/returns, care).
 - [x] GET /content/{key} public.
 - [x] Admin edit content blocks; validate markdown/HTML safety.
+- [x] Admin hardening: optimistic locking for content edits (`expected_version`) and 409 conflict on stale writes.
 - [x] Content versioning with draft/publish states.
 - [x] Image uploads for content blocks.
 - [x] Rich text sanitization rules.
@@ -400,6 +401,13 @@ Below is a structured checklist you can turn into issues.
 - [x] Backend tests: admin filters/coupons/audit/image reorder/low-stock with sqlite override.
 - [x] Frontend tests: AdminService + admin component flows (sessions revoke, role update, low-stock, coupons, maintenance get/set, category reorder drag-drop).
 - [x] Admin i18n: localize remaining hardcoded strings in admin pages (assets/social/SEO/info) and ensure RO/EN parity.
+- [x] Admin UX: split `/admin/content` into subroutes (home/pages/blog/settings) and reduce the monolithic admin CMS page size.
+- [x] Admin UX: split `/admin/dashboard` into a dedicated component focused on metrics/owner ops (keep CMS elsewhere).
+- [x] Admin audit log UX: add filters (entity/user/action), pagination, and CSV export.
+- [x] E2E: extend Playwright coverage to CMS flows (home.sections edit, page updates, blog publish).
+- [ ] Support inbox: add contact form submissions (store + admin view) and route notifications to owner (email + in-app).
+- [ ] Returns/RMA: design and implement an admin workflow (create RMA, statuses, customer emails).
+- [ ] Shipping labels: add an admin workflow (provider integration or label upload + tracking association).
 
 ## UX, Performance, SEO & Accessibility
 - [x] Mobile-first responsive design across pages(full mobile compatibility).

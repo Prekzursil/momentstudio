@@ -12,8 +12,7 @@ import {
   AdminAuditEntriesResponse,
   AdminAuditEntity,
   AdminService,
-  AdminSummary,
-  OwnerTransferResponse
+  AdminSummary
 } from '../../../core/admin.service';
 import { ToastService } from '../../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
@@ -385,7 +384,7 @@ export class AdminDashboardComponent implements OnInit {
     this.admin
       .transferOwner({ identifier, confirm: this.ownerTransferConfirm, password: this.ownerTransferPassword })
       .subscribe({
-        next: (_res: OwnerTransferResponse) => {
+        next: () => {
           this.ownerTransferLoading = false;
           this.ownerTransferIdentifier = '';
           this.ownerTransferConfirm = '';
