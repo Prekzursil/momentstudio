@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
@@ -30,7 +30,7 @@ import { AdminBlogComment, BlogService } from '../../core/blog.service';
 import { FxAdminService, FxAdminStatus } from '../../core/fx-admin.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Subscription } from 'rxjs';
 import { MarkdownService } from '../../core/markdown.service';
 import { AuthService } from '../../core/auth.service';
 import { diffLines } from 'diff';
@@ -1486,7 +1486,7 @@ type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
 	      </div>
 	  `
 })
-export class AdminComponent implements OnInit {
+export class AdminComponent implements OnInit, OnDestroy {
   crumbs = [
     { label: 'adminUi.nav.content', url: '/admin/content' },
     { label: 'adminUi.content.nav.home' }
@@ -1495,6 +1495,7 @@ export class AdminComponent implements OnInit {
   section = signal<AdminContentSection>('home');
 
   private readonly contentVersions: Record<string, number> = {};
+  private routeSub?: Subscription;
 
   summary = signal<AdminSummary | null>(null);
   loading = signal<boolean>(true);
@@ -1729,10 +1730,18 @@ export class AdminComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.route.data.subscribe((data) => {
+    this.routeSub = this.route.data.subscribe((data) => {
       const next = this.normalizeSection(data['section']);
       this.applySection(next);
     });
+  }
+
+  ngOnDestroy(): void {
+    this.routeSub?.unsubscribe();
+    this.routeSub = undefined;
+    for (const key of Object.keys(this.contentVersions)) {
+      delete this.contentVersions[key];
+    }
   }
 
   loadAll(): void {

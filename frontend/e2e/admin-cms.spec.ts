@@ -34,7 +34,7 @@ test('owner can update About page via CMS and audit log records it', async ({ pa
   await page.goto('/admin/dashboard');
   await page.getByLabel('Entity').selectOption('content');
   await page.getByRole('button', { name: 'Apply' }).click();
-  await expect(page.getByText('page.about')).toBeVisible();
+  await expect(page.getByText('page.about').first()).toBeVisible();
 });
 
 test('owner can toggle homepage sections via CMS', async ({ page }) => {
@@ -79,14 +79,11 @@ test('owner can create a published blog post from CMS', async ({ page }) => {
   await page.getByLabel('Status').selectOption('published');
   await page.getByLabel('Title').fill(title);
 
-  // Use the plain Markdown editor in CI to avoid rich-editor visibility flakiness.
-  const richToggle = page.getByRole('checkbox', { name: 'Rich editor' });
-  await expect(richToggle).toBeVisible();
-  await richToggle.uncheck();
-
-  const bodyTextarea = page.locator('textarea[rows="10"]').first();
-  await expect(bodyTextarea).toBeVisible();
-  await bodyTextarea.fill(`Hello from Playwright. ${title}`);
+  const editorRoot = page.locator('app-rich-editor .toastui-editor-defaultUI').first();
+  await expect(editorRoot).toBeVisible();
+  const editorBody = editorRoot.locator('.ProseMirror').first();
+  await expect(editorBody).toBeVisible();
+  await editorBody.fill(`Hello from Playwright. ${title}`);
 
   await page.getByRole('button', { name: 'Create post' }).click();
   await expect(page.getByText('Blog post created')).toBeVisible();

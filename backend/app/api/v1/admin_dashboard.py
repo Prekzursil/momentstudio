@@ -438,8 +438,10 @@ def _audit_union_subquery() -> object:
             ProductAuditLog.created_at.label("created_at"),
             cast(ProductAuditLog.user_id, String()).label("actor_user_id"),
             prod_actor.email.label("actor_email"),
+            prod_actor.username.label("actor_username"),
             cast(literal(None), String()).label("subject_user_id"),
             cast(literal(None), String()).label("subject_email"),
+            cast(literal(None), String()).label("subject_username"),
             cast(ProductAuditLog.product_id, String()).label("ref_id"),
             prod.slug.label("ref_key"),
             cast(ProductAuditLog.payload, Text()).label("data"),
@@ -459,8 +461,10 @@ def _audit_union_subquery() -> object:
             ContentAuditLog.created_at.label("created_at"),
             cast(ContentAuditLog.user_id, String()).label("actor_user_id"),
             content_actor.email.label("actor_email"),
+            content_actor.username.label("actor_username"),
             cast(literal(None), String()).label("subject_user_id"),
             cast(literal(None), String()).label("subject_email"),
+            cast(literal(None), String()).label("subject_username"),
             cast(ContentAuditLog.content_block_id, String()).label("ref_id"),
             block.key.label("ref_key"),
             cast(literal(None), Text()).label("data"),
@@ -480,8 +484,10 @@ def _audit_union_subquery() -> object:
             AdminAuditLog.created_at.label("created_at"),
             cast(AdminAuditLog.actor_user_id, String()).label("actor_user_id"),
             actor.email.label("actor_email"),
+            actor.username.label("actor_username"),
             cast(AdminAuditLog.subject_user_id, String()).label("subject_user_id"),
             subject.email.label("subject_email"),
+            subject.username.label("subject_username"),
             cast(literal(None), String()).label("ref_id"),
             cast(literal(None), String()).label("ref_key"),
             cast(AdminAuditLog.data, Text()).label("data"),
@@ -517,13 +523,17 @@ def _audit_filters(
         needle = user.strip().lower()
         if needle:
             actor_email = func.lower(func.coalesce(getattr(audit.c, "actor_email"), ""))  # type: ignore[attr-defined]
+            actor_username = func.lower(func.coalesce(getattr(audit.c, "actor_username"), ""))  # type: ignore[attr-defined]
             subject_email = func.lower(func.coalesce(getattr(audit.c, "subject_email"), ""))  # type: ignore[attr-defined]
+            subject_username = func.lower(func.coalesce(getattr(audit.c, "subject_username"), ""))  # type: ignore[attr-defined]
             actor_user_id = func.lower(func.coalesce(getattr(audit.c, "actor_user_id"), ""))  # type: ignore[attr-defined]
             subject_user_id = func.lower(func.coalesce(getattr(audit.c, "subject_user_id"), ""))  # type: ignore[attr-defined]
             filters.append(
                 or_(
                     actor_email.like(f"%{needle}%"),
+                    actor_username.like(f"%{needle}%"),
                     subject_email.like(f"%{needle}%"),
+                    subject_username.like(f"%{needle}%"),
                     actor_user_id.like(f"%{needle}%"),
                     subject_user_id.like(f"%{needle}%"),
                 )

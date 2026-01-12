@@ -982,6 +982,7 @@
       "reference": "Referință",
       "entityAll": "Toate",
       "export": "Export CSV",
+      "exportLimitNote": "Limitare: 5.000 intrări",
       "filters": {
         "entity": "Entitate",
         "action": "Acțiune conține",

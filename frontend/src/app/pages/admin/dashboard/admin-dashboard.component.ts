@@ -79,6 +79,7 @@ import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
           <div class="flex items-center justify-between gap-3 flex-wrap">
             <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.audit.title' | translate }}</h2>
             <div class="flex items-center gap-2">
+              <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.audit.exportLimitNote' | translate }}</span>
               <app-button size="sm" [label]="'adminUi.audit.export' | translate" (action)="downloadAuditCsv()"></app-button>
             </div>
           </div>
