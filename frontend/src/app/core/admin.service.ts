@@ -118,6 +118,32 @@ export interface AdminAudit {
   security?: AdminSecurityAuditItem[];
 }
 
+export type AdminAuditEntity = 'all' | 'product' | 'content' | 'security';
+
+export interface AdminAuditEntryUnified {
+  entity: AdminAuditEntity;
+  id: string;
+  action: string;
+  created_at: string;
+  actor_user_id?: string | null;
+  actor_email?: string | null;
+  subject_user_id?: string | null;
+  subject_email?: string | null;
+  ref_id?: string | null;
+  ref_key?: string | null;
+  data?: string | null;
+}
+
+export interface AdminAuditEntriesResponse {
+  items: AdminAuditEntryUnified[];
+  meta: {
+    page: number;
+    limit: number;
+    total_items: number;
+    total_pages: number;
+  };
+}
+
 export interface AdminAuditItem {
   id: string;
   product_id?: string;
@@ -254,6 +280,20 @@ export class AdminService {
 
   audit(): Observable<AdminAudit> {
     return this.api.get<AdminAudit>('/admin/dashboard/audit');
+  }
+
+  auditEntries(params: {
+    entity?: AdminAuditEntity;
+    action?: string;
+    user?: string;
+    page?: number;
+    limit?: number;
+  }): Observable<AdminAuditEntriesResponse> {
+    return this.api.get<AdminAuditEntriesResponse>('/admin/dashboard/audit/entries', params);
+  }
+
+  exportAuditCsv(params: { entity?: AdminAuditEntity; action?: string; user?: string }): Observable<Blob> {
+    return this.api.getBlob('/admin/dashboard/audit/export.csv', params);
   }
 
   transferOwner(payload: { identifier: string; confirm: string; password: string }): Observable<OwnerTransferResponse> {

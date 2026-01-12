@@ -979,6 +979,21 @@
       "productId": "ID produs:",
       "blockId": "ID bloc:",
       "at": "La:",
+      "reference": "Referință",
+      "entityAll": "Toate",
+      "export": "Export CSV",
+      "filters": {
+        "entity": "Entitate",
+        "action": "Acțiune conține",
+        "actionPlaceholder": "ex: publish, update, owner_transfer",
+        "user": "Utilizator conține",
+        "userPlaceholder": "email, username sau id utilizator",
+        "apply": "Aplică"
+      },
+      "pagination": "Pagina {{page}} din {{total}}",
+      "prev": "Anterior",
+      "next": "Următor",
+      "empty": "Nu există intrări de audit.",
       "securityActions": {
         "owner_transfer": "Transfer proprietar"
       },

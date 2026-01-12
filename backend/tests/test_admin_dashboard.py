@@ -106,6 +106,7 @@ async def reset_db(engine) -> None:
 
 async def seed_dashboard_data(session_factory):
     async with session_factory() as session:
+        admin = (await session.execute(select(User).where(User.email == "admin@example.com"))).scalar_one_or_none()
         cat = Category(slug="art", name="Art", description="desc", sort_order=1)
         session.add(cat)
         product = Product(
@@ -121,7 +122,7 @@ async def seed_dashboard_data(session_factory):
         product.images = [image]
         session.add(product)
         await session.flush()
-        session.add(ProductAuditLog(product_id=product.id, action="update"))
+        session.add(ProductAuditLog(product_id=product.id, action="update", user_id=getattr(admin, "id", None)))
 
         block = ContentBlock(
             key="home-hero",
@@ -132,7 +133,7 @@ async def seed_dashboard_data(session_factory):
         )
         session.add(block)
         await session.flush()
-        session.add(ContentAuditLog(content_block_id=block.id, action="publish", version=1))
+        session.add(ContentAuditLog(content_block_id=block.id, action="publish", version=1, user_id=getattr(admin, "id", None)))
 
         promo = PromoCode(code="SAVE10", percentage_off=10, currency="RON", active=True, max_uses=5)
         session.add(promo)
@@ -159,6 +160,15 @@ async def seed_dashboard_data(session_factory):
             customer_name=user.name or user.email,
         )
         session.add(order)
+        if admin:
+            session.add(
+                AdminAuditLog(
+                    action="test",
+                    actor_user_id=admin.id,
+                    subject_user_id=user.id,
+                    data={"identifier": user.email},
+                )
+            )
         await session.commit()
 
         return {
@@ -244,6 +254,37 @@ def test_admin_lists_and_audit_and_feed(test_app: Dict[str, object]) -> None:
     assert feed.status_code == 200
     assert any(item["slug"] == data["product_slug"] for item in feed.json())
 
+
+def test_admin_audit_entries_filters_and_export(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]
+    engine = test_app["engine"]
+    asyncio.run(reset_db(engine))
+    headers = auth_headers(client, session_factory)
+    asyncio.run(seed_dashboard_data(session_factory))
+
+    entries = client.get("/api/v1/admin/dashboard/audit/entries", headers=headers)
+    assert entries.status_code == 200, entries.text
+    payload = entries.json()
+    assert payload["items"]
+    assert payload["meta"]["total_items"] >= len(payload["items"])
+
+    only_products = client.get("/api/v1/admin/dashboard/audit/entries", headers=headers, params={"entity": "product"})
+    assert only_products.status_code == 200, only_products.text
+    assert all(item["entity"] == "product" for item in only_products.json()["items"])
+
+    only_security = client.get("/api/v1/admin/dashboard/audit/entries", headers=headers, params={"entity": "security"})
+    assert only_security.status_code == 200, only_security.text
+    assert all(item["entity"] == "security" for item in only_security.json()["items"])
+
+    by_actor = client.get("/api/v1/admin/dashboard/audit/entries", headers=headers, params={"user": "admin@example.com"})
+    assert by_actor.status_code == 200, by_actor.text
+    assert by_actor.json()["items"]
+
+    csv_resp = client.get("/api/v1/admin/dashboard/audit/export.csv", headers=headers, params={"entity": "security"})
+    assert csv_resp.status_code == 200, csv_resp.text
+    assert "text/csv" in csv_resp.headers.get("content-type", "")
+    assert csv_resp.text.splitlines()[0].startswith("created_at,entity,action")
 
 def test_category_and_image_reorder(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]

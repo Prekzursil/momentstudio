@@ -979,6 +979,21 @@
       "productId": "Product ID:",
       "blockId": "Block ID:",
       "at": "At:",
+      "reference": "Reference",
+      "entityAll": "All",
+      "export": "Export CSV",
+      "filters": {
+        "entity": "Entity",
+        "action": "Action contains",
+        "actionPlaceholder": "e.g. publish, update, owner_transfer",
+        "user": "User contains",
+        "userPlaceholder": "email, username, or user id",
+        "apply": "Apply"
+      },
+      "pagination": "Page {{page}} of {{total}}",
+      "prev": "Prev",
+      "next": "Next",
+      "empty": "No audit entries found.",
       "securityActions": {
         "owner_transfer": "Ownership transfer"
       },
