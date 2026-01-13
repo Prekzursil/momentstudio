@@ -28,7 +28,17 @@ describe('HomeComponent', () => {
         return of({
           title: 'Home layout',
           body_markdown: '',
-          meta: { sections: [{ id: 'featured_products', enabled: true }, { id: 'why', enabled: true }] },
+          meta: {
+            sections: [
+              { id: 'featured_products', enabled: true },
+              { id: 'why', enabled: true },
+              { id: 'hero', enabled: false },
+              { id: 'new_arrivals', enabled: false },
+              { id: 'featured_collections', enabled: false },
+              { id: 'story', enabled: false },
+              { id: 'recently_viewed', enabled: false }
+            ]
+          },
           images: []
         } as unknown as T);
       }

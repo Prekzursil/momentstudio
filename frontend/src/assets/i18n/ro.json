@@ -670,8 +670,33 @@
       "sections": {
         "title": "Ordinea secțiunilor de pe homepage",
         "hint": "Trage pentru a reordona secțiunile și a comuta vizibilitatea.",
+        "addBlock": "Adaugă bloc personalizat",
+        "blocks": {
+          "hero": "Erou",
+          "featured_products": "Produse recomandate",
+          "new_arrivals": "Cele mai noi",
+          "featured_collections": "Colecții recomandate",
+          "story": "Povestea noastră",
+          "recently_viewed": "Văzute recent",
+          "why": "De ce",
+          "text": "Text",
+          "image": "Imagine",
+          "gallery": "Galerie"
+        },
         "enabled": "Activată",
         "drag": "trage",
+        "fields": {
+          "title": "Titlu",
+          "body": "Conținut (Markdown)",
+          "preview": "Previzualizare",
+          "imageUrl": "URL imagine",
+          "linkUrl": "URL link (opțional)",
+          "alt": "Text alternativ",
+          "caption": "Legendă (opțional)",
+          "gallery": "Imagini galerie",
+          "galleryEmpty": "Nu există imagini încă. Adaugă una pentru a afișa acest bloc.",
+          "image": "Imagine"
+        },
         "success": {
           "save": "Ordinea secțiunilor a fost salvată."
         },

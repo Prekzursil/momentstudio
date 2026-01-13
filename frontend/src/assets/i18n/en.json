@@ -670,8 +670,33 @@
       "sections": {
         "title": "Homepage sections order",
         "hint": "Drag to reorder sections and toggle visibility.",
+        "addBlock": "Add custom block",
+        "blocks": {
+          "hero": "Hero",
+          "featured_products": "Featured products",
+          "new_arrivals": "New arrivals",
+          "featured_collections": "Featured collections",
+          "story": "Our story",
+          "recently_viewed": "Recently viewed",
+          "why": "Why",
+          "text": "Text",
+          "image": "Image",
+          "gallery": "Gallery"
+        },
         "enabled": "Enabled",
         "drag": "drag",
+        "fields": {
+          "title": "Title",
+          "body": "Body (Markdown)",
+          "preview": "Preview",
+          "imageUrl": "Image URL",
+          "linkUrl": "Link URL (optional)",
+          "alt": "Alt text",
+          "caption": "Caption (optional)",
+          "gallery": "Gallery images",
+          "galleryEmpty": "No images yet. Add one to display this block.",
+          "image": "Image"
+        },
         "success": {
           "save": "Sections order saved."
         },

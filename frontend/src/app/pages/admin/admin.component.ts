@@ -39,6 +39,39 @@ import { ContentRevisionsComponent } from './shared/content-revisions.component'
 import { AssetLibraryComponent } from './shared/asset-library.component';
 
 type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
+type UiLang = 'en' | 'ro';
+
+type HomeSectionId =
+  | 'hero'
+  | 'featured_products'
+  | 'new_arrivals'
+  | 'featured_collections'
+  | 'story'
+  | 'recently_viewed'
+  | 'why';
+
+type HomeBlockType = HomeSectionId | 'text' | 'image' | 'gallery';
+
+type LocalizedText = { en: string; ro: string };
+
+type HomeGalleryImageDraft = {
+  url: string;
+  alt: LocalizedText;
+  caption: LocalizedText;
+};
+
+type HomeBlockDraft = {
+  key: string;
+  type: HomeBlockType;
+  enabled: boolean;
+  title: LocalizedText;
+  body_markdown: LocalizedText;
+  url: string;
+  link_url: string;
+  alt: LocalizedText;
+  caption: LocalizedText;
+  images: HomeGalleryImageDraft[];
+};
 
 @Component({
   selector: 'app-admin',
@@ -385,34 +418,228 @@ type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
             </div>
           </section>
 
-          <section *ngIf="section() === 'home'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.home.sections.title' | translate }}</h2>
-              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.save' | translate" (action)="saveSections()"></app-button>
-            </div>
-            <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.home.sections.hint' | translate }}</p>
-            <div class="grid gap-2">
-              <div
-                *ngFor="let section of sectionOrder"
-                class="flex items-center justify-between rounded-lg border border-dashed border-slate-300 p-3 text-sm bg-slate-50 dark:border-slate-700 dark:bg-slate-950/30"
-                draggable="true"
-                (dragstart)="onSectionDragStart(section)"
-                (dragover)="onSectionDragOver($event)"
-                (drop)="onSectionDrop(section)"
-              >
-                <div class="grid gap-1">
-                  <span class="font-semibold text-slate-900 dark:text-slate-50">{{ sectionLabel(section) }}</span>
-                  <span class="text-[11px] text-slate-500 dark:text-slate-400">{{ section }}</span>
+          <section *ngIf="section() === 'home'" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div class="grid gap-1">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.home.sections.title' | translate }}</h2>
+                <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.home.sections.hint' | translate }}</p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2 text-sm">
+                <div class="flex gap-2">
+                  <button
+                    class="px-3 py-1 rounded border"
+                    [class.bg-slate-900]="homeBlocksLang === 'en'"
+                    [class.text-white]="homeBlocksLang === 'en'"
+                    (click)="selectHomeBlocksLang('en')"
+                    type="button"
+                  >
+                    EN
+                  </button>
+                  <button
+                    class="px-3 py-1 rounded border"
+                    [class.bg-slate-900]="homeBlocksLang === 'ro'"
+                    [class.text-white]="homeBlocksLang === 'ro'"
+                    (click)="selectHomeBlocksLang('ro')"
+                    type="button"
+                  >
+                    RO
+                  </button>
                 </div>
-                <div class="flex items-center gap-3">
-                  <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                    <input type="checkbox" [checked]="isSectionEnabled(section)" (change)="toggleSectionEnabled(section, $event)" />
-                    {{ 'adminUi.home.sections.enabled' | translate }}
-                  </label>
-                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.drag' | translate }}</span>
-                </div>
+                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.save' | translate" (action)="saveSections()"></app-button>
               </div>
             </div>
+
+            <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.home.sections.addBlock' | translate }}
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="newHomeBlockType"
+                >
+                  <option [ngValue]="'text'">{{ 'adminUi.home.sections.blocks.text' | translate }}</option>
+                  <option [ngValue]="'image'">{{ 'adminUi.home.sections.blocks.image' | translate }}</option>
+                  <option [ngValue]="'gallery'">{{ 'adminUi.home.sections.blocks.gallery' | translate }}</option>
+                </select>
+              </label>
+              <app-button size="sm" [label]="'adminUi.actions.add' | translate" (action)="addHomeBlock()"></app-button>
+            </div>
+
+            <div class="grid gap-2">
+              <div
+                *ngFor="let block of homeBlocks"
+                class="rounded-xl border border-dashed border-slate-300 p-3 text-sm bg-slate-50 dark:border-slate-700 dark:bg-slate-950/30"
+                draggable="true"
+                (dragstart)="onHomeBlockDragStart(block.key)"
+                (dragover)="onHomeBlockDragOver($event)"
+                (drop)="onHomeBlockDrop(block.key)"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div class="grid gap-1 min-w-0">
+                    <span class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ homeBlockLabel(block) }}</span>
+                    <span class="text-[11px] text-slate-500 dark:text-slate-400 truncate">{{ block.type }} · {{ block.key }}</span>
+                  </div>
+                  <div class="flex items-center gap-3 shrink-0">
+                    <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                      <input type="checkbox" [checked]="block.enabled" (change)="toggleHomeBlockEnabled(block, $event)" />
+                      {{ 'adminUi.home.sections.enabled' | translate }}
+                    </label>
+                    <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.drag' | translate }}</span>
+                    <app-button
+                      *ngIf="isCustomHomeBlock(block)"
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.actions.delete' | translate"
+                      (action)="removeHomeBlock(block.key)"
+                    ></app-button>
+                  </div>
+                </div>
+
+                <ng-container *ngIf="isCustomHomeBlock(block)">
+                  <div class="mt-3 grid gap-3">
+                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {{ 'adminUi.home.sections.fields.title' | translate }}
+                      <input
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        [(ngModel)]="block.title[homeBlocksLang]"
+                      />
+                    </label>
+
+                    <ng-container [ngSwitch]="block.type">
+                      <ng-container *ngSwitchCase="'text'">
+                        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                          {{ 'adminUi.home.sections.fields.body' | translate }}
+                          <textarea
+                            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                            rows="5"
+                            [(ngModel)]="block.body_markdown[homeBlocksLang]"
+                          ></textarea>
+                        </label>
+                        <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                          <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.fields.preview' | translate }}</p>
+                          <div class="markdown mt-2 text-slate-700 dark:text-slate-200" [innerHTML]="renderMarkdown(block.body_markdown[homeBlocksLang])"></div>
+                        </div>
+                      </ng-container>
+
+                      <ng-container *ngSwitchCase="'image'">
+                        <div class="grid gap-3 md:grid-cols-2">
+                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                            {{ 'adminUi.home.sections.fields.imageUrl' | translate }}
+                            <input
+                              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                              [(ngModel)]="block.url"
+                            />
+                          </label>
+                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                            {{ 'adminUi.home.sections.fields.linkUrl' | translate }}
+                            <input
+                              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                              [(ngModel)]="block.link_url"
+                            />
+                          </label>
+                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                            {{ 'adminUi.home.sections.fields.alt' | translate }}
+                            <input
+                              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                              [(ngModel)]="block.alt[homeBlocksLang]"
+                            />
+                          </label>
+                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                            {{ 'adminUi.home.sections.fields.caption' | translate }}
+                            <input
+                              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                              [(ngModel)]="block.caption[homeBlocksLang]"
+                            />
+                          </label>
+                        </div>
+
+                        <details class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+                          <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                            {{ 'adminUi.site.assets.library.title' | translate }}
+                          </summary>
+                          <div class="mt-3">
+                            <app-asset-library
+                              [allowUpload]="true"
+                              [allowSelect]="true"
+                              [initialKey]="'site.assets'"
+                              (select)="setImageBlockUrl(block.key, $event)"
+                            ></app-asset-library>
+                          </div>
+                        </details>
+
+                        <div *ngIf="block.url" class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                          <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.fields.preview' | translate }}</p>
+                          <img class="mt-3 w-full max-h-[260px] rounded-2xl object-cover" [src]="block.url" [alt]="block.alt[homeBlocksLang] || block.title[homeBlocksLang] || ''" loading="lazy" />
+                        </div>
+                      </ng-container>
+
+                      <ng-container *ngSwitchCase="'gallery'">
+                        <div class="grid gap-3">
+                          <div class="flex items-center justify-between">
+                            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.fields.gallery' | translate }}</p>
+                            <app-button size="sm" variant="ghost" [label]="'adminUi.actions.add' | translate" (action)="addGalleryImage(block.key)"></app-button>
+                          </div>
+
+                          <div *ngIf="block.images.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                            {{ 'adminUi.home.sections.fields.galleryEmpty' | translate }}
+                          </div>
+
+                          <div *ngIf="block.images.length > 0" class="grid gap-2">
+                            <div *ngFor="let img of block.images; let idx = index" class="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                              <div class="flex items-center justify-between gap-3">
+                                <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">{{ 'adminUi.home.sections.fields.image' | translate }} {{ idx + 1 }}</span>
+                                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.delete' | translate" (action)="removeGalleryImage(block.key, idx)"></app-button>
+                              </div>
+                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                {{ 'adminUi.home.sections.fields.imageUrl' | translate }}
+                                <input
+                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  [(ngModel)]="img.url"
+                                />
+                              </label>
+                              <div class="grid gap-3 md:grid-cols-2">
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.sections.fields.alt' | translate }}
+                                  <input
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="img.alt[homeBlocksLang]"
+                                  />
+                                </label>
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.sections.fields.caption' | translate }}
+                                  <input
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="img.caption[homeBlocksLang]"
+                                  />
+                                </label>
+                              </div>
+                              <div *ngIf="img.url" class="flex items-center gap-3">
+                                <img class="h-16 w-16 rounded-xl object-cover" [src]="img.url" [alt]="img.alt[homeBlocksLang] || ''" loading="lazy" />
+                                <span class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ img.url }}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <details class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+                            <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                              {{ 'adminUi.site.assets.library.title' | translate }}
+                            </summary>
+                            <div class="mt-3">
+                              <app-asset-library
+                                [allowUpload]="true"
+                                [allowSelect]="true"
+                                [initialKey]="'site.assets'"
+                                (select)="addGalleryImageFromAsset(block.key, $event)"
+                              ></app-asset-library>
+                            </div>
+                          </details>
+                        </div>
+                      </ng-container>
+                    </ng-container>
+                  </div>
+                </ng-container>
+              </div>
+            </div>
+
             <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="sectionsMessage">{{ sectionsMessage }}</span>
           </section>
 
@@ -1605,9 +1832,10 @@ export class AdminComponent implements OnInit, OnDestroy {
   draggingSlug: string | null = null;
   selectedIds = new Set<string>();
   allSelected = false;
-  sectionOrder: string[] = ['hero', 'featured_products', 'new_arrivals', 'featured_collections', 'story', 'recently_viewed', 'why'];
-  sectionEnabled: Record<string, boolean> = {};
-  draggingSection: string | null = null;
+  homeBlocksLang: UiLang = 'en';
+  newHomeBlockType: 'text' | 'image' | 'gallery' = 'text';
+  homeBlocks: HomeBlockDraft[] = [];
+  draggingHomeBlockKey: string | null = null;
   sectionsMessage = '';
 
   heroLang = 'en';
@@ -3540,59 +3768,44 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
   }
 
-  // Sections ordering
-  loadSections(): void {
-    this.admin.getContent('home.sections').subscribe({
-      next: (block) => {
-        this.rememberContentVersion('home.sections', block);
-        const rawSections = block.meta?.['sections'];
-        if (Array.isArray(rawSections) && rawSections.length) {
-          const order: string[] = [];
-          const enabled: Record<string, boolean> = {};
-          for (const raw of rawSections) {
-            if (!raw || typeof raw !== 'object') continue;
-            const id = (raw as { id?: unknown }).id;
-            if (typeof id !== 'string' || !id.trim()) continue;
-            const normalized = this.normalizeHomeSectionId(id);
-            if (!normalized || order.includes(normalized)) continue;
-            order.push(normalized);
-            const isEnabled = (raw as { enabled?: unknown }).enabled;
-            enabled[normalized] = isEnabled === false ? false : true;
-          }
-          if (order.length) {
-            this.sectionOrder = this.ensureAllDefaultHomeSections(order);
-            this.sectionEnabled = this.ensureAllDefaultHomeSectionsEnabled(this.sectionOrder, enabled);
-            return;
-          }
-        }
-
-        const legacyOrder = block.meta?.['order'];
-        if (Array.isArray(legacyOrder) && legacyOrder.length) {
-          const normalized: string[] = [];
-          const enabled: Record<string, boolean> = {};
-          for (const id of legacyOrder) {
-            const mapped = this.normalizeHomeSectionId(id);
-            if (!mapped || normalized.includes(mapped)) continue;
-            normalized.push(mapped);
-            enabled[mapped] = true;
-          }
-          if (normalized.length) {
-            this.sectionOrder = this.ensureAllDefaultHomeSections(normalized);
-            this.sectionEnabled = this.ensureAllDefaultHomeSectionsEnabled(this.sectionOrder, enabled);
-            return;
-          }
-        }
-
-        this.applyDefaultHomeSections();
-      },
-      error: () => {
-        delete this.contentVersions['home.sections'];
-        this.applyDefaultHomeSections();
-      }
-    });
+  // Homepage sections (page builder blocks)
+  selectHomeBlocksLang(lang: UiLang): void {
+    this.homeBlocksLang = lang;
   }
 
-  private normalizeHomeSectionId(value: unknown): string | null {
+  private emptyLocalizedText(): LocalizedText {
+    return { en: '', ro: '' };
+  }
+
+  private toLocalizedText(value: unknown): LocalizedText {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return { en: trimmed, ro: trimmed };
+    }
+    if (!value || typeof value !== 'object') {
+      return this.emptyLocalizedText();
+    }
+    const record = value as Record<string, unknown>;
+    return {
+      en: typeof record['en'] === 'string' ? String(record['en']).trim() : '',
+      ro: typeof record['ro'] === 'string' ? String(record['ro']).trim() : ''
+    };
+  }
+
+  private isHomeSectionId(value: unknown): value is HomeSectionId {
+    return (
+      value === 'hero' ||
+      value === 'featured_products' ||
+      value === 'new_arrivals' ||
+      value === 'featured_collections' ||
+      value === 'story' ||
+      value === 'recently_viewed' ||
+      value === 'why'
+    );
+  }
+
+  private normalizeHomeSectionId(value: unknown): HomeSectionId | null {
+    if (this.isHomeSectionId(value)) return value;
     if (typeof value !== 'string') return null;
     const raw = value.trim();
     if (!raw) return null;
@@ -3600,7 +3813,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       .replace(/([a-z])([A-Z])/g, '$1_$2')
       .toLowerCase()
       .replace(/[\s-]+/g, '_');
-    if (this.defaultHomeSectionIds().includes(key)) return key;
+    if (this.isHomeSectionId(key)) return key;
     if (key === 'collections') return 'featured_collections';
     if (key === 'featured') return 'featured_products';
     if (key === 'bestsellers') return 'featured_products';
@@ -3610,80 +3823,302 @@ export class AdminComponent implements OnInit, OnDestroy {
     return null;
   }
 
-  private defaultHomeSectionIds(): string[] {
+  private defaultHomeSectionIds(): HomeSectionId[] {
     return ['hero', 'featured_products', 'new_arrivals', 'featured_collections', 'story', 'recently_viewed', 'why'];
   }
 
-  private ensureAllDefaultHomeSections(order: string[]): string[] {
-    const out = [...order];
+  private makeHomeBlockDraft(key: string, type: HomeBlockType, enabled: boolean): HomeBlockDraft {
+    return {
+      key,
+      type,
+      enabled,
+      title: this.emptyLocalizedText(),
+      body_markdown: this.emptyLocalizedText(),
+      url: '',
+      link_url: '',
+      alt: this.emptyLocalizedText(),
+      caption: this.emptyLocalizedText(),
+      images: []
+    };
+  }
+
+  private ensureAllDefaultHomeBlocks(blocks: HomeBlockDraft[]): HomeBlockDraft[] {
+    const out = [...blocks];
+    const existing = new Set(out.filter((b) => this.isHomeSectionId(b.type)).map((b) => b.type as HomeSectionId));
     for (const id of this.defaultHomeSectionIds()) {
-      if (!out.includes(id)) out.push(id);
+      if (existing.has(id)) continue;
+      out.push(this.makeHomeBlockDraft(id, id, true));
     }
     return out;
   }
 
-  private ensureAllDefaultHomeSectionsEnabled(order: string[], enabled: Record<string, boolean>): Record<string, boolean> {
-    const out: Record<string, boolean> = { ...enabled };
-    for (const id of order) {
-      if (!(id in out)) out[id] = true;
-    }
-    return out;
+  isCustomHomeBlock(block: HomeBlockDraft): boolean {
+    return block.type === 'text' || block.type === 'image' || block.type === 'gallery';
   }
 
-  private applyDefaultHomeSections(): void {
-    const defaults = this.defaultHomeSectionIds();
-    this.sectionOrder = defaults;
-    const enabled: Record<string, boolean> = {};
-    for (const id of defaults) enabled[id] = true;
-    this.sectionEnabled = enabled;
+  homeBlockLabel(block: HomeBlockDraft): string {
+    const key = `adminUi.home.sections.blocks.${block.type}`;
+    const translated = this.t(key);
+    return translated !== key ? translated : String(block.type);
   }
 
-  sectionLabel(section: string): string {
-    return section
-      .split('_')
-      .filter((s) => s.length)
-      .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
-      .join(' ');
-  }
-
-  isSectionEnabled(section: string): boolean {
-    return this.sectionEnabled[section] !== false;
-  }
-
-  toggleSectionEnabled(section: string, event: Event): void {
+  toggleHomeBlockEnabled(block: HomeBlockDraft, event: Event): void {
     const target = event.target as HTMLInputElement | null;
-    this.sectionEnabled[section] = Boolean(target?.checked);
+    const enabled = target?.checked !== false;
+    this.homeBlocks = this.homeBlocks.map((b) => (b.key === block.key ? { ...b, enabled } : b));
   }
 
-  onSectionDragStart(section: string): void {
-    this.draggingSection = section;
+  onHomeBlockDragStart(key: string): void {
+    this.draggingHomeBlockKey = key;
   }
 
-  onSectionDragOver(event: DragEvent): void {
+  onHomeBlockDragOver(event: DragEvent): void {
     event.preventDefault();
   }
 
-  onSectionDrop(section: string): void {
-    if (!this.draggingSection || this.draggingSection === section) return;
-    const current = [...this.sectionOrder];
-    const from = current.indexOf(this.draggingSection);
-    const to = current.indexOf(section);
+  onHomeBlockDrop(targetKey: string): void {
+    if (!this.draggingHomeBlockKey || this.draggingHomeBlockKey === targetKey) return;
+    const current = [...this.homeBlocks];
+    const from = current.findIndex((b) => b.key === this.draggingHomeBlockKey);
+    const to = current.findIndex((b) => b.key === targetKey);
     if (from === -1 || to === -1) {
-      this.draggingSection = null;
+      this.draggingHomeBlockKey = null;
       return;
     }
-    current.splice(from, 1);
-    current.splice(to, 0, this.draggingSection);
-    this.sectionOrder = current;
-    this.draggingSection = null;
+    const [moved] = current.splice(from, 1);
+    current.splice(to, 0, moved);
+    this.homeBlocks = current;
+    this.draggingHomeBlockKey = null;
+  }
+
+  private nextCustomBlockKey(type: string): string {
+    const base = `${type}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    let key = base;
+    let i = 1;
+    while (this.homeBlocks.some((b) => b.key === key)) {
+      key = `${base}-${i}`;
+      i += 1;
+    }
+    return key;
+  }
+
+  addHomeBlock(): void {
+    const type = this.newHomeBlockType;
+    const key = this.nextCustomBlockKey(type);
+    const draft = this.makeHomeBlockDraft(key, type, true);
+    this.homeBlocks = [...this.homeBlocks, draft];
+  }
+
+  removeHomeBlock(key: string): void {
+    const target = this.homeBlocks.find((b) => b.key === key);
+    if (!target || !this.isCustomHomeBlock(target)) return;
+    this.homeBlocks = this.homeBlocks.filter((b) => b.key !== key);
+  }
+
+  setImageBlockUrl(blockKey: string, url: string): void {
+    const value = (url || '').trim();
+    if (!value) return;
+    this.homeBlocks = this.homeBlocks.map((b) => (b.key === blockKey ? { ...b, url: value } : b));
+    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+  }
+
+  addGalleryImage(blockKey: string): void {
+    this.homeBlocks = this.homeBlocks.map((b) => {
+      if (b.key !== blockKey || b.type !== 'gallery') return b;
+      return {
+        ...b,
+        images: [
+          ...b.images,
+          {
+            url: '',
+            alt: this.emptyLocalizedText(),
+            caption: this.emptyLocalizedText()
+          }
+        ]
+      };
+    });
+  }
+
+  addGalleryImageFromAsset(blockKey: string, url: string): void {
+    const value = (url || '').trim();
+    if (!value) return;
+    this.homeBlocks = this.homeBlocks.map((b) => {
+      if (b.key !== blockKey || b.type !== 'gallery') return b;
+      return {
+        ...b,
+        images: [
+          ...b.images,
+          {
+            url: value,
+            alt: this.emptyLocalizedText(),
+            caption: this.emptyLocalizedText()
+          }
+        ]
+      };
+    });
+    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+  }
+
+  removeGalleryImage(blockKey: string, idx: number): void {
+    this.homeBlocks = this.homeBlocks.map((b) => {
+      if (b.key !== blockKey || b.type !== 'gallery') return b;
+      const next = [...b.images];
+      next.splice(idx, 1);
+      return { ...b, images: next };
+    });
+  }
+
+  loadSections(): void {
+    this.admin.getContent('home.sections').subscribe({
+      next: (block) => {
+        this.rememberContentVersion('home.sections', block);
+        const meta = block.meta || {};
+        const rawBlocks = meta['blocks'];
+        if (Array.isArray(rawBlocks) && rawBlocks.length) {
+          const configured: HomeBlockDraft[] = [];
+          const seenKeys = new Set<string>();
+          const seenBuiltIns = new Set<HomeSectionId>();
+
+          const ensureUniqueKey = (raw: unknown, fallback: string): string => {
+            const base = (typeof raw === 'string' ? raw.trim() : '') || fallback;
+            let key = base;
+            let i = 1;
+            while (!key || seenKeys.has(key)) {
+              key = `${base}-${i}`;
+              i += 1;
+            }
+            seenKeys.add(key);
+            return key;
+          };
+
+          for (const raw of rawBlocks) {
+            if (!raw || typeof raw !== 'object') continue;
+            const rec = raw as Record<string, unknown>;
+            const typeRaw = typeof rec['type'] === 'string' ? String(rec['type']).trim() : '';
+            const enabledRaw = rec['enabled'];
+            const enabled = enabledRaw === false ? false : true;
+            const builtIn = this.normalizeHomeSectionId(typeRaw);
+            const type: HomeBlockType | null =
+              builtIn || (typeRaw === 'text' || typeRaw === 'image' || typeRaw === 'gallery' ? (typeRaw as HomeBlockType) : null);
+            if (!type) continue;
+
+            if (builtIn) {
+              if (seenBuiltIns.has(builtIn)) continue;
+              seenBuiltIns.add(builtIn);
+              seenKeys.add(builtIn);
+              configured.push(this.makeHomeBlockDraft(builtIn, builtIn, enabled));
+              continue;
+            }
+
+            const key = ensureUniqueKey(rec['key'], this.nextCustomBlockKey(type));
+            const draft = this.makeHomeBlockDraft(key, type, enabled);
+            draft.title = this.toLocalizedText(rec['title']);
+            if (type === 'text') {
+              draft.body_markdown = this.toLocalizedText(rec['body_markdown']);
+            } else if (type === 'image') {
+              draft.url = typeof rec['url'] === 'string' ? String(rec['url']).trim() : '';
+              draft.link_url = typeof rec['link_url'] === 'string' ? String(rec['link_url']).trim() : '';
+              draft.alt = this.toLocalizedText(rec['alt']);
+              draft.caption = this.toLocalizedText(rec['caption']);
+            } else if (type === 'gallery') {
+              const imagesRaw = rec['images'];
+              if (Array.isArray(imagesRaw)) {
+                for (const imgRaw of imagesRaw) {
+                  if (!imgRaw || typeof imgRaw !== 'object') continue;
+                  const imgRec = imgRaw as Record<string, unknown>;
+                  const url = typeof imgRec['url'] === 'string' ? String(imgRec['url']).trim() : '';
+                  if (!url) continue;
+                  draft.images.push({
+                    url,
+                    alt: this.toLocalizedText(imgRec['alt']),
+                    caption: this.toLocalizedText(imgRec['caption'])
+                  });
+                }
+              }
+            }
+            configured.push(draft);
+          }
+
+          if (configured.length) {
+            this.homeBlocks = this.ensureAllDefaultHomeBlocks(configured);
+            return;
+          }
+        }
+
+        const derived: HomeBlockDraft[] = [];
+        const seen = new Set<HomeSectionId>();
+        const addSection = (rawId: unknown, enabled: boolean) => {
+          const id = this.normalizeHomeSectionId(rawId);
+          if (!id || seen.has(id)) return;
+          seen.add(id);
+          derived.push(this.makeHomeBlockDraft(id, id, enabled));
+        };
+
+        const rawSections = meta['sections'];
+        if (Array.isArray(rawSections)) {
+          for (const raw of rawSections) {
+            if (!raw || typeof raw !== 'object') continue;
+            addSection((raw as { id?: unknown }).id, (raw as { enabled?: unknown }).enabled === false ? false : true);
+          }
+          if (derived.length) {
+            this.homeBlocks = this.ensureAllDefaultHomeBlocks(derived);
+            return;
+          }
+        }
+
+        const legacyOrder = meta['order'];
+        if (Array.isArray(legacyOrder) && legacyOrder.length) {
+          for (const raw of legacyOrder) {
+            addSection(raw, true);
+          }
+          if (derived.length) {
+            this.homeBlocks = this.ensureAllDefaultHomeBlocks(derived);
+            return;
+          }
+        }
+
+        this.homeBlocks = this.ensureAllDefaultHomeBlocks([]);
+      },
+      error: () => {
+        delete this.contentVersions['home.sections'];
+        this.homeBlocks = this.ensureAllDefaultHomeBlocks([]);
+      }
+    });
   }
 
   saveSections(): void {
-    const sections = this.sectionOrder.map((id) => ({ id, enabled: this.isSectionEnabled(id) }));
+    const blocks = this.homeBlocks.map((b) => {
+      const base: Record<string, unknown> = { key: b.key, type: b.type, enabled: b.enabled };
+      if (b.type === 'text') {
+        base['title'] = b.title;
+        base['body_markdown'] = b.body_markdown;
+      } else if (b.type === 'image') {
+        base['title'] = b.title;
+        base['url'] = b.url;
+        base['link_url'] = b.link_url;
+        base['alt'] = b.alt;
+        base['caption'] = b.caption;
+      } else if (b.type === 'gallery') {
+        base['title'] = b.title;
+        base['images'] = b.images.map((img) => ({ url: img.url, alt: img.alt, caption: img.caption }));
+      }
+      return base;
+    });
+
+    const sections: Array<{ id: HomeSectionId; enabled: boolean }> = [];
+    const seen = new Set<HomeSectionId>();
+    for (const block of this.homeBlocks) {
+      if (!this.isHomeSectionId(block.type)) continue;
+      const id = block.type as HomeSectionId;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      sections.push({ id, enabled: block.enabled });
+    }
+
     const payload = {
       title: 'Home sections',
       body_markdown: 'Home layout order',
-      meta: { version: 1, sections },
+      meta: { version: 2, blocks, sections, order: sections.map((s) => s.id) },
       status: 'published'
     };
     const ok = this.t('adminUi.home.sections.success.save');
