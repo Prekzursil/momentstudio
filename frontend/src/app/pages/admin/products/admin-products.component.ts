@@ -16,7 +16,6 @@ type ProductStatusFilter = 'all' | 'draft' | 'published' | 'archived';
 
 type ProductForm = {
   name: string;
-  slug: string;
   category_id: string;
   base_price: number;
   stock_quantity: number;
@@ -194,7 +193,15 @@ type ProductTranslationForm = {
 
         <div class="grid gap-3 md:grid-cols-2">
           <app-input [label]="'adminUi.products.table.name' | translate" [(value)]="form.name"></app-input>
-          <app-input [label]="'adminUi.products.form.slug' | translate" [(value)]="form.slug"></app-input>
+          <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            <span>{{ 'adminUi.products.form.slug' | translate }}</span>
+            <div class="h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 shadow-sm flex items-center dark:border-slate-800 dark:bg-slate-950/20 dark:text-slate-100">
+              <span *ngIf="editingSlug(); else slugHint" class="font-mono truncate">{{ editingSlug() }}</span>
+              <ng-template #slugHint>
+                <span class="text-slate-500 dark:text-slate-400">{{ 'adminUi.products.form.slugAutoHint' | translate }}</span>
+              </ng-template>
+            </div>
+          </div>
 
           <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
             {{ 'adminUi.products.table.category' | translate }}
@@ -503,7 +510,6 @@ export class AdminProductsComponent implements OnInit {
         const basePrice = typeof prod.base_price === 'number' ? prod.base_price : Number(prod.base_price || 0);
         this.form = {
           name: prod.name || '',
-          slug: prod.slug || slug,
           category_id: prod.category_id || '',
           base_price: Number.isFinite(basePrice) ? basePrice : 0,
           stock_quantity: Number(prod.stock_quantity || 0),
@@ -527,7 +533,6 @@ export class AdminProductsComponent implements OnInit {
   save(): void {
     const payload: any = {
       name: this.form.name,
-      slug: this.form.slug,
       category_id: this.form.category_id,
       base_price: Number(this.form.base_price),
       stock_quantity: Number(this.form.stock_quantity),
@@ -547,7 +552,7 @@ export class AdminProductsComponent implements OnInit {
       next: (prod: any) => {
         this.toast.success(this.t('adminUi.products.success.save'));
         this.editorMessage.set(this.t('adminUi.products.success.save'));
-        const newSlug = (prod?.slug as string | undefined) || this.form.slug || slug || null;
+        const newSlug = (prod?.slug as string | undefined) || slug || null;
         this.editingSlug.set(newSlug);
         this.images.set(Array.isArray(prod?.images) ? prod.images : this.images());
         if (newSlug) this.loadTranslations(newSlug);
@@ -688,7 +693,6 @@ export class AdminProductsComponent implements OnInit {
   private blankForm(): ProductForm {
     return {
       name: '',
-      slug: '',
       category_id: '',
       base_price: 0,
       stock_quantity: 0,

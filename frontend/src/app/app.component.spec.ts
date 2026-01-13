@@ -16,6 +16,7 @@ describe('AppComponent', () => {
           useValue: {
             user: () => null,
             isAuthenticated: () => false,
+            loadCurrentUser: () => of(null),
             updatePreferredLanguage: () => of(null)
           }
         }

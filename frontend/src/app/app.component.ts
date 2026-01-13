@@ -8,6 +8,7 @@ import { ToastService } from './core/toast.service';
 import { ThemeService, ThemePreference } from './core/theme.service';
 import { TranslateService } from '@ngx-translate/core';
 import { LanguageService } from './core/language.service';
+import { AuthService } from './core/auth.service';
 
 @Component({
   selector: 'app-root',
@@ -39,9 +40,14 @@ export class AppComponent {
     private toast: ToastService,
     private theme: ThemeService,
     private translate: TranslateService,
-    private lang: LanguageService
+    private lang: LanguageService,
+    private auth: AuthService
   ) {
     // Language is handled by LanguageService (localStorage + preferred_language + browser fallback).
+    // Revalidate any persisted session on startup to avoid "logged in but unauthorized" UI states.
+    if (this.auth.isAuthenticated()) {
+      this.auth.loadCurrentUser().subscribe({ error: () => void 0 });
+    }
   }
 
   onThemeChange(pref: ThemePreference): void {

@@ -238,6 +238,74 @@ def test_catalog_admin_and_public_flows(test_app: Dict[str, object]) -> None:
     assert all(p["slug"] != "white-cup" for p in res.json()["items"])
 
 
+def test_catalog_slug_autogen_and_slug_reuse_after_delete(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token = create_admin_token(SessionLocal, email="slugadmin@example.com")
+
+    # Category slug should be auto-generated when omitted.
+    category_res = client.post(
+        "/api/v1/catalog/categories",
+        json={"name": "Cups"},
+        headers=auth_headers(admin_token),
+    )
+    assert category_res.status_code == 201, category_res.text
+    assert category_res.json()["slug"] == "cups"
+    category_id = category_res.json()["id"]
+
+    # Category slug should be immutable.
+    category_update = client.patch(
+        "/api/v1/catalog/categories/cups",
+        json={"slug": "mugs"},
+        headers=auth_headers(admin_token),
+    )
+    assert category_update.status_code == 400, category_update.text
+
+    # Product slug should be auto-generated when omitted.
+    first = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": category_id,
+            "name": "White Cup",
+            "base_price": 10.5,
+            "currency": "RON",
+            "stock_quantity": 3,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert first.status_code == 201, first.text
+    assert first.json()["slug"] == "white-cup"
+
+    # Product slug should be immutable.
+    attempt_slug_change = client.patch(
+        "/api/v1/catalog/products/white-cup",
+        json={"slug": "changed-slug"},
+        headers=auth_headers(admin_token),
+    )
+    assert attempt_slug_change.status_code == 400, attempt_slug_change.text
+
+    # Deleted products should free their old slug for reuse.
+    deleted = client.delete("/api/v1/catalog/products/white-cup", headers=auth_headers(admin_token))
+    assert deleted.status_code == 204
+
+    second = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": category_id,
+            "name": "White Cup",
+            "base_price": 12.0,
+            "currency": "RON",
+            "stock_quantity": 1,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert second.status_code == 201, second.text
+    assert second.json()["slug"] == "white-cup"
+
+
 def test_catalog_translation_admin_endpoints(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
@@ -563,24 +631,26 @@ def test_slug_history_recently_viewed_and_csv(test_app: Dict[str, object]) -> No
         "/api/v1/catalog/products",
         json={
             "category_id": category_id,
-            "slug": "old-slug",
+            "slug": "new-slug",
             "name": "Old Name",
             "base_price": 5,
             "currency": "RON",
             "stock_quantity": 1,
-            "status": "draft",
+            "status": "published",
         },
         headers=auth_headers(admin_token),
     )
     assert res.status_code == 201
 
-    update = client.patch(
-        "/api/v1/catalog/products/old-slug",
-        json={"slug": "new-slug", "status": "published"},
-        headers=auth_headers(admin_token),
-    )
-    assert update.status_code == 200
-    assert update.json()["slug"] == "new-slug"
+    async def _seed_slug_history(product_id: str) -> None:
+        from app.models.catalog import ProductSlugHistory
+        import uuid
+
+        async with SessionLocal() as session:
+            session.add(ProductSlugHistory(product_id=uuid.UUID(product_id), slug="old-slug"))
+            await session.commit()
+
+    asyncio.run(_seed_slug_history(res.json()["id"]))
 
     # Old slug should redirect to current product
     from_history = client.get("/api/v1/catalog/products/old-slug", params={"session_id": "sess-123"})
