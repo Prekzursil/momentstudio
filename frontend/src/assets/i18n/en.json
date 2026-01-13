@@ -655,6 +655,14 @@
         "saveShipping": "Save shipping",
         "contactLabel": "Contact",
         "saveContact": "Save contact",
+        "builder": {
+          "title": "Page builder blocks",
+          "hint": "Optional: build richer About/Contact pages with blocks. If blocks are present, the storefront renders them instead of the Markdown body.",
+          "page": "Page",
+          "addBlock": "Add block",
+          "success": { "save": "Blocks saved." },
+          "errors": { "save": "Could not save blocks." }
+        },
         "success": { "save": "Content saved." },
         "errors": { "save": "Could not save content." }
       }

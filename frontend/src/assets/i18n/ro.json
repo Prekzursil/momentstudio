@@ -655,6 +655,14 @@
         "saveShipping": "Salvează livrarea",
         "contactLabel": "Contact",
         "saveContact": "Salvează contactul",
+        "builder": {
+          "title": "Blocuri tip page builder",
+          "hint": "Opțional: construiește pagini mai bogate (Povestea noastră/Contact) din blocuri. Dacă există blocuri, magazinul le afișează în locul conținutului Markdown.",
+          "page": "Pagină",
+          "addBlock": "Adaugă bloc",
+          "success": { "save": "Blocurile au fost salvate." },
+          "errors": { "save": "Nu am putut salva blocurile." }
+        },
         "success": { "save": "Conținut salvat." },
         "errors": { "save": "Nu am putut salva conținutul." }
       }

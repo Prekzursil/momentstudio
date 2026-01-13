@@ -5,18 +5,13 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 
 import { ApiService } from '../../core/api.service';
-import { AuthService } from '../../core/auth.service';
 import { MarkdownService } from '../../core/markdown.service';
-import { SiteSocialService } from '../../core/site-social.service';
-import { SupportService } from '../../core/support.service';
-import { ContactComponent } from './contact.component';
+import { AboutComponent } from './about.component';
 
-describe('ContactComponent', () => {
+describe('AboutComponent', () => {
   let meta: jasmine.SpyObj<Meta>;
   let title: jasmine.SpyObj<Title>;
   let api: jasmine.SpyObj<ApiService>;
-  let auth: jasmine.SpyObj<AuthService>;
-  let support: jasmine.SpyObj<SupportService>;
   let translate: TranslateService;
 
   beforeEach(() => {
@@ -24,36 +19,21 @@ describe('ContactComponent', () => {
     title = jasmine.createSpyObj<Title>('Title', ['setTitle']);
     api = jasmine.createSpyObj<ApiService>('ApiService', ['get']);
     api.get.and.callFake((path: string, params?: Record<string, unknown>) => {
-      if (path !== '/content/pages/contact') throw new Error(`Unexpected path: ${path}`);
+      if (path !== '/content/pages/about') throw new Error(`Unexpected path: ${path}`);
       if (params?.['lang'] === 'ro') {
-        return of({ title: 'Contact RO', body_markdown: 'Salut', images: [] } as any);
+        return of({ title: 'Despre noi', body_markdown: 'Salut', meta: null, images: [] } as any);
       }
-      return of({ title: 'Contact', body_markdown: 'Hello', images: [] } as any);
+      return of({ title: 'About', body_markdown: 'Hello', meta: null, images: [] } as any);
     });
     const markdown = { render: (s: string) => s } as unknown as MarkdownService;
-    auth = jasmine.createSpyObj<AuthService>('AuthService', ['user']);
-    auth.user.and.returnValue(null);
-    support = jasmine.createSpyObj<SupportService>('SupportService', ['submitContact']);
-    support.submitContact.and.returnValue(of({} as any));
-    const social = {
-      get: () =>
-        of({
-          contact: { phone: '+40723204204', email: 'momentstudio.ro@gmail.com' },
-          instagramPages: [],
-          facebookPages: []
-        })
-    } as unknown as SiteSocialService;
 
     TestBed.configureTestingModule({
-      imports: [RouterTestingModule, ContactComponent, TranslateModule.forRoot()],
+      imports: [RouterTestingModule, AboutComponent, TranslateModule.forRoot()],
       providers: [
         { provide: Title, useValue: title },
         { provide: Meta, useValue: meta },
         { provide: ApiService, useValue: api },
-        { provide: MarkdownService, useValue: markdown },
-        { provide: SiteSocialService, useValue: social },
-        { provide: AuthService, useValue: auth },
-        { provide: SupportService, useValue: support }
+        { provide: MarkdownService, useValue: markdown }
       ]
     });
 
@@ -61,14 +41,14 @@ describe('ContactComponent', () => {
     translate.setTranslation(
       'en',
       {
-        contact: { metaTitle: 'Contact | momentstudio', metaDescription: 'Contact desc' }
+        about: { metaTitle: 'About | momentstudio', metaDescription: 'About desc' }
       },
       true
     );
     translate.setTranslation(
       'ro',
       {
-        contact: { metaTitle: 'Contact | momentstudio (RO)', metaDescription: 'Descriere contact' }
+        about: { metaTitle: 'Despre noi | momentstudio', metaDescription: 'Descriere' }
       },
       true
     );
@@ -76,17 +56,17 @@ describe('ContactComponent', () => {
   });
 
   it('sets meta tags on init', () => {
-    const fixture = TestBed.createComponent(ContactComponent);
+    const fixture = TestBed.createComponent(AboutComponent);
     fixture.detectChanges();
 
-    expect(title.setTitle).toHaveBeenCalledWith('Contact | momentstudio');
+    expect(title.setTitle).toHaveBeenCalledWith('About | momentstudio');
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Hello' });
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'og:description', content: 'Hello' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'og:title', content: 'Contact | momentstudio' });
+    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'og:title', content: 'About | momentstudio' });
   });
 
   it('updates meta tags when language changes', () => {
-    const fixture = TestBed.createComponent(ContactComponent);
+    const fixture = TestBed.createComponent(AboutComponent);
     fixture.detectChanges();
 
     title.setTitle.calls.reset();
@@ -94,45 +74,43 @@ describe('ContactComponent', () => {
 
     translate.use('ro');
 
-    expect(title.setTitle).toHaveBeenCalledWith('Contact RO | momentstudio');
+    expect(title.setTitle).toHaveBeenCalledWith('Despre noi | momentstudio');
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Salut' });
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'og:description', content: 'Salut' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'og:title', content: 'Contact RO | momentstudio' });
+    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'og:title', content: 'Despre noi | momentstudio' });
   });
 
   it('uses page blocks for meta description when present', () => {
     api.get.and.callFake((path: string, params?: Record<string, unknown>) => {
-      if (path !== '/content/pages/contact') throw new Error(`Unexpected path: ${path}`);
+      if (path !== '/content/pages/about') throw new Error(`Unexpected path: ${path}`);
       if (params?.['lang'] === 'ro') {
         return of({
-          title: 'Contact RO',
+          title: 'Despre noi',
           body_markdown: 'Salut',
           meta: {
-            blocks: [
-              { key: 'intro', type: 'text', enabled: true, title: { ro: 'Introducere' }, body_markdown: { ro: 'Bun venit' } }
-            ]
-          }
+            blocks: [{ key: 'intro', type: 'text', enabled: true, title: { ro: 'Introducere' }, body_markdown: { ro: 'Bun venit' } }]
+          },
+          images: []
         } as any);
       }
       return of({
-        title: 'Contact',
+        title: 'About',
         body_markdown: 'Hello',
         meta: {
-          blocks: [
-            { key: 'intro', type: 'text', enabled: true, title: { en: 'Intro' }, body_markdown: { en: 'Welcome' } }
-          ]
-        }
+          blocks: [{ key: 'intro', type: 'text', enabled: true, title: { en: 'Intro' }, body_markdown: { en: 'Welcome' } }]
+        },
+        images: []
       } as any);
     });
 
-    const fixture = TestBed.createComponent(ContactComponent);
+    const fixture = TestBed.createComponent(AboutComponent);
     fixture.detectChanges();
 
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Intro Welcome' });
   });
 
   it('stops updating after destroy', () => {
-    const fixture = TestBed.createComponent(ContactComponent);
+    const fixture = TestBed.createComponent(AboutComponent);
     const cmp = fixture.componentInstance;
     fixture.detectChanges();
     cmp.ngOnDestroy();
@@ -146,3 +124,4 @@ describe('ContactComponent', () => {
     expect(meta.updateTag).not.toHaveBeenCalled();
   });
 });
+

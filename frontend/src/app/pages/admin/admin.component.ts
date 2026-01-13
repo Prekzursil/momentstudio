@@ -73,6 +73,10 @@ type HomeBlockDraft = {
   images: HomeGalleryImageDraft[];
 };
 
+type PageBuilderKey = 'page.about' | 'page.contact';
+type PageBlockType = 'text' | 'image' | 'gallery';
+type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
+
 @Component({
   selector: 'app-admin',
   standalone: true,
@@ -281,6 +285,7 @@ type HomeBlockDraft = {
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.pages.title' | translate }}</h2>
               <div class="flex gap-2 text-sm">
                 <button
+                  type="button"
                   class="px-3 py-1 rounded border"
                   [class.bg-slate-900]="infoLang === 'en'"
                   [class.text-white]="infoLang === 'en'"
@@ -289,6 +294,7 @@ type HomeBlockDraft = {
                   EN
                 </button>
                 <button
+                  type="button"
                   class="px-3 py-1 rounded border"
                   [class.bg-slate-900]="infoLang === 'ro'"
                   [class.text-white]="infoLang === 'ro'"
@@ -304,47 +310,275 @@ type HomeBlockDraft = {
                 <textarea
                   rows="3"
                   class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="infoForm.about"
+                  [(ngModel)]="infoForm.about[infoLang]"
                 ></textarea>
               </label>
               <div class="flex gap-2">
-                <app-button size="sm" [label]="'adminUi.site.pages.saveAbout' | translate" (action)="saveInfo('page.about', infoForm.about)"></app-button>
+                <app-button size="sm" [label]="'adminUi.site.pages.saveAbout' | translate" (action)="saveInfo('page.about', infoForm.about[infoLang])"></app-button>
               </div>
               <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
                 {{ 'adminUi.site.pages.faqLabel' | translate }}
                 <textarea
                   rows="3"
                   class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="infoForm.faq"
+                  [(ngModel)]="infoForm.faq[infoLang]"
                 ></textarea>
               </label>
               <div class="flex gap-2">
-                <app-button size="sm" [label]="'adminUi.site.pages.saveFaq' | translate" (action)="saveInfo('page.faq', infoForm.faq)"></app-button>
+                <app-button size="sm" [label]="'adminUi.site.pages.saveFaq' | translate" (action)="saveInfo('page.faq', infoForm.faq[infoLang])"></app-button>
               </div>
               <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
                 {{ 'adminUi.site.pages.shippingLabel' | translate }}
                 <textarea
                   rows="3"
                   class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="infoForm.shipping"
+                  [(ngModel)]="infoForm.shipping[infoLang]"
                 ></textarea>
               </label>
               <div class="flex gap-2">
-                <app-button size="sm" [label]="'adminUi.site.pages.saveShipping' | translate" (action)="saveInfo('page.shipping', infoForm.shipping)"></app-button>
+                <app-button size="sm" [label]="'adminUi.site.pages.saveShipping' | translate" (action)="saveInfo('page.shipping', infoForm.shipping[infoLang])"></app-button>
               </div>
               <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
                 {{ 'adminUi.site.pages.contactLabel' | translate }}
                 <textarea
                   rows="3"
                   class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="infoForm.contact"
+                  [(ngModel)]="infoForm.contact[infoLang]"
                 ></textarea>
               </label>
               <div class="flex gap-2">
-                <app-button size="sm" [label]="'adminUi.site.pages.saveContact' | translate" (action)="saveInfo('page.contact', infoForm.contact)"></app-button>
+                <app-button size="sm" [label]="'adminUi.site.pages.saveContact' | translate" (action)="saveInfo('page.contact', infoForm.contact[infoLang])"></app-button>
                 <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="infoMessage">{{ infoMessage }}</span>
                 <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="infoError">{{ infoError }}</span>
               </div>
+
+              <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.site.pages.builder.title' | translate }}
+                </summary>
+                <div class="mt-3 grid gap-3">
+                  <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.site.pages.builder.hint' | translate }}</p>
+
+                  <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
+                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {{ 'adminUi.site.pages.builder.page' | translate }}
+                      <select
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        [(ngModel)]="pageBlocksKey"
+                      >
+                        <option [ngValue]="'page.about'">{{ 'adminUi.site.pages.aboutLabel' | translate }}</option>
+                        <option [ngValue]="'page.contact'">{{ 'adminUi.site.pages.contactLabel' | translate }}</option>
+                      </select>
+                    </label>
+
+                    <div class="flex items-end gap-2">
+                      <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                        {{ 'adminUi.site.pages.builder.addBlock' | translate }}
+                        <select
+                          class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          [(ngModel)]="newPageBlockType"
+                        >
+                          <option [ngValue]="'text'">{{ 'adminUi.home.sections.blocks.text' | translate }}</option>
+                          <option [ngValue]="'image'">{{ 'adminUi.home.sections.blocks.image' | translate }}</option>
+                          <option [ngValue]="'gallery'">{{ 'adminUi.home.sections.blocks.gallery' | translate }}</option>
+                        </select>
+                      </label>
+                      <app-button size="sm" [label]="'adminUi.actions.add' | translate" (action)="addPageBlock(pageBlocksKey)"></app-button>
+                    </div>
+                  </div>
+
+                  <div class="grid gap-2">
+                    <div
+                      *ngFor="let block of pageBlocks[pageBlocksKey]"
+                      class="rounded-xl border border-dashed border-slate-300 p-3 text-sm bg-white dark:border-slate-700 dark:bg-slate-900"
+                      draggable="true"
+                      (dragstart)="onPageBlockDragStart(pageBlocksKey, block.key)"
+                      (dragover)="onPageBlockDragOver($event)"
+                      (drop)="onPageBlockDrop(pageBlocksKey, block.key)"
+                    >
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="grid gap-1 min-w-0">
+                          <span class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                            {{ ('adminUi.home.sections.blocks.' + block.type) | translate }}
+                          </span>
+                          <span class="text-[11px] text-slate-500 dark:text-slate-400 truncate">{{ block.type }} · {{ block.key }}</span>
+                        </div>
+                        <div class="flex items-center gap-3 shrink-0">
+                          <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                            <input type="checkbox" [checked]="block.enabled" (change)="togglePageBlockEnabled(pageBlocksKey, block.key, $event)" />
+                            {{ 'adminUi.home.sections.enabled' | translate }}
+                          </label>
+                          <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.drag' | translate }}</span>
+                          <app-button size="sm" variant="ghost" [label]="'adminUi.actions.delete' | translate" (action)="removePageBlock(pageBlocksKey, block.key)"></app-button>
+                        </div>
+                      </div>
+
+                      <div class="mt-3 grid gap-3" *ngIf="block.enabled">
+                        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                          {{ 'adminUi.home.sections.fields.title' | translate }}
+                          <input
+                            class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                            [(ngModel)]="block.title[infoLang]"
+                          />
+                        </label>
+
+                        <ng-container [ngSwitch]="block.type">
+                          <ng-container *ngSwitchCase="'text'">
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.home.sections.fields.body' | translate }}
+                              <textarea
+                                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                rows="4"
+                                [(ngModel)]="block.body_markdown[infoLang]"
+                              ></textarea>
+                            </label>
+                            <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                              <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                                {{ 'adminUi.home.sections.fields.preview' | translate }}
+                              </summary>
+                              <div
+                                class="markdown mt-2 text-slate-700 dark:text-slate-200"
+                                [innerHTML]="renderMarkdown(block.body_markdown[infoLang] || '')"
+                              ></div>
+                            </details>
+                          </ng-container>
+
+                          <ng-container *ngSwitchCase="'image'">
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.home.sections.fields.imageUrl' | translate }}
+                              <input
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.url"
+                              />
+                            </label>
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.home.sections.fields.linkUrl' | translate }}
+                              <input
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.link_url"
+                              />
+                            </label>
+                            <div class="grid gap-3 sm:grid-cols-2">
+                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                {{ 'adminUi.home.sections.fields.alt' | translate }}
+                                <input
+                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  [(ngModel)]="block.alt[infoLang]"
+                                />
+                              </label>
+                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                {{ 'adminUi.home.sections.fields.caption' | translate }}
+                                <input
+                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  [(ngModel)]="block.caption[infoLang]"
+                                />
+                              </label>
+                            </div>
+                            <img
+                              *ngIf="(block.url || '').trim()"
+                              class="mt-2 w-full max-h-[260px] rounded-2xl border border-slate-200 object-cover dark:border-slate-800"
+                              [src]="block.url"
+                              [alt]="block.alt[infoLang] || block.title[infoLang] || ''"
+                              loading="lazy"
+                            />
+                            <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                              <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                                {{ 'adminUi.site.assets.library.title' | translate }}
+                              </summary>
+                              <div class="mt-3">
+                                <app-asset-library
+                                  [allowUpload]="true"
+                                  [allowSelect]="true"
+                                  [uploadKey]="pageBlocksKey"
+                                  [initialKey]="pageBlocksKey"
+                                  (select)="setPageImageBlockUrl(pageBlocksKey, block.key, $event)"
+                                ></app-asset-library>
+                              </div>
+                            </details>
+                          </ng-container>
+
+                          <ng-container *ngSwitchCase="'gallery'">
+                            <div class="flex items-center justify-between">
+                              <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                                {{ 'adminUi.home.sections.fields.gallery' | translate }}
+                              </p>
+                              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.add' | translate" (action)="addPageGalleryImage(pageBlocksKey, block.key)"></app-button>
+                            </div>
+                            <div *ngIf="block.images.length === 0" class="text-sm text-slate-500 dark:text-slate-400">
+                              {{ 'adminUi.home.sections.fields.galleryEmpty' | translate }}
+                            </div>
+                            <div *ngIf="block.images.length" class="grid gap-3">
+                              <div *ngFor="let img of block.images; let idx = index" class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
+                                <div class="flex items-center justify-between gap-2">
+                                  <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">{{ 'adminUi.home.sections.fields.image' | translate }} {{ idx + 1 }}</p>
+                                  <app-button size="sm" variant="ghost" [label]="'adminUi.actions.remove' | translate" (action)="removePageGalleryImage(pageBlocksKey, block.key, idx)"></app-button>
+                                </div>
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.sections.fields.imageUrl' | translate }}
+                                  <input
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="img.url"
+                                  />
+                                </label>
+                                <div class="grid gap-3 sm:grid-cols-2">
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.alt' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="img.alt[infoLang]"
+                                    />
+                                  </label>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.caption' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="img.caption[infoLang]"
+                                    />
+                                  </label>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                  <img
+                                    *ngIf="(img.url || '').trim()"
+                                    class="h-16 w-16 rounded-xl border border-slate-200 object-cover dark:border-slate-800"
+                                    [src]="img.url"
+                                    [alt]="img.alt[infoLang] || ''"
+                                    loading="lazy"
+                                  />
+                                </div>
+                              </div>
+
+                              <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                                <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                                  {{ 'adminUi.site.assets.library.title' | translate }}
+                                </summary>
+                                <div class="mt-3">
+                                  <app-asset-library
+                                    [allowUpload]="true"
+                                    [allowSelect]="true"
+                                    [uploadKey]="pageBlocksKey"
+                                    [initialKey]="pageBlocksKey"
+                                    (select)="addPageGalleryImageFromAsset(pageBlocksKey, block.key, $event)"
+                                  ></app-asset-library>
+                                </div>
+                              </details>
+                            </div>
+                          </ng-container>
+                        </ng-container>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="savePageBlocks(pageBlocksKey)"></app-button>
+                    <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="pageBlocksMessage[pageBlocksKey]">
+                      {{ pageBlocksMessage[pageBlocksKey] }}
+                    </span>
+                    <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="pageBlocksError[pageBlocksKey]">
+                      {{ pageBlocksError[pageBlocksKey] }}
+                    </span>
+                  </div>
+                </div>
+              </details>
 
               <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
                 <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
@@ -2072,10 +2306,23 @@ export class AdminComponent implements OnInit, OnDestroy {
   seoForm = { title: '', description: '' };
   seoMessage: string | null = null;
   seoError: string | null = null;
-  infoLang: 'en' | 'ro' = 'en';
-  infoForm = { about: '', faq: '', shipping: '', contact: '' };
+  infoLang: UiLang = 'en';
+  infoForm: { about: LocalizedText; faq: LocalizedText; shipping: LocalizedText; contact: LocalizedText } = {
+    about: { en: '', ro: '' },
+    faq: { en: '', ro: '' },
+    shipping: { en: '', ro: '' },
+    contact: { en: '', ro: '' }
+  };
   infoMessage: string | null = null;
   infoError: string | null = null;
+  pageBlocksKey: PageBuilderKey = 'page.about';
+  newPageBlockType: PageBlockType = 'text';
+  pageBlocks: Record<PageBuilderKey, PageBlockDraft[]> = { 'page.about': [], 'page.contact': [] };
+  pageBlocksMeta: Record<PageBuilderKey, Record<string, unknown>> = { 'page.about': {}, 'page.contact': {} };
+  pageBlocksMessage: Record<PageBuilderKey, string | null> = { 'page.about': null, 'page.contact': null };
+  pageBlocksError: Record<PageBuilderKey, string | null> = { 'page.about': null, 'page.contact': null };
+  draggingPageBlockKey: string | null = null;
+  draggingPageBlocksKey: PageBuilderKey | null = null;
   coupons: AdminCoupon[] = [];
   newCoupon: Partial<AdminCoupon> = { code: '', percentage_off: 0, active: true, currency: 'RON' };
   stockEdits: Record<string, number> = {};
@@ -3807,39 +4054,62 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    });
 	  }
 
-  selectInfoLang(lang: 'en' | 'ro'): void {
+  selectInfoLang(lang: UiLang): void {
     this.infoLang = lang;
-    this.loadInfo();
   }
 
   loadInfo(): void {
-    const loadKey = (key: string, target: 'about' | 'faq' | 'shipping' | 'contact') => {
-      this.admin.getContent(key, this.infoLang).subscribe({
-        next: (block) => {
-          this.rememberContentVersion(key, block);
-          this.infoForm[target] = block.body_markdown || '';
-        },
-        error: () => {
-          delete this.contentVersions[key];
-          this.infoForm[target] = '';
+    const loadKey = async (key: string, target: 'about' | 'faq' | 'shipping' | 'contact'): Promise<void> => {
+      const next: LocalizedText = { en: '', ro: '' };
+      let meta: Record<string, unknown> | null | undefined;
+
+      try {
+        const enBlock = await firstValueFrom(this.admin.getContent(key, 'en'));
+        this.rememberContentVersion(key, enBlock);
+        next.en = enBlock.body_markdown || '';
+        meta = (enBlock as { meta?: Record<string, unknown> | null }).meta;
+      } catch {
+        delete this.contentVersions[key];
+      }
+
+      try {
+        const roBlock = await firstValueFrom(this.admin.getContent(key, 'ro'));
+        next.ro = roBlock.body_markdown || '';
+        if (!meta) {
+          meta = (roBlock as { meta?: Record<string, unknown> | null }).meta;
         }
-      });
+      } catch {
+        // ignore
+      }
+
+      this.infoForm[target] = next;
+
+      if (key === 'page.about' || key === 'page.contact') {
+        const pageKey = key as PageBuilderKey;
+        const metaObj = (meta || {}) as Record<string, unknown>;
+        this.pageBlocksMeta[pageKey] = metaObj;
+        this.pageBlocks[pageKey] = this.parsePageBlocksDraft(metaObj);
+      }
     };
-    loadKey('page.about', 'about');
-    loadKey('page.faq', 'faq');
-    loadKey('page.shipping', 'shipping');
-    loadKey('page.contact', 'contact');
+
+    void loadKey('page.about', 'about');
+    void loadKey('page.faq', 'faq');
+    void loadKey('page.shipping', 'shipping');
+    void loadKey('page.contact', 'contact');
   }
 
 	  saveInfo(key: 'page.about' | 'page.faq' | 'page.shipping' | 'page.contact', body: string): void {
     this.infoMessage = null;
     this.infoError = null;
     const payload = {
-      title: key,
       body_markdown: body,
       status: 'published',
       lang: this.infoLang
 	    };
+    const createPayload = {
+      title: key,
+      ...payload
+    };
 	    const onSuccess = (block?: { version?: number } | null) => {
         this.rememberContentVersion(key, block);
 	      this.infoMessage = this.t('adminUi.site.pages.success.save');
@@ -3853,7 +4123,7 @@ export class AdminComponent implements OnInit, OnDestroy {
             this.infoMessage = null;
             return;
           }
-	        this.admin.createContent(key, payload).subscribe({
+	        this.admin.createContent(key, createPayload).subscribe({
 	          next: (created) => onSuccess(created),
 	          error: () => {
 	            this.infoError = this.t('adminUi.site.pages.errors.save');
@@ -3863,6 +4133,251 @@ export class AdminComponent implements OnInit, OnDestroy {
         }
 	    });
 	  }
+
+  private parsePageBlocksDraft(meta: Record<string, unknown> | null | undefined): PageBlockDraft[] {
+    const rawBlocks = meta?.['blocks'];
+    if (!Array.isArray(rawBlocks) || rawBlocks.length === 0) return [];
+
+    const configured: PageBlockDraft[] = [];
+    const seen = new Set<string>();
+
+    for (const [idx, raw] of rawBlocks.entries()) {
+      if (!raw || typeof raw !== 'object') continue;
+      const rec = raw as Record<string, unknown>;
+      const typeRaw = typeof rec['type'] === 'string' ? String(rec['type']).trim() : '';
+      if (typeRaw !== 'text' && typeRaw !== 'image' && typeRaw !== 'gallery') continue;
+      const key = typeof rec['key'] === 'string' ? String(rec['key']).trim() : '';
+      const finalKey = key || `${typeRaw}_${idx + 1}`;
+      if (!finalKey || seen.has(finalKey)) continue;
+      seen.add(finalKey);
+
+      const enabled = rec['enabled'] === false ? false : true;
+      const draft: PageBlockDraft = {
+        key: finalKey,
+        type: typeRaw,
+        enabled,
+        title: this.toLocalizedText(rec['title']),
+        body_markdown: this.emptyLocalizedText(),
+        url: '',
+        link_url: '',
+        alt: this.emptyLocalizedText(),
+        caption: this.emptyLocalizedText(),
+        images: []
+      };
+
+      if (typeRaw === 'text') {
+        draft.body_markdown = this.toLocalizedText(rec['body_markdown']);
+      } else if (typeRaw === 'image') {
+        draft.url = typeof rec['url'] === 'string' ? String(rec['url']).trim() : '';
+        draft.link_url = typeof rec['link_url'] === 'string' ? String(rec['link_url']).trim() : '';
+        draft.alt = this.toLocalizedText(rec['alt']);
+        draft.caption = this.toLocalizedText(rec['caption']);
+      } else if (typeRaw === 'gallery') {
+        const imagesRaw = rec['images'];
+        if (Array.isArray(imagesRaw)) {
+          for (const imgRaw of imagesRaw) {
+            if (!imgRaw || typeof imgRaw !== 'object') continue;
+            const imgRec = imgRaw as Record<string, unknown>;
+            const url = typeof imgRec['url'] === 'string' ? String(imgRec['url']).trim() : '';
+            if (!url) continue;
+            draft.images.push({
+              url,
+              alt: this.toLocalizedText(imgRec['alt']),
+              caption: this.toLocalizedText(imgRec['caption'])
+            });
+          }
+        }
+      }
+
+      configured.push(draft);
+    }
+
+    return configured;
+  }
+
+  addPageBlock(pageKey: PageBuilderKey): void {
+    const current = [...(this.pageBlocks[pageKey] || [])];
+    const type = this.newPageBlockType;
+    const existing = new Set(current.map((b) => b.key));
+    const base = `${type}_${Date.now()}`;
+    let key = base;
+    let suffix = 1;
+    while (existing.has(key)) {
+      key = `${base}_${suffix++}`;
+    }
+    current.push({
+      key,
+      type,
+      enabled: true,
+      title: this.emptyLocalizedText(),
+      body_markdown: this.emptyLocalizedText(),
+      url: '',
+      link_url: '',
+      alt: this.emptyLocalizedText(),
+      caption: this.emptyLocalizedText(),
+      images: []
+    });
+    this.pageBlocks[pageKey] = current;
+  }
+
+  removePageBlock(pageKey: PageBuilderKey, blockKey: string): void {
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).filter((b) => b.key !== blockKey);
+  }
+
+  togglePageBlockEnabled(pageKey: PageBuilderKey, blockKey: string, event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    const enabled = target?.checked !== false;
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => (b.key === blockKey ? { ...b, enabled } : b));
+  }
+
+  onPageBlockDragStart(pageKey: PageBuilderKey, blockKey: string): void {
+    this.draggingPageBlocksKey = pageKey;
+    this.draggingPageBlockKey = blockKey;
+  }
+
+  onPageBlockDragOver(event: DragEvent): void {
+    event.preventDefault();
+  }
+
+  onPageBlockDrop(pageKey: PageBuilderKey, targetKey: string): void {
+    if (!this.draggingPageBlocksKey || !this.draggingPageBlockKey) return;
+    if (this.draggingPageBlocksKey !== pageKey) return;
+    if (this.draggingPageBlockKey === targetKey) return;
+
+    const current = [...(this.pageBlocks[pageKey] || [])];
+    const from = current.findIndex((b) => b.key === this.draggingPageBlockKey);
+    const to = current.findIndex((b) => b.key === targetKey);
+    if (from === -1 || to === -1) return;
+
+    const [moved] = current.splice(from, 1);
+    current.splice(to, 0, moved);
+    this.pageBlocks[pageKey] = current;
+    this.draggingPageBlocksKey = null;
+    this.draggingPageBlockKey = null;
+  }
+
+  setPageImageBlockUrl(pageKey: PageBuilderKey, blockKey: string, url: string): void {
+    const value = (url || '').trim();
+    if (!value) return;
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => (b.key === blockKey ? { ...b, url: value } : b));
+    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+  }
+
+  addPageGalleryImage(pageKey: PageBuilderKey, blockKey: string): void {
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+      if (b.key !== blockKey || b.type !== 'gallery') return b;
+      return {
+        ...b,
+        images: [
+          ...b.images,
+          {
+            url: '',
+            alt: this.emptyLocalizedText(),
+            caption: this.emptyLocalizedText()
+          }
+        ]
+      };
+    });
+  }
+
+  addPageGalleryImageFromAsset(pageKey: PageBuilderKey, blockKey: string, url: string): void {
+    const value = (url || '').trim();
+    if (!value) return;
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+      if (b.key !== blockKey || b.type !== 'gallery') return b;
+      return {
+        ...b,
+        images: [
+          ...b.images,
+          {
+            url: value,
+            alt: this.emptyLocalizedText(),
+            caption: this.emptyLocalizedText()
+          }
+        ]
+      };
+    });
+    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+  }
+
+  removePageGalleryImage(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+      if (b.key !== blockKey || b.type !== 'gallery') return b;
+      const next = [...b.images];
+      next.splice(idx, 1);
+      return { ...b, images: next };
+    });
+  }
+
+  savePageBlocks(pageKey: PageBuilderKey): void {
+    this.pageBlocksMessage[pageKey] = null;
+    this.pageBlocksError[pageKey] = null;
+    const blocks = (this.pageBlocks[pageKey] || []).map((b) => {
+      const base: Record<string, unknown> = { key: b.key, type: b.type, enabled: b.enabled };
+      base['title'] = b.title;
+      if (b.type === 'text') {
+        base['body_markdown'] = b.body_markdown;
+      } else if (b.type === 'image') {
+        base['url'] = b.url;
+        base['link_url'] = b.link_url;
+        base['alt'] = b.alt;
+        base['caption'] = b.caption;
+      } else if (b.type === 'gallery') {
+        base['images'] = b.images.map((img) => ({ url: img.url, alt: img.alt, caption: img.caption }));
+      }
+      return base;
+    });
+
+    const meta = { ...(this.pageBlocksMeta[pageKey] || {}), blocks };
+    const payload: Record<string, unknown> = { meta };
+
+    const ok = this.t('adminUi.site.pages.builder.success.save');
+    const errMsg = this.t('adminUi.site.pages.builder.errors.save');
+
+    const reload = () => {
+      this.loadInfo();
+    };
+
+    this.admin.updateContentBlock(pageKey, this.withExpectedVersion(pageKey, payload)).subscribe({
+      next: (block) => {
+        this.rememberContentVersion(pageKey, block);
+        this.pageBlocksMeta[pageKey] = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
+        this.pageBlocksMessage[pageKey] = ok;
+        this.pageBlocksError[pageKey] = null;
+      },
+      error: (err) => {
+        if (this.handleContentConflict(err, pageKey, reload)) {
+          this.pageBlocksError[pageKey] = errMsg;
+          this.pageBlocksMessage[pageKey] = null;
+          return;
+        }
+        if (err?.status === 404) {
+          const body = (this.infoForm[pageKey === 'page.about' ? 'about' : 'contact']?.en || 'Page builder') as string;
+          const createPayload = {
+            title: pageKey,
+            body_markdown: body || 'Page builder',
+            status: 'published',
+            meta
+          };
+          this.admin.createContent(pageKey, createPayload).subscribe({
+            next: (created) => {
+              this.rememberContentVersion(pageKey, created);
+              this.pageBlocksMeta[pageKey] = ((created as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
+              this.pageBlocksMessage[pageKey] = ok;
+              this.pageBlocksError[pageKey] = null;
+            },
+            error: () => {
+              this.pageBlocksError[pageKey] = errMsg;
+              this.pageBlocksMessage[pageKey] = null;
+            }
+          });
+          return;
+        }
+        this.pageBlocksError[pageKey] = errMsg;
+        this.pageBlocksMessage[pageKey] = null;
+      }
+    });
+  }
 
   // Homepage hero
   selectHeroLang(lang: string): void {

@@ -8,6 +8,7 @@ import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { CardComponent } from '../../shared/card.component';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { MarkdownService } from '../../core/markdown.service';
+import { PageBlock, pageBlocksToPlainText, parsePageBlocks } from '../../shared/page-blocks';
 
 interface ContentImage {
   url: string;
@@ -17,6 +18,7 @@ interface ContentImage {
 interface ContentBlock {
   title: string;
   body_markdown: string;
+  meta?: Record<string, unknown> | null;
   images: ContentImage[];
 }
 
@@ -40,14 +42,77 @@ interface ContentBlock {
         </div>
 
         <div *ngIf="!loading() && !hasError() && block()" class="grid gap-5">
-          <img
-            *ngIf="block()!.images?.length"
-            [src]="block()!.images[0].url"
-            [alt]="block()!.images[0].alt_text || block()!.title"
-            class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
-            loading="lazy"
-          />
-          <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
+          <ng-container *ngIf="pageBlocks().length; else markdownContent">
+            <div class="grid gap-6">
+              <ng-container *ngFor="let b of pageBlocks()">
+                <ng-container [ngSwitch]="b.type">
+                  <div *ngSwitchCase="'text'" class="grid gap-2">
+                    <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                      {{ b.title }}
+                    </h2>
+                    <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="b.body_html"></div>
+                  </div>
+
+                  <div *ngSwitchCase="'image'" class="grid gap-2">
+                    <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                      {{ b.title }}
+                    </h2>
+                    <a
+                      *ngIf="b.link_url; else plainImage"
+                      class="block"
+                      [href]="b.link_url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <img
+                        [src]="b.url"
+                        [alt]="b.alt || b.title || ''"
+                        class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+                        loading="lazy"
+                      />
+                    </a>
+                    <ng-template #plainImage>
+                      <img
+                        [src]="b.url"
+                        [alt]="b.alt || b.title || ''"
+                        class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+                        loading="lazy"
+                      />
+                    </ng-template>
+                    <p *ngIf="b.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ b.caption }}</p>
+                  </div>
+
+                  <div *ngSwitchCase="'gallery'" class="grid gap-2">
+                    <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                      {{ b.title }}
+                    </h2>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                      <div *ngFor="let img of b.images" class="grid gap-2">
+                        <img
+                          [src]="img.url"
+                          [alt]="img.alt || b.title || ''"
+                          class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+                          loading="lazy"
+                        />
+                        <p *ngIf="img.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ img.caption }}</p>
+                      </div>
+                    </div>
+                  </div>
+                </ng-container>
+              </ng-container>
+            </div>
+          </ng-container>
+
+          <ng-template #markdownContent>
+            <img
+              *ngIf="block()!.images?.length"
+              [src]="block()!.images[0].url"
+              [alt]="block()!.images[0].alt_text || block()!.title"
+              class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+              loading="lazy"
+            />
+            <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
+          </ng-template>
         </div>
       </app-card>
     </app-container>
@@ -63,6 +128,7 @@ export class AboutComponent implements OnInit, OnDestroy {
   loading = signal<boolean>(true);
   hasError = signal<boolean>(false);
   bodyHtml = signal<string>('');
+  pageBlocks = signal<PageBlock[]>([]);
 
   private langSub?: Subscription;
 
@@ -86,18 +152,22 @@ export class AboutComponent implements OnInit, OnDestroy {
   private load(): void {
     this.loading.set(true);
     this.hasError.set(false);
+    this.pageBlocks.set([]);
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     this.api.get<ContentBlock>('/content/pages/about', { lang }).subscribe({
       next: (block) => {
         this.block.set(block);
         this.bodyHtml.set(this.markdown.render(block.body_markdown));
+        this.pageBlocks.set(parsePageBlocks(block.meta, lang, (md) => this.markdown.render(md)));
         this.loading.set(false);
         this.hasError.set(false);
-        this.setMetaTags(block.title, block.body_markdown);
+        const metaBody = this.pageBlocks().length ? pageBlocksToPlainText(this.pageBlocks()) : block.body_markdown;
+        this.setMetaTags(block.title, metaBody);
       },
       error: () => {
         this.block.set(null);
         this.bodyHtml.set('');
+        this.pageBlocks.set([]);
         this.loading.set(false);
         this.hasError.set(true);
         this.setMetaTags(this.translate.instant('about.metaTitle'), this.translate.instant('about.metaDescription'));
