@@ -13,9 +13,11 @@ from sqlalchemy.orm import selectinload
 
 from app.models.catalog import (
     Category,
+    CategoryTranslation,
     Product,
     ProductImage,
     ProductOption,
+    ProductTranslation,
     ProductVariant,
     ProductStatus,
     Tag,
@@ -27,11 +29,13 @@ from app.models.catalog import (
 )
 from app.schemas.catalog import (
     CategoryCreate,
+    CategoryTranslationUpsert,
     CategoryUpdate,
     CategoryReorderItem,
     CategoryRead,
     ProductCreate,
     ProductImageCreate,
+    ProductTranslationUpsert,
     ProductUpdate,
     ProductVariantCreate,
     BulkProductUpdateItem,
@@ -73,6 +77,117 @@ def apply_product_translation(product: Product, lang: str | None) -> None:
             product.meta_description = match.meta_description or product.meta_description
     if product.category:
         apply_category_translation(product.category, lang)
+
+
+async def list_category_translations(session: AsyncSession, category: Category) -> list[CategoryTranslation]:
+    rows = (
+        (
+            await session.execute(
+                select(CategoryTranslation)
+                .where(CategoryTranslation.category_id == category.id)
+                .order_by(CategoryTranslation.lang.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return list(rows)
+
+
+async def upsert_category_translation(
+    session: AsyncSession,
+    *,
+    category: Category,
+    lang: str,
+    payload: CategoryTranslationUpsert,
+) -> CategoryTranslation:
+    existing = await session.scalar(
+        select(CategoryTranslation).where(CategoryTranslation.category_id == category.id, CategoryTranslation.lang == lang)
+    )
+    if existing:
+        existing.name = payload.name
+        existing.description = payload.description
+        session.add(existing)
+        await session.commit()
+        await session.refresh(existing)
+        return existing
+
+    created = CategoryTranslation(category_id=category.id, lang=lang, name=payload.name, description=payload.description)
+    session.add(created)
+    await session.commit()
+    await session.refresh(created)
+    return created
+
+
+async def delete_category_translation(session: AsyncSession, *, category: Category, lang: str) -> None:
+    existing = await session.scalar(
+        select(CategoryTranslation).where(CategoryTranslation.category_id == category.id, CategoryTranslation.lang == lang)
+    )
+    if not existing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category translation not found")
+    await session.delete(existing)
+    await session.commit()
+
+
+async def list_product_translations(session: AsyncSession, product: Product) -> list[ProductTranslation]:
+    rows = (
+        (
+            await session.execute(
+                select(ProductTranslation)
+                .where(ProductTranslation.product_id == product.id)
+                .order_by(ProductTranslation.lang.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return list(rows)
+
+
+async def upsert_product_translation(
+    session: AsyncSession,
+    *,
+    product: Product,
+    lang: str,
+    payload: ProductTranslationUpsert,
+) -> ProductTranslation:
+    existing = await session.scalar(
+        select(ProductTranslation).where(ProductTranslation.product_id == product.id, ProductTranslation.lang == lang)
+    )
+    if existing:
+        existing.name = payload.name
+        existing.short_description = payload.short_description
+        existing.long_description = payload.long_description
+        existing.meta_title = payload.meta_title
+        existing.meta_description = payload.meta_description
+        session.add(existing)
+        await session.commit()
+        await session.refresh(existing)
+        return existing
+
+    created = ProductTranslation(
+        product_id=product.id,
+        lang=lang,
+        name=payload.name,
+        short_description=payload.short_description,
+        long_description=payload.long_description,
+        meta_title=payload.meta_title,
+        meta_description=payload.meta_description,
+    )
+    session.add(created)
+    await session.commit()
+    await session.refresh(created)
+    return created
+
+
+async def delete_product_translation(session: AsyncSession, *, product: Product, lang: str) -> None:
+    existing = await session.scalar(
+        select(ProductTranslation).where(ProductTranslation.product_id == product.id, ProductTranslation.lang == lang)
+    )
+    if not existing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product translation not found")
+    await session.delete(existing)
+    await session.commit()
 
 
 async def get_product_by_slug(

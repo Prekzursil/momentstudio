@@ -38,6 +38,17 @@ class CategoryRead(CategoryBase):
     sort_order: int
 
 
+class CategoryTranslationUpsert(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    description: str | None = None
+
+
+class CategoryTranslationRead(CategoryTranslationUpsert):
+    model_config = ConfigDict(from_attributes=True)
+
+    lang: str
+
+
 class ProductBase(BaseModel):
     category_id: UUID
     slug: str = Field(min_length=1, max_length=160)
@@ -225,6 +236,27 @@ class ProductUpdate(BaseModel):
         if value and "<script" in value.lower():
             raise ValueError("Invalid rich text content")
         return value
+
+
+class ProductTranslationUpsert(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    short_description: str | None = Field(default=None, max_length=280)
+    long_description: str | None = None
+    meta_title: str | None = Field(default=None, max_length=180)
+    meta_description: str | None = Field(default=None, max_length=300)
+
+    @field_validator("long_description")
+    @classmethod
+    def validate_long_description(cls, value: str | None):
+        if value and "<script" in value.lower():
+            raise ValueError("Invalid rich text content")
+        return value
+
+
+class ProductTranslationRead(ProductTranslationUpsert):
+    model_config = ConfigDict(from_attributes=True)
+
+    lang: str
 
 
 class BulkProductUpdateItem(BaseModel):

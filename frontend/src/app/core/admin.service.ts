@@ -103,6 +103,12 @@ export interface AdminCategory {
   sort_order?: number;
 }
 
+export interface AdminCategoryTranslation {
+  lang: 'en' | 'ro';
+  name: string;
+  description?: string | null;
+}
+
 export interface AdminProductDetail extends AdminProduct {
   short_description?: string | null;
   long_description?: string | null;
@@ -110,6 +116,15 @@ export interface AdminProductDetail extends AdminProduct {
   stock_quantity: number;
   images?: { id: string; url: string; alt_text?: string | null }[];
   tags?: string[];
+}
+
+export interface AdminProductTranslation {
+  lang: 'en' | 'ro';
+  name: string;
+  short_description?: string | null;
+  long_description?: string | null;
+  meta_title?: string | null;
+  meta_description?: string | null;
 }
 
 export interface AdminAudit {
@@ -338,6 +353,18 @@ export class AdminService {
     return this.api.post<AdminCategory>('/catalog/categories', payload);
   }
 
+  getCategoryTranslations(slug: string): Observable<AdminCategoryTranslation[]> {
+    return this.api.get<AdminCategoryTranslation[]>(`/catalog/categories/${slug}/translations`);
+  }
+
+  upsertCategoryTranslation(slug: string, lang: 'en' | 'ro', payload: { name: string; description?: string | null }): Observable<AdminCategoryTranslation> {
+    return this.api.put<AdminCategoryTranslation>(`/catalog/categories/${slug}/translations/${lang}`, payload);
+  }
+
+  deleteCategoryTranslation(slug: string, lang: 'en' | 'ro'): Observable<void> {
+    return this.api.delete<void>(`/catalog/categories/${slug}/translations/${lang}`);
+  }
+
   deleteCategory(slug: string): Observable<AdminCategory> {
     return this.api.delete<AdminCategory>(`/catalog/categories/${slug}`);
   }
@@ -348,6 +375,28 @@ export class AdminService {
 
   getProduct(slug: string): Observable<AdminProductDetail> {
     return this.api.get<AdminProductDetail>(`/catalog/products/${slug}`);
+  }
+
+  getProductTranslations(slug: string): Observable<AdminProductTranslation[]> {
+    return this.api.get<AdminProductTranslation[]>(`/catalog/products/${slug}/translations`);
+  }
+
+  upsertProductTranslation(
+    slug: string,
+    lang: 'en' | 'ro',
+    payload: {
+      name: string;
+      short_description?: string | null;
+      long_description?: string | null;
+      meta_title?: string | null;
+      meta_description?: string | null;
+    }
+  ): Observable<AdminProductTranslation> {
+    return this.api.put<AdminProductTranslation>(`/catalog/products/${slug}/translations/${lang}`, payload);
+  }
+
+  deleteProductTranslation(slug: string, lang: 'en' | 'ro'): Observable<void> {
+    return this.api.delete<void>(`/catalog/products/${slug}/translations/${lang}`);
   }
 
   createProduct(payload: Partial<AdminProductDetail>): Observable<AdminProductDetail> {

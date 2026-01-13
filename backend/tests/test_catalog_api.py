@@ -224,6 +224,76 @@ def test_catalog_admin_and_public_flows(test_app: Dict[str, object]) -> None:
     res = client.get("/api/v1/catalog/products")
     assert all(p["slug"] != "white-cup" for p in res.json()["items"])
 
+
+def test_catalog_translation_admin_endpoints(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token = create_admin_token(SessionLocal, email="translations-admin@example.com")
+
+    category_res = client.post(
+        "/api/v1/catalog/categories",
+        json={"slug": "t-cups", "name": "Cups"},
+        headers=auth_headers(admin_token),
+    )
+    assert category_res.status_code == 201, category_res.text
+    category_id = category_res.json()["id"]
+
+    product_res = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": category_id,
+            "slug": "t-blue-cup",
+            "name": "Blue Cup",
+            "base_price": 25.0,
+            "currency": "RON",
+            "stock_quantity": 10,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert product_res.status_code == 201, product_res.text
+
+    upsert_cat = client.put(
+        "/api/v1/catalog/categories/t-cups/translations/ro",
+        json={"name": "Căni", "description": "Colecție de căni"},
+        headers=auth_headers(admin_token),
+    )
+    assert upsert_cat.status_code == 200, upsert_cat.text
+    assert upsert_cat.json()["lang"] == "ro"
+    assert upsert_cat.json()["name"] == "Căni"
+
+    upsert_prod = client.put(
+        "/api/v1/catalog/products/t-blue-cup/translations/ro",
+        json={"name": "Cană Albastră", "short_description": "Albastru intens"},
+        headers=auth_headers(admin_token),
+    )
+    assert upsert_prod.status_code == 200, upsert_prod.text
+    assert upsert_prod.json()["lang"] == "ro"
+    assert upsert_prod.json()["name"] == "Cană Albastră"
+
+    list_prod_tr = client.get("/api/v1/catalog/products/t-blue-cup/translations", headers=auth_headers(admin_token))
+    assert list_prod_tr.status_code == 200, list_prod_tr.text
+    assert [t["lang"] for t in list_prod_tr.json()] == ["ro"]
+
+    ro_list = client.get("/api/v1/catalog/products?lang=ro&sort=name_asc")
+    assert ro_list.status_code == 200, ro_list.text
+    ro_items = ro_list.json()["items"]
+    assert ro_items[0]["slug"] == "t-blue-cup"
+    assert ro_items[0]["name"] == "Cană Albastră"
+    assert ro_items[0]["category"]["name"] == "Căni"
+
+    delete_prod = client.delete(
+        "/api/v1/catalog/products/t-blue-cup/translations/ro",
+        headers=auth_headers(admin_token),
+    )
+    assert delete_prod.status_code == 204, delete_prod.text
+
+    ro_list_after = client.get("/api/v1/catalog/products?lang=ro&sort=name_asc")
+    assert ro_list_after.status_code == 200
+    ro_items_after = ro_list_after.json()["items"]
+    assert ro_items_after[0]["name"] == "Blue Cup"
+
 def test_product_price_bounds(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
