@@ -667,6 +667,9 @@
           "required": "Slug and name are required.",
           "save": "Could not save collection."
         }
+      },
+      "story": {
+        "title": "Homepage story teaser"
       }
     },
     "blog": {
@@ -1096,6 +1099,25 @@
       "livePreview": "Live preview",
       "previewEmpty": "Nothing to preview yet.",
       "save": "Save content",
+      "revisions": {
+        "title": "Revisions",
+        "loading": "Loading revisions…",
+        "empty": "No revisions yet.",
+        "select": "Select revision",
+        "diffVsCurrent": "Diff vs current (v{{version}})",
+        "rollback": "Rollback",
+        "confirms": {
+          "rollback": "Rollback to version {{version}}? This will overwrite the current content."
+        },
+        "success": {
+          "rolledBack": "Rolled back"
+        },
+        "errors": {
+          "load": "Could not load revisions",
+          "loadVersion": "Could not load version",
+          "rollback": "Could not rollback"
+        }
+      },
       "errors": {
         "conflictTitle": "Edit conflict",
         "conflictCopy": "This content changed elsewhere. Reload and try again.",

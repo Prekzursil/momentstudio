@@ -35,6 +35,7 @@ import { MarkdownService } from '../../core/markdown.service';
 import { AuthService } from '../../core/auth.service';
 import { diffLines } from 'diff';
 import { formatIdentity } from '../../shared/user-identity';
+import { ContentRevisionsComponent } from './shared/content-revisions.component';
 
 type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
 
@@ -52,6 +53,7 @@ type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
     RichEditorComponent,
     LocalizedCurrencyPipe,
     SkeletonComponent,
+    ContentRevisionsComponent,
     TranslateModule
   ],
  template: `
@@ -299,6 +301,27 @@ type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
                 <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="infoMessage">{{ infoMessage }}</span>
                 <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="infoError">{{ infoError }}</span>
               </div>
+
+              <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.content.revisions.title' | translate }}
+                </summary>
+                <div class="mt-3 grid gap-3">
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.content.revisions.select' | translate }}
+                    <select
+                      class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [(ngModel)]="pagesRevisionKey"
+                    >
+                      <option [ngValue]="'page.about'">{{ 'adminUi.site.pages.aboutLabel' | translate }}</option>
+                      <option [ngValue]="'page.faq'">{{ 'adminUi.site.pages.faqLabel' | translate }}</option>
+                      <option [ngValue]="'page.shipping'">{{ 'adminUi.site.pages.shippingLabel' | translate }}</option>
+                      <option [ngValue]="'page.contact'">{{ 'adminUi.site.pages.contactLabel' | translate }}</option>
+                    </select>
+                  </label>
+                  <app-content-revisions [contentKey]="pagesRevisionKey" [titleKey]="pagesRevisionTitleKey()"></app-content-revisions>
+                </div>
+              </details>
             </div>
           </section>
 
@@ -367,6 +390,28 @@ type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
               </div>
             </div>
             <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="sectionsMessage">{{ sectionsMessage }}</span>
+          </section>
+
+          <section *ngIf="section() === 'home'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+              <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.content.revisions.title' | translate }}
+              </summary>
+              <div class="mt-3 grid gap-3">
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.content.revisions.select' | translate }}
+                  <select
+                    class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="homeRevisionKey"
+                  >
+                    <option [ngValue]="'home.hero'">{{ 'adminUi.home.hero.title' | translate }}</option>
+                    <option [ngValue]="'home.sections'">{{ 'adminUi.home.sections.title' | translate }}</option>
+                    <option [ngValue]="'home.story'">{{ 'adminUi.home.story.title' | translate }}</option>
+                  </select>
+                </label>
+                <app-content-revisions [contentKey]="homeRevisionKey" [titleKey]="homeRevisionTitleKey()"></app-content-revisions>
+              </div>
+            </details>
           </section>
 
           <section *ngIf="section() === 'home'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -1477,6 +1522,28 @@ type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
               </div>
             </div>
           </section>
+
+          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+              <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.content.revisions.title' | translate }}
+              </summary>
+              <div class="mt-3 grid gap-3">
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.content.revisions.select' | translate }}
+                  <select
+                    class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="settingsRevisionKey"
+                  >
+                    <option [ngValue]="'site.assets'">{{ 'adminUi.site.assets.title' | translate }}</option>
+                    <option [ngValue]="'site.social'">{{ 'adminUi.site.social.title' | translate }}</option>
+                    <option [ngValue]="'seo.' + seoPage">{{ ('adminUi.site.seo.title' | translate) + ' · ' + seoPage.toUpperCase() }}</option>
+                  </select>
+                </label>
+                <app-content-revisions [contentKey]="settingsRevisionKey" [titleKey]="settingsRevisionTitleKey()"></app-content-revisions>
+              </div>
+            </details>
+          </section>
         </div>
 	        <ng-template #loadingTpl>
 	          <div class="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -1496,6 +1563,10 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   private readonly contentVersions: Record<string, number> = {};
   private routeSub?: Subscription;
+
+  pagesRevisionKey = 'page.about';
+  homeRevisionKey = 'home.hero';
+  settingsRevisionKey = 'site.assets';
 
   summary = signal<AdminSummary | null>(null);
   loading = signal<boolean>(true);
@@ -1723,6 +1794,48 @@ export class AdminComponent implements OnInit, OnDestroy {
     delete this.contentVersions[key];
     reload();
     return true;
+  }
+
+  pagesRevisionTitleKey(): string {
+    switch (this.pagesRevisionKey) {
+      case 'page.about':
+        return 'adminUi.site.pages.aboutLabel';
+      case 'page.faq':
+        return 'adminUi.site.pages.faqLabel';
+      case 'page.shipping':
+        return 'adminUi.site.pages.shippingLabel';
+      case 'page.contact':
+        return 'adminUi.site.pages.contactLabel';
+      default:
+        return 'adminUi.content.revisions.title';
+    }
+  }
+
+  homeRevisionTitleKey(): string {
+    switch (this.homeRevisionKey) {
+      case 'home.hero':
+        return 'adminUi.home.hero.title';
+      case 'home.sections':
+        return 'adminUi.home.sections.title';
+      case 'home.story':
+        return 'adminUi.home.story.title';
+      default:
+        return 'adminUi.content.revisions.title';
+    }
+  }
+
+  settingsRevisionTitleKey(): string {
+    if ((this.settingsRevisionKey || '').startsWith('seo.')) {
+      return 'adminUi.site.seo.title';
+    }
+    switch (this.settingsRevisionKey) {
+      case 'site.assets':
+        return 'adminUi.site.assets.title';
+      case 'site.social':
+        return 'adminUi.site.social.title';
+      default:
+        return 'adminUi.content.revisions.title';
+    }
   }
 
   isOwner(): boolean {

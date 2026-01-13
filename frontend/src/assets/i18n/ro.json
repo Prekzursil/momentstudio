@@ -667,6 +667,9 @@
           "required": "Slug și nume sunt obligatorii.",
           "save": "Nu am putut salva colecția."
         }
+      },
+      "story": {
+        "title": "Secțiune poveste (teaser) pe homepage"
       }
     },
     "blog": {
@@ -1096,6 +1099,25 @@
       "livePreview": "Previzualizare live",
       "previewEmpty": "Nimic de previzualizat încă.",
       "save": "Salvează conținutul",
+      "revisions": {
+        "title": "Revizii",
+        "loading": "Se încarcă reviziile…",
+        "empty": "Nu există revizii încă.",
+        "select": "Alege revizia",
+        "diffVsCurrent": "Diferențe față de versiunea curentă (v{{version}})",
+        "rollback": "Revino",
+        "confirms": {
+          "rollback": "Revii la versiunea {{version}}? Conținutul curent va fi suprascris."
+        },
+        "success": {
+          "rolledBack": "S-a revenit"
+        },
+        "errors": {
+          "load": "Nu am putut încărca reviziile",
+          "loadVersion": "Nu am putut încărca versiunea",
+          "rollback": "Nu am putut reveni"
+        }
+      },
       "errors": {
         "conflictTitle": "Conflict de editare",
         "conflictCopy": "Conținutul s-a schimbat în altă parte. Reîncarcă și încearcă din nou.",
