@@ -31,6 +31,14 @@ type ProductForm = {
   is_highlight: boolean;
 };
 
+type ProductTranslationForm = {
+  name: string;
+  short_description: string;
+  long_description: string;
+  meta_title: string;
+  meta_description: string;
+};
+
 @Component({
   selector: 'app-admin-products',
   standalone: true,
@@ -259,19 +267,113 @@ type ProductForm = {
           </span>
         </label>
 
-        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-          {{ 'adminUi.products.form.description' | translate }}
-          <textarea
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-            rows="4"
-            [(ngModel)]="form.long_description"
-          ></textarea>
-        </label>
+	        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	          {{ 'adminUi.products.form.description' | translate }}
+	          <textarea
+	            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	            rows="4"
+	            [(ngModel)]="form.long_description"
+	          ></textarea>
+	        </label>
 
-        <div class="flex items-center gap-2">
-          <app-button [label]="'adminUi.products.form.save' | translate" (action)="save()"></app-button>
-          <span *ngIf="editorMessage()" class="text-sm text-emerald-700 dark:text-emerald-300">{{ editorMessage() }}</span>
-        </div>
+	        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
+	          <div class="grid gap-1">
+	            <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
+	              {{ 'adminUi.products.translations.title' | translate }}
+	            </h3>
+	            <p class="text-xs text-slate-500 dark:text-slate-400">
+	              {{ 'adminUi.products.translations.hint' | translate }}
+	            </p>
+	          </div>
+
+	          <div
+	            *ngIf="translationError()"
+	            class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+	          >
+	            {{ translationError() }}
+	          </div>
+
+	          <div class="grid gap-4 lg:grid-cols-2">
+	            <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	              <div class="flex items-center justify-between gap-3">
+	                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">RO</p>
+	                <div class="flex items-center gap-2">
+	                  <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="saveTranslation('ro')"></app-button>
+	                  <app-button
+	                    *ngIf="translationExists.ro"
+	                    size="sm"
+	                    variant="ghost"
+	                    [label]="'adminUi.actions.delete' | translate"
+	                    (action)="deleteTranslation('ro')"
+	                  ></app-button>
+	                </div>
+	              </div>
+
+	              <app-input [label]="'adminUi.products.table.name' | translate" [(value)]="translations.ro.name"></app-input>
+
+	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                {{ 'adminUi.products.form.shortDescription' | translate }}
+	                <textarea
+	                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                  rows="2"
+	                  maxlength="280"
+	                  [(ngModel)]="translations.ro.short_description"
+	                ></textarea>
+	              </label>
+
+	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                {{ 'adminUi.products.form.description' | translate }}
+	                <textarea
+	                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                  rows="4"
+	                  [(ngModel)]="translations.ro.long_description"
+	                ></textarea>
+	              </label>
+	            </div>
+
+	            <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	              <div class="flex items-center justify-between gap-3">
+	                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">EN</p>
+	                <div class="flex items-center gap-2">
+	                  <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="saveTranslation('en')"></app-button>
+	                  <app-button
+	                    *ngIf="translationExists.en"
+	                    size="sm"
+	                    variant="ghost"
+	                    [label]="'adminUi.actions.delete' | translate"
+	                    (action)="deleteTranslation('en')"
+	                  ></app-button>
+	                </div>
+	              </div>
+
+	              <app-input [label]="'adminUi.products.table.name' | translate" [(value)]="translations.en.name"></app-input>
+
+	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                {{ 'adminUi.products.form.shortDescription' | translate }}
+	                <textarea
+	                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                  rows="2"
+	                  maxlength="280"
+	                  [(ngModel)]="translations.en.short_description"
+	                ></textarea>
+	              </label>
+
+	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                {{ 'adminUi.products.form.description' | translate }}
+	                <textarea
+	                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                  rows="4"
+	                  [(ngModel)]="translations.en.long_description"
+	                ></textarea>
+	              </label>
+	            </div>
+	          </div>
+	        </div>
+
+	        <div class="flex items-center gap-2">
+	          <app-button [label]="'adminUi.products.form.save' | translate" (action)="save()"></app-button>
+	          <span *ngIf="editorMessage()" class="text-sm text-emerald-700 dark:text-emerald-300">{{ editorMessage() }}</span>
+	        </div>
 
         <div class="grid gap-3">
           <div class="flex items-center justify-between">
@@ -329,6 +431,14 @@ export class AdminProductsComponent implements OnInit {
 
   form: ProductForm = this.blankForm();
 
+  translationLoading = signal(false);
+  translationError = signal<string | null>(null);
+  translationExists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
+  translations: Record<'en' | 'ro', ProductTranslationForm> = {
+    en: this.blankTranslationForm(),
+    ro: this.blankTranslationForm()
+  };
+
   constructor(
     private productsApi: AdminProductsService,
     private catalog: CatalogService,
@@ -368,6 +478,7 @@ export class AdminProductsComponent implements OnInit {
     this.editorMessage.set(null);
     this.images.set([]);
     this.form = this.blankForm();
+    this.resetTranslations();
     const first = this.adminCategories()[0];
     if (first) this.form.category_id = first.id;
   }
@@ -378,6 +489,7 @@ export class AdminProductsComponent implements OnInit {
     this.editorError.set(null);
     this.editorMessage.set(null);
     this.images.set([]);
+    this.resetTranslations();
   }
 
   edit(slug: string): void {
@@ -385,6 +497,7 @@ export class AdminProductsComponent implements OnInit {
     this.editorError.set(null);
     this.editorMessage.set(null);
     this.editingSlug.set(slug);
+    this.resetTranslations();
     this.admin.getProduct(slug).subscribe({
       next: (prod: any) => {
         const basePrice = typeof prod.base_price === 'number' ? prod.base_price : Number(prod.base_price || 0);
@@ -405,6 +518,7 @@ export class AdminProductsComponent implements OnInit {
           is_highlight: Array.isArray(prod.tags) ? prod.tags.includes('highlight') : false
         };
         this.images.set(Array.isArray(prod.images) ? prod.images : []);
+        this.loadTranslations((prod.slug || slug).toString());
       },
       error: () => this.editorError.set(this.t('adminUi.products.errors.load'))
     });
@@ -436,9 +550,60 @@ export class AdminProductsComponent implements OnInit {
         const newSlug = (prod?.slug as string | undefined) || this.form.slug || slug || null;
         this.editingSlug.set(newSlug);
         this.images.set(Array.isArray(prod?.images) ? prod.images : this.images());
+        if (newSlug) this.loadTranslations(newSlug);
         this.load();
       },
       error: () => this.editorError.set(this.t('adminUi.products.errors.save'))
+    });
+  }
+
+  saveTranslation(lang: 'en' | 'ro'): void {
+    const slug = this.editingSlug();
+    if (!slug) return;
+    this.translationError.set(null);
+
+    const name = this.translations[lang].name.trim();
+    if (!name) {
+      this.toast.error(this.t('adminUi.products.translations.errors.nameRequired'));
+      return;
+    }
+
+    const payload = {
+      name,
+      short_description: this.translations[lang].short_description.trim()
+        ? this.translations[lang].short_description.trim().slice(0, 280)
+        : null,
+      long_description: this.translations[lang].long_description.trim() ? this.translations[lang].long_description.trim() : null
+    };
+
+    this.admin.upsertProductTranslation(slug, lang, payload).subscribe({
+      next: (updated) => {
+        this.translationExists[lang] = true;
+        this.translations[lang] = {
+          ...this.translations[lang],
+          name: updated.name || name,
+          short_description: (updated.short_description || '').toString(),
+          long_description: (updated.long_description || '').toString(),
+          meta_title: (updated.meta_title || '').toString(),
+          meta_description: (updated.meta_description || '').toString()
+        };
+        this.toast.success(this.t('adminUi.products.translations.success.save'));
+      },
+      error: () => this.translationError.set(this.t('adminUi.products.translations.errors.save'))
+    });
+  }
+
+  deleteTranslation(lang: 'en' | 'ro'): void {
+    const slug = this.editingSlug();
+    if (!slug) return;
+    this.translationError.set(null);
+    this.admin.deleteProductTranslation(slug, lang).subscribe({
+      next: () => {
+        this.translationExists[lang] = false;
+        this.translations[lang] = this.blankTranslationForm();
+        this.toast.success(this.t('adminUi.products.translations.success.delete'));
+      },
+      error: () => this.translationError.set(this.t('adminUi.products.translations.errors.delete'))
     });
   }
 
@@ -537,6 +702,55 @@ export class AdminProductsComponent implements OnInit {
       is_bestseller: false,
       is_highlight: false
     };
+  }
+
+  private blankTranslationForm(): ProductTranslationForm {
+    return {
+      name: '',
+      short_description: '',
+      long_description: '',
+      meta_title: '',
+      meta_description: ''
+    };
+  }
+
+  private resetTranslations(): void {
+    this.translationLoading.set(false);
+    this.translationError.set(null);
+    this.translationExists = { en: false, ro: false };
+    this.translations = { en: this.blankTranslationForm(), ro: this.blankTranslationForm() };
+  }
+
+  private loadTranslations(slug: string): void {
+    this.translationLoading.set(true);
+    this.translationError.set(null);
+    this.admin.getProductTranslations(slug).subscribe({
+      next: (items) => {
+        const mapped: Record<'en' | 'ro', ProductTranslationForm> = {
+          en: this.blankTranslationForm(),
+          ro: this.blankTranslationForm()
+        };
+        const exists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
+        for (const t of items || []) {
+          if (t.lang !== 'en' && t.lang !== 'ro') continue;
+          exists[t.lang] = true;
+          mapped[t.lang] = {
+            name: (t.name || '').toString(),
+            short_description: (t.short_description || '').toString(),
+            long_description: (t.long_description || '').toString(),
+            meta_title: (t.meta_title || '').toString(),
+            meta_description: (t.meta_description || '').toString()
+          };
+        }
+        this.translationExists = exists;
+        this.translations = mapped;
+        this.translationLoading.set(false);
+      },
+      error: () => {
+        this.translationError.set(this.t('adminUi.products.translations.errors.load'));
+        this.translationLoading.set(false);
+      }
+    });
   }
 
   private buildTags(): string[] {

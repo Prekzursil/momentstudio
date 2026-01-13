@@ -54,7 +54,26 @@
     "replyTime": "De obicei răspundem în 1–2 zile lucrătoare.",
     "followUs": "Urmărește-ne",
     "phoneLabel": "Telefon",
-    "emailLabel": "Email"
+    "emailLabel": "Email",
+    "form": {
+      "title": "Trimite un mesaj",
+      "topicLabel": "Subiect",
+      "topicContact": "General",
+      "topicSupport": "Suport",
+      "topicRefund": "Rambursare",
+      "topicDispute": "Dispută",
+      "nameLabel": "Nume",
+      "emailLabel": "Email",
+      "orderLabel": "Referință comandă (opțional)",
+      "orderPlaceholder": "ex. MS-12345",
+      "messageLabel": "Mesaj",
+      "messagePlaceholder": "Spune-ne cu ce te putem ajuta…",
+      "submit": "Trimite",
+      "sending": "Se trimite…",
+      "successTitle": "Mesaj trimis",
+      "successCopy": "Mulțumim! Revenim cu un răspuns cât de curând.",
+      "error": "Nu am putut trimite mesajul. Încearcă din nou."
+    }
   },
   "account": {
     "completeProfile": {
@@ -219,6 +238,15 @@
     "reviews": "{{count}} review-uri",
     "soldOut": "Stoc epuizat",
     "lowStock": "Stoc redus",
+    "notifyBackInStock": "Anunță-mă când revine în stoc",
+    "notifyRequested": "Solicitat",
+    "notifyCancel": "Anulează solicitarea",
+    "notifyRequiresSignInTitle": "Autentificare necesară",
+    "notifyRequiresSignInBody": "Autentifică-te pentru a solicita notificări când produsul revine în stoc.",
+    "notifyRequestedTitle": "Solicitare salvată",
+    "notifyRequestedBody": "Îți vom trimite email când {{name}} este disponibil.",
+    "notifyCanceledTitle": "Solicitare anulată",
+    "notifyCanceledBody": "Nu vei mai primi emailuri când {{name}} revine în stoc.",
     "handmade": "Colecție lucrată manual",
     "uniqueness": "Fiecare piesă este modelată și glazurată manual, astfel că variațiile de culoare și formă sunt intenționate. Fiecare articol este unic.",
     "variant": "Variantă",
@@ -390,7 +418,9 @@
       "dashboard": "Panou",
       "products": "Produse",
       "orders": "Comenzi",
+      "returns": "Retururi",
       "users": "Utilizatori",
+      "support": "Suport",
       "content": "Conținut"
     },
     "dashboardTitle": "Panou administrare",
@@ -419,7 +449,129 @@
       "save": "Salvează",
       "cancel": "Anulează",
       "edit": "Editează",
-      "refresh": "Reîncarcă"
+      "refresh": "Reîncarcă",
+      "copy": "Copiază",
+      "use": "Folosește",
+      "prev": "Anterior",
+      "next": "Înainte"
+    },
+    "support": {
+      "title": "Inbox suport",
+      "subtitle": "Mesaje trimise din formularul de contact.",
+      "filters": {
+        "search": "Caută",
+        "searchPlaceholder": "Email, nume, mesaj, referință…",
+        "topic": "Subiect",
+        "topicAll": "Toate",
+        "status": "Stare",
+        "statusAll": "Toate",
+        "apply": "Aplică"
+      },
+      "topics": {
+        "contact": "General",
+        "support": "Suport",
+        "refund": "Rambursare",
+        "dispute": "Dispută"
+      },
+      "status": {
+        "new": "Nou",
+        "triaged": "Triat",
+        "resolved": "Rezolvat"
+      },
+      "table": {
+        "date": "Data",
+        "topic": "Subiect",
+        "status": "Stare",
+        "from": "De la",
+        "order": "Comandă"
+      },
+      "empty": "Nu există mesaje.",
+      "pagination": "Pagina {{page}} din {{total}} · {{count}} total",
+      "prev": "Înapoi",
+      "next": "Înainte",
+      "detail": {
+        "title": "Mesaj",
+        "empty": "Selectează un mesaj pentru detalii.",
+        "meta": "Detalii",
+        "order": "Comandă",
+        "message": "Mesaj",
+        "statusLabel": "Stare",
+        "adminNote": "Notă admin",
+        "adminNotePlaceholder": "Notițe interne (nu sunt vizibile pentru client)…",
+        "save": "Salvează"
+      },
+      "success": {
+        "saved": "Salvat."
+      },
+      "errors": {
+        "load": "Nu am putut încărca mesajele.",
+        "loadDetail": "Nu am putut încărca detaliile mesajului.",
+        "save": "Nu am putut salva modificările."
+      }
+    },
+    "returns": {
+      "title": "Retururi",
+      "filters": {
+        "search": "Caută",
+        "searchPh": "Referință comandă, email, nume…",
+        "status": "Stare",
+        "statusAll": "Toate",
+        "apply": "Aplică"
+      },
+      "status": {
+        "requested": "Solicitat",
+        "approved": "Aprobat",
+        "rejected": "Respins",
+        "received": "Primit",
+        "refunded": "Rambursat",
+        "closed": "Închis"
+      },
+      "table": {
+        "date": "Data",
+        "status": "Stare",
+        "order": "Comandă",
+        "customer": "Client"
+      },
+      "empty": "Nu există cereri de retur.",
+      "pagination": "Pagina {{page}} din {{total}} · {{count}} total",
+      "prev": "Înapoi",
+      "next": "Înainte",
+      "detail": {
+        "title": "Cerere de retur",
+        "empty": "Selectează o cerere de retur pentru detalii.",
+        "order": "Comandă",
+        "status": "Stare",
+        "reason": "Motiv",
+        "customerMessage": "Mesaj client",
+        "items": "Produse",
+        "adminNote": "Notă admin",
+        "adminNotePh": "Notițe interne (vizibile doar staff-ului)…",
+        "save": "Salvează"
+      },
+      "success": {
+        "saved": "Salvat."
+      },
+      "errors": {
+        "load": "Nu am putut încărca cererile de retur.",
+        "loadDetail": "Nu am putut încărca cererea de retur.",
+        "save": "Nu am putut salva modificările."
+      },
+      "viewAllForOrder": "Vezi toate retururile pentru această comandă",
+      "create": {
+        "open": "Creează retur",
+        "title": "Creează cerere de retur",
+        "hint": "Selectează cantitățile și motivele. Clientul va primi un email.",
+        "reasonPh": "De ce dorește clientul returul?",
+        "customerMessagePh": "Mesaj de la client (opțional)…",
+        "qtyLabel": "Cantitate retur",
+        "reasonRequired": "Motivul este obligatoriu.",
+        "itemsRequired": "Selectează cel puțin un produs pentru retur.",
+        "create": "Creează",
+        "success": "Cerere de retur creată.",
+        "errors": {
+          "create": "Nu am putut crea cererea de retur."
+        }
+      }
     },
     "site": {
       "assets": {
@@ -429,7 +581,30 @@
         "socialImageUrl": "URL imagine socială",
         "save": "Salvează resursele",
         "success": { "save": "Resurse salvate." },
-        "errors": { "save": "Nu am putut salva resursele." }
+        "errors": { "save": "Nu am putut salva resursele." },
+        "library": {
+          "title": "Bibliotecă de imagini",
+          "hint": "Răsfoiește imaginile încărcate și reutilizează-le în pagini și setări.",
+          "search": "Caută",
+          "searchPlaceholder": "Caută după cheie, URL sau text alternativ…",
+          "scope": "Cheie",
+          "scopeAll": "Toate cheile",
+          "upload": "Încarcă imagine",
+          "uploadHint": "Încărcările sunt atașate la {{key}} pentru organizare.",
+          "loading": "Se încarcă imaginile…",
+          "empty": "Nu există imagini.",
+          "pagination": "Pagina {{page}} din {{total}}",
+          "success": {
+            "uploaded": "Încărcată.",
+            "copied": "Copiat în clipboard.",
+            "selected": "Selectată."
+          },
+          "errors": {
+            "load": "Nu am putut încărca imaginile.",
+            "upload": "Nu am putut încărca imaginea.",
+            "copy": "Nu am putut copia în clipboard."
+          }
+        }
       },
       "social": {
         "title": "Rețele sociale și contact",
@@ -480,6 +655,14 @@
         "saveShipping": "Salvează livrarea",
         "contactLabel": "Contact",
         "saveContact": "Salvează contactul",
+        "builder": {
+          "title": "Blocuri tip page builder",
+          "hint": "Opțional: construiește pagini mai bogate (Povestea noastră/Contact) din blocuri. Dacă există blocuri, magazinul le afișează în locul conținutului Markdown.",
+          "page": "Pagină",
+          "addBlock": "Adaugă bloc",
+          "success": { "save": "Blocurile au fost salvate." },
+          "errors": { "save": "Nu am putut salva blocurile." }
+        },
         "success": { "save": "Conținut salvat." },
         "errors": { "save": "Nu am putut salva conținutul." }
       }
@@ -504,8 +687,33 @@
       "sections": {
         "title": "Ordinea secțiunilor de pe homepage",
         "hint": "Trage pentru a reordona secțiunile și a comuta vizibilitatea.",
+        "addBlock": "Adaugă bloc personalizat",
+        "blocks": {
+          "hero": "Erou",
+          "featured_products": "Produse recomandate",
+          "new_arrivals": "Cele mai noi",
+          "featured_collections": "Colecții recomandate",
+          "story": "Povestea noastră",
+          "recently_viewed": "Văzute recent",
+          "why": "De ce",
+          "text": "Text",
+          "image": "Imagine",
+          "gallery": "Galerie"
+        },
         "enabled": "Activată",
         "drag": "trage",
+        "fields": {
+          "title": "Titlu",
+          "body": "Conținut (Markdown)",
+          "preview": "Previzualizare",
+          "imageUrl": "URL imagine",
+          "linkUrl": "URL link (opțional)",
+          "alt": "Text alternativ",
+          "caption": "Legendă (opțional)",
+          "gallery": "Imagini galerie",
+          "galleryEmpty": "Nu există imagini încă. Adaugă una pentru a afișa acest bloc.",
+          "image": "Imagine"
+        },
         "success": {
           "save": "Ordinea secțiunilor a fost salvată."
         },
@@ -528,6 +736,9 @@
           "required": "Slug și nume sunt obligatorii.",
           "save": "Nu am putut salva colecția."
         }
+      },
+      "story": {
+        "title": "Secțiune poveste (teaser) pe homepage"
       }
     },
     "blog": {
@@ -773,6 +984,20 @@
         "duplicate": "Nu am putut duplica produsul",
         "saveFirst": "Salvează produsul înainte de a încărca imagini"
       },
+      "translations": {
+        "title": "Traduceri",
+        "hint": "Suprascrieri opționale pe limbă. Dacă sunt goale, magazinul folosește câmpurile implicite.",
+        "success": {
+          "save": "Traducere salvată",
+          "delete": "Traducere eliminată"
+        },
+        "errors": {
+          "load": "Nu am putut încărca traducerile.",
+          "save": "Nu am putut salva traducerea.",
+          "delete": "Nu am putut șterge traducerea.",
+          "nameRequired": "Numele este obligatoriu pentru traduceri."
+        }
+      },
       "actions": {
         "create": "Creează",
         "update": "Actualizează",
@@ -784,6 +1009,22 @@
       "title": "Categorii",
       "add": "Adaugă categorie",
       "slug": "Slug",
+      "description": "Descriere",
+      "translations": {
+        "button": "Traduceri",
+        "title": "Traduceri",
+        "hint": "Suprascrieri opționale pe limbă afișate în magazin.",
+        "success": {
+          "save": "Traducere salvată",
+          "delete": "Traducere eliminată"
+        },
+        "errors": {
+          "load": "Nu am putut încărca traducerile.",
+          "save": "Nu am putut salva traducerea.",
+          "delete": "Nu am putut șterge traducerea.",
+          "nameRequired": "Numele este obligatoriu pentru traduceri."
+        }
+      },
       "success": {
         "add": "Categorie adăugată",
         "delete": "Categorie ștearsă",
@@ -811,6 +1052,16 @@
       "tracking": "Tracking",
       "updateStatus": "Actualizează status",
       "trackingNumber": "Număr tracking",
+      "trackingUrl": "Link tracking",
+      "trackingUrlPlaceholder": "https://tracking.example/...",
+      "shippingLabel": "Etichetă de livrare",
+      "shippingLabelChoose": "Alege fișier",
+      "shippingLabelNoFile": "Niciun fișier selectat",
+      "shippingLabelNone": "Nu există încă o etichetă încărcată.",
+      "shippingLabelUpload": "Încarcă",
+      "shippingLabelDownload": "Descarcă",
+      "shippingLabelDelete": "Șterge",
+      "confirmDeleteLabel": "Ștergi eticheta de livrare pentru această comandă?",
       "save": "Salvează modificările",
       "saveHint": "Actualizează statusul și tracking-ul; emailul se trimite la expediere.",
       "actionsTitle": "Acțiuni",
@@ -865,7 +1116,9 @@
         "capture": "Plata a fost capturată",
         "void": "Plata a fost anulată",
         "refund": "Rambursarea a fost solicitată",
-        "deliveryEmail": "Emailul de livrare a fost trimis"
+        "deliveryEmail": "Emailul de livrare a fost trimis",
+        "shippingLabelUpload": "Eticheta a fost încărcată",
+        "shippingLabelDelete": "Eticheta a fost ștearsă"
       },
       "errors": {
         "load": "Nu am putut încărca comenzile.",
@@ -876,7 +1129,10 @@
         "void": "Nu am putut anula plata.",
         "refund": "Nu am putut solicita rambursarea.",
         "deliveryEmail": "Nu am putut trimite emailul de livrare.",
-        "packingSlip": "Nu am putut descărca packing slip-ul."
+        "packingSlip": "Nu am putut descărca packing slip-ul.",
+        "shippingLabelUpload": "Nu am putut încărca eticheta.",
+        "shippingLabelDownload": "Nu am putut descărca eticheta.",
+        "shippingLabelDelete": "Nu am putut șterge eticheta."
       }
     },
     "users": {
@@ -942,6 +1198,25 @@
       "livePreview": "Previzualizare live",
       "previewEmpty": "Nimic de previzualizat încă.",
       "save": "Salvează conținutul",
+      "revisions": {
+        "title": "Revizii",
+        "loading": "Se încarcă reviziile…",
+        "empty": "Nu există revizii încă.",
+        "select": "Alege revizia",
+        "diffVsCurrent": "Diferențe față de versiunea curentă (v{{version}})",
+        "rollback": "Revino",
+        "confirms": {
+          "rollback": "Revii la versiunea {{version}}? Conținutul curent va fi suprascris."
+        },
+        "success": {
+          "rolledBack": "S-a revenit"
+        },
+        "errors": {
+          "load": "Nu am putut încărca reviziile",
+          "loadVersion": "Nu am putut încărca versiunea",
+          "rollback": "Nu am putut reveni"
+        }
+      },
       "errors": {
         "conflictTitle": "Conflict de editare",
         "conflictCopy": "Conținutul s-a schimbat în altă parte. Reîncarcă și încearcă din nou.",

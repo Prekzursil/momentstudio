@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     enforce_decimal_prices: bool = True
 
     media_root: str = "uploads"
+    private_media_root: str = "private_uploads"
     cors_origins: list[str] = ["http://localhost:4200"]
     cors_allow_credentials: bool = True
     cors_allow_methods: list[str] = ["*"]

@@ -32,3 +32,7 @@ class AdminOrderRead(OrderRead):
     customer_username: str | None = None
     shipping_address: AddressRead | None = None
     billing_address: AddressRead | None = None
+    tracking_url: str | None = None
+    shipping_label_filename: str | None = None
+    shipping_label_uploaded_at: datetime | None = None
+    has_shipping_label: bool = False

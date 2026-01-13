@@ -1,0 +1,164 @@
+from __future__ import annotations
+
+from uuid import UUID
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.dependencies import require_admin
+from app.db.session import get_session
+from app.models.returns import ReturnRequestStatus
+from app.models.user import User
+from app.schemas.admin_common import AdminPaginationMeta
+from app.schemas.returns import (
+    ReturnRequestCreate,
+    ReturnRequestListItem,
+    ReturnRequestListResponse,
+    ReturnRequestRead,
+    ReturnRequestUpdate,
+)
+from app.services import email as email_service
+from app.services import returns as returns_service
+
+router = APIRouter(prefix="/returns", tags=["returns"])
+
+
+@router.get("/admin", response_model=ReturnRequestListResponse)
+async def admin_list_returns(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+    q: str | None = Query(default=None),
+    status_filter: ReturnRequestStatus | None = Query(default=None),
+    order_id: UUID | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=25, ge=1, le=100),
+) -> ReturnRequestListResponse:
+    rows, total_items = await returns_service.list_return_requests(
+        session,
+        q=q,
+        status_filter=status_filter,
+        order_id=order_id,
+        page=page,
+        limit=limit,
+    )
+    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
+    return ReturnRequestListResponse(
+        items=[
+            ReturnRequestListItem(
+                id=r.id,
+                order_id=r.order_id,
+                order_reference=getattr(r.order, "reference_code", None),
+                customer_email=getattr(r.order, "customer_email", None),
+                customer_name=getattr(r.order, "customer_name", None),
+                status=r.status,
+                created_at=r.created_at,
+            )
+            for r in rows
+        ],
+        meta=AdminPaginationMeta(total_items=total_items, total_pages=total_pages, page=page, limit=limit),
+    )
+
+
+@router.get("/admin/{return_id}", response_model=ReturnRequestRead)
+async def admin_get_return(
+    return_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> ReturnRequestRead:
+    record = await returns_service.get_return_request(session, return_id)
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Return request not found")
+
+    payload = ReturnRequestRead.model_validate(record).model_dump()
+    payload["order_reference"] = getattr(record.order, "reference_code", None)
+    payload["customer_email"] = getattr(record.order, "customer_email", None)
+    payload["customer_name"] = getattr(record.order, "customer_name", None)
+    payload["items"] = [
+        {
+            "id": item.id,
+            "order_item_id": item.order_item_id,
+            "quantity": item.quantity,
+            "product_id": getattr(getattr(item.order_item, "product", None), "id", None) if getattr(item, "order_item", None) else None,
+            "product_name": getattr(getattr(item.order_item, "product", None), "name", None) if getattr(item, "order_item", None) else None,
+        }
+        for item in record.items
+    ]
+    return ReturnRequestRead(**payload)
+
+
+@router.get("/admin/by-order/{order_id}", response_model=list[ReturnRequestRead])
+async def admin_list_returns_for_order(
+    order_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> list[ReturnRequestRead]:
+    rows, _ = await returns_service.list_return_requests(session, order_id=order_id, page=1, limit=100)
+    out: list[ReturnRequestRead] = []
+    for r in rows:
+        detail = await returns_service.get_return_request(session, r.id)
+        if not detail:
+            continue
+        payload = ReturnRequestRead.model_validate(detail).model_dump()
+        payload["order_reference"] = getattr(detail.order, "reference_code", None)
+        payload["customer_email"] = getattr(detail.order, "customer_email", None)
+        payload["customer_name"] = getattr(detail.order, "customer_name", None)
+        payload["items"] = [
+            {
+                "id": item.id,
+                "order_item_id": item.order_item_id,
+                "quantity": item.quantity,
+                "product_id": getattr(getattr(item.order_item, "product", None), "id", None) if getattr(item, "order_item", None) else None,
+                "product_name": getattr(getattr(item.order_item, "product", None), "name", None) if getattr(item, "order_item", None) else None,
+            }
+            for item in detail.items
+        ]
+        out.append(ReturnRequestRead(**payload))
+    return out
+
+
+@router.post("/admin", response_model=ReturnRequestRead, status_code=status.HTTP_201_CREATED)
+async def admin_create_return(
+    payload: ReturnRequestCreate,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin),
+) -> ReturnRequestRead:
+    created = await returns_service.create_return_request(session, payload=payload, actor=admin)
+
+    to_email = getattr(created.order, "customer_email", None)
+    if to_email:
+        lang = created.user.preferred_language if getattr(created, "user", None) else None
+        background_tasks.add_task(email_service.send_return_request_created, to_email, created, lang=lang)
+
+    return await admin_get_return(created.id, session=session, _=admin)
+
+
+@router.patch("/admin/{return_id}", response_model=ReturnRequestRead)
+async def admin_update_return(
+    return_id: UUID,
+    payload: ReturnRequestUpdate,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin),
+) -> ReturnRequestRead:
+    record = await returns_service.get_return_request(session, return_id)
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Return request not found")
+
+    prev_status = ReturnRequestStatus(record.status)
+    updated = await returns_service.update_return_request(session, record=record, payload=payload, actor=admin)
+
+    next_status = ReturnRequestStatus(updated.status)
+    to_email = getattr(updated.order, "customer_email", None)
+    if to_email and next_status != prev_status:
+        lang = updated.user.preferred_language if getattr(updated, "user", None) else None
+        background_tasks.add_task(
+            email_service.send_return_request_status_update,
+            to_email,
+            updated,
+            previous_status=prev_status,
+            lang=lang,
+        )
+
+    return await admin_get_return(updated.id, session=session, _=admin)
+

@@ -76,6 +76,7 @@ class OrderCreate(BaseModel):
 class OrderUpdate(BaseModel):
     status: OrderStatus | None = None
     tracking_number: str | None = Field(default=None, max_length=50)
+    tracking_url: str | None = Field(default=None, max_length=255)
     shipping_method_id: UUID | None = None
     shipped_quantity: int | None = Field(default=None, ge=0)
 

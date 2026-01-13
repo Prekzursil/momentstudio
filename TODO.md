@@ -405,9 +405,15 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin UX: split `/admin/dashboard` into a dedicated component focused on metrics/owner ops (keep CMS elsewhere).
 - [x] Admin audit log UX: add filters (entity/user/action), pagination, and CSV export.
 - [x] E2E: extend Playwright coverage to CMS flows (home.sections edit, page updates, blog publish).
-- [ ] Support inbox: add contact form submissions (store + admin view) and route notifications to owner (email + in-app).
-- [ ] Returns/RMA: design and implement an admin workflow (create RMA, statuses, customer emails).
-- [ ] Shipping labels: add an admin workflow (provider integration or label upload + tracking association).
+- [x] Support inbox: add contact form submissions (store + admin view) and route notifications to owner (email + in-app).
+- [x] Returns/RMA: design and implement an admin workflow (create RMA, statuses, customer emails).
+- [x] Shipping labels: add an admin workflow (provider integration or label upload + tracking association).
+- [x] CMS UX: add revision history + rollback UI for ContentBlocks (home/pages/settings) and show diffs before restoring.
+- [x] CMS UX: introduce a visual homepage “page builder” via `home.sections` (blocks: text, image, gallery) with live preview and reordering.
+- [x] CMS UX: extend the page builder blocks to static pages (e.g., `page.about`, `page.contact`) beyond Markdown-only editing.
+- [x] CMS UX: add an asset library (upload/browse/reuse images) and allow selecting existing uploads for hero/page blocks.
+- [x] Admin i18n/content: expose RO/EN translation fields for products and categories (optional; fallback to available language).
+- [x] Storefront: add “Notify me when back in stock” UI on product detail (out-of-stock), wired to the back-in-stock request flow.
 
 ## UX, Performance, SEO & Accessibility
 - [x] Mobile-first responsive design across pages(full mobile compatibility).

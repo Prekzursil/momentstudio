@@ -310,6 +310,132 @@ async def send_blog_comment_reply_notification(
     return await send_email(to_email, subject, text_body, html_body)
 
 
+async def send_contact_submission_notification(
+    to_email: str,
+    *,
+    topic: str,
+    from_name: str,
+    from_email: str,
+    message: str,
+    order_reference: str | None = None,
+    admin_url: str | None = None,
+    lang: str | None = None,
+) -> bool:
+    lng = _lang_or_default(lang)
+    subject = "New contact submission" if lng == "en" else "Mesaj nou de contact"
+    if env is None:
+        lines = [
+            ("New contact submission" if lng == "en" else "Mesaj nou de contact"),
+            f"Topic: {topic}",
+            f"From: {from_name} <{from_email}>",
+        ]
+        if order_reference:
+            lines.append(f"Order: {order_reference}")
+        lines.append("")
+        lines.append(message)
+        if admin_url:
+            lines.extend(["", f"View in admin: {admin_url}"])
+        return await send_email(to_email, subject, "\n".join(lines))
+    text_body, html_body = render_template(
+        "contact_submission_admin.txt.j2",
+        {
+            "lang": lng,
+            "topic": topic,
+            "from_name": from_name,
+            "from_email": from_email,
+            "message": message,
+            "order_reference": order_reference,
+            "admin_url": admin_url,
+        },
+    )
+    return await send_email(to_email, subject, text_body, html_body)
+
+
+async def send_return_request_created(to_email: str, return_request, *, lang: str | None = None) -> bool:
+    lng = _lang_or_default(lang)
+    subject = "Return request created" if lng == "en" else "Cerere de retur creată"
+    order_ref = getattr(getattr(return_request, "order", None), "reference_code", None) or str(
+        getattr(return_request, "order_id", "")
+    )
+    customer_name = getattr(getattr(return_request, "order", None), "customer_name", None) or ""
+    items = []
+    for it in getattr(return_request, "items", []) or []:
+        order_item = getattr(it, "order_item", None)
+        product = getattr(order_item, "product", None) if order_item else None
+        items.append({"name": getattr(product, "name", None) or str(getattr(it, "order_item_id", "")), "quantity": it.quantity})
+
+    if env is None:
+        lines = [
+            ("Return request created" if lng == "en" else "Cerere de retur creată"),
+            f"Order: {order_ref}",
+        ]
+        if customer_name:
+            lines.append(f"Customer: {customer_name}")
+        lines.append("")
+        for row in items:
+            lines.append(f"- {row['name']} x{row['quantity']}")
+        lines.append("")
+        lines.append(getattr(return_request, "reason", "") or "")
+        return await send_email(to_email, subject, "\n".join(lines))
+
+    text_body, html_body = render_template(
+        "return_request_created.txt.j2",
+        {
+            "lang": lng,
+            "order_reference": order_ref,
+            "customer_name": customer_name,
+            "reason": getattr(return_request, "reason", None),
+            "customer_message": getattr(return_request, "customer_message", None),
+            "status": getattr(getattr(return_request, "status", None), "value", None) or str(getattr(return_request, "status", "")),
+            "items": items,
+            "account_url": f"{settings.frontend_origin.rstrip('/')}/account",
+        },
+    )
+    return await send_email(to_email, subject, text_body, html_body)
+
+
+async def send_return_request_status_update(
+    to_email: str,
+    return_request,
+    *,
+    previous_status,
+    lang: str | None = None,
+) -> bool:
+    lng = _lang_or_default(lang)
+    subject = "Return request update" if lng == "en" else "Actualizare cerere de retur"
+    order_ref = getattr(getattr(return_request, "order", None), "reference_code", None) or str(
+        getattr(return_request, "order_id", "")
+    )
+    customer_name = getattr(getattr(return_request, "order", None), "customer_name", None) or ""
+
+    if env is None:
+        lines = [
+            ("Return request update" if lng == "en" else "Actualizare cerere de retur"),
+            f"Order: {order_ref}",
+            f"Status: {getattr(previous_status, 'value', previous_status)} -> {getattr(getattr(return_request, 'status', None), 'value', getattr(return_request, 'status', ''))}",
+        ]
+        if customer_name:
+            lines.append(f"Customer: {customer_name}")
+        note = getattr(return_request, "admin_note", None)
+        if note:
+            lines.extend(["", note])
+        return await send_email(to_email, subject, "\n".join(lines))
+
+    text_body, html_body = render_template(
+        "return_request_status_update.txt.j2",
+        {
+            "lang": lng,
+            "order_reference": order_ref,
+            "customer_name": customer_name,
+            "previous_status": getattr(previous_status, "value", previous_status),
+            "status": getattr(getattr(return_request, "status", None), "value", None) or str(getattr(return_request, "status", "")),
+            "admin_note": getattr(return_request, "admin_note", None),
+            "account_url": f"{settings.frontend_origin.rstrip('/')}/account",
+        },
+    )
+    return await send_email(to_email, subject, text_body, html_body)
+
+
 def render_template(template_name: str, context: dict) -> tuple[str, str]:
     if env is None:
         body = str(context)

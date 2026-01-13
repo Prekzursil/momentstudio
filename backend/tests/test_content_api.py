@@ -69,7 +69,7 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     # Create
     create = client.post(
         "/api/v1/content/admin/home.hero",
-        json={"title": "Hero", "body_markdown": "Welcome!", "status": "published", "meta": {"headline": "Hero"}},
+        json={"title": "Hero", "body_markdown": "Welcome!", "status": "published", "meta": {"headline": "Hero"}, "lang": "en"},
         headers=auth_headers(admin_token),
     )
     assert create.status_code == 201, create.text
@@ -148,6 +148,20 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     )
     assert img_resp.status_code == 200
     assert len(img_resp.json()["images"]) == 1
+
+    assets = client.get("/api/v1/content/admin/assets/images", headers=auth_headers(admin_token))
+    assert assets.status_code == 200, assets.text
+    data = assets.json()
+    assert data["meta"]["total_items"] >= 1
+    assert any(item["content_key"] == "home.hero" for item in data["items"])
+
+    assets_filtered = client.get(
+        "/api/v1/content/admin/assets/images",
+        params={"key": "home.hero"},
+        headers=auth_headers(admin_token),
+    )
+    assert assets_filtered.status_code == 200, assets_filtered.text
+    assert all(item["content_key"] == "home.hero" for item in assets_filtered.json()["items"])
 
     # Audit log
     audit = client.get("/api/v1/content/admin/home.hero/audit", headers=auth_headers(admin_token))

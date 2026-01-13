@@ -120,6 +120,11 @@ export const routes: Routes = [
         title: 'Order | Admin | momentstudio'
       },
       {
+        path: 'returns',
+        loadComponent: () => import('./pages/admin/returns/admin-returns.component').then((m) => m.AdminReturnsComponent),
+        title: 'Returns | Admin | momentstudio'
+      },
+      {
         path: 'products',
         loadComponent: () => import('./pages/admin/products/admin-products.component').then((m) => m.AdminProductsComponent),
         title: 'Products | Admin | momentstudio'
@@ -128,6 +133,11 @@ export const routes: Routes = [
         path: 'users',
         loadComponent: () => import('./pages/admin/users/admin-users.component').then((m) => m.AdminUsersComponent),
         title: 'Users | Admin | momentstudio'
+      },
+      {
+        path: 'support',
+        loadComponent: () => import('./pages/admin/support/admin-support.component').then((m) => m.AdminSupportComponent),
+        title: 'Support | Admin | momentstudio'
       }
     ]
   },

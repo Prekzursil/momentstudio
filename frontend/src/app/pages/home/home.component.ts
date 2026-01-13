@@ -23,10 +23,42 @@ type HomeSectionId =
   | 'recently_viewed'
   | 'why';
 
-interface HomeSectionConfig {
-  id: HomeSectionId;
+type HomeBlockType = HomeSectionId | 'text' | 'image' | 'gallery';
+
+interface HomeBlockBase {
+  key: string;
+  type: HomeBlockType;
   enabled: boolean;
 }
+
+interface HomeTextBlock extends HomeBlockBase {
+  type: 'text';
+  title?: string | null;
+  body_html: string;
+}
+
+interface HomeImageBlock extends HomeBlockBase {
+  type: 'image';
+  title?: string | null;
+  url: string;
+  alt?: string | null;
+  caption?: string | null;
+  link_url?: string | null;
+}
+
+interface HomeGalleryImage {
+  url: string;
+  alt?: string | null;
+  caption?: string | null;
+}
+
+interface HomeGalleryBlock extends HomeBlockBase {
+  type: 'gallery';
+  title?: string | null;
+  images: HomeGalleryImage[];
+}
+
+type HomeBlock = HomeBlockBase | HomeTextBlock | HomeImageBlock | HomeGalleryBlock;
 
 interface ContentImage {
   url: string;
@@ -40,14 +72,14 @@ interface ContentBlockRead {
   images: ContentImage[];
 }
 
-const DEFAULT_SECTIONS: HomeSectionConfig[] = [
-  { id: 'hero', enabled: true },
-  { id: 'featured_products', enabled: true },
-  { id: 'new_arrivals', enabled: true },
-  { id: 'featured_collections', enabled: true },
-  { id: 'story', enabled: true },
-  { id: 'recently_viewed', enabled: true },
-  { id: 'why', enabled: true }
+const DEFAULT_BLOCKS: HomeBlock[] = [
+  { key: 'hero', type: 'hero', enabled: true },
+  { key: 'featured_products', type: 'featured_products', enabled: true },
+  { key: 'new_arrivals', type: 'new_arrivals', enabled: true },
+  { key: 'featured_collections', type: 'featured_collections', enabled: true },
+  { key: 'story', type: 'story', enabled: true },
+  { key: 'recently_viewed', type: 'recently_viewed', enabled: true },
+  { key: 'why', type: 'why', enabled: true }
 ];
 
 @Component({
@@ -56,8 +88,8 @@ const DEFAULT_SECTIONS: HomeSectionConfig[] = [
   imports: [CommonModule, ButtonComponent, CardComponent, ContainerComponent, ProductCardComponent, SkeletonComponent, TranslateModule],
   template: `
     <section class="grid gap-10">
-      <ng-container *ngFor="let section of enabledSections()">
-        <ng-container [ngSwitch]="section.id">
+      <ng-container *ngFor="let block of enabledBlocks()">
+        <ng-container [ngSwitch]="block.type">
           <ng-container *ngSwitchCase="'hero'">
             <div class="grid gap-6 lg:grid-cols-[1.2fr_1fr] items-center">
               <div class="grid gap-4">
@@ -211,6 +243,48 @@ const DEFAULT_SECTIONS: HomeSectionConfig[] = [
             </div>
           </ng-container>
 
+          <ng-container *ngSwitchCase="'text'">
+            <ng-container *ngIf="asTextBlock(block) as tb">
+              <div class="grid gap-4">
+                <h2 *ngIf="tb.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ tb.title }}</h2>
+                <app-card>
+                  <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="tb.body_html"></div>
+                </app-card>
+              </div>
+            </ng-container>
+          </ng-container>
+
+          <ng-container *ngSwitchCase="'image'">
+            <ng-container *ngIf="asImageBlock(block) as img">
+              <div class="grid gap-4">
+                <h2 *ngIf="img.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ img.title }}</h2>
+                <app-card>
+                  <a *ngIf="img.link_url; else imageOnly" [href]="img.link_url" class="block" target="_blank" rel="noopener noreferrer">
+                    <img class="w-full rounded-2xl object-cover" [src]="img.url" [alt]="img.alt || img.title || ''" loading="lazy" />
+                  </a>
+                  <ng-template #imageOnly>
+                    <img class="w-full rounded-2xl object-cover" [src]="img.url" [alt]="img.alt || img.title || ''" loading="lazy" />
+                  </ng-template>
+                  <p *ngIf="img.caption" class="mt-3 text-sm text-slate-600 dark:text-slate-300">{{ img.caption }}</p>
+                </app-card>
+              </div>
+            </ng-container>
+          </ng-container>
+
+          <ng-container *ngSwitchCase="'gallery'">
+            <ng-container *ngIf="asGalleryBlock(block) as gal">
+              <div class="grid gap-4">
+                <h2 *ngIf="gal.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ gal.title }}</h2>
+                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <app-card *ngFor="let image of gal.images">
+                    <img class="w-full rounded-2xl object-cover" [src]="image.url" [alt]="image.alt || gal.title || ''" loading="lazy" />
+                    <p *ngIf="image.caption" class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ image.caption }}</p>
+                  </app-card>
+                </div>
+              </div>
+            </ng-container>
+          </ng-container>
+
           <ng-container *ngSwitchCase="'recently_viewed'">
             <div *ngIf="recentlyViewed.length" class="grid gap-4">
               <div class="flex items-center justify-between">
@@ -248,7 +322,7 @@ const DEFAULT_SECTIONS: HomeSectionConfig[] = [
   `
 })
 export class HomeComponent implements OnInit, OnDestroy {
-  sections = signal<HomeSectionConfig[]>(DEFAULT_SECTIONS);
+  blocks = signal<HomeBlock[]>(DEFAULT_BLOCKS);
 
   heroBlock = signal<ContentBlockRead | null>(null);
   heroLoading = signal<boolean>(true);
@@ -273,7 +347,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   skeletons = Array.from({ length: 3 });
   readonly isAdmin = computed(() => this.auth.isAdmin());
-  readonly enabledSections = computed(() => this.sections().filter((s) => s.enabled));
+  readonly enabledBlocks = computed(() => this.blocks().filter((b) => b.enabled));
 
   private langSub?: Subscription;
 
@@ -306,25 +380,110 @@ export class HomeComponent implements OnInit, OnDestroy {
   private loadLayout(): void {
     this.api.get<ContentBlockRead>('/content/home.sections').subscribe({
       next: (block) => {
-        this.sections.set(this.parseSections(block.meta));
+        const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+        this.blocks.set(this.parseBlocks(block.meta, lang));
         this.loadSectionData();
       },
       error: () => {
-        this.sections.set(DEFAULT_SECTIONS);
+        this.blocks.set(DEFAULT_BLOCKS);
         this.loadSectionData();
       }
     });
   }
 
-  private parseSections(meta: ContentBlockRead['meta']): HomeSectionConfig[] {
-    const configured: HomeSectionConfig[] = [];
-    const seen = new Set<HomeSectionId>();
+  private parseBlocks(meta: ContentBlockRead['meta'], lang: 'en' | 'ro'): HomeBlock[] {
+    const configured: HomeBlock[] = [];
+    const seenKeys = new Set<string>();
 
+    const ensureUniqueKey = (raw: unknown, fallback: string): string | null => {
+      const key = (typeof raw === 'string' ? raw.trim() : '') || fallback;
+      if (!key) return null;
+      if (seenKeys.has(key)) return null;
+      seenKeys.add(key);
+      return key;
+    };
+
+    const readLocalized = (value: unknown): string | null => {
+      if (typeof value === 'string') return value.trim() || null;
+      if (!value || typeof value !== 'object') return null;
+      const record = value as Record<string, unknown>;
+      const preferred = typeof record[lang] === 'string' ? String(record[lang]).trim() : '';
+      if (preferred) return preferred;
+      const otherLang = lang === 'ro' ? 'en' : 'ro';
+      const fallback = typeof record[otherLang] === 'string' ? String(record[otherLang]).trim() : '';
+      return fallback || null;
+    };
+
+    const rawBlocks = meta?.['blocks'];
+    if (Array.isArray(rawBlocks) && rawBlocks.length) {
+      for (const raw of rawBlocks) {
+        if (!raw || typeof raw !== 'object') continue;
+        const rec = raw as Record<string, unknown>;
+        const typeRaw = typeof rec['type'] === 'string' ? String(rec['type']).trim() : '';
+        const enabledRaw = rec['enabled'];
+        const enabled = enabledRaw === false ? false : true;
+        const normalizedBuiltIn = this.normalizeHomeSectionId(typeRaw);
+
+        const type: HomeBlockType | null =
+          normalizedBuiltIn ||
+          (typeRaw === 'text' || typeRaw === 'image' || typeRaw === 'gallery' ? (typeRaw as HomeBlockType) : null);
+        if (!type) continue;
+
+        const key = ensureUniqueKey(rec['key'], type);
+        if (!key) continue;
+
+        if (type === 'text') {
+          const title = readLocalized(rec['title']);
+          const body = readLocalized(rec['body_markdown']) || '';
+          configured.push({ key, type, enabled, title, body_html: this.markdown.render(body) });
+          continue;
+        }
+        if (type === 'image') {
+          const url = typeof rec['url'] === 'string' ? rec['url'].trim() : '';
+          if (!url) continue;
+          configured.push({
+            key,
+            type,
+            enabled,
+            title: readLocalized(rec['title']),
+            url,
+            alt: readLocalized(rec['alt']),
+            caption: readLocalized(rec['caption']),
+            link_url: typeof rec['link_url'] === 'string' ? rec['link_url'].trim() : null
+          });
+          continue;
+        }
+        if (type === 'gallery') {
+          const imagesRaw = rec['images'];
+          const images: HomeGalleryImage[] = [];
+          if (Array.isArray(imagesRaw)) {
+            for (const imgRaw of imagesRaw) {
+              if (!imgRaw || typeof imgRaw !== 'object') continue;
+              const imgRec = imgRaw as Record<string, unknown>;
+              const url = typeof imgRec['url'] === 'string' ? imgRec['url'].trim() : '';
+              if (!url) continue;
+              images.push({ url, alt: readLocalized(imgRec['alt']), caption: readLocalized(imgRec['caption']) });
+            }
+          }
+          if (!images.length) continue;
+          configured.push({ key, type, enabled, title: readLocalized(rec['title']), images });
+          continue;
+        }
+
+        configured.push({ key, type, enabled });
+      }
+      if (configured.length) {
+        return this.ensureAllDefaultBlocks(configured);
+      }
+    }
+
+    const derived: HomeBlock[] = [];
+    const seen = new Set<HomeSectionId>();
     const addSection = (rawId: unknown, enabled: boolean) => {
       const id = this.normalizeHomeSectionId(rawId);
       if (!id || seen.has(id)) return;
       seen.add(id);
-      configured.push({ id, enabled });
+      derived.push({ key: id, type: id, enabled });
     };
 
     const rawSections = meta?.['sections'];
@@ -335,8 +494,8 @@ export class HomeComponent implements OnInit, OnDestroy {
         const enabled = (raw as { enabled?: unknown }).enabled;
         addSection(id, enabled === false ? false : true);
       }
-      if (configured.length) {
-        return configured;
+      if (derived.length) {
+        return this.ensureAllDefaultBlocks(derived);
       }
     }
 
@@ -345,12 +504,21 @@ export class HomeComponent implements OnInit, OnDestroy {
       for (const raw of legacyOrder) {
         addSection(raw, true);
       }
-      if (configured.length) {
-        return configured;
+      if (derived.length) {
+        return this.ensureAllDefaultBlocks(derived);
       }
     }
 
-    return DEFAULT_SECTIONS;
+    return DEFAULT_BLOCKS;
+  }
+
+  private ensureAllDefaultBlocks(blocks: HomeBlock[]): HomeBlock[] {
+    const out = [...blocks];
+    const existing = new Set(out.filter((b) => this.isHomeSectionId(b.type)).map((b) => b.type as HomeSectionId));
+    for (const id of DEFAULT_BLOCKS.filter((b) => this.isHomeSectionId(b.type)).map((b) => b.type as HomeSectionId)) {
+      if (!existing.has(id)) out.push({ key: id, type: id, enabled: true });
+    }
+    return out;
   }
 
   private isHomeSectionId(value: unknown): value is HomeSectionId {
@@ -385,12 +553,28 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   private loadSectionData(): void {
-    const ids = new Set(this.enabledSections().map((s) => s.id));
+    const ids = new Set(
+      this.enabledBlocks()
+        .map((b) => (this.isHomeSectionId(b.type) ? (b.type as HomeSectionId) : null))
+        .filter((x): x is HomeSectionId => Boolean(x))
+    );
     if (ids.has('hero')) this.loadHero();
     if (ids.has('featured_products')) this.loadFeatured();
     if (ids.has('new_arrivals')) this.loadNewArrivals();
     if (ids.has('featured_collections')) this.loadCollections();
     if (ids.has('story')) this.loadStory();
+  }
+
+  asTextBlock(block: HomeBlock): HomeTextBlock | null {
+    return block.type === 'text' ? (block as HomeTextBlock) : null;
+  }
+
+  asImageBlock(block: HomeBlock): HomeImageBlock | null {
+    return block.type === 'image' ? (block as HomeImageBlock) : null;
+  }
+
+  asGalleryBlock(block: HomeBlock): HomeGalleryBlock | null {
+    return block.type === 'gallery' ? (block as HomeGalleryBlock) : null;
   }
 
   loadFeatured(): void {

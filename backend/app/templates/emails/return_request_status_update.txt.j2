@@ -1,0 +1,34 @@
+{% if lang == "ro" -%}
+Actualizare cerere de retur pentru comanda: {{ order_reference }}
+{% else -%}
+Return request update for order: {{ order_reference }}
+{% endif %}
+
+{% if customer_name -%}
+{% if lang == "ro" -%}
+Client: {{ customer_name }}
+{% else -%}
+Customer: {{ customer_name }}
+{% endif %}
+{% endif %}
+
+{% if lang == "ro" -%}
+Status: {{ previous_status }} → {{ status }}
+{% else -%}
+Status: {{ previous_status }} → {{ status }}
+{% endif %}
+
+{% if admin_note -%}
+{% if lang == "ro" -%}
+Notă: {{ admin_note }}
+{% else -%}
+Note: {{ admin_note }}
+{% endif %}
+{% endif %}
+
+{% if lang == "ro" -%}
+Cont: {{ account_url }}
+{% else -%}
+Account: {{ account_url }}
+{% endif %}
+

@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.content import ContentStatus
+from app.schemas.catalog import PaginationMeta
 
 
 class ContentBlockBase(BaseModel):
@@ -71,6 +72,20 @@ class ContentImageRead(BaseModel):
     url: str
     alt_text: str | None = None
     sort_order: int
+
+
+class ContentImageAssetRead(BaseModel):
+    id: UUID
+    url: str
+    alt_text: str | None = None
+    sort_order: int
+    created_at: datetime
+    content_key: str
+
+
+class ContentImageAssetListResponse(BaseModel):
+    items: list[ContentImageAssetRead]
+    meta: PaginationMeta
 
 
 class ContentBlockVersionListItem(BaseModel):

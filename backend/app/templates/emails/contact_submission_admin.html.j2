@@ -1,0 +1,34 @@
+<h2 style="margin:0 0 12px 0;">
+  {% if lang == "ro" %}Mesaj nou de contact{% else %}New contact submission{% endif %}
+</h2>
+
+<p style="margin:0 0 8px 0;">
+  <strong>{% if lang == "ro" %}Tip{% else %}Topic{% endif %}:</strong>
+  {{ topic }}
+</p>
+
+<p style="margin:0 0 8px 0;">
+  <strong>{% if lang == "ro" %}De la{% else %}From{% endif %}:</strong>
+  {{ from_name }} &lt;{{ from_email }}&gt;
+</p>
+
+{% if order_reference %}
+  <p style="margin:0 0 8px 0;">
+    <strong>{% if lang == "ro" %}Comandă{% else %}Order{% endif %}:</strong>
+    {{ order_reference }}
+  </p>
+{% endif %}
+
+<hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0;" />
+
+<pre style="white-space:pre-wrap;margin:0;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">
+{{ message }}
+</pre>
+
+{% if admin_url %}
+  <p style="margin:16px 0 0 0;">
+    <a href="{{ admin_url }}">
+      {% if lang == "ro" %}Deschide în admin{% else %}Open in admin{% endif %}
+    </a>
+  </p>
+{% endif %}
