@@ -29,6 +29,8 @@ def _ensure_utc(dt: datetime | None) -> datetime | None:
 def _apply_content_translation(block: ContentBlock, lang: str | None) -> None:
     if not lang or not getattr(block, "translations", None):
         return
+    if block.lang and lang == block.lang:
+        return
     match = next((t for t in block.translations if t.lang == lang), None)
     if match:
         block.title = match.title
@@ -129,8 +131,9 @@ async def upsert_block(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Content has changed (expected version {expected_version}, found {block.version})",
         )
-    # If lang is provided, upsert translation instead of touching the base content
-    if lang:
+    # If lang is provided and differs from the base language, upsert a translation instead of touching base content.
+    # Admin UI often sends lang for base edits (e.g. en), so we treat lang==block.lang (or unset base lang) as base update.
+    if lang and block.lang and lang != block.lang:
         await session.refresh(block, attribute_names=["translations"])
         translation = next((t for t in block.translations if t.lang == lang), None)
         if translation:

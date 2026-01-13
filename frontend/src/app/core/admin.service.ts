@@ -217,6 +217,20 @@ export interface ContentBlockVersionRead extends ContentBlockVersionListItem {
   translations?: ContentTranslationSnapshot[] | null;
 }
 
+export interface ContentImageAssetRead {
+  id: string;
+  url: string;
+  alt_text?: string | null;
+  sort_order: number;
+  created_at: string;
+  content_key: string;
+}
+
+export interface ContentImageAssetListResponse {
+  items: ContentImageAssetRead[];
+  meta: { total_items: number; total_pages: number; page: number; limit: number };
+}
+
 export interface ContentSavePayload {
   title?: string;
   body_markdown?: string;
@@ -427,6 +441,10 @@ export class AdminService {
 
   rollbackContentVersion(key: string, version: number): Observable<ContentBlock> {
     return this.api.post<ContentBlock>(`/content/admin/${key}/versions/${version}/rollback`, {});
+  }
+
+  listContentImages(params?: { key?: string; q?: string; page?: number; limit?: number }): Observable<ContentImageAssetListResponse> {
+    return this.api.get<ContentImageAssetListResponse>('/content/admin/assets/images', params as any);
   }
 
   fetchSocialThumbnail(url: string): Observable<SocialThumbnailResponse> {

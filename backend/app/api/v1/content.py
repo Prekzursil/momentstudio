@@ -1,16 +1,18 @@
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Query
-from sqlalchemy import select
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.dependencies import get_session, require_admin
-from app.models.content import ContentBlockVersion
+from app.models.content import ContentBlock, ContentBlockVersion, ContentImage
 from app.schemas.content import (
     ContentAuditRead,
     ContentBlockCreate,
     ContentBlockRead,
     ContentBlockUpdate,
+    ContentImageAssetListResponse,
+    ContentImageAssetRead,
     ContentBlockVersionListItem,
     ContentBlockVersionRead,
 )
@@ -108,9 +110,70 @@ async def admin_upload_content_image(
 ) -> ContentBlockRead:
     block = await content_service.get_block_by_key(session, key, lang=lang)
     if not block:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+        # Allow uploads to implicitly create the content bucket for convenience (admin-only).
+        create_payload = ContentBlockCreate(
+            title=key,
+            body_markdown="Asset bucket",
+            status="draft",
+            lang=lang,
+            meta={},
+        )
+        block = await content_service.upsert_block(session, key, create_payload, actor_id=admin.id)
     block = await content_service.add_image(session, block, file, actor_id=admin.id)
     return block
+
+
+@router.get("/admin/assets/images", response_model=ContentImageAssetListResponse)
+async def admin_list_content_images(
+    session: AsyncSession = Depends(get_session),
+    key: str | None = Query(default=None, description="Filter by content block key"),
+    q: str | None = Query(default=None, description="Search content key, URL, or alt text"),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=24, ge=1, le=100),
+    _: str = Depends(require_admin),
+) -> ContentImageAssetListResponse:
+    filters = []
+    if key:
+        filters.append(ContentBlock.key == key)
+    if q:
+        needle = f"%{q.strip()}%"
+        filters.append(
+            or_(
+                ContentBlock.key.ilike(needle),
+                ContentImage.url.ilike(needle),
+                ContentImage.alt_text.ilike(needle),
+            )
+        )
+
+    total = await session.scalar(select(func.count()).select_from(ContentImage).join(ContentBlock).where(*filters))
+    total_items = int(total or 0)
+    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
+    offset = (page - 1) * limit
+
+    result = await session.execute(
+        select(ContentImage, ContentBlock.key)
+        .join(ContentBlock)
+        .where(*filters)
+        .order_by(ContentImage.created_at.desc(), ContentImage.id.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    items: list[ContentImageAssetRead] = []
+    for img, block_key in result.all():
+        items.append(
+            ContentImageAssetRead(
+                id=img.id,
+                url=img.url,
+                alt_text=img.alt_text,
+                sort_order=img.sort_order,
+                created_at=img.created_at,
+                content_key=block_key,
+            )
+        )
+    return ContentImageAssetListResponse(
+        items=items,
+        meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
+    )
 
 
 @router.get("/admin/{key}/preview", response_model=ContentBlockRead)

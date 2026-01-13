@@ -36,6 +36,7 @@ import { AuthService } from '../../core/auth.service';
 import { diffLines } from 'diff';
 import { formatIdentity } from '../../shared/user-identity';
 import { ContentRevisionsComponent } from './shared/content-revisions.component';
+import { AssetLibraryComponent } from './shared/asset-library.component';
 
 type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
 
@@ -54,6 +55,7 @@ type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
     LocalizedCurrencyPipe,
     SkeletonComponent,
     ContentRevisionsComponent,
+    AssetLibraryComponent,
     TranslateModule
   ],
  template: `
@@ -78,6 +80,15 @@ type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
               <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="assetsMessage">{{ assetsMessage }}</span>
               <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="assetsError">{{ assetsError }}</span>
             </div>
+
+            <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+              <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.site.assets.library.title' | translate }}
+              </summary>
+              <div class="mt-3">
+                <app-asset-library [initialKey]="'site.assets'" [allowSelect]="false"></app-asset-library>
+              </div>
+            </details>
           </section>
 
 	          <section *ngIf="section() === 'settings'" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -354,6 +365,19 @@ type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
               <app-input [label]="'adminUi.home.hero.ctaUrl' | translate" [(value)]="heroForm.cta_url"></app-input>
               <app-input [label]="'adminUi.home.hero.imageUrl' | translate" [(value)]="heroForm.image"></app-input>
             </div>
+            <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+              <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.site.assets.library.title' | translate }}
+              </summary>
+              <div class="mt-3">
+                <app-asset-library
+                  [allowUpload]="false"
+                  [allowSelect]="true"
+                  [initialKey]="'site.assets'"
+                  (select)="onHeroImageSelected($event)"
+                ></app-asset-library>
+              </div>
+            </details>
             <div class="flex gap-2">
               <app-button [label]="'adminUi.actions.save' | translate" (action)="saveHero()"></app-button>
               <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="heroMessage()">{{ heroMessage() }}</span>
@@ -3507,6 +3531,13 @@ export class AdminComponent implements OnInit, OnDestroy {
         handleError();
       }
     });
+  }
+
+  onHeroImageSelected(url: string): void {
+    const value = (url || '').trim();
+    if (!value) return;
+    this.heroForm.image = value;
+    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
   }
 
   // Sections ordering

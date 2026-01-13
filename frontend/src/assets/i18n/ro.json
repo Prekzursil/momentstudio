@@ -440,7 +440,11 @@
       "save": "Salvează",
       "cancel": "Anulează",
       "edit": "Editează",
-      "refresh": "Reîncarcă"
+      "refresh": "Reîncarcă",
+      "copy": "Copiază",
+      "use": "Folosește",
+      "prev": "Anterior",
+      "next": "Înainte"
     },
     "support": {
       "title": "Inbox suport",
@@ -568,7 +572,30 @@
         "socialImageUrl": "URL imagine socială",
         "save": "Salvează resursele",
         "success": { "save": "Resurse salvate." },
-        "errors": { "save": "Nu am putut salva resursele." }
+        "errors": { "save": "Nu am putut salva resursele." },
+        "library": {
+          "title": "Bibliotecă de imagini",
+          "hint": "Răsfoiește imaginile încărcate și reutilizează-le în pagini și setări.",
+          "search": "Caută",
+          "searchPlaceholder": "Caută după cheie, URL sau text alternativ…",
+          "scope": "Cheie",
+          "scopeAll": "Toate cheile",
+          "upload": "Încarcă imagine",
+          "uploadHint": "Încărcările sunt atașate la {{key}} pentru organizare.",
+          "loading": "Se încarcă imaginile…",
+          "empty": "Nu există imagini.",
+          "pagination": "Pagina {{page}} din {{total}}",
+          "success": {
+            "uploaded": "Încărcată.",
+            "copied": "Copiat în clipboard.",
+            "selected": "Selectată."
+          },
+          "errors": {
+            "load": "Nu am putut încărca imaginile.",
+            "upload": "Nu am putut încărca imaginea.",
+            "copy": "Nu am putut copia în clipboard."
+          }
+        }
       },
       "social": {
         "title": "Rețele sociale și contact",

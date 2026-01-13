@@ -440,7 +440,11 @@
       "save": "Save",
       "cancel": "Cancel",
       "edit": "Edit",
-      "refresh": "Refresh"
+      "refresh": "Refresh",
+      "copy": "Copy",
+      "use": "Use",
+      "prev": "Prev",
+      "next": "Next"
     },
     "support": {
       "title": "Support inbox",
@@ -568,7 +572,30 @@
         "socialImageUrl": "Social image URL",
         "save": "Save assets",
         "success": { "save": "Assets saved." },
-        "errors": { "save": "Could not save assets." }
+        "errors": { "save": "Could not save assets." },
+        "library": {
+          "title": "Asset library",
+          "hint": "Browse uploaded images and reuse them across pages and settings.",
+          "search": "Search",
+          "searchPlaceholder": "Search by key, URL, or alt text…",
+          "scope": "Scope",
+          "scopeAll": "All keys",
+          "upload": "Upload image",
+          "uploadHint": "Uploads are attached to {{key}} for easy organization.",
+          "loading": "Loading assets…",
+          "empty": "No images found.",
+          "pagination": "Page {{page}} of {{total}}",
+          "success": {
+            "uploaded": "Uploaded.",
+            "copied": "Copied to clipboard.",
+            "selected": "Selected."
+          },
+          "errors": {
+            "load": "Could not load assets.",
+            "upload": "Could not upload image.",
+            "copy": "Could not copy to clipboard."
+          }
+        }
       },
       "social": {
         "title": "Social & contact",
