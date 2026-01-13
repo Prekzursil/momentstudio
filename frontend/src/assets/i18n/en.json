@@ -967,6 +967,20 @@
         "duplicate": "Could not duplicate product",
         "saveFirst": "Save product before uploading images"
       },
+      "translations": {
+        "title": "Translations",
+        "hint": "Optional per-language overrides. If empty, the storefront falls back to the default fields.",
+        "success": {
+          "save": "Translation saved",
+          "delete": "Translation removed"
+        },
+        "errors": {
+          "load": "Could not load translations.",
+          "save": "Could not save translation.",
+          "delete": "Could not delete translation.",
+          "nameRequired": "Name is required for translations."
+        }
+      },
       "actions": {
         "create": "Create",
         "update": "Update",
@@ -978,6 +992,22 @@
       "title": "Categories",
       "add": "Add category",
       "slug": "Slug",
+      "description": "Description",
+      "translations": {
+        "button": "Translations",
+        "title": "Translations",
+        "hint": "Optional per-language overrides shown on the storefront.",
+        "success": {
+          "save": "Translation saved",
+          "delete": "Translation removed"
+        },
+        "errors": {
+          "load": "Could not load translations.",
+          "save": "Could not save translation.",
+          "delete": "Could not delete translation.",
+          "nameRequired": "Name is required for translations."
+        }
+      },
       "success": {
         "add": "Category added",
         "delete": "Category deleted",

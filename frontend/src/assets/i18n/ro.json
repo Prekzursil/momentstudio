@@ -967,6 +967,20 @@
         "duplicate": "Nu am putut duplica produsul",
         "saveFirst": "Salvează produsul înainte de a încărca imagini"
       },
+      "translations": {
+        "title": "Traduceri",
+        "hint": "Suprascrieri opționale pe limbă. Dacă sunt goale, magazinul folosește câmpurile implicite.",
+        "success": {
+          "save": "Traducere salvată",
+          "delete": "Traducere eliminată"
+        },
+        "errors": {
+          "load": "Nu am putut încărca traducerile.",
+          "save": "Nu am putut salva traducerea.",
+          "delete": "Nu am putut șterge traducerea.",
+          "nameRequired": "Numele este obligatoriu pentru traduceri."
+        }
+      },
       "actions": {
         "create": "Creează",
         "update": "Actualizează",
@@ -978,6 +992,22 @@
       "title": "Categorii",
       "add": "Adaugă categorie",
       "slug": "Slug",
+      "description": "Descriere",
+      "translations": {
+        "button": "Traduceri",
+        "title": "Traduceri",
+        "hint": "Suprascrieri opționale pe limbă afișate în magazin.",
+        "success": {
+          "save": "Traducere salvată",
+          "delete": "Traducere eliminată"
+        },
+        "errors": {
+          "load": "Nu am putut încărca traducerile.",
+          "save": "Nu am putut salva traducerea.",
+          "delete": "Nu am putut șterge traducerea.",
+          "nameRequired": "Numele este obligatoriu pentru traduceri."
+        }
+      },
       "success": {
         "add": "Categorie adăugată",
         "delete": "Categorie ștearsă",
