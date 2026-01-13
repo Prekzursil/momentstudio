@@ -451,6 +451,193 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
     assert order.stripe_payment_intent_id == "pi_test"
 
 
+def test_authenticated_checkout_creates_separate_billing_address(
+    checkout_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client: TestClient = checkout_app["client"]  # type: ignore[assignment]
+    SessionLocal = checkout_app["session_factory"]  # type: ignore[assignment]
+
+    async def seed():
+        async with SessionLocal() as session:
+            category = Category(slug="bill", name="Billing")
+            product = Product(
+                category=category,
+                slug="bill-prod",
+                sku="BILL-1",
+                name="Billing Product",
+                base_price=Decimal("10.00"),
+                currency="RON",
+                stock_quantity=10,
+                images=[ProductImage(url="/media/img1.png", alt_text="img")],
+            )
+            session.add(product)
+            await session.commit()
+            await session.refresh(product)
+            return {"product_id": product.id}
+
+    seeded = asyncio.run(seed())
+
+    async def fake_create_payment_intent(session, cart, amount_cents=None):
+        return {"client_secret": "secret_test", "intent_id": "pi_test"}
+
+    monkeypatch.setattr(payments, "create_payment_intent", fake_create_payment_intent)
+
+    register = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "billbuyer@example.com",
+            "username": "billbuyer",
+            "password": "secret123",
+            "name": "Bill Buyer",
+            "first_name": "Bill",
+            "last_name": "Buyer",
+            "date_of_birth": "2000-01-01",
+            "phone": "+40723204204",
+        },
+    )
+    assert register.status_code == 201, register.text
+    token = register.json()["tokens"]["access_token"]
+    user_id = register.json()["user"]["id"]
+
+    async def mark_verified() -> None:
+        async with SessionLocal() as session:
+            user = await session.get(User, UUID(user_id))
+            assert user is not None
+            user.email_verified = True
+            session.add(user)
+            await session.commit()
+
+    asyncio.run(mark_verified())
+
+    add_res = client.post(
+        "/api/v1/cart/items",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"product_id": str(seeded["product_id"]), "quantity": 1},
+    )
+    assert add_res.status_code in (200, 201), add_res.text
+
+    res = client.post(
+        "/api/v1/orders/checkout",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "line1": "Ship St",
+            "city": "Ship City",
+            "postal_code": "12345",
+            "country": "US",
+            "billing_line1": "Bill St",
+            "billing_city": "Bill City",
+            "billing_postal_code": "54321",
+            "billing_country": "US",
+            "save_address": False,
+        },
+    )
+    assert res.status_code == 201, res.text
+
+    async def fetch_order() -> Order | None:
+        async with SessionLocal() as session:
+            return (await session.execute(select(Order).order_by(Order.created_at.desc()))).scalars().first()
+
+    order = asyncio.run(fetch_order())
+    assert order is not None
+    assert order.shipping_address_id is not None
+    assert order.billing_address_id is not None
+    assert order.billing_address_id != order.shipping_address_id
+
+
+def test_authenticated_checkout_cod_skips_payment_intent(checkout_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch) -> None:
+    client: TestClient = checkout_app["client"]  # type: ignore[assignment]
+    SessionLocal = checkout_app["session_factory"]  # type: ignore[assignment]
+
+    async def seed():
+        async with SessionLocal() as session:
+            category = Category(slug="cod", name="COD")
+            product = Product(
+                category=category,
+                slug="cod-prod",
+                sku="COD-1",
+                name="COD Product",
+                base_price=Decimal("10.00"),
+                currency="RON",
+                stock_quantity=10,
+                images=[ProductImage(url="/media/img1.png", alt_text="img")],
+            )
+            session.add(product)
+            await session.commit()
+            await session.refresh(product)
+            return {"product_id": product.id}
+
+    seeded = asyncio.run(seed())
+
+    called: dict[str, object] = {"called": False}
+
+    async def fake_create_payment_intent(*args, **kwargs):
+        called["called"] = True
+        return {"client_secret": "secret_test", "intent_id": "pi_test"}
+
+    monkeypatch.setattr(payments, "create_payment_intent", fake_create_payment_intent)
+
+    register = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "codbuyer@example.com",
+            "username": "codbuyer",
+            "password": "secret123",
+            "name": "COD Buyer",
+            "first_name": "COD",
+            "last_name": "Buyer",
+            "date_of_birth": "2000-01-01",
+            "phone": "+40723204204",
+        },
+    )
+    assert register.status_code == 201, register.text
+    token = register.json()["tokens"]["access_token"]
+    user_id = register.json()["user"]["id"]
+
+    async def mark_verified() -> None:
+        async with SessionLocal() as session:
+            user = await session.get(User, UUID(user_id))
+            assert user is not None
+            user.email_verified = True
+            session.add(user)
+            await session.commit()
+
+    asyncio.run(mark_verified())
+
+    add_res = client.post(
+        "/api/v1/cart/items",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"product_id": str(seeded["product_id"]), "quantity": 1},
+    )
+    assert add_res.status_code in (200, 201), add_res.text
+
+    res = client.post(
+        "/api/v1/orders/checkout",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "line1": "123 Test St",
+            "city": "Testville",
+            "postal_code": "12345",
+            "country": "US",
+            "save_address": False,
+            "payment_method": "cod",
+        },
+    )
+    assert res.status_code == 201, res.text
+    body = res.json()
+    assert body["payment_method"] == "cod"
+    assert body["client_secret"] is None
+    assert called["called"] is False
+
+    async def fetch_order() -> Order | None:
+        async with SessionLocal() as session:
+            return (await session.execute(select(Order).order_by(Order.created_at.desc()))).scalars().first()
+
+    order = asyncio.run(fetch_order())
+    assert order is not None
+    assert getattr(order, "payment_method", None) == "cod"
+    assert order.stripe_payment_intent_id is None
+
+
 def test_checkout_sends_admin_alert_fallback_when_no_owner(
     checkout_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -16,6 +16,33 @@ import { ThemeMode, ThemeService } from '../../core/theme.service';
 import { AuthService } from '../../core/auth.service';
 import { buildE164, listPhoneCountries, PhoneCountryOption } from '../../shared/phone';
 
+type CheckoutShippingAddress = {
+  name: string;
+  email: string;
+  line1: string;
+  line2?: string;
+  city: string;
+  region?: string;
+  postal: string;
+  country: string;
+  password?: string;
+};
+
+type CheckoutBillingAddress = {
+  line1: string;
+  line2?: string;
+  city: string;
+  region?: string;
+  postal: string;
+  country: string;
+};
+
+type SavedCheckout = {
+  address: CheckoutShippingAddress;
+  billingSameAsShipping: boolean;
+  billing: CheckoutBillingAddress;
+};
+
 @Component({
   selector: 'app-checkout',
   standalone: true,
@@ -250,6 +277,58 @@ import { buildE164, listPhoneCountries, PhoneCountryOption } from '../../shared/
                   </select>
                 </label>
               </div>
+              <div class="grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">
+                    {{ 'checkout.billingTitle' | translate }}
+                  </p>
+                  <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                    <input type="checkbox" [(ngModel)]="billingSameAsShipping" name="billingSameAsShipping" />
+                    {{ 'checkout.billingSameAsShipping' | translate }}
+                  </label>
+                </div>
+                <div *ngIf="!billingSameAsShipping" class="grid sm:grid-cols-2 gap-3">
+                  <label class="text-sm grid gap-1 sm:col-span-2">
+                    {{ 'checkout.line1' | translate }}
+                    <input
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      name="billingLine1"
+                      [(ngModel)]="billing.line1"
+                      required
+                    />
+                  </label>
+                  <label class="text-sm grid gap-1">
+                    {{ 'checkout.city' | translate }}
+                    <input
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      name="billingCity"
+                      [(ngModel)]="billing.city"
+                      required
+                    />
+                  </label>
+                  <label class="text-sm grid gap-1">
+                    {{ 'checkout.postal' | translate }}
+                    <input
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      name="billingPostal"
+                      [(ngModel)]="billing.postal"
+                      required
+                    />
+                  </label>
+                  <label class="text-sm grid gap-1 sm:col-span-2">
+                    {{ 'checkout.country' | translate }}
+                    <select
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      name="billingCountry"
+                      [(ngModel)]="billing.country"
+                      required
+                    >
+                      <option value="">{{ 'checkout.countrySelect' | translate }}</option>
+                      <option *ngFor="let c of countries" [value]="c">{{ c }}</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
               <label class="flex items-center gap-2 text-sm">
                 <input type="checkbox" [(ngModel)]="saveAddress" name="saveAddress" />
                 {{ 'checkout.saveAddress' | translate }}
@@ -285,7 +364,50 @@ import { buildE164, listPhoneCountries, PhoneCountryOption } from '../../shared/
 
             <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
               <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step4' | translate }}</p>
-              <div class="border border-dashed border-slate-200 rounded-lg p-3 text-sm dark:border-slate-700">
+              <div class="grid sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  class="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  [ngClass]="
+                    paymentMethod === 'stripe'
+                      ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'
+                      : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800'
+                  "
+                  (click)="setPaymentMethod('stripe')"
+                  [attr.aria-pressed]="paymentMethod === 'stripe'"
+                >
+                  <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                    <path d="M2 10h20"></path>
+                  </svg>
+                  <span>{{ 'checkout.paymentCard' | translate }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  [ngClass]="
+                    paymentMethod === 'cod'
+                      ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'
+                      : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800'
+                  "
+                  (click)="setPaymentMethod('cod')"
+                  [attr.aria-pressed]="paymentMethod === 'cod'"
+                >
+                  <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M2 7h20v10H2z"></path>
+                    <path d="M6 11h4"></path>
+                    <path d="M16 11h2"></path>
+                  </svg>
+                  <span>{{ 'checkout.paymentCash' | translate }}</span>
+                </button>
+              </div>
+              <p class="text-xs text-slate-600 dark:text-slate-300" *ngIf="paymentMethod === 'stripe'">
+                {{ 'checkout.paymentCardHint' | translate }}
+              </p>
+              <p class="text-xs text-slate-600 dark:text-slate-300" *ngIf="paymentMethod === 'cod'">
+                {{ 'checkout.paymentCashHint' | translate }}
+              </p>
+              <div *ngIf="paymentMethod === 'stripe'" class="border border-dashed border-slate-200 rounded-lg p-3 text-sm dark:border-slate-700">
                 <div #cardHost class="min-h-[48px]"></div>
                 <p *ngIf="cardError" class="text-rose-700 dark:text-rose-300 text-xs mt-2">{{ cardError }}</p>
               </div>
@@ -361,19 +483,28 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
   guestEmailVerified = false;
   guestSendingCode = false;
   guestConfirmingCode = false;
-  guestEmailError = '';
-  private lastGuestEmailRequested: string | null = null;
-  private lastGuestEmailVerified: string | null = null;
-  address: { name: string; email: string; line1: string; line2?: string; city: string; region?: string; postal: string; country: string; password?: string } = {
-    name: '',
-    email: '',
-    line1: '',
+	  guestEmailError = '';
+	  private lastGuestEmailRequested: string | null = null;
+	  private lastGuestEmailVerified: string | null = null;
+	  address: CheckoutShippingAddress = {
+	    name: '',
+	    email: '',
+	    line1: '',
     line2: '',
     city: '',
     region: '',
     postal: '',
-    country: '',
-    password: ''
+	    country: '',
+	    password: ''
+	  };
+	  billingSameAsShipping = true;
+	  billing: CheckoutBillingAddress = {
+	    line1: '',
+	    line2: '',
+	    city: '',
+    region: '',
+    postal: '',
+    country: ''
   };
   discount = 0;
 
@@ -385,6 +516,7 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
   private clientSecret: string | null = null;
   syncing = false;
   placing = false;
+  paymentMethod: 'stripe' | 'cod' = 'stripe';
   private stripeThemeEffect?: EffectRef;
 
   constructor(
@@ -396,10 +528,13 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
     private theme: ThemeService,
     public auth: AuthService
   ) {
-    const saved = this.loadSavedAddress();
+    const saved = this.loadSavedCheckout();
     if (saved) {
-      this.address = saved;
+      this.address = saved.address;
+      this.billingSameAsShipping = saved.billingSameAsShipping;
+      this.billing = saved.billing;
     }
+    this.paymentMethod = this.getStripePublishableKey() ? 'stripe' : 'cod';
     this.phoneCountries = listPhoneCountries(this.translate.currentLang || 'en');
     this.stripeThemeEffect = effect(() => {
       const mode = this.theme.mode()();
@@ -492,6 +627,10 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.errorMessage = '';
+    if (this.paymentMethod === 'stripe' && (!this.stripe || !this.card)) {
+      this.errorMessage = this.translate.instant('checkout.paymentNotReady');
+      return;
+    }
     this.placing = true;
     if (this.auth.isAuthenticated()) {
       this.submitCheckout();
@@ -521,30 +660,102 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
 
   private persistAddress(): void {
     if (typeof localStorage === 'undefined') return;
-    localStorage.setItem('checkout_address', JSON.stringify(this.address));
-  }
+    const billing = this.billingSameAsShipping
+      ? { line1: this.address.line1, line2: this.address.line2, city: this.address.city, region: this.address.region, postal: this.address.postal, country: this.address.country }
+      : this.billing;
+    localStorage.setItem(
+      'checkout_address',
+      JSON.stringify({
+        address: {
+          name: this.address.name,
+          email: this.address.email,
+          line1: this.address.line1,
+          line2: this.address.line2 || '',
+          city: this.address.city,
+          region: this.address.region || '',
+          postal: this.address.postal,
+          country: this.address.country || '',
+        },
+        billingSameAsShipping: this.billingSameAsShipping,
+        billing: {
+          line1: billing.line1,
+          line2: billing.line2 || '',
+          city: billing.city,
+          region: billing.region || '',
+          postal: billing.postal,
+          country: billing.country || '',
+        }
+      })
+	    );
+	  }
 
-  private loadSavedAddress():
-    | {
-        name: string;
-        email: string;
-        line1: string;
-        city: string;
-        postal: string;
-        country: string;
+	  private loadSavedCheckout(): SavedCheckout | null {
+	    if (typeof localStorage === 'undefined') return null;
+	    try {
+	      const raw = localStorage.getItem('checkout_address');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as any;
+      if (parsed && typeof parsed === 'object' && parsed.address) {
+        const addr = parsed.address as any;
+        const billing = (parsed.billing as any) || null;
+        const billingSame = Boolean(parsed.billingSameAsShipping);
+        return {
+          address: {
+            name: String(addr.name || ''),
+            email: String(addr.email || ''),
+            line1: String(addr.line1 || ''),
+            line2: String(addr.line2 || ''),
+            city: String(addr.city || ''),
+            region: String(addr.region || ''),
+            postal: String(addr.postal || ''),
+            country: String(addr.country || ''),
+            password: ''
+          },
+          billingSameAsShipping: billingSame,
+          billing: {
+            line1: String(billing?.line1 || ''),
+            line2: String(billing?.line2 || ''),
+            city: String(billing?.city || ''),
+            region: String(billing?.region || ''),
+            postal: String(billing?.postal || ''),
+            country: String(billing?.country || ''),
+          }
+        };
       }
-    | null {
-    if (typeof localStorage === 'undefined') return null;
-    try {
-      const raw = localStorage.getItem('checkout_address');
-      return raw ? (JSON.parse(raw) as typeof this.address) : null;
+      // legacy shape: the stored value was the flat address object
+      const legacy = parsed as any;
+      const addr = {
+        name: String(legacy.name || ''),
+        email: String(legacy.email || ''),
+        line1: String(legacy.line1 || ''),
+        line2: String(legacy.line2 || ''),
+        city: String(legacy.city || ''),
+        region: String(legacy.region || ''),
+        postal: String(legacy.postal || ''),
+        country: String(legacy.country || ''),
+        password: ''
+      };
+      return {
+        address: addr,
+        billingSameAsShipping: true,
+        billing: {
+          line1: addr.line1,
+          line2: addr.line2,
+          city: addr.city,
+          region: addr.region,
+          postal: addr.postal,
+          country: addr.country
+        }
+      };
     } catch {
       return null;
     }
   }
 
   async ngAfterViewInit(): Promise<void> {
-    await this.setupStripe();
+    if (this.paymentMethod === 'stripe') {
+      await this.setupStripe();
+    }
     this.syncBackendCart(this.items());
     this.loadGuestEmailVerificationStatus();
   }
@@ -555,6 +766,7 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
   }
 
   private async setupStripe(): Promise<void> {
+    if (this.card) return;
     const publishableKey = this.getStripePublishableKey();
     if (!publishableKey) {
       this.cardError = 'Stripe publishable key not set.';
@@ -573,6 +785,23 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
         this.cardError = event.error ? event.error.message ?? 'Card error' : null;
       });
     }
+  }
+
+  setPaymentMethod(method: 'stripe' | 'cod'): void {
+    this.paymentMethod = method;
+    this.errorMessage = '';
+    this.cardError = null;
+    if (method === 'stripe') {
+      setTimeout(() => void this.setupStripe(), 0);
+      return;
+    }
+    if (this.card) {
+      this.card.destroy();
+      this.card = undefined;
+    }
+    this.stripe = null;
+    this.elements = undefined;
+    this.clientSecret = null;
   }
 
   private buildStripeCardStyle(mode: ThemeMode) {
@@ -641,19 +870,28 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
   }
 
   private submitCheckout(): void {
-    const body = {
+    const body: Record<string, unknown> = {
       line1: this.address.line1,
       line2: this.address.line2,
       city: this.address.city,
       region: this.address.region,
       postal_code: this.address.postal,
-      country: this.address.country || 'US',
+      country: this.address.country || 'RO',
       shipping_method_id: null,
       promo_code: this.promo || null,
       save_address: this.saveAddress
     };
+    if (!this.billingSameAsShipping) {
+      body['billing_line1'] = this.billing.line1;
+      body['billing_line2'] = this.billing.line2 || null;
+      body['billing_city'] = this.billing.city;
+      body['billing_region'] = this.billing.region || null;
+      body['billing_postal_code'] = this.billing.postal;
+      body['billing_country'] = this.billing.country || this.address.country || 'RO';
+    }
+    body['payment_method'] = this.paymentMethod;
     this.api
-      .post<{ order_id: string; reference_code?: string; client_secret: string }>(
+      .post<{ order_id: string; reference_code?: string; client_secret: string | null; payment_method?: string }>(
         '/orders/checkout',
         body,
         this.cartApi.headers()
@@ -661,6 +899,12 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
       .subscribe({
         next: (res) => {
           this.clientSecret = res.client_secret;
+          if (this.paymentMethod !== 'stripe' || !res.client_secret) {
+            if (this.saveAddress) this.persistAddress();
+            this.placing = false;
+            void this.router.navigate(['/checkout/success']);
+            return;
+          }
           this.confirmPayment(res.client_secret)
             .then((paymentOk) => {
               if (!paymentOk) {
@@ -779,9 +1023,16 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
       region: this.address.region || null,
       postal_code: this.address.postal,
       country: this.address.country || 'RO',
+      billing_line1: this.billingSameAsShipping ? null : this.billing.line1,
+      billing_line2: this.billingSameAsShipping ? null : this.billing.line2 || null,
+      billing_city: this.billingSameAsShipping ? null : this.billing.city,
+      billing_region: this.billingSameAsShipping ? null : this.billing.region || null,
+      billing_postal_code: this.billingSameAsShipping ? null : this.billing.postal,
+      billing_country: this.billingSameAsShipping ? null : this.billing.country || this.address.country || 'RO',
       shipping_method_id: null,
       promo_code: this.promo || null,
       save_address: this.saveAddress,
+      payment_method: this.paymentMethod,
       create_account: this.guestCreateAccount
     };
 
@@ -797,7 +1048,7 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
     }
 
     this.api
-      .post<{ order_id: string; reference_code?: string; client_secret: string }>(
+      .post<{ order_id: string; reference_code?: string; client_secret: string | null; payment_method?: string }>(
         '/orders/guest-checkout',
         payload,
         this.cartApi.headers()
@@ -805,6 +1056,12 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
       .subscribe({
         next: (res) => {
           this.clientSecret = res.client_secret;
+          if (this.paymentMethod !== 'stripe' || !res.client_secret) {
+            if (this.saveAddress) this.persistAddress();
+            this.placing = false;
+            void this.router.navigate(['/checkout/success']);
+            return;
+          }
           this.confirmPayment(res.client_secret)
             .then((paymentOk) => {
               if (!paymentOk) {

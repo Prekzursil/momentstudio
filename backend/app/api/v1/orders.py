@@ -140,6 +140,9 @@ async def checkout(
     if payload.promo_code:
         promo = await cart_service.validate_promo(session, payload.promo_code, currency=None)
 
+    has_billing = bool((payload.billing_line1 or "").strip())
+    billing_same_as_shipping = not has_billing
+
     shipping_addr = await address_service.create_address(
         session,
         current_user.id,
@@ -152,12 +155,39 @@ async def checkout(
             postal_code=payload.postal_code,
             country=payload.country,
             is_default_shipping=payload.save_address,
-            is_default_billing=payload.save_address,
+            is_default_billing=bool(payload.save_address and billing_same_as_shipping),
         ),
     )
 
+    billing_addr = shipping_addr
+    if has_billing:
+        if not payload.billing_city or not payload.billing_postal_code or not payload.billing_country:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Billing address is incomplete")
+        billing_addr = await address_service.create_address(
+            session,
+            current_user.id,
+            AddressCreate(
+                label="Checkout (Billing)",
+                line1=payload.billing_line1 or payload.line1,
+                line2=payload.billing_line2,
+                city=payload.billing_city,
+                region=payload.billing_region,
+                postal_code=payload.billing_postal_code,
+                country=payload.billing_country,
+                is_default_shipping=False,
+                is_default_billing=payload.save_address,
+            ),
+        )
+
     totals, discount_val = cart_service.calculate_totals(user_cart, shipping_method=shipping_method, promo=promo)
-    intent = await payments.create_payment_intent(session, user_cart, amount_cents=int(totals.total * 100))
+    payment_method = payload.payment_method or "stripe"
+    intent = None
+    client_secret = None
+    payment_intent_id = None
+    if payment_method == "stripe":
+        intent = await payments.create_payment_intent(session, user_cart, amount_cents=int(totals.total * 100))
+        client_secret = str(intent.get("client_secret"))
+        payment_intent_id = str(intent.get("intent_id"))
     order = await order_service.build_order_from_cart(
         session,
         current_user.id,
@@ -165,9 +195,10 @@ async def checkout(
         customer_name=getattr(current_user, "name", None) or current_user.email,
         cart=user_cart,
         shipping_address_id=shipping_addr.id,
-        billing_address_id=shipping_addr.id,
+        billing_address_id=billing_addr.id,
         shipping_method=shipping_method,
-        payment_intent_id=intent["intent_id"],
+        payment_method=payment_method,
+        payment_intent_id=payment_intent_id,
         discount=discount_val,
     )
     await notification_service.create_notification(
@@ -189,7 +220,12 @@ async def checkout(
             current_user.email,
             owner.preferred_language if owner else None,
         )
-    return GuestCheckoutResponse(order_id=order.id, reference_code=order.reference_code, client_secret=intent["client_secret"])
+    return GuestCheckoutResponse(
+        order_id=order.id,
+        reference_code=order.reference_code,
+        client_secret=client_secret,
+        payment_method=payment_method,
+    )
 
 
 @router.get("", response_model=list[OrderRead])
@@ -456,6 +492,9 @@ async def guest_checkout(
     if payload.promo_code:
         promo = await cart_service.validate_promo(session, payload.promo_code, currency=None)
 
+    has_billing = bool((payload.billing_line1 or "").strip())
+    billing_same_as_shipping = not has_billing
+
     shipping_addr = await address_service.create_address(
         session,
         user_id,
@@ -468,12 +507,39 @@ async def guest_checkout(
             postal_code=payload.postal_code,
             country=payload.country,
             is_default_shipping=bool(payload.save_address and payload.create_account),
-            is_default_billing=bool(payload.save_address and payload.create_account),
+            is_default_billing=bool(payload.save_address and payload.create_account and billing_same_as_shipping),
         ),
     )
 
+    billing_addr = shipping_addr
+    if has_billing:
+        if not payload.billing_city or not payload.billing_postal_code or not payload.billing_country:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Billing address is incomplete")
+        billing_addr = await address_service.create_address(
+            session,
+            user_id,
+            AddressCreate(
+                label="Guest Checkout (Billing)" if not payload.create_account else "Checkout (Billing)",
+                line1=payload.billing_line1 or payload.line1,
+                line2=payload.billing_line2,
+                city=payload.billing_city,
+                region=payload.billing_region,
+                postal_code=payload.billing_postal_code,
+                country=payload.billing_country,
+                is_default_shipping=False,
+                is_default_billing=bool(payload.save_address and payload.create_account),
+            ),
+        )
+
     totals, discount_val = cart_service.calculate_totals(cart, shipping_method=shipping_method, promo=promo)
-    intent = await payments.create_payment_intent(session, cart, amount_cents=int(totals.total * 100))
+    payment_method = payload.payment_method or "stripe"
+    intent = None
+    client_secret = None
+    payment_intent_id = None
+    if payment_method == "stripe":
+        intent = await payments.create_payment_intent(session, cart, amount_cents=int(totals.total * 100))
+        client_secret = str(intent.get("client_secret"))
+        payment_intent_id = str(intent.get("intent_id"))
     order = await order_service.build_order_from_cart(
         session,
         user_id,
@@ -481,9 +547,10 @@ async def guest_checkout(
         customer_name=customer_name,
         cart=cart,
         shipping_address_id=shipping_addr.id,
-        billing_address_id=shipping_addr.id,
+        billing_address_id=billing_addr.id,
         shipping_method=shipping_method,
-        payment_intent_id=intent["intent_id"],
+        payment_method=payment_method,
+        payment_intent_id=payment_intent_id,
         discount=discount_val,
     )
 
@@ -499,7 +566,12 @@ async def guest_checkout(
             owner.preferred_language if owner else None,
         )
 
-    return GuestCheckoutResponse(order_id=order.id, reference_code=order.reference_code, client_secret=intent["client_secret"])
+    return GuestCheckoutResponse(
+        order_id=order.id,
+        reference_code=order.reference_code,
+        client_secret=client_secret,
+        payment_method=payment_method,
+    )
 
 
 @router.patch("/admin/{order_id}", response_model=AdminOrderRead)

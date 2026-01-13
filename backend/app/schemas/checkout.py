@@ -40,6 +40,13 @@ class GuestCheckoutRequest(BaseModel):
     region: str | None = Field(default=None, max_length=100)
     postal_code: str = Field(min_length=1, max_length=20)
     country: str = Field(min_length=2, max_length=2)
+    billing_line1: str | None = Field(default=None, min_length=1, max_length=200)
+    billing_line2: str | None = Field(default=None, max_length=200)
+    billing_city: str | None = Field(default=None, min_length=1, max_length=100)
+    billing_region: str | None = Field(default=None, max_length=100)
+    billing_postal_code: str | None = Field(default=None, min_length=1, max_length=20)
+    billing_country: str | None = Field(default=None, min_length=2, max_length=2)
+    payment_method: str = Field(default="stripe", pattern="^(stripe|cod)$")
     shipping_method_id: UUID | None = None
     promo_code: str | None = None
     save_address: bool = True
@@ -48,7 +55,8 @@ class GuestCheckoutRequest(BaseModel):
 class GuestCheckoutResponse(BaseModel):
     order_id: UUID
     reference_code: str | None = None
-    client_secret: str
+    client_secret: str | None = None
+    payment_method: str = "stripe"
 
 
 class CheckoutRequest(BaseModel):
@@ -58,6 +66,13 @@ class CheckoutRequest(BaseModel):
     region: str | None = Field(default=None, max_length=100)
     postal_code: str = Field(min_length=1, max_length=20)
     country: str = Field(min_length=2, max_length=2)
+    billing_line1: str | None = Field(default=None, min_length=1, max_length=200)
+    billing_line2: str | None = Field(default=None, max_length=200)
+    billing_city: str | None = Field(default=None, min_length=1, max_length=100)
+    billing_region: str | None = Field(default=None, max_length=100)
+    billing_postal_code: str | None = Field(default=None, min_length=1, max_length=20)
+    billing_country: str | None = Field(default=None, min_length=2, max_length=2)
+    payment_method: str = Field(default="stripe", pattern="^(stripe|cod)$")
     shipping_method_id: UUID | None = None
     promo_code: str | None = None
     save_address: bool = True

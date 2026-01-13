@@ -26,6 +26,7 @@ async def build_order_from_cart(
     shipping_address_id: UUID | None,
     billing_address_id: UUID | None,
     shipping_method: ShippingMethod | None = None,
+    payment_method: str = "stripe",
     payment_intent_id: str | None = None,
     discount: Decimal | None = None,
 ) -> Order:
@@ -65,6 +66,7 @@ async def build_order_from_cart(
         tax_amount=tax,
         shipping_amount=shipping_amount,
         currency="RON",
+        payment_method=payment_method,
         shipping_address_id=shipping_address_id,
         billing_address_id=billing_address_id,
         items=items,
@@ -232,8 +234,12 @@ async def update_order(
     if "status" in data and data["status"]:
         current_status = OrderStatus(order.status)
         next_status = OrderStatus(data["status"])
-        if next_status not in ALLOWED_TRANSITIONS.get(current_status, set()):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
+        allowed = ALLOWED_TRANSITIONS.get(current_status, set())
+        if next_status not in allowed:
+            if current_status == OrderStatus.pending and next_status == OrderStatus.shipped and getattr(order, "payment_method", None) == "cod":
+                pass
+            else:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
         order.status = next_status
         data.pop("status")
         await _log_event(session, order.id, "status_change", f"{current_status.value} -> {next_status.value}")
