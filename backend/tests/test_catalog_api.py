@@ -12,7 +12,7 @@ from app.main import app
 from app.db.base import Base
 from app.db.session import get_session
 from app.models.user import UserRole
-from app.models.catalog import ProductAuditLog, Category, Product, CategoryTranslation, ProductTranslation
+from app.models.catalog import BackInStockRequest, Category, CategoryTranslation, Product, ProductAuditLog, ProductTranslation
 from app.services.auth import create_user
 from app.schemas.user import UserCreate
 from app.core.config import settings
@@ -56,6 +56,19 @@ def create_admin_token(session_factory, email="admin@example.com"):
             return tokens["access_token"]
 
     return asyncio.run(create_admin())
+
+
+def create_user_token(session_factory, email: str = "user@example.com") -> tuple[str, str]:
+    async def create_and_token():
+        async with session_factory() as session:
+            user = await create_user(session, UserCreate(email=email, password="password123", name="User"))
+            await session.commit()
+            from app.services.auth import issue_tokens_for_user
+
+            tokens = await issue_tokens_for_user(session, user)
+            return tokens["access_token"], str(user.id)
+
+    return asyncio.run(create_and_token())
 
 
 def _jpeg_bytes() -> bytes:
@@ -734,3 +747,119 @@ def test_featured_collections_feed_and_audit(test_app: Dict[str, object]) -> Non
 
     count = asyncio.run(audit_count())
     assert count >= 1
+
+
+def test_back_in_stock_request_flow(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token = create_admin_token(SessionLocal, email="stockadmin@example.com")
+    user_token, _ = create_user_token(SessionLocal, email="bis@example.com")
+
+    category = client.post(
+        "/api/v1/catalog/categories",
+        json={"slug": "bis-cups", "name": "Cups"},
+        headers=auth_headers(admin_token),
+    )
+    assert category.status_code == 201, category.text
+    category_id = category.json()["id"]
+
+    product = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": category_id,
+            "slug": "bis-cup",
+            "name": "Back In Stock Cup",
+            "base_price": 10.0,
+            "currency": "RON",
+            "stock_quantity": 0,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert product.status_code == 201, product.text
+
+    status_res = client.get("/api/v1/catalog/products/bis-cup/back-in-stock", headers=auth_headers(user_token))
+    assert status_res.status_code == 200, status_res.text
+    assert status_res.json()["in_stock"] is False
+    assert status_res.json()["request"] is None
+
+    first = client.post("/api/v1/catalog/products/bis-cup/back-in-stock", headers=auth_headers(user_token))
+    assert first.status_code == 200, first.text
+    req_id = first.json()["id"]
+
+    second = client.post("/api/v1/catalog/products/bis-cup/back-in-stock", headers=auth_headers(user_token))
+    assert second.status_code == 200, second.text
+    assert second.json()["id"] == req_id
+
+    status_after = client.get("/api/v1/catalog/products/bis-cup/back-in-stock", headers=auth_headers(user_token))
+    assert status_after.status_code == 200, status_after.text
+    assert status_after.json()["request"]["id"] == req_id
+
+    cancel = client.delete("/api/v1/catalog/products/bis-cup/back-in-stock", headers=auth_headers(user_token))
+    assert cancel.status_code == 204, cancel.text
+
+    status_canceled = client.get("/api/v1/catalog/products/bis-cup/back-in-stock", headers=auth_headers(user_token))
+    assert status_canceled.status_code == 200, status_canceled.text
+    assert status_canceled.json()["request"] is None
+
+
+def test_back_in_stock_fulfilled_on_restock(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token = create_admin_token(SessionLocal, email="restockadmin@example.com")
+    user_token, _ = create_user_token(SessionLocal, email="restock@example.com")
+
+    category = client.post(
+        "/api/v1/catalog/categories",
+        json={"slug": "restock-cat", "name": "Cups"},
+        headers=auth_headers(admin_token),
+    )
+    assert category.status_code == 201, category.text
+    category_id = category.json()["id"]
+
+    product = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": category_id,
+            "slug": "restock-cup",
+            "name": "Restock Cup",
+            "base_price": 10.0,
+            "currency": "RON",
+            "stock_quantity": 0,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert product.status_code == 201, product.text
+
+    req = client.post("/api/v1/catalog/products/restock-cup/back-in-stock", headers=auth_headers(user_token))
+    assert req.status_code == 200, req.text
+
+    restock = client.patch(
+        "/api/v1/catalog/products/restock-cup",
+        json={"stock_quantity": 5},
+        headers=auth_headers(admin_token),
+    )
+    assert restock.status_code == 200, restock.text
+
+    status_res = client.get("/api/v1/catalog/products/restock-cup/back-in-stock", headers=auth_headers(user_token))
+    assert status_res.status_code == 200, status_res.text
+    assert status_res.json()["in_stock"] is True
+    assert status_res.json()["request"] is None
+
+    cannot_request = client.post("/api/v1/catalog/products/restock-cup/back-in-stock", headers=auth_headers(user_token))
+    assert cannot_request.status_code == 400, cannot_request.text
+
+    async def read_request():
+        async with SessionLocal() as session:
+            stmt = (
+                select(BackInStockRequest)
+                .join(Product, Product.id == BackInStockRequest.product_id)
+                .where(Product.slug == "restock-cup")
+            )
+            return (await session.execute(stmt)).scalar_one()
+
+    record = asyncio.run(read_request())
+    assert record.fulfilled_at is not None

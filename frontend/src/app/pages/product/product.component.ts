@@ -2,7 +2,7 @@ import { CommonModule, NgOptimizedImage, DOCUMENT } from '@angular/common';
 import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { CatalogService, Product } from '../../core/catalog.service';
+import { BackInStockRequest, CatalogService, Product } from '../../core/catalog.service';
 import { CartStore } from '../../core/cart.store';
 import { RecentlyViewedService } from '../../core/recently-viewed.service';
 import { ContainerComponent } from '../../layout/container.component';
@@ -147,7 +147,30 @@ import { Router } from '@angular/router';
               </div>
 
               <div class="flex gap-3">
-                <app-button [label]="'product.addToCart' | translate" size="lg" (action)="addToCart()"></app-button>
+                <app-button
+                  [label]="'product.addToCart' | translate"
+                  size="lg"
+                  (action)="addToCart()"
+                  [disabled]="isOutOfStock()"
+                ></app-button>
+                <app-button
+                  *ngIf="isOutOfStock()"
+                  [label]="
+                    backInStockRequest
+                      ? ('product.notifyRequested' | translate)
+                      : ('product.notifyBackInStock' | translate)
+                  "
+                  variant="ghost"
+                  (action)="requestBackInStock()"
+                  [disabled]="backInStockLoading || !!backInStockRequest"
+                ></app-button>
+                <app-button
+                  *ngIf="isOutOfStock() && backInStockRequest"
+                  [label]="'product.notifyCancel' | translate"
+                  variant="ghost"
+                  (action)="cancelBackInStock()"
+                  [disabled]="backInStockLoading"
+                ></app-button>
                 <app-button [label]="'product.backToShop' | translate" variant="ghost" [routerLink]="['/shop']"></app-button>
                 <app-button
                   [label]="wishlisted ? ('wishlist.saved' | translate) : ('wishlist.save' | translate)"
@@ -256,6 +279,8 @@ export class ProductComponent implements OnInit, OnDestroy {
   quantity = 1;
   activeImageIndex = 0;
   previewOpen = false;
+  backInStockLoading = false;
+  backInStockRequest: BackInStockRequest | null = null;
   recentlyViewed: Product[] = [];
   private ldScript?: HTMLScriptElement;
   private langSub?: Subscription;
@@ -307,6 +332,7 @@ export class ProductComponent implements OnInit, OnDestroy {
     this.loading = true;
     this.loadError = false;
     this.product = null;
+    this.backInStockRequest = null;
     const slug = this.slug;
     if (!slug) {
       this.loading = false;
@@ -327,6 +353,7 @@ export class ProductComponent implements OnInit, OnDestroy {
         this.updateStructuredData(product);
         const updated = this.recentlyViewedService.add(product);
         this.recentlyViewed = updated.filter((p) => p.slug !== product.slug).slice(0, 8);
+        this.loadBackInStockStatus();
       },
       error: (err) => {
         this.product = null;
@@ -358,6 +385,10 @@ export class ProductComponent implements OnInit, OnDestroy {
 
   addToCart(): void {
     if (!this.product) return;
+    if (this.isOutOfStock()) {
+      this.toast.error(this.translate.instant('product.soldOut'), this.translate.instant('product.notifyBackInStock'));
+      return;
+    }
     this.cartStore.addFromProduct({
       product_id: this.product.id,
       variant_id: null,
@@ -486,6 +517,74 @@ export class ProductComponent implements OnInit, OnDestroy {
     }
     link.setAttribute('href', href);
     this.canonicalEl = link;
+  }
+
+  isOutOfStock(): boolean {
+    const product = this.product;
+    if (!product) return false;
+    const stock = product.stock_quantity ?? 0;
+    const allowBackorder = !!product.allow_backorder;
+    return stock <= 0 && !allowBackorder;
+  }
+
+  private loadBackInStockStatus(): void {
+    const product = this.product;
+    if (!product || !this.isOutOfStock()) return;
+    if (!this.auth.isAuthenticated()) return;
+    this.catalog.getBackInStockStatus(product.slug).subscribe({
+      next: (status) => {
+        this.backInStockRequest = status.request ?? null;
+      }
+    });
+  }
+
+  requestBackInStock(): void {
+    const product = this.product;
+    if (!product || !this.isOutOfStock()) return;
+    if (!this.auth.isAuthenticated()) {
+      this.toast.info(
+        this.translate.instant('product.notifyRequiresSignInTitle'),
+        this.translate.instant('product.notifyRequiresSignInBody')
+      );
+      void this.router.navigateByUrl('/login');
+      return;
+    }
+    if (this.backInStockRequest) return;
+    this.backInStockLoading = true;
+    this.catalog.requestBackInStock(product.slug).subscribe({
+      next: (req) => {
+        this.backInStockLoading = false;
+        this.backInStockRequest = req;
+        this.toast.success(
+          this.translate.instant('product.notifyRequestedTitle'),
+          this.translate.instant('product.notifyRequestedBody', { name: product.name })
+        );
+      },
+      error: () => {
+        this.backInStockLoading = false;
+        this.toast.error(this.translate.instant('product.loadErrorTitle'), this.translate.instant('product.loadErrorCopy'));
+      }
+    });
+  }
+
+  cancelBackInStock(): void {
+    const product = this.product;
+    if (!product || !this.backInStockRequest) return;
+    this.backInStockLoading = true;
+    this.catalog.cancelBackInStock(product.slug).subscribe({
+      next: () => {
+        this.backInStockLoading = false;
+        this.backInStockRequest = null;
+        this.toast.success(
+          this.translate.instant('product.notifyCanceledTitle'),
+          this.translate.instant('product.notifyCanceledBody', { name: product.name })
+        );
+      },
+      error: () => {
+        this.backInStockLoading = false;
+        this.toast.error(this.translate.instant('product.loadErrorTitle'), this.translate.instant('product.loadErrorCopy'));
+      }
+    });
   }
 
 }

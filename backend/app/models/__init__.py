@@ -21,6 +21,7 @@ from app.models.catalog import (
     FeaturedCollection,
     CategoryTranslation,
     ProductTranslation,
+    BackInStockRequest,
 )  # noqa: F401
 from app.models.cart import Cart, CartItem  # noqa: F401
 from app.models.promo import PromoCode  # noqa: F401
@@ -55,6 +56,7 @@ __all__ = [
     "FeaturedCollection",
     "CategoryTranslation",
     "ProductTranslation",
+    "BackInStockRequest",
     "Tag",
     "Cart",
     "CartItem",

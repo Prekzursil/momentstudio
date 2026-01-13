@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.catalog import (
+    BackInStockRequest,
     Category,
     CategoryTranslation,
     Product,
@@ -47,7 +48,9 @@ from app.schemas.catalog import (
 from app.services.storage import delete_file
 from app.services import email as email_service
 from app.services import auth as auth_service
+from app.services import notifications as notifications_service
 from app.core.config import settings
+from app.models.user import User
 
 
 async def get_category_by_slug(session: AsyncSession, slug: str) -> Category | None:
@@ -364,6 +367,7 @@ async def create_product(
 async def update_product(
     session: AsyncSession, product: Product, payload: ProductUpdate, commit: bool = True, user_id: uuid.UUID | None = None
 ) -> Product:
+    was_out_of_stock = is_out_of_stock(product)
     data = payload.model_dump(exclude_unset=True)
     if "base_price" in data or "currency" in data:
         _validate_price_currency(data.get("base_price", product.base_price), data.get("currency", product.currency))
@@ -382,11 +386,14 @@ async def update_product(
             setattr(product, field, value.upper())
         else:
             setattr(product, field, value)
+    is_now_out_of_stock = is_out_of_stock(product)
     _set_publish_timestamp(product, data.get("status"))
     session.add(product)
     if commit:
         await session.commit()
         await session.refresh(product)
+        if was_out_of_stock and not is_now_out_of_stock:
+            await fulfill_back_in_stock_requests(session, product=product)
         await _log_product_action(session, product.id, "update", user_id, data)
         await _maybe_alert_low_stock(session, product)
     else:
@@ -448,21 +455,27 @@ async def bulk_update_products(
     products = {p.id: p for p in result.scalars()}
 
     updated: list[Product] = []
+    restocked: set[uuid.UUID] = set()
     for item in updates:
         product = products.get(item.product_id)
         if not product:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Product {item.product_id} not found")
+        was_out_of_stock = is_out_of_stock(product)
         data = item.model_dump(exclude_unset=True)
         if "status" in data and data["status"]:
             _set_publish_timestamp(product, data["status"])
         for field in ("base_price", "stock_quantity", "status"):
             if field in data and data[field] is not None:
                 setattr(product, field, data[field])
+        if was_out_of_stock and not is_out_of_stock(product):
+            restocked.add(product.id)
         session.add(product)
         updated.append(product)
     await session.commit()
     for product in updated:
         await session.refresh(product)
+        if product.id in restocked:
+            await fulfill_back_in_stock_requests(session, product=product)
         await _log_product_action(
             session,
             product.id,
@@ -1050,3 +1063,113 @@ async def _maybe_alert_low_stock(session: AsyncSession, product: Product, thresh
         return
 
     await email_service.send_low_stock_alert(to_email, product.name, product.stock_quantity)
+
+
+def is_out_of_stock(product: Product) -> bool:
+    return bool((product.stock_quantity or 0) <= 0 and not getattr(product, "allow_backorder", False))
+
+
+async def get_active_back_in_stock_request(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    product_id: uuid.UUID,
+) -> BackInStockRequest | None:
+    stmt = (
+        select(BackInStockRequest)
+        .where(
+            BackInStockRequest.user_id == user_id,
+            BackInStockRequest.product_id == product_id,
+            BackInStockRequest.fulfilled_at.is_(None),
+            BackInStockRequest.canceled_at.is_(None),
+        )
+        .order_by(BackInStockRequest.created_at.desc())
+        .limit(1)
+    )
+    return (await session.execute(stmt)).scalar_one_or_none()
+
+
+async def create_back_in_stock_request(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    product: Product,
+) -> BackInStockRequest:
+    if not is_out_of_stock(product):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Product is in stock")
+
+    existing = await get_active_back_in_stock_request(session, user_id=user_id, product_id=product.id)
+    if existing:
+        return existing
+
+    record = BackInStockRequest(user_id=user_id, product_id=product.id)
+    session.add(record)
+    await session.commit()
+    await session.refresh(record)
+    owner = await auth_service.get_owner_user(session)
+    if owner:
+        try:
+            await notifications_service.create_notification(
+                session,
+                user_id=owner.id,
+                type="back_in_stock_request",
+                title=f"Product interest: {product.name}",
+                body="A customer asked to be notified when this product is back in stock.",
+                url=f"/admin/products?search={product.slug}",
+            )
+        except Exception:
+            # Notifications are best-effort; the request should still succeed.
+            pass
+    return record
+
+
+async def cancel_back_in_stock_request(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    product_id: uuid.UUID,
+) -> BackInStockRequest | None:
+    record = await get_active_back_in_stock_request(session, user_id=user_id, product_id=product_id)
+    if not record:
+        return None
+    record.canceled_at = datetime.now(timezone.utc)
+    session.add(record)
+    await session.commit()
+    await session.refresh(record)
+    return record
+
+
+async def fulfill_back_in_stock_requests(session: AsyncSession, *, product: Product) -> int:
+    now = datetime.now(timezone.utc)
+    stmt = (
+        select(BackInStockRequest, User.email)
+        .join(User, User.id == BackInStockRequest.user_id)
+        .where(
+            BackInStockRequest.product_id == product.id,
+            BackInStockRequest.fulfilled_at.is_(None),
+            BackInStockRequest.canceled_at.is_(None),
+        )
+        .order_by(BackInStockRequest.created_at.asc())
+    )
+    rows = list((await session.execute(stmt)).all())
+    if not rows:
+        return 0
+
+    requests: list[BackInStockRequest] = []
+    for req, _email in rows:
+        req.fulfilled_at = now
+        requests.append(req)
+    session.add_all(requests)
+    await session.commit()
+
+    sent = 0
+    for req, email in rows:
+        if not email:
+            continue
+        if await email_service.send_back_in_stock(email, product.name):
+            req.notified_at = datetime.now(timezone.utc)
+            sent += 1
+    if sent:
+        session.add_all([req for req, _ in rows])
+        await session.commit()
+    return sent

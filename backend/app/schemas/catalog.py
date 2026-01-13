@@ -259,6 +259,21 @@ class ProductTranslationRead(ProductTranslationUpsert):
     lang: str
 
 
+class BackInStockRequestRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    created_at: datetime
+    fulfilled_at: datetime | None = None
+    canceled_at: datetime | None = None
+    notified_at: datetime | None = None
+
+
+class BackInStockStatus(BaseModel):
+    in_stock: bool
+    request: BackInStockRequestRead | None = None
+
+
 class BulkProductUpdateItem(BaseModel):
     product_id: UUID
     base_price: float | None = Field(default=None, ge=0)
