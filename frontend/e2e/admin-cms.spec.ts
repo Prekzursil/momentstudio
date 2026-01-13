@@ -20,7 +20,7 @@ test('owner can update About page via CMS and audit log records it', async ({ pa
   const marker = `E2E Our story ${Date.now()}`;
 
   await page.goto('/admin/content/pages');
-  const aboutField = page.getByLabel('Our story (About)');
+  const aboutField = page.getByRole('textbox', { name: 'Our story (About)' });
   await expect(aboutField).toBeVisible();
   // Wait for the CMS content to finish loading so it doesn't overwrite our edits.
   await expect(aboutField).not.toHaveValue('');
@@ -49,7 +49,7 @@ test('owner can toggle homepage sections via CMS', async ({ page }) => {
 
   const whyRow = sectionsPanel
     .locator('div[draggable="true"]')
-    .filter({ has: page.locator('span', { hasText: /^why$/ }) })
+    .filter({ has: page.locator('span', { hasText: /^Why$/ }) })
     .first();
   await expect(whyRow).toBeVisible();
 

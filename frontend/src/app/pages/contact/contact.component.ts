@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Meta, Title } from '@angular/platform-browser';
-import { Subscription } from 'rxjs';
+import { Subscription, finalize } from 'rxjs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../core/api.service';
@@ -423,17 +423,23 @@ export class ContactComponent implements OnInit, OnDestroy {
       order_reference: this.formOrderRef.trim() ? this.formOrderRef.trim() : null
     };
     this.submitting.set(true);
-    this.support.submitContact(payload).subscribe({
-      next: () => {
-        this.submitSuccess.set(true);
-        this.formMessage = '';
-        this.formOrderRef = '';
-      },
-      error: (err) => {
-        const msg = err?.error?.detail || this.translate.instant('contact.form.error');
-        this.submitError.set(msg);
-      },
-      complete: () => this.submitting.set(false)
-    });
+    this.support
+      .submitContact(payload)
+      .pipe(
+        finalize(() => {
+          this.submitting.set(false);
+        })
+      )
+      .subscribe({
+        next: () => {
+          this.submitSuccess.set(true);
+          this.formMessage = '';
+          this.formOrderRef = '';
+        },
+        error: (err) => {
+          const msg = err?.error?.detail || this.translate.instant('contact.form.error');
+          this.submitError.set(msg);
+        }
+      });
   }
 }

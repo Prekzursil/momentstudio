@@ -93,18 +93,21 @@ async def create_return_request(
 
     order_items_by_id = {item.id: item for item in order.items}
     items: list[ReturnRequestItem] = []
+    requested_quantities: dict[UUID, int] = {}
     for item_payload in payload.items:
-        order_item = order_items_by_id.get(item_payload.order_item_id)
+        if item_payload.quantity <= 0:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid quantity")
+        requested_quantities[item_payload.order_item_id] = requested_quantities.get(item_payload.order_item_id, 0) + int(
+            item_payload.quantity
+        )
+
+    for order_item_id, quantity in requested_quantities.items():
+        order_item = order_items_by_id.get(order_item_id)
         if not order_item:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order item")
-        if item_payload.quantity <= 0 or item_payload.quantity > int(order_item.quantity):
+        if quantity <= 0 or quantity > int(order_item.quantity):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid quantity")
-        items.append(
-            ReturnRequestItem(
-                order_item_id=order_item.id,
-                quantity=item_payload.quantity,
-            )
-        )
+        items.append(ReturnRequestItem(order_item_id=order_item.id, quantity=quantity))
 
     now = datetime.now(timezone.utc)
     record = ReturnRequest(

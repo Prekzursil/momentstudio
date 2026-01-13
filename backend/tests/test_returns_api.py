@@ -5,6 +5,7 @@ from typing import Dict
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core import security
@@ -42,6 +43,9 @@ def test_app() -> Dict[str, object]:
 async def _seed_admin(session_factory) -> None:
     settings.maintenance_mode = False
     async with session_factory() as session:
+        existing = (await session.execute(select(User).where(User.email == "admin@example.com"))).scalar_one_or_none()
+        if existing:
+            return
         admin = User(
             email="admin@example.com",
             username="admin",
@@ -69,20 +73,21 @@ def _auth_headers(client: TestClient, session_factory) -> dict[str, str]:
 
 async def _seed_order(session_factory) -> tuple[uuid.UUID, uuid.UUID]:
     async with session_factory() as session:
+        suffix = uuid.uuid4().hex[:8]
         user = User(
-            email="user@example.com",
-            username="user",
+            email=f"user-{suffix}@example.com",
+            username=f"user_{suffix}",
             hashed_password=security.hash_password("Password123"),
-            name="Customer",
+            name=f"Customer {suffix}",
             role=UserRole.customer,
             email_verified=True,
         )
         session.add(user)
 
-        cat = Category(slug="cat", name="Cat", description="d", sort_order=1)
+        cat = Category(slug=f"cat-{suffix}", name="Cat", description="d", sort_order=1)
         session.add(cat)
         product = Product(
-            slug="p1",
+            slug=f"p-{suffix}",
             name="Product 1",
             base_price=100,
             currency="RON",
@@ -161,6 +166,28 @@ def test_admin_can_create_list_and_update_return_request(test_app: Dict[str, obj
     )
     assert updated.status_code == 200, updated.text
     assert updated.json()["status"] == "approved"
+
+def test_create_return_request_rejects_duplicate_order_items(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]  # type: ignore[assignment]
+
+    headers = _auth_headers(client, session_factory)
+    order_id, order_item_id = asyncio.run(_seed_order(session_factory))
+
+    created = client.post(
+        "/api/v1/returns/admin",
+        headers=headers,
+        json={
+            "order_id": str(order_id),
+            "reason": "Too many duplicates",
+            "customer_message": "Trying to exceed quantity",
+            "items": [
+                {"order_item_id": str(order_item_id), "quantity": 1},
+                {"order_item_id": str(order_item_id), "quantity": 2},
+            ],
+        },
+    )
+    assert created.status_code == 400, created.text
 
 
 def test_returns_admin_endpoints_require_admin(test_app: Dict[str, object]) -> None:
