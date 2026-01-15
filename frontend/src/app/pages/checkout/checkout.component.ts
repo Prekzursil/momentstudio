@@ -15,6 +15,8 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ThemeMode, ThemeService } from '../../core/theme.service';
 import { AuthService } from '../../core/auth.service';
 import { buildE164, listPhoneCountries, PhoneCountryOption } from '../../shared/phone';
+import { LockerPickerComponent } from '../../shared/locker-picker.component';
+import { LockerProvider, LockerRead } from '../../core/shipping.service';
 
 type CheckoutShippingAddress = {
   name: string;
@@ -41,12 +43,25 @@ type SavedCheckout = {
   address: CheckoutShippingAddress;
   billingSameAsShipping: boolean;
   billing: CheckoutBillingAddress;
+  courier?: LockerProvider;
+  deliveryType?: 'home' | 'locker';
+  locker?: LockerRead | null;
 };
 
 @Component({
   selector: 'app-checkout',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent, LocalizedCurrencyPipe, TranslateModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    ContainerComponent,
+    ButtonComponent,
+    BreadcrumbComponent,
+    LocalizedCurrencyPipe,
+    TranslateModule,
+    LockerPickerComponent
+  ],
   template: `
 	    <app-container classes="py-10 grid gap-6">
 	      <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -277,6 +292,63 @@ type SavedCheckout = {
                   </select>
                 </label>
               </div>
+
+              <div class="grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
+                <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">
+                  {{ 'checkout.deliveryTitle' | translate }}
+                </p>
+                <div class="grid sm:grid-cols-2 gap-3">
+                  <label class="text-sm grid gap-1">
+                    {{ 'checkout.deliveryType' | translate }}
+                    <div class="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        class="flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                        [ngClass]="
+                          deliveryType === 'home'
+                            ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'
+                            : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800'
+                        "
+                        (click)="setDeliveryType('home')"
+                        [attr.aria-pressed]="deliveryType === 'home'"
+                      >
+                        {{ 'checkout.deliveryHome' | translate }}
+                      </button>
+                      <button
+                        type="button"
+                        class="flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                        [ngClass]="
+                          deliveryType === 'locker'
+                            ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'
+                            : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800'
+                        "
+                        (click)="setDeliveryType('locker')"
+                        [attr.aria-pressed]="deliveryType === 'locker'"
+                      >
+                        {{ 'checkout.deliveryLocker' | translate }}
+                      </button>
+                    </div>
+                  </label>
+                  <label class="text-sm grid gap-1">
+                    {{ 'checkout.courier' | translate }}
+                    <select
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      name="courier"
+                      [(ngModel)]="courier"
+                      (ngModelChange)="onCourierChanged()"
+                      required
+                    >
+                      <option value="sameday">{{ 'checkout.courierSameday' | translate }}</option>
+                      <option value="fan_courier">{{ 'checkout.courierFanCourier' | translate }}</option>
+                    </select>
+                  </label>
+                </div>
+                <div *ngIf="deliveryType === 'locker'" class="grid gap-2">
+                  <app-locker-picker [provider]="courier" [(selected)]="locker"></app-locker-picker>
+                  <p *ngIf="deliveryError" class="text-xs text-amber-700 dark:text-amber-300">{{ deliveryError }}</p>
+                </div>
+              </div>
+
               <div class="grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">
@@ -486,6 +558,10 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
   guestEmailError = '';
   private lastGuestEmailRequested: string | null = null;
   private lastGuestEmailVerified: string | null = null;
+  courier: LockerProvider = 'sameday';
+  deliveryType: 'home' | 'locker' = 'home';
+  locker: LockerRead | null = null;
+  deliveryError = '';
   address: CheckoutShippingAddress = {
     name: '',
     email: '',
@@ -533,6 +609,9 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
       this.address = saved.address;
       this.billingSameAsShipping = saved.billingSameAsShipping;
       this.billing = saved.billing;
+      this.courier = saved.courier ?? 'sameday';
+      this.deliveryType = saved.deliveryType ?? 'home';
+      this.locker = saved.locker ?? null;
     }
     this.paymentMethod = this.getStripePublishableKey() ? 'stripe' : 'cod';
     this.phoneCountries = listPhoneCountries(this.translate.currentLang || 'en');
@@ -599,6 +678,11 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.addressError = '';
+    this.deliveryError = '';
+    if (this.deliveryType === 'locker' && !this.locker) {
+      this.deliveryError = this.translate.instant('checkout.deliveryLockerRequired');
+      return;
+    }
     if (this.auth.isAuthenticated() && !this.emailVerified()) {
       this.errorMessage = this.translate.instant('auth.emailVerificationNeeded');
       return;
@@ -684,7 +768,10 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
           region: billing.region || '',
           postal: billing.postal,
           country: billing.country || '',
-        }
+        },
+        courier: this.courier,
+        deliveryType: this.deliveryType,
+        locker: this.locker ? { ...this.locker } : null
       })
     );
   }
@@ -719,7 +806,10 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
             region: String(billing?.region || ''),
             postal: String(billing?.postal || ''),
             country: String(billing?.country || '')
-          }
+          },
+          courier: parsed.courier === 'fan_courier' ? 'fan_courier' : 'sameday',
+          deliveryType: parsed.deliveryType === 'locker' ? 'locker' : 'home',
+          locker: parsed.locker && typeof parsed.locker === 'object' ? (parsed.locker as LockerRead) : null
         };
       }
       // legacy shape: the stored value was the flat address object
@@ -745,10 +835,28 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
           region: addr.region,
           postal: addr.postal,
           country: addr.country
-        }
+        },
+        courier: 'sameday',
+        deliveryType: 'home',
+        locker: null
       };
     } catch {
       return null;
+    }
+  }
+
+  setDeliveryType(value: 'home' | 'locker'): void {
+    this.deliveryType = value;
+    this.deliveryError = '';
+    if (value === 'home') {
+      this.locker = null;
+    }
+  }
+
+  onCourierChanged(): void {
+    this.deliveryError = '';
+    if (this.deliveryType === 'locker') {
+      this.locker = null;
     }
   }
 
@@ -879,7 +987,14 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
       country: this.address.country || 'RO',
       shipping_method_id: null,
       promo_code: this.promo || null,
-      save_address: this.saveAddress
+      save_address: this.saveAddress,
+      courier: this.courier,
+      delivery_type: this.deliveryType,
+      locker_id: this.deliveryType === 'locker' ? this.locker?.id ?? null : null,
+      locker_name: this.deliveryType === 'locker' ? this.locker?.name ?? null : null,
+      locker_address: this.deliveryType === 'locker' ? this.locker?.address ?? null : null,
+      locker_lat: this.deliveryType === 'locker' ? this.locker?.lat ?? null : null,
+      locker_lng: this.deliveryType === 'locker' ? this.locker?.lng ?? null : null,
     };
     if (!this.billingSameAsShipping) {
       body['billing_line1'] = this.billing.line1;
@@ -1033,7 +1148,14 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
       promo_code: this.promo || null,
       save_address: this.saveAddress,
       payment_method: this.paymentMethod,
-      create_account: this.guestCreateAccount
+      create_account: this.guestCreateAccount,
+      courier: this.courier,
+      delivery_type: this.deliveryType,
+      locker_id: this.deliveryType === 'locker' ? this.locker?.id ?? null : null,
+      locker_name: this.deliveryType === 'locker' ? this.locker?.name ?? null : null,
+      locker_address: this.deliveryType === 'locker' ? this.locker?.address ?? null : null,
+      locker_lat: this.deliveryType === 'locker' ? this.locker?.lat ?? null : null,
+      locker_lng: this.deliveryType === 'locker' ? this.locker?.lng ?? null : null,
     };
 
     if (this.guestCreateAccount) {
