@@ -800,6 +800,14 @@ import { missingRequiredProfileFields as computeMissingRequiredProfileFields, ty
                   <span class="text-slate-500 dark:text-slate-400">Shipping</span>
                   <span>{{ order.shipping_method?.name || '—' }}</span>
                 </div>
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <span class="text-slate-500 dark:text-slate-400">Delivery</span>
+                  <span>{{ deliveryLabel(order) }}</span>
+                </div>
+                <div *ngIf="lockerLabel(order)" class="flex flex-wrap items-center justify-between gap-2">
+                  <span class="text-slate-500 dark:text-slate-400">Locker</span>
+                  <span class="truncate">{{ lockerLabel(order) }}</span>
+                </div>
               </div>
 
               <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
@@ -1167,6 +1175,28 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     const trimmed = (trackingNumber || '').trim();
     if (!trimmed) return '';
     return `https://t.17track.net/en#nums=${encodeURIComponent(trimmed)}`;
+  }
+
+  deliveryLabel(order: Order): string {
+    const courierRaw = (order.courier ?? '').trim().toLowerCase();
+    const courier =
+      courierRaw === 'sameday'
+        ? 'Sameday'
+        : courierRaw === 'fan_courier'
+          ? 'Fan Courier'
+          : (order.courier ?? '').trim();
+    const typeRaw = (order.delivery_type ?? '').trim().toLowerCase();
+    const deliveryType = typeRaw === 'home' ? 'Home delivery' : typeRaw === 'locker' ? 'Locker pickup' : (order.delivery_type ?? '').trim();
+    const parts = [courier, deliveryType].filter((p) => (p || '').trim());
+    return parts.length ? parts.join(' · ') : '—';
+  }
+
+  lockerLabel(order: Order): string | null {
+    if ((order.delivery_type ?? '').trim().toLowerCase() !== 'locker') return null;
+    const name = (order.locker_name ?? '').trim();
+    const address = (order.locker_address ?? '').trim();
+    const detail = [name, address].filter((p) => p).join(' — ');
+    return detail || null;
   }
 
   reorder(order: Order): void {

@@ -80,11 +80,20 @@ type OrderAction =
                 <div class="mt-1 font-semibold text-slate-900 dark:text-slate-50">
                   {{ order()!.total_amount | localizedCurrency : order()!.currency }}
                 </div>
+                <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.orders.paymentMethod' | translate }}: {{ paymentMethodLabel() }}
+                </div>
               </div>
               <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
                 <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.tracking' | translate }}</div>
                 <div class="mt-1 font-semibold text-slate-900 dark:text-slate-50 truncate">
                   {{ order()!.tracking_number || '—' }}
+                </div>
+                <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.orders.deliveryMethod' | translate }}: {{ deliveryLabel() }}
+                </div>
+                <div *ngIf="lockerLabel()" class="mt-1 text-xs text-slate-600 dark:text-slate-300 truncate">
+                  {{ lockerLabel() }}
                 </div>
               </div>
             </div>
@@ -537,6 +546,42 @@ export class AdminOrderDetailComponent implements OnInit {
     const username = (o.customer_username ?? '').trim();
     if (email && username) return `${email} (${username})`;
     return email || username || this.translate.instant('adminUi.orders.guest');
+  }
+
+  paymentMethodLabel(): string {
+    const o = this.order();
+    if (!o) return '—';
+    const method = (o.payment_method ?? '').trim().toLowerCase();
+    if (method === 'cod') return this.translate.instant('adminUi.orders.paymentCod');
+    if (method === 'paypal') return this.translate.instant('adminUi.orders.paymentPaypal');
+    if (method === 'stripe') return this.translate.instant('adminUi.orders.paymentStripe');
+    return method || '—';
+  }
+
+  deliveryLabel(): string {
+    const o = this.order();
+    if (!o) return '—';
+    const courierRaw = (o.courier ?? '').trim().toLowerCase();
+    const courier = courierRaw === 'sameday' ? 'Sameday' : courierRaw === 'fan_courier' ? 'Fan Courier' : (o.courier ?? '').trim();
+    const type = (o.delivery_type ?? '').trim().toLowerCase();
+    const deliveryType =
+      type === 'locker'
+        ? this.translate.instant('adminUi.orders.deliveryLocker')
+        : type === 'home'
+          ? this.translate.instant('adminUi.orders.deliveryHome')
+          : (o.delivery_type ?? '').trim();
+    const parts = [courier, deliveryType].filter((p) => (p || '').trim());
+    return parts.length ? parts.join(' · ') : '—';
+  }
+
+  lockerLabel(): string | null {
+    const o = this.order();
+    if (!o) return null;
+    if ((o.delivery_type ?? '').toLowerCase() !== 'locker') return null;
+    const name = (o.locker_name ?? '').trim();
+    const address = (o.locker_address ?? '').trim();
+    const detail = [name, address].filter((p) => p).join(' — ');
+    return detail ? `${this.translate.instant('adminUi.orders.locker')}: ${detail}` : null;
   }
 
   save(): void {
