@@ -7,18 +7,22 @@ from pydantic import field_validator
 from app.models.catalog import ProductStatus
 
 
-class CategoryBase(BaseModel):
-    slug: str = Field(min_length=1, max_length=120)
+class CategoryFields(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     description: str | None = None
     sort_order: int = 0
 
 
-class CategoryCreate(CategoryBase):
-    pass
+class CategoryBase(CategoryFields):
+    slug: str = Field(min_length=1, max_length=120)
+
+
+class CategoryCreate(CategoryFields):
+    slug: str | None = Field(default=None, min_length=1, max_length=120)
 
 
 class CategoryUpdate(BaseModel):
+    slug: str | None = Field(default=None, min_length=1, max_length=120)
     name: str | None = Field(default=None, max_length=120)
     description: str | None = None
     sort_order: int | None = None
@@ -49,9 +53,8 @@ class CategoryTranslationRead(CategoryTranslationUpsert):
     lang: str
 
 
-class ProductBase(BaseModel):
+class ProductFields(BaseModel):
     category_id: UUID
-    slug: str = Field(min_length=1, max_length=160)
     sku: str | None = Field(default=None, min_length=3, max_length=64)
     name: str = Field(min_length=1, max_length=160)
     short_description: str | None = Field(default=None, max_length=280)
@@ -84,6 +87,10 @@ class ProductBase(BaseModel):
         if cleaned != "RON":
             raise ValueError("Only RON currency is supported")
         return cleaned
+
+
+class ProductBase(ProductFields):
+    slug: str = Field(min_length=1, max_length=160)
 
 
 class ProductImageBase(BaseModel):
@@ -187,7 +194,8 @@ class PaginationMeta(BaseModel):
     limit: int
 
 
-class ProductCreate(ProductBase):
+class ProductCreate(ProductFields):
+    slug: str | None = Field(default=None, min_length=1, max_length=160)
     images: list[ProductImageCreate] = []
     variants: list[ProductVariantCreate] = []
     tags: list[str] = []

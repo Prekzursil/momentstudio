@@ -7,7 +7,7 @@ import string
 import uuid
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -281,10 +281,21 @@ async def _log_product_action(
 
 
 async def create_category(session: AsyncSession, payload: CategoryCreate) -> Category:
-    existing = await get_category_by_slug(session, payload.slug)
-    if existing:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category slug already exists")
-    category = Category(**payload.model_dump())
+    requested = (payload.slug or "").strip()
+    base = (requested or slugify(payload.name or "") or "category")[:120]
+    candidate = base
+    counter = 2
+    while await get_category_by_slug(session, candidate):
+        suffix = f"-{counter}"
+        candidate = f"{base[: 120 - len(suffix)]}{suffix}"
+        counter += 1
+
+    category = Category(
+        slug=candidate,
+        name=payload.name,
+        description=payload.description,
+        sort_order=payload.sort_order,
+    )
     session.add(category)
     await session.commit()
     await session.refresh(category)
@@ -292,7 +303,13 @@ async def create_category(session: AsyncSession, payload: CategoryCreate) -> Cat
 
 
 async def update_category(session: AsyncSession, category: Category, payload: CategoryUpdate) -> Category:
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    data = payload.model_dump(exclude_unset=True)
+    if "slug" in data:
+        requested_slug = (data.get("slug") or "").strip()
+        if requested_slug and requested_slug != category.slug:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category slug cannot be changed")
+        data.pop("slug", None)
+    for field, value in data.items():
         setattr(category, field, value)
     session.add(category)
     await session.commit()
@@ -336,14 +353,27 @@ async def reorder_categories(session: AsyncSession, payload: list[CategoryReorde
 async def create_product(
     session: AsyncSession, payload: ProductCreate, commit: bool = True, user_id: uuid.UUID | None = None
 ) -> Product:
-    await _ensure_slug_unique(session, payload.slug)
-    sku = payload.sku or await _generate_unique_sku(session, payload.slug)
+    requested_slug = (payload.slug or "").strip()
+    base_slug = (requested_slug or slugify(payload.name or "") or "product")[:160]
+    candidate_slug = base_slug
+    counter = 2
+    while True:
+        try:
+            await _ensure_slug_unique(session, candidate_slug)
+            break
+        except HTTPException:
+            suffix = f"-{counter}"
+            candidate_slug = f"{base_slug[: 160 - len(suffix)]}{suffix}"
+            counter += 1
+
+    sku = payload.sku or await _generate_unique_sku(session, candidate_slug)
     await _ensure_sku_unique(session, sku)
     _validate_price_currency(payload.base_price, payload.currency)
 
     images_payload = payload.images or []
     variants_payload: list[ProductVariantCreate] = getattr(payload, "variants", []) or []
     product_data = payload.model_dump(exclude={"images", "variants", "tags", "options"})
+    product_data["slug"] = candidate_slug
     product_data["sku"] = sku
     product_data["currency"] = payload.currency.upper()
     product = Product(**product_data)
@@ -372,9 +402,9 @@ async def update_product(
     if "base_price" in data or "currency" in data:
         _validate_price_currency(data.get("base_price", product.base_price), data.get("currency", product.currency))
     if "slug" in data:
-        await _ensure_slug_unique(session, data["slug"], exclude_id=product.id)
         if data["slug"] and data["slug"] != product.slug:
-            await _record_slug_history(session, product, product.slug)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Slug cannot be changed")
+        data.pop("slug", None)
     if "sku" in data and data["sku"]:
         await _ensure_sku_unique(session, data["sku"], exclude_id=product.id)
     if "tags" in data and data["tags"] is not None:
@@ -441,10 +471,16 @@ async def update_product_image_sort(session: AsyncSession, product: Product, ima
 
 
 async def soft_delete_product(session: AsyncSession, product: Product, user_id: uuid.UUID | None = None) -> None:
+    original_slug = product.slug
     product.is_deleted = True
+    # Free the slug for reuse by moving deleted products to a stable tombstone slug.
+    product.slug = f"deleted-{product.id}"
     session.add(product)
+    await session.execute(delete(ProductSlugHistory).where(ProductSlugHistory.product_id == product.id))
     await session.commit()
-    await _log_product_action(session, product.id, "soft_delete", user_id, {"slug": product.slug})
+    await _log_product_action(
+        session, product.id, "soft_delete", user_id, {"slug": original_slug, "tombstone_slug": product.slug}
+    )
 
 
 async def bulk_update_products(
@@ -730,9 +766,13 @@ async def duplicate_product(session: AsyncSession, product: Product) -> Product:
     base_slug = f"{product.slug}-copy"
     new_slug = base_slug
     counter = 1
-    while await get_product_by_slug(session, new_slug):
-        counter += 1
-        new_slug = f"{base_slug}-{counter}"
+    while True:
+        try:
+            await _ensure_slug_unique(session, new_slug)
+            break
+        except HTTPException:
+            counter += 1
+            new_slug = f"{base_slug}-{counter}"
     new_sku = await _generate_unique_sku(session, new_slug)
 
     clone = Product(

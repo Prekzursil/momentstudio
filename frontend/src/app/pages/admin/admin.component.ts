@@ -1086,11 +1086,11 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.categories.title' | translate }}</h2>
             </div>
-            <div class="grid md:grid-cols-3 gap-2 items-end text-sm">
+            <div class="grid md:grid-cols-[1fr_auto] gap-2 items-end text-sm">
               <app-input [label]="'adminUi.products.table.name' | translate" [(value)]="categoryName"></app-input>
-              <app-input [label]="'adminUi.categories.slug' | translate" [(value)]="categorySlug"></app-input>
               <app-button size="sm" [label]="'adminUi.categories.add' | translate" (action)="addCategory()"></app-button>
             </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.categories.slugAutoHint' | translate }}</p>
 	            <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
 	              <div
 	                *ngFor="let cat of categories"
@@ -2142,7 +2142,6 @@ export class AdminComponent implements OnInit, OnDestroy {
   products: AdminProduct[] = [];
   categories: AdminCategory[] = [];
   categoryName = '';
-  categorySlug = '';
   categoryTranslationsSlug: string | null = null;
   categoryTranslationsError = signal<string | null>(null);
   categoryTranslationExists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
@@ -2744,15 +2743,14 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   addCategory(): void {
-    if (!this.categoryName || !this.categorySlug) {
+    if (!this.categoryName) {
       this.toast.error(this.t('adminUi.products.errors.required'));
       return;
     }
-    this.admin.createCategory({ name: this.categoryName, slug: this.categorySlug }).subscribe({
+    this.admin.createCategory({ name: this.categoryName }).subscribe({
       next: (cat) => {
         this.categories = [cat, ...this.categories];
         this.categoryName = '';
-        this.categorySlug = '';
         this.toast.success(this.t('adminUi.categories.success.add'));
       },
       error: () => this.toast.error(this.t('adminUi.categories.errors.add'))
