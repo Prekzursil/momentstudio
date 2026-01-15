@@ -57,6 +57,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Seed example products/categories for dev.
 - [x] SKU generation and uniqueness enforcement.
 - [x] Slug collision handling and validator.
+- [x] Auto-generate product/category slugs (admin UX) and make slugs immutable; free product slugs on delete.
 - [x] Product status enums (draft/published/archived).
 - [x] Track publish date and last_modified.
 - [x] Bulk price/stock update endpoint for admins.
@@ -69,7 +70,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Recently viewed products service (per session).
 - [x] Admin export products CSV.
 - [x] Admin import products CSV with dry-run validation.
-- [x] Product slug history/redirects on slug change.
+- [x] Product slug history/redirects for legacy slugs (slugs are immutable going forward).
 - [x] Server-side pagination metadata (total pages/items).
 - [x] Sort options: newest, price asc/desc, name asc/desc.
 - [x] Backorder/preorder flag + estimated restock date.
@@ -318,6 +319,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Payment form with Stripe elements.
 - [x] Checkout: add billing address section with “same as shipping” toggle and attach billing to orders.
 - [x] Payments UX: add payment method selector with icons (card via Stripe, cash on delivery).
+- [ ] Checkout: add a billing address section with a “same as shipping” toggle and persist/attach it to orders.
+- [ ] Payments UX: add payment method icons and implement Cash on delivery (RON) as an additional option (PayPal optional follow-up).
 - [x] Checkout error states and retry.
 - [x] Save address checkbox for checkout.
 - [x] Order confirmation page with next steps.
@@ -384,7 +387,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin UX: add `/admin/products` page (catalog workflows) and wire it into the admin sidebar.
 - [x] Admin UX: add `/admin/users` page (users + security workflows) and wire it into the admin sidebar.
 - [x] Product list table (sort/search).
-- [x] Product create/edit form (slug, category, price, stock, description, images, variants).
+- [x] Product create/edit form (slug auto-generated, category, price, stock, description, images, variants).
 - [x] Admin orders list with filters + order detail/status update.
 - [x] Admin orders: add actions (retry/capture/void/refund note, delivery email, packing slip download).
 - [x] Content editor for hero and static pages.

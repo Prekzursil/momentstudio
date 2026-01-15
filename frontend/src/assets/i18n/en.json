@@ -956,6 +956,7 @@
       },
       "form": {
         "slug": "Slug",
+        "slugAutoHint": "Auto-generated after save.",
         "sku": "SKU",
         "shortDescription": "Short description",
         "shortDescriptionHint": "Shown in product cards and listings (max 280 characters).",
@@ -984,7 +985,7 @@
         "load": "Unable to load product",
         "save": "Failed to save product",
         "delete": "Failed to delete product",
-        "required": "Category name and slug are required",
+        "required": "Category name is required",
         "image": "Image upload failed",
         "deleteImage": "Failed to delete image",
         "duplicate": "Could not duplicate product",
@@ -1015,6 +1016,7 @@
       "title": "Categories",
       "add": "Add category",
       "slug": "Slug",
+      "slugAutoHint": "Slug is auto-generated from the name.",
       "description": "Description",
       "translations": {
         "button": "Translations",

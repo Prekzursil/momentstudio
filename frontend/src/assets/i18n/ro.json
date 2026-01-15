@@ -956,6 +956,7 @@
       },
       "form": {
         "slug": "Slug",
+        "slugAutoHint": "Generat automat după salvare.",
         "sku": "SKU",
         "shortDescription": "Descriere scurtă",
         "shortDescriptionHint": "Apare în carduri și liste (max 280 caractere).",
@@ -984,7 +985,7 @@
         "load": "Nu am putut încărca produsul",
         "save": "Nu am putut salva produsul",
         "delete": "Nu am putut șterge produsul",
-        "required": "Numele și slug-ul categoriei sunt obligatorii",
+        "required": "Numele categoriei este obligatoriu",
         "image": "Încărcarea imaginii a eșuat",
         "deleteImage": "Nu am putut șterge imaginea",
         "duplicate": "Nu am putut duplica produsul",
@@ -1015,6 +1016,7 @@
       "title": "Categorii",
       "add": "Adaugă categorie",
       "slug": "Slug",
+      "slugAutoHint": "Slug-ul este generat automat din nume.",
       "description": "Descriere",
       "translations": {
         "button": "Traduceri",

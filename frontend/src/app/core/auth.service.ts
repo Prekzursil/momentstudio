@@ -257,20 +257,26 @@ export class AuthService {
   refresh(): Observable<AuthTokens | null> {
     const refreshToken = this.getRefreshToken();
     if (!refreshToken) return of(null);
-    return this.api.post<AuthResponse>('/auth/refresh', { refresh_token: refreshToken }).pipe(
-      tap((res) => this.persist(res)),
-      map((res) => res.tokens)
+    return this.api.post<AuthTokens>('/auth/refresh', { refresh_token: refreshToken }).pipe(
+      tap((tokens) => this.setTokens(tokens)),
+      catchError(() => of(null))
     );
   }
 
   logout(): Observable<void> {
     const refreshToken = this.getRefreshToken();
+    const accessToken = this.getAccessToken();
     this.clear();
     if (!refreshToken) return of(void 0);
-    return this.api.post<void>('/auth/logout', { refresh_token: refreshToken }).pipe(
+    const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined;
+    return this.api.post<void>('/auth/logout', { refresh_token: refreshToken }, headers).pipe(
       catchError(() => of(void 0)),
       map(() => void 0)
     );
+  }
+
+  clearSession(): void {
+    this.clear();
   }
 
   requestPasswordReset(email: string): Observable<void> {
@@ -292,6 +298,16 @@ export class AuthService {
       localStorage.setItem('auth_tokens', JSON.stringify(res.tokens));
       localStorage.setItem('auth_user', JSON.stringify(res.user));
       localStorage.setItem('auth_role', res.user.role);
+    }
+  }
+
+  setTokens(tokens: AuthTokens | null): void {
+    this.tokens = tokens;
+    if (typeof localStorage === 'undefined') return;
+    if (tokens) {
+      localStorage.setItem('auth_tokens', JSON.stringify(tokens));
+    } else {
+      localStorage.removeItem('auth_tokens');
     }
   }
 
