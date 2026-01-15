@@ -47,6 +47,13 @@ class GuestCheckoutRequest(BaseModel):
     billing_postal_code: str | None = Field(default=None, min_length=1, max_length=20)
     billing_country: str | None = Field(default=None, min_length=2, max_length=2)
     payment_method: str = Field(default="stripe", pattern="^(stripe|cod)$")
+    courier: str = Field(default="sameday", pattern="^(sameday|fan_courier)$")
+    delivery_type: str = Field(default="home", pattern="^(home|locker)$")
+    locker_id: str | None = Field(default=None, max_length=80)
+    locker_name: str | None = Field(default=None, max_length=255)
+    locker_address: str | None = Field(default=None, max_length=255)
+    locker_lat: float | None = None
+    locker_lng: float | None = None
     shipping_method_id: UUID | None = None
     promo_code: str | None = None
     save_address: bool = True
@@ -73,6 +80,13 @@ class CheckoutRequest(BaseModel):
     billing_postal_code: str | None = Field(default=None, min_length=1, max_length=20)
     billing_country: str | None = Field(default=None, min_length=2, max_length=2)
     payment_method: str = Field(default="stripe", pattern="^(stripe|cod)$")
+    courier: str = Field(default="sameday", pattern="^(sameday|fan_courier)$")
+    delivery_type: str = Field(default="home", pattern="^(home|locker)$")
+    locker_id: str | None = Field(default=None, max_length=80)
+    locker_name: str | None = Field(default=None, max_length=255)
+    locker_address: str | None = Field(default=None, max_length=255)
+    locker_lat: float | None = None
+    locker_lng: float | None = None
     shipping_method_id: UUID | None = None
     promo_code: str | None = None
     save_address: bool = True

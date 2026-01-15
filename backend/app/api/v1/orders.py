@@ -54,6 +54,33 @@ def _generate_guest_email_token() -> str:
 GUEST_EMAIL_TOKEN_MAX_ATTEMPTS = 10
 
 
+def _delivery_from_payload(
+    *,
+    courier: str,
+    delivery_type: str,
+    locker_id: str | None,
+    locker_name: str | None,
+    locker_address: str | None,
+    locker_lat: float | None,
+    locker_lng: float | None,
+) -> tuple[str, str, str | None, str | None, str | None, float | None, float | None]:
+    courier_clean = (courier or "sameday").strip()
+    delivery_clean = (delivery_type or "home").strip()
+    if delivery_clean == "locker":
+        if not (locker_id or "").strip() or not (locker_name or "").strip() or locker_lat is None or locker_lng is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Locker selection is required")
+        return (
+            courier_clean,
+            delivery_clean,
+            locker_id.strip(),
+            locker_name.strip(),
+            (locker_address or "").strip() or None,
+            float(locker_lat),
+            float(locker_lng),
+        )
+    return courier_clean, delivery_clean, None, None, None, None, None
+
+
 def _sanitize_filename(value: str | None) -> str:
     name = Path(value or "").name.strip()
     if not name:
@@ -186,6 +213,15 @@ async def checkout(
 
     totals, discount_val = cart_service.calculate_totals(user_cart, shipping_method=shipping_method, promo=promo)
     payment_method = payload.payment_method or "stripe"
+    courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = _delivery_from_payload(
+        courier=payload.courier,
+        delivery_type=payload.delivery_type,
+        locker_id=payload.locker_id,
+        locker_name=payload.locker_name,
+        locker_address=payload.locker_address,
+        locker_lat=payload.locker_lat,
+        locker_lng=payload.locker_lng,
+    )
     intent = None
     client_secret = None
     payment_intent_id = None
@@ -204,6 +240,13 @@ async def checkout(
         shipping_method=shipping_method,
         payment_method=payment_method,
         payment_intent_id=payment_intent_id,
+        courier=courier,
+        delivery_type=delivery_type,
+        locker_id=locker_id,
+        locker_name=locker_name,
+        locker_address=locker_address,
+        locker_lat=locker_lat,
+        locker_lng=locker_lng,
         discount=discount_val,
     )
     await notification_service.create_notification(
@@ -543,6 +586,15 @@ async def guest_checkout(
 
     totals, discount_val = cart_service.calculate_totals(cart, shipping_method=shipping_method, promo=promo)
     payment_method = payload.payment_method or "stripe"
+    courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = _delivery_from_payload(
+        courier=payload.courier,
+        delivery_type=payload.delivery_type,
+        locker_id=payload.locker_id,
+        locker_name=payload.locker_name,
+        locker_address=payload.locker_address,
+        locker_lat=payload.locker_lat,
+        locker_lng=payload.locker_lng,
+    )
     intent = None
     client_secret = None
     payment_intent_id = None
@@ -561,6 +613,13 @@ async def guest_checkout(
         shipping_method=shipping_method,
         payment_method=payment_method,
         payment_intent_id=payment_intent_id,
+        courier=courier,
+        delivery_type=delivery_type,
+        locker_id=locker_id,
+        locker_name=locker_name,
+        locker_address=locker_address,
+        locker_lat=locker_lat,
+        locker_lng=locker_lng,
         discount=discount_val,
     )
 

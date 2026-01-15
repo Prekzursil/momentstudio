@@ -51,6 +51,13 @@ class OrderRead(BaseModel):
     user_id: UUID | None = None
     reference_code: str | None = None
     status: OrderStatus
+    courier: str | None = None
+    delivery_type: str | None = None
+    locker_id: str | None = None
+    locker_name: str | None = None
+    locker_address: str | None = None
+    locker_lat: float | None = None
+    locker_lng: float | None = None
     payment_retry_count: int
     total_amount: float
     tax_amount: float
