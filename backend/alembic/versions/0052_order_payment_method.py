@@ -1,7 +1,7 @@
 """Add payment_method to orders.
 
-Revision ID: 0052_order_payment_method
-Revises: 0051_back_in_stock_requests
+Revision ID: 0052
+Revises: 0051
 Create Date: 2026-01-13
 """
 
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = "0052_order_payment_method"
-down_revision = "0051_back_in_stock_requests"
+revision: str = "0052"
+down_revision: str | None = "0051"
 branch_labels = None
 depends_on = None
 
@@ -27,4 +27,3 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_column("orders", "payment_method")
-

@@ -161,7 +161,12 @@ async def checkout(
 
     billing_addr = shipping_addr
     if has_billing:
-        if not payload.billing_city or not payload.billing_postal_code or not payload.billing_country:
+        if not (
+            (payload.billing_line1 or "").strip()
+            and (payload.billing_city or "").strip()
+            and (payload.billing_postal_code or "").strip()
+            and (payload.billing_country or "").strip()
+        ):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Billing address is incomplete")
         billing_addr = await address_service.create_address(
             session,
@@ -513,7 +518,12 @@ async def guest_checkout(
 
     billing_addr = shipping_addr
     if has_billing:
-        if not payload.billing_city or not payload.billing_postal_code or not payload.billing_country:
+        if not (
+            (payload.billing_line1 or "").strip()
+            and (payload.billing_city or "").strip()
+            and (payload.billing_postal_code or "").strip()
+            and (payload.billing_country or "").strip()
+        ):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Billing address is incomplete")
         billing_addr = await address_service.create_address(
             session,

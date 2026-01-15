@@ -634,7 +634,7 @@ def test_authenticated_checkout_cod_skips_payment_intent(checkout_app: Dict[str,
 
     order = asyncio.run(fetch_order())
     assert order is not None
-    assert getattr(order, "payment_method", None) == "cod"
+    assert order.payment_method == "cod"
     assert order.stripe_payment_intent_id is None
 
 

@@ -483,25 +483,25 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
   guestEmailVerified = false;
   guestSendingCode = false;
   guestConfirmingCode = false;
-	  guestEmailError = '';
-	  private lastGuestEmailRequested: string | null = null;
-	  private lastGuestEmailVerified: string | null = null;
-	  address: CheckoutShippingAddress = {
-	    name: '',
-	    email: '',
-	    line1: '',
+  guestEmailError = '';
+  private lastGuestEmailRequested: string | null = null;
+  private lastGuestEmailVerified: string | null = null;
+  address: CheckoutShippingAddress = {
+    name: '',
+    email: '',
+    line1: '',
     line2: '',
     city: '',
     region: '',
     postal: '',
-	    country: '',
-	    password: ''
-	  };
-	  billingSameAsShipping = true;
-	  billing: CheckoutBillingAddress = {
-	    line1: '',
-	    line2: '',
-	    city: '',
+    country: '',
+    password: ''
+  };
+  billingSameAsShipping = true;
+  billing: CheckoutBillingAddress = {
+    line1: '',
+    line2: '',
+    city: '',
     region: '',
     postal: '',
     country: ''
@@ -686,13 +686,13 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
           country: billing.country || '',
         }
       })
-	    );
-	  }
+    );
+  }
 
-	  private loadSavedCheckout(): SavedCheckout | null {
-	    if (typeof localStorage === 'undefined') return null;
-	    try {
-	      const raw = localStorage.getItem('checkout_address');
+  private loadSavedCheckout(): SavedCheckout | null {
+    if (typeof localStorage === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem('checkout_address');
       if (!raw) return null;
       const parsed = JSON.parse(raw) as any;
       if (parsed && typeof parsed === 'object' && parsed.address) {
@@ -718,7 +718,7 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
             city: String(billing?.city || ''),
             region: String(billing?.region || ''),
             postal: String(billing?.postal || ''),
-            country: String(billing?.country || ''),
+            country: String(billing?.country || '')
           }
         };
       }
