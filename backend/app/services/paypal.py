@@ -141,3 +141,22 @@ async def capture_order(*, paypal_order_id: str) -> str:
                 return cap["id"]
     return ""
 
+
+async def refund_capture(*, paypal_capture_id: str) -> str:
+    """Refund a captured PayPal payment and return the PayPal refund id (if available)."""
+    token = await _get_access_token()
+    refund_url = f"{_base_url()}/v2/payments/captures/{paypal_capture_id}/refund"
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.post(
+                refund_url,
+                json={},
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="PayPal refund failed") from exc
+
+    refund_id = data.get("id")
+    return refund_id if isinstance(refund_id, str) else ""

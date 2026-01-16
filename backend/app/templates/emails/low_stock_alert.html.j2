@@ -1,1 +1,5 @@
+{% if lang == "ro" -%}
+<p>{{ product_name }} are stoc redus ({{ stock }} rămase).</p>
+{% else -%}
 <p>{{ product_name }} is low on stock ({{ stock }} remaining).</p>
+{% endif %}

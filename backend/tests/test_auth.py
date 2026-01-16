@@ -166,7 +166,8 @@ def test_password_reset_flow(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     sent = {"token": None}
 
-    async def fake_send(email: str, token: str):
+    async def fake_send(email: str, token: str, lang: str | None = None):
+        _ = lang
         sent["token"] = token
         return True
 

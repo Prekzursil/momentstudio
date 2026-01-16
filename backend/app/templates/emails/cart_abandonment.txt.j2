@@ -1,1 +1,9 @@
+{% if lang == "ro" -%}
+Ai lăsat produse în coș. Finalizează comanda când ai timp.
+
+Coș: {{ cart_url }}
+{% else -%}
 You left items in your cart. Complete your order soon.
+
+Cart: {{ cart_url }}
+{% endif %}

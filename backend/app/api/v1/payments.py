@@ -7,9 +7,11 @@ from app.core.config import settings
 from app.core.dependencies import get_current_user_optional
 from app.db.session import get_session
 from app.models.cart import Cart
+from app.models.order import Order, OrderStatus, OrderEvent
 from app.services import payments
 from app.services import auth as auth_service
 from app.services import email as email_service
+from app.services import notifications as notification_service
 from app.api.v1 import cart as cart_api
 
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -72,5 +74,56 @@ async def stripe_webhook(
                 lang=owner.preferred_language if owner else None,
             )
 
-    # Order status updates would occur here based on event["type"]
+    if inserted and event_type == "payment_intent.succeeded":
+        data = event.get("data")
+        obj = data.get("object") if isinstance(data, dict) else None
+        get = obj.get if hasattr(obj, "get") else None  # type: ignore[assignment]
+        intent_id = get("id") if callable(get) else None
+        if intent_id:
+            order = (
+                (
+                    await session.execute(
+                        select(Order)
+                        .options(selectinload(Order.user))
+                        .where(Order.stripe_payment_intent_id == str(intent_id))
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            if order and order.status in {OrderStatus.pending, OrderStatus.paid}:
+                did_update_status = False
+                if order.status != OrderStatus.paid:
+                    order.status = OrderStatus.paid
+                    session.add(order)
+                    session.add(OrderEvent(order_id=order.id, event="payment_captured", note=f"Stripe {intent_id}"))
+                    await session.commit()
+                    await session.refresh(order)
+                    did_update_status = True
+
+                # Avoid duplicate emails/notifications when the payment capture action already handled them.
+                if did_update_status:
+                    customer_to = (order.user.email if order.user and order.user.email else None) or getattr(
+                        order, "customer_email", None
+                    )
+                    customer_lang = order.user.preferred_language if order.user else None
+                    if customer_to:
+                        background_tasks.add_task(
+                            email_service.send_order_processing_update,
+                            customer_to,
+                            order,
+                            lang=customer_lang,
+                        )
+                    if order.user and order.user.id:
+                        await notification_service.create_notification(
+                            session,
+                            user_id=order.user.id,
+                            type="order",
+                            title="Payment received"
+                            if (order.user.preferred_language or "en") != "ro"
+                            else "Plată confirmată",
+                            body=f"Reference {order.reference_code}" if order.reference_code else None,
+                            url="/account",
+                        )
+
     return {"received": True, "type": event.get("type")}

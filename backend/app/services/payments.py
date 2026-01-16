@@ -35,6 +35,7 @@ async def create_payment_intent(session: AsyncSession, cart: Cart, amount_cents:
         intent = stripe.PaymentIntent.create(
             amount=amount_cents,
             currency="ron",
+            capture_method="manual",
             metadata={"cart_id": str(cart.id), "user_id": str(cart.user_id) if cart.user_id else ""},
         )
     except Exception as exc:
@@ -91,6 +92,17 @@ async def void_payment_intent(intent_id: str) -> dict:
     init_stripe()
     try:
         return stripe.PaymentIntent.cancel(intent_id)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+async def refund_payment_intent(intent_id: str) -> dict:
+    """Refund a captured PaymentIntent."""
+    if not settings.stripe_secret_key:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
+    init_stripe()
+    try:
+        return stripe.Refund.create(payment_intent=intent_id)
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 

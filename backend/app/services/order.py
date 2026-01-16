@@ -115,6 +115,8 @@ async def get_orders_for_user(session: AsyncSession, user_id: UUID) -> Sequence[
             selectinload(Order.shipping_method),
             selectinload(Order.events),
             selectinload(Order.user),
+            selectinload(Order.shipping_address),
+            selectinload(Order.billing_address),
         )
         .order_by(Order.created_at.desc())
     )
@@ -130,6 +132,8 @@ async def get_order(session: AsyncSession, user_id: UUID, order_id: UUID) -> Ord
             selectinload(Order.shipping_method),
             selectinload(Order.events),
             selectinload(Order.user),
+            selectinload(Order.shipping_address),
+            selectinload(Order.billing_address),
         )
     )
     return result.scalar_one_or_none()
@@ -143,6 +147,8 @@ async def list_orders(session: AsyncSession, status: OrderStatus | None = None, 
             selectinload(Order.shipping_method),
             selectinload(Order.events),
             selectinload(Order.user),
+            selectinload(Order.shipping_address),
+            selectinload(Order.billing_address),
         )
         .order_by(Order.created_at.desc())
     )
@@ -237,7 +243,8 @@ async def get_order_by_id_admin(session: AsyncSession, order_id: UUID) -> Order 
 ALLOWED_TRANSITIONS = {
     OrderStatus.pending: {OrderStatus.paid, OrderStatus.cancelled},
     OrderStatus.paid: {OrderStatus.shipped, OrderStatus.refunded},
-    OrderStatus.shipped: {OrderStatus.refunded},
+    OrderStatus.shipped: {OrderStatus.delivered, OrderStatus.refunded},
+    OrderStatus.delivered: {OrderStatus.refunded},
     OrderStatus.cancelled: set(),
     OrderStatus.refunded: set(),
 }
@@ -247,15 +254,34 @@ async def update_order(
     session: AsyncSession, order: Order, payload: OrderUpdate, shipping_method: ShippingMethod | None = None
 ) -> Order:
     data = payload.model_dump(exclude_unset=True)
+    explicit_status = bool(data.get("status"))
     if "status" in data and data["status"]:
         current_status = OrderStatus(order.status)
         next_status = OrderStatus(data["status"])
+        payment_method = (getattr(order, "payment_method", None) or "").strip().lower()
+        if (
+            current_status == OrderStatus.pending
+            and next_status == OrderStatus.paid
+            and payment_method == "stripe"
+            and bool((getattr(order, "stripe_payment_intent_id", None) or "").strip())
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Stripe orders must be accepted via Capture payment.",
+            )
+        if (
+            current_status == OrderStatus.pending
+            and next_status == OrderStatus.cancelled
+            and payment_method == "stripe"
+            and bool((getattr(order, "stripe_payment_intent_id", None) or "").strip())
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Stripe orders must be rejected via Void payment.",
+            )
         allowed = ALLOWED_TRANSITIONS.get(current_status, set())
         if next_status not in allowed:
-            if current_status == OrderStatus.pending and next_status == OrderStatus.shipped and getattr(order, "payment_method", None) == "cod":
-                pass
-            else:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
         order.status = next_status
         data.pop("status")
         await _log_event(session, order.id, "status_change", f"{current_status.value} -> {next_status.value}")
@@ -271,6 +297,18 @@ async def update_order(
 
     for field, value in data.items():
         setattr(order, field, value)
+
+    tracking_in_payload = any(
+        (str(data.get(key) or "").strip() for key in ("tracking_number", "tracking_url"))
+    )
+    if (
+        not explicit_status
+        and tracking_in_payload
+        and order.status == OrderStatus.paid
+    ):
+        previous = OrderStatus(order.status)
+        order.status = OrderStatus.shipped
+        await _log_event(session, order.id, "status_auto_ship", f"{previous.value} -> {OrderStatus.shipped.value}")
     session.add(order)
     await session.commit()
     hydrated = await get_order_by_id(session, order.id)
@@ -324,6 +362,8 @@ async def get_order_by_id(session: AsyncSession, order_id: UUID) -> Order | None
             selectinload(Order.shipping_method),
             selectinload(Order.events),
             selectinload(Order.user),
+            selectinload(Order.shipping_address),
+            selectinload(Order.billing_address),
         )
         .where(Order.id == order_id)
     )
@@ -359,8 +399,8 @@ async def retry_payment(session: AsyncSession, order: Order) -> Order:
 
 
 async def refund_order(session: AsyncSession, order: Order, note: str | None = None) -> Order:
-    if order.status not in {OrderStatus.paid, OrderStatus.shipped}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Refund allowed only for paid or shipped orders")
+    if order.status not in {OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Refund allowed only for paid/shipped/delivered orders")
     previous = order.status
     order.status = OrderStatus.refunded
     await _log_event(session, order.id, "refund_requested", note or f"Manual refund requested from {previous.value}")
@@ -392,10 +432,19 @@ async def void_payment(session: AsyncSession, order: Order, intent_id: str | Non
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent id required")
     if order.status not in {OrderStatus.pending, OrderStatus.paid}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Void only allowed for pending/paid orders")
-    await payments.void_payment_intent(payment_intent_id)
+    event = "payment_voided"
+    note = f"Intent {payment_intent_id}"
+    try:
+        await payments.void_payment_intent(payment_intent_id)
+    except HTTPException:
+        # If the intent is already captured, cancel will fail. Fall back to a best-effort refund.
+        refund = await payments.refund_payment_intent(payment_intent_id)
+        refund_id = refund.get("id") if isinstance(refund, dict) else None
+        event = "payment_refunded"
+        note = f"Stripe refund {refund_id}".strip() if refund_id else "Stripe refund"
     order.stripe_payment_intent_id = payment_intent_id
     order.status = OrderStatus.cancelled
-    await _log_event(session, order.id, "payment_voided", f"Intent {payment_intent_id}")
+    await _log_event(session, order.id, event, note)
     session.add(order)
     await session.commit()
     hydrated = await get_order_by_id(session, order.id)

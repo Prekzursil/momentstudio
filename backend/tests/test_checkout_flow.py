@@ -149,7 +149,7 @@ def test_guest_checkout_email_verification_and_create_account(
         captured["amount_cents"] = amount_cents
         return {"client_secret": "secret_test", "intent_id": "pi_test"}
 
-    async def fake_send_order_confirmation(to_email, order, items=None):
+    async def fake_send_order_confirmation(to_email, order, items=None, lang=None):
         captured["email"] = to_email
         return True
 
@@ -163,10 +163,17 @@ def test_guest_checkout_email_verification_and_create_account(
         captured["verification_token"] = token
         return True
 
+    async def fake_send_welcome_email(to_email, first_name=None, lang=None):
+        captured["welcome_email"] = to_email
+        captured["welcome_lang"] = lang
+        captured["welcome_first_name"] = first_name
+        return True
+
     monkeypatch.setattr(payments, "create_payment_intent", fake_create_payment_intent)
     monkeypatch.setattr(email_service, "send_order_confirmation", fake_send_order_confirmation)
     monkeypatch.setattr(email_service, "send_new_order_notification", fake_send_new_order_notification)
     monkeypatch.setattr(email_service, "send_verification_email", fake_send_verification_email)
+    monkeypatch.setattr(email_service, "send_welcome_email", fake_send_welcome_email)
 
     req = client.post(
         "/api/v1/orders/guest-checkout/email/request",
@@ -225,6 +232,9 @@ def test_guest_checkout_email_verification_and_create_account(
     assert captured.get("admin_email") == "owner2@example.com"
     assert captured.get("admin_customer_email") == "guest2@example.com"
     assert captured.get("amount_cents") == 2200
+    assert captured.get("welcome_email") == "guest2@example.com"
+    assert captured.get("welcome_lang") == "en"
+    assert captured.get("welcome_first_name") == "Guest"
 
     async def fetch_user() -> User:
         async with SessionLocal() as session:
@@ -402,7 +412,7 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
         captured["amount_cents"] = amount_cents
         return {"client_secret": "secret_test", "intent_id": "pi_test"}
 
-    async def fake_send_order_confirmation(to_email, order, items=None):
+    async def fake_send_order_confirmation(to_email, order, items=None, lang=None):
         captured["email"] = to_email
         return True
 
@@ -779,13 +789,14 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
         json={"paypal_order_id": "PAYPAL-ORDER-1"},
     )
     assert capture.status_code == 200, capture.text
-    assert capture.json()["status"] == "paid"
+    # PayPal capture confirms payment, but order acceptance is still an admin action.
+    assert capture.json()["status"] == "pending"
     assert capture.json()["paypal_capture_id"] == "CAPTURE-1"
     assert called["paypal_captured"] is True
 
     order2 = asyncio.run(fetch_order())
     assert order2 is not None
-    assert order2.status.value == "paid"
+    assert order2.status.value == "pending"
     assert order2.paypal_capture_id == "CAPTURE-1"
 
 

@@ -16,6 +16,7 @@ class OrderStatus(str, enum.Enum):
     pending = "pending"
     paid = "paid"
     shipped = "shipped"
+    delivered = "delivered"
     cancelled = "cancelled"
     refunded = "refunded"
 

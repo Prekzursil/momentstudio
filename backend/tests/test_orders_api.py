@@ -256,11 +256,11 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     sent = {"count": 0, "shipped": 0, "delivered": 0, "refund": 0}
     refund_meta: dict[str, str | None] = {"to": None, "requested_by": None, "note": None}
 
-    async def fake_send_order_confirmation(to_email, order, items=None):
+    async def fake_send_order_confirmation(to_email, order, items=None, lang=None):
         sent["count"] += 1
         return True
 
-    async def fake_send_shipping_update(to_email, order, tracking=None):
+    async def fake_send_shipping_update(to_email, order, tracking=None, lang=None):
         sent["shipped"] += 1
         return True
 
@@ -365,7 +365,7 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     assert receipt.status_code == 200
     assert receipt.headers.get("content-type", "").startswith("application/pdf")
     assert receipt.headers.get("content-disposition", "").startswith("attachment;")
-    assert "Receipt for order" in receipt.text
+    assert receipt.content.startswith(b"%PDF")
 
     other_token, _ = create_user_token(SessionLocal, email="otherbuyer@example.com")
     forbidden = client.get(f"/api/v1/orders/{order_id}/receipt", headers=auth_headers(other_token))
@@ -393,7 +393,7 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
 
     shipping_method_id = asyncio.run(seed_shipping())
 
-    async def fake_email(to_email, order, items=None):
+    async def fake_email(to_email, order, items=None, lang=None):
         return True
 
     monkeypatch.setattr(email_service, "send_order_confirmation", fake_email)

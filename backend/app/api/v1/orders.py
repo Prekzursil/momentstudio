@@ -25,6 +25,7 @@ from app.services import order as order_service
 from app.services import email as email_service
 from app.services import auth as auth_service
 from app.services import private_storage
+from app.services import receipts as receipt_service
 from app.schemas.checkout import (
     CheckoutRequest,
     GuestCheckoutRequest,
@@ -126,6 +127,7 @@ async def create_order(
         shipping_address_id=payload.shipping_address_id,
         billing_address_id=payload.billing_address_id,
         shipping_method=shipping_method,
+        payment_method="cod",
     )
     await notification_service.create_notification(
         session,
@@ -135,7 +137,13 @@ async def create_order(
         body=f"Reference {order.reference_code}" if order.reference_code else None,
         url="/account",
     )
-    background_tasks.add_task(email_service.send_order_confirmation, current_user.email, order, order.items)
+    background_tasks.add_task(
+        email_service.send_order_confirmation,
+        current_user.email,
+        order,
+        order.items,
+        current_user.preferred_language,
+    )
     owner = await auth_service.get_owner_user(session)
     admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
     if admin_to:
@@ -270,7 +278,13 @@ async def checkout(
         body=f"Reference {order.reference_code}" if order.reference_code else None,
         url="/account",
     )
-    background_tasks.add_task(email_service.send_order_confirmation, current_user.email, order, order.items)
+    background_tasks.add_task(
+        email_service.send_order_confirmation,
+        current_user.email,
+        order,
+        order.items,
+        current_user.preferred_language,
+    )
     owner = await auth_service.get_owner_user(session)
     admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
     if admin_to:
@@ -294,6 +308,7 @@ async def checkout(
 @router.post("/paypal/capture", response_model=PayPalCaptureResponse)
 async def capture_paypal_order(
     payload: PayPalCaptureRequest,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     current_user=Depends(get_current_user_optional),
 ) -> PayPalCaptureResponse:
@@ -314,7 +329,7 @@ async def capture_paypal_order(
         if not current_user or order.user_id != current_user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
 
-    if order.paypal_capture_id and order.status == OrderStatus.paid:
+    if order.paypal_capture_id:
         return PayPalCaptureResponse(
             order_id=order.id,
             reference_code=order.reference_code,
@@ -327,7 +342,6 @@ async def capture_paypal_order(
 
     capture_id = await paypal_service.capture_order(paypal_order_id=paypal_order_id)
     order.paypal_capture_id = capture_id or order.paypal_capture_id
-    order.status = OrderStatus.paid
     session.add(order)
     session.add(OrderEvent(order_id=order.id, event="payment_captured", note=f"PayPal {capture_id}".strip()))
     await session.commit()
@@ -594,6 +608,12 @@ async def guest_checkout(
         await session.commit()
         await session.refresh(user)
         user_id = user.id
+        background_tasks.add_task(
+            email_service.send_welcome_email,
+            user.email,
+            first_name=user.first_name,
+            lang=user.preferred_language,
+        )
 
     shipping_method = None
     if payload.shipping_method_id:
@@ -698,7 +718,13 @@ async def guest_checkout(
         discount=discount_val,
     )
 
-    background_tasks.add_task(email_service.send_order_confirmation, email, order, order.items)
+    background_tasks.add_task(
+        email_service.send_order_confirmation,
+        email,
+        order,
+        order.items,
+        payload.preferred_language,
+    )
     owner = await auth_service.get_owner_user(session)
     admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
     if admin_to:
@@ -738,20 +764,99 @@ async def admin_update_order(
         if not shipping_method:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
     updated = await order_service.update_order(session, order, payload, shipping_method=shipping_method)
-    if previous_status != updated.status and updated.status == OrderStatus.shipped:
-        shipping_to = (
-            updated.user.email
-            if updated.user and updated.user.email
-            else getattr(updated, "customer_email", None)
+    if previous_status != updated.status:
+        if (
+            updated.status == OrderStatus.cancelled
+            and (updated.payment_method or "").strip().lower() == "paypal"
+            and updated.paypal_capture_id
+        ):
+            try:
+                refund_id = await paypal_service.refund_capture(paypal_capture_id=updated.paypal_capture_id)
+                session.add(
+                    OrderEvent(
+                        order_id=updated.id,
+                        event="payment_refunded",
+                        note=f"PayPal refund {refund_id}".strip() if refund_id else "PayPal refund",
+                    )
+                )
+                await session.commit()
+            except HTTPException:
+                owner = await auth_service.get_owner_user(session)
+                if owner and owner.id:
+                    await notification_service.create_notification(
+                        session,
+                        user_id=owner.id,
+                        type="admin",
+                        title="PayPal refund required"
+                        if (owner.preferred_language or "en") != "ro"
+                        else "Rambursare PayPal necesară",
+                        body=(
+                            f"Order {updated.reference_code or updated.id} needs a manual PayPal refund."
+                            if (owner.preferred_language or "en") != "ro"
+                            else f"Comanda {updated.reference_code or updated.id} necesită o rambursare PayPal manuală."
+                        ),
+                        url=f"/admin/orders/{updated.id}",
+                    )
+        customer_email = (updated.user.email if updated.user and updated.user.email else None) or getattr(
+            updated, "customer_email", None
         )
-        if shipping_to:
-            background_tasks.add_task(email_service.send_shipping_update, shipping_to, updated, updated.tracking_number)
+        customer_lang = updated.user.preferred_language if updated.user else None
+        if customer_email:
+            if updated.status == OrderStatus.paid:
+                background_tasks.add_task(
+                    email_service.send_order_processing_update,
+                    customer_email,
+                    updated,
+                    lang=customer_lang,
+                )
+            elif updated.status == OrderStatus.shipped:
+                background_tasks.add_task(
+                    email_service.send_shipping_update,
+                    customer_email,
+                    updated,
+                    updated.tracking_number,
+                    customer_lang,
+                )
+            elif updated.status == OrderStatus.delivered:
+                background_tasks.add_task(
+                    email_service.send_delivery_confirmation,
+                    customer_email,
+                    updated,
+                    customer_lang,
+                )
+            elif updated.status == OrderStatus.cancelled:
+                background_tasks.add_task(
+                    email_service.send_order_cancelled_update,
+                    customer_email,
+                    updated,
+                    lang=customer_lang,
+                )
+            elif updated.status == OrderStatus.refunded:
+                background_tasks.add_task(
+                    email_service.send_order_refunded_update,
+                    customer_email,
+                    updated,
+                    lang=customer_lang,
+                )
+
         if updated.user and updated.user.id:
+            if updated.status == OrderStatus.paid:
+                title = "Order processing" if (updated.user.preferred_language or "en") != "ro" else "Comandă în procesare"
+            elif updated.status == OrderStatus.shipped:
+                title = "Order shipped" if (updated.user.preferred_language or "en") != "ro" else "Comandă expediată"
+            elif updated.status == OrderStatus.delivered:
+                title = "Order complete" if (updated.user.preferred_language or "en") != "ro" else "Comandă finalizată"
+            elif updated.status == OrderStatus.cancelled:
+                title = "Order cancelled" if (updated.user.preferred_language or "en") != "ro" else "Comandă anulată"
+            elif updated.status == OrderStatus.refunded:
+                title = "Order refunded" if (updated.user.preferred_language or "en") != "ro" else "Comandă rambursată"
+            else:
+                title = "Order update" if (updated.user.preferred_language or "en") != "ro" else "Actualizare comandă"
             await notification_service.create_notification(
                 session,
                 user_id=updated.user.id,
                 type="order",
-                title="Order shipped" if (updated.user.preferred_language or "en") != "ro" else "Comandă expediată",
+                title=title,
                 body=f"Reference {updated.reference_code}" if updated.reference_code else None,
                 url="/account",
             )
@@ -887,6 +992,19 @@ async def admin_refund_order(
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
     updated = await order_service.refund_order(session, order, note=note)
+    customer_to = (updated.user.email if updated.user and updated.user.email else None) or getattr(updated, "customer_email", None)
+    customer_lang = updated.user.preferred_language if updated.user else None
+    if customer_to:
+        background_tasks.add_task(email_service.send_order_refunded_update, customer_to, updated, lang=customer_lang)
+    if updated.user and updated.user.id:
+        await notification_service.create_notification(
+            session,
+            user_id=updated.user.id,
+            type="order",
+            title="Order refunded" if (updated.user.preferred_language or "en") != "ro" else "Comandă rambursată",
+            body=f"Reference {updated.reference_code}" if updated.reference_code else None,
+            url="/account",
+        )
     owner = await auth_service.get_owner_user(session)
     admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
     if admin_to:
@@ -959,6 +1077,7 @@ async def admin_packing_slip(
 
 @router.post("/admin/{order_id}/capture-payment", response_model=OrderRead)
 async def admin_capture_payment(
+    background_tasks: BackgroundTasks,
     order_id: UUID,
     intent_id: str | None = None,
     session: AsyncSession = Depends(get_session),
@@ -967,11 +1086,26 @@ async def admin_capture_payment(
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    return await order_service.capture_payment(session, order, intent_id=intent_id)
+    updated = await order_service.capture_payment(session, order, intent_id=intent_id)
+    customer_to = (updated.user.email if updated.user and updated.user.email else None) or getattr(updated, "customer_email", None)
+    customer_lang = updated.user.preferred_language if updated.user else None
+    if customer_to:
+        background_tasks.add_task(email_service.send_order_processing_update, customer_to, updated, lang=customer_lang)
+    if updated.user and updated.user.id:
+        await notification_service.create_notification(
+            session,
+            user_id=updated.user.id,
+            type="order",
+            title="Order processing" if (updated.user.preferred_language or "en") != "ro" else "Comandă în procesare",
+            body=f"Reference {updated.reference_code}" if updated.reference_code else None,
+            url="/account",
+        )
+    return updated
 
 
 @router.post("/admin/{order_id}/void-payment", response_model=OrderRead)
 async def admin_void_payment(
+    background_tasks: BackgroundTasks,
     order_id: UUID,
     intent_id: str | None = None,
     session: AsyncSession = Depends(get_session),
@@ -980,7 +1114,21 @@ async def admin_void_payment(
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    return await order_service.void_payment(session, order, intent_id=intent_id)
+    updated = await order_service.void_payment(session, order, intent_id=intent_id)
+    customer_to = (updated.user.email if updated.user and updated.user.email else None) or getattr(updated, "customer_email", None)
+    customer_lang = updated.user.preferred_language if updated.user else None
+    if customer_to:
+        background_tasks.add_task(email_service.send_order_cancelled_update, customer_to, updated, lang=customer_lang)
+    if updated.user and updated.user.id:
+        await notification_service.create_notification(
+            session,
+            user_id=updated.user.id,
+            type="order",
+            title="Order cancelled" if (updated.user.preferred_language or "en") != "ro" else "Comandă anulată",
+            body=f"Reference {updated.reference_code}" if updated.reference_code else None,
+            url="/account",
+        )
+    return updated
 
 
 @router.post("/shipping-methods", response_model=ShippingMethodRead, status_code=status.HTTP_201_CREATED)
@@ -1019,13 +1167,8 @@ async def download_receipt(
     ref = order.reference_code or str(order.id)
     filename = f"receipt-{ref}.pdf"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
-    content = (
-        f"Receipt for order {ref}\n"
-        f"Status: {order.status}\n"
-        f"Total: {order.total_amount} {order.currency}\n"
-        f"Items: {len(order.items)}\n"
-    )
-    return PlainTextResponse(content, media_type="application/pdf", headers=headers)
+    pdf = receipt_service.render_order_receipt_pdf(order, order.items)
+    return StreamingResponse(io.BytesIO(pdf), media_type="application/pdf", headers=headers)
 
 
 @router.post("/{order_id}/reorder", response_model=CartRead)

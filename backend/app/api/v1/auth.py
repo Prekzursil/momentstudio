@@ -248,6 +248,7 @@ class UserAliasesResponse(BaseModel):
 async def register(
     payload: RegisterRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(register_rate_limit),
 ) -> AuthResponse:
@@ -268,6 +269,19 @@ async def register(
         ),
     )
     metrics.record_signup()
+    record = await auth_service.create_email_verification(session, user)
+    background_tasks.add_task(
+        email_service.send_verification_email,
+        user.email,
+        record.token,
+        user.preferred_language,
+    )
+    background_tasks.add_task(
+        email_service.send_welcome_email,
+        user.email,
+        first_name=user.first_name,
+        lang=user.preferred_language,
+    )
     tokens = await auth_service.issue_tokens_for_user(session, user)
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
@@ -349,6 +363,7 @@ async def logout(
 @router.post("/password/change", status_code=status.HTTP_200_OK)
 async def change_password(
     payload: ChangePasswordRequest,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> dict:
@@ -357,6 +372,7 @@ async def change_password(
     current_user.hashed_password = security.hash_password(payload.new_password)
     session.add(current_user)
     await session.commit()
+    background_tasks.add_task(email_service.send_password_changed, current_user.email, lang=current_user.preferred_language)
     return {"detail": "Password updated"}
 
 
@@ -367,7 +383,12 @@ async def request_email_verification(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     record = await auth_service.create_email_verification(session, current_user)
-    background_tasks.add_task(email_service.send_verification_email, current_user.email, record.token)
+    background_tasks.add_task(
+        email_service.send_verification_email,
+        current_user.email,
+        record.token,
+        current_user.preferred_language,
+    )
     return {"detail": "Verification email sent"}
 
 
@@ -436,9 +457,12 @@ async def update_email(
 ) -> UserResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+    old_email = current_user.email
     user = await auth_service.update_email(session, current_user, str(payload.email))
     record = await auth_service.create_email_verification(session, user)
-    background_tasks.add_task(email_service.send_verification_email, user.email, record.token)
+    background_tasks.add_task(email_service.send_email_changed, old_email, old_email=old_email, new_email=user.email, lang=user.preferred_language)
+    background_tasks.add_task(email_service.send_email_changed, user.email, old_email=old_email, new_email=user.email, lang=user.preferred_language)
+    background_tasks.add_task(email_service.send_verification_email, user.email, record.token, user.preferred_language)
     return UserResponse.model_validate(user)
 
 
@@ -656,17 +680,20 @@ async def request_password_reset(
     _: None = Depends(reset_request_rate_limit),
 ) -> dict[str, str]:
     reset = await auth_service.create_reset_token(session, payload.email)
-    background_tasks.add_task(email_service.send_password_reset, payload.email, reset.token)
+    user = await session.get(User, reset.user_id)
+    background_tasks.add_task(email_service.send_password_reset, payload.email, reset.token, getattr(user, "preferred_language", None))
     return {"status": "sent"}
 
 
 @router.post("/password-reset/confirm", status_code=status.HTTP_200_OK)
 async def confirm_password_reset(
     payload: PasswordResetConfirm,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(reset_confirm_rate_limit),
 ) -> dict[str, str]:
-    await auth_service.confirm_reset_token(session, payload.token, payload.new_password)
+    user = await auth_service.confirm_reset_token(session, payload.token, payload.new_password)
+    background_tasks.add_task(email_service.send_password_changed, user.email, lang=user.preferred_language)
     return {"status": "updated"}
 
 
@@ -809,6 +836,7 @@ class GoogleCompleteRequest(BaseModel):
 @router.post("/google/complete", response_model=AuthResponse)
 async def google_complete_registration(
     payload: GoogleCompleteRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_google_completion_user),
     session: AsyncSession = Depends(get_session),
     response: Response = None,
@@ -826,6 +854,15 @@ async def google_complete_registration(
         password=payload.password,
         preferred_language=payload.preferred_language,
     )
+    background_tasks.add_task(
+        email_service.send_welcome_email,
+        user.email,
+        first_name=user.first_name,
+        lang=user.preferred_language,
+    )
+    if not user.email_verified:
+        record = await auth_service.create_email_verification(session, user)
+        background_tasks.add_task(email_service.send_verification_email, user.email, record.token, user.preferred_language)
     tokens = await auth_service.issue_tokens_for_user(session, user)
     if response:
         set_refresh_cookie(response, tokens["refresh_token"])

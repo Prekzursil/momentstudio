@@ -1,1 +1,7 @@
+{% if lang == "ro" -%}
+<p>Ai lăsat produse în coș. Finalizează comanda când ai timp.</p>
+<p><a href="{{ cart_url }}">Vezi coșul</a></p>
+{% else -%}
 <p>You left items in your cart. Complete your order soon.</p>
+<p><a href="{{ cart_url }}">View cart</a></p>
+{% endif %}
