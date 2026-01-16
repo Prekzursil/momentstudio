@@ -242,7 +242,7 @@ async def get_order_by_id_admin(session: AsyncSession, order_id: UUID) -> Order 
 
 ALLOWED_TRANSITIONS = {
     OrderStatus.pending: {OrderStatus.paid, OrderStatus.cancelled},
-    OrderStatus.paid: {OrderStatus.shipped, OrderStatus.refunded},
+    OrderStatus.paid: {OrderStatus.shipped, OrderStatus.refunded, OrderStatus.cancelled},
     OrderStatus.shipped: {OrderStatus.delivered, OrderStatus.refunded},
     OrderStatus.delivered: {OrderStatus.refunded},
     OrderStatus.cancelled: set(),
@@ -284,7 +284,7 @@ async def update_order(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Payment is not captured yet. Wait for payment confirmation before accepting the order.",
                 )
-        if current_status == OrderStatus.pending and next_status == OrderStatus.cancelled:
+        if next_status == OrderStatus.cancelled and current_status in {OrderStatus.pending, OrderStatus.paid}:
             if cancel_reason_clean is None or not cancel_reason_clean:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancel reason is required")
         allowed = ALLOWED_TRANSITIONS.get(current_status, set())

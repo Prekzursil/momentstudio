@@ -532,6 +532,23 @@ def test_admin_accept_requires_payment_capture_and_cancel_reason(
     assert accept_with_capture.status_code == 200, accept_with_capture.text
     assert accept_with_capture.json()["status"] == "paid"
 
+    cancel_paid_missing_reason = client.patch(
+        f"/api/v1/orders/admin/{stripe_order_id_str}",
+        headers=auth_headers(admin_token),
+        json={"status": "cancelled"},
+    )
+    assert cancel_paid_missing_reason.status_code == 400, cancel_paid_missing_reason.text
+    assert "Cancel reason is required" in cancel_paid_missing_reason.text
+
+    cancel_paid = client.patch(
+        f"/api/v1/orders/admin/{stripe_order_id_str}",
+        headers=auth_headers(admin_token),
+        json={"status": "cancelled", "cancel_reason": "Customer requested cancellation"},
+    )
+    assert cancel_paid.status_code == 200, cancel_paid.text
+    assert cancel_paid.json()["status"] == "cancelled"
+    assert cancel_paid.json()["cancel_reason"] == "Customer requested cancellation"
+
     async def seed_pending_order() -> UUID:
         async with SessionLocal() as session:
             order = Order(
