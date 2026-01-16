@@ -984,6 +984,7 @@
       "form": {
         "slug": "Slug",
         "slugAutoHint": "Auto-generated after save.",
+        "priceFormatHint": "Use numbers and a dot with up to 2 decimals (example: 123.45).",
         "sku": "SKU",
         "shortDescription": "Short description",
         "shortDescriptionHint": "Shown in product cards and listings (max 280 characters).",
@@ -1098,7 +1099,7 @@
       "shippingLabelDelete": "Delete",
       "confirmDeleteLabel": "Delete the shipping label for this order?",
       "save": "Save changes",
-      "saveHint": "Updates status and tracking; emails send on shipped.",
+      "saveHint": "Updates status and tracking; emails send on status changes.",
       "actionsTitle": "Actions",
       "paymentTitle": "Payment",
       "paymentMethod": "Payment method",
@@ -1149,8 +1150,9 @@
       "next": "Next",
       "all": "All",
       "pending": "Pending",
-      "paid": "Paid",
+      "paid": "In progress",
       "shipped": "Shipped",
+      "delivered": "Complete",
       "cancelled": "Cancelled",
       "refunded": "Refunded",
       "success": {

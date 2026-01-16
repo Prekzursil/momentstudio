@@ -742,12 +742,13 @@ import { missingRequiredProfileFields as computeMissingRequiredProfileFields, ty
                 [(ngModel)]="orderFilter"
                 (change)="filterOrders()"
               >
-                <option value="">All</option>
-                <option value="pending">Pending</option>
-                <option value="paid">Paid</option>
-                <option value="shipped">Shipped</option>
-                <option value="cancelled">Cancelled</option>
-                <option value="refunded">Refunded</option>
+                <option value="">{{ 'adminUi.orders.all' | translate }}</option>
+                <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
+                <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
+                <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
+                <option value="delivered">{{ 'adminUi.orders.delivered' | translate }}</option>
+                <option value="cancelled">{{ 'adminUi.orders.cancelled' | translate }}</option>
+                <option value="refunded">{{ 'adminUi.orders.refunded' | translate }}</option>
               </select>
             </label>
           </div>
@@ -770,7 +771,9 @@ import { missingRequiredProfileFields as computeMissingRequiredProfileFields, ty
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
                   <span class="font-semibold text-slate-900 dark:text-slate-50">Order #{{ order.reference_code || order.id }}</span>
-                  <span class="text-xs rounded-full px-2 py-1" [ngClass]="orderStatusChipClass(order.status)">{{ order.status }}</span>
+                  <span class="text-xs rounded-full px-2 py-1" [ngClass]="orderStatusChipClass(order.status)">
+                    {{ ('adminUi.orders.' + order.status) | translate }}
+                  </span>
                 </div>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   {{ order.created_at | date: 'mediumDate' }} · {{ order.items.length }} item{{ order.items.length === 1 ? '' : 's' }}
@@ -1165,6 +1168,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
       pending: 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-100',
       paid: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100',
       shipped: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-100',
+      delivered: 'bg-teal-100 text-teal-800 dark:bg-teal-950/40 dark:text-teal-100',
       cancelled: 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-100',
       refunded: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'
     };

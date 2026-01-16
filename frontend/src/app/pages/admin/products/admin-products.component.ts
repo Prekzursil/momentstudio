@@ -17,7 +17,7 @@ type ProductStatusFilter = 'all' | 'draft' | 'published' | 'archived';
 type ProductForm = {
   name: string;
   category_id: string;
-  base_price: number;
+  base_price: string;
   stock_quantity: number;
   status: 'draft' | 'published' | 'archived';
   is_active: boolean;
@@ -214,7 +214,15 @@ type ProductTranslationForm = {
             </select>
           </label>
 
-          <app-input [label]="'adminUi.products.table.price' | translate" type="number" [(value)]="form.base_price"></app-input>
+          <app-input
+            [label]="'adminUi.products.table.price' | translate"
+            [placeholder]="'123.45'"
+            type="text"
+            inputMode="decimal"
+            [value]="form.base_price"
+            (valueChange)="onBasePriceChange($event)"
+            [hint]="basePriceError || ('adminUi.products.form.priceFormatHint' | translate)"
+          ></app-input>
           <app-input [label]="'adminUi.products.table.stock' | translate" type="number" [(value)]="form.stock_quantity"></app-input>
 
           <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -437,6 +445,7 @@ export class AdminProductsComponent implements OnInit {
   adminCategories = signal<Array<{ id: string; name: string }>>([]);
 
   form: ProductForm = this.blankForm();
+  basePriceError = '';
 
   translationLoading = signal(false);
   translationError = signal<string | null>(null);
@@ -485,6 +494,7 @@ export class AdminProductsComponent implements OnInit {
     this.editorMessage.set(null);
     this.images.set([]);
     this.form = this.blankForm();
+    this.basePriceError = '';
     this.resetTranslations();
     const first = this.adminCategories()[0];
     if (first) this.form.category_id = first.id;
@@ -496,6 +506,7 @@ export class AdminProductsComponent implements OnInit {
     this.editorError.set(null);
     this.editorMessage.set(null);
     this.images.set([]);
+    this.basePriceError = '';
     this.resetTranslations();
   }
 
@@ -504,6 +515,7 @@ export class AdminProductsComponent implements OnInit {
     this.editorError.set(null);
     this.editorMessage.set(null);
     this.editingSlug.set(slug);
+    this.basePriceError = '';
     this.resetTranslations();
     this.admin.getProduct(slug).subscribe({
       next: (prod: any) => {
@@ -511,7 +523,7 @@ export class AdminProductsComponent implements OnInit {
         this.form = {
           name: prod.name || '',
           category_id: prod.category_id || '',
-          base_price: Number.isFinite(basePrice) ? basePrice : 0,
+          base_price: this.formatMoneyInput(Number.isFinite(basePrice) ? basePrice : 0),
           stock_quantity: Number(prod.stock_quantity || 0),
           status: (prod.status as any) || 'draft',
           is_active: prod.is_active !== false,
@@ -530,11 +542,24 @@ export class AdminProductsComponent implements OnInit {
     });
   }
 
+  onBasePriceChange(next: string | number): void {
+    const raw = String(next ?? '');
+    const { clean, changed } = this.sanitizeMoneyInput(raw);
+    this.form.base_price = clean;
+    this.basePriceError = changed ? this.t('adminUi.products.form.priceFormatHint') : '';
+  }
+
   save(): void {
+    const basePrice = this.parseMoneyInput(this.form.base_price);
+    if (basePrice === null) {
+      this.editorError.set(this.t('adminUi.products.form.priceFormatHint'));
+      return;
+    }
+
     const payload: any = {
       name: this.form.name,
       category_id: this.form.category_id,
-      base_price: Number(this.form.base_price),
+      base_price: basePrice,
       stock_quantity: Number(this.form.stock_quantity),
       status: this.form.status,
       is_active: this.form.is_active,
@@ -690,11 +715,48 @@ export class AdminProductsComponent implements OnInit {
     return 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100';
   }
 
+  private sanitizeMoneyInput(raw: string): { clean: string; changed: boolean } {
+    const trimmed = (raw ?? '').trim();
+    if (!trimmed) return { clean: '', changed: false };
+    let clean = '';
+    let sawDot = false;
+    for (const ch of trimmed) {
+      if (ch >= '0' && ch <= '9') {
+        clean += ch;
+        continue;
+      }
+      if (ch === '.' && !sawDot) {
+        sawDot = true;
+        clean += '.';
+      }
+    }
+    if (clean.startsWith('.')) clean = `0${clean}`;
+    if (sawDot) {
+      const [whole, fracRaw = ''] = clean.split('.', 2);
+      const frac = fracRaw.slice(0, 2);
+      clean = frac.length ? `${whole}.${frac}` : whole;
+    }
+    return { clean, changed: clean !== trimmed };
+  }
+
+  private parseMoneyInput(raw: string): number | null {
+    const { clean } = this.sanitizeMoneyInput(raw);
+    if (!clean) return null;
+    const parsed = Number(clean);
+    if (!Number.isFinite(parsed)) return null;
+    return Math.round(parsed * 100) / 100;
+  }
+
+  private formatMoneyInput(value: number): string {
+    if (!Number.isFinite(value)) return '';
+    return (Math.round(value * 100) / 100).toFixed(2);
+  }
+
   private blankForm(): ProductForm {
     return {
       name: '',
       category_id: '',
-      base_price: 0,
+      base_price: '',
       stock_quantity: 0,
       status: 'draft',
       is_active: true,

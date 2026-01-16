@@ -12,7 +12,7 @@ import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { AdminOrderDetail, AdminOrdersService } from '../../../core/admin-orders.service';
 import { AdminReturnsService, ReturnRequestRead } from '../../../core/admin-returns.service';
 
-type OrderStatus = 'pending' | 'paid' | 'shipped' | 'cancelled' | 'refunded';
+type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
 type OrderAction =
   | 'save'
   | 'retry'
@@ -108,6 +108,7 @@ type OrderAction =
                   <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
                   <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
                   <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
+                  <option value="delivered">{{ 'adminUi.orders.delivered' | translate }}</option>
                   <option value="cancelled">{{ 'adminUi.orders.cancelled' | translate }}</option>
                   <option value="refunded">{{ 'adminUi.orders.refunded' | translate }}</option>
                 </select>

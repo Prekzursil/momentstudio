@@ -11,7 +11,7 @@ import { ToastService } from '../../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { AdminOrderListItem, AdminOrderListResponse, AdminOrdersService } from '../../../core/admin-orders.service';
 
-type OrderStatusFilter = 'all' | 'pending' | 'paid' | 'shipped' | 'cancelled' | 'refunded';
+type OrderStatusFilter = 'all' | 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
 
 @Component({
   selector: 'app-admin-orders',
@@ -53,6 +53,7 @@ type OrderStatusFilter = 'all' | 'pending' | 'paid' | 'shipped' | 'cancelled' | 
               <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
               <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
               <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
+              <option value="delivered">{{ 'adminUi.orders.delivered' | translate }}</option>
               <option value="cancelled">{{ 'adminUi.orders.cancelled' | translate }}</option>
               <option value="refunded">{{ 'adminUi.orders.refunded' | translate }}</option>
             </select>
@@ -252,6 +253,8 @@ export class AdminOrdersComponent implements OnInit {
         return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-200';
       case 'shipped':
         return 'bg-indigo-100 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-200';
+      case 'delivered':
+        return 'bg-teal-100 text-teal-900 dark:bg-teal-900/30 dark:text-teal-200';
       case 'cancelled':
         return 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100';
       case 'refunded':

@@ -159,6 +159,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Template system for emails with variables.
 - [x] Email preview endpoint (dev-only).
 - [x] Rate limiting for email sends per user/session.
+- [x] Emails: send bilingual (RO+EN) content in a single email for transactional notifications (welcome, verification, password reset/changed, email change, order status updates, owner alerts).
+- [x] Emails: include product links in the order confirmation email (links to `/products/:slug`).
+- [x] Emails: send welcome email when a guest checkout creates an account.
+- [ ] Receipt UX: add an HTML receipt/invoice view with clickable product links (PDF receipt is a raster export, so links can’t be embedded).
 
 ## Backend - Security, Observability, Testing
 - [x] CORS config for dev/prod.
@@ -308,6 +312,7 @@ Below is a structured checklist you can turn into issues.
 
 ## Frontend - Cart & Checkout
 - [x] Cart page/drawer with quantities and totals.
+- [x] Cart UX: make cart item image/title link to the product page (`/products/:slug`).
 - [x] Update quantity/remove items; stock error messaging.
 - [x] Checkout steps: shipping address, promo, payment (Stripe).
 - [x] Order summary during checkout.
@@ -325,6 +330,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Save address checkbox for checkout.
 - [x] Order confirmation page with next steps.
 - [x] Cart mini-icon badge with item count.
+- [x] Pricing UI: show RON amounts with `.` and max 2 decimals (no locale comma); EN may include ≈EUR/USD hints.
 - [x] Edge cases: out-of-stock and price changes during checkout.
 - [x] Checkout totals driven by backend shipping/promo validation (no hardcoded amounts).
 - [x] Checkout: require verified email before placing an order (signed-in or guest).
@@ -389,6 +395,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin UX: add `/admin/users` page (users + security workflows) and wire it into the admin sidebar.
 - [x] Product list table (sort/search).
 - [x] Product create/edit form (slug auto-generated, category, price, stock, description, images, variants).
+- [x] Admin products: validate price input as `123.45` (digits + `.` with max 2 decimals) and show a hint/placeholder.
 - [x] Admin orders list with filters + order detail/status update.
 - [x] Admin orders: add actions (retry/capture/void/refund note, delivery email, packing slip download).
 - [x] Content editor for hero and static pages.

@@ -34,16 +34,22 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
           <div *ngFor="let item of items()" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex gap-4">
-              <img
-                [src]="item.image ?? 'assets/placeholder/product-placeholder.svg'"
-                [alt]="item.name"
-                class="h-24 w-24 rounded-xl object-cover border border-slate-100 dark:border-slate-800"
-                [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
-              />
+              <a [routerLink]="['/products', item.slug]" class="shrink-0">
+                <img
+                  [src]="item.image ?? 'assets/placeholder/product-placeholder.svg'"
+                  [alt]="item.name"
+                  class="h-24 w-24 rounded-xl object-cover border border-slate-100 dark:border-slate-800"
+                  [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
+                />
+              </a>
               <div class="flex-1 grid gap-2">
                 <div class="flex items-start justify-between">
                   <div>
-                    <p class="font-semibold text-slate-900 dark:text-slate-50">{{ item.name }}</p>
+                    <a
+                      [routerLink]="['/products', item.slug]"
+                      class="font-semibold text-slate-900 dark:text-slate-50 hover:underline"
+                      >{{ item.name }}</a
+                    >
                     <p class="text-sm text-slate-500 dark:text-slate-400">In stock: {{ item.stock }}</p>
                   </div>
                   <button class="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50" (click)="remove(item.id)">

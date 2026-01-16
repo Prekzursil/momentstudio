@@ -984,6 +984,7 @@
       "form": {
         "slug": "Slug",
         "slugAutoHint": "Generat automat după salvare.",
+        "priceFormatHint": "Folosește doar cifre și punct, cu maxim 2 zecimale (exemplu: 123.45).",
         "sku": "SKU",
         "shortDescription": "Descriere scurtă",
         "shortDescriptionHint": "Apare în carduri și liste (max 280 caractere).",
@@ -1098,7 +1099,7 @@
       "shippingLabelDelete": "Șterge",
       "confirmDeleteLabel": "Ștergi eticheta de livrare pentru această comandă?",
       "save": "Salvează modificările",
-      "saveHint": "Actualizează statusul și tracking-ul; emailul se trimite la expediere.",
+      "saveHint": "Actualizează statusul și tracking-ul; emailurile se trimit la schimbări de status.",
       "actionsTitle": "Acțiuni",
       "paymentTitle": "Plată",
       "paymentMethod": "Metodă de plată",
@@ -1149,8 +1150,9 @@
       "next": "Următor",
       "all": "Toate",
       "pending": "În așteptare",
-      "paid": "Plătită",
+      "paid": "În proces",
       "shipped": "Expediată",
+      "delivered": "Finalizată",
       "cancelled": "Anulată",
       "refunded": "Rambursată",
       "success": {
