@@ -7,20 +7,7 @@ import { AboutComponent } from './pages/about/about.component';
 import { BlogListComponent } from './pages/blog/blog-list.component';
 import { BlogPostComponent } from './pages/blog/blog-post.component';
 import { ContactComponent } from './pages/contact/contact.component';
-import { ProductComponent } from './pages/product/product.component';
 import { adminGuard, authGuard } from './core/auth.guard';
-import { CartComponent } from './pages/cart/cart.component';
-import { CheckoutComponent } from './pages/checkout/checkout.component';
-import { PayPalReturnComponent } from './pages/checkout/paypal-return.component';
-import { PayPalCancelComponent } from './pages/checkout/paypal-cancel.component';
-import { SuccessComponent } from './pages/checkout/success.component';
-import { LoginComponent } from './pages/auth/login.component';
-import { RegisterComponent } from './pages/auth/register.component';
-import { GoogleCallbackComponent } from './pages/auth/google-callback.component';
-import { PasswordResetRequestComponent } from './pages/auth/password-reset-request.component';
-import { PasswordResetComponent } from './pages/auth/password-reset.component';
-import { AccountComponent } from './pages/account/account.component';
-import { ChangePasswordComponent } from './pages/account/change-password.component';
 import { shopCategoriesResolver } from './core/shop.resolver';
 
 export const routes: Routes = [
@@ -35,38 +22,68 @@ export const routes: Routes = [
   { path: 'contact', component: ContactComponent, title: 'Contact | momentstudio' },
   { path: 'blog', component: BlogListComponent, title: 'Blog | momentstudio' },
   { path: 'blog/:slug', component: BlogPostComponent, title: 'Blog | momentstudio' },
-  { path: 'products/:slug', component: ProductComponent, title: 'Product | momentstudio' },
-  { path: 'cart', component: CartComponent, title: 'Cart | momentstudio' },
-  { path: 'checkout', component: CheckoutComponent, title: 'Checkout | momentstudio' },
-  { path: 'checkout/paypal/return', component: PayPalReturnComponent, title: 'PayPal | momentstudio' },
-  { path: 'checkout/paypal/cancel', component: PayPalCancelComponent, title: 'Checkout | momentstudio' },
+  {
+    path: 'products/:slug',
+    loadComponent: () => import('./pages/product/product.component').then((m) => m.ProductComponent),
+    title: 'Product | momentstudio'
+  },
+  { path: 'cart', loadComponent: () => import('./pages/cart/cart.component').then((m) => m.CartComponent), title: 'Cart | momentstudio' },
+  {
+    path: 'checkout',
+    loadComponent: () => import('./pages/checkout/checkout.component').then((m) => m.CheckoutComponent),
+    title: 'Checkout | momentstudio'
+  },
+  {
+    path: 'checkout/paypal/return',
+    loadComponent: () => import('./pages/checkout/paypal-return.component').then((m) => m.PayPalReturnComponent),
+    title: 'PayPal | momentstudio'
+  },
+  {
+    path: 'checkout/paypal/cancel',
+    loadComponent: () => import('./pages/checkout/paypal-cancel.component').then((m) => m.PayPalCancelComponent),
+    title: 'Checkout | momentstudio'
+  },
   {
     path: 'checkout/success',
-    component: SuccessComponent,
+    loadComponent: () => import('./pages/checkout/success.component').then((m) => m.SuccessComponent),
     title: 'Order placed | momentstudio'
   },
-  { path: 'login', component: LoginComponent, title: 'Login | momentstudio' },
-  { path: 'register', component: RegisterComponent, title: 'Register | momentstudio' },
+  {
+    path: 'receipt/:token',
+    loadComponent: () => import('./pages/receipt/receipt.component').then((m) => m.ReceiptComponent),
+    title: 'Receipt | momentstudio'
+  },
+  { path: 'login', loadComponent: () => import('./pages/auth/login.component').then((m) => m.LoginComponent), title: 'Login | momentstudio' },
+  {
+    path: 'register',
+    loadComponent: () => import('./pages/auth/register.component').then((m) => m.RegisterComponent),
+    title: 'Register | momentstudio'
+  },
   {
     path: 'auth/google/callback',
-    component: GoogleCallbackComponent,
+    loadComponent: () => import('./pages/auth/google-callback.component').then((m) => m.GoogleCallbackComponent),
     title: 'Google sign-in | momentstudio'
   },
   {
     path: 'password-reset',
-    component: PasswordResetRequestComponent,
+    loadComponent: () => import('./pages/auth/password-reset-request.component').then((m) => m.PasswordResetRequestComponent),
     title: 'Password reset | momentstudio'
   },
   {
     path: 'password-reset/confirm',
-    component: PasswordResetComponent,
+    loadComponent: () => import('./pages/auth/password-reset.component').then((m) => m.PasswordResetComponent),
     title: 'Set new password | momentstudio'
   },
-  { path: 'account', canActivate: [authGuard], component: AccountComponent, title: 'Account | momentstudio' },
+  {
+    path: 'account',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/account/account.component').then((m) => m.AccountComponent),
+    title: 'Account | momentstudio'
+  },
   {
     path: 'account/password',
     canActivate: [authGuard],
-    component: ChangePasswordComponent,
+    loadComponent: () => import('./pages/account/change-password.component').then((m) => m.ChangePasswordComponent),
     title: 'Change password | momentstudio'
   },
   {

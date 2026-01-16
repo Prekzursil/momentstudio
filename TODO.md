@@ -162,7 +162,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Emails: send bilingual (RO+EN) content in a single email for transactional notifications (welcome, verification, password reset/changed, email change, order status updates, owner alerts).
 - [x] Emails: include product links in the order confirmation email (links to `/products/:slug`).
 - [x] Emails: send welcome email when a guest checkout creates an account.
-- [ ] Receipt UX: add an HTML receipt/invoice view with clickable product links (PDF receipt is a raster export, so links can’t be embedded).
+- [x] Receipt UX: add a shareable HTML receipt view (`/receipt/:token`) with clickable product links + a real PDF renderer with embedded hyperlinks (token PDF endpoint).
 
 ## Backend - Security, Observability, Testing
 - [x] CORS config for dev/prod.

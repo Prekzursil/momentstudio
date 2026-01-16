@@ -12,7 +12,7 @@ import { AuthService, AuthUser, UserAliasesResponse } from '../../core/auth.serv
 import { AccountService, AccountDeletionStatus, Address, Order, AddressCreateRequest } from '../../core/account.service';
 import { BlogMyComment, BlogService, PaginationMeta } from '../../core/blog.service';
 import { forkJoin, map, of, switchMap } from 'rxjs';
-import { loadStripe, Stripe, StripeElements, StripeCardElement, StripeCardElementChangeEvent } from '@stripe/stripe-js';
+import type { Stripe, StripeElements, StripeCardElement, StripeCardElementChangeEvent } from '@stripe/stripe-js';
 import { ApiService } from '../../core/api.service';
 import { appConfig } from '../../core/app-config';
 import { WishlistService } from '../../core/wishlist.service';
@@ -1930,6 +1930,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
       this.cardError = 'Stripe publishable key is not configured';
       return;
     }
+    const { loadStripe } = await import('@stripe/stripe-js');
     this.stripe = await loadStripe(publishableKey);
     if (!this.stripe) {
       this.cardError = 'Could not initialize Stripe.';

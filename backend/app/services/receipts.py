@@ -1,15 +1,336 @@
 from __future__ import annotations
 
 import io
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 from typing import Sequence, SupportsFloat, SupportsIndex
+from xml.sax.saxutils import escape as xml_escape
 
 from PIL import Image, ImageDraw, ImageFont
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+from app.core.config import settings
+from app.schemas.receipt import ReceiptAddressRead, ReceiptItemRead, ReceiptRead
 
 
 Font = ImageFont.FreeTypeFont | ImageFont.ImageFont
 MoneyValue = str | SupportsFloat | SupportsIndex
+_REPORTLAB_FONTS_READY = False
+
+
+def build_order_receipt(order, items: Sequence | None = None) -> ReceiptRead:
+    items = items or getattr(order, "items", []) or []
+    currency = getattr(order, "currency", "RON") or "RON"
+    frontend_origin = settings.frontend_origin.rstrip("/")
+
+    def _addr(addr) -> ReceiptAddressRead | None:
+        if not addr:
+            return None
+        line1 = (getattr(addr, "line1", None) or "").strip()
+        city = (getattr(addr, "city", None) or "").strip()
+        postal_code = (getattr(addr, "postal_code", None) or "").strip()
+        country = (getattr(addr, "country", None) or "").strip()
+        if not line1 or not city or not postal_code or not country:
+            return None
+        return ReceiptAddressRead(
+            line1=line1,
+            line2=(getattr(addr, "line2", None) or "").strip() or None,
+            city=city,
+            region=(getattr(addr, "region", None) or "").strip() or None,
+            postal_code=postal_code,
+            country=country,
+        )
+
+    receipt_items: list[ReceiptItemRead] = []
+    for item in items:
+        product = getattr(item, "product", None)
+        slug = (getattr(product, "slug", None) or "").strip() or None
+        name = (getattr(product, "name", None) or "").strip() or str(getattr(item, "product_id", ""))
+        product_url = f"{frontend_origin}/products/{slug}" if slug else None
+        receipt_items.append(
+            ReceiptItemRead(
+                product_id=getattr(item, "product_id"),
+                slug=slug,
+                name=name,
+                quantity=int(getattr(item, "quantity", 0) or 0),
+                unit_price=float(getattr(item, "unit_price", 0.0) or 0.0),
+                subtotal=float(getattr(item, "subtotal", 0.0) or 0.0),
+                product_url=product_url,
+            )
+        )
+
+    created_at = getattr(order, "created_at", datetime.now(timezone.utc))
+    status_raw = getattr(order, "status", "")
+    status_value = getattr(status_raw, "value", status_raw) or ""
+
+    return ReceiptRead(
+        order_id=getattr(order, "id"),
+        reference_code=getattr(order, "reference_code", None),
+        status=str(status_value),
+        created_at=created_at,
+        currency=currency,
+        payment_method=getattr(order, "payment_method", None),
+        courier=getattr(order, "courier", None),
+        delivery_type=getattr(order, "delivery_type", None),
+        locker_name=getattr(order, "locker_name", None),
+        locker_address=getattr(order, "locker_address", None),
+        tracking_number=getattr(order, "tracking_number", None),
+        customer_email=(getattr(order, "customer_email", None) or "").strip() or None,
+        customer_name=(getattr(order, "customer_name", None) or "").strip() or None,
+        shipping_amount=float(getattr(order, "shipping_amount", 0.0) or 0.0),
+        tax_amount=float(getattr(order, "tax_amount", 0.0) or 0.0),
+        total_amount=float(getattr(order, "total_amount", 0.0) or 0.0),
+        shipping_address=_addr(getattr(order, "shipping_address", None)),
+        billing_address=_addr(getattr(order, "billing_address", None)),
+        items=receipt_items,
+    )
+
+
+def _register_reportlab_fonts() -> tuple[str, str]:
+    global _REPORTLAB_FONTS_READY
+    if _REPORTLAB_FONTS_READY:
+        return ("Helvetica", "Helvetica-Bold")
+
+    regular_candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed.ttf",
+    ]
+    bold_candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf",
+    ]
+
+    regular_path = next((p for p in regular_candidates if Path(p).exists()), None)
+    bold_path = next((p for p in bold_candidates if Path(p).exists()), None)
+
+    if regular_path and bold_path:
+        pdfmetrics.registerFont(TTFont("MomentSans", regular_path))
+        pdfmetrics.registerFont(TTFont("MomentSansBold", bold_path))
+        _REPORTLAB_FONTS_READY = True
+        return ("MomentSans", "MomentSansBold")
+
+    _REPORTLAB_FONTS_READY = True
+    return ("Helvetica", "Helvetica-Bold")
+
+
+def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None) -> bytes:
+    """Render a bilingual (RO/EN) receipt PDF with clickable product links."""
+
+    items = items or getattr(order, "items", []) or []
+    receipt = build_order_receipt(order, items)
+
+    font_regular, font_bold = _register_reportlab_fonts()
+    styles = getSampleStyleSheet()
+    base_style = ParagraphStyle(
+        "base",
+        parent=styles["Normal"],
+        fontName=font_regular,
+        fontSize=10,
+        leading=13,
+        textColor=colors.HexColor("#0f172a"),
+    )
+    small_muted = ParagraphStyle(
+        "muted",
+        parent=base_style,
+        fontSize=9,
+        leading=12,
+        textColor=colors.HexColor("#475569"),
+    )
+    h1 = ParagraphStyle(
+        "h1",
+        parent=base_style,
+        fontName=font_bold,
+        fontSize=18,
+        leading=22,
+    )
+    h2 = ParagraphStyle(
+        "h2",
+        parent=base_style,
+        fontName=font_bold,
+        fontSize=11,
+        leading=14,
+        textColor=colors.HexColor("#0f172a"),
+        spaceBefore=6,
+        spaceAfter=4,
+    )
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        leftMargin=20 * mm,
+        rightMargin=20 * mm,
+        topMargin=18 * mm,
+        bottomMargin=18 * mm,
+        title=f"Receipt {receipt.reference_code or receipt.order_id}",
+    )
+
+    story: list[object] = []
+
+    story.append(Paragraph("Receipt / Chitanță", h1))
+    story.append(Spacer(1, 6))
+    ref = receipt.reference_code or str(receipt.order_id)
+    created = receipt.created_at.strftime("%Y-%m-%d %H:%M")
+    story.append(Paragraph(f"Order / Comandă: <b>{xml_escape(ref)}</b>", base_style))
+    story.append(Paragraph(f"Date / Dată: {xml_escape(created)}", small_muted))
+    story.append(Spacer(1, 10))
+
+    if receipt.customer_name or receipt.customer_email:
+        story.append(Paragraph("Customer / Client", h2))
+        if receipt.customer_name:
+            story.append(Paragraph(xml_escape(receipt.customer_name), base_style))
+        if receipt.customer_email:
+            story.append(Paragraph(xml_escape(receipt.customer_email), small_muted))
+        story.append(Spacer(1, 8))
+
+    if receipt.shipping_address or receipt.billing_address:
+        story.append(Paragraph("Addresses / Adrese", h2))
+
+        def _addr_lines(addr: ReceiptAddressRead | None) -> str:
+            if not addr:
+                return "—"
+            parts = [
+                addr.line1,
+                addr.line2 or "",
+                f"{addr.postal_code} {addr.city}",
+                addr.region or "",
+                addr.country,
+            ]
+            safe = [xml_escape(p) for p in parts if p]
+            return "<br/>".join(safe) if safe else "—"
+
+        addr_table = Table(
+            [
+                [
+                    Paragraph("<b>Shipping / Livrare</b><br/>" + _addr_lines(receipt.shipping_address), base_style),
+                    Paragraph("<b>Billing / Facturare</b><br/>" + _addr_lines(receipt.billing_address), base_style),
+                ]
+            ],
+            colWidths=[(doc.width - 12) / 2, (doc.width - 12) / 2],
+        )
+        addr_table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#e2e8f0")),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.6, colors.HexColor("#e2e8f0")),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 8),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ]
+            )
+        )
+        story.append(addr_table)
+        story.append(Spacer(1, 10))
+
+    # Payment / delivery info
+    info_lines: list[str] = []
+    if receipt.payment_method:
+        info_lines.append(f"Payment / Plată: {xml_escape(receipt.payment_method)}")
+    if receipt.courier or receipt.delivery_type:
+        detail = " · ".join([x for x in [receipt.courier, receipt.delivery_type] if x])
+        info_lines.append(f"Delivery / Livrare: {xml_escape(detail)}")
+    if receipt.delivery_type == "locker" and (receipt.locker_name or receipt.locker_address):
+        locker_detail = " — ".join([x for x in [receipt.locker_name, receipt.locker_address] if x])
+        info_lines.append(f"Locker: {xml_escape(locker_detail)}")
+    if receipt.tracking_number:
+        info_lines.append(f"AWB / Tracking: {xml_escape(receipt.tracking_number)}")
+    if info_lines:
+        story.append(Paragraph("<br/>".join(info_lines), small_muted))
+        story.append(Spacer(1, 10))
+
+    story.append(Paragraph("Items / Produse", h2))
+
+    header_style = ParagraphStyle(
+        "tableHeader",
+        parent=small_muted,
+        fontName=font_bold,
+        textColor=colors.HexColor("#475569"),
+    )
+
+    def _money_cell(value: float | None) -> str:
+        if value is None:
+            return "—"
+        return xml_escape(_money(value, receipt.currency))
+
+    rows: list[list[object]] = [
+        [
+            Paragraph("Product / Produs", header_style),
+            Paragraph("Qty", header_style),
+            Paragraph("Unit", header_style),
+            Paragraph("Total", header_style),
+        ]
+    ]
+
+    for it in receipt.items:
+        name = xml_escape(it.name)
+        if it.product_url:
+            link = xml_escape(it.product_url)
+            name = f'<font color="#4f46e5"><link href="{link}">{name}</link></font>'
+        rows.append(
+            [
+                Paragraph(name, base_style),
+                Paragraph(str(it.quantity), base_style),
+                Paragraph(_money_cell(it.unit_price), base_style),
+                Paragraph(_money_cell(it.subtotal), base_style),
+            ]
+        )
+
+    table = Table(rows, colWidths=[doc.width * 0.55, doc.width * 0.10, doc.width * 0.17, doc.width * 0.18])
+    table.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LINEBELOW", (0, 0), (-1, 0), 0.8, colors.HexColor("#e2e8f0")),
+                ("LINEABOVE", (0, 1), (-1, -1), 0.4, colors.HexColor("#e2e8f0")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("ALIGN", (1, 1), (1, -1), "RIGHT"),
+                ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
+                ("ALIGN", (3, 1), (3, -1), "RIGHT"),
+            ]
+        )
+    )
+    story.append(table)
+    story.append(Spacer(1, 12))
+
+    # Totals
+    totals_rows: list[list[object]] = []
+    totals_rows.append([Paragraph("Shipping / Livrare", small_muted), Paragraph(_money_cell(receipt.shipping_amount or 0.0), base_style)])
+    totals_rows.append([Paragraph("Tax / Taxe", small_muted), Paragraph(_money_cell(receipt.tax_amount or 0.0), base_style)])
+    totals_rows.append(
+        [
+            Paragraph("<b>Total / Total</b>", base_style),
+            Paragraph(f"<b>{_money_cell(receipt.total_amount or 0.0)}</b>", base_style),
+        ]
+    )
+    totals = Table(totals_rows, colWidths=[doc.width * 0.75, doc.width * 0.25])
+    totals.setStyle(
+        TableStyle(
+            [
+                ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ]
+        )
+    )
+    story.append(totals)
+    story.append(Spacer(1, 10))
+    story.append(Paragraph("Thank you! / Mulțumim!", small_muted))
+
+    doc.build(story)
+    return buf.getvalue()
 
 
 def _load_font(size: int, *, bold: bool = False) -> Font:
@@ -55,10 +376,17 @@ def _format_date(value: object) -> str:
 
 
 def render_order_receipt_pdf(order, items: Sequence | None = None) -> bytes:
-    """Render a simple bilingual (RO/EN) receipt PDF.
+    try:
+        return _render_order_receipt_pdf_reportlab(order, items)
+    except Exception:
+        # Fallback to the legacy raster implementation for maximum resilience.
+        return render_order_receipt_pdf_raster(order, items)
 
-    This is intentionally implemented as a PDF-embedded raster image so we can
-    reliably render Romanian diacritics without introducing heavy PDF deps.
+
+def render_order_receipt_pdf_raster(order, items: Sequence | None = None) -> bytes:
+    """Legacy receipt renderer (PDF-embedded raster image).
+
+    Kept as a fallback in case the PDF engine/font stack fails.
     """
 
     items = items or getattr(order, "items", []) or []

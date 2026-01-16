@@ -8,7 +8,7 @@ import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { CartStore, CartItem } from '../../core/cart.store';
 import { CartApi } from '../../core/cart.api';
-import { loadStripe, Stripe, StripeElements, StripeCardElement, StripeCardElementChangeEvent } from '@stripe/stripe-js';
+import type { Stripe, StripeElements, StripeCardElement, StripeCardElementChangeEvent } from '@stripe/stripe-js';
 import { ApiService } from '../../core/api.service';
 import { appConfig } from '../../core/app-config';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -904,6 +904,7 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
       this.cardError = 'Stripe publishable key not set.';
       return;
     }
+    const { loadStripe } = await import('@stripe/stripe-js');
     this.stripe = await loadStripe(publishableKey);
     if (!this.stripe) {
       this.cardError = 'Could not init Stripe';

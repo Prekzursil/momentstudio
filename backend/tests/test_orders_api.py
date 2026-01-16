@@ -1,5 +1,6 @@
 import asyncio
 from decimal import Decimal
+from datetime import datetime, timedelta, timezone
 from typing import Dict
 from uuid import UUID
 
@@ -23,6 +24,7 @@ from app.services import payments as payments_service
 from app.services import email as email_service
 from app.schemas.order import ShippingMethodCreate
 from app.core.config import settings
+from app.core.security import create_receipt_token
 
 
 @pytest.fixture
@@ -370,6 +372,19 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     other_token, _ = create_user_token(SessionLocal, email="otherbuyer@example.com")
     forbidden = client.get(f"/api/v1/orders/{order_id}/receipt", headers=auth_headers(other_token))
     assert forbidden.status_code == 404
+
+    token = create_receipt_token(order_id=order_id, expires_at=datetime.now(timezone.utc) + timedelta(days=1))
+    public_json = client.get(f"/api/v1/orders/receipt/{token}")
+    assert public_json.status_code == 200
+    assert public_json.json()["order_id"] == order_id
+
+    public_pdf = client.get(f"/api/v1/orders/receipt/{token}/pdf")
+    assert public_pdf.status_code == 200
+    assert public_pdf.headers.get("content-type", "").startswith("application/pdf")
+    assert public_pdf.content.startswith(b"%PDF")
+
+    bad_token = client.get("/api/v1/orders/receipt/invalid-token")
+    assert bad_token.status_code == 403
 
     delivery = client.post(f"/api/v1/orders/admin/{order_id}/delivery-email", headers=auth_headers(admin_token))
     assert delivery.status_code == 200

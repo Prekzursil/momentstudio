@@ -1,6 +1,7 @@
 import logging
 import smtplib
 import html as _html
+from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from pathlib import Path
 from typing import Sequence
@@ -13,6 +14,7 @@ except ImportError:
     select_autoescape = None  # type: ignore
 
 from app.core.config import settings
+from app.core.security import create_receipt_token
 from app.services import receipts as receipt_service
 
 logger = logging.getLogger(__name__)
@@ -28,6 +30,8 @@ _rate_per_recipient: dict[str, list[float]] = {}
 
 
 EmailAttachment = dict[str, object]
+
+RECEIPT_SHARE_DAYS = 365
 
 
 def _build_message(
@@ -227,7 +231,10 @@ def _delivery_lines(order, *, lang: str) -> list[str]:
 async def send_order_confirmation(to_email: str, order, items: Sequence | None = None, lang: str | None = None) -> bool:
     ref = getattr(order, "reference_code", None) or str(getattr(order, "id", ""))
     currency = getattr(order, "currency", "RON") or "RON"
-    receipt_url = f"{settings.frontend_origin.rstrip('/')}/api/v1/orders/{getattr(order, 'id', '')}/receipt"
+    receipt_expires_at = datetime.now(timezone.utc) + timedelta(days=RECEIPT_SHARE_DAYS)
+    receipt_token = create_receipt_token(order_id=str(getattr(order, "id", "")), expires_at=receipt_expires_at)
+    receipt_url = f"{settings.frontend_origin.rstrip('/')}/receipt/{receipt_token}"
+    receipt_pdf_url = f"{settings.frontend_origin.rstrip('/')}/api/v1/orders/receipt/{receipt_token}/pdf"
     receipt_filename = f"receipt-{ref}.pdf"
 
     def _lines(lng: str) -> list[str]:
@@ -285,7 +292,10 @@ async def send_order_confirmation(to_email: str, order, items: Sequence | None =
         account_url = f"{settings.frontend_origin.rstrip('/')}/account"
         lines.append("")
         lines.append(
-            f"Chitanță (PDF): {receipt_url}" if lng == "ro" else f"Receipt (PDF): {receipt_url}"
+            f"Chitanță (HTML): {receipt_url}" if lng == "ro" else f"Receipt (HTML): {receipt_url}"
+        )
+        lines.append(
+            f"Chitanță (PDF): {receipt_pdf_url}" if lng == "ro" else f"Receipt (PDF): {receipt_pdf_url}"
         )
         lines.append(
             f"Detalii în cont: {account_url}" if lng == "ro" else f"View in your account: {account_url}"

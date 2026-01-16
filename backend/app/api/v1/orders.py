@@ -14,6 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import require_complete_profile, require_verified_email, require_admin, get_current_user_optional
 from app.core.config import settings
+from app.core.security import decode_receipt_token
 from app.db.session import get_session
 from app.models.address import Address
 from app.models.cart import Cart
@@ -43,6 +44,7 @@ from app.services import paypal as paypal_service
 from app.services import address as address_service
 from app.api.v1 import cart as cart_api
 from app.schemas.order_admin import AdminOrderListItem, AdminOrderListResponse, AdminOrderRead, AdminPaginationMeta
+from app.schemas.receipt import ReceiptRead
 from app.services import notifications as notification_service
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -1164,6 +1166,48 @@ async def download_receipt(
     order = await order_service.get_order(session, current_user.id, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    ref = order.reference_code or str(order.id)
+    filename = f"receipt-{ref}.pdf"
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    pdf = receipt_service.render_order_receipt_pdf(order, order.items)
+    return StreamingResponse(io.BytesIO(pdf), media_type="application/pdf", headers=headers)
+
+
+@router.get("/receipt/{token}", response_model=ReceiptRead)
+async def read_receipt_by_token(
+    token: str,
+    session: AsyncSession = Depends(get_session),
+) -> ReceiptRead:
+    order_id = decode_receipt_token(token)
+    if not order_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid receipt token")
+    try:
+        order_uuid = UUID(order_id)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid receipt token")
+
+    order = await order_service.get_order_by_id(session, order_uuid)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Receipt not found")
+    return receipt_service.build_order_receipt(order, order.items)
+
+
+@router.get("/receipt/{token}/pdf")
+async def download_receipt_by_token(
+    token: str,
+    session: AsyncSession = Depends(get_session),
+):
+    order_id = decode_receipt_token(token)
+    if not order_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid receipt token")
+    try:
+        order_uuid = UUID(order_id)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid receipt token")
+
+    order = await order_service.get_order_by_id(session, order_uuid)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Receipt not found")
     ref = order.reference_code or str(order.id)
     filename = f"receipt-{ref}.pdf"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
