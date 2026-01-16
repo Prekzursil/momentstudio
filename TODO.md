@@ -107,7 +107,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Order + OrderItem models + migrations.
 - [x] Service to build order from cart (price snapshot).
 - [x] Stripe integration: PaymentIntent create, return client secret.
-- [x] Stripe webhook for payment succeeded/failed; update status.
+- [x] Stripe webhook: record payment capture/failure events; keep orders pending until admin acceptance.
 - [x] GET /orders and /orders/{id}.
 - [x] Admin order list/filter + status/tracking update.
 - [x] Order status enums and transitions (pending/paid/shipped/cancelled/refunded).
@@ -127,6 +127,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Payments: add Cash on delivery (RON) option stored on orders (payment_method) and allow admin to ship COD orders from pending.
 - [x] Payments: add PayPal option in checkout (keep RON as primary currency) and document supported methods.
 - [x] Orders: include payment method + delivery details in customer/owner emails (COD vs card, courier/tracking).
+- [x] Orders: require a cancel reason when rejecting an order and surface it in emails + “My orders”; notify owner when a manual refund is required.
 
 ## Backend - CMS & Content
 - [x] ContentBlock model + migration.
