@@ -67,7 +67,10 @@ export class AdminOrdersService {
     return this.api.get<AdminOrderDetail>(`/orders/admin/${orderId}`);
   }
 
-  update(orderId: string, payload: { status?: string; tracking_number?: string | null; tracking_url?: string | null }): Observable<AdminOrderDetail> {
+  update(
+    orderId: string,
+    payload: { status?: string; cancel_reason?: string | null; tracking_number?: string | null; tracking_url?: string | null }
+  ): Observable<AdminOrderDetail> {
     return this.api.patch<AdminOrderDetail>(`/orders/admin/${orderId}`, payload);
   }
 

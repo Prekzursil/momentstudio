@@ -250,41 +250,60 @@ ALLOWED_TRANSITIONS = {
 }
 
 
+def _has_payment_captured(order: Order) -> bool:
+    method = (getattr(order, "payment_method", None) or "").strip().lower()
+    if method == "cod":
+        return False
+    if method == "paypal":
+        return bool((getattr(order, "paypal_capture_id", None) or "").strip())
+    if method == "stripe":
+        return any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
+    return False
+
+
 async def update_order(
     session: AsyncSession, order: Order, payload: OrderUpdate, shipping_method: ShippingMethod | None = None
 ) -> Order:
     data = payload.model_dump(exclude_unset=True)
     explicit_status = bool(data.get("status"))
+    cancel_reason = data.pop("cancel_reason", None)
+    cancel_reason_clean: str | None
+    if cancel_reason is None:
+        cancel_reason_clean = None
+    else:
+        cancel_reason_clean = (str(cancel_reason) if cancel_reason is not None else "").strip()
+        if cancel_reason_clean:
+            cancel_reason_clean = cancel_reason_clean[:2000]
     if "status" in data and data["status"]:
         current_status = OrderStatus(order.status)
         next_status = OrderStatus(data["status"])
         payment_method = (getattr(order, "payment_method", None) or "").strip().lower()
-        if (
-            current_status == OrderStatus.pending
-            and next_status == OrderStatus.paid
-            and payment_method == "stripe"
-            and bool((getattr(order, "stripe_payment_intent_id", None) or "").strip())
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Stripe orders are marked as in progress automatically once the payment succeeds.",
-            )
-        if (
-            current_status == OrderStatus.pending
-            and next_status == OrderStatus.cancelled
-            and payment_method == "stripe"
-            and bool((getattr(order, "stripe_payment_intent_id", None) or "").strip())
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Stripe orders must be rejected via Void payment.",
-            )
+        if current_status == OrderStatus.pending and next_status == OrderStatus.paid and payment_method in {"stripe", "paypal"}:
+            if not _has_payment_captured(order):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Payment is not captured yet. Wait for payment confirmation before accepting the order.",
+                )
+        if current_status == OrderStatus.pending and next_status == OrderStatus.cancelled:
+            if cancel_reason_clean is None or not cancel_reason_clean:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancel reason is required")
         allowed = ALLOWED_TRANSITIONS.get(current_status, set())
         if next_status not in allowed:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
         order.status = next_status
         data.pop("status")
         await _log_event(session, order.id, "status_change", f"{current_status.value} -> {next_status.value}")
+
+    if cancel_reason_clean is not None:
+        if not cancel_reason_clean:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancel reason is required")
+        if order.status != OrderStatus.cancelled:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancel reason can only be set for cancelled orders")
+        previous_reason = (getattr(order, "cancel_reason", None) or "").strip()
+        if previous_reason != cancel_reason_clean:
+            order.cancel_reason = cancel_reason_clean
+            session.add(order)
+            session.add(OrderEvent(order_id=order.id, event="cancel_reason_updated", note="Updated"))
 
     if shipping_method:
         order.shipping_method_id = shipping_method.id
@@ -418,8 +437,10 @@ async def capture_payment(session: AsyncSession, order: Order, intent_id: str | 
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Capture only allowed for pending/paid orders")
     await payments.capture_payment_intent(payment_intent_id)
     order.stripe_payment_intent_id = payment_intent_id
-    order.status = OrderStatus.paid
-    await _log_event(session, order.id, "payment_captured", f"Intent {payment_intent_id}")
+    await session.refresh(order, attribute_names=["events"])
+    already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
+    if not already_captured:
+        session.add(OrderEvent(order_id=order.id, event="payment_captured", note=f"Intent {payment_intent_id}"))
     session.add(order)
     await session.commit()
     hydrated = await get_order_by_id(session, order.id)
@@ -444,6 +465,8 @@ async def void_payment(session: AsyncSession, order: Order, intent_id: str | Non
         note = f"Stripe refund {refund_id}".strip() if refund_id else "Stripe refund"
     order.stripe_payment_intent_id = payment_intent_id
     order.status = OrderStatus.cancelled
+    if not (getattr(order, "cancel_reason", None) or "").strip():
+        order.cancel_reason = "Cancelled via payment void/refund."
     await _log_event(session, order.id, event, note)
     session.add(order)
     await session.commit()

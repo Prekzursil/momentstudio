@@ -84,7 +84,7 @@ async def stripe_webhook(
                 (
                     await session.execute(
                         select(Order)
-                        .options(selectinload(Order.user))
+                        .options(selectinload(Order.user), selectinload(Order.events))
                         .where(Order.stripe_payment_intent_id == str(intent_id))
                     )
                 )
@@ -92,38 +92,23 @@ async def stripe_webhook(
                 .first()
             )
             if order and order.status in {OrderStatus.pending, OrderStatus.paid}:
-                did_update_status = False
-                if order.status != OrderStatus.paid:
-                    order.status = OrderStatus.paid
-                    session.add(order)
+                already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
+                if not already_captured:
                     session.add(OrderEvent(order_id=order.id, event="payment_captured", note=f"Stripe {intent_id}"))
                     await session.commit()
                     await session.refresh(order)
-                    did_update_status = True
 
-                # Avoid duplicate emails/notifications when the payment capture action already handled them.
-                if did_update_status:
-                    customer_to = (order.user.email if order.user and order.user.email else None) or getattr(
-                        order, "customer_email", None
+                # Keep orders pending until an admin accepts them; still notify the customer of payment receipt.
+                if order.user and order.user.id:
+                    await notification_service.create_notification(
+                        session,
+                        user_id=order.user.id,
+                        type="order",
+                        title="Payment received"
+                        if (order.user.preferred_language or "en") != "ro"
+                        else "Plată confirmată",
+                        body=f"Reference {order.reference_code}" if order.reference_code else None,
+                        url="/account",
                     )
-                    customer_lang = order.user.preferred_language if order.user else None
-                    if customer_to:
-                        background_tasks.add_task(
-                            email_service.send_order_processing_update,
-                            customer_to,
-                            order,
-                            lang=customer_lang,
-                        )
-                    if order.user and order.user.id:
-                        await notification_service.create_notification(
-                            session,
-                            user_id=order.user.id,
-                            type="order",
-                            title="Payment received"
-                            if (order.user.preferred_language or "en") != "ro"
-                            else "Plată confirmată",
-                            body=f"Reference {order.reference_code}" if order.reference_code else None,
-                            url="/account",
-                        )
 
     return {"received": True, "type": event.get("type")}

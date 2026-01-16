@@ -1,16 +1,19 @@
 import asyncio
+from decimal import Decimal
 from typing import Callable, Dict
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core import security
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
+from app.models.order import Order, OrderStatus
 from app.models.user import User, UserRole
 from app.models.webhook import StripeWebhookEvent  # noqa: F401
 from app.services import email as email_service
@@ -152,3 +155,64 @@ def test_webhook_dispute_notifies_owner_once(monkeypatch: pytest.MonkeyPatch, te
     assert sent["count"] == 1
     assert sent["to"] == "owner@example.com"
     assert sent["event_type"] == "charge.dispute.created"
+
+
+def test_webhook_payment_intent_succeeded_does_not_mark_order_paid(
+    monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]
+) -> None:
+    monkeypatch.setattr(settings, "stripe_webhook_secret", "whsec_test")
+
+    event = {
+        "id": "evt_pi_succeeded_1",
+        "type": "payment_intent.succeeded",
+        "data": {"object": {"id": "pi_test_123"}},
+    }
+    monkeypatch.setattr(
+        "app.services.payments.stripe.Webhook.construct_event",
+        lambda payload, sig_header, secret: event,
+    )
+
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]
+
+    async def seed_order() -> None:
+        async with session_factory() as session:
+            order = Order(
+                status=OrderStatus.pending,
+                reference_code="STRIPEPI",
+                customer_email="pi@example.com",
+                customer_name="PI Buyer",
+                total_amount=Decimal("10.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+                payment_method="stripe",
+                stripe_payment_intent_id="pi_test_123",
+            )
+            session.add(order)
+            await session.commit()
+
+    asyncio.run(seed_order())
+
+    res = client.post("/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"})
+    assert res.status_code == 200, res.text
+
+    async def fetch() -> tuple[OrderStatus, bool]:
+        async with session_factory() as session:
+            order = (
+                (
+                    await session.execute(
+                        select(Order)
+                        .options(selectinload(Order.events))
+                        .where(Order.reference_code == "STRIPEPI")
+                    )
+                )
+                .scalars()
+                .one()
+            )
+            captured = any(evt.event == "payment_captured" for evt in order.events)
+            return order.status, captured
+
+    status_val, captured = asyncio.run(fetch())
+    assert status_val == OrderStatus.pending
+    assert captured is True

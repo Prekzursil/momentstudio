@@ -51,6 +51,7 @@ class OrderRead(BaseModel):
     user_id: UUID | None = None
     reference_code: str | None = None
     status: OrderStatus
+    cancel_reason: str | None = Field(default=None, max_length=2000)
     courier: str | None = None
     delivery_type: str | None = None
     locker_id: str | None = None
@@ -85,6 +86,7 @@ class OrderCreate(BaseModel):
 
 class OrderUpdate(BaseModel):
     status: OrderStatus | None = None
+    cancel_reason: str | None = Field(default=None, max_length=2000)
     tracking_number: str | None = Field(default=None, max_length=50)
     tracking_url: str | None = Field(default=None, max_length=255)
     shipping_method_id: UUID | None = None

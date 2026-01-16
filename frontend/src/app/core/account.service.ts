@@ -31,6 +31,7 @@ export interface Order {
   id: string;
   reference_code?: string | null;
   status: string;
+  cancel_reason?: string | null;
   payment_method?: string;
   payment_retry_count?: number;
   total_amount: number;

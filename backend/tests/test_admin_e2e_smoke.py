@@ -17,7 +17,7 @@ from app.main import app
 from app.models.address import Address
 from app.models.cart import Cart, CartItem
 from app.models.catalog import Category, Product, ProductImage, ProductStatus
-from app.models.order import Order, OrderItem, OrderStatus
+from app.models.order import Order, OrderEvent, OrderItem, OrderStatus
 from app.models.promo import PromoCode
 from app.models.user import User, UserRole
 from app.services import storage
@@ -119,6 +119,7 @@ async def seed_data(session_factory):
         )
         session.add(order)
         await session.flush()
+        session.add(OrderEvent(order_id=order.id, event="payment_captured", note="seed"))
         session.add(OrderItem(order_id=order.id, product_id=product.id, quantity=1, unit_price=100, subtotal=100))
 
         await session.commit()

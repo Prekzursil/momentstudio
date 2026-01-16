@@ -811,6 +811,10 @@ import { missingRequiredProfileFields as computeMissingRequiredProfileFields, ty
                   <span class="text-slate-500 dark:text-slate-400">Locker</span>
                   <span class="truncate">{{ lockerLabel(order) }}</span>
                 </div>
+                <div *ngIf="order.status === 'cancelled' && order.cancel_reason" class="flex flex-wrap items-start justify-between gap-2">
+                  <span class="text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.cancelReason' | translate }}</span>
+                  <span class="max-w-[520px] text-right whitespace-pre-wrap">{{ order.cancel_reason }}</span>
+                </div>
               </div>
 
               <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">

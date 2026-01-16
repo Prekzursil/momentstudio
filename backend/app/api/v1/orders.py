@@ -767,35 +767,27 @@ async def admin_update_order(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
     updated = await order_service.update_order(session, order, payload, shipping_method=shipping_method)
     if previous_status != updated.status:
-        if (
-            updated.status == OrderStatus.cancelled
-            and (updated.payment_method or "").strip().lower() == "paypal"
-            and updated.paypal_capture_id
-        ):
-            try:
-                refund_id = await paypal_service.refund_capture(paypal_capture_id=updated.paypal_capture_id)
-                session.add(
-                    OrderEvent(
-                        order_id=updated.id,
-                        event="payment_refunded",
-                        note=f"PayPal refund {refund_id}".strip() if refund_id else "PayPal refund",
-                    )
-                )
-                await session.commit()
-            except HTTPException:
+        if updated.status == OrderStatus.cancelled:
+            payment_method = (updated.payment_method or "").strip().lower()
+            refund_needed = False
+            if payment_method == "paypal" and updated.paypal_capture_id:
+                refund_needed = True
+            if payment_method == "stripe" and updated.stripe_payment_intent_id:
+                refund_needed = any(evt.event == "payment_captured" for evt in updated.events or [])
+            if refund_needed:
                 owner = await auth_service.get_owner_user(session)
                 if owner and owner.id:
                     await notification_service.create_notification(
                         session,
                         user_id=owner.id,
                         type="admin",
-                        title="PayPal refund required"
+                        title="Refund required"
                         if (owner.preferred_language or "en") != "ro"
-                        else "Rambursare PayPal necesară",
+                        else "Rambursare necesară",
                         body=(
-                            f"Order {updated.reference_code or updated.id} needs a manual PayPal refund."
+                            f"Order {updated.reference_code or updated.id} was cancelled and needs a manual refund ({payment_method})."
                             if (owner.preferred_language or "en") != "ro"
-                            else f"Comanda {updated.reference_code or updated.id} necesită o rambursare PayPal manuală."
+                            else f"Comanda {updated.reference_code or updated.id} a fost anulată și necesită o rambursare manuală ({payment_method})."
                         ),
                         url=f"/admin/orders/{updated.id}",
                     )

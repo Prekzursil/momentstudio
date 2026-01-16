@@ -15,7 +15,7 @@ from app.db.session import get_session
 from app.models.address import Address
 from app.models.catalog import Category, Product
 from app.models.cart import Cart, CartItem
-from app.models.order import Order, OrderStatus
+from app.models.order import Order, OrderEvent, OrderStatus
 from app.models.user import User, UserRole
 from app.services.auth import create_user, issue_tokens_for_user
 from app.schemas.user import UserCreate
@@ -445,8 +445,9 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
         headers=auth_headers(admin_token),
     )
     assert capture.status_code == 200
-    assert capture.json()["status"] == "paid"
+    assert capture.json()["status"] == "pending"
     assert capture.json()["stripe_payment_intent_id"] == "pi_test_123"
+    assert any(evt["event"] == "payment_captured" for evt in capture.json()["events"])
 
     void = client.post(
         f"/api/v1/orders/admin/{order_id}/void-payment",
@@ -465,6 +466,118 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
     assert reorder_resp.status_code == 200
     assert len(reorder_resp.json()["items"]) == 1
     assert reorder_resp.json()["items"][0]["product_id"]
+
+
+def test_admin_accept_requires_payment_capture_and_cancel_reason(
+    test_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    async def fake_email(*_args, **_kwargs):
+        return True
+
+    monkeypatch.setattr(email_service, "send_order_processing_update", fake_email)
+    monkeypatch.setattr(email_service, "send_order_cancelled_update", fake_email)
+    monkeypatch.setattr(email_service, "send_order_refunded_update", fake_email)
+    monkeypatch.setattr(email_service, "send_shipping_update", fake_email)
+    monkeypatch.setattr(email_service, "send_delivery_confirmation", fake_email)
+
+    token, user_id = create_user_token(SessionLocal, email="buyer-paycap@example.com")
+    admin_token, _ = create_user_token(SessionLocal, email="admin-paycap@example.com", admin=True)
+
+    async def seed_stripe_order() -> UUID:
+        async with SessionLocal() as session:
+            order = Order(
+                user_id=user_id,
+                status=OrderStatus.pending,
+                reference_code="PAYCAP",
+                customer_email="buyer-paycap@example.com",
+                customer_name="Buyer",
+                total_amount=Decimal("10.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+                payment_method="stripe",
+                stripe_payment_intent_id="pi_paycap",
+            )
+            session.add(order)
+            await session.commit()
+            await session.refresh(order)
+            return order.id
+
+    stripe_order_id = asyncio.run(seed_stripe_order())
+    stripe_order_id_str = str(stripe_order_id)
+
+    accept_without_capture = client.patch(
+        f"/api/v1/orders/admin/{stripe_order_id_str}",
+        headers=auth_headers(admin_token),
+        json={"status": "paid"},
+    )
+    assert accept_without_capture.status_code == 400, accept_without_capture.text
+    assert "Payment is not captured" in accept_without_capture.text
+
+    async def seed_capture_event() -> None:
+        async with SessionLocal() as session:
+            session.add(OrderEvent(order_id=stripe_order_id, event="payment_captured", note="test"))
+            await session.commit()
+
+    asyncio.run(seed_capture_event())
+
+    accept_with_capture = client.patch(
+        f"/api/v1/orders/admin/{stripe_order_id_str}",
+        headers=auth_headers(admin_token),
+        json={"status": "paid"},
+    )
+    assert accept_with_capture.status_code == 200, accept_with_capture.text
+    assert accept_with_capture.json()["status"] == "paid"
+
+    async def seed_pending_order() -> UUID:
+        async with SessionLocal() as session:
+            order = Order(
+                user_id=user_id,
+                status=OrderStatus.pending,
+                reference_code="CANCEL1",
+                customer_email="buyer-paycap@example.com",
+                customer_name="Buyer",
+                total_amount=Decimal("11.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+                payment_method="cod",
+            )
+            session.add(order)
+            await session.commit()
+            await session.refresh(order)
+            return order.id
+
+    pending_id = asyncio.run(seed_pending_order())
+    pending_id_str = str(pending_id)
+
+    cancel_missing_reason = client.patch(
+        f"/api/v1/orders/admin/{pending_id_str}",
+        headers=auth_headers(admin_token),
+        json={"status": "cancelled"},
+    )
+    assert cancel_missing_reason.status_code == 400, cancel_missing_reason.text
+    assert "Cancel reason is required" in cancel_missing_reason.text
+
+    cancel = client.patch(
+        f"/api/v1/orders/admin/{pending_id_str}",
+        headers=auth_headers(admin_token),
+        json={"status": "cancelled", "cancel_reason": "Out of stock"},
+    )
+    assert cancel.status_code == 200, cancel.text
+    assert cancel.json()["status"] == "cancelled"
+    assert cancel.json()["cancel_reason"] == "Out of stock"
+
+    edit_reason = client.patch(
+        f"/api/v1/orders/admin/{pending_id_str}",
+        headers=auth_headers(admin_token),
+        json={"cancel_reason": "Out of stock (refund issued)"},
+    )
+    assert edit_reason.status_code == 200, edit_reason.text
+    assert edit_reason.json()["cancel_reason"] == "Out of stock (refund issued)"
 
 
 def test_admin_shipping_label_upload_download_and_delete(

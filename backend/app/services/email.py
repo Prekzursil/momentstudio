@@ -367,11 +367,14 @@ async def send_order_processing_update(to_email: str, order, *, lang: str | None
 async def send_order_cancelled_update(to_email: str, order, *, lang: str | None = None) -> bool:
     ref = getattr(order, "reference_code", None) or str(getattr(order, "id", ""))
     contact_url = f"{settings.frontend_origin.rstrip('/')}/contact"
+    cancel_reason = (getattr(order, "cancel_reason", None) or "").strip() or None
 
     def _lines(lng: str) -> list[str]:
         lines = [
             f"Comanda {ref} a fost anulată." if lng == "ro" else f"Your order {ref} was cancelled."
         ]
+        if cancel_reason:
+            lines.append(("Motiv: " if lng == "ro" else "Reason: ") + cancel_reason)
         lines.append(
             "Dacă ai întrebări sau crezi că este o eroare, te rugăm să ne contactezi."
             if lng == "ro"
@@ -383,9 +386,9 @@ async def send_order_cancelled_update(to_email: str, order, *, lang: str | None 
             lines.append(("Plată: " if lng == "ro" else "Payment: ") + payment)
         if raw_payment_method in {"stripe", "paypal"}:
             lines.append(
-                "Dacă ai plătit cu cardul, suma va fi rambursată în contul tău în curând."
+                "Dacă ai plătit cu cardul, suma va fi rambursată în contul tău cât mai curând."
                 if lng == "ro"
-                else "If you paid by card, the amount will be refunded back to your account soon."
+                else "If you paid by card, the amount will be refunded back to your account as soon as possible."
             )
         lines.extend(_delivery_lines(order, lang=lng))
         lines.append("")

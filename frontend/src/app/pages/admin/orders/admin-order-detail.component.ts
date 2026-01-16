@@ -117,6 +117,19 @@ type OrderAction =
               <app-input [label]="'adminUi.orders.trackingNumber' | translate" [(value)]="trackingNumber"></app-input>
             </div>
 
+            <label
+              *ngIf="statusValue === 'cancelled' || order()!.status === 'cancelled'"
+              class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
+            >
+              {{ 'adminUi.orders.cancelReason' | translate }}
+              <textarea
+                class="min-h-[92px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                [placeholder]="'adminUi.orders.cancelReasonPlaceholder' | translate"
+                [(ngModel)]="cancelReason"
+              ></textarea>
+              <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.cancelReasonHint' | translate }}</span>
+            </label>
+
             <app-input
               [label]="'adminUi.orders.trackingUrl' | translate"
               [placeholder]="'adminUi.orders.trackingUrlPlaceholder' | translate"
@@ -488,6 +501,7 @@ export class AdminOrderDetailComponent implements OnInit {
   statusValue: OrderStatus = 'pending';
   trackingNumber = '';
   trackingUrl = '';
+  cancelReason = '';
   refundNote = '';
   returnReason = '';
   returnCustomerMessage = '';
@@ -581,10 +595,16 @@ export class AdminOrderDetailComponent implements OnInit {
   save(): void {
     const orderId = this.order()?.id;
     if (!orderId) return;
+    const currentStatus = ((this.order()?.status as OrderStatus) || 'pending') as OrderStatus;
+    if (this.statusValue === 'cancelled' && !this.cancelReason.trim()) {
+      this.toast.error(this.translate.instant('adminUi.orders.errors.cancelReasonRequired'));
+      return;
+    }
     this.action.set('save');
     this.api
       .update(orderId, {
-        status: this.statusValue,
+        status: this.statusValue !== currentStatus ? this.statusValue : undefined,
+        cancel_reason: this.statusValue === 'cancelled' ? this.cancelReason.trim() : undefined,
         tracking_number: this.trackingNumber.trim() || null,
         tracking_url: this.trackingUrl.trim() || null
       })
@@ -594,6 +614,7 @@ export class AdminOrderDetailComponent implements OnInit {
           this.statusValue = (o.status as OrderStatus) || 'pending';
           this.trackingNumber = o.tracking_number ?? '';
           this.trackingUrl = o.tracking_url ?? '';
+          this.cancelReason = o.cancel_reason ?? '';
           this.action.set(null);
           this.toast.success(this.translate.instant('adminUi.orders.success.status'));
         },
@@ -783,6 +804,7 @@ export class AdminOrderDetailComponent implements OnInit {
         this.statusValue = (o.status as OrderStatus) || 'pending';
         this.trackingNumber = o.tracking_number ?? '';
         this.trackingUrl = o.tracking_url ?? '';
+        this.cancelReason = o.cancel_reason ?? '';
         this.returnQty = {};
         (o.items || []).forEach((it) => (this.returnQty[it.id] = 0));
         this.loadReturns(o.id);
