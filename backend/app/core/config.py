@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     secret_key: str = "dev-secret-key"
     stripe_secret_key: str = "sk_test_placeholder"
     stripe_webhook_secret: str | None = None
+    paypal_client_id: str | None = None
+    paypal_client_secret: str | None = None
+    paypal_env: str = "sandbox"
     jwt_algorithm: str = "HS256"
     access_token_exp_minutes: int = 30
     refresh_token_exp_days: int = 7

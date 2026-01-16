@@ -451,6 +451,344 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
     assert order.stripe_payment_intent_id == "pi_test"
 
 
+def test_authenticated_checkout_creates_separate_billing_address(
+    checkout_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client: TestClient = checkout_app["client"]  # type: ignore[assignment]
+    SessionLocal = checkout_app["session_factory"]  # type: ignore[assignment]
+
+    async def seed():
+        async with SessionLocal() as session:
+            category = Category(slug="bill", name="Billing")
+            product = Product(
+                category=category,
+                slug="bill-prod",
+                sku="BILL-1",
+                name="Billing Product",
+                base_price=Decimal("10.00"),
+                currency="RON",
+                stock_quantity=10,
+                images=[ProductImage(url="/media/img1.png", alt_text="img")],
+            )
+            session.add(product)
+            await session.commit()
+            await session.refresh(product)
+            return {"product_id": product.id}
+
+    seeded = asyncio.run(seed())
+
+    async def fake_create_payment_intent(session, cart, amount_cents=None):
+        return {"client_secret": "secret_test", "intent_id": "pi_test"}
+
+    monkeypatch.setattr(payments, "create_payment_intent", fake_create_payment_intent)
+
+    register = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "billbuyer@example.com",
+            "username": "billbuyer",
+            "password": "secret123",
+            "name": "Bill Buyer",
+            "first_name": "Bill",
+            "last_name": "Buyer",
+            "date_of_birth": "2000-01-01",
+            "phone": "+40723204204",
+        },
+    )
+    assert register.status_code == 201, register.text
+    token = register.json()["tokens"]["access_token"]
+    user_id = register.json()["user"]["id"]
+
+    async def mark_verified() -> None:
+        async with SessionLocal() as session:
+            user = await session.get(User, UUID(user_id))
+            assert user is not None
+            user.email_verified = True
+            session.add(user)
+            await session.commit()
+
+    asyncio.run(mark_verified())
+
+    add_res = client.post(
+        "/api/v1/cart/items",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"product_id": str(seeded["product_id"]), "quantity": 1},
+    )
+    assert add_res.status_code in (200, 201), add_res.text
+
+    res = client.post(
+        "/api/v1/orders/checkout",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "line1": "Ship St",
+            "city": "Ship City",
+            "postal_code": "12345",
+            "country": "US",
+            "billing_line1": "Bill St",
+            "billing_city": "Bill City",
+            "billing_postal_code": "54321",
+            "billing_country": "US",
+            "save_address": False,
+        },
+    )
+    assert res.status_code == 201, res.text
+
+    async def fetch_order() -> Order | None:
+        async with SessionLocal() as session:
+            return (await session.execute(select(Order).order_by(Order.created_at.desc()))).scalars().first()
+
+    order = asyncio.run(fetch_order())
+    assert order is not None
+    assert order.shipping_address_id is not None
+    assert order.billing_address_id is not None
+    assert order.billing_address_id != order.shipping_address_id
+
+
+def test_authenticated_checkout_cod_skips_payment_intent(checkout_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch) -> None:
+    client: TestClient = checkout_app["client"]  # type: ignore[assignment]
+    SessionLocal = checkout_app["session_factory"]  # type: ignore[assignment]
+
+    async def seed():
+        async with SessionLocal() as session:
+            category = Category(slug="cod", name="COD")
+            product = Product(
+                category=category,
+                slug="cod-prod",
+                sku="COD-1",
+                name="COD Product",
+                base_price=Decimal("10.00"),
+                currency="RON",
+                stock_quantity=10,
+                images=[ProductImage(url="/media/img1.png", alt_text="img")],
+            )
+            session.add(product)
+            await session.commit()
+            await session.refresh(product)
+            return {"product_id": product.id}
+
+    seeded = asyncio.run(seed())
+
+    called: dict[str, object] = {"called": False}
+
+    async def fake_create_payment_intent(*args, **kwargs):
+        called["called"] = True
+        return {"client_secret": "secret_test", "intent_id": "pi_test"}
+
+    monkeypatch.setattr(payments, "create_payment_intent", fake_create_payment_intent)
+
+    register = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "codbuyer@example.com",
+            "username": "codbuyer",
+            "password": "secret123",
+            "name": "COD Buyer",
+            "first_name": "COD",
+            "last_name": "Buyer",
+            "date_of_birth": "2000-01-01",
+            "phone": "+40723204204",
+        },
+    )
+    assert register.status_code == 201, register.text
+    token = register.json()["tokens"]["access_token"]
+    user_id = register.json()["user"]["id"]
+
+    async def mark_verified() -> None:
+        async with SessionLocal() as session:
+            user = await session.get(User, UUID(user_id))
+            assert user is not None
+            user.email_verified = True
+            session.add(user)
+            await session.commit()
+
+    asyncio.run(mark_verified())
+
+    add_res = client.post(
+        "/api/v1/cart/items",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"product_id": str(seeded["product_id"]), "quantity": 1},
+    )
+    assert add_res.status_code in (200, 201), add_res.text
+
+    res = client.post(
+        "/api/v1/orders/checkout",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "line1": "123 Test St",
+            "city": "Testville",
+            "postal_code": "12345",
+            "country": "US",
+            "save_address": False,
+            "payment_method": "cod",
+        },
+    )
+    assert res.status_code == 201, res.text
+    body = res.json()
+    assert body["payment_method"] == "cod"
+    assert body["client_secret"] is None
+    assert called["called"] is False
+
+    async def fetch_order() -> Order | None:
+        async with SessionLocal() as session:
+            return (await session.execute(select(Order).order_by(Order.created_at.desc()))).scalars().first()
+
+    order = asyncio.run(fetch_order())
+    assert order is not None
+    assert order.payment_method == "cod"
+    assert order.stripe_payment_intent_id is None
+
+
+def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
+    checkout_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client: TestClient = checkout_app["client"]  # type: ignore[assignment]
+    SessionLocal = checkout_app["session_factory"]  # type: ignore[assignment]
+
+    async def seed():
+        async with SessionLocal() as session:
+            category = Category(slug="pp", name="PayPal")
+            owner = User(
+                email="ownerpp@example.com",
+                username="ownerpp",
+                hashed_password=security.hash_password("Password123"),
+                name="Owner",
+                role=UserRole.owner,
+                email_verified=True,
+            )
+            product = Product(
+                category=category,
+                slug="pp-prod",
+                sku="PP-1",
+                name="PayPal Product",
+                base_price=Decimal("10.00"),
+                currency="RON",
+                stock_quantity=10,
+                images=[ProductImage(url="/media/img1.png", alt_text="img")],
+            )
+            session.add_all([owner, product])
+            await session.commit()
+            await session.refresh(product)
+            return {"product_id": product.id}
+
+    seeded = asyncio.run(seed())
+
+    called: dict[str, object] = {"stripe_called": False, "paypal_created": False, "paypal_captured": False}
+
+    async def fake_create_payment_intent(*args, **kwargs):
+        called["stripe_called"] = True
+        return {"client_secret": "secret_test", "intent_id": "pi_test"}
+
+    async def fake_paypal_create_order(*, total_ron, reference, return_url, cancel_url):
+        called["paypal_created"] = True
+        assert str(reference)
+        assert str(return_url).startswith("http")
+        assert str(cancel_url).startswith("http")
+        return "PAYPAL-ORDER-1", "https://paypal.example/approve"
+
+    async def fake_paypal_capture_order(*, paypal_order_id: str) -> str:
+        called["paypal_captured"] = True
+        assert paypal_order_id == "PAYPAL-ORDER-1"
+        return "CAPTURE-1"
+
+    async def fake_send_order_confirmation(*args, **kwargs):
+        return True
+
+    async def fake_send_new_order_notification(*args, **kwargs):
+        return True
+
+    from app.services import paypal as paypal_service  # imported by orders API
+
+    monkeypatch.setattr(payments, "create_payment_intent", fake_create_payment_intent)
+    monkeypatch.setattr(paypal_service, "create_order", fake_paypal_create_order)
+    monkeypatch.setattr(paypal_service, "capture_order", fake_paypal_capture_order)
+    monkeypatch.setattr(email_service, "send_order_confirmation", fake_send_order_confirmation)
+    monkeypatch.setattr(email_service, "send_new_order_notification", fake_send_new_order_notification)
+
+    register = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "ppbuyer@example.com",
+            "username": "ppbuyer",
+            "password": "secret123",
+            "name": "PP Buyer",
+            "first_name": "PP",
+            "last_name": "Buyer",
+            "date_of_birth": "2000-01-01",
+            "phone": "+40723204204",
+        },
+    )
+    assert register.status_code == 201, register.text
+    token = register.json()["tokens"]["access_token"]
+    user_id = register.json()["user"]["id"]
+
+    async def mark_verified() -> None:
+        async with SessionLocal() as session:
+            user = await session.get(User, UUID(user_id))
+            assert user is not None
+            user.email_verified = True
+            session.add(user)
+            await session.commit()
+
+    asyncio.run(mark_verified())
+
+    add_res = client.post(
+        "/api/v1/cart/items",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"product_id": str(seeded["product_id"]), "quantity": 1},
+    )
+    assert add_res.status_code in (200, 201), add_res.text
+
+    checkout = client.post(
+        "/api/v1/orders/checkout",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "line1": "123 Test St",
+            "city": "Testville",
+            "postal_code": "12345",
+            "country": "US",
+            "save_address": False,
+            "payment_method": "paypal",
+        },
+    )
+    assert checkout.status_code == 201, checkout.text
+    body = checkout.json()
+    assert body["client_secret"] is None
+    assert body["payment_method"] == "paypal"
+    assert body["paypal_order_id"] == "PAYPAL-ORDER-1"
+    assert body["paypal_approval_url"] == "https://paypal.example/approve"
+    assert called["stripe_called"] is False
+    assert called["paypal_created"] is True
+
+    async def fetch_order() -> Order | None:
+        async with SessionLocal() as session:
+            return (await session.execute(select(Order).order_by(Order.created_at.desc()))).scalars().first()
+
+    order = asyncio.run(fetch_order())
+    assert order is not None
+    assert order.payment_method == "paypal"
+    assert order.paypal_order_id == "PAYPAL-ORDER-1"
+    assert order.stripe_payment_intent_id is None
+
+    # Capturing a signed-in order requires authentication.
+    capture_anon = client.post("/api/v1/orders/paypal/capture", json={"paypal_order_id": "PAYPAL-ORDER-1"})
+    assert capture_anon.status_code == 403, capture_anon.text
+
+    capture = client.post(
+        "/api/v1/orders/paypal/capture",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"paypal_order_id": "PAYPAL-ORDER-1"},
+    )
+    assert capture.status_code == 200, capture.text
+    assert capture.json()["status"] == "paid"
+    assert capture.json()["paypal_capture_id"] == "CAPTURE-1"
+    assert called["paypal_captured"] is True
+
+    order2 = asyncio.run(fetch_order())
+    assert order2 is not None
+    assert order2.status.value == "paid"
+    assert order2.paypal_capture_id == "CAPTURE-1"
+
+
 def test_checkout_sends_admin_alert_fallback_when_no_owner(
     checkout_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
 ) -> None:

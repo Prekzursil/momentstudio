@@ -51,12 +51,22 @@ class OrderRead(BaseModel):
     user_id: UUID | None = None
     reference_code: str | None = None
     status: OrderStatus
+    courier: str | None = None
+    delivery_type: str | None = None
+    locker_id: str | None = None
+    locker_name: str | None = None
+    locker_address: str | None = None
+    locker_lat: float | None = None
+    locker_lng: float | None = None
     payment_retry_count: int
     total_amount: float
     tax_amount: float
     shipping_amount: float
     currency: str
+    payment_method: str
     stripe_payment_intent_id: str | None = None
+    paypal_order_id: str | None = None
+    paypal_capture_id: str | None = None
     tracking_number: str | None = None
     shipping_method: ShippingMethodRead | None = None
     shipping_address_id: UUID | None = None

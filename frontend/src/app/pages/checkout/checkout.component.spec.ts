@@ -61,6 +61,7 @@ describe('CheckoutComponent', () => {
   it('submits authenticated checkout via /orders/checkout', fakeAsync(() => {
     const fixture = TestBed.createComponent(CheckoutComponent);
     const cmp = fixture.componentInstance;
+    cmp.paymentMethod = 'cod';
     cmp.promo = 'SAVE';
     cmp.saveAddress = false;
     cmp.address = {
@@ -72,10 +73,6 @@ describe('CheckoutComponent', () => {
       country: 'US',
       region: 'ST',
     } as any;
-    (cmp as any).stripe = {
-      confirmCardPayment: () => Promise.resolve({ error: null })
-    } as any;
-    (cmp as any).card = { destroy: () => {}, update: () => {} } as any;
 
     cmp.placeOrder({ valid: true } as any);
     tick();
@@ -88,6 +85,8 @@ describe('CheckoutComponent', () => {
     expect(payload.shipping_method_id).toBeNull();
     expect(payload.promo_code).toBe('SAVE');
     expect(payload.save_address).toBeFalse();
+    expect(payload.payment_method).toBe('cod');
+    expect(payload.billing_line1).toBeUndefined();
     expect(router.navigate).toHaveBeenCalledWith(['/checkout/success']);
   }));
 });

@@ -40,7 +40,17 @@ class Order(Base):
     total_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     payment_retry_count: Mapped[int] = mapped_column(default=0, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="RON")
+    payment_method: Mapped[str] = mapped_column(String(20), nullable=False, default="stripe")
+    courier: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    delivery_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    locker_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    locker_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    locker_address: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    locker_lat: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
+    locker_lng: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
     stripe_payment_intent_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    paypal_order_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    paypal_capture_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     shipping_address_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("addresses.id"), nullable=True
     )

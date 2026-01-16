@@ -12,12 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.core.dependencies import require_complete_profile, require_verified_email, require_admin
+from app.core.dependencies import require_complete_profile, require_verified_email, require_admin, get_current_user_optional
 from app.core.config import settings
 from app.db.session import get_session
 from app.models.address import Address
 from app.models.cart import Cart
-from app.models.order import OrderStatus, OrderEvent
+from app.models.order import Order, OrderStatus, OrderEvent
 from app.schemas.cart import CartRead
 from app.schemas.order import OrderRead, OrderCreate, OrderUpdate, ShippingMethodCreate, ShippingMethodRead, OrderEventRead
 from app.services import cart as cart_service
@@ -32,10 +32,13 @@ from app.schemas.checkout import (
     GuestEmailVerificationConfirmRequest,
     GuestEmailVerificationRequest,
     GuestEmailVerificationStatus,
+    PayPalCaptureRequest,
+    PayPalCaptureResponse,
 )
 from app.schemas.user import UserCreate
 from app.schemas.address import AddressCreate
 from app.services import payments
+from app.services import paypal as paypal_service
 from app.services import address as address_service
 from app.api.v1 import cart as cart_api
 from app.schemas.order_admin import AdminOrderListItem, AdminOrderListResponse, AdminOrderRead, AdminPaginationMeta
@@ -52,6 +55,33 @@ def _generate_guest_email_token() -> str:
     return str(secrets.randbelow(1_000_000)).zfill(6)
 
 GUEST_EMAIL_TOKEN_MAX_ATTEMPTS = 10
+
+
+def _delivery_from_payload(
+    *,
+    courier: str,
+    delivery_type: str,
+    locker_id: str | None,
+    locker_name: str | None,
+    locker_address: str | None,
+    locker_lat: float | None,
+    locker_lng: float | None,
+) -> tuple[str, str, str | None, str | None, str | None, float | None, float | None]:
+    courier_clean = (courier or "sameday").strip()
+    delivery_clean = (delivery_type or "home").strip()
+    if delivery_clean == "locker":
+        if not (locker_id or "").strip() or not (locker_name or "").strip() or locker_lat is None or locker_lng is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Locker selection is required")
+        return (
+            courier_clean,
+            delivery_clean,
+            locker_id.strip(),
+            locker_name.strip(),
+            (locker_address or "").strip() or None,
+            float(locker_lat),
+            float(locker_lng),
+        )
+    return courier_clean, delivery_clean, None, None, None, None, None
 
 
 def _sanitize_filename(value: str | None) -> str:
@@ -140,6 +170,9 @@ async def checkout(
     if payload.promo_code:
         promo = await cart_service.validate_promo(session, payload.promo_code, currency=None)
 
+    has_billing = bool((payload.billing_line1 or "").strip())
+    billing_same_as_shipping = not has_billing
+
     shipping_addr = await address_service.create_address(
         session,
         current_user.id,
@@ -152,12 +185,62 @@ async def checkout(
             postal_code=payload.postal_code,
             country=payload.country,
             is_default_shipping=payload.save_address,
-            is_default_billing=payload.save_address,
+            is_default_billing=bool(payload.save_address and billing_same_as_shipping),
         ),
     )
 
+    billing_addr = shipping_addr
+    if has_billing:
+        if not (
+            (payload.billing_line1 or "").strip()
+            and (payload.billing_city or "").strip()
+            and (payload.billing_postal_code or "").strip()
+            and (payload.billing_country or "").strip()
+        ):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Billing address is incomplete")
+        billing_addr = await address_service.create_address(
+            session,
+            current_user.id,
+            AddressCreate(
+                label="Checkout (Billing)",
+                line1=payload.billing_line1 or payload.line1,
+                line2=payload.billing_line2,
+                city=payload.billing_city,
+                region=payload.billing_region,
+                postal_code=payload.billing_postal_code,
+                country=payload.billing_country,
+                is_default_shipping=False,
+                is_default_billing=payload.save_address,
+            ),
+        )
+
     totals, discount_val = cart_service.calculate_totals(user_cart, shipping_method=shipping_method, promo=promo)
-    intent = await payments.create_payment_intent(session, user_cart, amount_cents=int(totals.total * 100))
+    payment_method = payload.payment_method or "stripe"
+    courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = _delivery_from_payload(
+        courier=payload.courier,
+        delivery_type=payload.delivery_type,
+        locker_id=payload.locker_id,
+        locker_name=payload.locker_name,
+        locker_address=payload.locker_address,
+        locker_lat=payload.locker_lat,
+        locker_lng=payload.locker_lng,
+    )
+    intent = None
+    client_secret = None
+    payment_intent_id = None
+    paypal_order_id = None
+    paypal_approval_url = None
+    if payment_method == "stripe":
+        intent = await payments.create_payment_intent(session, user_cart, amount_cents=int(totals.total * 100))
+        client_secret = str(intent.get("client_secret"))
+        payment_intent_id = str(intent.get("intent_id"))
+    elif payment_method == "paypal":
+        paypal_order_id, paypal_approval_url = await paypal_service.create_order(
+            total_ron=totals.total,
+            reference=str(user_cart.id),
+            return_url=f"{settings.frontend_origin}/checkout/paypal/return",
+            cancel_url=f"{settings.frontend_origin}/checkout/paypal/cancel",
+        )
     order = await order_service.build_order_from_cart(
         session,
         current_user.id,
@@ -165,9 +248,18 @@ async def checkout(
         customer_name=getattr(current_user, "name", None) or current_user.email,
         cart=user_cart,
         shipping_address_id=shipping_addr.id,
-        billing_address_id=shipping_addr.id,
+        billing_address_id=billing_addr.id,
         shipping_method=shipping_method,
-        payment_intent_id=intent["intent_id"],
+        payment_method=payment_method,
+        payment_intent_id=payment_intent_id,
+        paypal_order_id=paypal_order_id,
+        courier=courier,
+        delivery_type=delivery_type,
+        locker_id=locker_id,
+        locker_name=locker_name,
+        locker_address=locker_address,
+        locker_lat=locker_lat,
+        locker_lng=locker_lng,
         discount=discount_val,
     )
     await notification_service.create_notification(
@@ -189,7 +281,64 @@ async def checkout(
             current_user.email,
             owner.preferred_language if owner else None,
         )
-    return GuestCheckoutResponse(order_id=order.id, reference_code=order.reference_code, client_secret=intent["client_secret"])
+    return GuestCheckoutResponse(
+        order_id=order.id,
+        reference_code=order.reference_code,
+        client_secret=client_secret,
+        paypal_order_id=paypal_order_id,
+        paypal_approval_url=paypal_approval_url,
+        payment_method=payment_method,
+    )
+
+
+@router.post("/paypal/capture", response_model=PayPalCaptureResponse)
+async def capture_paypal_order(
+    payload: PayPalCaptureRequest,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user_optional),
+) -> PayPalCaptureResponse:
+    paypal_order_id = (payload.paypal_order_id or "").strip()
+    if not paypal_order_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="PayPal order id is required")
+
+    order = (
+        (await session.execute(select(Order).where(Order.paypal_order_id == paypal_order_id))).scalars().first()
+    )
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    if (order.payment_method or "").strip().lower() != "paypal":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order is not a PayPal order")
+
+    # For signed-in checkouts, keep the capture bound to the same user.
+    if order.user_id:
+        if not current_user or order.user_id != current_user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+
+    if order.paypal_capture_id and order.status == OrderStatus.paid:
+        return PayPalCaptureResponse(
+            order_id=order.id,
+            reference_code=order.reference_code,
+            status=order.status,
+            paypal_capture_id=order.paypal_capture_id,
+        )
+
+    if order.status not in {OrderStatus.pending, OrderStatus.paid}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order cannot be captured")
+
+    capture_id = await paypal_service.capture_order(paypal_order_id=paypal_order_id)
+    order.paypal_capture_id = capture_id or order.paypal_capture_id
+    order.status = OrderStatus.paid
+    session.add(order)
+    session.add(OrderEvent(order_id=order.id, event="payment_captured", note=f"PayPal {capture_id}".strip()))
+    await session.commit()
+    await session.refresh(order)
+
+    return PayPalCaptureResponse(
+        order_id=order.id,
+        reference_code=order.reference_code,
+        status=order.status,
+        paypal_capture_id=order.paypal_capture_id,
+    )
 
 
 @router.get("", response_model=list[OrderRead])
@@ -456,6 +605,9 @@ async def guest_checkout(
     if payload.promo_code:
         promo = await cart_service.validate_promo(session, payload.promo_code, currency=None)
 
+    has_billing = bool((payload.billing_line1 or "").strip())
+    billing_same_as_shipping = not has_billing
+
     shipping_addr = await address_service.create_address(
         session,
         user_id,
@@ -468,12 +620,62 @@ async def guest_checkout(
             postal_code=payload.postal_code,
             country=payload.country,
             is_default_shipping=bool(payload.save_address and payload.create_account),
-            is_default_billing=bool(payload.save_address and payload.create_account),
+            is_default_billing=bool(payload.save_address and payload.create_account and billing_same_as_shipping),
         ),
     )
 
+    billing_addr = shipping_addr
+    if has_billing:
+        if not (
+            (payload.billing_line1 or "").strip()
+            and (payload.billing_city or "").strip()
+            and (payload.billing_postal_code or "").strip()
+            and (payload.billing_country or "").strip()
+        ):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Billing address is incomplete")
+        billing_addr = await address_service.create_address(
+            session,
+            user_id,
+            AddressCreate(
+                label="Guest Checkout (Billing)" if not payload.create_account else "Checkout (Billing)",
+                line1=payload.billing_line1 or payload.line1,
+                line2=payload.billing_line2,
+                city=payload.billing_city,
+                region=payload.billing_region,
+                postal_code=payload.billing_postal_code,
+                country=payload.billing_country,
+                is_default_shipping=False,
+                is_default_billing=bool(payload.save_address and payload.create_account),
+            ),
+        )
+
     totals, discount_val = cart_service.calculate_totals(cart, shipping_method=shipping_method, promo=promo)
-    intent = await payments.create_payment_intent(session, cart, amount_cents=int(totals.total * 100))
+    payment_method = payload.payment_method or "stripe"
+    courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = _delivery_from_payload(
+        courier=payload.courier,
+        delivery_type=payload.delivery_type,
+        locker_id=payload.locker_id,
+        locker_name=payload.locker_name,
+        locker_address=payload.locker_address,
+        locker_lat=payload.locker_lat,
+        locker_lng=payload.locker_lng,
+    )
+    intent = None
+    client_secret = None
+    payment_intent_id = None
+    paypal_order_id = None
+    paypal_approval_url = None
+    if payment_method == "stripe":
+        intent = await payments.create_payment_intent(session, cart, amount_cents=int(totals.total * 100))
+        client_secret = str(intent.get("client_secret"))
+        payment_intent_id = str(intent.get("intent_id"))
+    elif payment_method == "paypal":
+        paypal_order_id, paypal_approval_url = await paypal_service.create_order(
+            total_ron=totals.total,
+            reference=str(cart.id),
+            return_url=f"{settings.frontend_origin}/checkout/paypal/return",
+            cancel_url=f"{settings.frontend_origin}/checkout/paypal/cancel",
+        )
     order = await order_service.build_order_from_cart(
         session,
         user_id,
@@ -481,9 +683,18 @@ async def guest_checkout(
         customer_name=customer_name,
         cart=cart,
         shipping_address_id=shipping_addr.id,
-        billing_address_id=shipping_addr.id,
+        billing_address_id=billing_addr.id,
         shipping_method=shipping_method,
-        payment_intent_id=intent["intent_id"],
+        payment_method=payment_method,
+        payment_intent_id=payment_intent_id,
+        paypal_order_id=paypal_order_id,
+        courier=courier,
+        delivery_type=delivery_type,
+        locker_id=locker_id,
+        locker_name=locker_name,
+        locker_address=locker_address,
+        locker_lat=locker_lat,
+        locker_lng=locker_lng,
         discount=discount_val,
     )
 
@@ -499,7 +710,14 @@ async def guest_checkout(
             owner.preferred_language if owner else None,
         )
 
-    return GuestCheckoutResponse(order_id=order.id, reference_code=order.reference_code, client_secret=intent["client_secret"])
+    return GuestCheckoutResponse(
+        order_id=order.id,
+        reference_code=order.reference_code,
+        client_secret=client_secret,
+        paypal_order_id=paypal_order_id,
+        paypal_approval_url=paypal_approval_url,
+        payment_method=payment_method,
+    )
 
 
 @router.patch("/admin/{order_id}", response_model=AdminOrderRead)

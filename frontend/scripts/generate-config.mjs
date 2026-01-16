@@ -50,8 +50,10 @@ const apiBaseUrl = process.env.API_BASE_URL ?? parsed.API_BASE_URL ?? '/api/v1';
 const appEnv = process.env.APP_ENV ?? parsed.APP_ENV ?? 'development';
 const appVersion = process.env.APP_VERSION ?? parsed.APP_VERSION ?? packageVersion;
 const stripePublishableKey = process.env.STRIPE_PUBLISHABLE_KEY ?? parsed.STRIPE_PUBLISHABLE_KEY ?? '';
+const paypalEnabledRaw = process.env.PAYPAL_ENABLED ?? parsed.PAYPAL_ENABLED ?? '';
 const sentryDsn = process.env.SENTRY_DSN ?? parsed.SENTRY_DSN ?? '';
 const captchaSiteKey = process.env.CAPTCHA_SITE_KEY ?? parsed.CAPTCHA_SITE_KEY ?? '';
+const paypalEnabled = ['1', 'true', 'yes', 'on'].includes(String(paypalEnabledRaw).trim().toLowerCase());
 
 const outPath = path.join(frontendRoot, 'src', 'assets', 'app-config.js');
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
@@ -61,6 +63,7 @@ const config = {
   appEnv,
   appVersion,
   stripePublishableKey,
+  paypalEnabled,
   sentryDsn,
   captchaSiteKey
 };

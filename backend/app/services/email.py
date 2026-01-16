@@ -63,6 +63,59 @@ def _lang_or_default(lang: str | None) -> str:
     return lang if lang in {"en", "ro"} else "en"
 
 
+def _courier_label(courier: str | None, *, lang: str) -> str | None:
+    value = (courier or "").strip().lower()
+    if not value:
+        return None
+    if value == "sameday":
+        return "Sameday"
+    if value in {"fan", "fan_courier", "fan courier"}:
+        return "Fan Courier"
+    return courier
+
+
+def _delivery_type_label(delivery_type: str | None, *, lang: str) -> str | None:
+    value = (delivery_type or "").strip().lower()
+    if not value:
+        return None
+    if value == "home":
+        return "Home delivery" if lang == "en" else "Livrare la adresă"
+    if value == "locker":
+        return "Locker pickup" if lang == "en" else "Ridicare din locker"
+    return delivery_type
+
+
+def _payment_method_label(payment_method: str | None, *, lang: str) -> str | None:
+    value = (payment_method or "").strip().lower()
+    if not value:
+        return None
+    if value == "stripe":
+        return "Card (Stripe)" if lang == "en" else "Card (Stripe)"
+    if value == "cod":
+        return "Cash on delivery" if lang == "en" else "Ramburs"
+    if value == "paypal":
+        return "PayPal"
+    return payment_method
+
+
+def _delivery_lines(order, *, lang: str) -> list[str]:
+    courier = _courier_label(getattr(order, "courier", None), lang=lang)
+    delivery = _delivery_type_label(getattr(order, "delivery_type", None), lang=lang)
+    lines: list[str] = []
+    if courier or delivery:
+        label = "Delivery" if lang == "en" else "Livrare"
+        detail = " · ".join([x for x in [courier, delivery] if x])
+        lines.append(f"{label}: {detail}")
+    if (getattr(order, "delivery_type", None) or "").strip().lower() == "locker":
+        locker_name = (getattr(order, "locker_name", None) or "").strip()
+        locker_address = (getattr(order, "locker_address", None) or "").strip()
+        if locker_name or locker_address:
+            label = "Locker" if lang == "en" else "Locker"
+            detail = " — ".join([x for x in [locker_name, locker_address] if x])
+            lines.append(f"{label}: {detail}")
+    return lines
+
+
 async def send_order_confirmation(to_email: str, order, items: Sequence | None = None, lang: str | None = None) -> bool:
     lng = _lang_or_default(lang)
     subject = (
@@ -79,6 +132,10 @@ async def send_order_confirmation(to_email: str, order, items: Sequence | None =
         lines.append("Items:" if lng == "en" else "Produse:")
         for item in items:
             lines.append(f"- {getattr(item, 'product_id', '')} x {item.quantity}")
+    payment = _payment_method_label(getattr(order, "payment_method", None), lang=lng)
+    if payment:
+        lines.append(("Payment: " if lng == "en" else "Plată: ") + payment)
+    lines.extend(_delivery_lines(order, lang=lng))
     lines.append(f"Total: {order.total_amount} {getattr(order, 'currency', 'RON')}")
     text_body = "\n".join(lines)
     return await send_email(to_email, subject, text_body)
@@ -100,6 +157,10 @@ async def send_new_order_notification(
     ]
     if customer_email:
         lines.append(f"Customer: {customer_email}" if lng == "en" else f"Client: {customer_email}")
+    payment = _payment_method_label(getattr(order, "payment_method", None), lang=lng)
+    if payment:
+        lines.append(("Payment: " if lng == "en" else "Plată: ") + payment)
+    lines.extend(_delivery_lines(order, lang=lng))
     lines.append(f"Total: {order.total_amount} {getattr(order, 'currency', 'RON')}")
     text_body = "\n".join(lines)
     return await send_email(to_email, subject, text_body)
@@ -141,6 +202,9 @@ async def send_shipping_update(to_email: str, order, tracking_number: str | None
     )
     if tracking_number:
         text_body += f"\nTracking: {tracking_number}"
+    delivery_lines = _delivery_lines(order, lang=lng)
+    if delivery_lines:
+        text_body += "\n" + "\n".join(delivery_lines)
     return await send_email(to_email, subject, text_body)
 
 
@@ -156,6 +220,9 @@ async def send_delivery_confirmation(to_email: str, order, lang: str | None = No
         if lng == "en"
         else f"Comanda {order.reference_code or order.id} a fost livrată."
     )
+    delivery_lines = _delivery_lines(order, lang=lng)
+    if delivery_lines:
+        text_body += "\n" + "\n".join(delivery_lines)
     return await send_email(to_email, subject, text_body)
 
 

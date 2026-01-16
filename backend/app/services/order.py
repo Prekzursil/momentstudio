@@ -26,7 +26,16 @@ async def build_order_from_cart(
     shipping_address_id: UUID | None,
     billing_address_id: UUID | None,
     shipping_method: ShippingMethod | None = None,
+    payment_method: str = "stripe",
     payment_intent_id: str | None = None,
+    paypal_order_id: str | None = None,
+    courier: str | None = None,
+    delivery_type: str | None = None,
+    locker_id: str | None = None,
+    locker_name: str | None = None,
+    locker_address: str | None = None,
+    locker_lat: float | None = None,
+    locker_lng: float | None = None,
     discount: Decimal | None = None,
 ) -> Order:
     if not cart.items:
@@ -65,11 +74,20 @@ async def build_order_from_cart(
         tax_amount=tax,
         shipping_amount=shipping_amount,
         currency="RON",
+        payment_method=payment_method,
+        courier=courier,
+        delivery_type=delivery_type,
+        locker_id=locker_id,
+        locker_name=locker_name,
+        locker_address=locker_address,
+        locker_lat=locker_lat,
+        locker_lng=locker_lng,
         shipping_address_id=shipping_address_id,
         billing_address_id=billing_address_id,
         items=items,
         shipping_method_id=shipping_method.id if shipping_method else None,
         stripe_payment_intent_id=payment_intent_id,
+        paypal_order_id=paypal_order_id,
     )
     session.add(order)
     await session.commit()
@@ -232,8 +250,12 @@ async def update_order(
     if "status" in data and data["status"]:
         current_status = OrderStatus(order.status)
         next_status = OrderStatus(data["status"])
-        if next_status not in ALLOWED_TRANSITIONS.get(current_status, set()):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
+        allowed = ALLOWED_TRANSITIONS.get(current_status, set())
+        if next_status not in allowed:
+            if current_status == OrderStatus.pending and next_status == OrderStatus.shipped and getattr(order, "payment_method", None) == "cod":
+                pass
+            else:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
         order.status = next_status
         data.pop("status")
         await _log_event(session, order.id, "status_change", f"{current_status.value} -> {next_status.value}")
