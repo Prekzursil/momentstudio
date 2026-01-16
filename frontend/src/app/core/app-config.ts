@@ -3,6 +3,7 @@ export interface AppConfig {
   appEnv: string;
   appVersion: string;
   stripePublishableKey: string;
+  paypalEnabled: boolean;
   sentryDsn: string;
   captchaSiteKey: string;
 }
@@ -18,6 +19,7 @@ const defaults: AppConfig = {
   appEnv: 'development',
   appVersion: '',
   stripePublishableKey: '',
+  paypalEnabled: false,
   sentryDsn: '',
   captchaSiteKey: ''
 };

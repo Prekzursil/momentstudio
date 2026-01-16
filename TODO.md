@@ -125,8 +125,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Address validation hook (country/postal rules).
 - [x] Checkout: support separate billing address (fallback to shipping) and attach billing/shipping addresses to orders.
 - [x] Payments: add Cash on delivery (RON) option stored on orders (payment_method) and allow admin to ship COD orders from pending.
-- [ ] Payments: add PayPal option in checkout (keep RON as primary currency) and document supported methods.
-- [ ] Orders: include payment method + delivery details in customer/owner emails (COD vs card, courier/tracking).
+- [x] Payments: add PayPal option in checkout (keep RON as primary currency) and document supported methods.
+- [x] Orders: include payment method + delivery details in customer/owner emails (COD vs card, courier/tracking).
 
 ## Backend - CMS & Content
 - [x] ContentBlock model + migration.
@@ -319,8 +319,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Payment form with Stripe elements.
 - [x] Checkout: add billing address section with “same as shipping” toggle and attach billing to orders.
 - [x] Payments UX: add payment method selector with icons (card via Stripe, cash on delivery).
-- [ ] Checkout: add a billing address section with a “same as shipping” toggle and persist/attach it to orders.
-- [ ] Payments UX: add payment method icons and implement Cash on delivery (RON) as an additional option (PayPal optional follow-up).
+- [x] Checkout: add a billing address section with a “same as shipping” toggle and persist/attach it to orders.
+- [x] Payments UX: add payment method icons and implement Cash on delivery (RON) as an additional option (PayPal optional follow-up).
 - [x] Checkout error states and retry.
 - [x] Save address checkbox for checkout.
 - [x] Order confirmation page with next steps.
@@ -341,8 +341,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Frontend test: Checkout component calls `/cart/sync`, `/payments/intent`, `/orders/checkout` and handles errors/retry.
 - [x] Frontend test: CartStore add/remove via backend merges quantities and is resilient to errors.
 - [x] Frontend test: ProductComponent “Add to cart” posts to backend and shows toast (mock CartStore).
-- [ ] Checkout: add courier selection (home delivery vs locker) and show it in order details/emails.
-- [ ] Payments UX: add PayPal (optional) and show all payment options with icons + clear copy.
+- [x] Checkout: add courier selection (home delivery vs locker) and show it in order details/emails.
+- [x] Payments UX: add PayPal (optional) and show all payment options with icons + clear copy.
+- [ ] Shipping: integrate official locker APIs for Sameday + Fan Courier (replace Overpass fallback; credentials required).
 
 ## Frontend - Auth & Account
 - [x] Login page with validation.

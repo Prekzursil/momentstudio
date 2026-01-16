@@ -48,6 +48,8 @@ type SavedCheckout = {
   locker?: LockerRead | null;
 };
 
+type CheckoutPaymentMethod = 'stripe' | 'cod' | 'paypal';
+
 @Component({
   selector: 'app-checkout',
   standalone: true,
@@ -63,171 +65,171 @@ type SavedCheckout = {
     LockerPickerComponent
   ],
   template: `
-	    <app-container classes="py-10 grid gap-6">
-	      <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-	      <div class="grid lg:grid-cols-[2fr_1fr] gap-6 items-start">
-	        <section class="grid gap-4">
-	          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'checkout.title' | translate }}</h1>
-	          <div
-	            *ngIf="errorMessage"
+      <app-container classes="py-10 grid gap-6">
+        <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
+        <div class="grid lg:grid-cols-[2fr_1fr] gap-6 items-start">
+          <section class="grid gap-4">
+            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'checkout.title' | translate }}</h1>
+            <div
+              *ngIf="errorMessage"
             class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex items-start justify-between gap-3 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
-	          >
-	            <span>{{ errorMessage }}</span>
-	            <app-button size="sm" variant="ghost" [label]="'checkout.retry' | translate" (action)="retryValidation()"></app-button>
-	          </div>
-	          <div
-	            *ngIf="!auth.isAuthenticated()"
-	            class="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-800 flex flex-wrap items-center justify-between gap-3 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-	          >
-	            <span class="font-medium">{{ 'checkout.guest' | translate }}</span>
-	            <div class="flex flex-wrap gap-2">
-	              <app-button size="sm" variant="ghost" [label]="'auth.login' | translate" routerLink="/login"></app-button>
-	              <app-button size="sm" variant="ghost" [label]="'auth.register' | translate" routerLink="/register"></app-button>
-	            </div>
-	          </div>
-	          <div
-	            *ngIf="auth.isAuthenticated() && !emailVerified()"
-	            class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex items-start justify-between gap-3 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
-	          >
-	            <span>{{ 'auth.emailVerificationNeeded' | translate }}</span>
-	            <app-button size="sm" variant="ghost" [label]="'auth.emailVerificationConfirm' | translate" routerLink="/account"></app-button>
-	          </div>
-	          <form #checkoutForm="ngForm" class="grid gap-4" (ngSubmit)="placeOrder(checkoutForm)">
-	            <div
-	              *ngIf="!auth.isAuthenticated()"
-	              class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-	            >
-	              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step1' | translate }}</p>
-	              <label class="flex items-center gap-2 text-sm">
-	                <input type="checkbox" [(ngModel)]="guestCreateAccount" name="guestCreateAccount" />
-	                {{ 'checkout.createAccount' | translate }}
-	              </label>
-	              <div *ngIf="guestCreateAccount" class="grid sm:grid-cols-2 gap-3">
-	                <label class="text-sm grid gap-1">
-	                  {{ 'auth.username' | translate }}
-	                  <input
-	                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-	                    name="guestUsername"
-	                    [(ngModel)]="guestUsername"
-	                    autocomplete="username"
-	                    required
-	                    minlength="3"
-	                    maxlength="30"
-	                    pattern="^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$"
-	                  />
-	                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'validation.usernameInvalid' | translate }}</span>
-	                </label>
-	                <div class="grid gap-1 text-sm">
-	                  <span class="font-medium text-slate-700 dark:text-slate-200">{{ 'auth.password' | translate }}</span>
-	                  <div class="grid grid-cols-[1fr_auto] gap-2 items-center">
-	                    <input
-	                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-	                      name="guestPassword"
-	                      [type]="guestShowPassword ? 'text' : 'password'"
-	                      [(ngModel)]="guestPassword"
-	                      autocomplete="new-password"
-	                      required
-	                      minlength="6"
-	                      maxlength="128"
-	                    />
-	                    <app-button size="sm" variant="ghost" [label]="guestShowPassword ? ('auth.hide' | translate) : ('auth.show' | translate)" (action)="toggleGuestPassword()"></app-button>
-	                  </div>
-	                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'validation.passwordMin' | translate }}</span>
-	                </div>
-	                <div class="grid gap-1 text-sm">
-	                  <span class="font-medium text-slate-700 dark:text-slate-200">{{ 'auth.confirmPassword' | translate }}</span>
-	                  <div class="grid grid-cols-[1fr_auto] gap-2 items-center">
-	                    <input
-	                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-	                      name="guestPasswordConfirm"
-	                      [type]="guestShowPasswordConfirm ? 'text' : 'password'"
-	                      [(ngModel)]="guestPasswordConfirm"
-	                      autocomplete="new-password"
-	                      required
-	                      minlength="6"
-	                      maxlength="128"
-	                    />
-	                    <app-button
-	                      size="sm"
-	                      variant="ghost"
-	                      [label]="guestShowPasswordConfirm ? ('auth.hide' | translate) : ('auth.show' | translate)"
-	                      (action)="toggleGuestPasswordConfirm()"
-	                    ></app-button>
-	                  </div>
-	                  <span *ngIf="guestPasswordConfirm && guestPasswordConfirm !== guestPassword" class="text-xs text-amber-700 dark:text-amber-300">
-	                    {{ 'validation.passwordMismatch' | translate }}
-	                  </span>
-	                </div>
-	                <label class="text-sm grid gap-1">
-	                  {{ 'auth.firstName' | translate }}
-	                  <input
-	                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-	                    name="guestFirstName"
-	                    [(ngModel)]="guestFirstName"
-	                    autocomplete="given-name"
-	                    required
-	                  />
-	                </label>
-	                <label class="text-sm grid gap-1">
-	                  {{ 'auth.middleName' | translate }}
-	                  <input
-	                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-	                    name="guestMiddleName"
-	                    [(ngModel)]="guestMiddleName"
-	                    autocomplete="additional-name"
-	                  />
-	                </label>
-	                <label class="text-sm grid gap-1">
-	                  {{ 'auth.lastName' | translate }}
-	                  <input
-	                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-	                    name="guestLastName"
-	                    [(ngModel)]="guestLastName"
-	                    autocomplete="family-name"
-	                    required
-	                  />
-	                </label>
-	                <label class="text-sm grid gap-1">
-	                  {{ 'auth.dateOfBirth' | translate }}
-	                  <input
-	                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-	                    name="guestDob"
-	                    type="date"
-	                    [(ngModel)]="guestDob"
-	                    required
-	                  />
-	                </label>
-	                <div class="grid gap-1 text-sm sm:col-span-2">
-	                  <span class="font-medium text-slate-700 dark:text-slate-200">{{ 'auth.phone' | translate }}</span>
-	                  <div class="grid grid-cols-[auto_1fr] gap-2">
-	                    <select
-	                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                      name="guestPhoneCountry"
-	                      [(ngModel)]="guestPhoneCountry"
-	                      required
-	                    >
-	                      <option *ngFor="let c of phoneCountries" [value]="c.code">{{ c.flag }} {{ c.dial }} {{ c.name }}</option>
-	                    </select>
-	                    <input
-	                      type="tel"
-	                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-	                      name="guestPhoneNational"
-	                      [(ngModel)]="guestPhoneNational"
-	                      autocomplete="tel-national"
-	                      required
-	                      pattern="^[0-9]{6,14}$"
-	                    />
-	                  </div>
-	                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'auth.phoneHint' | translate }}</span>
-	                  <span *ngIf="guestPhoneNational && !guestPhoneE164()" class="text-xs text-amber-700 dark:text-amber-300">
-	                    {{ 'validation.phoneInvalid' | translate }}
-	                  </span>
-	                </div>
-	              </div>
-	            </div>
-	            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-	              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step2' | translate }}</p>
-	              <div class="grid sm:grid-cols-2 gap-3">
+            >
+              <span>{{ errorMessage }}</span>
+              <app-button size="sm" variant="ghost" [label]="'checkout.retry' | translate" (action)="retryValidation()"></app-button>
+            </div>
+            <div
+              *ngIf="!auth.isAuthenticated()"
+              class="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-800 flex flex-wrap items-center justify-between gap-3 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+            >
+              <span class="font-medium">{{ 'checkout.guest' | translate }}</span>
+              <div class="flex flex-wrap gap-2">
+                <app-button size="sm" variant="ghost" [label]="'auth.login' | translate" routerLink="/login"></app-button>
+                <app-button size="sm" variant="ghost" [label]="'auth.register' | translate" routerLink="/register"></app-button>
+              </div>
+            </div>
+            <div
+              *ngIf="auth.isAuthenticated() && !emailVerified()"
+              class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex items-start justify-between gap-3 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+            >
+              <span>{{ 'auth.emailVerificationNeeded' | translate }}</span>
+              <app-button size="sm" variant="ghost" [label]="'auth.emailVerificationConfirm' | translate" routerLink="/account"></app-button>
+            </div>
+            <form #checkoutForm="ngForm" class="grid gap-4" (ngSubmit)="placeOrder(checkoutForm)">
+              <div
+                *ngIf="!auth.isAuthenticated()"
+                class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step1' | translate }}</p>
+                <label class="flex items-center gap-2 text-sm">
+                  <input type="checkbox" [(ngModel)]="guestCreateAccount" name="guestCreateAccount" />
+                  {{ 'checkout.createAccount' | translate }}
+                </label>
+                <div *ngIf="guestCreateAccount" class="grid sm:grid-cols-2 gap-3">
+                  <label class="text-sm grid gap-1">
+                    {{ 'auth.username' | translate }}
+                    <input
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      name="guestUsername"
+                      [(ngModel)]="guestUsername"
+                      autocomplete="username"
+                      required
+                      minlength="3"
+                      maxlength="30"
+                      pattern="^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$"
+                    />
+                    <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'validation.usernameInvalid' | translate }}</span>
+                  </label>
+                  <div class="grid gap-1 text-sm">
+                    <span class="font-medium text-slate-700 dark:text-slate-200">{{ 'auth.password' | translate }}</span>
+                    <div class="grid grid-cols-[1fr_auto] gap-2 items-center">
+                      <input
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                        name="guestPassword"
+                        [type]="guestShowPassword ? 'text' : 'password'"
+                        [(ngModel)]="guestPassword"
+                        autocomplete="new-password"
+                        required
+                        minlength="6"
+                        maxlength="128"
+                      />
+                      <app-button size="sm" variant="ghost" [label]="guestShowPassword ? ('auth.hide' | translate) : ('auth.show' | translate)" (action)="toggleGuestPassword()"></app-button>
+                    </div>
+                    <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'validation.passwordMin' | translate }}</span>
+                  </div>
+                  <div class="grid gap-1 text-sm">
+                    <span class="font-medium text-slate-700 dark:text-slate-200">{{ 'auth.confirmPassword' | translate }}</span>
+                    <div class="grid grid-cols-[1fr_auto] gap-2 items-center">
+                      <input
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                        name="guestPasswordConfirm"
+                        [type]="guestShowPasswordConfirm ? 'text' : 'password'"
+                        [(ngModel)]="guestPasswordConfirm"
+                        autocomplete="new-password"
+                        required
+                        minlength="6"
+                        maxlength="128"
+                      />
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="guestShowPasswordConfirm ? ('auth.hide' | translate) : ('auth.show' | translate)"
+                        (action)="toggleGuestPasswordConfirm()"
+                      ></app-button>
+                    </div>
+                    <span *ngIf="guestPasswordConfirm && guestPasswordConfirm !== guestPassword" class="text-xs text-amber-700 dark:text-amber-300">
+                      {{ 'validation.passwordMismatch' | translate }}
+                    </span>
+                  </div>
+                  <label class="text-sm grid gap-1">
+                    {{ 'auth.firstName' | translate }}
+                    <input
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      name="guestFirstName"
+                      [(ngModel)]="guestFirstName"
+                      autocomplete="given-name"
+                      required
+                    />
+                  </label>
+                  <label class="text-sm grid gap-1">
+                    {{ 'auth.middleName' | translate }}
+                    <input
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      name="guestMiddleName"
+                      [(ngModel)]="guestMiddleName"
+                      autocomplete="additional-name"
+                    />
+                  </label>
+                  <label class="text-sm grid gap-1">
+                    {{ 'auth.lastName' | translate }}
+                    <input
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      name="guestLastName"
+                      [(ngModel)]="guestLastName"
+                      autocomplete="family-name"
+                      required
+                    />
+                  </label>
+                  <label class="text-sm grid gap-1">
+                    {{ 'auth.dateOfBirth' | translate }}
+                    <input
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      name="guestDob"
+                      type="date"
+                      [(ngModel)]="guestDob"
+                      required
+                    />
+                  </label>
+                  <div class="grid gap-1 text-sm sm:col-span-2">
+                    <span class="font-medium text-slate-700 dark:text-slate-200">{{ 'auth.phone' | translate }}</span>
+                    <div class="grid grid-cols-[auto_1fr] gap-2">
+                      <select
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        name="guestPhoneCountry"
+                        [(ngModel)]="guestPhoneCountry"
+                        required
+                      >
+                        <option *ngFor="let c of phoneCountries" [value]="c.code">{{ c.flag }} {{ c.dial }} {{ c.name }}</option>
+                      </select>
+                      <input
+                        type="tel"
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                        name="guestPhoneNational"
+                        [(ngModel)]="guestPhoneNational"
+                        autocomplete="tel-national"
+                        required
+                        pattern="^[0-9]{6,14}$"
+                      />
+                    </div>
+                    <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'auth.phoneHint' | translate }}</span>
+                    <span *ngIf="guestPhoneNational && !guestPhoneE164()" class="text-xs text-amber-700 dark:text-amber-300">
+                      {{ 'validation.phoneInvalid' | translate }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step2' | translate }}</p>
+                <div class="grid sm:grid-cols-2 gap-3">
                 <label class="text-sm grid gap-1">
                   {{ 'checkout.name' | translate }}
                   <input class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400" name="name" [(ngModel)]="address.name" required />
@@ -405,12 +407,12 @@ type SavedCheckout = {
                 <input type="checkbox" [(ngModel)]="saveAddress" name="saveAddress" />
                 {{ 'checkout.saveAddress' | translate }}
               </label>
-	              <p *ngIf="addressError" class="text-sm text-amber-700 dark:text-amber-300">{{ addressError }}</p>
-	            </div>
+                <p *ngIf="addressError" class="text-sm text-amber-700 dark:text-amber-300">{{ addressError }}</p>
+              </div>
 
-	            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-	              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step3' | translate }}</p>
-	              <div class="flex gap-3">
+              <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step3' | translate }}</p>
+                <div class="flex gap-3">
                 <input
                   class="rounded-lg border border-slate-200 bg-white px-3 py-2 flex-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
                   [(ngModel)]="promo"
@@ -436,7 +438,7 @@ type SavedCheckout = {
 
             <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
               <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step4' | translate }}</p>
-              <div class="grid sm:grid-cols-2 gap-3">
+              <div class="grid gap-3" [ngClass]="paypalEnabled ? 'sm:grid-cols-3' : 'sm:grid-cols-2'">
                 <button
                   type="button"
                   class="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
@@ -453,6 +455,24 @@ type SavedCheckout = {
                     <path d="M2 10h20"></path>
                   </svg>
                   <span>{{ 'checkout.paymentCard' | translate }}</span>
+                </button>
+                <button
+                  *ngIf="paypalEnabled"
+                  type="button"
+                  class="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  [ngClass]="
+                    paymentMethod === 'paypal'
+                      ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'
+                      : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800'
+                  "
+                  (click)="setPaymentMethod('paypal')"
+                  [attr.aria-pressed]="paymentMethod === 'paypal'"
+                >
+                  <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M7 20h7a6 6 0 0 0 0-12H7z"></path>
+                    <path d="M7 8h6a4 4 0 0 1 0 8H7"></path>
+                  </svg>
+                  <span>{{ 'checkout.paymentPayPal' | translate }}</span>
                 </button>
                 <button
                   type="button"
@@ -475,6 +495,9 @@ type SavedCheckout = {
               </div>
               <p class="text-xs text-slate-600 dark:text-slate-300" *ngIf="paymentMethod === 'stripe'">
                 {{ 'checkout.paymentCardHint' | translate }}
+              </p>
+              <p class="text-xs text-slate-600 dark:text-slate-300" *ngIf="paymentMethod === 'paypal'">
+                {{ 'checkout.paymentPayPalHint' | translate }}
               </p>
               <p class="text-xs text-slate-600 dark:text-slate-300" *ngIf="paymentMethod === 'cod'">
                 {{ 'checkout.paymentCashHint' | translate }}
@@ -507,10 +530,10 @@ type SavedCheckout = {
             <span>{{ 'checkout.subtotal' | translate }}</span>
             <span>{{ subtotal() | localizedCurrency : currency }}</span>
           </div>
-	          <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
-	            <span>{{ 'checkout.shipping' | translate }}</span>
-	            <span>{{ 0 | localizedCurrency : currency }}</span>
-	          </div>
+            <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
+              <span>{{ 'checkout.shipping' | translate }}</span>
+              <span>{{ 0 | localizedCurrency : currency }}</span>
+            </div>
           <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
             <span>{{ 'checkout.promo' | translate }}</span>
             <span class="text-emerald-700 dark:text-emerald-300">-{{ discount | localizedCurrency : currency }}</span>
@@ -519,10 +542,10 @@ type SavedCheckout = {
             <span>{{ 'checkout.estimatedTotal' | translate }}</span>
             <span>{{ total | localizedCurrency : currency }}</span>
           </div>
-	        </aside>
-	      </div>
-	    </app-container>
-	  `
+          </aside>
+        </div>
+      </app-container>
+    `
 })
 export class CheckoutComponent implements AfterViewInit, OnDestroy {
   crumbs = [
@@ -592,7 +615,8 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
   private clientSecret: string | null = null;
   syncing = false;
   placing = false;
-  paymentMethod: 'stripe' | 'cod' = 'stripe';
+  paymentMethod: CheckoutPaymentMethod = 'stripe';
+  paypalEnabled = Boolean(appConfig.paypalEnabled);
   private stripeThemeEffect?: EffectRef;
 
   constructor(
@@ -613,7 +637,7 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
       this.deliveryType = saved.deliveryType ?? 'home';
       this.locker = saved.locker ?? null;
     }
-    this.paymentMethod = this.getStripePublishableKey() ? 'stripe' : 'cod';
+    this.paymentMethod = this.defaultPaymentMethod();
     this.phoneCountries = listPhoneCountries(this.translate.currentLang || 'en');
     this.stripeThemeEffect = effect(() => {
       const mode = this.theme.mode()();
@@ -895,7 +919,7 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  setPaymentMethod(method: 'stripe' | 'cod'): void {
+  setPaymentMethod(method: CheckoutPaymentMethod): void {
     this.paymentMethod = method;
     this.errorMessage = '';
     this.cardError = null;
@@ -938,7 +962,17 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
   }
 
   private getStripePublishableKey(): string | null {
-    return appConfig.stripePublishableKey || null;
+    const raw = (appConfig.stripePublishableKey || '').trim();
+    if (!raw) return null;
+    // Treat template placeholders as "not configured" so checkout can default to COD.
+    if (raw.includes('replace_me') || raw.includes('placeholder')) return null;
+    return raw;
+  }
+
+  private defaultPaymentMethod(): CheckoutPaymentMethod {
+    if (this.getStripePublishableKey()) return 'stripe';
+    if (this.paypalEnabled) return 'paypal';
+    return 'cod';
   }
 
   private async confirmPayment(clientSecret: string): Promise<boolean> {
@@ -970,11 +1004,11 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
       )
       .subscribe({
         next: () => (this.syncing = false),
-      error: () => {
-        this.syncing = false;
-        this.errorMessage = 'Could not sync cart with server';
-      }
-    });
+        error: () => {
+          this.syncing = false;
+          this.errorMessage = 'Could not sync cart with server';
+        }
+      });
   }
 
   private submitCheckout(): void {
@@ -1006,7 +1040,14 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
     }
     body['payment_method'] = this.paymentMethod;
     this.api
-      .post<{ order_id: string; reference_code?: string; client_secret: string | null; payment_method?: string }>(
+      .post<{
+        order_id: string;
+        reference_code?: string;
+        client_secret: string | null;
+        paypal_order_id?: string | null;
+        paypal_approval_url?: string | null;
+        payment_method?: string;
+      }>(
         '/orders/checkout',
         body,
         this.cartApi.headers()
@@ -1014,10 +1055,25 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
       .subscribe({
         next: (res) => {
           this.clientSecret = res.client_secret;
-          if (this.paymentMethod !== 'stripe' || !res.client_secret) {
+          if (this.paymentMethod === 'paypal') {
+            if (this.saveAddress) this.persistAddress();
+            this.placing = false;
+            if (res.paypal_approval_url) {
+              window.location.assign(res.paypal_approval_url);
+              return;
+            }
+            this.errorMessage = this.translate.instant('checkout.paymentNotReady');
+            return;
+          }
+          if (this.paymentMethod === 'cod') {
             if (this.saveAddress) this.persistAddress();
             this.placing = false;
             void this.router.navigate(['/checkout/success']);
+            return;
+          }
+          if (!res.client_secret) {
+            this.errorMessage = this.translate.instant('checkout.paymentNotReady');
+            this.placing = false;
             return;
           }
           this.confirmPayment(res.client_secret)
@@ -1170,7 +1226,14 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
     }
 
     this.api
-      .post<{ order_id: string; reference_code?: string; client_secret: string | null; payment_method?: string }>(
+      .post<{
+        order_id: string;
+        reference_code?: string;
+        client_secret: string | null;
+        paypal_order_id?: string | null;
+        paypal_approval_url?: string | null;
+        payment_method?: string;
+      }>(
         '/orders/guest-checkout',
         payload,
         this.cartApi.headers()
@@ -1178,10 +1241,25 @@ export class CheckoutComponent implements AfterViewInit, OnDestroy {
       .subscribe({
         next: (res) => {
           this.clientSecret = res.client_secret;
-          if (this.paymentMethod !== 'stripe' || !res.client_secret) {
+          if (this.paymentMethod === 'paypal') {
+            if (this.saveAddress) this.persistAddress();
+            this.placing = false;
+            if (res.paypal_approval_url) {
+              window.location.assign(res.paypal_approval_url);
+              return;
+            }
+            this.errorMessage = this.translate.instant('checkout.paymentNotReady');
+            return;
+          }
+          if (this.paymentMethod === 'cod') {
             if (this.saveAddress) this.persistAddress();
             this.placing = false;
             void this.router.navigate(['/checkout/success']);
+            return;
+          }
+          if (!res.client_secret) {
+            this.errorMessage = this.translate.instant('checkout.paymentNotReady');
+            this.placing = false;
             return;
           }
           this.confirmPayment(res.client_secret)

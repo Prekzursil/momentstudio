@@ -28,6 +28,7 @@ async def build_order_from_cart(
     shipping_method: ShippingMethod | None = None,
     payment_method: str = "stripe",
     payment_intent_id: str | None = None,
+    paypal_order_id: str | None = None,
     courier: str | None = None,
     delivery_type: str | None = None,
     locker_id: str | None = None,
@@ -86,6 +87,7 @@ async def build_order_from_cart(
         items=items,
         shipping_method_id=shipping_method.id if shipping_method else None,
         stripe_payment_intent_id=payment_intent_id,
+        paypal_order_id=paypal_order_id,
     )
     session.add(order)
     await session.commit()

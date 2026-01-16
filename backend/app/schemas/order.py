@@ -65,6 +65,8 @@ class OrderRead(BaseModel):
     currency: str
     payment_method: str
     stripe_payment_intent_id: str | None = None
+    paypal_order_id: str | None = None
+    paypal_capture_id: str | None = None
     tracking_number: str | None = None
     shipping_method: ShippingMethodRead | None = None
     shipping_address_id: UUID | None = None

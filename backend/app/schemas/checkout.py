@@ -2,6 +2,8 @@ from datetime import date
 from uuid import UUID
 from pydantic import BaseModel, EmailStr, Field
 
+from app.models.order import OrderStatus
+
 
 class GuestEmailVerificationRequest(BaseModel):
     email: EmailStr
@@ -46,7 +48,7 @@ class GuestCheckoutRequest(BaseModel):
     billing_region: str | None = Field(default=None, max_length=100)
     billing_postal_code: str | None = Field(default=None, min_length=1, max_length=20)
     billing_country: str | None = Field(default=None, min_length=2, max_length=2)
-    payment_method: str = Field(default="stripe", pattern="^(stripe|cod)$")
+    payment_method: str = Field(default="stripe", pattern="^(stripe|cod|paypal)$")
     courier: str = Field(default="sameday", pattern="^(sameday|fan_courier)$")
     delivery_type: str = Field(default="home", pattern="^(home|locker)$")
     locker_id: str | None = Field(default=None, max_length=80)
@@ -63,7 +65,20 @@ class GuestCheckoutResponse(BaseModel):
     order_id: UUID
     reference_code: str | None = None
     client_secret: str | None = None
+    paypal_order_id: str | None = None
+    paypal_approval_url: str | None = None
     payment_method: str = "stripe"
+
+
+class PayPalCaptureRequest(BaseModel):
+    paypal_order_id: str = Field(min_length=1, max_length=255)
+
+
+class PayPalCaptureResponse(BaseModel):
+    order_id: UUID
+    reference_code: str | None = None
+    status: OrderStatus
+    paypal_capture_id: str | None = None
 
 
 class CheckoutRequest(BaseModel):
@@ -79,7 +94,7 @@ class CheckoutRequest(BaseModel):
     billing_region: str | None = Field(default=None, max_length=100)
     billing_postal_code: str | None = Field(default=None, min_length=1, max_length=20)
     billing_country: str | None = Field(default=None, min_length=2, max_length=2)
-    payment_method: str = Field(default="stripe", pattern="^(stripe|cod)$")
+    payment_method: str = Field(default="stripe", pattern="^(stripe|cod|paypal)$")
     courier: str = Field(default="sameday", pattern="^(sameday|fan_courier)$")
     delivery_type: str = Field(default="home", pattern="^(home|locker)$")
     locker_id: str | None = Field(default=None, max_length=80)

@@ -11,6 +11,8 @@ import { ProductComponent } from './pages/product/product.component';
 import { adminGuard, authGuard } from './core/auth.guard';
 import { CartComponent } from './pages/cart/cart.component';
 import { CheckoutComponent } from './pages/checkout/checkout.component';
+import { PayPalReturnComponent } from './pages/checkout/paypal-return.component';
+import { PayPalCancelComponent } from './pages/checkout/paypal-cancel.component';
 import { SuccessComponent } from './pages/checkout/success.component';
 import { LoginComponent } from './pages/auth/login.component';
 import { RegisterComponent } from './pages/auth/register.component';
@@ -36,6 +38,8 @@ export const routes: Routes = [
   { path: 'products/:slug', component: ProductComponent, title: 'Product | momentstudio' },
   { path: 'cart', component: CartComponent, title: 'Cart | momentstudio' },
   { path: 'checkout', component: CheckoutComponent, title: 'Checkout | momentstudio' },
+  { path: 'checkout/paypal/return', component: PayPalReturnComponent, title: 'PayPal | momentstudio' },
+  { path: 'checkout/paypal/cancel', component: PayPalCancelComponent, title: 'Checkout | momentstudio' },
   {
     path: 'checkout/success',
     component: SuccessComponent,
