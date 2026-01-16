@@ -208,13 +208,6 @@ type OrderAction =
                     <app-button
                       size="sm"
                       variant="ghost"
-                      [label]="'adminUi.orders.actions.capturePayment' | translate"
-                      [disabled]="action() !== null"
-                      (action)="capturePayment()"
-                    ></app-button>
-                    <app-button
-                      size="sm"
-                      variant="ghost"
                       [label]="'adminUi.orders.actions.voidPayment' | translate"
                       [disabled]="action() !== null"
                       (action)="voidPayment()"
@@ -702,23 +695,6 @@ export class AdminOrderDetailComponent implements OnInit {
       },
       error: () => {
         this.toast.error(this.translate.instant('adminUi.orders.errors.retry'));
-        this.action.set(null);
-      }
-    });
-  }
-
-  capturePayment(): void {
-    const orderId = this.orderId;
-    if (!orderId) return;
-    this.action.set('capture');
-    this.api.capturePayment(orderId).subscribe({
-      next: () => {
-        this.toast.success(this.translate.instant('adminUi.orders.success.capture'));
-        this.load(orderId);
-        this.action.set(null);
-      },
-      error: () => {
-        this.toast.error(this.translate.instant('adminUi.orders.errors.capture'));
         this.action.set(null);
       }
     });

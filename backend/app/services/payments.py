@@ -35,7 +35,6 @@ async def create_payment_intent(session: AsyncSession, cart: Cart, amount_cents:
         intent = stripe.PaymentIntent.create(
             amount=amount_cents,
             currency="ron",
-            capture_method="manual",
             metadata={"cart_id": str(cart.id), "user_id": str(cart.user_id) if cart.user_id else ""},
         )
     except Exception as exc:

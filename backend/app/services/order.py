@@ -267,7 +267,7 @@ async def update_order(
         ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Stripe orders must be accepted via Capture payment.",
+                detail="Stripe orders are marked as in progress automatically once the payment succeeds.",
             )
         if (
             current_status == OrderStatus.pending
