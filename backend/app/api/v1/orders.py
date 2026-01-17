@@ -198,11 +198,13 @@ async def checkout(
     has_billing = bool((payload.billing_line1 or "").strip())
     billing_same_as_shipping = not has_billing
 
+    address_user_id = current_user.id if payload.save_address else None
+
     shipping_addr = await address_service.create_address(
         session,
-        current_user.id,
+        address_user_id,
         AddressCreate(
-            label="Checkout",
+            label="Checkout" if payload.save_address else "Checkout (One-time)",
             line1=payload.line1,
             line2=payload.line2,
             city=payload.city,
@@ -225,9 +227,9 @@ async def checkout(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Billing address is incomplete")
         billing_addr = await address_service.create_address(
             session,
-            current_user.id,
+            address_user_id,
             AddressCreate(
-                label="Checkout (Billing)",
+                label="Checkout (Billing)" if payload.save_address else "Checkout (Billing · One-time)",
                 line1=payload.billing_line1 or payload.line1,
                 line2=payload.billing_line2,
                 city=payload.billing_city,
