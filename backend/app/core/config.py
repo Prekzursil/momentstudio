@@ -83,6 +83,17 @@ class Settings(BaseSettings):
     fx_refresh_enabled: bool = False
     fx_refresh_interval_seconds: int = 60 * 60 * 6
 
+    # Locker lookup (Sameday/FANbox)
+    # In production you should configure official courier credentials.
+    # For local development, Overpass (OpenStreetMap) can be used as a best-effort fallback.
+    lockers_use_overpass_fallback: bool = True
+    sameday_api_base_url: str | None = None
+    sameday_api_username: str | None = None
+    sameday_api_password: str | None = None
+    fan_api_base_url: str = "https://api.fancourier.ro"
+    fan_api_username: str | None = None
+    fan_api_password: str | None = None
+
 
 @lru_cache
 def get_settings() -> Settings:

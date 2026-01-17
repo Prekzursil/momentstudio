@@ -7,12 +7,19 @@ from typing import Final
 
 import httpx
 
+from app.core.config import settings
 from app.schemas.shipping import LockerProvider, LockerRead
 
 
 _OVERPASS_URL: Final[str] = "https://overpass-api.de/api/interpreter"
 _CACHE_TTL: Final[timedelta] = timedelta(hours=6)
+_OFFICIAL_CACHE_TTL: Final[timedelta] = timedelta(hours=24)
+_AUTH_SAFETY_WINDOW: Final[timedelta] = timedelta(minutes=5)
 _UA: Final[str] = "momentstudio/1.0 (+https://momentstudio.ro)"
+
+
+class LockersNotConfiguredError(RuntimeError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -21,7 +28,32 @@ class _CacheEntry:
     items: list[LockerRead]
 
 
+@dataclass(frozen=True)
+class _AllLockersEntry:
+    expires_at: datetime
+    items: list["_LockerPoint"]
+
+
+@dataclass(frozen=True)
+class _AuthToken:
+    token: str
+    expires_at: datetime
+
+
+@dataclass(frozen=True)
+class _LockerPoint:
+    id: str
+    provider: LockerProvider
+    name: str
+    address: str | None
+    lat: float
+    lng: float
+
+
 _cache: dict[str, _CacheEntry] = {}
+_all_lockers: dict[LockerProvider, _AllLockersEntry] = {}
+_sameday_auth: _AuthToken | None = None
+_fan_auth: _AuthToken | None = None
 
 
 def _round_coord(value: float) -> float:
@@ -130,6 +162,224 @@ def _parse_overpass_json(data: dict, *, provider: LockerProvider, lat: float, ln
     return items
 
 
+def _sameday_configured() -> bool:
+    return bool(settings.sameday_api_base_url and settings.sameday_api_username and settings.sameday_api_password)
+
+
+def _fan_configured() -> bool:
+    return bool(settings.fan_api_base_url and settings.fan_api_username and settings.fan_api_password)
+
+
+def _sameday_base_url() -> str:
+    if not settings.sameday_api_base_url:
+        raise LockersNotConfiguredError("Sameday locker API is not configured")
+    return settings.sameday_api_base_url.rstrip("/")
+
+
+def _fan_base_url() -> str:
+    return (settings.fan_api_base_url or "https://api.fancourier.ro").rstrip("/")
+
+
+def _parse_sameday_expire_at(value: object) -> datetime:
+    raw = str(value or "").strip()
+    if not raw:
+        return datetime.now(timezone.utc) + timedelta(hours=12)
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"):
+        try:
+            dt = datetime.strptime(raw, fmt)
+            return dt.replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    return datetime.now(timezone.utc) + timedelta(minutes=10)
+
+
+async def _sameday_get_token() -> str:
+    global _sameday_auth
+    now = datetime.now(timezone.utc)
+    if _sameday_auth and _sameday_auth.expires_at - _AUTH_SAFETY_WINDOW > now:
+        return _sameday_auth.token
+
+    if not settings.sameday_api_username or not settings.sameday_api_password:
+        raise LockersNotConfiguredError("Sameday locker API is not configured")
+
+    headers = {
+        "User-Agent": _UA,
+        "Accept": "application/json",
+        "X-Auth-Username": settings.sameday_api_username,
+        "X-Auth-Password": settings.sameday_api_password,
+    }
+    timeout = httpx.Timeout(15.0, connect=5.0)
+    async with httpx.AsyncClient(base_url=_sameday_base_url(), timeout=timeout, headers=headers) as client:
+        resp = await client.post("/api/authenticate", data={"remember_me": "1"})
+        resp.raise_for_status()
+        data = resp.json()
+
+    token = str((data or {}).get("token") or "").strip()
+    if not token:
+        raise RuntimeError("Sameday authentication returned an empty token")
+    expires_at = _parse_sameday_expire_at((data or {}).get("expire_at"))
+    _sameday_auth = _AuthToken(token=token, expires_at=expires_at)
+    return token
+
+
+async def _load_sameday_lockers() -> list[_LockerPoint]:
+    token = await _sameday_get_token()
+    headers = {"User-Agent": _UA, "Accept": "application/json", "X-Auth-Token": token}
+    timeout = httpx.Timeout(20.0, connect=5.0)
+
+    page = 1
+    count_per_page = 200
+    items: list[_LockerPoint] = []
+    async with httpx.AsyncClient(base_url=_sameday_base_url(), timeout=timeout, headers=headers) as client:
+        while True:
+            resp = await client.get("/api/client/lockers", params={"page": page, "countPerPage": count_per_page})
+            resp.raise_for_status()
+            data = resp.json() or {}
+            for row in data.get("data") or []:
+                try:
+                    locker_id = str(row.get("lockerId") or "").strip()
+                    lat_val = float(row.get("lat"))
+                    lng_val = float(row.get("lng"))
+                    name = str(row.get("name") or "").strip()[:255]
+                    address = (str(row.get("address") or "").strip() or None)
+                    if not locker_id or not name:
+                        continue
+                except Exception:
+                    continue
+                items.append(
+                    _LockerPoint(
+                        id=f"sameday:{locker_id}",
+                        provider=LockerProvider.sameday,
+                        name=name,
+                        address=address[:255] if address else None,
+                        lat=lat_val,
+                        lng=lng_val,
+                    )
+                )
+            pages = int(data.get("pages") or 1)
+            current = int(data.get("currentPage") or page)
+            if current >= pages:
+                break
+            page += 1
+    return items
+
+
+async def _fan_get_token() -> str:
+    global _fan_auth
+    now = datetime.now(timezone.utc)
+    if _fan_auth and _fan_auth.expires_at - _AUTH_SAFETY_WINDOW > now:
+        return _fan_auth.token
+
+    if not settings.fan_api_username or not settings.fan_api_password:
+        raise LockersNotConfiguredError("FAN Courier locker API is not configured")
+
+    headers = {"User-Agent": _UA, "Accept": "application/json"}
+    timeout = httpx.Timeout(15.0, connect=5.0)
+    async with httpx.AsyncClient(base_url=_fan_base_url(), timeout=timeout, headers=headers) as client:
+        resp = await client.post("/login", params={"username": settings.fan_api_username, "password": settings.fan_api_password})
+        resp.raise_for_status()
+        data = resp.json() or {}
+    token = str(data.get("token") or "").strip()
+    if not token:
+        raise RuntimeError("FAN Courier authentication returned an empty token")
+    _fan_auth = _AuthToken(token=token, expires_at=now + timedelta(hours=23))
+    return token
+
+
+def _format_fan_address(addr: dict) -> str | None:
+    street = " ".join([(addr.get("street") or "").strip(), (addr.get("streetNo") or "").strip()]).strip()
+    locality = (addr.get("locality") or "").strip()
+    county = (addr.get("county") or "").strip()
+    parts = [p for p in [street, locality, county] if p]
+    if parts:
+        return ", ".join(parts)[:255]
+    return None
+
+
+async def _load_fan_lockers() -> list[_LockerPoint]:
+    token = await _fan_get_token()
+    headers = {"User-Agent": _UA, "Accept": "application/json", "Authorization": f"Bearer {token}"}
+    timeout = httpx.Timeout(20.0, connect=5.0)
+    async with httpx.AsyncClient(base_url=_fan_base_url(), timeout=timeout, headers=headers) as client:
+        resp = await client.get("/reports/pickup-points", params={"type": "fanbox"})
+        resp.raise_for_status()
+        data = resp.json() or {}
+
+    items: list[_LockerPoint] = []
+    for row in data.get("data") or []:
+        try:
+            locker_id = str(row.get("id") or "").strip()
+            lat_val = float(row.get("latitude"))
+            lng_val = float(row.get("longitude"))
+            name = str(row.get("name") or "").strip()[:255]
+            if not locker_id or not name:
+                continue
+        except Exception:
+            continue
+        address = _format_fan_address(row.get("address") or {})
+        items.append(
+            _LockerPoint(
+                id=f"fan:{locker_id}",
+                provider=LockerProvider.fan_courier,
+                name=name,
+                address=address,
+                lat=lat_val,
+                lng=lng_val,
+            )
+        )
+    return items
+
+
+async def _get_all_lockers(provider: LockerProvider) -> list[_LockerPoint]:
+    now = datetime.now(timezone.utc)
+    cached = _all_lockers.get(provider)
+    if cached and cached.expires_at > now:
+        return cached.items
+
+    try:
+        if provider == LockerProvider.sameday:
+            if not _sameday_configured():
+                raise LockersNotConfiguredError("Sameday locker API is not configured")
+            items = await _load_sameday_lockers()
+        else:
+            if not _fan_configured():
+                raise LockersNotConfiguredError("FAN Courier locker API is not configured")
+            items = await _load_fan_lockers()
+
+        _all_lockers[provider] = _AllLockersEntry(expires_at=now + _OFFICIAL_CACHE_TTL, items=items)
+        return items
+    except Exception:
+        # If refresh fails, return any stale cache instead of hard failing.
+        if cached:
+            return cached.items
+        raise
+
+
+def _select_nearby_lockers(
+    points: list[_LockerPoint], *, lat: float, lng: float, radius_km: float, limit: int, provider: LockerProvider
+) -> list[LockerRead]:
+    radius = max(1.0, min(50.0, float(radius_km)))
+    cap = max(1, min(200, int(limit)))
+    nearby: list[LockerRead] = []
+    for p in points:
+        dist = _haversine_km(lat, lng, p.lat, p.lng)
+        if dist > radius:
+            continue
+        nearby.append(
+            LockerRead(
+                id=p.id,
+                provider=provider,
+                name=p.name,
+                address=p.address,
+                lat=p.lat,
+                lng=p.lng,
+                distance_km=dist,
+            )
+        )
+    nearby.sort(key=lambda x: (x.distance_km or 0.0, x.name))
+    return nearby[:cap]
+
+
 async def list_lockers(
     *,
     provider: LockerProvider,
@@ -140,19 +390,28 @@ async def list_lockers(
     force_refresh: bool = False,
 ) -> list[LockerRead]:
     now = datetime.now(timezone.utc)
-    key = f"{provider}:{_round_coord(lat)}:{_round_coord(lng)}:{int(radius_km)}:{int(limit)}"
+    source = "official" if ((provider == LockerProvider.sameday and _sameday_configured()) or (provider == LockerProvider.fan_courier and _fan_configured())) else "overpass"
+    key = f"{provider}:{source}:{_round_coord(lat)}:{_round_coord(lng)}:{int(radius_km)}:{int(limit)}"
     cached = _cache.get(key)
     if not force_refresh and cached and cached.expires_at > now:
         return cached.items
 
-    radius_m = max(1000, min(50_000, int(float(radius_km) * 1000)))
-    limit = max(1, min(200, int(limit)))
-    query = _build_query(provider, lat=float(lat), lng=float(lng), radius_m=radius_m)
-
-    headers = {"User-Agent": _UA, "Accept": "application/json"}
-    timeout = httpx.Timeout(10.0, connect=5.0)
-
     try:
+        if source == "official":
+            points = await _get_all_lockers(provider)
+            items = _select_nearby_lockers(points, lat=float(lat), lng=float(lng), radius_km=radius_km, limit=limit, provider=provider)
+            _cache[key] = _CacheEntry(expires_at=now + _CACHE_TTL, items=items)
+            return items
+
+        if not settings.lockers_use_overpass_fallback:
+            raise LockersNotConfiguredError("Locker API is not configured")
+
+        radius_m = max(1000, min(50_000, int(float(radius_km) * 1000)))
+        limit = max(1, min(200, int(limit)))
+        query = _build_query(provider, lat=float(lat), lng=float(lng), radius_m=radius_m)
+
+        headers = {"User-Agent": _UA, "Accept": "application/json"}
+        timeout = httpx.Timeout(10.0, connect=5.0)
         async with httpx.AsyncClient(timeout=timeout, headers=headers) as client:
             resp = await client.post(_OVERPASS_URL, content=query.encode("utf-8"))
             resp.raise_for_status()
@@ -161,7 +420,7 @@ async def list_lockers(
         _cache[key] = _CacheEntry(expires_at=now + _CACHE_TTL, items=items)
         return items
     except Exception:
-        # Fallback to any cached value (even stale) if Overpass is down.
+        # Fallback to any cached value (even stale) if the upstream is down.
         if cached:
             return cached.items
         raise
@@ -169,4 +428,7 @@ async def list_lockers(
 
 def _reset_cache_for_tests() -> None:
     _cache.clear()
-
+    _all_lockers.clear()
+    global _sameday_auth, _fan_auth
+    _sameday_auth = None
+    _fan_auth = None

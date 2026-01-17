@@ -350,7 +350,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Frontend test: ProductComponent “Add to cart” posts to backend and shows toast (mock CartStore).
 - [x] Checkout: add courier selection (home delivery vs locker) and show it in order details/emails.
 - [x] Payments UX: add PayPal (optional) and show all payment options with icons + clear copy.
-- [ ] Shipping: integrate official locker APIs for Sameday + Fan Courier (replace Overpass fallback; credentials required).
+- [x] Shipping: integrate official locker APIs for Sameday + Fan Courier (env-configured; optional Overpass fallback for local dev).
 
 ## Frontend - Auth & Account
 - [x] Login page with validation.
