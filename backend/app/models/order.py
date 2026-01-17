@@ -51,6 +51,7 @@ class Order(Base):
     locker_lat: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
     locker_lng: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
     stripe_payment_intent_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    stripe_checkout_session_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     paypal_order_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     paypal_capture_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     shipping_address_id: Mapped[uuid.UUID | None] = mapped_column(

@@ -145,9 +145,22 @@ def test_guest_checkout_email_verification_and_create_account(
 
     captured: dict[str, object] = {}
 
-    async def fake_create_payment_intent(session, cart, amount_cents=None):
+    async def fake_create_checkout_session(
+        *,
+        amount_cents: int,
+        customer_email: str,
+        success_url: str,
+        cancel_url: str,
+        lang: str | None = None,
+        metadata: dict[str, str] | None = None,
+    ) -> dict:
         captured["amount_cents"] = amount_cents
-        return {"client_secret": "secret_test", "intent_id": "pi_test"}
+        captured["stripe_customer_email"] = customer_email
+        captured["stripe_success_url"] = success_url
+        captured["stripe_cancel_url"] = cancel_url
+        captured["stripe_lang"] = lang
+        captured["stripe_metadata"] = metadata or {}
+        return {"session_id": "cs_test", "checkout_url": "https://stripe.example/checkout"}
 
     async def fake_send_order_confirmation(to_email, order, items=None, lang=None):
         captured["email"] = to_email
@@ -169,7 +182,7 @@ def test_guest_checkout_email_verification_and_create_account(
         captured["welcome_first_name"] = first_name
         return True
 
-    monkeypatch.setattr(payments, "create_payment_intent", fake_create_payment_intent)
+    monkeypatch.setattr(payments, "create_checkout_session", fake_create_checkout_session)
     monkeypatch.setattr(email_service, "send_order_confirmation", fake_send_order_confirmation)
     monkeypatch.setattr(email_service, "send_new_order_notification", fake_send_new_order_notification)
     monkeypatch.setattr(email_service, "send_verification_email", fake_send_verification_email)
@@ -227,11 +240,14 @@ def test_guest_checkout_email_verification_and_create_account(
     )
     assert checkout.status_code == 201, checkout.text
     body = checkout.json()
-    assert body["client_secret"] == "secret_test"
+    assert body["payment_method"] == "stripe"
+    assert body["stripe_session_id"] == "cs_test"
+    assert body["stripe_checkout_url"] == "https://stripe.example/checkout"
     assert captured.get("email") == "guest2@example.com"
     assert captured.get("admin_email") == "owner2@example.com"
     assert captured.get("admin_customer_email") == "guest2@example.com"
-    assert captured.get("amount_cents") == 2200
+    # Subtotal 20.00 RON + tax 2.00 RON + shipping 20.00 RON (flat, CMS-configurable) => 42.00 RON
+    assert captured.get("amount_cents") == 4200
     assert captured.get("welcome_email") == "guest2@example.com"
     assert captured.get("welcome_lang") == "en"
     assert captured.get("welcome_first_name") == "Guest"
@@ -408,9 +424,18 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
 
     captured: dict[str, object] = {}
 
-    async def fake_create_payment_intent(session, cart, amount_cents=None):
+    async def fake_create_checkout_session(
+        *,
+        amount_cents: int,
+        customer_email: str,
+        success_url: str,
+        cancel_url: str,
+        lang: str | None = None,
+        metadata: dict[str, str] | None = None,
+    ) -> dict:
         captured["amount_cents"] = amount_cents
-        return {"client_secret": "secret_test", "intent_id": "pi_test"}
+        captured["stripe_customer_email"] = customer_email
+        return {"session_id": "cs_test", "checkout_url": "https://stripe.example/checkout"}
 
     async def fake_send_order_confirmation(to_email, order, items=None, lang=None):
         captured["email"] = to_email
@@ -422,7 +447,7 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
         captured["admin_customer_email"] = customer_email
         return True
 
-    monkeypatch.setattr(payments, "create_payment_intent", fake_create_payment_intent)
+    monkeypatch.setattr(payments, "create_checkout_session", fake_create_checkout_session)
     monkeypatch.setattr(email_service, "send_order_confirmation", fake_send_order_confirmation)
     monkeypatch.setattr(email_service, "send_new_order_notification", fake_send_new_order_notification)
 
@@ -443,9 +468,11 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
     )
     assert res.status_code == 201, res.text
     body = res.json()
-    assert body["client_secret"] == "secret_test"
-    # Subtotal: 2 * 50 = 100; discount 10% => 10; taxable 90; tax 9; shipping 10 => total 109 => cents 10900
-    assert captured.get("amount_cents") == 10900
+    assert body["payment_method"] == "stripe"
+    assert body["stripe_session_id"] == "cs_test"
+    assert body["stripe_checkout_url"] == "https://stripe.example/checkout"
+    # Subtotal: 2 * 50 = 100; discount 10% => 10; taxable 90; tax 9; shipping 20 => total 119 => cents 11900
+    assert captured.get("amount_cents") == 11900
     assert captured.get("email") == "buyer@example.com"
     assert captured.get("admin_email") == "owner@example.com"
     assert captured.get("admin_customer_email") == "buyer@example.com"
@@ -457,8 +484,8 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
 
     order = asyncio.run(fetch_order())
     assert order is not None
-    assert float(order.total_amount) == pytest.approx(109.0)
-    assert order.stripe_payment_intent_id == "pi_test"
+    assert float(order.total_amount) == pytest.approx(119.0)
+    assert order.stripe_checkout_session_id == "cs_test"
 
 
 def test_authenticated_checkout_creates_separate_billing_address(
@@ -487,10 +514,10 @@ def test_authenticated_checkout_creates_separate_billing_address(
 
     seeded = asyncio.run(seed())
 
-    async def fake_create_payment_intent(session, cart, amount_cents=None):
-        return {"client_secret": "secret_test", "intent_id": "pi_test"}
+    async def fake_create_checkout_session(*args, **kwargs) -> dict:
+        return {"session_id": "cs_test", "checkout_url": "https://stripe.example/checkout"}
 
-    monkeypatch.setattr(payments, "create_payment_intent", fake_create_payment_intent)
+    monkeypatch.setattr(payments, "create_checkout_session", fake_create_checkout_session)
 
     register = client.post(
         "/api/v1/auth/register",
@@ -578,13 +605,13 @@ def test_authenticated_checkout_cod_skips_payment_intent(checkout_app: Dict[str,
 
     seeded = asyncio.run(seed())
 
-    called: dict[str, object] = {"called": False}
+    called: dict[str, object] = {"stripe_called": False}
 
-    async def fake_create_payment_intent(*args, **kwargs):
-        called["called"] = True
-        return {"client_secret": "secret_test", "intent_id": "pi_test"}
+    async def fake_create_checkout_session(*args, **kwargs) -> dict:
+        called["stripe_called"] = True
+        return {"session_id": "cs_test", "checkout_url": "https://stripe.example/checkout"}
 
-    monkeypatch.setattr(payments, "create_payment_intent", fake_create_payment_intent)
+    monkeypatch.setattr(payments, "create_checkout_session", fake_create_checkout_session)
 
     register = client.post(
         "/api/v1/auth/register",
@@ -635,8 +662,9 @@ def test_authenticated_checkout_cod_skips_payment_intent(checkout_app: Dict[str,
     assert res.status_code == 201, res.text
     body = res.json()
     assert body["payment_method"] == "cod"
-    assert body["client_secret"] is None
-    assert called["called"] is False
+    assert body["stripe_checkout_url"] is None
+    assert body["paypal_approval_url"] is None
+    assert called["stripe_called"] is False
 
     async def fetch_order() -> Order | None:
         async with SessionLocal() as session:
@@ -645,7 +673,7 @@ def test_authenticated_checkout_cod_skips_payment_intent(checkout_app: Dict[str,
     order = asyncio.run(fetch_order())
     assert order is not None
     assert order.payment_method == "cod"
-    assert order.stripe_payment_intent_id is None
+    assert order.stripe_checkout_session_id is None
 
 
 def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
@@ -684,9 +712,9 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
 
     called: dict[str, object] = {"stripe_called": False, "paypal_created": False, "paypal_captured": False}
 
-    async def fake_create_payment_intent(*args, **kwargs):
+    async def fake_create_checkout_session(*args, **kwargs) -> dict:
         called["stripe_called"] = True
-        return {"client_secret": "secret_test", "intent_id": "pi_test"}
+        return {"session_id": "cs_test", "checkout_url": "https://stripe.example/checkout"}
 
     async def fake_paypal_create_order(*, total_ron, reference, return_url, cancel_url):
         called["paypal_created"] = True
@@ -708,7 +736,7 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
 
     from app.services import paypal as paypal_service  # imported by orders API
 
-    monkeypatch.setattr(payments, "create_payment_intent", fake_create_payment_intent)
+    monkeypatch.setattr(payments, "create_checkout_session", fake_create_checkout_session)
     monkeypatch.setattr(paypal_service, "create_order", fake_paypal_create_order)
     monkeypatch.setattr(paypal_service, "capture_order", fake_paypal_capture_order)
     monkeypatch.setattr(email_service, "send_order_confirmation", fake_send_order_confirmation)
@@ -762,7 +790,6 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
     )
     assert checkout.status_code == 201, checkout.text
     body = checkout.json()
-    assert body["client_secret"] is None
     assert body["payment_method"] == "paypal"
     assert body["paypal_order_id"] == "PAYPAL-ORDER-1"
     assert body["paypal_approval_url"] == "https://paypal.example/approve"
@@ -777,7 +804,7 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
     assert order is not None
     assert order.payment_method == "paypal"
     assert order.paypal_order_id == "PAYPAL-ORDER-1"
-    assert order.stripe_payment_intent_id is None
+    assert order.stripe_checkout_session_id is None
 
     # Capturing a signed-in order requires authentication.
     capture_anon = client.post("/api/v1/orders/paypal/capture", json={"paypal_order_id": "PAYPAL-ORDER-1"})
@@ -867,16 +894,25 @@ def test_checkout_sends_admin_alert_fallback_when_no_owner(
 
     captured: dict[str, object] = {}
 
-    async def fake_create_payment_intent(session, cart, amount_cents=None):
+    async def fake_create_checkout_session(
+        *,
+        amount_cents: int,
+        customer_email: str,
+        success_url: str,
+        cancel_url: str,
+        lang: str | None = None,
+        metadata: dict[str, str] | None = None,
+    ) -> dict:
         captured["amount_cents"] = amount_cents
-        return {"client_secret": "secret_test", "intent_id": "pi_test"}
+        captured["stripe_customer_email"] = customer_email
+        return {"session_id": "cs_test", "checkout_url": "https://stripe.example/checkout"}
 
     async def fake_send_new_order_notification(to_email, order, customer_email=None, lang=None):
         captured["admin_email"] = to_email
         captured["admin_customer_email"] = customer_email
         return True
 
-    monkeypatch.setattr(payments, "create_payment_intent", fake_create_payment_intent)
+    monkeypatch.setattr(payments, "create_checkout_session", fake_create_checkout_session)
     monkeypatch.setattr(email_service, "send_new_order_notification", fake_send_new_order_notification)
 
     res = client.post(

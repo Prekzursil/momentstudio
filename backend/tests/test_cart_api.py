@@ -224,6 +224,6 @@ def test_cart_sync_metadata_and_totals(test_app: Dict[str, object]) -> None:
     assert item["currency"] == "RON"
 
     totals = body["totals"]
-    # subtotal 10*2=20, discount 5% =>1, taxable 19, tax 1.9, shipping 5 => total 25.9
+    # subtotal 10*2=20, discount 5% =>1, taxable 19, tax 1.9, shipping 20 => total 40.9
     assert float(totals["subtotal"]) == pytest.approx(20.0)
-    assert float(totals["total"]) == pytest.approx(25.9, rel=1e-2)
+    assert float(totals["total"]) == pytest.approx(40.9, rel=1e-2)

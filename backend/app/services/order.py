@@ -28,7 +28,11 @@ async def build_order_from_cart(
     shipping_method: ShippingMethod | None = None,
     payment_method: str = "stripe",
     payment_intent_id: str | None = None,
+    stripe_checkout_session_id: str | None = None,
     paypal_order_id: str | None = None,
+    tax_amount: Decimal | None = None,
+    shipping_amount: Decimal | None = None,
+    total_amount: Decimal | None = None,
     courier: str | None = None,
     delivery_type: str | None = None,
     locker_id: str | None = None,
@@ -61,18 +65,23 @@ async def build_order_from_cart(
     taxable = subtotal - discount_val
     if taxable < 0:
         taxable = Decimal("0")
-    tax = _calculate_tax(taxable)
-    shipping_amount = _calculate_shipping(subtotal, shipping_method)
-    total = taxable + tax + shipping_amount
+    computed_tax = _calculate_tax(taxable)
+    computed_shipping = _calculate_shipping(subtotal, shipping_method)
+    computed_total = taxable + computed_tax + computed_shipping
+
+    if tax_amount is not None and shipping_amount is not None and total_amount is not None:
+        computed_tax = Decimal(tax_amount)
+        computed_shipping = Decimal(shipping_amount)
+        computed_total = Decimal(total_amount)
 
     order = Order(
         user_id=user_id,
         reference_code=ref,
         customer_email=customer_email,
         customer_name=customer_name,
-        total_amount=total,
-        tax_amount=tax,
-        shipping_amount=shipping_amount,
+        total_amount=computed_total,
+        tax_amount=computed_tax,
+        shipping_amount=computed_shipping,
         currency="RON",
         payment_method=payment_method,
         courier=courier,
@@ -87,6 +96,7 @@ async def build_order_from_cart(
         items=items,
         shipping_method_id=shipping_method.id if shipping_method else None,
         stripe_payment_intent_id=payment_intent_id,
+        stripe_checkout_session_id=stripe_checkout_session_id,
         paypal_order_id=paypal_order_id,
     )
     session.add(order)

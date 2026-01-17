@@ -74,6 +74,58 @@ async def stripe_webhook(
                 lang=owner.preferred_language if owner else None,
             )
 
+    if inserted and event_type == "checkout.session.completed":
+        data = event.get("data")
+        obj = data.get("object") if isinstance(data, dict) else None
+        get = obj.get if hasattr(obj, "get") else None  # type: ignore[assignment]
+        session_id = get("id") if callable(get) else None
+        payment_intent_id = get("payment_intent") if callable(get) else None
+        payment_status = get("payment_status") if callable(get) else None
+        if session_id and str(payment_status or "").lower() == "paid":
+            order = (
+                (
+                    await session.execute(
+                        select(Order)
+                        .options(selectinload(Order.user), selectinload(Order.events))
+                        .where(Order.stripe_checkout_session_id == str(session_id))
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            if order and order.status in {OrderStatus.pending, OrderStatus.paid}:
+                if payment_intent_id and not order.stripe_payment_intent_id:
+                    order.stripe_payment_intent_id = str(payment_intent_id)
+                    session.add(order)
+                    await session.commit()
+                    await session.refresh(order)
+
+                already_captured = any(
+                    getattr(evt, "event", None) == "payment_captured" for evt in (order.events or [])
+                )
+                if not already_captured:
+                    session.add(
+                        OrderEvent(
+                            order_id=order.id,
+                            event="payment_captured",
+                            note=f"Stripe checkout {session_id}",
+                        )
+                    )
+                    await session.commit()
+                    await session.refresh(order)
+
+                if order.user and order.user.id:
+                    await notification_service.create_notification(
+                        session,
+                        user_id=order.user.id,
+                        type="order",
+                        title="Payment received"
+                        if (order.user.preferred_language or "en") != "ro"
+                        else "Plată confirmată",
+                        body=f"Reference {order.reference_code}" if order.reference_code else None,
+                        url="/account",
+                    )
+
     if inserted and event_type == "payment_intent.succeeded":
         data = event.get("data")
         obj = data.get("object") if isinstance(data, dict) else None

@@ -10,6 +10,7 @@ import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { ToastService } from '../../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { AdminOrderListItem, AdminOrderListResponse, AdminOrdersService } from '../../../core/admin-orders.service';
+import { orderStatusChipClass } from '../../../shared/order-status';
 
 type OrderStatusFilter = 'all' | 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
 
@@ -248,20 +249,7 @@ export class AdminOrdersComponent implements OnInit {
   }
 
   statusPillClass(status: string): string {
-    switch (status) {
-      case 'paid':
-        return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-200';
-      case 'shipped':
-        return 'bg-indigo-100 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-200';
-      case 'delivered':
-        return 'bg-teal-100 text-teal-900 dark:bg-teal-900/30 dark:text-teal-200';
-      case 'cancelled':
-        return 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100';
-      case 'refunded':
-        return 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200';
-      default:
-        return 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100';
-    }
+    return orderStatusChipClass(status);
   }
 
   private load(): void {

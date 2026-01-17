@@ -36,8 +36,9 @@ describe('Checkout auth gating', () => {
     cartApi.sync.and.returnValue(of({}));
     cartApi.headers.and.returnValue({});
 
-    apiService = jasmine.createSpyObj('ApiService', ['post']);
-    apiService.post.and.returnValue(of({ order_id: 'order1', reference_code: 'REF', client_secret: 'pi_secret' }));
+    apiService = jasmine.createSpyObj('ApiService', ['post', 'get']);
+    apiService.post.and.returnValue(of({ order_id: 'order1', reference_code: 'REF', payment_method: 'cod' }));
+    apiService.get.and.returnValue(of({ email: null, verified: false }));
 
     auth = jasmine.createSpyObj('AuthService', ['isAuthenticated', 'user']);
     auth.isAuthenticated.and.returnValue(false);
@@ -46,7 +47,7 @@ describe('Checkout auth gating', () => {
     TestBed.configureTestingModule({
       imports: [RouterTestingModule, CheckoutComponent, TranslateModule.forRoot()],
       providers: [
-        { provide: CartStore, useValue: { items: itemsSignal, subtotal: subtotalSignal } },
+        { provide: CartStore, useValue: { items: itemsSignal, subtotal: subtotalSignal, clear: jasmine.createSpy('clear') } },
         { provide: CartApi, useValue: cartApi },
         { provide: ApiService, useValue: apiService },
         { provide: AuthService, useValue: auth },
@@ -56,7 +57,6 @@ describe('Checkout auth gating', () => {
   });
 
   it('renders login/register actions when signed out', fakeAsync(() => {
-    spyOn(CheckoutComponent.prototype, 'ngAfterViewInit').and.returnValue(Promise.resolve());
     const fixture = TestBed.createComponent(CheckoutComponent);
     fixture.detectChanges();
     tick();
@@ -71,7 +71,7 @@ describe('Checkout auth gating', () => {
   }));
 
   it('submits guest checkout via /orders/guest-checkout when verified', fakeAsync(() => {
-    spyOn(CheckoutComponent.prototype, 'ngAfterViewInit').and.returnValue(Promise.resolve());
+    apiService.get.and.returnValue(of({ email: 'guest@example.com', verified: true }));
     const router = TestBed.inject(Router);
     spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
     const fixture = TestBed.createComponent(CheckoutComponent);
@@ -87,10 +87,6 @@ describe('Checkout auth gating', () => {
       line2: ''
     } as any;
     cmp.guestEmailVerified = true;
-    (cmp as any).stripe = {
-      confirmCardPayment: () => Promise.resolve({ error: null })
-    } as any;
-    (cmp as any).card = { destroy: () => {}, update: () => {} } as any;
 
     fixture.detectChanges();
     tick();

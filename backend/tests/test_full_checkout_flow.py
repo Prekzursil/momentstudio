@@ -72,15 +72,28 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
 
     captured: dict[str, object] = {}
 
-    async def fake_create_payment_intent(session, cart, amount_cents=None):
+    async def fake_create_checkout_session(
+        *,
+        amount_cents: int,
+        customer_email: str,
+        success_url: str,
+        cancel_url: str,
+        lang: str | None = None,
+        metadata: dict[str, str] | None = None,
+    ) -> dict:
         captured["amount_cents"] = amount_cents
-        return {"client_secret": "secret_logged", "intent_id": "pi_logged"}
+        captured["customer_email"] = customer_email
+        captured["success_url"] = success_url
+        captured["cancel_url"] = cancel_url
+        captured["lang"] = lang
+        captured["metadata"] = metadata
+        return {"session_id": "cs_test_logged", "checkout_url": "https://checkout.stripe.test/session/cs_test_logged"}
 
     async def fake_order_email(*args, **kwargs):
         captured["email_sent"] = True
         return True
 
-    monkeypatch.setattr(payments, "create_payment_intent", fake_create_payment_intent)
+    monkeypatch.setattr(payments, "create_checkout_session", fake_create_checkout_session)
     monkeypatch.setattr(email_service, "send_order_confirmation", fake_order_email)
 
     # Register and login
@@ -119,7 +132,7 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
     )
     assert add_res.status_code in (200, 201), add_res.text
 
-    # Checkout as authenticated user (returns order_id + client_secret)
+    # Checkout as authenticated user (returns order_id + Stripe checkout URL)
     order_res = client.post(
         "/api/v1/orders/checkout",
         headers={"Authorization": f"Bearer {token}"},
@@ -137,7 +150,9 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
     assert order_res.status_code == 201, order_res.text
     body = order_res.json()
     assert body["order_id"]
-    assert body["client_secret"]
+    assert body["payment_method"] == "stripe"
+    assert body["stripe_session_id"] == "cs_test_logged"
+    assert body["stripe_checkout_url"].startswith("https://")
     assert captured.get("email_sent") is True
 
     # Verify order is visible via API endpoints

@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     paypal_client_id: str | None = None
     paypal_client_secret: str | None = None
     paypal_env: str = "sandbox"
+    netopia_enabled: bool = False
     jwt_algorithm: str = "HS256"
     access_token_exp_minutes: int = 30
     refresh_token_exp_days: int = 7

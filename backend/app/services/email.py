@@ -202,11 +202,13 @@ def _payment_method_label(payment_method: str | None, *, lang: str) -> str | Non
     if not value:
         return None
     if value == "stripe":
-        return "Card (Stripe)" if lang == "en" else "Card (Stripe)"
+        return "Stripe"
     if value == "cod":
         return "Cash on delivery" if lang == "en" else "Ramburs"
     if value == "paypal":
         return "PayPal"
+    if value == "netopia":
+        return "Netopia"
     return payment_method
 
 

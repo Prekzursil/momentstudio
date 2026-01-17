@@ -11,6 +11,7 @@ import { ToastService } from '../../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { AdminOrderDetail, AdminOrdersService } from '../../../core/admin-orders.service';
 import { AdminReturnsService, ReturnRequestRead } from '../../../core/admin-returns.service';
+import { orderStatusChipClass } from '../../../shared/order-status';
 
 type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
 type OrderAction =
@@ -71,8 +72,13 @@ type OrderAction =
             <div class="grid md:grid-cols-3 gap-3 text-sm">
               <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
                 <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.table.status' | translate }}</div>
-                <div class="mt-1 font-semibold text-slate-900 dark:text-slate-50">
-                  {{ ('adminUi.orders.' + order()!.status) | translate }}
+                <div class="mt-2">
+                  <span
+                    class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                    [ngClass]="statusChipClass(order()!.status)"
+                  >
+                    {{ ('adminUi.orders.' + order()!.status) | translate }}
+                  </span>
                 </div>
               </div>
               <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
@@ -519,6 +525,10 @@ export class AdminOrderDetailComponent implements OnInit {
     private toast: ToastService,
     private translate: TranslateService
   ) {}
+
+  statusChipClass(status: string): string {
+    return orderStatusChipClass(status);
+  }
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('orderId');

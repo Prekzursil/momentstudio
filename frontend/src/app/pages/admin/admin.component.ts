@@ -224,6 +224,41 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
             </div>
           </section>
 
+          <section *ngIf="section() === 'settings'" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex items-center justify-between gap-3">
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.checkout.title' | translate }}</h2>
+              <div class="flex items-center gap-2">
+                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadCheckoutSettings()"></app-button>
+                <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="saveCheckoutSettings()"></app-button>
+              </div>
+            </div>
+            <p class="text-xs text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.site.checkout.hint' | translate }}
+            </p>
+            <div class="grid md:grid-cols-2 gap-3 text-sm">
+              <app-input
+                [label]="'adminUi.site.checkout.shippingFee' | translate"
+                type="number"
+                [min]="0"
+                [step]="0.01"
+                placeholder="20.00"
+                [(value)]="checkoutSettingsForm.shipping_fee_ron"
+              ></app-input>
+              <app-input
+                [label]="'adminUi.site.checkout.freeShippingThreshold' | translate"
+                type="number"
+                [min]="0"
+                [step]="0.01"
+                placeholder="300.00"
+                [(value)]="checkoutSettingsForm.free_shipping_threshold_ron"
+              ></app-input>
+            </div>
+            <div class="flex items-center gap-2 text-sm">
+              <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="checkoutSettingsMessage">{{ checkoutSettingsMessage }}</span>
+              <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="checkoutSettingsError">{{ checkoutSettingsError }}</span>
+            </div>
+          </section>
+
           <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.seo.title' | translate }}</h2>
@@ -2104,6 +2139,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                   >
                     <option [ngValue]="'site.assets'">{{ 'adminUi.site.assets.title' | translate }}</option>
                     <option [ngValue]="'site.social'">{{ 'adminUi.site.social.title' | translate }}</option>
+                    <option [ngValue]="'site.checkout'">{{ 'adminUi.site.checkout.title' | translate }}</option>
                     <option [ngValue]="'seo.' + seoPage">{{ ('adminUi.site.seo.title' | translate) + ' · ' + seoPage.toUpperCase() }}</option>
                   </select>
                 </label>
@@ -2300,6 +2336,12 @@ export class AdminComponent implements OnInit, OnDestroy {
   socialError: string | null = null;
   socialThumbLoading: Record<string, boolean> = {};
   socialThumbErrors: Record<string, string> = {};
+  checkoutSettingsForm: { shipping_fee_ron: number | string; free_shipping_threshold_ron: number | string } = {
+    shipping_fee_ron: 20,
+    free_shipping_threshold_ron: 300
+  };
+  checkoutSettingsMessage: string | null = null;
+  checkoutSettingsError: string | null = null;
   seoLang: 'en' | 'ro' = 'en';
   seoPage: 'home' | 'shop' | 'product' | 'category' | 'about' = 'home';
   seoForm = { title: '', description: '' };
@@ -2420,6 +2462,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         return 'adminUi.site.assets.title';
       case 'site.social':
         return 'adminUi.site.social.title';
+      case 'site.checkout':
+        return 'adminUi.site.checkout.title';
       default:
         return 'adminUi.content.revisions.title';
     }
@@ -2529,6 +2573,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
     this.loadAssets();
     this.loadSocial();
+    this.loadCheckoutSettings();
     this.loadSeo();
     this.loadFxStatus();
     this.admin.getMaintenance().subscribe({
@@ -3812,6 +3857,67 @@ export class AdminComponent implements OnInit, OnDestroy {
       error: () => {
         delete this.contentVersions['site.assets'];
         this.assetsForm = { logo_url: '', favicon_url: '', social_image_url: '' };
+      }
+    });
+  }
+
+  loadCheckoutSettings(): void {
+    this.checkoutSettingsError = null;
+    this.checkoutSettingsMessage = null;
+    this.admin.getContent('site.checkout').subscribe({
+      next: (block) => {
+        this.rememberContentVersion('site.checkout', block);
+        const meta = (block.meta || {}) as Record<string, any>;
+        const shipping = Number(meta['shipping_fee_ron']);
+        const threshold = Number(meta['free_shipping_threshold_ron']);
+        this.checkoutSettingsForm = {
+          shipping_fee_ron: Number.isFinite(shipping) && shipping >= 0 ? shipping : 20,
+          free_shipping_threshold_ron: Number.isFinite(threshold) && threshold >= 0 ? threshold : 300
+        };
+      },
+      error: () => {
+        delete this.contentVersions['site.checkout'];
+        this.checkoutSettingsForm = { shipping_fee_ron: 20, free_shipping_threshold_ron: 300 };
+      }
+    });
+  }
+
+  saveCheckoutSettings(): void {
+    this.checkoutSettingsMessage = null;
+    this.checkoutSettingsError = null;
+    const shippingRaw = Number(this.checkoutSettingsForm.shipping_fee_ron);
+    const thresholdRaw = Number(this.checkoutSettingsForm.free_shipping_threshold_ron);
+    const shipping = Number.isFinite(shippingRaw) && shippingRaw >= 0 ? Math.round(shippingRaw * 100) / 100 : 20;
+    const threshold = Number.isFinite(thresholdRaw) && thresholdRaw >= 0 ? Math.round(thresholdRaw * 100) / 100 : 300;
+
+    const payload = {
+      title: 'Checkout settings',
+      body_markdown: 'Shipping fee and free-shipping threshold used at checkout.',
+      status: 'published',
+      meta: { version: 1, shipping_fee_ron: shipping, free_shipping_threshold_ron: threshold }
+    };
+
+    const onSuccess = (block?: { version?: number } | null) => {
+      this.rememberContentVersion('site.checkout', block);
+      this.checkoutSettingsMessage = this.t('adminUi.site.checkout.success.save');
+      this.checkoutSettingsError = null;
+    };
+
+    this.admin.updateContentBlock('site.checkout', this.withExpectedVersion('site.checkout', payload)).subscribe({
+      next: (block) => onSuccess(block),
+      error: (err) => {
+        if (this.handleContentConflict(err, 'site.checkout', () => this.loadCheckoutSettings())) {
+          this.checkoutSettingsError = this.t('adminUi.site.checkout.errors.save');
+          this.checkoutSettingsMessage = null;
+          return;
+        }
+        this.admin.createContent('site.checkout', payload).subscribe({
+          next: (created) => onSuccess(created),
+          error: () => {
+            this.checkoutSettingsError = this.t('adminUi.site.checkout.errors.save');
+            this.checkoutSettingsMessage = null;
+          }
+        });
       }
     });
   }

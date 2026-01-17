@@ -1,4 +1,4 @@
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import stripe
 from fastapi import HTTPException, status
@@ -46,6 +46,61 @@ async def create_payment_intent(session: AsyncSession, cart: Cart, amount_cents:
     if not client_secret or not intent_id:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Stripe client secret missing")
     return {"client_secret": str(client_secret), "intent_id": str(intent_id)}
+
+
+async def create_checkout_session(
+    *,
+    amount_cents: int,
+    customer_email: str,
+    success_url: str,
+    cancel_url: str,
+    lang: str | None = None,
+    metadata: dict[str, str] | None = None,
+) -> dict:
+    """Create a Stripe Checkout Session and return {session_id, checkout_url}.
+
+    This uses Stripe-hosted checkout (redirect flow). The associated PaymentIntent
+    metadata includes our provided metadata so webhooks/confirm endpoints can map
+    back to internal entities.
+    """
+    if not settings.stripe_secret_key:
+        metrics.record_payment_failure()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
+    if amount_cents <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid amount")
+
+    init_stripe()
+    locale: Literal["en", "ro"] = "ro" if (lang or "").strip().lower() == "ro" else "en"
+    safe_metadata = {str(k): str(v) for (k, v) in (metadata or {}).items() if k and v is not None}
+    try:
+        session_obj = stripe.checkout.Session.create(
+            mode="payment",
+            customer_email=customer_email,
+            line_items=[
+                {
+                    "price_data": {
+                        "currency": "ron",
+                        "unit_amount": int(amount_cents),
+                        "product_data": {"name": "momentstudio"},
+                    },
+                    "quantity": 1,
+                }
+            ],
+            success_url=success_url,
+            cancel_url=cancel_url,
+            locale=locale,
+            metadata=safe_metadata,
+            payment_intent_data={"metadata": safe_metadata},
+        )
+    except Exception as exc:
+        metrics.record_payment_failure()
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Stripe checkout session creation failed") from exc
+
+    session_id = getattr(session_obj, "id", None) or (session_obj.get("id") if hasattr(session_obj, "get") else None)
+    checkout_url = getattr(session_obj, "url", None) or (session_obj.get("url") if hasattr(session_obj, "get") else None)
+    if not session_id or not checkout_url:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Stripe checkout session missing url")
+    return {"session_id": str(session_id), "checkout_url": str(checkout_url)}
 
 
 async def handle_webhook_event(session: AsyncSession, payload: bytes, sig_header: str | None) -> tuple[dict, bool]:

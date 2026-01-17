@@ -6,6 +6,7 @@ import { ContainerComponent } from '../../layout/container.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
+import { orderStatusChipClass } from '../../shared/order-status';
 import { AddressFormComponent } from '../../shared/address-form.component';
 import { ToastService } from '../../core/toast.service';
 import { AuthService, AuthUser, UserAliasesResponse } from '../../core/auth.service';
@@ -1168,15 +1169,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   orderStatusChipClass(status: string): string {
-    const styles: Record<string, string> = {
-      pending: 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-100',
-      paid: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100',
-      shipped: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-100',
-      delivered: 'bg-teal-100 text-teal-800 dark:bg-teal-950/40 dark:text-teal-100',
-      cancelled: 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-100',
-      refunded: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'
-    };
-    return styles[status] || styles['refunded'];
+    return orderStatusChipClass(status);
   }
 
   trackingUrl(trackingNumber: string): string {

@@ -49,7 +49,7 @@ describe('CheckoutComponent', () => {
       imports: [CheckoutComponent, TranslateModule.forRoot()],
       providers: [
         { provide: Router, useValue: router },
-        { provide: CartStore, useValue: { items: itemsSignal, subtotal: subtotalSignal } },
+        { provide: CartStore, useValue: { items: itemsSignal, subtotal: subtotalSignal, clear: jasmine.createSpy('clear') } },
         { provide: CartApi, useValue: cartApi },
         { provide: ApiService, useValue: apiService },
         { provide: AuthService, useValue: auth },

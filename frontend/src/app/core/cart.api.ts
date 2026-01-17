@@ -72,8 +72,10 @@ export class CartApi {
     );
   }
 
-  get(): Observable<CartResponse> {
-    return this.api.get<CartResponse>('/cart', undefined, this.headers());
+  get(
+    params?: Record<string, string | number | boolean | string[] | number[] | undefined>
+  ): Observable<CartResponse> {
+    return this.api.get<CartResponse>('/cart', params, this.headers());
   }
 
   paymentIntent(): Observable<{ client_secret: string; intent_id: string }> {

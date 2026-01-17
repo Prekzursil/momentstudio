@@ -48,7 +48,7 @@ class GuestCheckoutRequest(BaseModel):
     billing_region: str | None = Field(default=None, max_length=100)
     billing_postal_code: str | None = Field(default=None, min_length=1, max_length=20)
     billing_country: str | None = Field(default=None, min_length=2, max_length=2)
-    payment_method: str = Field(default="stripe", pattern="^(stripe|cod|paypal)$")
+    payment_method: str = Field(default="stripe", pattern="^(stripe|cod|paypal|netopia)$")
     courier: str = Field(default="sameday", pattern="^(sameday|fan_courier)$")
     delivery_type: str = Field(default="home", pattern="^(home|locker)$")
     locker_id: str | None = Field(default=None, max_length=80)
@@ -64,9 +64,10 @@ class GuestCheckoutRequest(BaseModel):
 class GuestCheckoutResponse(BaseModel):
     order_id: UUID
     reference_code: str | None = None
-    client_secret: str | None = None
     paypal_order_id: str | None = None
     paypal_approval_url: str | None = None
+    stripe_session_id: str | None = None
+    stripe_checkout_url: str | None = None
     payment_method: str = "stripe"
 
 
@@ -79,6 +80,16 @@ class PayPalCaptureResponse(BaseModel):
     reference_code: str | None = None
     status: OrderStatus
     paypal_capture_id: str | None = None
+
+
+class StripeConfirmRequest(BaseModel):
+    session_id: str = Field(min_length=1, max_length=255)
+
+
+class StripeConfirmResponse(BaseModel):
+    order_id: UUID
+    reference_code: str | None = None
+    status: OrderStatus
 
 
 class CheckoutRequest(BaseModel):
@@ -94,7 +105,7 @@ class CheckoutRequest(BaseModel):
     billing_region: str | None = Field(default=None, max_length=100)
     billing_postal_code: str | None = Field(default=None, min_length=1, max_length=20)
     billing_country: str | None = Field(default=None, min_length=2, max_length=2)
-    payment_method: str = Field(default="stripe", pattern="^(stripe|cod|paypal)$")
+    payment_method: str = Field(default="stripe", pattern="^(stripe|cod|paypal|netopia)$")
     courier: str = Field(default="sameday", pattern="^(sameday|fan_courier)$")
     delivery_type: str = Field(default="home", pattern="^(home|locker)$")
     locker_id: str | None = Field(default=None, max_length=80)

@@ -39,8 +39,18 @@ export const routes: Routes = [
     title: 'PayPal | momentstudio'
   },
   {
+    path: 'checkout/stripe/return',
+    loadComponent: () => import('./pages/checkout/stripe-return.component').then((m) => m.StripeReturnComponent),
+    title: 'Stripe | momentstudio'
+  },
+  {
     path: 'checkout/paypal/cancel',
     loadComponent: () => import('./pages/checkout/paypal-cancel.component').then((m) => m.PayPalCancelComponent),
+    title: 'Checkout | momentstudio'
+  },
+  {
+    path: 'checkout/stripe/cancel',
+    loadComponent: () => import('./pages/checkout/stripe-cancel.component').then((m) => m.StripeCancelComponent),
     title: 'Checkout | momentstudio'
   },
   {

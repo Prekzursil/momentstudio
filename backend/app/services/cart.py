@@ -97,7 +97,14 @@ def _get_first_image(product: Product | None) -> str | None:
     return first[0].url if first else None
 
 
-def _calculate_shipping_amount(subtotal: Decimal, shipping_method: ShippingMethod | None) -> Decimal:
+def _calculate_shipping_amount(
+    subtotal: Decimal,
+    shipping_method: ShippingMethod | None,
+    *,
+    shipping_fee_ron: Decimal | None = None,
+) -> Decimal:
+    if shipping_fee_ron is not None:
+        return shipping_fee_ron
     if not shipping_method:
         return Decimal("0")
     base = Decimal(shipping_method.rate_flat or 0)
@@ -133,6 +140,9 @@ def _calculate_totals(
     cart: Cart,
     shipping_method: ShippingMethod | None = None,
     promo: PromoCodeRead | None = None,
+    *,
+    shipping_fee_ron: Decimal | None = None,
+    free_shipping_threshold_ron: Decimal | None = None,
     currency: str | None = "RON",
 ) -> Totals:
     subtotal = sum(_to_decimal(item.unit_price_at_add) * item.quantity for item in cart.items)
@@ -142,7 +152,10 @@ def _calculate_totals(
     if taxable < 0:
         taxable = Decimal("0")
     tax = _to_decimal(taxable * Decimal("0.1"))
-    shipping = _to_decimal(_calculate_shipping_amount(subtotal, shipping_method))
+    shipping_amount = _calculate_shipping_amount(subtotal, shipping_method, shipping_fee_ron=shipping_fee_ron)
+    if free_shipping_threshold_ron is not None and taxable >= free_shipping_threshold_ron:
+        shipping_amount = Decimal("0")
+    shipping = _to_decimal(shipping_amount)
     total = _to_decimal(taxable + tax + shipping)
     if total < 0:
         total = Decimal("0.00")
@@ -150,14 +163,26 @@ def _calculate_totals(
 
 
 def calculate_totals(
-    cart: Cart, shipping_method: ShippingMethod | None = None, promo: PromoCodeRead | None = None
+    cart: Cart,
+    shipping_method: ShippingMethod | None = None,
+    promo: PromoCodeRead | None = None,
+    *,
+    shipping_fee_ron: Decimal | None = None,
+    free_shipping_threshold_ron: Decimal | None = None,
 ) -> tuple[Totals, Decimal]:
     subtotal = sum(_to_decimal(item.unit_price_at_add) * item.quantity for item in cart.items)
     discount_val = _compute_discount(_to_decimal(subtotal), promo)
-    currency = next(
-        (getattr(item.product, "currency", None) for item in cart.items if getattr(item, "product", None)), "RON"
-    ) or "RON"
-    totals = _calculate_totals(cart, shipping_method=shipping_method, promo=promo, currency=currency)
+    # The app enforces a single-currency policy (RON). Avoid accessing lazy-loaded
+    # product relationships here, since this function is used in sync contexts.
+    currency = "RON"
+    totals = _calculate_totals(
+        cart,
+        shipping_method=shipping_method,
+        promo=promo,
+        shipping_fee_ron=shipping_fee_ron,
+        free_shipping_threshold_ron=free_shipping_threshold_ron,
+        currency=currency,
+    )
     return totals, discount_val
 
 
@@ -166,6 +191,9 @@ async def serialize_cart(
     cart: Cart,
     shipping_method: ShippingMethod | None = None,
     promo: PromoCodeRead | None = None,
+    *,
+    shipping_fee_ron: Decimal | None = None,
+    free_shipping_threshold_ron: Decimal | None = None,
 ) -> CartRead:
     result = await session.execute(
         select(Cart)
@@ -180,7 +208,14 @@ async def serialize_cart(
     currency = next(
         (getattr(item.product, "currency", None) for item in hydrated.items if getattr(item, "product", None)), "RON"
     ) or "RON"
-    totals = _calculate_totals(hydrated, shipping_method=shipping_method, promo=promo, currency=currency)
+    totals = _calculate_totals(
+        hydrated,
+        shipping_method=shipping_method,
+        promo=promo,
+        shipping_fee_ron=shipping_fee_ron,
+        free_shipping_threshold_ron=free_shipping_threshold_ron,
+        currency=currency,
+    )
     return CartRead(
         id=hydrated.id,
         user_id=hydrated.user_id,

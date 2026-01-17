@@ -24,6 +24,7 @@ from app.schemas.order import OrderRead, OrderCreate, OrderUpdate, ShippingMetho
 from app.services import cart as cart_service
 from app.services import order as order_service
 from app.services import email as email_service
+from app.services import checkout_settings as checkout_settings_service
 from app.services import auth as auth_service
 from app.services import private_storage
 from app.services import receipts as receipt_service
@@ -36,6 +37,8 @@ from app.schemas.checkout import (
     GuestEmailVerificationStatus,
     PayPalCaptureRequest,
     PayPalCaptureResponse,
+    StripeConfirmRequest,
+    StripeConfirmResponse,
 )
 from app.schemas.user import UserCreate
 from app.schemas.address import AddressCreate
@@ -120,6 +123,15 @@ async def create_order(
         if not shipping_method:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
 
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+    totals, _ = cart_service.calculate_totals(
+        cart,
+        shipping_method=shipping_method,
+        promo=None,
+        shipping_fee_ron=checkout_settings.shipping_fee_ron,
+        free_shipping_threshold_ron=checkout_settings.free_shipping_threshold_ron,
+    )
+
     order = await order_service.build_order_from_cart(
         session,
         current_user.id,
@@ -130,6 +142,9 @@ async def create_order(
         billing_address_id=payload.billing_address_id,
         shipping_method=shipping_method,
         payment_method="cod",
+        tax_amount=totals.tax,
+        shipping_amount=totals.shipping,
+        total_amount=totals.total,
     )
     await notification_service.create_notification(
         session,
@@ -224,7 +239,14 @@ async def checkout(
             ),
         )
 
-    totals, discount_val = cart_service.calculate_totals(user_cart, shipping_method=shipping_method, promo=promo)
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+    totals, discount_val = cart_service.calculate_totals(
+        user_cart,
+        shipping_method=shipping_method,
+        promo=promo,
+        shipping_fee_ron=checkout_settings.shipping_fee_ron,
+        free_shipping_threshold_ron=checkout_settings.free_shipping_threshold_ron,
+    )
     payment_method = payload.payment_method or "stripe"
     courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = _delivery_from_payload(
         courier=payload.courier,
@@ -235,15 +257,22 @@ async def checkout(
         locker_lat=payload.locker_lat,
         locker_lng=payload.locker_lng,
     )
-    intent = None
-    client_secret = None
+    stripe_session_id = None
+    stripe_checkout_url = None
     payment_intent_id = None
     paypal_order_id = None
     paypal_approval_url = None
     if payment_method == "stripe":
-        intent = await payments.create_payment_intent(session, user_cart, amount_cents=int(totals.total * 100))
-        client_secret = str(intent.get("client_secret"))
-        payment_intent_id = str(intent.get("intent_id"))
+        stripe_session = await payments.create_checkout_session(
+            amount_cents=int(totals.total * 100),
+            customer_email=current_user.email,
+            success_url=f"{settings.frontend_origin.rstrip('/')}/checkout/stripe/return?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{settings.frontend_origin.rstrip('/')}/checkout/stripe/cancel?session_id={{CHECKOUT_SESSION_ID}}",
+            lang=current_user.preferred_language,
+            metadata={"cart_id": str(user_cart.id), "user_id": str(current_user.id)},
+        )
+        stripe_session_id = str(stripe_session.get("session_id"))
+        stripe_checkout_url = str(stripe_session.get("checkout_url"))
     elif payment_method == "paypal":
         paypal_order_id, paypal_approval_url = await paypal_service.create_order(
             total_ron=totals.total,
@@ -251,6 +280,8 @@ async def checkout(
             return_url=f"{settings.frontend_origin}/checkout/paypal/return",
             cancel_url=f"{settings.frontend_origin}/checkout/paypal/cancel",
         )
+    elif payment_method == "netopia":
+        raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Netopia is not configured yet")
     order = await order_service.build_order_from_cart(
         session,
         current_user.id,
@@ -262,6 +293,7 @@ async def checkout(
         shipping_method=shipping_method,
         payment_method=payment_method,
         payment_intent_id=payment_intent_id,
+        stripe_checkout_session_id=stripe_session_id,
         paypal_order_id=paypal_order_id,
         courier=courier,
         delivery_type=delivery_type,
@@ -271,6 +303,9 @@ async def checkout(
         locker_lat=locker_lat,
         locker_lng=locker_lng,
         discount=discount_val,
+        tax_amount=totals.tax,
+        shipping_amount=totals.shipping,
+        total_amount=totals.total,
     )
     await notification_service.create_notification(
         session,
@@ -300,9 +335,10 @@ async def checkout(
     return GuestCheckoutResponse(
         order_id=order.id,
         reference_code=order.reference_code,
-        client_secret=client_secret,
         paypal_order_id=paypal_order_id,
         paypal_approval_url=paypal_approval_url,
+        stripe_session_id=stripe_session_id,
+        stripe_checkout_url=stripe_checkout_url,
         payment_method=payment_method,
     )
 
@@ -355,6 +391,68 @@ async def capture_paypal_order(
         status=order.status,
         paypal_capture_id=order.paypal_capture_id,
     )
+
+
+@router.post("/stripe/confirm", response_model=StripeConfirmResponse)
+async def confirm_stripe_checkout(
+    payload: StripeConfirmRequest,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user_optional),
+) -> StripeConfirmResponse:
+    session_id = (payload.session_id or "").strip()
+    if not session_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Session id is required")
+
+    if not settings.stripe_secret_key:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
+
+    payments.init_stripe()
+    try:
+        checkout_session = payments.stripe.checkout.Session.retrieve(session_id)  # type: ignore[attr-defined]
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Stripe session lookup failed") from exc
+
+    payment_status = (
+        getattr(checkout_session, "payment_status", None)
+        or (checkout_session.get("payment_status") if hasattr(checkout_session, "get") else None)
+    )
+    if str(payment_status or "").lower() != "paid":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment not completed")
+
+    order = (
+        (await session.execute(select(Order).options(selectinload(Order.events)).where(Order.stripe_checkout_session_id == session_id)))
+        .scalars()
+        .first()
+    )
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    # For signed-in checkouts, keep confirmation bound to the same user.
+    if order.user_id:
+        if not current_user or order.user_id != getattr(current_user, "id", None):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+
+    payment_intent_id = (
+        getattr(checkout_session, "payment_intent", None)
+        or (checkout_session.get("payment_intent") if hasattr(checkout_session, "get") else None)
+    )
+    if payment_intent_id and not order.stripe_payment_intent_id:
+        order.stripe_payment_intent_id = str(payment_intent_id)
+
+    already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
+    if not already_captured:
+        session.add(
+            OrderEvent(
+                order_id=order.id,
+                event="payment_captured",
+                note=f"Stripe session {session_id}",
+            )
+        )
+    session.add(order)
+    await session.commit()
+    await session.refresh(order)
+
+    return StripeConfirmResponse(order_id=order.id, reference_code=order.reference_code, status=order.status)
 
 
 @router.get("", response_model=list[OrderRead])
@@ -671,7 +769,14 @@ async def guest_checkout(
             ),
         )
 
-    totals, discount_val = cart_service.calculate_totals(cart, shipping_method=shipping_method, promo=promo)
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+    totals, discount_val = cart_service.calculate_totals(
+        cart,
+        shipping_method=shipping_method,
+        promo=promo,
+        shipping_fee_ron=checkout_settings.shipping_fee_ron,
+        free_shipping_threshold_ron=checkout_settings.free_shipping_threshold_ron,
+    )
     payment_method = payload.payment_method or "stripe"
     courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = _delivery_from_payload(
         courier=payload.courier,
@@ -682,15 +787,22 @@ async def guest_checkout(
         locker_lat=payload.locker_lat,
         locker_lng=payload.locker_lng,
     )
-    intent = None
-    client_secret = None
+    stripe_session_id = None
+    stripe_checkout_url = None
     payment_intent_id = None
     paypal_order_id = None
     paypal_approval_url = None
     if payment_method == "stripe":
-        intent = await payments.create_payment_intent(session, cart, amount_cents=int(totals.total * 100))
-        client_secret = str(intent.get("client_secret"))
-        payment_intent_id = str(intent.get("intent_id"))
+        stripe_session = await payments.create_checkout_session(
+            amount_cents=int(totals.total * 100),
+            customer_email=email,
+            success_url=f"{settings.frontend_origin.rstrip('/')}/checkout/stripe/return?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{settings.frontend_origin.rstrip('/')}/checkout/stripe/cancel?session_id={{CHECKOUT_SESSION_ID}}",
+            lang=payload.preferred_language,
+            metadata={"cart_id": str(cart.id), "user_id": str(user_id) if user_id else ""},
+        )
+        stripe_session_id = str(stripe_session.get("session_id"))
+        stripe_checkout_url = str(stripe_session.get("checkout_url"))
     elif payment_method == "paypal":
         paypal_order_id, paypal_approval_url = await paypal_service.create_order(
             total_ron=totals.total,
@@ -698,6 +810,8 @@ async def guest_checkout(
             return_url=f"{settings.frontend_origin}/checkout/paypal/return",
             cancel_url=f"{settings.frontend_origin}/checkout/paypal/cancel",
         )
+    elif payment_method == "netopia":
+        raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Netopia is not configured yet")
     order = await order_service.build_order_from_cart(
         session,
         user_id,
@@ -709,6 +823,7 @@ async def guest_checkout(
         shipping_method=shipping_method,
         payment_method=payment_method,
         payment_intent_id=payment_intent_id,
+        stripe_checkout_session_id=stripe_session_id,
         paypal_order_id=paypal_order_id,
         courier=courier,
         delivery_type=delivery_type,
@@ -718,6 +833,9 @@ async def guest_checkout(
         locker_lat=locker_lat,
         locker_lng=locker_lng,
         discount=discount_val,
+        tax_amount=totals.tax,
+        shipping_amount=totals.shipping,
+        total_amount=totals.total,
     )
 
     background_tasks.add_task(
@@ -741,9 +859,10 @@ async def guest_checkout(
     return GuestCheckoutResponse(
         order_id=order.id,
         reference_code=order.reference_code,
-        client_secret=client_secret,
         paypal_order_id=paypal_order_id,
         paypal_approval_url=paypal_approval_url,
+        stripe_session_id=stripe_session_id,
+        stripe_checkout_url=stripe_checkout_url,
         payment_method=payment_method,
     )
 
