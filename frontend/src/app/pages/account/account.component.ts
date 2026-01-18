@@ -846,7 +846,7 @@ import { missingRequiredProfileFields as computeMissingRequiredProfileFields, ty
                 <div class="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700">
                   <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Totals</p>
                   <div class="mt-2 grid gap-1 text-slate-700 dark:text-slate-200">
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-center justify-between" *ngIf="(order.tax_amount || 0) > 0">
                       <span class="text-slate-500 dark:text-slate-400">VAT</span>
                       <span>{{ (order.tax_amount || 0) | localizedCurrency : order.currency || 'RON' }}</span>
                     </div>

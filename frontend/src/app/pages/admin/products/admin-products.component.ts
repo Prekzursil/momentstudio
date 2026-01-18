@@ -18,6 +18,9 @@ type ProductForm = {
   name: string;
   category_id: string;
   base_price: string;
+  sale_enabled: boolean;
+  sale_type: 'percent' | 'amount';
+  sale_value: string;
   stock_quantity: number;
   status: 'draft' | 'published' | 'archived';
   is_active: boolean;
@@ -64,8 +67,8 @@ type ProductTranslationForm = {
       </div>
 
       <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
-        <div class="grid gap-3 lg:grid-cols-[1fr_240px_240px_auto] items-end">
-          <app-input [label]="'adminUi.products.search' | translate" [(value)]="q"></app-input>
+	        <div class="grid gap-3 lg:grid-cols-[1fr_240px_240px_auto] items-end">
+	          <app-input [label]="'adminUi.products.search' | translate" [(value)]="q"></app-input>
 
           <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
             {{ 'adminUi.products.table.status' | translate }}
@@ -91,15 +94,91 @@ type ProductTranslationForm = {
             </select>
           </label>
 
-          <div class="flex items-center gap-2">
-            <app-button size="sm" [label]="'adminUi.actions.refresh' | translate" (action)="applyFilters()"></app-button>
-            <app-button size="sm" variant="ghost" [label]="'adminUi.actions.reset' | translate" (action)="resetFilters()"></app-button>
-          </div>
-        </div>
+	          <div class="flex items-center gap-2">
+	            <app-button size="sm" [label]="'adminUi.actions.refresh' | translate" (action)="applyFilters()"></app-button>
+	            <app-button size="sm" variant="ghost" [label]="'adminUi.actions.reset' | translate" (action)="resetFilters()"></app-button>
+	          </div>
+	        </div>
 
-        <div *ngIf="error()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
-          {{ error() }}
-        </div>
+          <div
+            *ngIf="selected.size > 0"
+            class="rounded-xl border border-slate-200 bg-slate-50 p-3 grid gap-3 dark:border-slate-800 dark:bg-slate-950/20"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.products.bulk.selected' | translate: { count: selected.size } }}
+              </p>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.products.bulk.clearSelection' | translate"
+                (action)="clearSelection()"
+                [disabled]="bulkBusy()"
+              ></app-button>
+            </div>
+
+            <div class="grid gap-3 lg:grid-cols-[200px_240px_auto_auto] items-end">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.products.sale.type' | translate }}
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="bulkSaleType"
+                  (change)="bulkSaleValue = ''"
+                  [disabled]="bulkBusy()"
+                >
+                  <option [ngValue]="'percent'">{{ 'adminUi.products.sale.typePercent' | translate }}</option>
+                  <option [ngValue]="'amount'">{{ 'adminUi.products.sale.typeAmount' | translate }}</option>
+                </select>
+              </label>
+
+              <app-input
+                [label]="'adminUi.products.bulk.saleValue' | translate"
+                [placeholder]="bulkSaleType === 'percent' ? '10' : '5.00'"
+                type="text"
+                inputMode="decimal"
+                [value]="bulkSaleValue"
+                (valueChange)="onBulkSaleValueChange($event)"
+                [disabled]="bulkBusy()"
+              ></app-input>
+
+              <app-button
+                size="sm"
+                [label]="'adminUi.products.bulk.applySale' | translate"
+                (action)="applySaleToSelected()"
+                [disabled]="bulkBusy()"
+              ></app-button>
+
+              <div class="flex flex-wrap gap-2 justify-end">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.products.bulk.clearSale' | translate"
+                  (action)="clearSaleForSelected()"
+                  [disabled]="bulkBusy()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.products.bulk.publish' | translate"
+                  (action)="publishSelected()"
+                  [disabled]="bulkBusy()"
+                ></app-button>
+              </div>
+            </div>
+
+            <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.products.bulk.note' | translate }}</p>
+
+            <div
+              *ngIf="bulkError()"
+              class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-2 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+            >
+              {{ bulkError() }}
+            </div>
+          </div>
+
+	        <div *ngIf="error()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+	          {{ error() }}
+	        </div>
 
         <div *ngIf="loading(); else tableTpl">
           <app-skeleton [rows]="8"></app-skeleton>
@@ -113,6 +192,15 @@ type ProductTranslationForm = {
             <table class="min-w-[980px] w-full text-sm">
               <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
                 <tr>
+                  <th class="text-left font-semibold px-3 py-2 w-10">
+                    <input
+                      type="checkbox"
+                      [checked]="allSelectedOnPage()"
+                      (change)="toggleSelectAll($event)"
+                      [disabled]="bulkBusy()"
+                      aria-label="Select all"
+                    />
+                  </th>
                   <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.name' | translate }}</th>
                   <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.price' | translate }}</th>
                   <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.status' | translate }}</th>
@@ -128,6 +216,15 @@ type ProductTranslationForm = {
                   *ngFor="let product of products()"
                   class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
                 >
+                  <td class="px-3 py-2">
+                    <input
+                      type="checkbox"
+                      [checked]="selected.has(product.id)"
+                      (change)="toggleSelected(product.id, $event)"
+                      [disabled]="bulkBusy()"
+                      aria-label="Select"
+                    />
+                  </td>
                   <td class="px-3 py-2 font-medium text-slate-900 dark:text-slate-50">
                     <div class="grid">
                       <span class="truncate">{{ product.name }}</span>
@@ -223,6 +320,44 @@ type ProductTranslationForm = {
             (valueChange)="onBasePriceChange($event)"
             [hint]="basePriceError || ('adminUi.products.form.priceFormatHint' | translate)"
           ></app-input>
+
+          <div class="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.products.sale.title' | translate }}
+              </p>
+              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                <input type="checkbox" [(ngModel)]="form.sale_enabled" (change)="onSaleEnabledChange()" />
+                {{ 'adminUi.products.sale.enabled' | translate }}
+              </label>
+            </div>
+
+            <div class="mt-3 grid gap-3 md:grid-cols-[200px_1fr] items-end">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.products.sale.type' | translate }}
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="form.sale_type"
+                  (change)="onSaleTypeChange()"
+                  [disabled]="!form.sale_enabled"
+                >
+                  <option [ngValue]="'percent'">{{ 'adminUi.products.sale.typePercent' | translate }}</option>
+                  <option [ngValue]="'amount'">{{ 'adminUi.products.sale.typeAmount' | translate }}</option>
+                </select>
+              </label>
+
+              <app-input
+                [label]="'adminUi.products.sale.value' | translate"
+                [placeholder]="form.sale_type === 'percent' ? '10' : '5.00'"
+                type="text"
+                inputMode="decimal"
+                [value]="form.sale_value"
+                (valueChange)="onSaleValueChange($event)"
+                [disabled]="!form.sale_enabled"
+                [hint]="saleValueError || ('adminUi.products.sale.note' | translate)"
+              ></app-input>
+            </div>
+          </div>
           <app-input [label]="'adminUi.products.table.stock' | translate" type="number" [(value)]="form.stock_quantity"></app-input>
 
           <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -446,6 +581,13 @@ export class AdminProductsComponent implements OnInit {
 
   form: ProductForm = this.blankForm();
   basePriceError = '';
+  saleValueError = '';
+
+  selected = new Set<string>();
+  bulkSaleType: 'percent' | 'amount' = 'percent';
+  bulkSaleValue = '';
+  bulkBusy = signal(false);
+  bulkError = signal<string | null>(null);
 
   translationLoading = signal(false);
   translationError = signal<string | null>(null);
@@ -471,6 +613,7 @@ export class AdminProductsComponent implements OnInit {
 
   applyFilters(): void {
     this.page = 1;
+    this.clearSelection();
     this.load();
   }
 
@@ -479,12 +622,131 @@ export class AdminProductsComponent implements OnInit {
     this.status = 'all';
     this.categorySlug = '';
     this.page = 1;
+    this.clearSelection();
     this.load();
   }
 
   goToPage(page: number): void {
     this.page = page;
+    this.clearSelection();
     this.load();
+  }
+
+  clearSelection(): void {
+    this.selected = new Set<string>();
+    this.bulkError.set(null);
+  }
+
+  toggleSelected(productId: string, event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    const checked = target?.checked !== false;
+    if (checked) {
+      this.selected.add(productId);
+    } else {
+      this.selected.delete(productId);
+    }
+    if (this.selected.size === 0) {
+      this.bulkError.set(null);
+    }
+  }
+
+  allSelectedOnPage(): boolean {
+    const items = this.products();
+    if (!items.length) return false;
+    return items.every((p) => this.selected.has(p.id));
+  }
+
+  toggleSelectAll(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    const checked = target?.checked !== false;
+    const ids = this.products().map((p) => p.id);
+    const next = new Set(this.selected);
+    if (checked) {
+      ids.forEach((id) => next.add(id));
+    } else {
+      ids.forEach((id) => next.delete(id));
+    }
+    this.selected = next;
+  }
+
+  onBulkSaleValueChange(next: string | number): void {
+    const raw = String(next ?? '');
+    const { clean } = this.sanitizeMoneyInput(raw);
+    this.bulkSaleValue = clean;
+  }
+
+  applySaleToSelected(): void {
+    this.bulkError.set(null);
+    const parsed = this.parseMoneyInput(this.bulkSaleValue);
+    if (parsed === null) {
+      this.bulkError.set(this.t('adminUi.products.bulk.valueRequired'));
+      return;
+    }
+    if (this.bulkSaleType === 'percent' && (parsed < 0 || parsed > 100)) {
+      this.bulkError.set(this.t('adminUi.products.sale.percentHint'));
+      return;
+    }
+    const payload = Array.from(this.selected).map((id) => ({
+      product_id: id,
+      sale_type: this.bulkSaleType,
+      sale_value: parsed
+    }));
+    this.bulkBusy.set(true);
+    this.admin.bulkUpdateProducts(payload).subscribe({
+      next: () => {
+        this.bulkBusy.set(false);
+        this.toast.success(this.t('adminUi.products.bulk.success'));
+        this.clearSelection();
+        this.load();
+      },
+      error: () => {
+        this.bulkBusy.set(false);
+        this.bulkError.set(this.t('adminUi.products.bulk.error'));
+      }
+    });
+  }
+
+  clearSaleForSelected(): void {
+    this.bulkError.set(null);
+    const payload = Array.from(this.selected).map((id) => ({
+      product_id: id,
+      sale_type: null,
+      sale_value: null
+    }));
+    this.bulkBusy.set(true);
+    this.admin.bulkUpdateProducts(payload).subscribe({
+      next: () => {
+        this.bulkBusy.set(false);
+        this.toast.success(this.t('adminUi.products.bulk.success'));
+        this.clearSelection();
+        this.load();
+      },
+      error: () => {
+        this.bulkBusy.set(false);
+        this.bulkError.set(this.t('adminUi.products.bulk.error'));
+      }
+    });
+  }
+
+  publishSelected(): void {
+    this.bulkError.set(null);
+    const payload = Array.from(this.selected).map((id) => ({
+      product_id: id,
+      status: 'published'
+    }));
+    this.bulkBusy.set(true);
+    this.admin.bulkUpdateProducts(payload).subscribe({
+      next: () => {
+        this.bulkBusy.set(false);
+        this.toast.success(this.t('adminUi.products.bulk.published'));
+        this.clearSelection();
+        this.load();
+      },
+      error: () => {
+        this.bulkBusy.set(false);
+        this.bulkError.set(this.t('adminUi.products.bulk.error'));
+      }
+    });
   }
 
   startNew(): void {
@@ -495,6 +757,7 @@ export class AdminProductsComponent implements OnInit {
     this.images.set([]);
     this.form = this.blankForm();
     this.basePriceError = '';
+    this.saleValueError = '';
     this.resetTranslations();
     const first = this.adminCategories()[0];
     if (first) this.form.category_id = first.id;
@@ -507,6 +770,7 @@ export class AdminProductsComponent implements OnInit {
     this.editorMessage.set(null);
     this.images.set([]);
     this.basePriceError = '';
+    this.saleValueError = '';
     this.resetTranslations();
   }
 
@@ -516,14 +780,29 @@ export class AdminProductsComponent implements OnInit {
     this.editorMessage.set(null);
     this.editingSlug.set(slug);
     this.basePriceError = '';
+    this.saleValueError = '';
     this.resetTranslations();
     this.admin.getProduct(slug).subscribe({
       next: (prod: any) => {
         const basePrice = typeof prod.base_price === 'number' ? prod.base_price : Number(prod.base_price || 0);
+        const rawSaleType = (prod.sale_type || '').toString();
+        const saleType: 'percent' | 'amount' = rawSaleType === 'amount' ? 'amount' : 'percent';
+        const saleValueNum =
+          typeof prod.sale_value === 'number' ? prod.sale_value : Number(prod.sale_value ?? 0);
+        const saleEnabled =
+          (typeof prod.sale_price === 'number' && Number.isFinite(prod.sale_price)) ||
+          (rawSaleType && Number.isFinite(saleValueNum) && saleValueNum > 0);
         this.form = {
           name: prod.name || '',
           category_id: prod.category_id || '',
           base_price: this.formatMoneyInput(Number.isFinite(basePrice) ? basePrice : 0),
+          sale_enabled: saleEnabled,
+          sale_type: saleType,
+          sale_value: saleEnabled
+            ? saleType === 'amount'
+              ? this.formatMoneyInput(Number.isFinite(saleValueNum) ? saleValueNum : 0)
+              : String(Math.round(saleValueNum * 100) / 100)
+            : '',
           stock_quantity: Number(prod.stock_quantity || 0),
           status: (prod.status as any) || 'draft',
           is_active: prod.is_active !== false,
@@ -549,6 +828,35 @@ export class AdminProductsComponent implements OnInit {
     this.basePriceError = changed ? this.t('adminUi.products.form.priceFormatHint') : '';
   }
 
+  onSaleEnabledChange(): void {
+    if (this.form.sale_enabled) return;
+    this.form.sale_value = '';
+    this.saleValueError = '';
+  }
+
+  onSaleTypeChange(): void {
+    this.form.sale_value = '';
+    this.saleValueError = '';
+  }
+
+  onSaleValueChange(next: string | number): void {
+    const raw = String(next ?? '');
+    const { clean, changed } = this.sanitizeMoneyInput(raw);
+    this.form.sale_value = clean;
+    if (!this.form.sale_enabled) {
+      this.saleValueError = '';
+      return;
+    }
+    if (this.form.sale_type === 'percent' && clean) {
+      const parsed = Number(clean);
+      if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
+        this.saleValueError = this.t('adminUi.products.sale.percentHint');
+        return;
+      }
+    }
+    this.saleValueError = changed ? this.t('adminUi.products.sale.valueHint') : '';
+  }
+
   save(): void {
     const basePrice = this.parseMoneyInput(this.form.base_price);
     if (basePrice === null) {
@@ -556,10 +864,33 @@ export class AdminProductsComponent implements OnInit {
       return;
     }
 
+    let sale_type: 'percent' | 'amount' | null = null;
+    let sale_value: number | null = null;
+    if (this.form.sale_enabled) {
+      sale_type = this.form.sale_type;
+      if (sale_type === 'amount') {
+        const amount = this.parseMoneyInput(this.form.sale_value);
+        if (amount === null) {
+          this.editorError.set(this.t('adminUi.products.sale.valueHint'));
+          return;
+        }
+        sale_value = amount;
+      } else {
+        const percent = this.parseMoneyInput(this.form.sale_value);
+        if (percent === null || percent < 0 || percent > 100) {
+          this.editorError.set(this.t('adminUi.products.sale.percentHint'));
+          return;
+        }
+        sale_value = percent;
+      }
+    }
+
     const payload: any = {
       name: this.form.name,
       category_id: this.form.category_id,
       base_price: basePrice,
+      sale_type,
+      sale_value,
       stock_quantity: Number(this.form.stock_quantity),
       status: this.form.status,
       is_active: this.form.is_active,
@@ -580,6 +911,7 @@ export class AdminProductsComponent implements OnInit {
         const newSlug = (prod?.slug as string | undefined) || slug || null;
         this.editingSlug.set(newSlug);
         this.images.set(Array.isArray(prod?.images) ? prod.images : this.images());
+        if (prod?.status) this.form.status = prod.status;
         if (newSlug) this.loadTranslations(newSlug);
         this.load();
       },
@@ -757,6 +1089,9 @@ export class AdminProductsComponent implements OnInit {
       name: '',
       category_id: '',
       base_price: '',
+      sale_enabled: false,
+      sale_type: 'percent',
+      sale_value: '',
       stock_quantity: 0,
       status: 'draft',
       is_active: true,

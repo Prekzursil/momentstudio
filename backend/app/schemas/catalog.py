@@ -60,6 +60,8 @@ class ProductFields(BaseModel):
     short_description: str | None = Field(default=None, max_length=280)
     long_description: str | None = None
     base_price: float = Field(ge=0)
+    sale_type: str | None = Field(default=None, pattern="^(percent|amount)$")
+    sale_value: float | None = Field(default=None, ge=0)
     currency: str = Field(default="RON", min_length=3, max_length=3)
     is_active: bool = True
     is_featured: bool = False
@@ -209,6 +211,8 @@ class ProductUpdate(BaseModel):
     short_description: str | None = Field(default=None, max_length=280)
     long_description: str | None = None
     base_price: float | None = Field(default=None, ge=0)
+    sale_type: str | None = Field(default=None, pattern="^(percent|amount)$")
+    sale_value: float | None = Field(default=None, ge=0)
     currency: str | None = Field(default=None, min_length=3, max_length=3)
     is_active: bool | None = None
     is_featured: bool | None = None
@@ -285,6 +289,8 @@ class BackInStockStatus(BaseModel):
 class BulkProductUpdateItem(BaseModel):
     product_id: UUID
     base_price: float | None = Field(default=None, ge=0)
+    sale_type: str | None = Field(default=None, pattern="^(percent|amount)$")
+    sale_value: float | None = Field(default=None, ge=0)
     stock_quantity: int | None = Field(default=None, ge=0)
     status: ProductStatus | None = None
 
@@ -300,6 +306,7 @@ class ProductRead(ProductBase):
     status: ProductStatus
     rating_average: float
     rating_count: int
+    sale_price: float | None = None
     images: list[ProductImageRead] = []
     category: CategoryRead
     variants: list[ProductVariantRead] = []
@@ -316,6 +323,7 @@ class ProductReadBrief(BaseModel):
     slug: str
     name: str
     base_price: float
+    sale_price: float | None = None
     currency: str
     is_featured: bool
     status: ProductStatus

@@ -641,7 +641,7 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
             <span>{{ 'checkout.additionalCost' | translate }}</span>
             <span>{{ quoteFee() | localizedCurrency : currency }}</span>
           </div>
-          <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
+          <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200" *ngIf="quoteTax() > 0">
             <span>{{ 'checkout.tax' | translate }}</span>
             <span>{{ quoteTax() | localizedCurrency : currency }}</span>
           </div>

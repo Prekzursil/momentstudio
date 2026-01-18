@@ -174,12 +174,18 @@
     "ctaShop": "Cumpără acum",
     "ctaAdmin": "Vezi admin",
     "featured": "Produse recomandate",
+    "saleProducts": "La reducere",
     "newArrivals": "Cele mai noi",
     "viewAll": "Vezi toate",
     "noFeatured": "Nu există produse recomandate acum.",
+    "saleEmpty": "Nu există produse la reducere acum.",
     "newArrivalsEmpty": "Nu există noutăți acum.",
     "featuredError": {
       "title": "Nu am putut încărca produsele recomandate.",
+      "copy": "Verifică conexiunea și încearcă din nou."
+    },
+    "saleError": {
+      "title": "Nu am putut încărca produsele la reducere.",
       "copy": "Verifică conexiunea și încearcă din nou."
     },
     "newArrivalsError": {
@@ -211,6 +217,7 @@
     "searchPlaceholder": "Caută produse",
     "search": "Căutare",
     "categories": "Categorii",
+    "sale": "La reducere",
     "allCategories": "Toate categoriile",
     "priceRange": "Interval de preț",
     "ariaMinPrice": "Preț minim",
@@ -277,7 +284,7 @@
     "summary": "Sumar comandă",
     "subtotal": "Subtotal",
     "shipping": "Livrare",
-    "tax": "Taxe",
+    "tax": "TVA",
     "calcAtCheckout": "Calculat la checkout",
     "estimatedTotal": "Total estimat",
     "checkout": "Continuă la checkout",
@@ -790,6 +797,7 @@
         "blocks": {
           "hero": "Erou",
           "featured_products": "Produse recomandate",
+          "sale_products": "La reducere",
           "new_arrivals": "Cele mai noi",
           "featured_collections": "Colecții recomandate",
           "story": "Povestea noastră",
@@ -1066,6 +1074,30 @@
         "highlight": "Evidențiat",
         "publishAt": "Publică la",
         "noImages": "Nu există imagini."
+      },
+      "sale": {
+        "title": "Reducere",
+        "enabled": "Activează reducerea",
+        "type": "Tip reducere",
+        "typePercent": "Procent",
+        "typeAmount": "Sumă",
+        "value": "Valoare",
+        "note": "Modificarea reducerii mută produsul în Draft până la republicare.",
+        "valueHint": "Folosește doar cifre și punct, cu maxim 2 zecimale (exemplu: 10.00).",
+        "percentHint": "Introdu un procent între 0 și 100."
+      },
+      "bulk": {
+        "selected": "{{count}} selectate",
+        "clearSelection": "Golește selecția",
+        "saleValue": "Valoare reducere",
+        "applySale": "Aplică reducerea",
+        "clearSale": "Șterge reducerea",
+        "publish": "Publică",
+        "note": "Aplicarea reducerii mută produsele în Draft. Folosește „Publică” când ești gata.",
+        "valueRequired": "Introdu valoarea reducerii.",
+        "success": "Produsele selectate au fost actualizate.",
+        "published": "Produsele selectate au fost publicate.",
+        "error": "Actualizarea în masă a eșuat."
       },
       "success": {
         "save": "Produs salvat",

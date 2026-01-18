@@ -14,6 +14,8 @@ type ButtonType = 'button' | 'submit' | 'reset';
     <ng-container *ngIf="routerLink; else buttonTpl">
       <a
         [routerLink]="routerLink"
+        [queryParams]="queryParams"
+        [fragment]="fragment"
         [ngClass]="classes"
         class="inline-flex items-center justify-center rounded-full font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
       >
@@ -41,6 +43,8 @@ export class ButtonComponent {
   @Input() size: ButtonSize = 'md';
   @Input() type: ButtonType = 'button';
   @Input() routerLink?: string | any[];
+  @Input() queryParams?: Record<string, any> | null;
+  @Input() fragment?: string | null;
   @Input() disabled = false;
   @Output() action = new EventEmitter<void>();
 

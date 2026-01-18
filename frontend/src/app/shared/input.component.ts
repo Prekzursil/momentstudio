@@ -15,6 +15,7 @@ import { FormsModule } from '@angular/forms';
         [(ngModel)]="value"
         (ngModelChange)="valueChange.emit($event)"
         [type]="type"
+        [disabled]="disabled"
         [attr.min]="min ?? null"
         [attr.max]="max ?? null"
         [attr.step]="step ?? null"
@@ -32,6 +33,7 @@ export class InputComponent {
   @Input() type: 'text' | 'email' | 'password' | 'number' | 'tel' | 'url' = 'text';
   @Input() hint = '';
   @Input() value: string | number = '';
+  @Input() disabled = false;
   @Input() min?: number;
   @Input() max?: number;
   @Input() step?: number;

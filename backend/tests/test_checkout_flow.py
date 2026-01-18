@@ -12,7 +12,7 @@ from app.main import app
 from app.db.base import Base
 from app.db.session import get_session
 from app.models.cart import Cart
-from app.models.catalog import Category, Product, ProductImage
+from app.models.catalog import Category, Product, ProductImage, ProductStatus
 from app.models.order import Order
 from app.models.user import User
 from app.core import security
@@ -63,6 +63,7 @@ def test_guest_checkout_requires_email_verification(checkout_app: Dict[str, obje
                 base_price=Decimal("10.00"),
                 currency="RON",
                 stock_quantity=10,
+                status=ProductStatus.published,
                 images=[ProductImage(url="/media/img1.png", alt_text="img")],
             )
             session.add(product)
@@ -127,6 +128,7 @@ def test_guest_checkout_email_verification_and_create_account(
                 base_price=Decimal("10.00"),
                 currency="RON",
                 stock_quantity=10,
+                status=ProductStatus.published,
                 images=[ProductImage(url="/media/img1.png", alt_text="img")],
             )
             session.add_all([owner, product])
@@ -311,6 +313,7 @@ def test_guest_checkout_email_verification_rate_limited(
                 base_price=Decimal("10.00"),
                 currency="RON",
                 stock_quantity=10,
+                status=ProductStatus.published,
                 images=[ProductImage(url="/media/img1.png", alt_text="img")],
             )
             session.add(product)
@@ -407,6 +410,7 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
                 base_price=Decimal("50.00"),
                 currency="RON",
                 stock_quantity=10,
+                status=ProductStatus.published,
                 images=[ProductImage(url="/media/img1.png", alt_text="img")],
             )
             shipping_method = await order_service.create_shipping_method(
@@ -570,6 +574,7 @@ def test_authenticated_checkout_creates_separate_billing_address(
                 base_price=Decimal("10.00"),
                 currency="RON",
                 stock_quantity=10,
+                status=ProductStatus.published,
                 images=[ProductImage(url="/media/img1.png", alt_text="img")],
             )
             session.add(product)
@@ -661,6 +666,7 @@ def test_authenticated_checkout_cod_skips_payment_intent(checkout_app: Dict[str,
                 base_price=Decimal("10.00"),
                 currency="RON",
                 stock_quantity=10,
+                status=ProductStatus.published,
                 images=[ProductImage(url="/media/img1.png", alt_text="img")],
             )
             session.add(product)
@@ -766,6 +772,7 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
                 base_price=Decimal("10.00"),
                 currency="RON",
                 stock_quantity=10,
+                status=ProductStatus.published,
                 images=[ProductImage(url="/media/img1.png", alt_text="img")],
             )
             session.add_all([owner, product])
@@ -929,6 +936,7 @@ def test_paypal_webhook_captures_order_without_return(
                 base_price=Decimal("10.00"),
                 currency="RON",
                 stock_quantity=10,
+                status=ProductStatus.published,
                 images=[ProductImage(url="/media/img1.png", alt_text="img")],
             )
             session.add_all([owner, product])
@@ -1067,6 +1075,7 @@ def test_checkout_sends_admin_alert_fallback_when_no_owner(
                 base_price=Decimal("10.00"),
                 currency="RON",
                 stock_quantity=10,
+                status=ProductStatus.published,
                 images=[ProductImage(url="/media/img1.png", alt_text="img")],
             )
             shipping_method = await order_service.create_shipping_method(

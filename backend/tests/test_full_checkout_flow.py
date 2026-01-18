@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
-from app.models.catalog import Category, Product, ProductImage
+from app.models.catalog import Category, Product, ProductImage, ProductStatus
 from app.models.order import Order
 from app.models.user import User
 from app.schemas.order import ShippingMethodCreate
@@ -59,6 +59,7 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
                 base_price=Decimal("25.00"),
                 currency="RON",
                 stock_quantity=5,
+                status=ProductStatus.published,
                 images=[ProductImage(url="/media/flow.png", alt_text="flow")],
             )
             shipping = await order_service.create_shipping_method(

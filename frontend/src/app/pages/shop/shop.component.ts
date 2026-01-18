@@ -53,6 +53,17 @@ import { Meta, Title } from '@angular/platform-browser';
           <div class="space-y-3">
             <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ 'shop.categories' | translate }}</p>
             <div class="space-y-2 max-h-48 overflow-auto pr-1">
+              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <input
+                  type="radio"
+                  name="category"
+                  class="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
+                  value="sale"
+                  [(ngModel)]="filters.category_slug"
+                  (change)="applyFilters()"
+                />
+                <span>{{ 'shop.sale' | translate }}</span>
+              </label>
               <label
                 *ngFor="let category of categories"
                 class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300"

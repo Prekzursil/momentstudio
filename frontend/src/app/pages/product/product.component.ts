@@ -105,9 +105,17 @@ import { Router } from '@angular/router';
               <div class="space-y-2">
                 <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">{{ 'product.handmade' | translate }}</p>
                 <h1 class="text-3xl font-semibold text-slate-900 dark:text-slate-50">{{ product.name }}</h1>
-              <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-                  {{ product.base_price | localizedCurrency : product.currency }}
-                </p>
+                <div class="flex items-baseline gap-3">
+                  <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                    {{ displayPrice(product) | localizedCurrency : product.currency }}
+                  </p>
+                  <p
+                    *ngIf="isOnSale(product)"
+                    class="text-sm text-slate-500 line-through dark:text-slate-300"
+                  >
+                    {{ product.base_price | localizedCurrency : product.currency }}
+                  </p>
+                </div>
                 <div class="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300" *ngIf="product.rating_count">
                   ★ {{ product.rating_average?.toFixed(1) ?? '0.0' }} ·
                   {{ 'product.reviews' | translate : { count: product.rating_count } }}
@@ -396,7 +404,7 @@ export class ProductComponent implements OnInit, OnDestroy {
       name: this.product.name,
       slug: this.product.slug,
       image: this.product.images?.[0]?.url,
-      price: Number(this.product.base_price),
+      price: Number(this.displayPrice(this.product)),
       currency: this.product.currency,
       stock: this.product.stock_quantity ?? 99
     });
@@ -476,7 +484,7 @@ export class ProductComponent implements OnInit, OnDestroy {
       sku: product.id,
       offers: {
         '@type': 'Offer',
-        price: product.base_price,
+        price: this.displayPrice(product),
         priceCurrency: product.currency,
         availability
       },
@@ -525,6 +533,15 @@ export class ProductComponent implements OnInit, OnDestroy {
     const stock = product.stock_quantity ?? 0;
     const allowBackorder = !!product.allow_backorder;
     return stock <= 0 && !allowBackorder;
+  }
+
+  isOnSale(product: Product): boolean {
+    const sale = product?.sale_price;
+    return typeof sale === 'number' && Number.isFinite(sale) && sale < product.base_price;
+  }
+
+  displayPrice(product: Product): number {
+    return this.isOnSale(product) ? Number(product.sale_price) : product.base_price;
   }
 
   private loadBackInStockStatus(): void {

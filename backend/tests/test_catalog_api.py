@@ -456,6 +456,66 @@ def test_product_price_bounds(test_app: Dict[str, object]) -> None:
     assert data["currency"] == "RON"
 
 
+def test_sale_filter_and_effective_price_bounds(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal, email="saleadmin@example.com")
+
+    res = client.post(
+        "/api/v1/catalog/categories",
+        json={"slug": "sale-cat", "name": "SaleCat"},
+        headers=auth_headers(admin_token),
+    )
+    assert res.status_code == 201, res.text
+    category_id = res.json()["id"]
+
+    res = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": category_id,
+            "slug": "sale-prod",
+            "name": "Sale Product",
+            "base_price": 100,
+            "sale_type": "percent",
+            "sale_value": 10,
+            "currency": "RON",
+            "stock_quantity": 1,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert res.status_code == 201, res.text
+    sale_id = res.json()["id"]
+    assert float(res.json()["sale_price"]) == 90.0
+
+    res = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": category_id,
+            "slug": "base-prod",
+            "name": "Base Product",
+            "base_price": 50,
+            "currency": "RON",
+            "stock_quantity": 1,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert res.status_code == 201, res.text
+
+    bounds = client.get("/api/v1/catalog/products/price-bounds")
+    assert bounds.status_code == 200
+    data = bounds.json()
+    assert data["min_price"] == 50
+    assert data["max_price"] == 90
+
+    listed = client.get("/api/v1/catalog/products", params={"category_slug": "sale"})
+    assert listed.status_code == 200, listed.text
+    items = listed.json()["items"]
+    assert len(items) == 1
+    assert items[0]["id"] == sale_id
+
+
 def test_product_image_upload_and_delete(tmp_path, test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]

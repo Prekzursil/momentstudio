@@ -10,7 +10,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.models.cart import Cart, CartItem
-from app.models.catalog import Product, ProductVariant
+from app.models.catalog import Product, ProductVariant, ProductStatus
 from app.schemas.cart import CartItemCreate, CartItemUpdate, CartRead, CartItemRead, Totals
 from app.schemas.promo import PromoCodeRead, PromoCodeCreate
 from app.schemas.cart_sync import CartSyncItem
@@ -288,7 +288,12 @@ async def add_item(
     payload: CartItemCreate,
 ) -> CartItem:
     product = await session.get(Product, payload.product_id)
-    if not product or product.is_deleted or not product.is_active:
+    if (
+        not product
+        or product.is_deleted
+        or not product.is_active
+        or getattr(product, "status", None) != ProductStatus.published
+    ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
     variant = None
@@ -301,7 +306,8 @@ async def add_item(
     limit = payload.max_quantity or (variant.stock_quantity if variant else product.stock_quantity)
     _enforce_max_quantity(payload.quantity, limit)
 
-    unit_price = _to_decimal(product.base_price)
+    base_price = product.sale_price if getattr(product, "sale_price", None) is not None else product.base_price
+    unit_price = _to_decimal(base_price)
     if variant:
         unit_price += _to_decimal(variant.additional_price_delta)
 

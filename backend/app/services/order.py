@@ -11,6 +11,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.models.cart import Cart
+from app.models.catalog import Product, ProductStatus
 from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod, OrderEvent
 from app.schemas.order import OrderUpdate, ShippingMethodCreate
 from app.services import checkout_settings as checkout_settings_service
@@ -47,6 +48,22 @@ async def build_order_from_cart(
 ) -> Order:
     if not cart.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
+
+    product_ids = {item.product_id for item in cart.items if getattr(item, "product_id", None)}
+    if product_ids:
+        result = await session.execute(
+            select(Product.id, Product.status, Product.is_active, Product.is_deleted).where(Product.id.in_(product_ids))
+        )
+        rows = list(result.all())
+        found = {row[0] for row in rows}
+        missing = product_ids - found
+        unavailable = [
+            pid
+            for (pid, status_value, is_active, is_deleted) in rows
+            if is_deleted or not is_active or ProductStatus(status_value) != ProductStatus.published
+        ]
+        if missing or unavailable:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more cart items are unavailable")
 
     subtotal = Decimal("0.00")
     items: list[OrderItem] = []

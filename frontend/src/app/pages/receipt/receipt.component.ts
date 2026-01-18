@@ -184,7 +184,7 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
                 <span>Additional / Cost supl.</span>
                 <span>{{ (receipt.fee_amount || 0) | localizedCurrency: receipt.currency }}</span>
               </div>
-              <div class="flex items-center justify-between text-slate-600 dark:text-slate-300">
+              <div class="flex items-center justify-between text-slate-600 dark:text-slate-300" *ngIf="(receipt.tax_amount || 0) > 0">
                 <span>VAT / TVA</span>
                 <span>{{ (receipt.tax_amount || 0) | localizedCurrency: receipt.currency }}</span>
               </div>

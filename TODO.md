@@ -146,6 +146,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Money: migrate monetary fields to Decimal end-to-end (models + schemas + calculations), eliminating float casts.
 - [x] Tax: make tax/VAT strategy configurable (rate, exemptions) instead of hard-coded `0.1`.
 - [x] Receipts: add Share/Revoke actions in Account + Admin UI (copy link, show expiry, revoke token).
+- [x] Sale: add per-product + bulk sale pricing (percent/amount) and show effective price in storefront.
+- [x] Sale: add “Sale” filter in shop and optional homepage “Sale products” block (CMS toggle).
+- [x] Catalog/Cart: prevent purchasing draft/unpublished products (cart add + order build validation).
+- [ ] Sale: add sale scheduling (start/end) and optional auto-publish at start.
+- [ ] Sale: add a dedicated `on_sale` filter param (avoid reserving `category_slug=sale`).
 - [ ] Shipping: compute weight-based shipping from cart weight (sum `weight_grams`) instead of using subtotal as a proxy.
 - [ ] Money: migrate Product/Variant monetary fields to Decimal end-to-end (models + schemas + UI parsing), remove remaining float annotations.
 - [ ] Orders: add admin filters for “Pending (any)” (covers `pending_payment` + `pending_acceptance`) and optionally highlight “Awaiting payment” vs “Awaiting acceptance”.

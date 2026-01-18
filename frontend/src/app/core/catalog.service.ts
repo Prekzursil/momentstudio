@@ -27,6 +27,9 @@ export interface Product {
   short_description?: string;
   long_description?: string;
   base_price: number;
+  sale_price?: number | null;
+  sale_type?: 'percent' | 'amount' | null;
+  sale_value?: number | null;
   currency: string;
   stock_quantity?: number | null;
   allow_backorder?: boolean | null;

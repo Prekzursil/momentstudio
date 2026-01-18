@@ -174,12 +174,18 @@
     "ctaShop": "Shop now",
     "ctaAdmin": "View admin",
     "featured": "Featured pieces",
+    "saleProducts": "On sale",
     "newArrivals": "New arrivals",
     "viewAll": "View all",
     "noFeatured": "No featured products right now.",
+    "saleEmpty": "No sale items right now.",
     "newArrivalsEmpty": "No new arrivals right now.",
     "featuredError": {
       "title": "Could not load featured products.",
+      "copy": "Check your connection and retry."
+    },
+    "saleError": {
+      "title": "Could not load sale items.",
       "copy": "Check your connection and retry."
     },
     "newArrivalsError": {
@@ -211,6 +217,7 @@
     "searchPlaceholder": "Search products",
     "search": "Search",
     "categories": "Categories",
+    "sale": "On sale",
     "allCategories": "All categories",
     "priceRange": "Price range",
     "ariaMinPrice": "Minimum price",
@@ -277,7 +284,7 @@
     "summary": "Order summary",
     "subtotal": "Subtotal",
     "shipping": "Shipping",
-    "tax": "Tax",
+    "tax": "VAT",
     "calcAtCheckout": "Calculated at checkout",
     "estimatedTotal": "Estimated total",
     "checkout": "Proceed to checkout",
@@ -790,6 +797,7 @@
         "blocks": {
           "hero": "Hero",
           "featured_products": "Featured products",
+          "sale_products": "On sale",
           "new_arrivals": "New arrivals",
           "featured_collections": "Featured collections",
           "story": "Our story",
@@ -1066,6 +1074,30 @@
         "highlight": "Highlight",
         "publishAt": "Publish at",
         "noImages": "No images yet."
+      },
+      "sale": {
+        "title": "Sale",
+        "enabled": "Enable sale pricing",
+        "type": "Discount type",
+        "typePercent": "% off",
+        "typeAmount": "Amount off",
+        "value": "Discount",
+        "note": "Changing sale pricing forces the product back to Draft until republished.",
+        "valueHint": "Use numbers and a dot with up to 2 decimals (example: 10.00).",
+        "percentHint": "Enter a percentage between 0 and 100."
+      },
+      "bulk": {
+        "selected": "{{count}} selected",
+        "clearSelection": "Clear selection",
+        "saleValue": "Sale value",
+        "applySale": "Apply sale",
+        "clearSale": "Clear sale",
+        "publish": "Publish",
+        "note": "Applying sale pricing forces products back to Draft. Use “Publish” once you're ready.",
+        "valueRequired": "Enter a sale value.",
+        "success": "Updated selected products.",
+        "published": "Published selected products.",
+        "error": "Bulk update failed."
       },
       "success": {
         "save": "Product saved",

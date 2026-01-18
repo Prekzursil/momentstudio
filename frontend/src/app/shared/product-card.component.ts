@@ -60,7 +60,17 @@ import { Router } from '@angular/router';
           </a>
           <span class="text-sm text-slate-500 dark:text-slate-300">{{ product.currency }}</span>
         </div>
-        <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ product.base_price | localizedCurrency : product.currency }}</p>
+        <div class="flex items-baseline gap-2">
+          <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+            {{ displayPrice | localizedCurrency : product.currency }}
+          </p>
+          <p
+            *ngIf="isOnSale"
+            class="text-sm text-slate-500 line-through dark:text-slate-300"
+          >
+            {{ product.base_price | localizedCurrency : product.currency }}
+          </p>
+        </div>
         <p *ngIf="product.short_description" class="text-sm text-slate-600 line-clamp-2 dark:text-slate-300">
           {{ product.short_description }}
         </p>
@@ -92,9 +102,19 @@ export class ProductCardComponent {
 
   get badge(): string | null {
     if (this.tag) return this.tag;
+    if (this.isOnSale) return this.translate.instant('shop.sale');
     const tagName = this.product.tags?.[0]?.name;
     if (tagName) return tagName;
     return this.stockBadge;
+  }
+
+  get isOnSale(): boolean {
+    const sale = this.product?.sale_price;
+    return typeof sale === 'number' && Number.isFinite(sale) && sale < this.product.base_price;
+  }
+
+  get displayPrice(): number {
+    return this.isOnSale ? Number(this.product.sale_price) : this.product.base_price;
   }
 
   get primaryImage(): string {

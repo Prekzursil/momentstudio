@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.main import app
 from app.db.base import Base
 from app.db.session import get_session
-from app.models.catalog import Category, Product, ProductImage
+from app.models.catalog import Category, Product, ProductImage, ProductStatus
 from app.services.auth import create_user
 from app.schemas.user import UserCreate
 from app.services import cart as cart_service
@@ -68,6 +68,7 @@ def seed_product(session_factory) -> UUID:
                 base_price=10,
                 currency="RON",
                 stock_quantity=5,
+                status=ProductStatus.published,
                 images=[ProductImage(url="/media/cup.png", alt_text="cup")],
             )
             session.add_all([category, product])

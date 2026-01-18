@@ -43,6 +43,7 @@ type UiLang = 'en' | 'ro';
 type HomeSectionId =
   | 'hero'
   | 'featured_products'
+  | 'sale_products'
   | 'new_arrivals'
   | 'featured_collections'
   | 'story'
@@ -4746,6 +4747,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     return (
       value === 'hero' ||
       value === 'featured_products' ||
+      value === 'sale_products' ||
       value === 'new_arrivals' ||
       value === 'featured_collections' ||
       value === 'story' ||
@@ -4767,14 +4769,24 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (key === 'collections') return 'featured_collections';
     if (key === 'featured') return 'featured_products';
     if (key === 'bestsellers') return 'featured_products';
+    if (key === 'sale' || key === 'sales') return 'sale_products';
     if (key === 'new') return 'new_arrivals';
     if (key === 'recent') return 'recently_viewed';
     if (key === 'recentlyviewed') return 'recently_viewed';
     return null;
   }
 
-  private defaultHomeSectionIds(): HomeSectionId[] {
-    return ['hero', 'featured_products', 'new_arrivals', 'featured_collections', 'story', 'recently_viewed', 'why'];
+  private defaultHomeSections(): { id: HomeSectionId; enabled: boolean }[] {
+    return [
+      { id: 'hero', enabled: true },
+      { id: 'featured_products', enabled: true },
+      { id: 'sale_products', enabled: false },
+      { id: 'new_arrivals', enabled: true },
+      { id: 'featured_collections', enabled: true },
+      { id: 'story', enabled: true },
+      { id: 'recently_viewed', enabled: true },
+      { id: 'why', enabled: true }
+    ];
   }
 
   private makeHomeBlockDraft(key: string, type: HomeBlockType, enabled: boolean): HomeBlockDraft {
@@ -4795,9 +4807,9 @@ export class AdminComponent implements OnInit, OnDestroy {
   private ensureAllDefaultHomeBlocks(blocks: HomeBlockDraft[]): HomeBlockDraft[] {
     const out = [...blocks];
     const existing = new Set(out.filter((b) => this.isHomeSectionId(b.type)).map((b) => b.type as HomeSectionId));
-    for (const id of this.defaultHomeSectionIds()) {
+    for (const { id, enabled } of this.defaultHomeSections()) {
       if (existing.has(id)) continue;
-      out.push(this.makeHomeBlockDraft(id, id, true));
+      out.push(this.makeHomeBlockDraft(id, id, enabled));
     }
     return out;
   }

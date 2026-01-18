@@ -1,3 +1,4 @@
+from decimal import Decimal
 from datetime import datetime, timezone
 import csv
 import io
@@ -49,6 +50,7 @@ from app.services.storage import delete_file
 from app.services import email as email_service
 from app.services import auth as auth_service
 from app.services import notifications as notifications_service
+from app.services import pricing
 from app.core.config import settings
 from app.models.user import User
 
@@ -267,6 +269,61 @@ def _validate_price_currency(base_price: float, currency: str) -> None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only RON currency is supported")
 
 
+def _to_decimal(value: object | None) -> Decimal:
+    if value is None:
+        return Decimal("0.00")
+    if isinstance(value, Decimal):
+        return value
+    return Decimal(str(value))
+
+
+def _compute_sale_price(
+    *,
+    base_price: object,
+    sale_type: str | None,
+    sale_value: object | None,
+) -> Decimal | None:
+    if not sale_type or sale_value is None:
+        return None
+    base = pricing.quantize_money(_to_decimal(base_price))
+    if base <= 0:
+        return None
+    value = pricing.quantize_money(_to_decimal(sale_value))
+    if value <= 0:
+        return None
+
+    discount = Decimal("0.00")
+    if sale_type == "percent":
+        if value >= 100:
+            discount = base
+        else:
+            discount = pricing.quantize_money(base * value / Decimal("100"))
+    elif sale_type == "amount":
+        discount = value
+    else:
+        return None
+
+    price = base - discount
+    if price <= 0:
+        return Decimal("0.00")
+    price = pricing.quantize_money(price)
+    if price >= base:
+        return None
+    return price
+
+
+def _sync_sale_fields(product: Product) -> None:
+    sale_price = _compute_sale_price(
+        base_price=product.base_price,
+        sale_type=getattr(product, "sale_type", None),
+        sale_value=getattr(product, "sale_value", None),
+    )
+    product.sale_price = sale_price
+    if sale_price is None:
+        product.sale_type = None
+        product.sale_value = None
+
+
 async def _log_product_action(
     session: AsyncSession, product_id: uuid.UUID, action: str, user_id: uuid.UUID | None, payload: dict | None
 ) -> None:
@@ -377,6 +434,7 @@ async def create_product(
     product_data["sku"] = sku
     product_data["currency"] = payload.currency.upper()
     product = Product(**product_data)
+    _sync_sale_fields(product)
     _set_publish_timestamp(product, payload.status)
     product.images = [ProductImage(**img.model_dump()) for img in images_payload]
     product.variants = [ProductVariant(**variant.model_dump()) for variant in variants_payload]
@@ -398,6 +456,8 @@ async def update_product(
     session: AsyncSession, product: Product, payload: ProductUpdate, commit: bool = True, user_id: uuid.UUID | None = None
 ) -> Product:
     was_out_of_stock = is_out_of_stock(product)
+    before_sale_type = getattr(product, "sale_type", None)
+    before_sale_value = getattr(product, "sale_value", None)
     data = payload.model_dump(exclude_unset=True)
     if "base_price" in data or "currency" in data:
         _validate_price_currency(data.get("base_price", product.base_price), data.get("currency", product.currency))
@@ -417,7 +477,16 @@ async def update_product(
         else:
             setattr(product, field, value)
     is_now_out_of_stock = is_out_of_stock(product)
-    _set_publish_timestamp(product, data.get("status"))
+    sale_fields_touched = "sale_type" in data or "sale_value" in data
+    if sale_fields_touched or "base_price" in data:
+        _sync_sale_fields(product)
+    if sale_fields_touched:
+        sale_changed = (getattr(product, "sale_type", None) != before_sale_type) or (
+            getattr(product, "sale_value", None) != before_sale_value
+        )
+        if sale_changed and product.status == ProductStatus.published:
+            product.status = ProductStatus.draft
+    _set_publish_timestamp(product, product.status)
     session.add(product)
     if commit:
         await session.commit()
@@ -497,12 +566,26 @@ async def bulk_update_products(
         if not product:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Product {item.product_id} not found")
         was_out_of_stock = is_out_of_stock(product)
+        before_sale_type = getattr(product, "sale_type", None)
+        before_sale_value = getattr(product, "sale_value", None)
         data = item.model_dump(exclude_unset=True)
-        if "status" in data and data["status"]:
-            _set_publish_timestamp(product, data["status"])
-        for field in ("base_price", "stock_quantity", "status"):
+        for field in ("base_price", "sale_type", "sale_value", "stock_quantity", "status"):
             if field in data and data[field] is not None:
                 setattr(product, field, data[field])
+            elif field in {"sale_type", "sale_value"} and field in data:
+                setattr(product, field, None)
+
+        sale_fields_touched = "sale_type" in data or "sale_value" in data
+        if sale_fields_touched or "base_price" in data:
+            _sync_sale_fields(product)
+        if sale_fields_touched:
+            sale_changed = (getattr(product, "sale_type", None) != before_sale_type) or (
+                getattr(product, "sale_value", None) != before_sale_value
+            )
+            if sale_changed and product.status == ProductStatus.published:
+                product.status = ProductStatus.draft
+
+        _set_publish_timestamp(product, product.status)
         if was_out_of_stock and not is_out_of_stock(product):
             restocked.add(product.id)
         session.add(product)
@@ -517,7 +600,14 @@ async def bulk_update_products(
             product.id,
             "bulk_update",
             user_id,
-            {"base_price": product.base_price, "stock_quantity": product.stock_quantity, "status": str(product.status)},
+            {
+                "base_price": product.base_price,
+                "sale_type": product.sale_type,
+                "sale_value": product.sale_value,
+                "sale_price": product.sale_price,
+                "stock_quantity": product.stock_quantity,
+                "status": str(product.status),
+            },
         )
     return updated
 
@@ -602,11 +692,12 @@ async def get_product_feed(session: AsyncSession, lang: str | None = None) -> li
     feed: list[ProductFeedItem] = []
     for p in products:
         apply_product_translation(p, lang)
+        effective_price = p.sale_price if getattr(p, "sale_price", None) is not None else p.base_price
         feed.append(
             ProductFeedItem(
                 slug=p.slug,
                 name=p.name,
-                price=float(p.base_price),
+                price=float(effective_price),
                 currency=p.currency,
                 description=p.short_description or p.long_description,
                 category_slug=p.category.slug if p.category else None,
@@ -649,9 +740,10 @@ async def get_product_price_bounds(
     search: str | None,
     tags: list[str] | None,
 ) -> tuple[float, float, str | None]:
+    effective_price = func.coalesce(Product.sale_price, Product.base_price)
     query = select(
-        func.min(Product.base_price),
-        func.max(Product.base_price),
+        func.min(effective_price),
+        func.max(effective_price),
         func.count(func.distinct(Product.currency)),
         func.min(Product.currency),
     ).where(
@@ -661,7 +753,10 @@ async def get_product_price_bounds(
     )
 
     if category_slug:
-        query = query.join(Category).where(Category.slug == category_slug)
+        if category_slug == "sale":
+            query = query.where(Product.sale_price.is_not(None))
+        else:
+            query = query.join(Category).where(Category.slug == category_slug)
     if is_featured is not None:
         query = query.where(Product.is_featured == is_featured)
     if search:
@@ -693,6 +788,7 @@ async def list_products_with_filters(
     offset: int,
     lang: str | None = None,
 ):
+    effective_price = func.coalesce(Product.sale_price, Product.base_price)
     options = [
         selectinload(Product.images),
         selectinload(Product.tags),
@@ -708,7 +804,10 @@ async def list_products_with_filters(
         .where(Product.is_deleted.is_(False), Product.is_active.is_(True), Product.status == ProductStatus.published)
     )
     if category_slug:
-        base_query = base_query.join(Category).where(Category.slug == category_slug)
+        if category_slug == "sale":
+            base_query = base_query.where(Product.sale_price.is_not(None))
+        else:
+            base_query = base_query.join(Category).where(Category.slug == category_slug)
     if is_featured is not None:
         base_query = base_query.where(Product.is_featured == is_featured)
     if search:
@@ -717,9 +816,9 @@ async def list_products_with_filters(
             (Product.name.ilike(like)) | (Product.short_description.ilike(like)) | (Product.long_description.ilike(like))
         )
     if min_price is not None:
-        base_query = base_query.where(Product.base_price >= min_price)
+        base_query = base_query.where(effective_price >= min_price)
     if max_price is not None:
-        base_query = base_query.where(Product.base_price <= max_price)
+        base_query = base_query.where(effective_price <= max_price)
     if tags:
         base_query = base_query.join(Product.tags).where(Tag.slug.in_(tags))
 
@@ -728,9 +827,9 @@ async def list_products_with_filters(
     total_items = total_result.scalar_one()
 
     if sort == "price_asc":
-        base_query = base_query.order_by(Product.base_price.asc())
+        base_query = base_query.order_by(effective_price.asc())
     elif sort == "price_desc":
-        base_query = base_query.order_by(Product.base_price.desc())
+        base_query = base_query.order_by(effective_price.desc())
     elif sort == "name_asc":
         base_query = base_query.order_by(Product.name.asc())
     elif sort == "name_desc":
@@ -783,6 +882,9 @@ async def duplicate_product(session: AsyncSession, product: Product) -> Product:
         short_description=product.short_description,
         long_description=product.long_description,
         base_price=product.base_price,
+        sale_type=product.sale_type,
+        sale_value=product.sale_value,
+        sale_price=product.sale_price,
         currency=product.currency,
         is_active=False,
         is_featured=False,

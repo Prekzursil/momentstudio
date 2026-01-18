@@ -13,7 +13,7 @@ from app.main import app
 from app.db.base import Base
 from app.db.session import get_session
 from app.models.address import Address
-from app.models.catalog import Category, Product
+from app.models.catalog import Category, Product, ProductStatus
 from app.models.cart import Cart, CartItem
 from app.models.order import Order, OrderEvent, OrderStatus
 from app.models.user import User, UserRole
@@ -115,6 +115,7 @@ def seed_cart_with_product(session_factory, user_id: UUID) -> UUID:
                 base_price=Decimal("20.00"),
                 currency="RON",
                 stock_quantity=5,
+                status=ProductStatus.published,
             )
             cart = Cart(user_id=user_id)
             cart.items = [
