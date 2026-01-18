@@ -149,6 +149,7 @@ def test_guest_checkout_email_verification_and_create_account(
 
     async def fake_create_checkout_session(
         *,
+        session: object,
         amount_cents: int,
         customer_email: str,
         success_url: str,
@@ -157,7 +158,9 @@ def test_guest_checkout_email_verification_and_create_account(
         metadata: dict[str, str] | None = None,
         line_items: list[dict[str, object]] | None = None,
         discount_cents: int | None = None,
+        promo_code: str | None = None,
     ) -> dict:
+        captured["stripe_promo_code"] = promo_code
         captured["amount_cents"] = amount_cents
         captured["stripe_customer_email"] = customer_email
         captured["stripe_success_url"] = success_url
@@ -464,6 +467,7 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
 
     async def fake_create_checkout_session(
         *,
+        session: object,
         amount_cents: int,
         customer_email: str,
         success_url: str,
@@ -472,7 +476,9 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
         metadata: dict[str, str] | None = None,
         line_items: list[dict[str, object]] | None = None,
         discount_cents: int | None = None,
+        promo_code: str | None = None,
     ) -> dict:
+        captured["stripe_promo_code"] = promo_code
         captured["amount_cents"] = amount_cents
         captured["stripe_customer_email"] = customer_email
         captured["stripe_line_items"] = line_items or []
@@ -1126,6 +1132,7 @@ def test_checkout_sends_admin_alert_fallback_when_no_owner(
 
     async def fake_create_checkout_session(
         *,
+        session: object,
         amount_cents: int,
         customer_email: str,
         success_url: str,
@@ -1134,7 +1141,9 @@ def test_checkout_sends_admin_alert_fallback_when_no_owner(
         metadata: dict[str, str] | None = None,
         line_items: list[dict[str, object]] | None = None,
         discount_cents: int | None = None,
+        promo_code: str | None = None,
     ) -> dict:
+        captured["stripe_promo_code"] = promo_code
         captured["amount_cents"] = amount_cents
         captured["stripe_customer_email"] = customer_email
         return {"session_id": "cs_test", "checkout_url": "https://stripe.example/checkout"}

@@ -76,6 +76,7 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
 
     async def fake_create_checkout_session(
         *,
+        session: object,
         amount_cents: int,
         customer_email: str,
         success_url: str,
@@ -84,7 +85,9 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
         metadata: dict[str, str] | None = None,
         line_items: list[dict[str, object]] | None = None,
         discount_cents: int | None = None,
+        promo_code: str | None = None,
     ) -> dict:
+        captured["promo_code"] = promo_code
         captured["amount_cents"] = amount_cents
         captured["customer_email"] = customer_email
         captured["success_url"] = success_url
