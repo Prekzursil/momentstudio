@@ -142,7 +142,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Receipts: add a PII-redacted shareable receipt mode (hide full addresses/email by default) and configurable token TTL/revocation.
 - [x] Payments: add PayPal webhooks to capture/settle orders even if the buyer never returns to the site.
 - [x] Payments: itemize Stripe Checkout line items (products + shipping + discount) instead of a single aggregated line.
-- [ ] Payments: map internal promo codes to reusable Stripe coupons/promotion codes (avoid per-checkout coupon creation).
+- [x] Payments: map internal promo codes to reusable Stripe coupons/promotion codes (avoid per-checkout coupon creation).
 - [ ] Payments: implement Netopia callback/webhook settlement + signature verification once enabled.
 - [x] Money: migrate monetary fields to Decimal end-to-end (models + schemas + calculations), eliminating float casts.
 - [x] Tax: make tax/VAT strategy configurable (rate, exemptions) instead of hard-coded `0.1`.
@@ -150,11 +150,12 @@ Below is a structured checklist you can turn into issues.
 - [x] Sale: add per-product + bulk sale pricing (percent/amount) and show effective price in storefront.
 - [x] Sale: add “Sale” filter in shop and optional homepage “Sale products” block (CMS toggle).
 - [x] Catalog/Cart: prevent purchasing draft/unpublished products (cart add + order build validation).
-- [ ] Sale: add sale scheduling (start/end) and optional auto-publish at start.
-- [ ] Sale: add a dedicated `on_sale` filter param (avoid reserving `category_slug=sale`).
-- [ ] Shipping: compute weight-based shipping from cart weight (sum `weight_grams`) instead of using subtotal as a proxy.
-- [ ] Money: migrate Product/Variant monetary fields to Decimal end-to-end (models + schemas + UI parsing), remove remaining float annotations.
-- [ ] Orders: add admin filters for “Pending (any)” (covers `pending_payment` + `pending_acceptance`) and optionally highlight “Awaiting payment” vs “Awaiting acceptance”.
+- [x] Sale: add sale scheduling (start/end) and optional auto-publish at start.
+- [x] Sale: add a dedicated `on_sale` filter param (avoid reserving `category_slug=sale`).
+- [x] Money: migrate Product/Variant monetary fields to Decimal end-to-end (models + schemas + UI parsing), remove remaining float annotations.
+- [x] Orders: add admin filters for “Pending (any)” (covers `pending_payment` + `pending_acceptance`) and optionally highlight “Awaiting payment” vs “Awaiting acceptance”.
+- [ ] Payments: increment promo `times_used` on successful payment capture (and avoid counting abandoned checkouts).
+- [ ] Payments: add admin tooling to invalidate Stripe coupon mappings when a promo is edited/disabled.
 
 ## Backend - CMS & Content
 - [x] ContentBlock model + migration.
