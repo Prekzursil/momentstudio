@@ -542,13 +542,15 @@ export class ShopComponent implements OnInit, OnDestroy {
 	    this.normalizePriceRange();
 	  }
 
-	  private parseBoolean(raw: unknown): boolean {
-	    if (raw === true) return true;
-	    if (raw === false || raw == null) return false;
-	    if (typeof raw === 'number') return raw === 1;
-	    const value = String(raw).trim().toLowerCase();
-	    return value === '1' || value === 'true' || value === 'yes';
-	  }
+		  private parseBoolean(raw: unknown): boolean {
+		    if (raw === true) return true;
+		    if (raw === false || raw == null) return false;
+		    if (typeof raw === 'number') return raw === 1;
+		    if (Array.isArray(raw)) return this.parseBoolean(raw[0]);
+		    if (typeof raw !== 'string') return false;
+		    const value = raw.trim().toLowerCase();
+		    return value === '1' || value === 'true' || value === 'yes';
+		  }
 
   private parsePrice(raw: unknown): number | undefined {
     if (raw === null || raw === undefined) return undefined;

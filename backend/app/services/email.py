@@ -78,7 +78,7 @@ def _money_str(value: object, currency: str) -> str:
         return f"{dec.quantize(Decimal('0.01'))} {currency}"
     except Exception:
         try:
-            return f"{float(value):.2f} {currency}"
+            return f"{float(str(value)):.2f} {currency}"
         except Exception:
             return f"{value} {currency}"
 

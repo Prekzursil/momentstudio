@@ -307,7 +307,8 @@ async def add_item(
     limit = payload.max_quantity or (variant.stock_quantity if variant else product.stock_quantity)
     _enforce_max_quantity(payload.quantity, limit)
 
-    base_price = product.sale_price if is_sale_active(product) else product.base_price
+    sale_price = product.sale_price if is_sale_active(product) else None
+    base_price = sale_price if sale_price is not None else product.base_price
     unit_price = _to_decimal(base_price)
     if variant:
         unit_price += _to_decimal(variant.additional_price_delta)

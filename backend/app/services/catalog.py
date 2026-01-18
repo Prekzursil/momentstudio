@@ -793,7 +793,7 @@ async def get_product_feed(session: AsyncSession, lang: str | None = None) -> li
     feed: list[ProductFeedItem] = []
     for p in products:
         apply_product_translation(p, lang)
-        effective_price = p.sale_price if is_sale_active(p) else p.base_price
+        effective_price = p.sale_price if is_sale_active(p) and p.sale_price is not None else p.base_price
         feed.append(
             ProductFeedItem(
                 slug=p.slug,
@@ -1208,9 +1208,9 @@ async def import_products_csv(session: AsyncSession, content: str, dry_run: bool
             errors.append(f"Row {idx}: missing slug, name, or category_slug")
             continue
         try:
-            base_price = float(row.get("base_price") or 0)
+            base_price = Decimal(str(row.get("base_price") or "0")).quantize(Decimal("0.01"))
             stock_quantity = int(row.get("stock_quantity") or 0)
-        except ValueError:
+        except Exception:
             errors.append(f"Row {idx}: invalid base_price or stock_quantity")
             continue
         currency = (row.get("currency") or "RON").strip().upper()

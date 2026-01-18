@@ -9,6 +9,7 @@ from sqlalchemy import String, cast, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.models.cart import Cart
 from app.models.catalog import Product, ProductStatus
@@ -246,7 +247,7 @@ async def admin_search_orders(
     limit = max(1, min(100, int(limit or 20)))
     offset = (page - 1) * limit
 
-    filters = []
+    filters: list[ColumnElement[bool]] = []
     if pending_any:
         filters.append(Order.status.in_([OrderStatus.pending_payment, OrderStatus.pending_acceptance]))
     elif status:

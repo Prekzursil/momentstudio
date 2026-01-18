@@ -302,7 +302,7 @@ def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None, *,
         textColor=colors.HexColor("#475569"),
     )
 
-    def _money_cell(value: float | None) -> str:
+    def _money_cell(value: MoneyValue | None) -> str:
         if value is None:
             return "—"
         return xml_escape(_money(value, receipt.currency))
