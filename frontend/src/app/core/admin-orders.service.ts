@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { ApiService } from './api.service';
-import { Address, Order, OrderItem } from './account.service';
+import { Address, Order, OrderItem, ReceiptShareToken } from './account.service';
 import { parseMoney } from '../shared/money';
 
 export interface AdminPaginationMeta {
@@ -150,5 +150,13 @@ export class AdminOrdersService {
 
   downloadExport(): Observable<Blob> {
     return this.api.getBlob('/orders/admin/export');
+  }
+
+  shareReceipt(orderId: string): Observable<ReceiptShareToken> {
+    return this.api.post<ReceiptShareToken>(`/orders/${orderId}/receipt/share`, {});
+  }
+
+  revokeReceiptShare(orderId: string): Observable<ReceiptShareToken> {
+    return this.api.post<ReceiptShareToken>(`/orders/${orderId}/receipt/revoke`, {});
   }
 }

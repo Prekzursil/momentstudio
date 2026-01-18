@@ -10,7 +10,7 @@ import { orderStatusChipClass } from '../../shared/order-status';
 import { AddressFormComponent } from '../../shared/address-form.component';
 import { ToastService } from '../../core/toast.service';
 import { AuthService, AuthUser, UserAliasesResponse } from '../../core/auth.service';
-import { AccountService, AccountDeletionStatus, Address, Order, AddressCreateRequest } from '../../core/account.service';
+import { AccountService, AccountDeletionStatus, Address, Order, AddressCreateRequest, ReceiptShareToken } from '../../core/account.service';
 import { BlogMyComment, BlogService, PaginationMeta } from '../../core/blog.service';
 import { forkJoin, map, of, switchMap } from 'rxjs';
 import type { Stripe, StripeElements, StripeCardElement, StripeCardElementChangeEvent } from '@stripe/stripe-js';
@@ -867,24 +867,41 @@ import { missingRequiredProfileFields as computeMissingRequiredProfileFields, ty
 
                 <div class="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700">
                   <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Actions</p>
-                  <div class="mt-2 flex flex-wrap gap-2">
-                    <app-button
-                      size="sm"
-                      variant="ghost"
-                      label="Reorder"
+	                  <div class="mt-2 flex flex-wrap gap-2">
+	                    <app-button
+	                      size="sm"
+	                      variant="ghost"
+	                      label="Reorder"
                       [disabled]="reorderingOrderId === order.id"
                       (action)="reorder(order)"
                     ></app-button>
-                    <app-button
-                      size="sm"
-                      variant="ghost"
-                      label="Receipt (PDF)"
-                      [disabled]="downloadingReceiptId === order.id"
-                      (action)="downloadReceipt(order)"
-                    ></app-button>
-                  </div>
-                </div>
-              </div>
+	                    <app-button
+	                      size="sm"
+	                      variant="ghost"
+	                      label="Receipt (PDF)"
+	                      [disabled]="downloadingReceiptId === order.id"
+	                      (action)="downloadReceipt(order)"
+	                    ></app-button>
+	                    <app-button
+	                      size="sm"
+	                      variant="ghost"
+	                      label="Share receipt link"
+	                      [disabled]="sharingReceiptId === order.id"
+	                      (action)="shareReceipt(order)"
+	                    ></app-button>
+	                    <app-button
+	                      size="sm"
+	                      variant="ghost"
+	                      label="Revoke receipt links"
+	                      [disabled]="revokingReceiptId === order.id"
+	                      (action)="revokeReceiptShare(order)"
+	                    ></app-button>
+	                  </div>
+	                  <div *ngIf="receiptShares()[order.id] as share" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+	                    Share link expires: {{ share.expires_at | date: 'short' }}
+	                  </div>
+	                </div>
+	              </div>
             </div>
           </details>
 
@@ -1244,6 +1261,68 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
       },
       complete: () => (this.downloadingReceiptId = null)
     });
+  }
+
+  receiptShares = signal<Record<string, ReceiptShareToken>>({});
+  sharingReceiptId: string | null = null;
+  revokingReceiptId: string | null = null;
+
+  shareReceipt(order: Order): void {
+    if (typeof navigator === 'undefined') return;
+    if (this.sharingReceiptId) return;
+
+    const existing = this.receiptShares()[order.id];
+    const expiresAt = existing?.expires_at ? new Date(existing.expires_at) : null;
+    if (existing?.receipt_url && expiresAt && expiresAt.getTime() > Date.now() + 30_000) {
+      void this.copyToClipboard(existing.receipt_url).then((ok) => {
+        this.toast.success(ok ? 'Receipt link copied' : 'Receipt link ready');
+      });
+      return;
+    }
+
+    this.sharingReceiptId = order.id;
+    this.account.shareReceipt(order.id).subscribe({
+      next: (token) => {
+        this.receiptShares.set({ ...this.receiptShares(), [order.id]: token });
+        void this.copyToClipboard(token.receipt_url).then((ok) => {
+          this.toast.success(ok ? 'Receipt link copied' : 'Receipt link generated');
+        });
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Could not generate receipt link.';
+        this.toast.error(message);
+      },
+      complete: () => (this.sharingReceiptId = null)
+    });
+  }
+
+  revokeReceiptShare(order: Order): void {
+    if (!confirm('Revoke previously shared receipt links for this order?')) return;
+    if (this.revokingReceiptId) return;
+    this.revokingReceiptId = order.id;
+    this.account.revokeReceiptShare(order.id).subscribe({
+      next: () => {
+        const nextShares = { ...this.receiptShares() };
+        delete nextShares[order.id];
+        this.receiptShares.set(nextShares);
+        this.toast.success('Receipt links revoked');
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Could not revoke receipt links.';
+        this.toast.error(message);
+      },
+      complete: () => (this.revokingReceiptId = null)
+    });
+  }
+
+  private async copyToClipboard(text: string): Promise<boolean> {
+    try {
+      if (!navigator.clipboard?.writeText) return false;
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   openAddressForm(existing?: Address): void {

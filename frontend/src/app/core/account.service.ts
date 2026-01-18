@@ -75,6 +75,13 @@ export interface AccountDeletionStatus {
   cooldown_hours: number;
 }
 
+export interface ReceiptShareToken {
+  token: string;
+  receipt_url: string;
+  receipt_pdf_url: string;
+  expires_at: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AccountService {
   constructor(private api: ApiService) {}
@@ -128,6 +135,14 @@ export class AccountService {
 
   downloadReceipt(orderId: string): Observable<Blob> {
     return this.api.getBlob(`/orders/${orderId}/receipt`);
+  }
+
+  shareReceipt(orderId: string): Observable<ReceiptShareToken> {
+    return this.api.post<ReceiptShareToken>(`/orders/${orderId}/receipt/share`, {});
+  }
+
+  revokeReceiptShare(orderId: string): Observable<ReceiptShareToken> {
+    return this.api.post<ReceiptShareToken>(`/orders/${orderId}/receipt/revoke`, {});
   }
 
   createAddress(payload: AddressCreateRequest): Observable<Address> {

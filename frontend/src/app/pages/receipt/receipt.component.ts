@@ -2,6 +2,7 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { Subscription } from 'rxjs';
+import { AuthService } from '../../core/auth.service';
 import { ReceiptRead, ReceiptService } from '../../core/receipt.service';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 
@@ -36,6 +37,15 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
             >
               Download PDF
             </a>
+            <button
+              *ngIf="token && receipt && auth.isAuthenticated()"
+              type="button"
+              class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900"
+              [disabled]="loading"
+              (click)="toggleReveal()"
+            >
+              {{ reveal ? 'Hide details' : 'Show full details' }}
+            </button>
             <a
               class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900"
               routerLink="/"
@@ -55,7 +65,13 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
             *ngIf="receipt.pii_redacted"
             class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
           >
-            This shared receipt hides personal details by default. / Această chitanță partajată ascunde datele personale în mod implicit.
+            <div class="grid gap-1">
+              <p>This shared receipt hides personal details by default.</p>
+              <p>Această chitanță partajată ascunde datele personale în mod implicit.</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400" *ngIf="auth.isAuthenticated() && reveal">
+                Full details are available only to the order owner or an admin.
+              </p>
+            </div>
           </div>
 
           <div class="grid gap-4 sm:grid-cols-2" *ngIf="receipt.customer_name || receipt.customer_email">
@@ -191,33 +207,46 @@ export class ReceiptComponent implements OnInit, OnDestroy {
   pdfUrl = '';
   loading = true;
   error = '';
+  reveal = false;
 
   private sub?: Subscription;
 
-  constructor(private route: ActivatedRoute, private receipts: ReceiptService) {}
+  constructor(private route: ActivatedRoute, private receipts: ReceiptService, public auth: AuthService) {}
 
   ngOnInit(): void {
     this.sub = this.route.paramMap.subscribe((params) => {
       this.token = params.get('token') || '';
-      if (!this.token) {
+      this.reveal = false;
+      this.loadReceipt();
+    });
+  }
+
+  toggleReveal(): void {
+    if (!this.token) return;
+    this.reveal = !this.reveal;
+    this.loadReceipt();
+  }
+
+  private loadReceipt(): void {
+    if (!this.token) {
+      this.loading = false;
+      this.receipt = null;
+      this.error = 'Missing receipt token.';
+      return;
+    }
+    this.loading = true;
+    this.error = '';
+    this.pdfUrl = this.receipts.pdfUrl(this.token, { reveal: this.reveal });
+    this.receipts.getByToken(this.token, { reveal: this.reveal }).subscribe({
+      next: (data) => {
+        this.receipt = data;
         this.loading = false;
-        this.error = 'Missing receipt token.';
-        return;
+      },
+      error: (err) => {
+        this.loading = false;
+        this.receipt = null;
+        this.error = err?.error?.detail || 'Receipt not found or link expired.';
       }
-      this.loading = true;
-      this.error = '';
-      this.pdfUrl = this.receipts.pdfUrl(this.token);
-      this.receipts.getByToken(this.token).subscribe({
-        next: (data) => {
-          this.receipt = data;
-          this.loading = false;
-        },
-        error: (err) => {
-          this.loading = false;
-          this.receipt = null;
-          this.error = err?.error?.detail || 'Receipt not found or link expired.';
-        }
-      });
     });
   }
 

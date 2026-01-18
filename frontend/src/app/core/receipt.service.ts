@@ -53,8 +53,9 @@ export class ReceiptService {
 
   constructor(private api: ApiService) {}
 
-  getByToken(token: string): Observable<ReceiptRead> {
-    return this.api.get<ReceiptRead>(`/orders/receipt/${encodeURIComponent(token)}`).pipe(
+  getByToken(token: string, opts?: { reveal?: boolean }): Observable<ReceiptRead> {
+    const params = opts?.reveal ? { reveal: true } : undefined;
+    return this.api.get<ReceiptRead>(`/orders/receipt/${encodeURIComponent(token)}`, params).pipe(
       map((r: any) => ({
         ...r,
         pii_redacted: Boolean(r?.pii_redacted),
@@ -71,7 +72,8 @@ export class ReceiptService {
     );
   }
 
-  pdfUrl(token: string): string {
-    return `${this.apiBaseUrl}/orders/receipt/${encodeURIComponent(token)}/pdf`;
+  pdfUrl(token: string, opts?: { reveal?: boolean }): string {
+    const base = `${this.apiBaseUrl}/orders/receipt/${encodeURIComponent(token)}/pdf`;
+    return opts?.reveal ? `${base}?reveal=true` : base;
   }
 }

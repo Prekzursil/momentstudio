@@ -9,6 +9,7 @@ import { InputComponent } from '../../../shared/input.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { ToastService } from '../../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
+import { ReceiptShareToken } from '../../../core/account.service';
 import { AdminOrderDetail, AdminOrdersService } from '../../../core/admin-orders.service';
 import { AdminReturnsService, ReturnRequestRead } from '../../../core/admin-returns.service';
 import { orderStatusChipClass } from '../../../shared/order-status';
@@ -32,7 +33,9 @@ type OrderAction =
   | 'packingSlip'
   | 'labelUpload'
   | 'labelDownload'
-  | 'labelDelete';
+  | 'labelDelete'
+  | 'receiptShare'
+  | 'receiptRevoke';
 
 @Component({
   selector: 'app-admin-order-detail',
@@ -220,11 +223,11 @@ type OrderAction =
             <div class="grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
               <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.actionsTitle' | translate }}</div>
 
-              <div class="grid gap-3 md:grid-cols-2">
-                <div class="grid gap-2">
-                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-                    {{ 'adminUi.orders.paymentTitle' | translate }}
-                  </div>
+	              <div class="grid gap-3 md:grid-cols-2">
+	                <div class="grid gap-2">
+	                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+	                    {{ 'adminUi.orders.paymentTitle' | translate }}
+	                  </div>
                   <div class="flex flex-wrap items-center gap-2">
                     <app-button
                       size="sm"
@@ -246,10 +249,10 @@ type OrderAction =
                   </div>
                 </div>
 
-                <div class="grid gap-2">
-                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-                    {{ 'adminUi.orders.customerCommsTitle' | translate }}
-                  </div>
+	                <div class="grid gap-2">
+	                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+	                    {{ 'adminUi.orders.customerCommsTitle' | translate }}
+	                  </div>
                   <div class="flex flex-wrap items-center gap-2">
                     <app-button
                       size="sm"
@@ -265,9 +268,34 @@ type OrderAction =
                       [disabled]="action() !== null"
                       (action)="downloadPackingSlip()"
                     ></app-button>
-                  </div>
-                </div>
-              </div>
+	                  </div>
+	                </div>
+
+	                <div class="grid gap-2">
+	                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+	                    {{ 'adminUi.orders.receiptLinks.title' | translate }}
+	                  </div>
+	                  <div class="flex flex-wrap items-center gap-2">
+	                    <app-button
+	                      size="sm"
+	                      variant="ghost"
+	                      [label]="'adminUi.orders.receiptLinks.share' | translate"
+	                      [disabled]="action() !== null"
+	                      (action)="shareReceipt()"
+	                    ></app-button>
+	                    <app-button
+	                      size="sm"
+	                      variant="ghost"
+	                      [label]="'adminUi.orders.receiptLinks.revoke' | translate"
+	                      [disabled]="action() !== null"
+	                      (action)="revokeReceiptShare()"
+	                    ></app-button>
+	                  </div>
+	                  <div *ngIf="receiptShare() as share" class="text-xs text-slate-600 dark:text-slate-300">
+	                    {{ 'adminUi.orders.receiptLinks.expires' | translate }}: {{ share.expires_at | date: 'short' }}
+	                  </div>
+	                </div>
+	              </div>
 
               <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
                 <app-input
@@ -512,6 +540,7 @@ export class AdminOrderDetailComponent implements OnInit {
   showReturnCreate = signal(false);
   creatingReturn = signal(false);
   returnCreateError = signal<string | null>(null);
+  receiptShare = signal<ReceiptShareToken | null>(null);
 
   statusValue: OrderStatus = 'pending_acceptance';
   trackingNumber = '';
@@ -814,9 +843,61 @@ export class AdminOrderDetailComponent implements OnInit {
     });
   }
 
+  shareReceipt(): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    const cached = this.receiptShare();
+    const expiresAt = cached?.expires_at ? new Date(cached.expires_at) : null;
+    if (cached?.receipt_url && expiresAt && expiresAt.getTime() > Date.now() + 30_000) {
+      void this.copyToClipboard(cached.receipt_url).then((ok) => {
+        this.toast.success(
+          ok ? this.translate.instant('adminUi.orders.receiptLinks.copied') : this.translate.instant('adminUi.orders.receiptLinks.ready')
+        );
+      });
+      return;
+    }
+    this.action.set('receiptShare');
+    this.api.shareReceipt(orderId).subscribe({
+      next: (token) => {
+        this.receiptShare.set(token);
+        void this.copyToClipboard(token.receipt_url).then((ok) => {
+          this.toast.success(
+            ok ? this.translate.instant('adminUi.orders.receiptLinks.copied') : this.translate.instant('adminUi.orders.receiptLinks.ready')
+          );
+        });
+        this.action.set(null);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.errors.receiptShare');
+        this.toast.error(msg);
+        this.action.set(null);
+      }
+    });
+  }
+
+  revokeReceiptShare(): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    if (!confirm(this.translate.instant('adminUi.orders.receiptLinks.confirmRevoke'))) return;
+    this.action.set('receiptRevoke');
+    this.api.revokeReceiptShare(orderId).subscribe({
+      next: () => {
+        this.receiptShare.set(null);
+        this.toast.success(this.translate.instant('adminUi.orders.receiptLinks.revoked'));
+        this.action.set(null);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.errors.receiptRevoke');
+        this.toast.error(msg);
+        this.action.set(null);
+      }
+    });
+  }
+
   private load(orderId: string): void {
     this.loading.set(true);
     this.error.set(null);
+    this.receiptShare.set(null);
     this.api.get(orderId).subscribe({
       next: (o) => {
         this.order.set(o);
@@ -834,6 +915,17 @@ export class AdminOrderDetailComponent implements OnInit {
         this.loading.set(false);
       }
     });
+  }
+
+  private async copyToClipboard(text: string): Promise<boolean> {
+    try {
+      if (typeof navigator === 'undefined') return false;
+      if (!navigator.clipboard?.writeText) return false;
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   toggleReturnCreate(): void {
