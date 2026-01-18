@@ -81,6 +81,8 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
         cancel_url: str,
         lang: str | None = None,
         metadata: dict[str, str] | None = None,
+        line_items: list[dict[str, object]] | None = None,
+        discount_cents: int | None = None,
     ) -> dict:
         captured["amount_cents"] = amount_cents
         captured["customer_email"] = customer_email
@@ -88,6 +90,8 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
         captured["cancel_url"] = cancel_url
         captured["lang"] = lang
         captured["metadata"] = metadata
+        captured["line_items"] = line_items or []
+        captured["discount_cents"] = discount_cents
         return {"session_id": "cs_test_logged", "checkout_url": "https://checkout.stripe.test/session/cs_test_logged"}
 
     async def fake_order_email(*args, **kwargs):

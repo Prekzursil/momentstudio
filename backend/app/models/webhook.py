@@ -15,3 +15,12 @@ class StripeWebhookEvent(Base):
     stripe_event_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     event_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class PayPalWebhookEvent(Base):
+    __tablename__ = "paypal_webhook_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    paypal_event_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    event_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

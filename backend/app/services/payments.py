@@ -62,6 +62,8 @@ async def create_checkout_session(
     cancel_url: str,
     lang: str | None = None,
     metadata: dict[str, str] | None = None,
+    line_items: list[dict[str, Any]] | None = None,
+    discount_cents: int | None = None,
 ) -> dict:
     """Create a Stripe Checkout Session and return {session_id, checkout_url}.
 
@@ -78,25 +80,58 @@ async def create_checkout_session(
     init_stripe()
     locale: Literal["en", "ro"] = "ro" if (lang or "").strip().lower() == "ro" else "en"
     safe_metadata = {str(k): str(v) for (k, v) in (metadata or {}).items() if k and v is not None}
+    normalized_items = line_items or [
+        {
+            "price_data": {
+                "currency": "ron",
+                "unit_amount": int(amount_cents),
+                "product_data": {"name": "momentstudio"},
+            },
+            "quantity": 1,
+        }
+    ]
+    discount_value = int(discount_cents or 0)
+    if discount_value < 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid discount")
+    if line_items is not None:
+        computed_total = 0
+        for item in normalized_items:
+            qty = item.get("quantity", 1)
+            if not isinstance(qty, int):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid line item quantity")
+            price_data = item.get("price_data")
+            if not isinstance(price_data, dict):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid line item price")
+            unit_amount = price_data.get("unit_amount")
+            if not isinstance(unit_amount, int):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid line item amount")
+            computed_total += unit_amount * qty
+        computed_total -= discount_value
+        if computed_total != amount_cents:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Line items total mismatch")
+
     try:
+        discounts_param = None
+        if discount_value:
+            coupon_obj = stripe.Coupon.create(duration="once", amount_off=discount_value, currency="ron")
+            coupon_id = getattr(coupon_obj, "id", None) or (coupon_obj.get("id") if hasattr(coupon_obj, "get") else None)
+            if coupon_id:
+                discounts_param = [{"coupon": str(coupon_id)}]
+
+        session_kwargs: dict[str, Any] = {
+            "mode": "payment",
+            "customer_email": customer_email,
+            "line_items": normalized_items,
+            "success_url": success_url,
+            "cancel_url": cancel_url,
+            "locale": locale,
+            "metadata": safe_metadata,
+            "payment_intent_data": {"metadata": safe_metadata},
+        }
+        if discounts_param:
+            session_kwargs["discounts"] = discounts_param
         session_obj = stripe.checkout.Session.create(
-            mode="payment",
-            customer_email=customer_email,
-            line_items=[
-                {
-                    "price_data": {
-                        "currency": "ron",
-                        "unit_amount": int(amount_cents),
-                        "product_data": {"name": "momentstudio"},
-                    },
-                    "quantity": 1,
-                }
-            ],
-            success_url=success_url,
-            cancel_url=cancel_url,
-            locale=locale,
-            metadata=safe_metadata,
-            payment_intent_data={"metadata": safe_metadata},
+            **session_kwargs
         )
     except Exception as exc:
         metrics.record_payment_failure()

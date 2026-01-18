@@ -153,6 +153,8 @@ def test_guest_checkout_email_verification_and_create_account(
         cancel_url: str,
         lang: str | None = None,
         metadata: dict[str, str] | None = None,
+        line_items: list[dict[str, object]] | None = None,
+        discount_cents: int | None = None,
     ) -> dict:
         captured["amount_cents"] = amount_cents
         captured["stripe_customer_email"] = customer_email
@@ -160,6 +162,8 @@ def test_guest_checkout_email_verification_and_create_account(
         captured["stripe_cancel_url"] = cancel_url
         captured["stripe_lang"] = lang
         captured["stripe_metadata"] = metadata or {}
+        captured["stripe_line_items"] = line_items or []
+        captured["stripe_discount_cents"] = discount_cents
         return {"session_id": "cs_test", "checkout_url": "https://stripe.example/checkout"}
 
     async def fake_send_order_confirmation(to_email, order, items=None, lang=None, *, receipt_share_days=None):
@@ -240,6 +244,17 @@ def test_guest_checkout_email_verification_and_create_account(
         },
     )
     assert checkout.status_code == 201, checkout.text
+    line_items = captured.get("stripe_line_items")
+    assert isinstance(line_items, list)
+    assert len(line_items) >= 2
+    assert any(
+        li.get("price_data", {}).get("product_data", {}).get("name") == "Guest Product 2" and li.get("quantity") == 2
+        for li in line_items
+        if isinstance(li, dict)
+    )
+    assert any(
+        li.get("price_data", {}).get("product_data", {}).get("name") == "Shipping" for li in line_items if isinstance(li, dict)
+    )
     body = checkout.json()
     assert body["payment_method"] == "stripe"
     assert body["stripe_session_id"] == "cs_test"
@@ -451,9 +466,13 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
         cancel_url: str,
         lang: str | None = None,
         metadata: dict[str, str] | None = None,
+        line_items: list[dict[str, object]] | None = None,
+        discount_cents: int | None = None,
     ) -> dict:
         captured["amount_cents"] = amount_cents
         captured["stripe_customer_email"] = customer_email
+        captured["stripe_line_items"] = line_items or []
+        captured["stripe_discount_cents"] = discount_cents
         return {"session_id": "cs_test", "checkout_url": "https://stripe.example/checkout"}
 
     async def fake_send_order_confirmation(to_email, order, items=None, lang=None, *, receipt_share_days=None):
@@ -492,6 +511,18 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
     assert body["stripe_checkout_url"] == "https://stripe.example/checkout"
     # Subtotal: 2 * 50 = 100; discount 10% => 10; taxable 90; tax 9; shipping 20 => total 119 => cents 11900
     assert captured.get("amount_cents") == 11900
+    assert captured.get("stripe_discount_cents") == 1000
+    line_items = captured.get("stripe_line_items")
+    assert isinstance(line_items, list)
+    assert any(
+        li.get("price_data", {}).get("product_data", {}).get("name") == "Checkout Product" and li.get("quantity") == 2
+        for li in line_items
+        if isinstance(li, dict)
+    )
+    assert any(
+        li.get("price_data", {}).get("product_data", {}).get("name") == "Shipping" for li in line_items if isinstance(li, dict)
+    )
+    assert any(li.get("price_data", {}).get("product_data", {}).get("name") == "VAT" for li in line_items if isinstance(li, dict))
     assert captured.get("email") is None
     assert captured.get("admin_email") is None
     assert captured.get("admin_customer_email") is None
@@ -756,7 +787,7 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
         called["stripe_called"] = True
         return {"session_id": "cs_test", "checkout_url": "https://stripe.example/checkout"}
 
-    async def fake_paypal_create_order(*, total_ron, reference, return_url, cancel_url):
+    async def fake_paypal_create_order(*, total_ron, reference, return_url, cancel_url, **_kwargs):
         called["paypal_created"] = True
         assert str(reference)
         assert str(return_url).startswith("http")
@@ -873,6 +904,150 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
     assert order2.paypal_capture_id == "CAPTURE-1"
 
 
+def test_paypal_webhook_captures_order_without_return(
+    checkout_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client: TestClient = checkout_app["client"]  # type: ignore[assignment]
+    SessionLocal = checkout_app["session_factory"]  # type: ignore[assignment]
+
+    async def seed():
+        async with SessionLocal() as session:
+            category = Category(slug="ppwh", name="PayPal Webhook")
+            owner = User(
+                email="ownerwh@example.com",
+                username="ownerwh",
+                hashed_password=security.hash_password("Password123"),
+                name="Owner",
+                role=UserRole.owner,
+                email_verified=True,
+            )
+            product = Product(
+                category=category,
+                slug="ppwh-prod",
+                sku="PPWH-1",
+                name="PayPal Webhook Product",
+                base_price=Decimal("10.00"),
+                currency="RON",
+                stock_quantity=10,
+                images=[ProductImage(url="/media/img1.png", alt_text="img")],
+            )
+            session.add_all([owner, product])
+            await session.commit()
+            await session.refresh(product)
+            return {"product_id": product.id}
+
+    seeded = asyncio.run(seed())
+
+    called: dict[str, int] = {"captured": 0, "order_email": 0, "admin_email": 0}
+
+    async def fake_paypal_create_order(*, total_ron, reference, return_url, cancel_url, **_kwargs):
+        assert str(reference)
+        assert str(return_url).startswith("http")
+        assert str(cancel_url).startswith("http")
+        return "PAYPAL-ORDER-WH-1", "https://paypal.example/approve"
+
+    async def fake_verify_webhook_signature(*, headers, event):
+        return True
+
+    async def fake_paypal_capture_order(*, paypal_order_id: str) -> str:
+        called["captured"] += 1
+        assert paypal_order_id == "PAYPAL-ORDER-WH-1"
+        return "CAPTURE-WH-1"
+
+    async def fake_send_order_confirmation(*args, **kwargs):
+        called["order_email"] += 1
+        return True
+
+    async def fake_send_new_order_notification(*args, **kwargs):
+        called["admin_email"] += 1
+        return True
+
+    from app.services import paypal as paypal_service  # imported by orders/payments APIs
+
+    monkeypatch.setattr(paypal_service, "create_order", fake_paypal_create_order)
+    monkeypatch.setattr(paypal_service, "verify_webhook_signature", fake_verify_webhook_signature)
+    monkeypatch.setattr(paypal_service, "capture_order", fake_paypal_capture_order)
+    monkeypatch.setattr(email_service, "send_order_confirmation", fake_send_order_confirmation)
+    monkeypatch.setattr(email_service, "send_new_order_notification", fake_send_new_order_notification)
+
+    register = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "ppwhbuyer@example.com",
+            "username": "ppwhbuyer",
+            "password": "secret123",
+            "name": "PPWH Buyer",
+            "first_name": "PPWH",
+            "last_name": "Buyer",
+            "date_of_birth": "2000-01-01",
+            "phone": "+40723204204",
+        },
+    )
+    assert register.status_code == 201, register.text
+    token = register.json()["tokens"]["access_token"]
+    user_id = register.json()["user"]["id"]
+
+    async def mark_verified() -> None:
+        async with SessionLocal() as session:
+            user = await session.get(User, UUID(user_id))
+            assert user is not None
+            user.email_verified = True
+            session.add(user)
+            await session.commit()
+
+    asyncio.run(mark_verified())
+
+    add_res = client.post(
+        "/api/v1/cart/items",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"product_id": str(seeded["product_id"]), "quantity": 1},
+    )
+    assert add_res.status_code in (200, 201), add_res.text
+
+    checkout = client.post(
+        "/api/v1/orders/checkout",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "line1": "123 Test St",
+            "city": "Testville",
+            "postal_code": "12345",
+            "country": "US",
+            "save_address": False,
+            "payment_method": "paypal",
+        },
+    )
+    assert checkout.status_code == 201, checkout.text
+    assert checkout.json()["paypal_order_id"] == "PAYPAL-ORDER-WH-1"
+
+    async def fetch_order() -> Order | None:
+        async with SessionLocal() as session:
+            return (await session.execute(select(Order).order_by(Order.created_at.desc()))).scalars().first()
+
+    order = asyncio.run(fetch_order())
+    assert order is not None
+    assert order.status.value == "pending_payment"
+    assert order.paypal_capture_id is None
+
+    evt = {"id": "WH-EVT-1", "event_type": "CHECKOUT.ORDER.APPROVED", "resource": {"id": "PAYPAL-ORDER-WH-1"}}
+    webhook = client.post("/api/v1/payments/paypal/webhook", json=evt)
+    assert webhook.status_code == 200, webhook.text
+    assert called["captured"] == 1
+    assert called["order_email"] == 1
+    assert called["admin_email"] == 1
+
+    order2 = asyncio.run(fetch_order())
+    assert order2 is not None
+    assert order2.status.value == "pending_acceptance"
+    assert order2.paypal_capture_id == "CAPTURE-WH-1"
+
+    # Idempotent: duplicates should not re-capture or resend.
+    webhook2 = client.post("/api/v1/payments/paypal/webhook", json=evt)
+    assert webhook2.status_code == 200, webhook2.text
+    assert called["captured"] == 1
+    assert called["order_email"] == 1
+    assert called["admin_email"] == 1
+
+
 def test_checkout_sends_admin_alert_fallback_when_no_owner(
     checkout_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -948,6 +1123,8 @@ def test_checkout_sends_admin_alert_fallback_when_no_owner(
         cancel_url: str,
         lang: str | None = None,
         metadata: dict[str, str] | None = None,
+        line_items: list[dict[str, object]] | None = None,
+        discount_cents: int | None = None,
     ) -> dict:
         captured["amount_cents"] = amount_cents
         captured["stripe_customer_email"] = customer_email

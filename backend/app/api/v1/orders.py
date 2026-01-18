@@ -3,6 +3,7 @@ import io
 import mimetypes
 import secrets
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from uuid import UUID
 
@@ -20,6 +21,7 @@ from app.models.address import Address
 from app.models.cart import Cart
 from app.models.order import Order, OrderItem, OrderStatus, OrderEvent
 from app.schemas.cart import CartRead
+from app.schemas.cart import Totals
 from app.schemas.order import OrderRead, OrderCreate, OrderUpdate, ShippingMethodCreate, ShippingMethodRead, OrderEventRead
 from app.services import cart as cart_service
 from app.services import order as order_service
@@ -50,6 +52,7 @@ from app.api.v1 import cart as cart_api
 from app.schemas.order_admin import AdminOrderListItem, AdminOrderListResponse, AdminOrderRead, AdminPaginationMeta
 from app.schemas.receipt import ReceiptRead, ReceiptShareTokenRead
 from app.services import notifications as notification_service
+from app.services import pricing
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -62,6 +65,122 @@ def _generate_guest_email_token() -> str:
     return str(secrets.randbelow(1_000_000)).zfill(6)
 
 GUEST_EMAIL_TOKEN_MAX_ATTEMPTS = 10
+
+
+def _as_decimal(value: object) -> Decimal:
+    if isinstance(value, Decimal):
+        return value
+    return Decimal(str(value))
+
+
+def _money_to_cents(value: Decimal) -> int:
+    quantized = pricing.quantize_money(value)
+    return int((quantized * 100).to_integral_value(rounding=ROUND_HALF_UP))
+
+
+def _charge_label(kind: str, lang: str | None) -> str:
+    ro = (lang or "").strip().lower() == "ro"
+    if kind == "shipping":
+        return "Livrare" if ro else "Shipping"
+    if kind == "fee":
+        return "Taxă" if ro else "Fee"
+    if kind == "vat":
+        return "TVA" if ro else "VAT"
+    if kind == "discount":
+        return "Reducere" if ro else "Discount"
+    return kind
+
+
+def _cart_item_name(item, lang: str | None) -> str:
+    product = getattr(item, "product", None)
+    variant = getattr(item, "variant", None)
+    base = (getattr(product, "name", None) or "").strip() or "Item"
+    variant_name = (getattr(variant, "name", None) or "").strip()
+    if variant_name:
+        return f"{base} ({variant_name})"
+    return base
+
+
+def _build_stripe_line_items(cart: Cart, totals: Totals, *, lang: str | None) -> list[dict[str, object]]:
+    items: list[dict[str, object]] = []
+    for item in cart.items:
+        unit_price = _as_decimal(getattr(item, "unit_price_at_add", 0))
+        unit_amount = _money_to_cents(unit_price)
+        quantity = int(getattr(item, "quantity", 0) or 0)
+        if quantity <= 0:
+            continue
+        items.append(
+            {
+                "price_data": {
+                    "currency": "ron",
+                    "unit_amount": unit_amount,
+                    "product_data": {"name": _cart_item_name(item, lang)},
+                },
+                "quantity": quantity,
+            }
+        )
+
+    shipping_cents = _money_to_cents(totals.shipping)
+    if shipping_cents:
+        items.append(
+            {
+                "price_data": {
+                    "currency": "ron",
+                    "unit_amount": shipping_cents,
+                    "product_data": {"name": _charge_label("shipping", lang)},
+                },
+                "quantity": 1,
+            }
+        )
+
+    fee_cents = _money_to_cents(totals.fee)
+    if fee_cents:
+        items.append(
+            {
+                "price_data": {
+                    "currency": "ron",
+                    "unit_amount": fee_cents,
+                    "product_data": {"name": _charge_label("fee", lang)},
+                },
+                "quantity": 1,
+            }
+        )
+
+    vat_cents = _money_to_cents(totals.tax)
+    if vat_cents:
+        items.append(
+            {
+                "price_data": {
+                    "currency": "ron",
+                    "unit_amount": vat_cents,
+                    "product_data": {"name": _charge_label("vat", lang)},
+                },
+                "quantity": 1,
+            }
+        )
+
+    return items
+
+
+def _build_paypal_items(cart: Cart, *, lang: str | None) -> list[dict[str, object]]:
+    items: list[dict[str, object]] = []
+    for item in cart.items:
+        quantity = int(getattr(item, "quantity", 0) or 0)
+        if quantity <= 0:
+            continue
+        product = getattr(item, "product", None)
+        sku = (getattr(product, "sku", None) or "").strip() or None
+        unit_price = pricing.quantize_money(_as_decimal(getattr(item, "unit_price_at_add", 0)))
+        record: dict[str, object] = {
+            "name": _cart_item_name(item, lang),
+            "quantity": str(quantity),
+            "unit_amount": {"currency_code": "RON", "value": str(unit_price)},
+            "category": "PHYSICAL_GOODS",
+        }
+        if sku:
+            record["sku"] = sku
+        items.append(record)
+    return items
 
 
 def _delivery_from_payload(
@@ -266,22 +385,33 @@ async def checkout(
     paypal_order_id = None
     paypal_approval_url = None
     if payment_method == "stripe":
+        stripe_line_items = _build_stripe_line_items(user_cart, totals, lang=current_user.preferred_language)
+        discount_cents = _money_to_cents(discount_val) if discount_val and discount_val > 0 else None
         stripe_session = await payments.create_checkout_session(
-            amount_cents=int(totals.total * 100),
+            amount_cents=_money_to_cents(totals.total),
             customer_email=current_user.email,
             success_url=f"{settings.frontend_origin.rstrip('/')}/checkout/stripe/return?session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{settings.frontend_origin.rstrip('/')}/checkout/stripe/cancel?session_id={{CHECKOUT_SESSION_ID}}",
             lang=current_user.preferred_language,
             metadata={"cart_id": str(user_cart.id), "user_id": str(current_user.id)},
+            line_items=stripe_line_items,
+            discount_cents=discount_cents,
         )
         stripe_session_id = str(stripe_session.get("session_id"))
         stripe_checkout_url = str(stripe_session.get("checkout_url"))
     elif payment_method == "paypal":
+        paypal_items = _build_paypal_items(user_cart, lang=current_user.preferred_language)
         paypal_order_id, paypal_approval_url = await paypal_service.create_order(
             total_ron=totals.total,
             reference=str(user_cart.id),
             return_url=f"{settings.frontend_origin}/checkout/paypal/return",
             cancel_url=f"{settings.frontend_origin}/checkout/paypal/cancel",
+            item_total_ron=totals.subtotal,
+            shipping_ron=totals.shipping,
+            tax_ron=totals.tax,
+            fee_ron=totals.fee,
+            discount_ron=discount_val,
+            items=paypal_items,
         )
     elif payment_method == "netopia":
         raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Netopia is not configured yet")
@@ -913,22 +1043,33 @@ async def guest_checkout(
     paypal_order_id = None
     paypal_approval_url = None
     if payment_method == "stripe":
+        stripe_line_items = _build_stripe_line_items(cart, totals, lang=payload.preferred_language)
+        discount_cents = _money_to_cents(discount_val) if discount_val and discount_val > 0 else None
         stripe_session = await payments.create_checkout_session(
-            amount_cents=int(totals.total * 100),
+            amount_cents=_money_to_cents(totals.total),
             customer_email=email,
             success_url=f"{settings.frontend_origin.rstrip('/')}/checkout/stripe/return?session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{settings.frontend_origin.rstrip('/')}/checkout/stripe/cancel?session_id={{CHECKOUT_SESSION_ID}}",
             lang=payload.preferred_language,
             metadata={"cart_id": str(cart.id), "user_id": str(user_id) if user_id else ""},
+            line_items=stripe_line_items,
+            discount_cents=discount_cents,
         )
         stripe_session_id = str(stripe_session.get("session_id"))
         stripe_checkout_url = str(stripe_session.get("checkout_url"))
     elif payment_method == "paypal":
+        paypal_items = _build_paypal_items(cart, lang=payload.preferred_language)
         paypal_order_id, paypal_approval_url = await paypal_service.create_order(
             total_ron=totals.total,
             reference=str(cart.id),
             return_url=f"{settings.frontend_origin}/checkout/paypal/return",
             cancel_url=f"{settings.frontend_origin}/checkout/paypal/cancel",
+            item_total_ron=totals.subtotal,
+            shipping_ron=totals.shipping,
+            tax_ron=totals.tax,
+            fee_ron=totals.fee,
+            discount_ron=discount_val,
+            items=paypal_items,
         )
     elif payment_method == "netopia":
         raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Netopia is not configured yet")
