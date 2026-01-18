@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
@@ -20,7 +20,6 @@ type OrderStatusFilter = 'all' | 'pending' | 'paid' | 'shipped' | 'delivered' | 
   imports: [
     CommonModule,
     FormsModule,
-    RouterLink,
     TranslateModule,
     BreadcrumbComponent,
     ButtonComponent,

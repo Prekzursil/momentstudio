@@ -62,11 +62,11 @@ describe('Checkout auth gating', () => {
     tick();
 
     const links = Array.from(fixture.nativeElement.querySelectorAll('a')) as HTMLAnchorElement[];
-    const routes = links
-      .map((el) => el.getAttribute('ng-reflect-router-link'))
+    const hrefs = links
+      .map((el) => el.getAttribute('href'))
       .filter((v): v is string => Boolean(v));
-    expect(routes).toContain('/login');
-    expect(routes).toContain('/register');
+    expect(hrefs.some((h) => h.includes('/login'))).toBeTrue();
+    expect(hrefs.some((h) => h.includes('/register'))).toBeTrue();
     expect(apiService.post).not.toHaveBeenCalled();
   }));
 

@@ -3,7 +3,6 @@ import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { ButtonComponent } from '../../shared/button.component';
 import { CardComponent } from '../../shared/card.component';
-import { ContainerComponent } from '../../layout/container.component';
 import { CatalogService, Product, FeaturedCollection } from '../../core/catalog.service';
 import { RecentlyViewedService } from '../../core/recently-viewed.service';
 import { ProductCardComponent } from '../../shared/product-card.component';
@@ -85,7 +84,7 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, ButtonComponent, CardComponent, ContainerComponent, ProductCardComponent, SkeletonComponent, TranslateModule],
+  imports: [CommonModule, ButtonComponent, CardComponent, ProductCardComponent, SkeletonComponent, TranslateModule],
   template: `
     <section class="grid gap-10">
       <ng-container *ngFor="let block of enabledBlocks()">

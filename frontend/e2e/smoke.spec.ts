@@ -12,15 +12,20 @@ test('shop shows seeded products', async ({ page }) => {
 });
 
 test('guest checkout prompts for email verification', async ({ page }) => {
-  await page.goto('/shop');
-  await page.locator('app-product-card a').first().click();
-  await page.getByRole('button', { name: 'Add to cart' }).click();
-
+  // This flow only validates that the guest email verification UI is reachable.
+  // Avoid depending on a seeded product page to reduce flakiness in CI.
+  const sync = page.waitForResponse((res) => res.url().includes('/api/v1/cart/sync'));
   await page.goto('/checkout');
-  await page.getByLabel('Email').fill('guest-e2e@example.com');
-  await page.getByRole('button', { name: 'Send code' }).click();
+  await sync;
+  const email = `guest-e2e-${Date.now()}@example.com`;
+  await page.getByLabel('Email').fill(email);
 
-  await expect(page.getByPlaceholder('Enter verification token')).toBeVisible();
+  const request = page.waitForResponse((res) => res.url().includes('/api/v1/orders/guest-checkout/email/request'));
+  await page.getByRole('button', { name: 'Send code' }).click();
+  const response = await request;
+  expect([200, 204]).toContain(response.status());
+
+  await expect(page.locator('input[name="guestEmailToken"]')).toBeVisible();
 });
 
 test('owner can sign in and reach admin dashboard', async ({ page }) => {

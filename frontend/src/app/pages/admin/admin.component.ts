@@ -1,9 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
-import { CardComponent } from '../../shared/card.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { InputComponent } from '../../shared/input.component';
 import { RichEditorComponent } from '../../shared/rich-editor.component';
@@ -83,9 +82,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
   imports: [
     CommonModule,
     FormsModule,
-    RouterLink,
     BreadcrumbComponent,
-    CardComponent,
     ButtonComponent,
     InputComponent,
     RichEditorComponent,

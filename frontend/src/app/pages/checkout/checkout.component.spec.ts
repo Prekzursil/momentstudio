@@ -9,6 +9,7 @@ import { ApiService } from '../../core/api.service';
 import { ActivatedRoute } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { AuthService } from '../../core/auth.service';
+import { RouterTestingModule } from '@angular/router/testing';
 
 describe('CheckoutComponent', () => {
   const itemsSignal = signal([
@@ -29,7 +30,6 @@ describe('CheckoutComponent', () => {
 
   let cartApi: any;
   let apiService: any;
-  let router: any;
   let auth: any;
 
   beforeEach(() => {
@@ -40,15 +40,13 @@ describe('CheckoutComponent', () => {
     apiService = jasmine.createSpyObj('ApiService', ['post']);
     apiService.post.and.returnValue(of({ order_id: 'order1', reference_code: 'REF', client_secret: 'pi_secret' }));
 
-    router = jasmine.createSpyObj('Router', ['navigate']);
     auth = jasmine.createSpyObj('AuthService', ['isAuthenticated', 'user']);
     auth.isAuthenticated.and.returnValue(true);
     auth.user.and.returnValue({ email_verified: true });
 
     TestBed.configureTestingModule({
-      imports: [CheckoutComponent, TranslateModule.forRoot()],
+      imports: [RouterTestingModule, CheckoutComponent, TranslateModule.forRoot()],
       providers: [
-        { provide: Router, useValue: router },
         { provide: CartStore, useValue: { items: itemsSignal, subtotal: subtotalSignal, clear: jasmine.createSpy('clear') } },
         { provide: CartApi, useValue: cartApi },
         { provide: ApiService, useValue: apiService },
@@ -59,6 +57,8 @@ describe('CheckoutComponent', () => {
   });
 
   it('submits authenticated checkout via /orders/checkout', fakeAsync(() => {
+    const router = TestBed.inject(Router);
+    spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
     const fixture = TestBed.createComponent(CheckoutComponent);
     const cmp = fixture.componentInstance;
     cmp.paymentMethod = 'cod';
