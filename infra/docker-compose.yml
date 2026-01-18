@@ -26,6 +26,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/adrianaart
+      FRONTEND_ORIGIN: http://localhost:4201
     ports:
       - "8000:8000"
     healthcheck:
@@ -50,7 +51,7 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "4200:80"
+      - "4201:80"
     healthcheck:
       # Use IPv4 explicitly: Alpine wget resolves localhost to ::1 first, while nginx
       # in this image listens on 0.0.0.0:80 (no IPv6), which makes the healthcheck fail.

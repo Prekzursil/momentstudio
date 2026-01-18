@@ -391,6 +391,8 @@ cd infra
 docker compose up --build
 ```
 
+- Docker frontend available at: http://localhost:4201
+
 ### Caching & CDN (guidance)
 
 - **Catalog** (`GET /api/v1/catalog/*`): public responses can be cached (short TTL) and/or served with ETags for CDN efficiency.

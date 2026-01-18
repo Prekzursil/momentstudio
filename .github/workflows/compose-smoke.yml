@@ -48,14 +48,14 @@ jobs:
           curl -fsS http://localhost:8000/api/v1/health/ready
 
           for i in $(seq 1 60); do
-            if curl -fsS http://localhost:4200 >/dev/null; then
+            if curl -fsS http://localhost:4201 >/dev/null; then
               echo "Frontend is up"
               break
             fi
             echo "Waiting for frontend... ($i/60)"
             sleep 2
           done
-          curl -fsS http://localhost:4200 >/dev/null
+          curl -fsS http://localhost:4201 >/dev/null
 
       - name: Prepare DB (migrations + seeds + owner)
         run: |
@@ -67,7 +67,7 @@ jobs:
       - name: Playwright E2E (checkout + admin)
         run: |
           cd frontend
-          E2E_BASE_URL=http://localhost:4200 npm run e2e
+          E2E_BASE_URL=http://localhost:4201 npm run e2e
 
       - name: Logs (on failure)
         if: failure()
