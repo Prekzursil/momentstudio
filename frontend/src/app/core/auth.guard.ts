@@ -8,7 +8,7 @@ export const authGuard: CanActivateFn = () => {
   const router = inject(Router);
   const toast = inject(ToastService);
   const auth = inject(AuthService);
-  return auth.ensureAuthenticated().pipe(
+  return auth.ensureAuthenticated({ silent: true }).pipe(
     map((ok) => {
       if (ok && auth.isAuthenticated()) return true;
       toast.error('Please sign in to continue.');
@@ -25,7 +25,7 @@ export const adminGuard: CanActivateFn = () => {
   const router = inject(Router);
   const toast = inject(ToastService);
   const auth = inject(AuthService);
-  return auth.ensureAuthenticated().pipe(
+  return auth.ensureAuthenticated({ silent: true }).pipe(
     map((ok) => {
       if (ok && auth.isAuthenticated() && auth.isAdmin()) return true;
       toast.error(ok ? 'Admin access required.' : 'Please sign in to continue.');

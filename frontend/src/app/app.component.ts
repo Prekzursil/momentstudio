@@ -45,7 +45,7 @@ export class AppComponent {
   ) {
     // Language is handled by LanguageService (localStorage + preferred_language + browser fallback).
     // Revalidate any persisted session on startup to avoid "logged in but unauthorized" UI states.
-    this.auth.ensureAuthenticated().subscribe({ error: () => void 0 });
+    this.auth.ensureAuthenticated({ silent: true }).subscribe({ error: () => void 0 });
   }
 
   onThemeChange(pref: ThemePreference): void {

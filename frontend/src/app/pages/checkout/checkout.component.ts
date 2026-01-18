@@ -265,11 +265,25 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                 <div class="grid sm:grid-cols-2 gap-3">
                 <label class="text-sm grid gap-1">
                   {{ 'checkout.name' | translate }}
-                  <input class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400" name="name" [(ngModel)]="address.name" required />
+                  <input
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                    name="name"
+                    autocomplete="name"
+                    [(ngModel)]="address.name"
+                    required
+                  />
                 </label>
                 <label class="text-sm grid gap-1">
                   {{ 'checkout.email' | translate }}
-                  <input class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400" name="email" [(ngModel)]="address.email" type="email" required (ngModelChange)="onEmailChanged()" />
+                  <input
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                    name="email"
+                    autocomplete="email"
+                    [(ngModel)]="address.email"
+                    type="email"
+                    required
+                    (ngModelChange)="onEmailChanged()"
+                  />
                   <div *ngIf="!auth.isAuthenticated()" class="flex flex-wrap items-center gap-2">
                     <app-button
                       size="sm"
@@ -309,7 +323,13 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                 </label>
                 <label class="text-sm grid gap-1 sm:col-span-2">
                   {{ 'checkout.line1' | translate }}
-                  <input class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400" name="line1" [(ngModel)]="address.line1" required />
+                  <input
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                    name="line1"
+                    autocomplete="shipping address-line1"
+                    [(ngModel)]="address.line1"
+                    required
+                  />
                 </label>
                 <div class="grid gap-3 sm:grid-cols-3 sm:col-span-2">
                   <label class="text-sm grid gap-1">
@@ -317,6 +337,7 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                     <input
                       class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
                       name="city"
+                      autocomplete="shipping address-level2"
                       [(ngModel)]="address.city"
                       [attr.list]="address.country === 'RO' ? 'roCities' : null"
                       required
@@ -328,6 +349,7 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                       <select
                         class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                         name="region"
+                        autocomplete="shipping address-level1"
                         [(ngModel)]="address.region"
                         required
                       >
@@ -339,6 +361,7 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                       <input
                         class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
                         name="region"
+                        autocomplete="shipping address-level1"
                         [(ngModel)]="address.region"
                       />
                     </ng-template>
@@ -348,6 +371,7 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                     <input
                       class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
                       name="postal"
+                      autocomplete="shipping postal-code"
                       [(ngModel)]="address.postal"
                       required
                     />
@@ -355,7 +379,13 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                 </div>
                 <label class="text-sm grid gap-1 sm:col-span-2">
                   {{ 'checkout.country' | translate }}
-                  <select class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" name="country" [(ngModel)]="address.country" required>
+                  <select
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    name="country"
+                    autocomplete="shipping country"
+                    [(ngModel)]="address.country"
+                    required
+                  >
                     <option value="">{{ 'checkout.countrySelect' | translate }}</option>
                     <option *ngFor="let c of countries" [value]="c.code">{{ c.flag }} {{ c.name }}</option>
                   </select>
@@ -434,6 +464,7 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                     <input
                       class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
                       name="billingLine1"
+                      autocomplete="billing address-line1"
                       [(ngModel)]="billing.line1"
                       required
                     />
@@ -444,6 +475,7 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                       <input
                         class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
                         name="billingCity"
+                        autocomplete="billing address-level2"
                         [(ngModel)]="billing.city"
                         [attr.list]="billing.country === 'RO' ? 'roCities' : null"
                         required
@@ -455,6 +487,7 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                         <select
                           class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                           name="billingRegion"
+                          autocomplete="billing address-level1"
                           [(ngModel)]="billing.region"
                           required
                         >
@@ -466,6 +499,7 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                         <input
                           class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
                           name="billingRegion"
+                          autocomplete="billing address-level1"
                           [(ngModel)]="billing.region"
                         />
                       </ng-template>
@@ -475,6 +509,7 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                       <input
                         class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
                         name="billingPostal"
+                        autocomplete="billing postal-code"
                         [(ngModel)]="billing.postal"
                         required
                       />
@@ -485,6 +520,7 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                     <select
                       class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                       name="billingCountry"
+                      autocomplete="billing country"
                       [(ngModel)]="billing.country"
                       required
                     >

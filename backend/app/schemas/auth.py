@@ -19,7 +19,7 @@ class TokenPayload(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    refresh_token: str | None = None
 
 
 class UserResponse(BaseModel):
@@ -72,6 +72,34 @@ class PasswordResetConfirm(BaseModel):
 
 class EmailVerificationConfirm(BaseModel):
     token: str
+
+
+class SecondaryEmailCreateRequest(BaseModel):
+    email: EmailStr
+
+
+class SecondaryEmailConfirmRequest(BaseModel):
+    token: str
+
+
+class SecondaryEmailMakePrimaryRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+
+
+class SecondaryEmailResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    email: str
+    verified: bool = False
+    verified_at: datetime | None = None
+    created_at: datetime
+
+
+class UserEmailsResponse(BaseModel):
+    primary_email: str
+    primary_verified: bool
+    secondary_emails: list[SecondaryEmailResponse]
 
 
 class AccountDeletionStatus(BaseModel):

@@ -92,7 +92,8 @@ describe('AccountComponent', () => {
       'logout',
       'role',
       'isAdmin',
-      'getAliases'
+      'getAliases',
+      'listEmails'
     ]);
     auth.isAuthenticated.and.returnValue(true);
     auth.role.and.returnValue('customer');
@@ -100,6 +101,7 @@ describe('AccountComponent', () => {
     auth.updateNotificationPreferences.and.returnValue(of({ ...profile, notify_marketing: true } as any));
     auth.logout.and.returnValue(of(void 0));
     auth.getAliases.and.returnValue(of({ usernames: [], display_names: [] } as any));
+    auth.listEmails.and.returnValue(of({ primary_email: profile.email, primary_verified: true, secondary_emails: [] } as any));
 
     account = jasmine.createSpyObj<AccountService>('AccountService', [
       'getProfile',

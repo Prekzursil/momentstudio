@@ -9,7 +9,7 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { orderStatusChipClass } from '../../shared/order-status';
 import { AddressFormComponent } from '../../shared/address-form.component';
 import { ToastService } from '../../core/toast.service';
-import { AuthService, AuthUser, UserAliasesResponse } from '../../core/auth.service';
+import { AuthService, AuthUser, SecondaryEmail, UserAliasesResponse } from '../../core/auth.service';
 import { AccountService, AccountDeletionStatus, Address, Order, AddressCreateRequest, ReceiptShareToken } from '../../core/account.service';
 import { BlogMyComment, BlogService, PaginationMeta } from '../../core/blog.service';
 import { forkJoin, map, of, switchMap } from 'rxjs';
@@ -499,6 +499,110 @@ import { missingRequiredProfileFields as computeMissingRequiredProfileFields, ty
             </div>
             <p *ngIf="emailChangeError" class="text-xs text-rose-700 dark:text-rose-300">{{ emailChangeError }}</p>
             <p *ngIf="emailChangeSuccess" class="text-xs text-emerald-700 dark:text-emerald-300">{{ emailChangeSuccess }}</p>
+          </div>
+
+          <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-3">
+            <div class="grid gap-1">
+              <p class="font-semibold text-slate-900 dark:text-slate-50">Secondary emails</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Add extra sign-in emails. Verified secondary emails can be used to sign in and can be made primary.
+              </p>
+            </div>
+
+            <div class="grid gap-2 sm:grid-cols-[2fr_auto] sm:items-end">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                Add email
+                <input
+                  name="secondaryEmailAdd"
+                  type="email"
+                  autocomplete="email"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  [disabled]="addingSecondaryEmail"
+                  [(ngModel)]="secondaryEmailToAdd"
+                />
+              </label>
+              <app-button size="sm" variant="ghost" label="Add" [disabled]="addingSecondaryEmail || !secondaryEmailToAdd.trim()" (action)="addSecondaryEmail()"></app-button>
+            </div>
+
+            <p *ngIf="secondaryEmailsError()" class="text-xs text-rose-700 dark:text-rose-300">{{ secondaryEmailsError() }}</p>
+            <p *ngIf="secondaryEmailMessage" class="text-xs text-slate-600 dark:text-slate-300">{{ secondaryEmailMessage }}</p>
+
+            <div *ngIf="secondaryEmailsLoading()" class="text-sm text-slate-600 dark:text-slate-300">Loading…</div>
+
+            <ul *ngIf="!secondaryEmailsLoading() && secondaryEmails().length" class="grid gap-2">
+              <li
+                *ngFor="let e of secondaryEmails()"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900 flex flex-col gap-2 sm:flex-row sm:items-center"
+              >
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-slate-900 dark:text-slate-50 truncate">{{ e.email }}</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ e.verified ? 'Verified' : 'Unverified' }}
+                  </p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
+                  <app-button
+                    *ngIf="!e.verified"
+                    size="sm"
+                    variant="ghost"
+                    label="Resend code"
+                    (action)="resendSecondaryEmailVerification(e.id)"
+                  ></app-button>
+
+                  <app-button
+                    *ngIf="e.verified && makePrimarySecondaryEmailId !== e.id"
+                    size="sm"
+                    variant="ghost"
+                    label="Make primary"
+                    (action)="startMakePrimary(e.id)"
+                  ></app-button>
+
+                  <app-button size="sm" variant="ghost" label="Remove" (action)="deleteSecondaryEmail(e.id)"></app-button>
+                </div>
+
+                <div *ngIf="makePrimarySecondaryEmailId === e.id" class="w-full grid gap-2 sm:grid-cols-[2fr_auto_auto] sm:items-end">
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Confirm password
+                    <input
+                      name="makePrimaryPassword"
+                      type="password"
+                      autocomplete="current-password"
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      [disabled]="makingPrimaryEmail"
+                      [(ngModel)]="makePrimaryPassword"
+                    />
+                  </label>
+                  <app-button size="sm" variant="ghost" label="Confirm" [disabled]="makingPrimaryEmail" (action)="confirmMakePrimary()"></app-button>
+                  <app-button size="sm" variant="ghost" label="Cancel" [disabled]="makingPrimaryEmail" (action)="cancelMakePrimary()"></app-button>
+                </div>
+                <p *ngIf="makePrimarySecondaryEmailId === e.id && makePrimaryError" class="w-full text-xs text-rose-700 dark:text-rose-300">
+                  {{ makePrimaryError }}
+                </p>
+              </li>
+            </ul>
+
+            <form class="grid gap-2 sm:grid-cols-[2fr_auto] sm:items-end" (ngSubmit)="confirmSecondaryEmailVerification()">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                Verify code
+                <input
+                  name="secondaryVerificationToken"
+                  type="text"
+                  autocomplete="one-time-code"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  [disabled]="verifyingSecondaryEmail"
+                  [(ngModel)]="secondaryVerificationToken"
+                />
+              </label>
+              <app-button
+                size="sm"
+                variant="ghost"
+                type="submit"
+                label="Verify"
+                [disabled]="verifyingSecondaryEmail || !secondaryVerificationToken.trim()"
+              ></app-button>
+            </form>
+            <p *ngIf="secondaryVerificationStatus" class="text-xs text-slate-600 dark:text-slate-300">{{ secondaryVerificationStatus }}</p>
           </div>
 
           <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-2">
@@ -1062,6 +1166,20 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   emailChangeError: string | null = null;
   emailChangeSuccess: string | null = null;
 
+  secondaryEmails = signal<SecondaryEmail[]>([]);
+  secondaryEmailsLoading = signal<boolean>(false);
+  secondaryEmailsError = signal<string | null>(null);
+  secondaryEmailToAdd = '';
+  addingSecondaryEmail = false;
+  secondaryEmailMessage: string | null = null;
+  secondaryVerificationToken = '';
+  secondaryVerificationStatus: string | null = null;
+  verifyingSecondaryEmail = false;
+  makePrimarySecondaryEmailId: string | null = null;
+  makePrimaryPassword = '';
+  makingPrimaryEmail = false;
+  makePrimaryError: string | null = null;
+
   exportingData = false;
   exportError: string | null = null;
 
@@ -1113,6 +1231,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     this.forceProfileCompletion = this.route.snapshot.queryParamMap.get('complete') === '1';
     this.wishlist.refresh();
     this.loadData();
+    this.loadSecondaryEmails();
     this.loadAliases();
     this.loadDeletionStatus();
     this.loadMyComments();
@@ -1523,7 +1642,7 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
           this.toast.success('Session refreshed');
           this.resetIdleTimer();
         } else {
-          this.toast.error('No refresh token available');
+          this.toast.error('Session expired. Please sign in again.');
         }
       },
       error: () => this.toast.error('Could not refresh session.')
@@ -2163,6 +2282,161 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
       },
       complete: () => {
         this.emailChanging = false;
+      }
+    });
+  }
+
+  private loadSecondaryEmails(): void {
+    this.secondaryEmailsLoading.set(true);
+    this.secondaryEmailsError.set(null);
+    this.auth.listEmails().subscribe({
+      next: (res) => {
+        this.secondaryEmails.set(res.secondary_emails ?? []);
+      },
+      error: () => {
+        this.secondaryEmailsError.set('Could not load secondary emails.');
+      },
+      complete: () => this.secondaryEmailsLoading.set(false)
+    });
+  }
+
+  addSecondaryEmail(): void {
+    if (this.addingSecondaryEmail) return;
+    const email = this.secondaryEmailToAdd.trim();
+    this.secondaryEmailMessage = null;
+    this.secondaryVerificationStatus = null;
+    if (!email) {
+      this.secondaryEmailMessage = 'Enter an email address.';
+      this.toast.error(this.secondaryEmailMessage);
+      return;
+    }
+    this.addingSecondaryEmail = true;
+    this.auth.addSecondaryEmail(email).subscribe({
+      next: (created) => {
+        const existing = this.secondaryEmails();
+        this.secondaryEmails.set([created, ...existing.filter((e) => e.id !== created.id)]);
+        this.secondaryEmailToAdd = '';
+        this.secondaryEmailMessage = 'Verification code sent. Enter it below to verify.';
+        this.toast.success('Secondary email added');
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Could not add secondary email.';
+        this.secondaryEmailMessage = message;
+        this.toast.error(message);
+      },
+      complete: () => {
+        this.addingSecondaryEmail = false;
+      }
+    });
+  }
+
+  resendSecondaryEmailVerification(secondaryEmailId: string): void {
+    this.secondaryEmailMessage = null;
+    this.secondaryVerificationStatus = null;
+    this.auth.requestSecondaryEmailVerification(secondaryEmailId).subscribe({
+      next: () => {
+        this.secondaryEmailMessage = 'Verification code resent.';
+        this.toast.success('Verification email sent');
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Could not resend verification email.';
+        this.secondaryEmailMessage = message;
+        this.toast.error(message);
+      }
+    });
+  }
+
+  confirmSecondaryEmailVerification(): void {
+    if (this.verifyingSecondaryEmail) return;
+    const token = this.secondaryVerificationToken.trim();
+    this.secondaryEmailMessage = null;
+    this.secondaryVerificationStatus = null;
+    if (!token) {
+      this.secondaryVerificationStatus = 'Enter the verification code.';
+      this.toast.error(this.secondaryVerificationStatus);
+      return;
+    }
+    this.verifyingSecondaryEmail = true;
+    this.auth.confirmSecondaryEmailVerification(token).subscribe({
+      next: (verified) => {
+        this.secondaryEmails.set(
+          this.secondaryEmails().map((e) =>
+            e.id === verified.id ? { ...e, verified: true, verified_at: verified.verified_at ?? new Date().toISOString() } : e
+          )
+        );
+        this.secondaryVerificationToken = '';
+        this.secondaryVerificationStatus = 'Secondary email verified.';
+        this.toast.success('Email verified');
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Could not verify secondary email.';
+        this.secondaryVerificationStatus = message;
+        this.toast.error(message);
+      },
+      complete: () => {
+        this.verifyingSecondaryEmail = false;
+      }
+    });
+  }
+
+  deleteSecondaryEmail(secondaryEmailId: string): void {
+    if (!confirm('Remove this secondary email?')) return;
+    this.secondaryEmailMessage = null;
+    this.secondaryVerificationStatus = null;
+    this.auth.deleteSecondaryEmail(secondaryEmailId).subscribe({
+      next: () => {
+        this.secondaryEmails.set(this.secondaryEmails().filter((e) => e.id !== secondaryEmailId));
+        if (this.makePrimarySecondaryEmailId === secondaryEmailId) {
+          this.cancelMakePrimary();
+        }
+        this.toast.success('Secondary email removed');
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Could not remove secondary email.';
+        this.toast.error(message);
+      }
+    });
+  }
+
+  startMakePrimary(secondaryEmailId: string): void {
+    this.makePrimarySecondaryEmailId = secondaryEmailId;
+    this.makePrimaryPassword = '';
+    this.makePrimaryError = null;
+  }
+
+  cancelMakePrimary(): void {
+    this.makePrimarySecondaryEmailId = null;
+    this.makePrimaryPassword = '';
+    this.makePrimaryError = null;
+  }
+
+  confirmMakePrimary(): void {
+    if (this.makingPrimaryEmail) return;
+    const id = this.makePrimarySecondaryEmailId;
+    if (!id) return;
+    const password = this.makePrimaryPassword;
+    this.makePrimaryError = null;
+    if (!password) {
+      this.makePrimaryError = 'Confirm your password to switch primary email.';
+      this.toast.error(this.makePrimaryError);
+      return;
+    }
+    this.makingPrimaryEmail = true;
+    this.auth.makeSecondaryEmailPrimary(id, password).subscribe({
+      next: (user) => {
+        this.profile.set(user);
+        this.emailVerified.set(Boolean(user.email_verified));
+        this.cancelMakePrimary();
+        this.loadSecondaryEmails();
+        this.toast.success('Primary email updated');
+      },
+      error: (err) => {
+        const message = err?.error?.detail || 'Could not update primary email.';
+        this.makePrimaryError = message;
+        this.toast.error(message);
+      },
+      complete: () => {
+        this.makingPrimaryEmail = false;
       }
     });
   }

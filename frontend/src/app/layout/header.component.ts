@@ -333,7 +333,7 @@ export class HeaderComponent implements OnDestroy {
   private unreadPoll?: number;
   private authEffect?: EffectRef;
 
-  readonly isAuthenticated = computed(() => Boolean(this.auth.user()));
+  readonly isAuthenticated = computed(() => this.auth.isAuthenticated());
   readonly currentUser = computed(() => this.auth.user());
   readonly isAdmin = computed(() => this.auth.isAdmin());
   readonly notifications = computed(() => this.notificationsService.items());
@@ -355,7 +355,7 @@ export class HeaderComponent implements OnDestroy {
       links.push({ label: 'nav.signIn', path: '/login' });
       links.push({ label: 'nav.register', path: '/register' });
     }
-    if (this.auth.isAdmin()) {
+    if (authenticated && this.auth.isAdmin()) {
       links.push({ label: 'nav.admin', path: '/admin' });
     }
     return links;

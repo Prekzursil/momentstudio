@@ -816,8 +816,7 @@ async def request_guest_email_verification(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing guest session id")
 
     email = _normalize_email(str(payload.email))
-    existing = await auth_service.get_user_by_email(session, email)
-    if existing:
+    if await auth_service.is_email_taken(session, email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered; please sign in to checkout.",
@@ -907,8 +906,7 @@ async def guest_checkout(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing guest session id")
 
     email = _normalize_email(str(payload.email))
-    existing = await auth_service.get_user_by_email(session, email)
-    if existing:
+    if await auth_service.is_email_taken(session, email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered; please sign in to checkout.",

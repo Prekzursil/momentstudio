@@ -2,6 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, catchError, map, of, switchMap, tap } from 'rxjs';
 import { ApiService } from './api.service';
+import { finalize, shareReplay } from 'rxjs/operators';
 
 export interface AuthTokens {
   access_token: string;
@@ -62,6 +63,20 @@ export interface UserAliasesResponse {
   display_names: DisplayNameHistoryItem[];
 }
 
+export interface SecondaryEmail {
+  id: string;
+  email: string;
+  verified: boolean;
+  verified_at?: string | null;
+  created_at: string;
+}
+
+export interface UserEmailsResponse {
+  primary_email: string;
+  primary_verified: boolean;
+  secondary_emails: SecondaryEmail[];
+}
+
 type StorageMode = 'local' | 'session';
 
 @Injectable({ providedIn: 'root' })
@@ -69,6 +84,8 @@ export class AuthService {
   private storageMode: StorageMode = 'session';
   private userSignal = signal<AuthUser | null>(null);
   private tokens: AuthTokens | null = null;
+  private refreshInFlight: Observable<AuthTokens | null> | null = null;
+  private ensureInFlight: Observable<boolean> | null = null;
 
   constructor(private api: ApiService, private router: Router) {
     this.bootstrap();
@@ -77,7 +94,7 @@ export class AuthService {
   user = () => this.userSignal();
 
   isAuthenticated(): boolean {
-    return Boolean(this.userSignal() && (this.hasValidAccessToken() || this.hasValidRefreshToken()));
+    return Boolean(this.userSignal());
   }
 
   role(): string | null {
@@ -104,7 +121,12 @@ export class AuthService {
     opts?: { remember?: boolean }
   ): Observable<AuthResponse> {
     return this.api
-      .post<AuthResponse>('/auth/login', { identifier, password, captcha_token: captchaToken ?? null })
+      .post<AuthResponse>('/auth/login', {
+        identifier,
+        password,
+        captcha_token: captchaToken ?? null,
+        remember: opts?.remember ?? false
+      })
       .pipe(tap((res) => this.persist(res, opts?.remember ?? false)));
   }
 
@@ -266,23 +288,63 @@ export class AuthService {
     return this.api.post<{ detail: string; email_verified: boolean }>('/auth/verify/confirm', { token });
   }
 
-  refresh(): Observable<AuthTokens | null> {
+  listEmails(): Observable<UserEmailsResponse> {
+    return this.api.get<UserEmailsResponse>('/auth/me/emails');
+  }
+
+  addSecondaryEmail(email: string): Observable<SecondaryEmail> {
+    return this.api.post<SecondaryEmail>('/auth/me/emails', { email });
+  }
+
+  requestSecondaryEmailVerification(secondaryEmailId: string): Observable<{ detail: string }> {
+    return this.api.post<{ detail: string }>(`/auth/me/emails/${secondaryEmailId}/verify/request`, {});
+  }
+
+  confirmSecondaryEmailVerification(token: string): Observable<SecondaryEmail> {
+    return this.api.post<SecondaryEmail>('/auth/me/emails/verify/confirm', { token });
+  }
+
+  deleteSecondaryEmail(secondaryEmailId: string): Observable<void> {
+    return this.api.delete<void>(`/auth/me/emails/${secondaryEmailId}`);
+  }
+
+  makeSecondaryEmailPrimary(secondaryEmailId: string, password: string): Observable<AuthUser> {
+    return this.api
+      .post<AuthUser>(`/auth/me/emails/${secondaryEmailId}/make-primary`, { password })
+      .pipe(tap((user) => this.setUser(user)));
+  }
+
+  refresh(opts?: { silent?: boolean }): Observable<AuthTokens | null> {
+    const silent = opts?.silent ?? false;
+    const headers = silent ? { 'X-Silent': '1' } : undefined;
+
+    if (this.refreshInFlight) {
+      return this.refreshInFlight;
+    }
+
     const refreshToken = this.getRefreshToken();
-    if (!refreshToken) return of(null);
-    if (this.isJwtExpired(refreshToken)) return of(null);
-    return this.api.post<AuthTokens>('/auth/refresh', { refresh_token: refreshToken }).pipe(
+    const body = refreshToken && !this.isJwtExpired(refreshToken) ? { refresh_token: refreshToken } : {};
+    const refresh$ = this.api.post<AuthTokens>('/auth/refresh', body, headers).pipe(
       tap((tokens) => this.setTokens(tokens)),
-      catchError(() => of(null))
+      map((tokens) => tokens),
+      catchError(() => of(null)),
+      finalize(() => {
+        this.refreshInFlight = null;
+      }),
+      shareReplay(1)
     );
+
+    this.refreshInFlight = refresh$;
+    return refresh$;
   }
 
   logout(): Observable<void> {
     const refreshToken = this.getRefreshToken();
     const accessToken = this.getAccessToken();
     this.clearSession({ redirectTo: '/' });
-    if (!refreshToken) return of(void 0);
     const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined;
-    return this.api.post<void>('/auth/logout', { refresh_token: refreshToken }, headers).pipe(
+    const body = refreshToken ? { refresh_token: refreshToken } : {};
+    return this.api.post<void>('/auth/logout', body, headers).pipe(
       catchError(() => of(void 0)),
       map(() => void 0)
     );
@@ -314,49 +376,56 @@ export class AuthService {
     return this.api.get<AuthUser>('/auth/me').pipe(tap((user) => this.setUser(user)));
   }
 
-  ensureAuthenticated(): Observable<boolean> {
-    if (!this.tokens) return of(false);
-    if (this.hasValidAccessToken()) {
-      return this.loadCurrentUser().pipe(
-        map(() => true),
-        catchError((err) => {
-          if (err?.status === 401 || err?.status === 403) {
-            this.clearSession();
-            return of(false);
-          }
-          return of(true);
-        })
+  ensureAuthenticated(opts?: { silent?: boolean }): Observable<boolean> {
+    const silent = opts?.silent ?? false;
+    const headers = silent ? { 'X-Silent': '1' } : undefined;
+
+    if (this.ensureInFlight) {
+      return this.ensureInFlight;
+    }
+
+    const me = () =>
+      this.api.get<AuthUser>('/auth/me', undefined, headers).pipe(
+        tap((user) => this.setUser(user)),
+        map(() => true)
       );
-    }
-    if (!this.hasValidRefreshToken()) {
-      this.clearSession();
-      return of(false);
-    }
-    return this.refresh().pipe(
-      switchMap((tokens) => {
-        if (!tokens) {
-          this.clearSession();
-          return of(false);
-        }
-        return this.loadCurrentUser().pipe(
-          map(() => true),
-          catchError((err) => {
-            if (err?.status === 401 || err?.status === 403) {
-              this.clearSession();
-              return of(false);
-            }
-            return of(true);
-          })
-        );
-      })
+
+    const ensure$ = (this.hasValidAccessToken()
+      ? me()
+      : (() => {
+          return this.refresh({ silent }).pipe(
+            switchMap((tokens) => {
+              if (!tokens) {
+                this.clearSession();
+                return of(false);
+              }
+              return me();
+            })
+          );
+        })()
+    ).pipe(
+      catchError(() => {
+        this.clearSession();
+        return of(false);
+      }),
+      finalize(() => {
+        this.ensureInFlight = null;
+      }),
+      shareReplay(1)
     );
+
+    this.ensureInFlight = ensure$;
+    return ensure$;
   }
 
   bootstrap(): void {
     const loaded = this.loadPersisted();
     this.tokens = loaded.tokens;
     this.storageMode = loaded.mode;
-    this.userSignal.set(loaded.user);
+    // Cookies are the source of truth for refresh sessions. Clear any legacy
+    // persisted tokens/user state (localStorage/sessionStorage).
+    this.userSignal.set(null);
+    this.clearStorage();
 
     // If both tokens are fully expired, wipe persisted state to avoid
     // "logged in but unauthorized" UI after restarts.
@@ -370,13 +439,12 @@ export class AuthService {
   }
 
   private persist(res: AuthResponse, remember: boolean): void {
-    this.storageMode = remember ? 'local' : 'session';
     this.tokens = res.tokens;
     this.setUser(res.user);
-    this.persistTokens(res.tokens);
-    this.persistRole(res.user.role);
-    // Ensure we don't keep stale sessions in the other storage backend.
-    this.clearStorage(this.storageMode === 'local' ? 'session' : 'local');
+    // Cookies are the source of truth for refresh sessions. Clear any legacy
+    // persisted tokens/user state to avoid stale \"logged in\" UI after reloads.
+    this.clearStorage();
+    this.storageMode = remember ? 'local' : 'session';
   }
 
   setTokens(tokens: AuthTokens | null): void {
@@ -385,16 +453,15 @@ export class AuthService {
       this.clearStorage();
       return;
     }
-    this.persistTokens(tokens);
+    // Do not persist tokens (cookie-based refresh sessions).
+    this.clearStorage();
   }
 
   private setUser(user: AuthUser | null): void {
     this.userSignal.set(user);
-    if (!user) {
-      this.removeFromStorage('auth_user');
-      return;
-    }
-    this.writeToStorage('auth_user', JSON.stringify(user));
+    // Never persist user state (avoid stale \"logged in\" UI after reloads).
+    this.removeFromStorage('auth_user');
+    this.removeFromStorage('auth_role');
   }
 
   private loadPersisted(): { tokens: AuthTokens | null; user: AuthUser | null; mode: StorageMode } {
@@ -453,7 +520,8 @@ export class AuthService {
 
   private isJwtExpired(token: string, skewSeconds = 30): boolean {
     const exp = this.parseJwtExpiry(token);
-    if (!exp) return false;
+    // If we can't parse expiry, treat as expired (invalid/stale token).
+    if (!exp) return true;
     const now = Math.floor(Date.now() / 1000);
     return exp <= now + Math.max(0, skewSeconds);
   }

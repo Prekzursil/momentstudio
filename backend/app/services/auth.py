@@ -16,11 +16,13 @@ from app.models.user import (
     EmailVerificationToken,
     PasswordResetToken,
     RefreshSession,
+    SecondaryEmailVerificationToken,
     User,
     UserRole,
     UserUsernameHistory,
     UserDisplayNameHistory,
     UserEmailHistory,
+    UserSecondaryEmail,
 )
 from app.schemas.user import UserCreate
 from app.services import self_service
@@ -31,6 +33,61 @@ async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
     result = await session.execute(select(User).where(func.lower(User.email) == email))
     return result.scalar_one_or_none()
 
+
+async def get_user_by_any_email(session: AsyncSession, email: str) -> User | None:
+    """
+    Returns a user when the email matches either the primary email or any secondary email
+    (verified or not).
+    """
+    email = (email or "").strip().lower()
+    if not email:
+        return None
+    user = await get_user_by_email(session, email)
+    if user:
+        return user
+    result = await session.execute(
+        select(User)
+        .join(UserSecondaryEmail, UserSecondaryEmail.user_id == User.id)
+        .where(func.lower(UserSecondaryEmail.email) == email)
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_user_by_login_email(session: AsyncSession, email: str) -> User | None:
+    """
+    Returns a user when the email matches either the primary email or a VERIFIED secondary email.
+    """
+    email = (email or "").strip().lower()
+    if not email:
+        return None
+    user = await get_user_by_email(session, email)
+    if user:
+        return user
+    result = await session.execute(
+        select(User)
+        .join(UserSecondaryEmail, UserSecondaryEmail.user_id == User.id)
+        .where(func.lower(UserSecondaryEmail.email) == email, UserSecondaryEmail.verified.is_(True))
+    )
+    return result.scalar_one_or_none()
+
+
+async def is_email_taken(session: AsyncSession, email: str, *, exclude_user_id: uuid.UUID | None = None) -> bool:
+    cleaned = (email or "").strip().lower()
+    if not cleaned:
+        return False
+
+    q_user = select(User.id).where(func.lower(User.email) == cleaned)
+    if exclude_user_id:
+        q_user = q_user.where(User.id != exclude_user_id)
+    existing_user_id = await session.scalar(q_user.limit(1))
+    if existing_user_id:
+        return True
+
+    q_secondary = select(UserSecondaryEmail.id).where(func.lower(UserSecondaryEmail.email) == cleaned)
+    if exclude_user_id:
+        q_secondary = q_secondary.where(UserSecondaryEmail.user_id != exclude_user_id)
+    existing_secondary_id = await session.scalar(q_secondary.limit(1))
+    return bool(existing_secondary_id)
 
 async def get_user_by_username(session: AsyncSession, username: str) -> User | None:
     result = await session.execute(select(User).where(User.username == username))
@@ -152,8 +209,9 @@ async def _try_reuse_name_tag(
 
 async def create_user(session: AsyncSession, user_in: UserCreate) -> User:
     normalized_email = (user_in.email or "").strip().lower()
-    existing = await get_user_by_email(session, normalized_email)
-    if existing:
+    if not normalized_email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email is required")
+    if await is_email_taken(session, normalized_email):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
 
     username = (
@@ -195,7 +253,7 @@ async def create_user(session: AsyncSession, user_in: UserCreate) -> User:
 async def authenticate_user(session: AsyncSession, identifier: str, password: str) -> User:
     identifier = (identifier or "").strip()
     if "@" in identifier:
-        user = await get_user_by_email(session, identifier)
+        user = await get_user_by_login_email(session, identifier)
     else:
         user = await get_user_by_username(session, identifier)
     if not user or not security.verify_password(password, user.hashed_password):
@@ -366,6 +424,8 @@ async def create_google_user(
     preferred_language: str = "en",
 ) -> User:
     email = (email or "").strip().lower()
+    if await is_email_taken(session, email):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
     username = await _generate_unique_username(session, email)
     display_name = (name or "").strip() or username
     display_name = display_name[:255]
@@ -409,23 +469,37 @@ async def update_email(session: AsyncSession, user: User, new_email: str) -> Use
     if cleaned == (user.email or "").strip().lower():
         return user
 
-    last = await session.scalar(
-        select(UserEmailHistory.created_at)
-        .where(UserEmailHistory.user_id == user.id)
-        .order_by(UserEmailHistory.created_at.desc())
-        .limit(1)
+    secondary = await session.scalar(
+        select(UserSecondaryEmail).where(
+            UserSecondaryEmail.user_id == user.id, func.lower(UserSecondaryEmail.email) == cleaned
+        )
     )
-    if last and isinstance(last, datetime):
-        if last.tzinfo is None:
-            last = last.replace(tzinfo=timezone.utc)
-        if datetime.now(timezone.utc) - last < EMAIL_CHANGE_COOLDOWN:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="You can change your email once every 30 days.",
-            )
+    if secondary:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="That email is already attached as a secondary email. Use the secondary email controls to make it primary.",
+        )
 
-    existing = await get_user_by_email(session, cleaned)
-    if existing and existing.id != user.id:
+    history_count = await session.scalar(
+        select(func.count()).select_from(UserEmailHistory).where(UserEmailHistory.user_id == user.id)
+    )
+    if int(history_count or 0) > 1:
+        last = await session.scalar(
+            select(UserEmailHistory.created_at)
+            .where(UserEmailHistory.user_id == user.id)
+            .order_by(UserEmailHistory.created_at.desc())
+            .limit(1)
+        )
+        if last and isinstance(last, datetime):
+            if last.tzinfo is None:
+                last = last.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) - last < EMAIL_CHANGE_COOLDOWN:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="You can change your email once every 30 days.",
+                )
+
+    if await is_email_taken(session, cleaned, exclude_user_id=user.id):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
 
     user.email = cleaned
@@ -433,6 +507,209 @@ async def update_email(session: AsyncSession, user: User, new_email: str) -> Use
     now = datetime.now(timezone.utc)
     session.add(user)
     session.add(UserEmailHistory(user_id=user.id, email=cleaned, created_at=now))
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
+async def list_secondary_emails(session: AsyncSession, user_id: uuid.UUID) -> list[UserSecondaryEmail]:
+    result = await session.execute(select(UserSecondaryEmail).where(UserSecondaryEmail.user_id == user_id))
+    return list(result.scalars().all())
+
+
+async def add_secondary_email(
+    session: AsyncSession,
+    user: User,
+    email: str,
+    *,
+    expires_minutes: int = 60,
+) -> tuple[UserSecondaryEmail, SecondaryEmailVerificationToken]:
+    cleaned = (email or "").strip().lower()
+    if not cleaned:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email is required")
+    if cleaned == (user.email or "").strip().lower():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That is already your primary email")
+    if await is_email_taken(session, cleaned):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+
+    secondary = UserSecondaryEmail(user_id=user.id, email=cleaned, verified=False)
+    session.add(secondary)
+    await session.flush()
+
+    token_value = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+    token = SecondaryEmailVerificationToken(
+        user_id=user.id,
+        secondary_email_id=secondary.id,
+        token=token_value,
+        expires_at=expires_at,
+        used=False,
+    )
+    session.add(token)
+    await session.commit()
+    await session.refresh(secondary)
+    await session.refresh(token)
+    return secondary, token
+
+
+async def _revoke_other_secondary_email_tokens(session: AsyncSession, secondary_email_id: uuid.UUID) -> None:
+    tokens = (
+        (
+            await session.execute(
+                select(SecondaryEmailVerificationToken).where(
+                    SecondaryEmailVerificationToken.secondary_email_id == secondary_email_id,
+                    SecondaryEmailVerificationToken.used.is_(False),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for tok in tokens:
+        tok.used = True
+    if tokens:
+        session.add_all(tokens)
+        await session.flush()
+
+
+async def request_secondary_email_verification(
+    session: AsyncSession,
+    user: User,
+    secondary_email_id: uuid.UUID,
+    *,
+    expires_minutes: int = 60,
+) -> SecondaryEmailVerificationToken:
+    secondary = await session.get(UserSecondaryEmail, secondary_email_id)
+    if not secondary or secondary.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Secondary email not found")
+    if secondary.verified:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Secondary email already verified")
+
+    await _revoke_other_secondary_email_tokens(session, secondary.id)
+    token_value = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+    token = SecondaryEmailVerificationToken(
+        user_id=user.id,
+        secondary_email_id=secondary.id,
+        token=token_value,
+        expires_at=expires_at,
+        used=False,
+    )
+    session.add(token)
+    await session.commit()
+    await session.refresh(token)
+    return token
+
+
+async def confirm_secondary_email_verification(session: AsyncSession, token: str) -> UserSecondaryEmail:
+    token = (token or "").strip()
+    record = (
+        (
+            await session.execute(
+                select(SecondaryEmailVerificationToken).where(
+                    SecondaryEmailVerificationToken.token == token,
+                    SecondaryEmailVerificationToken.used.is_(False),
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
+    expires_at = record.expires_at if record else None
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if not record or not expires_at or expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
+
+    secondary = await session.get(UserSecondaryEmail, record.secondary_email_id)
+    if not secondary:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Secondary email not found")
+
+    secondary.verified = True
+    secondary.verified_at = datetime.now(timezone.utc)
+    record.used = True
+    session.add_all([secondary, record])
+    await session.commit()
+    await session.refresh(secondary)
+    return secondary
+
+
+async def delete_secondary_email(session: AsyncSession, user: User, secondary_email_id: uuid.UUID) -> None:
+    secondary = await session.get(UserSecondaryEmail, secondary_email_id)
+    if not secondary or secondary.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Secondary email not found")
+    await session.delete(secondary)
+    await session.commit()
+
+
+async def make_secondary_email_primary(session: AsyncSession, user: User, secondary_email_id: uuid.UUID) -> User:
+    if user.google_sub:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email cannot be changed while Google is linked. Unlink Google first.",
+        )
+    secondary = await session.get(UserSecondaryEmail, secondary_email_id)
+    if not secondary or secondary.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Secondary email not found")
+    if not secondary.verified:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Verify this email before making it primary")
+
+    history_count = await session.scalar(
+        select(func.count()).select_from(UserEmailHistory).where(UserEmailHistory.user_id == user.id)
+    )
+    if int(history_count or 0) > 1:
+        last = await session.scalar(
+            select(UserEmailHistory.created_at)
+            .where(UserEmailHistory.user_id == user.id)
+            .order_by(UserEmailHistory.created_at.desc())
+            .limit(1)
+        )
+        if last and isinstance(last, datetime):
+            if last.tzinfo is None:
+                last = last.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) - last < EMAIL_CHANGE_COOLDOWN:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="You can change your email once every 30 days.",
+                )
+
+    new_primary = (secondary.email or "").strip().lower()
+    existing_primary = await get_user_by_email(session, new_primary)
+    if existing_primary and existing_primary.id != user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+
+    old_primary = (user.email or "").strip().lower()
+    old_primary_verified = bool(getattr(user, "email_verified", False))
+
+    user.email = new_primary
+    user.email_verified = True
+    now = datetime.now(timezone.utc)
+    session.add(UserEmailHistory(user_id=user.id, email=new_primary, created_at=now))
+
+    await session.delete(secondary)
+
+    if old_primary and old_primary != new_primary:
+        existing_old_secondary = await session.scalar(
+            select(UserSecondaryEmail).where(
+                UserSecondaryEmail.user_id == user.id,
+                func.lower(UserSecondaryEmail.email) == old_primary,
+            )
+        )
+        if existing_old_secondary:
+            if old_primary_verified and not existing_old_secondary.verified:
+                existing_old_secondary.verified = True
+                existing_old_secondary.verified_at = now
+            session.add(existing_old_secondary)
+        else:
+            session.add(
+                UserSecondaryEmail(
+                    user_id=user.id,
+                    email=old_primary,
+                    verified=old_primary_verified,
+                    verified_at=now if old_primary_verified else None,
+                )
+            )
+
     await session.commit()
     await session.refresh(user)
     return user
@@ -487,17 +764,17 @@ async def confirm_reset_token(session: AsyncSession, token: str, new_password: s
     return user
 
 
-async def create_refresh_session(session: AsyncSession, user_id: uuid.UUID) -> RefreshSession:
+async def create_refresh_session(session: AsyncSession, user_id: uuid.UUID, *, persistent: bool = True) -> RefreshSession:
     jti = secrets.token_hex(16)
     expires_at = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_exp_days)
-    refresh_session = RefreshSession(user_id=user_id, jti=jti, expires_at=expires_at, revoked=False)
+    refresh_session = RefreshSession(user_id=user_id, jti=jti, expires_at=expires_at, persistent=persistent, revoked=False)
     session.add(refresh_session)
     await session.flush()
     return refresh_session
 
 
-async def issue_tokens_for_user(session: AsyncSession, user: User) -> dict[str, str]:
-    refresh_session = await create_refresh_session(session, user.id)
+async def issue_tokens_for_user(session: AsyncSession, user: User, *, persistent: bool = True) -> dict[str, str]:
+    refresh_session = await create_refresh_session(session, user.id, persistent=persistent)
     access = security.create_access_token(str(user.id), refresh_session.jti)
     refresh = security.create_refresh_token(str(user.id), refresh_session.jti, refresh_session.expires_at)
     await session.commit()

@@ -97,6 +97,63 @@ def test_register_and_login_flow(test_app: Dict[str, object]) -> None:
     assert refreshed["refresh_token"]
 
 
+def test_secondary_emails_flow(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    sent: dict[str, str] = {}
+
+    async def fake_send(email: str, token: str, lang: str | None = None):
+        _ = lang
+        sent[email] = token
+        return True
+
+    monkeypatch.setattr("app.services.email.send_verification_email", fake_send)
+
+    res = client.post(
+        "/api/v1/auth/register",
+        json=make_register_payload(email="user@example.com", username="user2", password="supersecret", name="User"),
+    )
+    assert res.status_code == 201, res.text
+    access = res.json()["tokens"]["access_token"]
+
+    add = client.post(
+        "/api/v1/auth/me/emails",
+        headers=auth_headers(access),
+        json={"email": "alt@example.com"},
+    )
+    assert add.status_code == 201, add.text
+    secondary_id = add.json()["id"]
+    assert add.json()["email"] == "alt@example.com"
+    assert add.json()["verified"] is False
+    assert sent.get("alt@example.com")
+
+    confirm = client.post("/api/v1/auth/me/emails/verify/confirm", json={"token": sent["alt@example.com"]})
+    assert confirm.status_code == 200, confirm.text
+    assert confirm.json()["verified"] is True
+
+    login_secondary = client.post("/api/v1/auth/login", json={"identifier": "alt@example.com", "password": "supersecret"})
+    assert login_secondary.status_code == 200, login_secondary.text
+
+    make_primary = client.post(
+        f"/api/v1/auth/me/emails/{secondary_id}/make-primary",
+        headers=auth_headers(access),
+        json={"password": "supersecret"},
+    )
+    assert make_primary.status_code == 200, make_primary.text
+    assert make_primary.json()["email"] == "alt@example.com"
+
+    emails = client.get("/api/v1/auth/me/emails", headers=auth_headers(access))
+    assert emails.status_code == 200, emails.text
+    body = emails.json()
+    assert body["primary_email"] == "alt@example.com"
+    assert any(e["email"] == "user@example.com" for e in body["secondary_emails"])
+
+    register_conflict = client.post(
+        "/api/v1/auth/register",
+        json=make_register_payload(email="user@example.com", username="dupuser", password="supersecret", name="User"),
+    )
+    assert register_conflict.status_code == 400
+
 def test_register_rejects_invalid_phone(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 

@@ -717,7 +717,7 @@ async def transfer_owner(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
 
     if "@" in identifier:
-        target = await auth_service.get_user_by_email(session, identifier)
+        target = await auth_service.get_user_by_any_email(session, identifier)
     else:
         target = await auth_service.get_user_by_username(session, identifier)
     if not target:

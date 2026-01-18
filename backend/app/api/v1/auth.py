@@ -3,6 +3,7 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone, date
 from urllib.parse import urlencode
+from uuid import UUID
 
 from jose import jwt
 
@@ -17,16 +18,21 @@ from app.core.dependencies import get_current_user, get_google_completion_user, 
 from app.core.rate_limit import limiter, per_identifier_limiter
 from app.core.security import decode_token
 from app.db.session import get_session
-from app.models.user import User
+from app.models.user import User, UserSecondaryEmail
 from app.schemas.auth import (
     AuthResponse,
     GoogleCallbackResponse,
     AccountDeletionStatus,
     EmailVerificationConfirm,
+    SecondaryEmailConfirmRequest,
+    SecondaryEmailCreateRequest,
+    SecondaryEmailMakePrimaryRequest,
+    SecondaryEmailResponse,
     PasswordResetConfirm,
     PasswordResetRequest,
     RefreshRequest,
     TokenPair,
+    UserEmailsResponse,
     UserResponse,
 )
 from app.schemas.user import UserCreate
@@ -73,16 +79,16 @@ def _validate_google_state(state: str, expected_type: str, expected_user_id: str
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid state")
 
 
-def set_refresh_cookie(response: Response, token: str) -> None:
-    response.set_cookie(
-        "refresh_token",
-        token,
-        httponly=True,
-        secure=settings.secure_cookies,
-        samesite=settings.cookie_samesite.lower(),
-        max_age=settings.refresh_token_exp_days * 24 * 60 * 60,
-        path="/",
-    )
+def set_refresh_cookie(response: Response, token: str, *, persistent: bool = True) -> None:
+    payload = {
+        "httponly": True,
+        "secure": settings.secure_cookies,
+        "samesite": settings.cookie_samesite.lower(),
+        "path": "/",
+    }
+    if persistent:
+        payload["max_age"] = settings.refresh_token_exp_days * 24 * 60 * 60
+    response.set_cookie("refresh_token", token, **payload)
 
 
 def clear_refresh_cookie(response: Response) -> None:
@@ -216,6 +222,7 @@ class LoginRequest(BaseModel):
     email: str | None = None
     password: str = Field(min_length=1, max_length=128)
     captcha_token: str | None = None
+    remember: bool = False
 
 
 class UsernameUpdateRequest(BaseModel):
@@ -251,6 +258,7 @@ async def register(
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(register_rate_limit),
+    response: Response = None,
 ) -> AuthResponse:
     await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
     user = await auth_service.create_user(
@@ -282,7 +290,9 @@ async def register(
         first_name=user.first_name,
         lang=user.preferred_language,
     )
-    tokens = await auth_service.issue_tokens_for_user(session, user)
+    tokens = await auth_service.issue_tokens_for_user(session, user, persistent=False)
+    if response:
+        set_refresh_cookie(response, tokens["refresh_token"], persistent=False)
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 
@@ -312,20 +322,28 @@ async def login(
         metrics.record_login_failure()
         raise
     metrics.record_login_success()
-    tokens = await auth_service.issue_tokens_for_user(session, user)
+    persistent = bool(payload.remember)
+    tokens = await auth_service.issue_tokens_for_user(session, user, persistent=persistent)
     if response:
-        set_refresh_cookie(response, tokens["refresh_token"])
+        set_refresh_cookie(response, tokens["refresh_token"], persistent=persistent)
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 
 @router.post("/refresh", response_model=TokenPair)
 async def refresh_tokens(
     refresh_request: RefreshRequest,
+    request: Request,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(refresh_rate_limit),
     response: Response = None,
 ) -> TokenPair:
-    stored = await auth_service.validate_refresh_token(session, refresh_request.refresh_token)
+    refresh_token = (refresh_request.refresh_token or "").strip()
+    if not refresh_token:
+        refresh_token = (request.cookies.get("refresh_token") or "").strip()
+    if not refresh_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token missing")
+
+    stored = await auth_service.validate_refresh_token(session, refresh_token)
     user = await session.get(User, stored.user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
@@ -339,20 +357,24 @@ async def refresh_tokens(
     stored.revoked_reason = "rotated"
     session.add(stored)
     await session.flush()
-    tokens = await auth_service.issue_tokens_for_user(session, user)
+    persistent = bool(getattr(stored, "persistent", True))
+    tokens = await auth_service.issue_tokens_for_user(session, user, persistent=persistent)
     if response:
-        set_refresh_cookie(response, tokens["refresh_token"])
+        set_refresh_cookie(response, tokens["refresh_token"], persistent=persistent)
     return TokenPair(**tokens)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
     payload: RefreshRequest,
+    request: Request,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(get_current_user),
     response: Response = None,
 ) -> None:
-    payload_data = decode_token(payload.refresh_token)
+    refresh_token = (payload.refresh_token or "").strip()
+    if not refresh_token:
+        refresh_token = (request.cookies.get("refresh_token") or "").strip()
+    payload_data = decode_token(refresh_token) if refresh_token else None
     if payload_data and payload_data.get("jti"):
         await auth_service.revoke_refresh_token(session, payload_data["jti"], reason="logout")
     if response:
@@ -464,6 +486,102 @@ async def update_email(
     background_tasks.add_task(email_service.send_email_changed, user.email, old_email=old_email, new_email=user.email, lang=user.preferred_language)
     background_tasks.add_task(email_service.send_verification_email, user.email, record.token, user.preferred_language)
     return UserResponse.model_validate(user)
+
+
+@router.get(
+    "/me/emails",
+    response_model=UserEmailsResponse,
+    summary="List my emails",
+    description="Returns primary email and any secondary emails (verified/unverified).",
+)
+async def list_my_emails(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserEmailsResponse:
+    secondary = await auth_service.list_secondary_emails(session, current_user.id)
+    return UserEmailsResponse(
+        primary_email=current_user.email,
+        primary_verified=bool(current_user.email_verified),
+        secondary_emails=[SecondaryEmailResponse.model_validate(e) for e in secondary],
+    )
+
+
+@router.post(
+    "/me/emails",
+    response_model=SecondaryEmailResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a secondary email",
+)
+async def add_my_secondary_email(
+    payload: SecondaryEmailCreateRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> SecondaryEmailResponse:
+    secondary, token = await auth_service.add_secondary_email(session, current_user, str(payload.email))
+    background_tasks.add_task(email_service.send_verification_email, secondary.email, token.token, current_user.preferred_language)
+    return SecondaryEmailResponse.model_validate(secondary)
+
+
+@router.post(
+    "/me/emails/{secondary_email_id}/verify/request",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Resend verification for a secondary email",
+)
+async def request_secondary_email_verification(
+    secondary_email_id: UUID,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    token = await auth_service.request_secondary_email_verification(session, current_user, secondary_email_id)
+    secondary = await session.get(UserSecondaryEmail, secondary_email_id)
+    if secondary:
+        background_tasks.add_task(email_service.send_verification_email, secondary.email, token.token, current_user.preferred_language)
+    return {"detail": "Verification email sent"}
+
+
+@router.post(
+    "/me/emails/verify/confirm",
+    response_model=SecondaryEmailResponse,
+    summary="Confirm secondary email verification",
+)
+async def confirm_secondary_email_verification(
+    payload: SecondaryEmailConfirmRequest,
+    session: AsyncSession = Depends(get_session),
+) -> SecondaryEmailResponse:
+    secondary = await auth_service.confirm_secondary_email_verification(session, payload.token)
+    return SecondaryEmailResponse.model_validate(secondary)
+
+
+@router.post(
+    "/me/emails/{secondary_email_id}/make-primary",
+    response_model=UserResponse,
+    summary="Make a verified secondary email the primary email",
+)
+async def make_secondary_email_primary(
+    secondary_email_id: UUID,
+    payload: SecondaryEmailMakePrimaryRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+    user = await auth_service.make_secondary_email_primary(session, current_user, secondary_email_id)
+    return UserResponse.model_validate(user)
+
+
+@router.delete(
+    "/me/emails/{secondary_email_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a secondary email",
+)
+async def delete_secondary_email(
+    secondary_email_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    await auth_service.delete_secondary_email(session, current_user, secondary_email_id)
 
 
 @router.get("/me/export")
@@ -747,7 +865,7 @@ async def google_callback(
         if auth_service.is_profile_complete(existing_sub):
             tokens = await auth_service.issue_tokens_for_user(session, existing_sub)
             if response:
-                set_refresh_cookie(response, tokens["refresh_token"])
+                set_refresh_cookie(response, tokens["refresh_token"], persistent=True)
             logger.info("google_login_existing", extra={"user_id": str(existing_sub.id)})
             return GoogleCallbackResponse(user=UserResponse.model_validate(existing_sub), tokens=TokenPair(**tokens))
 
@@ -759,7 +877,7 @@ async def google_callback(
             completion_token=completion_token,
         )
 
-    existing_email = await auth_service.get_user_by_email(session, email)
+    existing_email = await auth_service.get_user_by_any_email(session, email)
     if existing_email and existing_email.google_sub and existing_email.google_sub != sub:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Google account already linked elsewhere")
     if existing_email and not existing_email.google_sub:
@@ -865,7 +983,7 @@ async def google_complete_registration(
         background_tasks.add_task(email_service.send_verification_email, user.email, record.token, user.preferred_language)
     tokens = await auth_service.issue_tokens_for_user(session, user)
     if response:
-        set_refresh_cookie(response, tokens["refresh_token"])
+        set_refresh_cookie(response, tokens["refresh_token"], persistent=True)
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 
