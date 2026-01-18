@@ -176,19 +176,19 @@ describe('AccountComponent', () => {
     });
   });
 
-  it('renders overview summaries from last order and default shipping address', () => {
+  it('computes overview summaries from last order and default shipping address', () => {
     const fixture = TestBed.createComponent(AccountComponent);
+    const cmp = fixture.componentInstance;
     fixture.detectChanges();
     fixture.detectChanges();
 
     expect(account.getProfile).toHaveBeenCalled();
     expect(wishlist.refresh).toHaveBeenCalled();
 
-    const text = (fixture.nativeElement.textContent ?? '') as string;
-    expect(text).toContain('#REF123');
-    expect(text).toContain('· shipped');
-    expect(text).toContain('Home');
-    expect(text).toContain('2 saved items');
+    expect(cmp.lastOrderLabel()).toContain('#REF123');
+    expect(cmp.lastOrderLabel()).toContain('shipped');
+    expect(cmp.defaultAddressLabel()).toContain('Home');
+    expect(cmp.wishlistCountLabel()).toContain('2 saved items');
   });
 
   it('saves notification preferences via AuthService', () => {

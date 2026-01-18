@@ -79,6 +79,49 @@
     }
   },
   "account": {
+    "header": {
+      "signedInAs": "Signed in as"
+    },
+    "sections": {
+      "overview": "Overview",
+      "profile": "Profile",
+      "addresses": "Addresses",
+      "notifications": "Notifications",
+      "security": "Security",
+      "comments": "My comments",
+      "privacy": "Privacy & data"
+    },
+    "overview": {
+      "title": "Overview",
+      "quickLinks": "Quick links",
+      "wishlistHint": "Saved items ready for later.",
+      "notificationsHint": "Control email updates.",
+      "securityHint": "Password, Google link, verification."
+    },
+    "orders": {
+      "shopNew": "Shop new",
+      "statusLabel": "Status",
+      "empty": "No orders yet.",
+      "browse": "Browse products",
+      "reorder": "Reorder",
+      "receiptPdf": "Receipt (PDF)",
+      "receiptShare": "Share receipt",
+      "receiptRevoke": "Revoke share"
+    },
+    "wishlist": {
+      "browse": "Browse products",
+      "empty": "No saved items yet."
+    },
+    "addresses": {
+      "add": "Add address",
+      "empty": "No addresses yet.",
+      "defaultShipping": "Default shipping",
+      "defaultBilling": "Default billing",
+      "makeDefaultShipping": "Make default shipping",
+      "makeDefaultBilling": "Make default billing",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
     "completeProfile": {
       "title": "Complete your profile",
       "copy": "To continue, please fill in the required details below.",

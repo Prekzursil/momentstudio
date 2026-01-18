@@ -88,13 +88,26 @@ export const routes: Routes = [
     path: 'account',
     canActivate: [authGuard],
     loadComponent: () => import('./pages/account/account.component').then((m) => m.AccountComponent),
+    children: [
+      { path: '', loadComponent: () => import('./pages/account/account-overview.component').then((m) => m.AccountOverviewComponent) },
+      { path: 'profile', loadComponent: () => import('./pages/account/account-profile.component').then((m) => m.AccountProfileComponent) },
+      { path: 'orders', loadComponent: () => import('./pages/account/account-orders.component').then((m) => m.AccountOrdersComponent) },
+      { path: 'addresses', loadComponent: () => import('./pages/account/account-addresses.component').then((m) => m.AccountAddressesComponent) },
+      { path: 'wishlist', loadComponent: () => import('./pages/account/account-wishlist.component').then((m) => m.AccountWishlistComponent) },
+      {
+        path: 'notifications',
+        loadComponent: () => import('./pages/account/account-notifications.component').then((m) => m.AccountNotificationsComponent)
+      },
+      { path: 'security', loadComponent: () => import('./pages/account/account-security.component').then((m) => m.AccountSecurityComponent) },
+      { path: 'comments', loadComponent: () => import('./pages/account/account-comments.component').then((m) => m.AccountCommentsComponent) },
+      { path: 'privacy', loadComponent: () => import('./pages/account/account-privacy.component').then((m) => m.AccountPrivacyComponent) },
+      {
+        path: 'password',
+        loadComponent: () => import('./pages/account/change-password.component').then((m) => m.ChangePasswordComponent),
+        title: 'Change password | momentstudio'
+      }
+    ],
     title: 'Account | momentstudio'
-  },
-  {
-    path: 'account/password',
-    canActivate: [authGuard],
-    loadComponent: () => import('./pages/account/change-password.component').then((m) => m.ChangePasswordComponent),
-    title: 'Change password | momentstudio'
   },
   {
     path: 'tickets',

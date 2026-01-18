@@ -79,6 +79,49 @@
     }
   },
   "account": {
+    "header": {
+      "signedInAs": "Conectat ca"
+    },
+    "sections": {
+      "overview": "Prezentare",
+      "profile": "Profil",
+      "addresses": "Adrese",
+      "notifications": "Notificări",
+      "security": "Securitate",
+      "comments": "Comentariile mele",
+      "privacy": "Confidențialitate & date"
+    },
+    "overview": {
+      "title": "Prezentare",
+      "quickLinks": "Acces rapid",
+      "wishlistHint": "Produse salvate pentru mai târziu.",
+      "notificationsHint": "Controlează actualizările pe email.",
+      "securityHint": "Parolă, Google, verificare."
+    },
+    "orders": {
+      "shopNew": "Vezi produse",
+      "statusLabel": "Stare",
+      "empty": "Nu ai comenzi încă.",
+      "browse": "Explorează produsele",
+      "reorder": "Recomandă din nou",
+      "receiptPdf": "Chitanță (PDF)",
+      "receiptShare": "Partajează chitanța",
+      "receiptRevoke": "Revocă partajarea"
+    },
+    "wishlist": {
+      "browse": "Explorează produsele",
+      "empty": "Nu ai produse salvate încă."
+    },
+    "addresses": {
+      "add": "Adaugă adresă",
+      "empty": "Nu ai adrese încă.",
+      "defaultShipping": "Livrare implicită",
+      "defaultBilling": "Facturare implicită",
+      "makeDefaultShipping": "Setează ca livrare implicită",
+      "makeDefaultBilling": "Setează ca facturare implicită",
+      "edit": "Editează",
+      "delete": "Șterge"
+    },
     "completeProfile": {
       "title": "Completează profilul",
       "copy": "Pentru a continua, completează detaliile obligatorii de mai jos.",
