@@ -512,7 +512,8 @@ async def capture_payment(session: AsyncSession, order: Order, intent_id: str | 
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent id required")
     if order.status not in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Capture only allowed for pending/paid orders"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Capture only allowed for pending_payment, pending_acceptance, or paid orders",
         )
     await payments.capture_payment_intent(payment_intent_id)
     order.stripe_payment_intent_id = payment_intent_id
@@ -534,7 +535,10 @@ async def void_payment(session: AsyncSession, order: Order, intent_id: str | Non
     if not payment_intent_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent id required")
     if order.status not in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Void only allowed for pending/paid orders")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Void only allowed for pending_payment, pending_acceptance, or paid orders",
+        )
     event = "payment_voided"
     note = f"Intent {payment_intent_id}"
     try:

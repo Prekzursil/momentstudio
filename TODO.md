@@ -43,6 +43,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Tests: update auth + Postgres integration tests for new registration/profile fields.
 - [x] Auth: add optional CAPTCHA verification for login/register (Cloudflare Turnstile) via env config (backend + frontend).
 - [x] Auth/Profile: add email change endpoint with 30-day cooldown + history tracking (disabled while Google is linked).
+- [ ] Auth/Profile: support secondary emails (add/verify/remove, set primary, login via verified secondary) with global uniqueness enforcement.
+- [ ] Auth: migrate frontend auth storage to cookie-based refresh sessions (avoid persisting refresh tokens in localStorage; wire “Keep me signed in” to cookie/session TTL).
 - [x] Auth/Profile: enforce username (7d) + display name (1h) change cooldowns and reuse display name tags when reverting.
 - [x] Profile: add “use Google photo” + “remove avatar” endpoints; default to local placeholder avatar (Google photo opt-in).
 
@@ -141,7 +143,7 @@ Below is a structured checklist you can turn into issues.
 - [ ] Payments: itemize Stripe Checkout line items (products + shipping + discount) instead of a single aggregated line.
 - [x] Money: migrate monetary fields to Decimal end-to-end (models + schemas + calculations), eliminating float casts.
 - [x] Tax: make tax/VAT strategy configurable (rate, exemptions) instead of hard-coded `0.1`.
-- [ ] Receipts: add Share/Revoke actions in Account + Admin UI (copy link, show expiry, revoke token).
+- [x] Receipts: add Share/Revoke actions in Account + Admin UI (copy link, show expiry, revoke token).
 - [ ] Shipping: compute weight-based shipping from cart weight (sum `weight_grams`) instead of using subtotal as a proxy.
 - [ ] Money: migrate Product/Variant monetary fields to Decimal end-to-end (models + schemas + UI parsing), remove remaining float annotations.
 - [ ] Orders: add admin filters for “Pending (any)” (covers `pending_payment` + `pending_acceptance`) and optionally highlight “Awaiting payment” vs “Awaiting acceptance”.
@@ -405,6 +407,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Auth UX: add live format validation for email/username/phone and show “already used” errors only on submit (avoid enumeration).
 - [x] Account UX: extend profile editor to manage first/middle/last name, DOB, and phone with country code.
 - [x] Tests: add/update frontend unit tests for registration wizard and profile field wiring.
+- [ ] Account: manage secondary emails (add/verify/remove, set primary) and allow login via verified secondary emails.
+- [ ] Forms: audit and set proper HTML `autocomplete` attributes across checkout/profile/tickets/contact forms for better browser autofill.
 
 ## Frontend - Admin Dashboard
 - [x] /admin layout with sidebar + guard.

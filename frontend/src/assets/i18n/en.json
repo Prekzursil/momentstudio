@@ -14,6 +14,9 @@
     "viewAdmin": "View admin",
     "account": "Account",
     "myProfile": "My profile",
+    "myOrders": "My orders",
+    "myWishlist": "My wishlist",
+    "helpCenter": "Help center",
     "cart": "Cart",
     "signIn": "Sign in",
     "register": "Register",
@@ -386,6 +389,7 @@
     "email": "Email",
     "username": "Username",
     "password": "Password",
+    "keepSignedIn": "Keep me signed in",
     "show": "Show",
     "hide": "Hide",
     "showPassword": "Show password",
@@ -563,18 +567,27 @@
         "meta": "Details",
         "order": "Order",
         "message": "Message",
+        "thread": "Thread",
+        "fromSupport": "Support",
+        "fromCustomer": "Customer",
+        "reply": "Reply",
+        "replyPlaceholder": "Write a reply to the customer…",
+        "solvedHint": "This ticket is marked as resolved.",
+        "sendReply": "Send reply",
         "statusLabel": "Status",
         "adminNote": "Admin note",
         "adminNotePlaceholder": "Internal notes (not visible to customer)…",
         "save": "Save"
       },
       "success": {
-        "saved": "Saved."
+        "saved": "Saved.",
+        "replySent": "Reply sent."
       },
       "errors": {
         "load": "Could not load submissions.",
         "loadDetail": "Could not load submission details.",
-        "save": "Could not save changes."
+        "save": "Could not save changes.",
+        "reply": "Could not send reply."
       }
     },
     "returns": {
@@ -1154,6 +1167,16 @@
       "save": "Save changes",
       "saveHint": "Updates status and tracking; emails send on status changes.",
       "actionsTitle": "Actions",
+      "receiptLinks": {
+        "title": "Receipt links",
+        "share": "Share receipt link",
+        "revoke": "Revoke receipt links",
+        "expires": "Expires",
+        "confirmRevoke": "Revoke all shared receipt links for this order?",
+        "copied": "Receipt link copied",
+        "ready": "Receipt link ready",
+        "revoked": "Receipt links revoked"
+      },
       "paymentTitle": "Payment",
       "paymentMethod": "Payment method",
       "paymentStripe": "Stripe",
@@ -1237,7 +1260,9 @@
         "packingSlip": "Could not download packing slip.",
         "shippingLabelUpload": "Could not upload shipping label.",
         "shippingLabelDownload": "Could not download shipping label.",
-        "shippingLabelDelete": "Could not delete shipping label."
+        "shippingLabelDelete": "Could not delete shipping label.",
+        "receiptShare": "Could not generate receipt link.",
+        "receiptRevoke": "Could not revoke receipt links."
       }
     },
     "users": {
@@ -1429,5 +1454,50 @@
     "addedBody": "{{name}} was added to your wishlist.",
     "removedTitle": "Removed from wishlist",
     "removedBody": "{{name}} was removed from your wishlist."
+  },
+  "tickets": {
+    "title": "Help center",
+    "subtitle": "Track your support requests and replies.",
+    "contactLink": "Prefer the contact form?",
+    "inbox": "My tickets",
+    "refresh": "Refresh",
+    "loading": "Loading tickets…",
+    "empty": "No tickets yet.",
+    "order": "Order",
+    "newTitle": "New ticket",
+    "category": "Issue category",
+    "categories": {
+      "refund": "Return / refund",
+      "product": "Product / delivery issue",
+      "payments": "Payment issue",
+      "other": "Other"
+    },
+    "orderOptional": "Order (optional)",
+    "orderSearchPlaceholder": "Search your orders…",
+    "noOrder": "No specific order",
+    "orderHint": "Selecting an order helps us locate the purchase faster.",
+    "description": "Description",
+    "descriptionPlaceholder": "Describe the issue and what you need help with…",
+    "send": "Send",
+    "thread": "Conversation",
+    "threadEmpty": "Select a ticket to see the conversation.",
+    "created": "Created",
+    "fromSupport": "Support",
+    "fromYou": "You",
+    "reply": "Reply",
+    "solvedHint": "This ticket is marked as solved.",
+    "replyPlaceholder": "Write a message…",
+    "sendReply": "Send reply",
+    "success": {
+      "created": "Ticket created.",
+      "sent": "Reply sent."
+    },
+    "errors": {
+      "load": "Could not load tickets.",
+      "loadDetail": "Could not load ticket.",
+      "form": "Please fill out the form.",
+      "create": "Could not create ticket.",
+      "reply": "Could not send reply."
+    }
   }
 }

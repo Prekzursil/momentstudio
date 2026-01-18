@@ -1,6 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { Observable, catchError, map, of, tap } from 'rxjs';
+import { Observable, catchError, map, of, switchMap, tap } from 'rxjs';
 import { ApiService } from './api.service';
 
 export interface AuthTokens {
@@ -62,17 +62,22 @@ export interface UserAliasesResponse {
   display_names: DisplayNameHistoryItem[];
 }
 
+type StorageMode = 'local' | 'session';
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private userSignal = signal<AuthUser | null>(this.loadUser());
-  private tokens: AuthTokens | null = this.loadTokens();
+  private storageMode: StorageMode = 'session';
+  private userSignal = signal<AuthUser | null>(null);
+  private tokens: AuthTokens | null = null;
 
-  constructor(private api: ApiService, private router: Router) {}
+  constructor(private api: ApiService, private router: Router) {
+    this.bootstrap();
+  }
 
   user = () => this.userSignal();
 
   isAuthenticated(): boolean {
-    return Boolean(this.tokens?.access_token);
+    return Boolean(this.userSignal() && (this.hasValidAccessToken() || this.hasValidRefreshToken()));
   }
 
   role(): string | null {
@@ -92,10 +97,15 @@ export class AuthService {
     return this.tokens?.refresh_token ?? null;
   }
 
-  login(identifier: string, password: string, captchaToken?: string): Observable<AuthResponse> {
+  login(
+    identifier: string,
+    password: string,
+    captchaToken?: string,
+    opts?: { remember?: boolean }
+  ): Observable<AuthResponse> {
     return this.api
       .post<AuthResponse>('/auth/login', { identifier, password, captcha_token: captchaToken ?? null })
-      .pipe(tap((res) => this.persist(res)));
+      .pipe(tap((res) => this.persist(res, opts?.remember ?? false)));
   }
 
   register(payload: {
@@ -110,8 +120,10 @@ export class AuthService {
     phone: string;
     preferred_language?: string;
     captcha_token?: string | null;
-  }): Observable<AuthResponse> {
-    return this.api.post<AuthResponse>('/auth/register', payload).pipe(tap((res) => this.persist(res)));
+  }, opts?: { remember?: boolean }): Observable<AuthResponse> {
+    return this.api
+      .post<AuthResponse>('/auth/register', payload)
+      .pipe(tap((res) => this.persist(res, opts?.remember ?? false)));
   }
 
   changePassword(current: string, newPassword: string): Observable<{ detail: string }> {
@@ -129,7 +141,7 @@ export class AuthService {
     return this.api.post<GoogleCallbackResponse>('/auth/google/callback', { code, state }).pipe(
       tap((res) => {
         if (res.tokens) {
-          this.persist({ user: res.user, tokens: res.tokens });
+          this.persist({ user: res.user, tokens: res.tokens }, false);
         }
       })
     );
@@ -151,7 +163,7 @@ export class AuthService {
   ): Observable<AuthResponse> {
     return this.api
       .post<AuthResponse>('/auth/google/complete', payload, { Authorization: `Bearer ${completionToken}` })
-      .pipe(tap((res) => this.persist(res)));
+      .pipe(tap((res) => this.persist(res, false)));
   }
 
   startGoogleLink(): Observable<string> {
@@ -257,6 +269,7 @@ export class AuthService {
   refresh(): Observable<AuthTokens | null> {
     const refreshToken = this.getRefreshToken();
     if (!refreshToken) return of(null);
+    if (this.isJwtExpired(refreshToken)) return of(null);
     return this.api.post<AuthTokens>('/auth/refresh', { refresh_token: refreshToken }).pipe(
       tap((tokens) => this.setTokens(tokens)),
       catchError(() => of(null))
@@ -266,7 +279,7 @@ export class AuthService {
   logout(): Observable<void> {
     const refreshToken = this.getRefreshToken();
     const accessToken = this.getAccessToken();
-    this.clear();
+    this.clearSession({ redirectTo: '/' });
     if (!refreshToken) return of(void 0);
     const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined;
     return this.api.post<void>('/auth/logout', { refresh_token: refreshToken }, headers).pipe(
@@ -275,8 +288,18 @@ export class AuthService {
     );
   }
 
-  clearSession(): void {
-    this.clear();
+  expireSession(): void {
+    this.clearSession({ redirectTo: '/login' });
+  }
+
+  clearSession(opts?: { redirectTo?: string }): void {
+    this.clearStorage();
+    this.tokens = null;
+    this.userSignal.set(null);
+    this.storageMode = 'session';
+    if (opts?.redirectTo) {
+      void this.router.navigateByUrl(opts.redirectTo);
+    }
   }
 
   requestPasswordReset(email: string): Observable<void> {
@@ -291,51 +314,103 @@ export class AuthService {
     return this.api.get<AuthUser>('/auth/me').pipe(tap((user) => this.setUser(user)));
   }
 
-  private persist(res: AuthResponse): void {
-    this.tokens = res.tokens;
-    this.setUser(res.user);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('auth_tokens', JSON.stringify(res.tokens));
-      localStorage.setItem('auth_user', JSON.stringify(res.user));
-      localStorage.setItem('auth_role', res.user.role);
+  ensureAuthenticated(): Observable<boolean> {
+    if (!this.tokens) return of(false);
+    if (this.hasValidAccessToken()) {
+      return this.loadCurrentUser().pipe(
+        map(() => true),
+        catchError((err) => {
+          if (err?.status === 401 || err?.status === 403) {
+            this.clearSession();
+            return of(false);
+          }
+          return of(true);
+        })
+      );
     }
+    if (!this.hasValidRefreshToken()) {
+      this.clearSession();
+      return of(false);
+    }
+    return this.refresh().pipe(
+      switchMap((tokens) => {
+        if (!tokens) {
+          this.clearSession();
+          return of(false);
+        }
+        return this.loadCurrentUser().pipe(
+          map(() => true),
+          catchError((err) => {
+            if (err?.status === 401 || err?.status === 403) {
+              this.clearSession();
+              return of(false);
+            }
+            return of(true);
+          })
+        );
+      })
+    );
   }
 
-  setTokens(tokens: AuthTokens | null): void {
-    this.tokens = tokens;
-    if (typeof localStorage === 'undefined') return;
-    if (tokens) {
-      localStorage.setItem('auth_tokens', JSON.stringify(tokens));
-    } else {
-      localStorage.removeItem('auth_tokens');
-    }
-  }
+  bootstrap(): void {
+    const loaded = this.loadPersisted();
+    this.tokens = loaded.tokens;
+    this.storageMode = loaded.mode;
+    this.userSignal.set(loaded.user);
 
-  private setUser(user: AuthUser | null): void {
-    this.userSignal.set(user);
-    if (typeof localStorage !== 'undefined') {
-      if (user) {
-        localStorage.setItem('auth_user', JSON.stringify(user));
-      } else {
-        localStorage.removeItem('auth_user');
+    // If both tokens are fully expired, wipe persisted state to avoid
+    // "logged in but unauthorized" UI after restarts.
+    if (this.tokens) {
+      const accessExpired = this.isJwtExpired(this.tokens.access_token);
+      const refreshExpired = this.isJwtExpired(this.tokens.refresh_token);
+      if (accessExpired && refreshExpired) {
+        this.clearSession();
       }
     }
   }
 
-  private clear(): void {
-    this.tokens = null;
-    this.userSignal.set(null);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem('auth_tokens');
-      localStorage.removeItem('auth_user');
-      localStorage.removeItem('auth_role');
-    }
-    void this.router.navigateByUrl('/');
+  private persist(res: AuthResponse, remember: boolean): void {
+    this.storageMode = remember ? 'local' : 'session';
+    this.tokens = res.tokens;
+    this.setUser(res.user);
+    this.persistTokens(res.tokens);
+    this.persistRole(res.user.role);
+    // Ensure we don't keep stale sessions in the other storage backend.
+    this.clearStorage(this.storageMode === 'local' ? 'session' : 'local');
   }
 
-  private loadTokens(): AuthTokens | null {
-    if (typeof localStorage === 'undefined') return null;
-    const raw = localStorage.getItem('auth_tokens');
+  setTokens(tokens: AuthTokens | null): void {
+    this.tokens = tokens;
+    if (!tokens) {
+      this.clearStorage();
+      return;
+    }
+    this.persistTokens(tokens);
+  }
+
+  private setUser(user: AuthUser | null): void {
+    this.userSignal.set(user);
+    if (!user) {
+      this.removeFromStorage('auth_user');
+      return;
+    }
+    this.writeToStorage('auth_user', JSON.stringify(user));
+  }
+
+  private loadPersisted(): { tokens: AuthTokens | null; user: AuthUser | null; mode: StorageMode } {
+    const sessionTokens = this.loadTokensFrom('session');
+    const localTokens = this.loadTokensFrom('local');
+    if (sessionTokens) {
+      return { tokens: sessionTokens, user: this.loadUserFrom('session'), mode: 'session' };
+    }
+    if (localTokens) {
+      return { tokens: localTokens, user: this.loadUserFrom('local'), mode: 'local' };
+    }
+    return { tokens: null, user: null, mode: 'session' };
+  }
+
+  private loadTokensFrom(mode: StorageMode): AuthTokens | null {
+    const raw = this.readFromStorage('auth_tokens', mode);
     if (!raw) return null;
     try {
       return JSON.parse(raw) as AuthTokens;
@@ -344,12 +419,104 @@ export class AuthService {
     }
   }
 
-  private loadUser(): AuthUser | null {
-    if (typeof localStorage === 'undefined') return null;
-    const raw = localStorage.getItem('auth_user');
+  private loadUserFrom(mode: StorageMode): AuthUser | null {
+    const raw = this.readFromStorage('auth_user', mode);
     if (!raw) return null;
     try {
       return JSON.parse(raw) as AuthUser;
+    } catch {
+      return null;
+    }
+  }
+
+  private hasValidAccessToken(): boolean {
+    const token = this.tokens?.access_token;
+    return Boolean(token && !this.isJwtExpired(token));
+  }
+
+  private hasValidRefreshToken(): boolean {
+    const token = this.tokens?.refresh_token;
+    return Boolean(token && !this.isJwtExpired(token));
+  }
+
+  private parseJwtExpiry(token: string): number | null {
+    const raw = (token || '').trim();
+    const parts = raw.split('.');
+    if (parts.length !== 3) return null;
+    try {
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))) as { exp?: number };
+      return typeof payload.exp === 'number' ? payload.exp : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private isJwtExpired(token: string, skewSeconds = 30): boolean {
+    const exp = this.parseJwtExpiry(token);
+    if (!exp) return false;
+    const now = Math.floor(Date.now() / 1000);
+    return exp <= now + Math.max(0, skewSeconds);
+  }
+
+  private persistTokens(tokens: AuthTokens): void {
+    this.writeToStorage('auth_tokens', JSON.stringify(tokens));
+  }
+
+  private persistRole(role: string): void {
+    this.writeToStorage('auth_role', String(role || ''));
+  }
+
+  private writeToStorage(key: string, value: string): void {
+    const storage = this.getStorage(this.storageMode);
+    if (!storage) return;
+    try {
+      storage.setItem(key, value);
+    } catch {
+      // ignore (e.g., blocked storage)
+    }
+  }
+
+  private readFromStorage(key: string, mode: StorageMode): string | null {
+    const storage = this.getStorage(mode);
+    if (!storage) return null;
+    try {
+      return storage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+
+  private removeFromStorage(key: string): void {
+    for (const mode of ['local', 'session'] as const) {
+      const storage = this.getStorage(mode);
+      if (!storage) continue;
+      try {
+        storage.removeItem(key);
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  private clearStorage(mode?: StorageMode): void {
+    const modes: StorageMode[] = mode ? [mode] : ['local', 'session'];
+    for (const m of modes) {
+      const storage = this.getStorage(m);
+      if (!storage) continue;
+      try {
+        storage.removeItem('auth_tokens');
+        storage.removeItem('auth_user');
+        storage.removeItem('auth_role');
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  private getStorage(mode: StorageMode): Storage | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      return mode === 'local' ? window.localStorage : window.sessionStorage;
     } catch {
       return null;
     }

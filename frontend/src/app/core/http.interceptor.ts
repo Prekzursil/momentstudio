@@ -78,7 +78,7 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
             return next(retryReq);
           }),
           catchError((refreshErr) => {
-            auth.clearSession();
+            auth.expireSession();
             handler.handle(refreshErr);
             return throwError(() => err);
           })

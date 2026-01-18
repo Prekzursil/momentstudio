@@ -14,6 +14,9 @@
     "viewAdmin": "Vezi admin",
     "account": "Cont",
     "myProfile": "Profilul meu",
+    "myOrders": "Comenzile mele",
+    "myWishlist": "Lista de dorințe",
+    "helpCenter": "Ajutor",
     "cart": "Coș",
     "signIn": "Autentificare",
     "register": "Înregistrare",
@@ -386,6 +389,7 @@
     "email": "Email",
     "username": "Utilizator",
     "password": "Parolă",
+    "keepSignedIn": "Păstrează-mă autentificat(ă)",
     "show": "Arată",
     "hide": "Ascunde",
     "showPassword": "Arată parola",
@@ -563,18 +567,27 @@
         "meta": "Detalii",
         "order": "Comandă",
         "message": "Mesaj",
+        "thread": "Conversație",
+        "fromSupport": "Suport",
+        "fromCustomer": "Client",
+        "reply": "Răspunde",
+        "replyPlaceholder": "Scrie un răspuns pentru client…",
+        "solvedHint": "Acest tichet este marcat ca rezolvat.",
+        "sendReply": "Trimite răspuns",
         "statusLabel": "Stare",
         "adminNote": "Notă admin",
         "adminNotePlaceholder": "Notițe interne (nu sunt vizibile pentru client)…",
         "save": "Salvează"
       },
       "success": {
-        "saved": "Salvat."
+        "saved": "Salvat.",
+        "replySent": "Răspuns trimis."
       },
       "errors": {
         "load": "Nu am putut încărca mesajele.",
         "loadDetail": "Nu am putut încărca detaliile mesajului.",
-        "save": "Nu am putut salva modificările."
+        "save": "Nu am putut salva modificările.",
+        "reply": "Nu am putut trimite răspunsul."
       }
     },
     "returns": {
@@ -1154,6 +1167,16 @@
       "save": "Salvează modificările",
       "saveHint": "Actualizează statusul și tracking-ul; emailurile se trimit la schimbări de status.",
       "actionsTitle": "Acțiuni",
+      "receiptLinks": {
+        "title": "Link-uri chitanță",
+        "share": "Generează link chitanță",
+        "revoke": "Revocă link-urile",
+        "expires": "Expiră",
+        "confirmRevoke": "Revoci toate link-urile de chitanță pentru această comandă?",
+        "copied": "Link chitanță copiat",
+        "ready": "Link chitanță pregătit",
+        "revoked": "Link-urile au fost revocate"
+      },
       "paymentTitle": "Plată",
       "paymentMethod": "Metodă de plată",
       "paymentStripe": "Stripe",
@@ -1237,7 +1260,9 @@
         "packingSlip": "Nu am putut descărca packing slip-ul.",
         "shippingLabelUpload": "Nu am putut încărca eticheta.",
         "shippingLabelDownload": "Nu am putut descărca eticheta.",
-        "shippingLabelDelete": "Nu am putut șterge eticheta."
+        "shippingLabelDelete": "Nu am putut șterge eticheta.",
+        "receiptShare": "Nu am putut genera link-ul de chitanță.",
+        "receiptRevoke": "Nu am putut revoca link-urile de chitanță."
       }
     },
     "users": {
@@ -1429,5 +1454,50 @@
     "addedBody": "{{name}} a fost adăugat la favorite.",
     "removedTitle": "Eliminat din favorite",
     "removedBody": "{{name}} a fost eliminat din favorite."
+  },
+  "tickets": {
+    "title": "Centru de ajutor",
+    "subtitle": "Urmărește solicitările de suport și răspunsurile.",
+    "contactLink": "Preferi formularul de contact?",
+    "inbox": "Tichetele mele",
+    "refresh": "Reîmprospătează",
+    "loading": "Se încarcă tichetele…",
+    "empty": "Nu există tichete.",
+    "order": "Comandă",
+    "newTitle": "Tichet nou",
+    "category": "Categoria problemei",
+    "categories": {
+      "refund": "Retur / ramburs",
+      "product": "Problemă produs / livrare",
+      "payments": "Problemă plată",
+      "other": "Altele"
+    },
+    "orderOptional": "Comandă (opțional)",
+    "orderSearchPlaceholder": "Caută în comenzile tale…",
+    "noOrder": "Fără comandă",
+    "orderHint": "Alegerea unei comenzi ne ajută să identificăm mai rapid achiziția.",
+    "description": "Descriere",
+    "descriptionPlaceholder": "Descrie problema și ce ajutor ai nevoie…",
+    "send": "Trimite",
+    "thread": "Conversație",
+    "threadEmpty": "Selectează un tichet pentru a vedea conversația.",
+    "created": "Creat",
+    "fromSupport": "Suport",
+    "fromYou": "Tu",
+    "reply": "Răspuns",
+    "solvedHint": "Acest tichet este marcat ca rezolvat.",
+    "replyPlaceholder": "Scrie un mesaj…",
+    "sendReply": "Trimite răspuns",
+    "success": {
+      "created": "Tichet creat.",
+      "sent": "Răspuns trimis."
+    },
+    "errors": {
+      "load": "Nu am putut încărca tichetele.",
+      "loadDetail": "Nu am putut încărca tichetul.",
+      "form": "Completează formularul.",
+      "create": "Nu am putut crea tichetul.",
+      "reply": "Nu am putut trimite răspunsul."
+    }
   }
 }
