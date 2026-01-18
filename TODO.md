@@ -421,6 +421,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Tests: add/update frontend unit tests for registration wizard and profile field wiring.
 - [x] Account: manage secondary emails (add/verify/remove, set primary) and allow login via verified secondary emails.
 - [ ] Forms: audit and set proper HTML `autocomplete` attributes across checkout/profile/tickets/contact forms for better browser autofill.
+- [ ] Auth UX: ensure header/profile dropdown always reflects server auth state after restart (clear stale UI on 401/refresh failure) and sign-out works consistently in all menus.
+- [ ] Wishlist: investigate reports of add/remove not persisting and add e2e coverage for save/unsave flows.
 
 ## Frontend - Admin Dashboard
 - [x] /admin layout with sidebar + guard.
