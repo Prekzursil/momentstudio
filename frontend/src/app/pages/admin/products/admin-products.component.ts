@@ -21,6 +21,9 @@ type ProductForm = {
   sale_enabled: boolean;
   sale_type: 'percent' | 'amount';
   sale_value: string;
+  sale_start_at: string;
+  sale_end_at: string;
+  sale_auto_publish: boolean;
   stock_quantity: number;
   status: 'draft' | 'published' | 'archived';
   is_active: boolean;
@@ -332,10 +335,10 @@ type ProductTranslationForm = {
               </label>
             </div>
 
-            <div class="mt-3 grid gap-3 md:grid-cols-[200px_1fr] items-end">
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.products.sale.type' | translate }}
-                <select
+	            <div class="mt-3 grid gap-3 md:grid-cols-[200px_1fr] items-end">
+	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                {{ 'adminUi.products.sale.type' | translate }}
+	                <select
                   class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   [(ngModel)]="form.sale_type"
                   (change)="onSaleTypeChange()"
@@ -353,11 +356,38 @@ type ProductTranslationForm = {
                 inputMode="decimal"
                 [value]="form.sale_value"
                 (valueChange)="onSaleValueChange($event)"
-                [disabled]="!form.sale_enabled"
-                [hint]="saleValueError || ('adminUi.products.sale.note' | translate)"
-              ></app-input>
-            </div>
-          </div>
+	                [disabled]="!form.sale_enabled"
+	                [hint]="saleValueError || ('adminUi.products.sale.note' | translate)"
+	              ></app-input>
+	            </div>
+
+	            <div class="mt-3 grid gap-3 md:grid-cols-3 items-end">
+	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                {{ 'adminUi.products.sale.startAt' | translate }}
+	                <input
+	                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                  type="datetime-local"
+	                  [(ngModel)]="form.sale_start_at"
+	                  [disabled]="!form.sale_enabled"
+	                />
+	              </label>
+
+	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                {{ 'adminUi.products.sale.endAt' | translate }}
+	                <input
+	                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                  type="datetime-local"
+	                  [(ngModel)]="form.sale_end_at"
+	                  [disabled]="!form.sale_enabled"
+	                />
+	              </label>
+
+	              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
+	                <input type="checkbox" [(ngModel)]="form.sale_auto_publish" [disabled]="!form.sale_enabled" />
+	                {{ 'adminUi.products.sale.autoPublish' | translate }}
+	              </label>
+	            </div>
+	          </div>
           <app-input [label]="'adminUi.products.table.stock' | translate" type="number" [(value)]="form.stock_quantity"></app-input>
 
           <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -803,6 +833,9 @@ export class AdminProductsComponent implements OnInit {
               ? this.formatMoneyInput(Number.isFinite(saleValueNum) ? saleValueNum : 0)
               : String(Math.round(saleValueNum * 100) / 100)
             : '',
+          sale_start_at: prod.sale_start_at ? this.toLocalDateTime(prod.sale_start_at) : '',
+          sale_end_at: prod.sale_end_at ? this.toLocalDateTime(prod.sale_end_at) : '',
+          sale_auto_publish: !!prod.sale_auto_publish,
           stock_quantity: Number(prod.stock_quantity || 0),
           status: (prod.status as any) || 'draft',
           is_active: prod.is_active !== false,
@@ -831,6 +864,9 @@ export class AdminProductsComponent implements OnInit {
   onSaleEnabledChange(): void {
     if (this.form.sale_enabled) return;
     this.form.sale_value = '';
+    this.form.sale_start_at = '';
+    this.form.sale_end_at = '';
+    this.form.sale_auto_publish = false;
     this.saleValueError = '';
   }
 
@@ -885,12 +921,20 @@ export class AdminProductsComponent implements OnInit {
       }
     }
 
+    if (this.form.sale_enabled && this.form.sale_auto_publish && !this.form.sale_start_at) {
+      this.editorError.set(this.t('adminUi.products.sale.startRequired'));
+      return;
+    }
+
     const payload: any = {
       name: this.form.name,
       category_id: this.form.category_id,
       base_price: basePrice,
       sale_type,
       sale_value,
+      sale_start_at: this.form.sale_enabled && this.form.sale_start_at ? new Date(this.form.sale_start_at).toISOString() : null,
+      sale_end_at: this.form.sale_enabled && this.form.sale_end_at ? new Date(this.form.sale_end_at).toISOString() : null,
+      sale_auto_publish: this.form.sale_enabled ? this.form.sale_auto_publish : false,
       stock_quantity: Number(this.form.stock_quantity),
       status: this.form.status,
       is_active: this.form.is_active,
@@ -1092,6 +1136,9 @@ export class AdminProductsComponent implements OnInit {
       sale_enabled: false,
       sale_type: 'percent',
       sale_value: '',
+      sale_start_at: '',
+      sale_end_at: '',
+      sale_auto_publish: false,
       stock_quantity: 0,
       status: 'draft',
       is_active: true,

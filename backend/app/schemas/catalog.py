@@ -62,6 +62,9 @@ class ProductFields(BaseModel):
     base_price: float = Field(ge=0)
     sale_type: str | None = Field(default=None, pattern="^(percent|amount)$")
     sale_value: float | None = Field(default=None, ge=0)
+    sale_start_at: datetime | None = None
+    sale_end_at: datetime | None = None
+    sale_auto_publish: bool = False
     currency: str = Field(default="RON", min_length=3, max_length=3)
     is_active: bool = True
     is_featured: bool = False
@@ -213,6 +216,9 @@ class ProductUpdate(BaseModel):
     base_price: float | None = Field(default=None, ge=0)
     sale_type: str | None = Field(default=None, pattern="^(percent|amount)$")
     sale_value: float | None = Field(default=None, ge=0)
+    sale_start_at: datetime | None = None
+    sale_end_at: datetime | None = None
+    sale_auto_publish: bool | None = None
     currency: str | None = Field(default=None, min_length=3, max_length=3)
     is_active: bool | None = None
     is_featured: bool | None = None
@@ -291,6 +297,9 @@ class BulkProductUpdateItem(BaseModel):
     base_price: float | None = Field(default=None, ge=0)
     sale_type: str | None = Field(default=None, pattern="^(percent|amount)$")
     sale_value: float | None = Field(default=None, ge=0)
+    sale_start_at: datetime | None = None
+    sale_end_at: datetime | None = None
+    sale_auto_publish: bool | None = None
     stock_quantity: int | None = Field(default=None, ge=0)
     status: ProductStatus | None = None
 

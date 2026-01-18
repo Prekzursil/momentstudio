@@ -70,6 +70,7 @@ export interface ProductPriceBounds {
 
 export interface ProductFilterParams {
   category_slug?: string;
+  on_sale?: boolean;
   search?: string;
   min_price?: number;
   max_price?: number;
@@ -104,6 +105,7 @@ export class CatalogService {
   listProducts(params: ProductFilterParams): Observable<ProductListResponse> {
     return this.api.get<ProductListResponse>('/catalog/products', {
       category_slug: params.category_slug,
+      on_sale: params.on_sale,
       search: params.search,
       min_price: params.min_price,
       max_price: params.max_price,
@@ -131,9 +133,12 @@ export class CatalogService {
     return this.api.delete<void>(`/catalog/products/${slug}/back-in-stock`);
   }
 
-  getProductPriceBounds(params: Pick<ProductFilterParams, 'category_slug' | 'search' | 'is_featured' | 'tags'>): Observable<ProductPriceBounds> {
+  getProductPriceBounds(
+    params: Pick<ProductFilterParams, 'category_slug' | 'on_sale' | 'search' | 'is_featured' | 'tags'>
+  ): Observable<ProductPriceBounds> {
     return this.api.get<ProductPriceBounds>('/catalog/products/price-bounds', {
       category_slug: params.category_slug,
+      on_sale: params.on_sale,
       search: params.search,
       is_featured: params.is_featured,
       tags: params.tags?.length ? params.tags : undefined

@@ -1082,7 +1082,11 @@
         "typePercent": "Procent",
         "typeAmount": "Sumă",
         "value": "Valoare",
+        "startAt": "Începe la",
+        "endAt": "Se termină la",
+        "autoPublish": "Publică automat când începe reducerea",
         "note": "Modificarea reducerii mută produsul în Draft până la republicare.",
+        "startRequired": "Alege o dată de început atunci când publicarea automată este activată.",
         "valueHint": "Folosește doar cifre și punct, cu maxim 2 zecimale (exemplu: 10.00).",
         "percentHint": "Introdu un procent între 0 și 100."
       },

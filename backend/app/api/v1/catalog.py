@@ -19,6 +19,7 @@ from app.schemas.catalog import (
     CategoryReorderItem,
     ProductCreate,
     ProductRead,
+    ProductReadBrief,
     ProductTranslationRead,
     ProductTranslationUpsert,
     ProductUpdate,
@@ -60,6 +61,7 @@ async def list_categories(
 async def list_products(
     session: AsyncSession = Depends(get_session),
     category_slug: str | None = Query(default=None),
+    on_sale: bool | None = Query(default=None),
     is_featured: bool | None = Query(default=None),
     search: str | None = Query(default=None),
     min_price: float | None = Query(default=None, ge=0),
@@ -70,20 +72,43 @@ async def list_products(
     limit: int = Query(default=20, ge=1, le=100),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
 ) -> ProductListResponse:
+    if category_slug == "sale" and on_sale is None:
+        on_sale = True
+        category_slug = None
+
+    await catalog_service.auto_publish_due_sales(session)
     offset = (page - 1) * limit
     min_bound, max_bound, currency = await catalog_service.get_product_price_bounds(
         session,
         category_slug=category_slug,
+        on_sale=on_sale,
         is_featured=is_featured,
         search=search,
         tags=tags,
     )
     items, total_items = await catalog_service.list_products_with_filters(
-        session, category_slug, is_featured, search, min_price, max_price, tags, sort, limit, offset, lang=lang
+        session,
+        category_slug,
+        on_sale,
+        is_featured,
+        search,
+        min_price,
+        max_price,
+        tags,
+        sort,
+        limit,
+        offset,
+        lang=lang,
     )
+    payload_items = []
+    for item in items:
+        model = ProductRead.model_validate(item)
+        if not catalog_service.is_sale_active(item):
+            model.sale_price = None
+        payload_items.append(model)
     total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
     return ProductListResponse(
-        items=items,
+        items=payload_items,
         meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
         bounds=ProductPriceBounds(min_price=min_bound, max_price=max_bound, currency=currency),
     )
@@ -93,13 +118,20 @@ async def list_products(
 async def get_product_price_bounds(
     session: AsyncSession = Depends(get_session),
     category_slug: str | None = Query(default=None),
+    on_sale: bool | None = Query(default=None),
     is_featured: bool | None = Query(default=None),
     search: str | None = Query(default=None),
     tags: list[str] | None = Query(default=None),
 ) -> ProductPriceBounds:
+    if category_slug == "sale" and on_sale is None:
+        on_sale = True
+        category_slug = None
+
+    await catalog_service.auto_publish_due_sales(session)
     min_price, max_price, currency = await catalog_service.get_product_price_bounds(
         session,
         category_slug=category_slug,
+        on_sale=on_sale,
         is_featured=is_featured,
         search=search,
         tags=tags,
@@ -331,8 +363,27 @@ async def bulk_update_products(
 
 @router.get("/collections/featured", response_model=list[FeaturedCollectionRead])
 async def list_featured_collections(session: AsyncSession = Depends(get_session)) -> list[FeaturedCollectionRead]:
+    await catalog_service.auto_publish_due_sales(session)
     collections = await catalog_service.list_featured_collections(session)
-    return [FeaturedCollectionRead.model_validate(c) for c in collections]
+    payload: list[FeaturedCollectionRead] = []
+    for collection in collections:
+        products = []
+        for product in getattr(collection, "products", []) or []:
+            model = ProductReadBrief.model_validate(product)
+            if not catalog_service.is_sale_active(product):
+                model.sale_price = None
+            products.append(model)
+        payload.append(
+            FeaturedCollectionRead(
+                id=collection.id,
+                slug=collection.slug,
+                name=collection.name,
+                description=collection.description,
+                created_at=collection.created_at,
+                products=products,
+            )
+        )
+    return payload
 
 
 @router.post("/collections/featured", response_model=FeaturedCollectionRead, status_code=status.HTTP_201_CREATED)
@@ -382,13 +433,20 @@ async def recently_viewed_products(
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
     current_user=Depends(get_current_user_optional),
 ) -> list[Product]:
+    await catalog_service.auto_publish_due_sales(session)
     products = await catalog_service.get_recently_viewed(
         session, getattr(current_user, "id", None) if current_user else None, session_id, limit
     )
     if lang:
         for p in products:
             catalog_service.apply_product_translation(p, lang)
-    return products
+    payload_items = []
+    for p in products:
+        model = ProductRead.model_validate(p)
+        if not catalog_service.is_sale_active(p):
+            model.sale_price = None
+        payload_items.append(model)
+    return payload_items
 
 
 @router.get("/products/export", response_class=StreamingResponse)
@@ -427,6 +485,7 @@ async def get_product(
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
     current_user=Depends(get_current_user_optional),
 ) -> Product:
+    await catalog_service.auto_publish_due_sales(session)
     product_options = [selectinload(Product.images)]
     if lang:
         product_options.append(selectinload(Product.translations))
@@ -445,7 +504,10 @@ async def get_product(
         await catalog_service.record_recently_viewed(
             session, product, getattr(current_user, "id", None) if current_user else None, session_id
         )
-    return product
+    model = ProductRead.model_validate(product)
+    if not is_admin and not catalog_service.is_sale_active(product):
+        model.sale_price = None
+    return model
 
 
 @router.get("/products/{slug}/back-in-stock", response_model=BackInStockStatus)
@@ -577,6 +639,7 @@ async def related_products(
     session: AsyncSession = Depends(get_session),
     current_user=Depends(get_current_user_optional),
 ) -> list[Product]:
+    await catalog_service.auto_publish_due_sales(session)
     product = await catalog_service.get_product_by_slug(
         session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
     )
@@ -586,4 +649,10 @@ async def related_products(
     if not is_admin and (not product.is_active or product.status != ProductStatus.published):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     related = await catalog_service.get_related_products(session, product, limit=4)
-    return related
+    payload_items = []
+    for p in related:
+        model = ProductRead.model_validate(p)
+        if not catalog_service.is_sale_active(p):
+            model.sale_price = None
+        payload_items.append(model)
+    return payload_items

@@ -8,7 +8,7 @@ import string
 import uuid
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, delete, func, select
+from sqlalchemy import and_, delete, func, select, update, or_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -277,6 +277,65 @@ def _to_decimal(value: object | None) -> Decimal:
     return Decimal(str(value))
 
 
+def _tz_aware(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
+def _validate_sale_schedule(*, sale_start_at: datetime | None, sale_end_at: datetime | None, sale_auto_publish: bool) -> None:
+    start = _tz_aware(sale_start_at)
+    end = _tz_aware(sale_end_at)
+    if start and end and end < start:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sale end must be after sale start")
+    if sale_auto_publish and not start:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sale start is required for auto-publish")
+
+
+def is_sale_active(product: Product, *, now: datetime | None = None) -> bool:
+    sale_price = getattr(product, "sale_price", None)
+    if sale_price is None:
+        return False
+    now_dt = now or datetime.now(timezone.utc)
+    start = _tz_aware(getattr(product, "sale_start_at", None))
+    end = _tz_aware(getattr(product, "sale_end_at", None))
+    if start and now_dt < start:
+        return False
+    if end and now_dt >= end:
+        return False
+    return True
+
+
+def _sale_active_clause(now: datetime):
+    start_ok = or_(Product.sale_start_at.is_(None), Product.sale_start_at <= now)
+    end_ok = or_(Product.sale_end_at.is_(None), Product.sale_end_at > now)
+    return and_(Product.sale_price.is_not(None), start_ok, end_ok)
+
+
+async def auto_publish_due_sales(session: AsyncSession, *, now: datetime | None = None) -> int:
+    """Publish draft products once their scheduled sale begins (best-effort, request-driven)."""
+    now_dt = now or datetime.now(timezone.utc)
+    clause = and_(
+        Product.is_deleted.is_(False),
+        Product.is_active.is_(True),
+        Product.status == ProductStatus.draft,
+        Product.sale_auto_publish.is_(True),
+        Product.sale_price.is_not(None),
+        Product.sale_start_at.is_not(None),
+        Product.sale_start_at <= now_dt,
+        or_(Product.sale_end_at.is_(None), Product.sale_end_at > now_dt),
+    )
+    res = await session.execute(
+        update(Product)
+        .where(clause)
+        .values(status=ProductStatus.published, publish_at=func.coalesce(Product.publish_at, now_dt))
+    )
+    updated = int(res.rowcount or 0)
+    if updated:
+        await session.commit()
+    return updated
+
+
 def _compute_sale_price(
     *,
     base_price: object,
@@ -322,6 +381,26 @@ def _sync_sale_fields(product: Product) -> None:
     if sale_price is None:
         product.sale_type = None
         product.sale_value = None
+        if hasattr(product, "sale_start_at"):
+            product.sale_start_at = None
+        if hasattr(product, "sale_end_at"):
+            product.sale_end_at = None
+        if hasattr(product, "sale_auto_publish"):
+            product.sale_auto_publish = False
+        return
+
+    sale_auto_publish = bool(getattr(product, "sale_auto_publish", False))
+    _validate_sale_schedule(
+        sale_start_at=getattr(product, "sale_start_at", None),
+        sale_end_at=getattr(product, "sale_end_at", None),
+        sale_auto_publish=sale_auto_publish,
+    )
+    if hasattr(product, "sale_start_at"):
+        product.sale_start_at = _tz_aware(getattr(product, "sale_start_at", None))
+    if hasattr(product, "sale_end_at"):
+        product.sale_end_at = _tz_aware(getattr(product, "sale_end_at", None))
+    if hasattr(product, "sale_auto_publish"):
+        product.sale_auto_publish = sale_auto_publish
 
 
 async def _log_product_action(
@@ -477,7 +556,9 @@ async def update_product(
         else:
             setattr(product, field, value)
     is_now_out_of_stock = is_out_of_stock(product)
-    sale_fields_touched = "sale_type" in data or "sale_value" in data
+    sale_fields_touched = any(
+        key in data for key in ("sale_type", "sale_value", "sale_start_at", "sale_end_at", "sale_auto_publish")
+    )
     if sale_fields_touched or "base_price" in data:
         _sync_sale_fields(product)
     if sale_fields_touched:
@@ -569,13 +650,33 @@ async def bulk_update_products(
         before_sale_type = getattr(product, "sale_type", None)
         before_sale_value = getattr(product, "sale_value", None)
         data = item.model_dump(exclude_unset=True)
-        for field in ("base_price", "sale_type", "sale_value", "stock_quantity", "status"):
-            if field in data and data[field] is not None:
+        for field in (
+            "base_price",
+            "sale_type",
+            "sale_value",
+            "sale_start_at",
+            "sale_end_at",
+            "sale_auto_publish",
+            "stock_quantity",
+            "status",
+        ):
+            if field not in data:
+                continue
+            if field == "sale_auto_publish":
+                if data[field] is None:
+                    setattr(product, field, False)
+                else:
+                    setattr(product, field, bool(data[field]))
+                continue
+            if field in {"sale_type", "sale_value", "sale_start_at", "sale_end_at"}:
+                setattr(product, field, data[field] if data[field] is not None else None)
+                continue
+            if data[field] is not None:
                 setattr(product, field, data[field])
-            elif field in {"sale_type", "sale_value"} and field in data:
-                setattr(product, field, None)
 
-        sale_fields_touched = "sale_type" in data or "sale_value" in data
+        sale_fields_touched = any(
+            key in data for key in ("sale_type", "sale_value", "sale_start_at", "sale_end_at", "sale_auto_publish")
+        )
         if sale_fields_touched or "base_price" in data:
             _sync_sale_fields(product)
         if sale_fields_touched:
@@ -692,7 +793,7 @@ async def get_product_feed(session: AsyncSession, lang: str | None = None) -> li
     feed: list[ProductFeedItem] = []
     for p in products:
         apply_product_translation(p, lang)
-        effective_price = p.sale_price if getattr(p, "sale_price", None) is not None else p.base_price
+        effective_price = p.sale_price if is_sale_active(p) else p.base_price
         feed.append(
             ProductFeedItem(
                 slug=p.slug,
@@ -736,11 +837,14 @@ def slugify(value: str) -> str:
 async def get_product_price_bounds(
     session: AsyncSession,
     category_slug: str | None,
+    on_sale: bool | None,
     is_featured: bool | None,
     search: str | None,
     tags: list[str] | None,
 ) -> tuple[float, float, str | None]:
-    effective_price = func.coalesce(Product.sale_price, Product.base_price)
+    now_dt = datetime.now(timezone.utc)
+    sale_active = _sale_active_clause(now_dt)
+    effective_price = case((sale_active, Product.sale_price), else_=Product.base_price)
     query = select(
         func.min(effective_price),
         func.max(effective_price),
@@ -753,10 +857,9 @@ async def get_product_price_bounds(
     )
 
     if category_slug:
-        if category_slug == "sale":
-            query = query.where(Product.sale_price.is_not(None))
-        else:
-            query = query.join(Category).where(Category.slug == category_slug)
+        query = query.join(Category).where(Category.slug == category_slug)
+    if on_sale is not None:
+        query = query.where(sale_active if on_sale else ~sale_active)
     if is_featured is not None:
         query = query.where(Product.is_featured == is_featured)
     if search:
@@ -778,6 +881,7 @@ async def get_product_price_bounds(
 async def list_products_with_filters(
     session: AsyncSession,
     category_slug: str | None,
+    on_sale: bool | None,
     is_featured: bool | None,
     search: str | None,
     min_price: float | None,
@@ -788,7 +892,9 @@ async def list_products_with_filters(
     offset: int,
     lang: str | None = None,
 ):
-    effective_price = func.coalesce(Product.sale_price, Product.base_price)
+    now_dt = datetime.now(timezone.utc)
+    sale_active = _sale_active_clause(now_dt)
+    effective_price = case((sale_active, Product.sale_price), else_=Product.base_price)
     options = [
         selectinload(Product.images),
         selectinload(Product.tags),
@@ -804,10 +910,9 @@ async def list_products_with_filters(
         .where(Product.is_deleted.is_(False), Product.is_active.is_(True), Product.status == ProductStatus.published)
     )
     if category_slug:
-        if category_slug == "sale":
-            base_query = base_query.where(Product.sale_price.is_not(None))
-        else:
-            base_query = base_query.join(Category).where(Category.slug == category_slug)
+        base_query = base_query.join(Category).where(Category.slug == category_slug)
+    if on_sale is not None:
+        base_query = base_query.where(sale_active if on_sale else ~sale_active)
     if is_featured is not None:
         base_query = base_query.where(Product.is_featured == is_featured)
     if search:

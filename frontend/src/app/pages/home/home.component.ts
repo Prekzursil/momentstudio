@@ -164,12 +164,12 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
             <div class="grid gap-4">
               <div class="flex items-center justify-between">
                 <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ 'home.saleProducts' | translate }}</h2>
-                <app-button
-                  [label]="'home.viewAll' | translate"
-                  variant="ghost"
-                  [routerLink]="['/shop']"
-                  [queryParams]="{ category_slug: 'sale' }"
-                ></app-button>
+	                <app-button
+	                  [label]="'home.viewAll' | translate"
+	                  variant="ghost"
+	                  [routerLink]="['/shop']"
+	                  [queryParams]="{ on_sale: 1 }"
+	                ></app-button>
               </div>
 
               <div *ngIf="saleLoading()" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -649,16 +649,16 @@ export class HomeComponent implements OnInit, OnDestroy {
       });
   }
 
-  loadSaleProducts(): void {
-    this.saleLoading.set(true);
-    this.saleError.set(false);
-    this.catalog
-      .listProducts({
-        category_slug: 'sale',
-        limit: 6,
-        sort: 'newest',
-        page: 1
-      })
+	  loadSaleProducts(): void {
+	    this.saleLoading.set(true);
+	    this.saleError.set(false);
+	    this.catalog
+	      .listProducts({
+	        on_sale: true,
+	        limit: 6,
+	        sort: 'newest',
+	        page: 1
+	      })
       .subscribe({
         next: (resp) => {
           this.saleProducts = resp.items;

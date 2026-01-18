@@ -20,6 +20,7 @@ from app.models.user import User
 from app.models.order import ShippingMethod
 from app.services import email as email_service
 from app.services.checkout_settings import CheckoutSettings
+from app.services.catalog import is_sale_active
 from app.services import pricing
 from app.core.config import settings
 from app.core.logging_config import request_id_ctx_var
@@ -306,7 +307,7 @@ async def add_item(
     limit = payload.max_quantity or (variant.stock_quantity if variant else product.stock_quantity)
     _enforce_max_quantity(payload.quantity, limit)
 
-    base_price = product.sale_price if getattr(product, "sale_price", None) is not None else product.base_price
+    base_price = product.sale_price if is_sale_active(product) else product.base_price
     unit_price = _to_decimal(base_price)
     if variant:
         unit_price += _to_decimal(variant.additional_price_delta)
