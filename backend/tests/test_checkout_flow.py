@@ -162,7 +162,7 @@ def test_guest_checkout_email_verification_and_create_account(
         captured["stripe_metadata"] = metadata or {}
         return {"session_id": "cs_test", "checkout_url": "https://stripe.example/checkout"}
 
-    async def fake_send_order_confirmation(to_email, order, items=None, lang=None):
+    async def fake_send_order_confirmation(to_email, order, items=None, lang=None, *, receipt_share_days=None):
         captured["email"] = to_email
         return True
 
@@ -456,7 +456,7 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
         captured["stripe_customer_email"] = customer_email
         return {"session_id": "cs_test", "checkout_url": "https://stripe.example/checkout"}
 
-    async def fake_send_order_confirmation(to_email, order, items=None, lang=None):
+    async def fake_send_order_confirmation(to_email, order, items=None, lang=None, *, receipt_share_days=None):
         captured["email"] = to_email
         return True
 
@@ -861,7 +861,7 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
     )
     assert capture.status_code == 200, capture.text
     # PayPal capture confirms payment, but order acceptance is still an admin action.
-    assert capture.json()["status"] == "pending"
+    assert capture.json()["status"] == "pending_acceptance"
     assert capture.json()["paypal_capture_id"] == "CAPTURE-1"
     assert called["paypal_captured"] is True
     assert called["order_email_sent"] is True
@@ -869,7 +869,7 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
 
     order2 = asyncio.run(fetch_order())
     assert order2 is not None
-    assert order2.status.value == "pending"
+    assert order2.status.value == "pending_acceptance"
     assert order2.paypal_capture_id == "CAPTURE-1"
 
 

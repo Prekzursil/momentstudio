@@ -94,7 +94,7 @@ async def seed(session_factory):
 
         order = Order(
             user_id=customer.id,
-            status=OrderStatus.pending,
+            status=OrderStatus.pending_acceptance,
             total_amount=50,
             currency="RON",
             tax_amount=0,
@@ -141,9 +141,9 @@ def test_admin_filters_and_low_stock(test_app: Dict[str, object]) -> None:
     asyncio.run(seed(session_factory))
     headers = auth_headers(client)
 
-    orders = client.get("/api/v1/orders/admin", params={"status": "pending"}, headers=headers)
+    orders = client.get("/api/v1/orders/admin", params={"status": "pending_acceptance"}, headers=headers)
     assert orders.status_code == 200
-    assert orders.json()[0]["status"] == "pending"
+    assert orders.json()[0]["status"] == "pending_acceptance"
 
     low_stock = client.get("/api/v1/admin/dashboard/low-stock", headers=headers)
     assert low_stock.status_code == 200

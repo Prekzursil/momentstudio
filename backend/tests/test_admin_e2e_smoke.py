@@ -108,7 +108,7 @@ async def seed_data(session_factory):
 
         order = Order(
             user_id=customer.id,
-            status=OrderStatus.pending,
+            status=OrderStatus.pending_acceptance,
             total_amount=100,
             currency="RON",
             tax_amount=0,

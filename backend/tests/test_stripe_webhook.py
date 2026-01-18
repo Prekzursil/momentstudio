@@ -178,7 +178,7 @@ def test_webhook_payment_intent_succeeded_does_not_mark_order_paid(
     async def seed_order() -> None:
         async with session_factory() as session:
             order = Order(
-                status=OrderStatus.pending,
+                status=OrderStatus.pending_payment,
                 reference_code="STRIPEPI",
                 customer_email="pi@example.com",
                 customer_name="PI Buyer",
@@ -214,5 +214,5 @@ def test_webhook_payment_intent_succeeded_does_not_mark_order_paid(
             return order.status, captured
 
     status_val, captured = asyncio.run(fetch())
-    assert status_val == OrderStatus.pending
+    assert status_val == OrderStatus.pending_acceptance
     assert captured is True

@@ -258,7 +258,7 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     sent = {"count": 0, "shipped": 0, "delivered": 0, "refund": 0}
     refund_meta: dict[str, str | None] = {"to": None, "requested_by": None, "note": None}
 
-    async def fake_send_order_confirmation(to_email, order, items=None, lang=None):
+    async def fake_send_order_confirmation(to_email, order, items=None, lang=None, *, receipt_share_days=None):
         sent["count"] += 1
         return True
 
@@ -291,14 +291,35 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     )
     assert res.status_code == 201, res.text
     order = res.json()
-    assert order["status"] == "pending"
+    assert order["status"] == "pending_acceptance"
     assert order["reference_code"]
     assert float(order["shipping_amount"]) >= 0
     order_id = order["id"]
     item_id = order["items"][0]["id"]
     assert sent["count"] == 1
 
-    retry = client.post(f"/api/v1/orders/admin/{order_id}/retry-payment", headers=auth_headers(admin_token))
+    async def seed_stripe_pending_payment_order() -> str:
+        async with SessionLocal() as session:
+            order = Order(
+                user_id=user_id,
+                status=OrderStatus.pending_payment,
+                reference_code="RETRY1",
+                customer_email="buyer@example.com",
+                customer_name="Buyer",
+                total_amount=Decimal("10.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+                payment_method="stripe",
+                stripe_payment_intent_id="pi_retry_1",
+            )
+            session.add(order)
+            await session.commit()
+            await session.refresh(order)
+            return str(order.id)
+
+    stripe_order_id = asyncio.run(seed_stripe_pending_payment_order())
+    retry = client.post(f"/api/v1/orders/admin/{stripe_order_id}/retry-payment", headers=auth_headers(admin_token))
     assert retry.status_code == 200
     assert retry.json()["payment_retry_count"] == 1
     assert any(evt["event"] == "payment_retry" for evt in retry.json()["events"])
@@ -408,7 +429,7 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
 
     shipping_method_id = asyncio.run(seed_shipping())
 
-    async def fake_email(to_email, order, items=None, lang=None):
+    async def fake_email(to_email, order, items=None, lang=None, *, receipt_share_days=None):
         return True
 
     monkeypatch.setattr(email_service, "send_order_confirmation", fake_email)
@@ -445,7 +466,7 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
         headers=auth_headers(admin_token),
     )
     assert capture.status_code == 200
-    assert capture.json()["status"] == "pending"
+    assert capture.json()["status"] == "pending_acceptance"
     assert capture.json()["stripe_payment_intent_id"] == "pi_test_123"
     assert any(evt["event"] == "payment_captured" for evt in capture.json()["events"])
 
@@ -490,7 +511,7 @@ def test_admin_accept_requires_payment_capture_and_cancel_reason(
         async with SessionLocal() as session:
             order = Order(
                 user_id=user_id,
-                status=OrderStatus.pending,
+                status=OrderStatus.pending_acceptance,
                 reference_code="PAYCAP",
                 customer_email="buyer-paycap@example.com",
                 customer_name="Buyer",
@@ -553,7 +574,7 @@ def test_admin_accept_requires_payment_capture_and_cancel_reason(
         async with SessionLocal() as session:
             order = Order(
                 user_id=user_id,
-                status=OrderStatus.pending,
+                status=OrderStatus.pending_acceptance,
                 reference_code="CANCEL1",
                 customer_email="buyer-paycap@example.com",
                 customer_name="Buyer",
@@ -612,7 +633,7 @@ def test_admin_shipping_label_upload_download_and_delete(
         async with SessionLocal() as session:
             order = Order(
                 user_id=user_id,
-                status=OrderStatus.pending,
+                status=OrderStatus.pending_acceptance,
                 reference_code="SHIPLABEL",
                 customer_email="buyer2@example.com",
                 customer_name="Buyer Two",
