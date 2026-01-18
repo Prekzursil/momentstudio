@@ -4,6 +4,7 @@ from uuid import UUID
 import logging
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -38,6 +39,18 @@ def _log_cart(event: str, cart: Cart, user_id: UUID | None = None) -> None:
 
 
 async def _get_or_create_cart(session: AsyncSession, user_id: UUID | None, session_id: str | None) -> Cart:
+    async def _load_by_session_id(sid: str) -> Cart | None:
+        result = await session.execute(
+            select(Cart)
+            .options(
+                selectinload(Cart.items)
+                .selectinload(CartItem.product)
+                .selectinload(Product.images)
+            )
+            .where(Cart.session_id == sid)
+        )
+        return result.scalar_one_or_none()
+
     if user_id:
         result = await session.execute(
             select(Cart)
@@ -52,21 +65,23 @@ async def _get_or_create_cart(session: AsyncSession, user_id: UUID | None, sessi
         if cart:
             return cart
     if session_id:
-        result = await session.execute(
-            select(Cart)
-            .options(
-                selectinload(Cart.items)
-                .selectinload(CartItem.product)
-                .selectinload(Product.images)
-            )
-            .where(Cart.session_id == session_id)
-        )
-        cart = result.scalar_one_or_none()
+        cart = await _load_by_session_id(session_id)
         if cart:
             return cart
     cart = Cart(user_id=user_id, session_id=session_id)
     session.add(cart)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        # Under concurrent requests, two carts may race on the same `session_id`.
+        # Recover by loading the existing cart instead of surfacing a 500.
+        if session_id:
+            cart = await _load_by_session_id(session_id)
+            if cart:
+                _log_cart("cart_race_recovered", cart, user_id=user_id)
+                return cart
+        raise
     await session.refresh(cart)
     return cart
 

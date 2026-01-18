@@ -1,3 +1,4 @@
+import asyncio
 import os
 import uuid
 
@@ -8,6 +9,7 @@ from httpx import AsyncClient
 from app.core.config import settings
 from app.db.session import SessionLocal, engine as app_engine
 from app.main import app
+from app.models.cart import Cart
 from app.models.catalog import Category, Product, ProductStatus
 from app.models.content import ContentBlock, ContentBlockTranslation, ContentStatus
 
@@ -88,6 +90,31 @@ async def test_postgres_core_flow_wishlist() -> None:
 
         removed = await client.delete(f"/api/v1/wishlist/{product_id}", headers=auth_headers(token))
         assert removed.status_code == 204, removed.text
+
+
+@pytest.mark.anyio
+async def test_postgres_cart_session_race_does_not_500() -> None:
+    """Guard against unique violations under concurrent cart creation."""
+    transport = httpx.ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        session_id = f"guest-{uuid.uuid4().hex}"
+        async with SessionLocal() as session:
+            cart = Cart(session_id=session_id)
+            session.add(cart)
+            await session.flush()  # Keep uncommitted row to force a race window.
+
+            task = asyncio.create_task(
+                client.post(
+                    "/api/v1/cart/sync",
+                    json={"items": []},
+                    headers={"X-Session-Id": session_id},
+                )
+            )
+            await asyncio.sleep(0.1)
+            await session.commit()
+
+        response = await task
+        assert response.status_code == 200, response.text
 
 
 @pytest.mark.anyio
