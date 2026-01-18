@@ -44,12 +44,13 @@ print_port_diagnostics() {
   fi
 }
 
+START_BACKEND=1
 if ! port_is_free "${UVICORN_PORT}"; then
-  echo "Port ${UVICORN_PORT} is already in use; cannot start backend."
+  echo "Port ${UVICORN_PORT} is already in use; skipping backend start."
   print_port_diagnostics "${UVICORN_PORT}"
-  echo "If you're running Docker Compose, stop it with:"
+  echo "Tip: if you want to run the backend from start.sh, stop anything using the port (often docker compose):"
   echo "  docker compose -f infra/docker-compose.yml down"
-  exit 1
+  START_BACKEND=0
 fi
 
 if ! port_is_free "${FRONTEND_PORT}"; then
@@ -79,9 +80,13 @@ if [ ! -d "${FRONTEND_DIR}/node_modules" ]; then
 fi
 
 echo "Starting backend on http://${UVICORN_HOST}:${UVICORN_PORT}"
-(cd "${BACKEND_DIR}" && exec uvicorn app.main:app --host "${UVICORN_HOST}" --port "${UVICORN_PORT}" --reload) &
-BACKEND_PID=$!
-trap 'kill "${BACKEND_PID}" 2>/dev/null || true' EXIT
+if [ "${START_BACKEND}" -eq 1 ]; then
+  (cd "${BACKEND_DIR}" && exec uvicorn app.main:app --host "${UVICORN_HOST}" --port "${UVICORN_PORT}" --reload) &
+  BACKEND_PID=$!
+  trap 'kill "${BACKEND_PID}" 2>/dev/null || true' EXIT
+else
+  echo "Backend was not started; assuming something else is serving http://${UVICORN_HOST}:${UVICORN_PORT}"
+fi
 
 echo "Starting frontend dev server on http://localhost:${FRONTEND_PORT}"
 (cd "${FRONTEND_DIR}" && exec npm start -- --port "${FRONTEND_PORT}")
