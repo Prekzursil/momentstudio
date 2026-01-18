@@ -19,9 +19,9 @@ Below is a structured checklist you can turn into issues.
 - [x] DX: run `alembic upgrade head` in `start.sh` before starting the backend to avoid schema drift.
 - [x] CI: add deployment/release job (e.g., container build + push) once runtime code lands.
 - [x] E2E: add real browser tests (Playwright) for checkout + admin flows and wire them into CI (Docker-backed).
-- [ ] DX: detect port collisions in `start.sh` (e.g., `docker compose` already bound to `4200`) and pick a free port or print a clear remediation hint.
-- [ ] Frontend: eliminate Node 24 `DEP0060 util._extend` deprecation warning (identify dependency via `--trace-deprecation` and upgrade/replace).
-- [ ] Docs: document seeded owner credentials and that `docker compose down -v` resets the DB (owner needs `bootstrap-owner` again).
+- [x] DX: detect port collisions in `start.sh` (e.g., `docker compose` already bound to `4200`) and pick a free port or print a clear remediation hint.
+- [x] Frontend: eliminate Node 24 `DEP0060 util._extend` deprecation warning (identify dependency via `--trace-deprecation` and upgrade/replace).
+- [x] Docs: document seeded owner credentials and that `docker compose down -v` resets the DB (owner needs `bootstrap-owner` again).
 
 ## Backend - Core & Auth
 - [x] Scaffold FastAPI app with versioned `/api/v1` router.
