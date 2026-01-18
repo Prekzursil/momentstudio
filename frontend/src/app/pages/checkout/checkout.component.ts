@@ -51,6 +51,7 @@ type CheckoutPaymentMethod = 'cod' | 'netopia' | 'paypal' | 'stripe';
 
 type CheckoutQuote = {
   subtotal: number;
+  fee: number;
   tax: number;
   shipping: number;
   total: number;
@@ -633,6 +634,13 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
             <span>{{ 'checkout.subtotal' | translate }}</span>
             <span>{{ quoteSubtotal() | localizedCurrency : currency }}</span>
           </div>
+          <div
+            class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200"
+            *ngIf="quoteFee() > 0"
+          >
+            <span>{{ 'checkout.additionalCost' | translate }}</span>
+            <span>{{ quoteFee() | localizedCurrency : currency }}</span>
+          </div>
           <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
             <span>{{ 'checkout.tax' | translate }}</span>
             <span>{{ quoteTax() | localizedCurrency : currency }}</span>
@@ -790,6 +798,10 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     return this.quote?.tax ?? 0;
   }
 
+  quoteFee(): number {
+    return this.quote?.fee ?? 0;
+  }
+
   quoteShipping(): number {
     return this.quote?.shipping ?? 0;
   }
@@ -801,12 +813,12 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   quoteDiscount(): number {
     const q = this.quote;
     if (!q) return 0;
-    return Math.max(0, q.subtotal + q.tax + q.shipping - q.total);
+    return Math.max(0, q.subtotal + q.fee + q.tax + q.shipping - q.total);
   }
 
   private buildSuccessSummary(orderId: string, referenceCode: string | null, paymentMethod: CheckoutPaymentMethod): CheckoutSuccessSummary {
-    const quote = this.quote ?? { subtotal: this.subtotal(), tax: 0, shipping: 0, total: this.subtotal(), currency: this.currency };
-    const discount = Math.max(0, quote.subtotal + quote.tax + quote.shipping - quote.total);
+    const quote = this.quote ?? { subtotal: this.subtotal(), fee: 0, tax: 0, shipping: 0, total: this.subtotal(), currency: this.currency };
+    const discount = Math.max(0, quote.subtotal + quote.fee + quote.tax + quote.shipping - quote.total);
     const items = this.items().map((i) => ({
       name: i.name,
       slug: i.slug,
@@ -846,11 +858,12 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   private setQuote(res: CartResponse): void {
     const totals = res?.totals ?? ({} as any);
     const subtotal = this.parseMoney(totals.subtotal);
+    const fee = this.parseMoney(totals.fee);
     const tax = this.parseMoney(totals.tax);
     const shipping = this.parseMoney(totals.shipping);
     const total = this.parseMoney(totals.total);
     const currency = (totals.currency ?? 'RON') as string;
-    this.quote = { subtotal, tax, shipping, total, currency };
+    this.quote = { subtotal, fee, tax, shipping, total, currency };
     this.currency = currency || 'RON';
   }
 

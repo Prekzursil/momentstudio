@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -8,8 +9,8 @@ from app.models.order import OrderStatus
 
 class ShippingMethodBase(BaseModel):
     name: str = Field(min_length=1, max_length=120)
-    rate_flat: float | None = Field(default=None, ge=0)
-    rate_per_kg: float | None = Field(default=None, ge=0)
+    rate_flat: Decimal | None = Field(default=None, ge=0)
+    rate_per_kg: Decimal | None = Field(default=None, ge=0)
 
 
 class ShippingMethodCreate(ShippingMethodBase):
@@ -40,8 +41,8 @@ class OrderItemRead(BaseModel):
     product: OrderItemProductRead | None = None
     quantity: int
     shipped_quantity: int
-    unit_price: float
-    subtotal: float
+    unit_price: Decimal
+    subtotal: Decimal
 
 
 class OrderRead(BaseModel):
@@ -60,9 +61,10 @@ class OrderRead(BaseModel):
     locker_lat: float | None = None
     locker_lng: float | None = None
     payment_retry_count: int
-    total_amount: float
-    tax_amount: float
-    shipping_amount: float
+    total_amount: Decimal
+    tax_amount: Decimal
+    fee_amount: Decimal = Decimal("0.00")
+    shipping_amount: Decimal
     currency: str
     payment_method: str
     stripe_payment_intent_id: str | None = None

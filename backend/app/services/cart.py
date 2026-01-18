@@ -19,6 +19,8 @@ from app.models.order import Order
 from app.models.user import User
 from app.models.order import ShippingMethod
 from app.services import email as email_service
+from app.services.checkout_settings import CheckoutSettings
+from app.services import pricing
 from app.core.config import settings
 from app.core.logging_config import request_id_ctx_var
 
@@ -156,25 +158,46 @@ def _calculate_totals(
     shipping_method: ShippingMethod | None = None,
     promo: PromoCodeRead | None = None,
     *,
+    checkout_settings: CheckoutSettings | None = None,
     shipping_fee_ron: Decimal | None = None,
     free_shipping_threshold_ron: Decimal | None = None,
     currency: str | None = "RON",
 ) -> Totals:
+    checkout = checkout_settings or CheckoutSettings()
     subtotal = sum(_to_decimal(item.unit_price_at_add) * item.quantity for item in cart.items)
     subtotal = _to_decimal(subtotal)
     discount_val = _compute_discount(subtotal, promo)
-    taxable = subtotal - discount_val
-    if taxable < 0:
-        taxable = Decimal("0")
-    tax = _to_decimal(taxable * Decimal("0.1"))
-    shipping_amount = _calculate_shipping_amount(subtotal, shipping_method, shipping_fee_ron=shipping_fee_ron)
-    if free_shipping_threshold_ron is not None and taxable >= free_shipping_threshold_ron:
-        shipping_amount = Decimal("0")
+
+    shipping_fee = shipping_fee_ron if shipping_fee_ron is not None else checkout.shipping_fee_ron
+    threshold = (
+        free_shipping_threshold_ron if free_shipping_threshold_ron is not None else checkout.free_shipping_threshold_ron
+    )
+    shipping_amount = _calculate_shipping_amount(subtotal, shipping_method, shipping_fee_ron=shipping_fee)
     shipping = _to_decimal(shipping_amount)
-    total = _to_decimal(taxable + tax + shipping)
-    if total < 0:
-        total = Decimal("0.00")
-    return Totals(subtotal=subtotal, tax=tax, shipping=shipping, total=total, currency=currency)
+    if threshold is not None and threshold >= 0 and (subtotal - discount_val) >= threshold:
+        shipping = Decimal("0.00")
+
+    breakdown = pricing.compute_totals(
+        subtotal=subtotal,
+        discount=discount_val,
+        shipping=shipping,
+        fee_enabled=checkout.fee_enabled,
+        fee_type=checkout.fee_type,
+        fee_value=checkout.fee_value,
+        vat_enabled=checkout.vat_enabled,
+        vat_rate_percent=checkout.vat_rate_percent,
+        vat_apply_to_shipping=checkout.vat_apply_to_shipping,
+        vat_apply_to_fee=checkout.vat_apply_to_fee,
+    )
+
+    return Totals(
+        subtotal=breakdown.subtotal,
+        fee=breakdown.fee,
+        tax=breakdown.vat,
+        shipping=breakdown.shipping,
+        total=breakdown.total,
+        currency=currency,
+    )
 
 
 def calculate_totals(
@@ -182,6 +205,7 @@ def calculate_totals(
     shipping_method: ShippingMethod | None = None,
     promo: PromoCodeRead | None = None,
     *,
+    checkout_settings: CheckoutSettings | None = None,
     shipping_fee_ron: Decimal | None = None,
     free_shipping_threshold_ron: Decimal | None = None,
 ) -> tuple[Totals, Decimal]:
@@ -194,6 +218,7 @@ def calculate_totals(
         cart,
         shipping_method=shipping_method,
         promo=promo,
+        checkout_settings=checkout_settings,
         shipping_fee_ron=shipping_fee_ron,
         free_shipping_threshold_ron=free_shipping_threshold_ron,
         currency=currency,
@@ -207,6 +232,7 @@ async def serialize_cart(
     shipping_method: ShippingMethod | None = None,
     promo: PromoCodeRead | None = None,
     *,
+    checkout_settings: CheckoutSettings | None = None,
     shipping_fee_ron: Decimal | None = None,
     free_shipping_threshold_ron: Decimal | None = None,
 ) -> CartRead:
@@ -227,6 +253,7 @@ async def serialize_cart(
         hydrated,
         shipping_method=shipping_method,
         promo=promo,
+        checkout_settings=checkout_settings,
         shipping_fee_ron=shipping_fee_ron,
         free_shipping_threshold_ron=free_shipping_threshold_ron,
         currency=currency,

@@ -744,7 +744,8 @@ import { missingRequiredProfileFields as computeMissingRequiredProfileFields, ty
                 (change)="filterOrders()"
               >
                 <option value="">{{ 'adminUi.orders.all' | translate }}</option>
-                <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
+                <option value="pending_payment">{{ 'adminUi.orders.pending_payment' | translate }}</option>
+                <option value="pending_acceptance">{{ 'adminUi.orders.pending_acceptance' | translate }}</option>
                 <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
                 <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
                 <option value="delivered">{{ 'adminUi.orders.delivered' | translate }}</option>
@@ -846,8 +847,12 @@ import { missingRequiredProfileFields as computeMissingRequiredProfileFields, ty
                   <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Totals</p>
                   <div class="mt-2 grid gap-1 text-slate-700 dark:text-slate-200">
                     <div class="flex items-center justify-between">
-                      <span class="text-slate-500 dark:text-slate-400">Tax</span>
+                      <span class="text-slate-500 dark:text-slate-400">VAT</span>
                       <span>{{ (order.tax_amount || 0) | localizedCurrency : order.currency || 'RON' }}</span>
+                    </div>
+                    <div class="flex items-center justify-between" *ngIf="(order.fee_amount || 0) > 0">
+                      <span class="text-slate-500 dark:text-slate-400">Additional</span>
+                      <span>{{ (order.fee_amount || 0) | localizedCurrency : order.currency || 'RON' }}</span>
                     </div>
                     <div class="flex items-center justify-between">
                       <span class="text-slate-500 dark:text-slate-400">Shipping</span>

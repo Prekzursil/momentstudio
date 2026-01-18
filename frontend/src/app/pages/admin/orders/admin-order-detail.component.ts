@@ -13,7 +13,15 @@ import { AdminOrderDetail, AdminOrdersService } from '../../../core/admin-orders
 import { AdminReturnsService, ReturnRequestRead } from '../../../core/admin-returns.service';
 import { orderStatusChipClass } from '../../../shared/order-status';
 
-type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+type OrderStatus =
+  | 'pending'
+  | 'pending_payment'
+  | 'pending_acceptance'
+  | 'paid'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled'
+  | 'refunded';
 type OrderAction =
   | 'save'
   | 'retry'
@@ -111,7 +119,8 @@ type OrderAction =
                   class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   [(ngModel)]="statusValue"
                 >
-                  <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
+                  <option value="pending_payment">{{ 'adminUi.orders.pending_payment' | translate }}</option>
+                  <option value="pending_acceptance">{{ 'adminUi.orders.pending_acceptance' | translate }}</option>
                   <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
                   <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
                   <option value="delivered">{{ 'adminUi.orders.delivered' | translate }}</option>
@@ -504,7 +513,7 @@ export class AdminOrderDetailComponent implements OnInit {
   creatingReturn = signal(false);
   returnCreateError = signal<string | null>(null);
 
-  statusValue: OrderStatus = 'pending';
+  statusValue: OrderStatus = 'pending_acceptance';
   trackingNumber = '';
   trackingUrl = '';
   cancelReason = '';
@@ -605,7 +614,7 @@ export class AdminOrderDetailComponent implements OnInit {
   save(): void {
     const orderId = this.order()?.id;
     if (!orderId) return;
-    const currentStatus = ((this.order()?.status as OrderStatus) || 'pending') as OrderStatus;
+    const currentStatus = ((this.order()?.status as OrderStatus) || 'pending_acceptance') as OrderStatus;
     if (this.statusValue === 'cancelled' && !this.cancelReason.trim()) {
       this.toast.error(this.translate.instant('adminUi.orders.errors.cancelReasonRequired'));
       return;
@@ -621,7 +630,7 @@ export class AdminOrderDetailComponent implements OnInit {
       .subscribe({
         next: (o) => {
           this.order.set(o);
-          this.statusValue = (o.status as OrderStatus) || 'pending';
+          this.statusValue = (o.status as OrderStatus) || 'pending_acceptance';
           this.trackingNumber = o.tracking_number ?? '';
           this.trackingUrl = o.tracking_url ?? '';
           this.cancelReason = o.cancel_reason ?? '';
@@ -811,7 +820,7 @@ export class AdminOrderDetailComponent implements OnInit {
     this.api.get(orderId).subscribe({
       next: (o) => {
         this.order.set(o);
-        this.statusValue = (o.status as OrderStatus) || 'pending';
+        this.statusValue = (o.status as OrderStatus) || 'pending_acceptance';
         this.trackingNumber = o.tracking_number ?? '';
         this.trackingUrl = o.tracking_url ?? '';
         this.cancelReason = o.cancel_reason ?? '';

@@ -52,8 +52,7 @@ async def get_cart(
         cart,
         shipping_method=shipping_method,
         promo=promo,
-        shipping_fee_ron=checkout_settings.shipping_fee_ron,
-        free_shipping_threshold_ron=checkout_settings.free_shipping_threshold_ron,
+        checkout_settings=checkout_settings,
     )
 
 
@@ -124,8 +123,7 @@ async def merge_guest_cart(
     return await cart_service.serialize_cart(
         session,
         merged_cart,
-        shipping_fee_ron=checkout_settings.shipping_fee_ron,
-        free_shipping_threshold_ron=checkout_settings.free_shipping_threshold_ron,
+        checkout_settings=checkout_settings,
     )
 
 
@@ -152,6 +150,5 @@ async def sync_cart(
     return await cart_service.serialize_cart(
         session,
         cart,
-        shipping_fee_ron=checkout_settings.shipping_fee_ron,
-        free_shipping_threshold_ron=checkout_settings.free_shipping_threshold_ron,
+        checkout_settings=checkout_settings,
     )

@@ -13,6 +13,8 @@ from sqlalchemy.orm import selectinload
 from app.models.cart import Cart
 from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod, OrderEvent
 from app.schemas.order import OrderUpdate, ShippingMethodCreate
+from app.services import checkout_settings as checkout_settings_service
+from app.services import pricing
 from app.services import payments
 
 
@@ -31,6 +33,7 @@ async def build_order_from_cart(
     stripe_checkout_session_id: str | None = None,
     paypal_order_id: str | None = None,
     tax_amount: Decimal | None = None,
+    fee_amount: Decimal | None = None,
     shipping_amount: Decimal | None = None,
     total_amount: Decimal | None = None,
     courier: str | None = None,
@@ -62,25 +65,59 @@ async def build_order_from_cart(
 
     ref = await _generate_reference_code(session)
     discount_val = discount or Decimal("0")
-    taxable = subtotal - discount_val
-    if taxable < 0:
-        taxable = Decimal("0")
-    computed_tax = _calculate_tax(taxable)
-    computed_shipping = _calculate_shipping(subtotal, shipping_method)
-    computed_total = taxable + computed_tax + computed_shipping
+    computed_fee = Decimal("0.00")
+    computed_tax = Decimal("0.00")
+    computed_shipping = Decimal("0.00")
+    computed_total = Decimal("0.00")
 
     if tax_amount is not None and shipping_amount is not None and total_amount is not None:
+        computed_fee = Decimal(fee_amount or 0)
         computed_tax = Decimal(tax_amount)
         computed_shipping = Decimal(shipping_amount)
         computed_total = Decimal(total_amount)
+    else:
+        checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+        taxable = subtotal - discount_val
+        if taxable < 0:
+            taxable = Decimal("0.00")
+        computed_shipping = (
+            Decimal(checkout_settings.shipping_fee_ron)
+            if checkout_settings.shipping_fee_ron is not None
+            else _calculate_shipping(subtotal, shipping_method)
+        )
+        threshold = checkout_settings.free_shipping_threshold_ron
+        if threshold is not None and threshold >= 0 and taxable >= threshold:
+            computed_shipping = Decimal("0.00")
+        breakdown = pricing.compute_totals(
+            subtotal=subtotal,
+            discount=discount_val,
+            shipping=computed_shipping,
+            fee_enabled=checkout_settings.fee_enabled,
+            fee_type=checkout_settings.fee_type,
+            fee_value=checkout_settings.fee_value,
+            vat_enabled=checkout_settings.vat_enabled,
+            vat_rate_percent=checkout_settings.vat_rate_percent,
+            vat_apply_to_shipping=checkout_settings.vat_apply_to_shipping,
+            vat_apply_to_fee=checkout_settings.vat_apply_to_fee,
+        )
+        computed_fee = breakdown.fee
+        computed_tax = breakdown.vat
+        computed_shipping = breakdown.shipping
+        computed_total = breakdown.total
 
+    method = (payment_method or "").strip().lower()
+    initial_status = (
+        OrderStatus.pending_payment if method in {"stripe", "paypal", "netopia"} else OrderStatus.pending_acceptance
+    )
     order = Order(
         user_id=user_id,
         reference_code=ref,
         customer_email=customer_email,
         customer_name=customer_name,
+        status=initial_status,
         total_amount=computed_total,
         tax_amount=computed_tax,
+        fee_amount=computed_fee,
         shipping_amount=computed_shipping,
         currency="RON",
         payment_method=payment_method,
@@ -251,7 +288,8 @@ async def get_order_by_id_admin(session: AsyncSession, order_id: UUID) -> Order 
 
 
 ALLOWED_TRANSITIONS = {
-    OrderStatus.pending: {OrderStatus.paid, OrderStatus.cancelled},
+    OrderStatus.pending_payment: {OrderStatus.pending_acceptance, OrderStatus.cancelled},
+    OrderStatus.pending_acceptance: {OrderStatus.paid, OrderStatus.cancelled},
     OrderStatus.paid: {OrderStatus.shipped, OrderStatus.refunded, OrderStatus.cancelled},
     OrderStatus.shipped: {OrderStatus.delivered, OrderStatus.refunded},
     OrderStatus.delivered: {OrderStatus.refunded},
@@ -288,13 +326,21 @@ async def update_order(
         current_status = OrderStatus(order.status)
         next_status = OrderStatus(data["status"])
         payment_method = (getattr(order, "payment_method", None) or "").strip().lower()
-        if current_status == OrderStatus.pending and next_status == OrderStatus.paid and payment_method in {"stripe", "paypal"}:
+        if (
+            current_status == OrderStatus.pending_acceptance
+            and next_status == OrderStatus.paid
+            and payment_method in {"stripe", "paypal"}
+        ):
             if not _has_payment_captured(order):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Payment is not captured yet. Wait for payment confirmation before accepting the order.",
                 )
-        if next_status == OrderStatus.cancelled and current_status in {OrderStatus.pending, OrderStatus.paid}:
+        if next_status == OrderStatus.cancelled and current_status in {
+            OrderStatus.pending_payment,
+            OrderStatus.pending_acceptance,
+            OrderStatus.paid,
+        }:
             if cancel_reason_clean is None or not cancel_reason_clean:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancel reason is required")
         allowed = ALLOWED_TRANSITIONS.get(current_status, set())
@@ -317,12 +363,37 @@ async def update_order(
 
     if shipping_method:
         order.shipping_method_id = shipping_method.id
-        subtotal: Decimal = sum((Decimal(item.subtotal) for item in order.items), start=Decimal("0"))
-        shipping_amount_dec = _calculate_shipping(subtotal, shipping_method)
-        tax_amount_dec = _calculate_tax(subtotal)
-        order.shipping_amount = float(shipping_amount_dec)
-        order.tax_amount = float(tax_amount_dec)
-        order.total_amount = float(subtotal + tax_amount_dec + shipping_amount_dec)
+        taxable_subtotal = (
+            Decimal(order.total_amount)
+            - Decimal(order.shipping_amount)
+            - Decimal(order.tax_amount)
+            - Decimal(getattr(order, "fee_amount", 0) or 0)
+        )
+        if taxable_subtotal < 0:
+            taxable_subtotal = Decimal("0.00")
+        taxable_subtotal = pricing.quantize_money(taxable_subtotal)
+
+        checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+        shipping_amount = Decimal(checkout_settings.shipping_fee_ron)
+        threshold = checkout_settings.free_shipping_threshold_ron
+        if threshold is not None and threshold >= 0 and taxable_subtotal >= threshold:
+            shipping_amount = Decimal("0.00")
+        shipping_amount = pricing.quantize_money(shipping_amount)
+
+        fee_amount = pricing.quantize_money(Decimal(getattr(order, "fee_amount", 0) or 0))
+        vat_amount = pricing.compute_vat(
+            taxable_subtotal=taxable_subtotal,
+            shipping=shipping_amount,
+            fee=fee_amount,
+            enabled=checkout_settings.vat_enabled,
+            vat_rate_percent=checkout_settings.vat_rate_percent,
+            apply_to_shipping=checkout_settings.vat_apply_to_shipping,
+            apply_to_fee=checkout_settings.vat_apply_to_fee,
+        )
+
+        order.shipping_amount = shipping_amount
+        order.tax_amount = vat_amount
+        order.total_amount = pricing.quantize_money(taxable_subtotal + fee_amount + shipping_amount + vat_amount)
 
     for field, value in data.items():
         setattr(order, field, value)
@@ -351,10 +422,6 @@ async def _generate_reference_code(session: AsyncSession, length: int = 10) -> s
         result = await session.execute(select(Order).where(Order.reference_code == candidate))
         if not result.scalar_one_or_none():
             return candidate
-
-
-def _calculate_tax(total: Decimal) -> Decimal:
-    return total * Decimal("0.1")
 
 
 def _calculate_shipping(subtotal: Decimal, method: ShippingMethod | None) -> Decimal:
@@ -417,8 +484,8 @@ async def update_fulfillment(session: AsyncSession, order: Order, item_id: UUID,
 
 
 async def retry_payment(session: AsyncSession, order: Order) -> Order:
-    if order.status != OrderStatus.pending:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Retry only allowed for pending orders")
+    if order.status != OrderStatus.pending_payment:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Retry only allowed for pending_payment orders")
     order.payment_retry_count += 1
     await _log_event(session, order.id, "payment_retry", f"Attempt {order.payment_retry_count}")
     session.add(order)
@@ -443,14 +510,19 @@ async def capture_payment(session: AsyncSession, order: Order, intent_id: str | 
     payment_intent_id = intent_id or order.stripe_payment_intent_id
     if not payment_intent_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent id required")
-    if order.status not in {OrderStatus.pending, OrderStatus.paid}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Capture only allowed for pending/paid orders")
+    if order.status not in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Capture only allowed for pending/paid orders"
+        )
     await payments.capture_payment_intent(payment_intent_id)
     order.stripe_payment_intent_id = payment_intent_id
     await session.refresh(order, attribute_names=["events"])
     already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
     if not already_captured:
         session.add(OrderEvent(order_id=order.id, event="payment_captured", note=f"Intent {payment_intent_id}"))
+    if order.status == OrderStatus.pending_payment:
+        order.status = OrderStatus.pending_acceptance
+        session.add(OrderEvent(order_id=order.id, event="status_change", note="pending_payment -> pending_acceptance"))
     session.add(order)
     await session.commit()
     hydrated = await get_order_by_id(session, order.id)
@@ -461,7 +533,7 @@ async def void_payment(session: AsyncSession, order: Order, intent_id: str | Non
     payment_intent_id = intent_id or order.stripe_payment_intent_id
     if not payment_intent_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent id required")
-    if order.status not in {OrderStatus.pending, OrderStatus.paid}:
+    if order.status not in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Void only allowed for pending/paid orders")
     event = "payment_voided"
     note = f"Intent {payment_intent_id}"

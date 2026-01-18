@@ -2,6 +2,7 @@ import logging
 import smtplib
 import html as _html
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from email.message import EmailMessage
 from pathlib import Path
 from typing import Sequence
@@ -69,6 +70,17 @@ def _html_pre(text_body: str) -> str:
         f"{_html.escape(text_body)}"
         "</pre>"
     )
+
+
+def _money_str(value: object, currency: str) -> str:
+    try:
+        dec = value if isinstance(value, Decimal) else Decimal(str(value))
+        return f"{dec.quantize(Decimal('0.01'))} {currency}"
+    except Exception:
+        try:
+            return f"{float(value):.2f} {currency}"
+        except Exception:
+            return f"{value} {currency}"
 
 
 async def send_email(
@@ -230,11 +242,24 @@ def _delivery_lines(order, *, lang: str) -> list[str]:
     return lines
 
 
-async def send_order_confirmation(to_email: str, order, items: Sequence | None = None, lang: str | None = None) -> bool:
+async def send_order_confirmation(
+    to_email: str,
+    order,
+    items: Sequence | None = None,
+    lang: str | None = None,
+    *,
+    receipt_share_days: int | None = None,
+) -> bool:
     ref = getattr(order, "reference_code", None) or str(getattr(order, "id", ""))
     currency = getattr(order, "currency", "RON") or "RON"
-    receipt_expires_at = datetime.now(timezone.utc) + timedelta(days=RECEIPT_SHARE_DAYS)
-    receipt_token = create_receipt_token(order_id=str(getattr(order, "id", "")), expires_at=receipt_expires_at)
+    ttl_days = int(receipt_share_days) if receipt_share_days and int(receipt_share_days) > 0 else RECEIPT_SHARE_DAYS
+    receipt_expires_at = datetime.now(timezone.utc) + timedelta(days=ttl_days)
+    token_version = int(getattr(order, "receipt_token_version", 0) or 0)
+    receipt_token = create_receipt_token(
+        order_id=str(getattr(order, "id", "")),
+        expires_at=receipt_expires_at,
+        token_version=token_version,
+    )
     receipt_url = f"{settings.frontend_origin.rstrip('/')}/receipt/{receipt_token}"
     receipt_pdf_url = f"{settings.frontend_origin.rstrip('/')}/api/v1/orders/receipt/{receipt_token}/pdf"
     receipt_filename = f"receipt-{ref}.pdf"
@@ -260,10 +285,7 @@ async def send_order_confirmation(to_email: str, order, items: Sequence | None =
                 qty = int(getattr(item, "quantity", 0) or 0)
                 unit_price = getattr(item, "unit_price", None)
                 if unit_price is not None:
-                    try:
-                        price_str = f"{float(unit_price):.2f} {currency}"
-                    except Exception:
-                        price_str = f"{unit_price} {currency}"
+                    price_str = _money_str(unit_price, currency)
                     tail = f" — {product_url}" if product_url else ""
                     lines.append(f"- {name} ×{qty} — {price_str}{tail}")
                 else:
@@ -271,25 +293,24 @@ async def send_order_confirmation(to_email: str, order, items: Sequence | None =
                     lines.append(f"- {name} ×{qty}{tail}")
 
         shipping_amount = getattr(order, "shipping_amount", None)
+        fee_amount = getattr(order, "fee_amount", None)
         tax_amount = getattr(order, "tax_amount", None)
         if shipping_amount is not None:
+            lines.append(("Livrare: " if lng == "ro" else "Shipping: ") + _money_str(shipping_amount, currency))
+        if fee_amount is not None:
             try:
-                shipping_str = f"{float(shipping_amount):.2f} {currency}"
+                fee_dec = fee_amount if isinstance(fee_amount, Decimal) else Decimal(str(fee_amount))
             except Exception:
-                shipping_str = f"{shipping_amount} {currency}"
-            lines.append(("Livrare: " if lng == "ro" else "Shipping: ") + shipping_str)
+                fee_dec = Decimal("0.00")
+            if fee_dec != 0:
+                lines.append(
+                    ("Cost suplimentar: " if lng == "ro" else "Additional cost: ")
+                    + _money_str(fee_amount, currency)
+                )
         if tax_amount is not None:
-            try:
-                tax_str = f"{float(tax_amount):.2f} {currency}"
-            except Exception:
-                tax_str = f"{tax_amount} {currency}"
-            lines.append(("Taxe: " if lng == "ro" else "Tax: ") + tax_str)
+            lines.append(("TVA: " if lng == "ro" else "VAT: ") + _money_str(tax_amount, currency))
 
-        try:
-            total_str = f"{float(getattr(order, 'total_amount', 0.0)):.2f} {currency}"
-        except Exception:
-            total_str = f"{getattr(order, 'total_amount', '')} {currency}"
-        lines.append(("Total: " if lng == "ro" else "Total: ") + total_str)
+        lines.append(("Total: " if lng == "ro" else "Total: ") + _money_str(getattr(order, "total_amount", 0), currency))
 
         account_url = f"{settings.frontend_origin.rstrip('/')}/account"
         lines.append("")
@@ -425,11 +446,7 @@ async def send_order_refunded_update(to_email: str, order, *, lang: str | None =
         lines = [
             f"Comanda {ref} a fost rambursată." if lng == "ro" else f"Your order {ref} was refunded."
         ]
-        try:
-            total_str = f"{float(getattr(order, 'total_amount', 0.0)):.2f} {currency}"
-        except Exception:
-            total_str = f"{getattr(order, 'total_amount', '')} {currency}"
-        lines.append(("Total: " if lng == "ro" else "Total: ") + total_str)
+        lines.append(("Total: " if lng == "ro" else "Total: ") + _money_str(getattr(order, "total_amount", 0), currency))
         payment = _payment_method_label(getattr(order, "payment_method", None), lang=lng)
         if payment:
             lines.append(("Plată: " if lng == "ro" else "Payment: ") + payment)
@@ -474,11 +491,7 @@ async def send_new_order_notification(
         if payment:
             lines.append(("Plată: " if lng == "ro" else "Payment: ") + payment)
         lines.extend(_delivery_lines(order, lang=lng))
-        try:
-            total_str = f"{float(getattr(order, 'total_amount', 0.0)):.2f} {currency}"
-        except Exception:
-            total_str = f"{getattr(order, 'total_amount', '')} {currency}"
-        lines.append(("Total: " if lng == "ro" else "Total: ") + total_str)
+        lines.append(("Total: " if lng == "ro" else "Total: ") + _money_str(getattr(order, "total_amount", 0), currency))
         admin_url = f"{settings.frontend_origin.rstrip('/')}/admin/orders"
         lines.append("")
         lines.append(f"Vezi în admin: {admin_url}" if lng == "ro" else f"View in admin: {admin_url}")
@@ -699,11 +712,7 @@ async def send_refund_requested_notification(
             lines.append(f"Cerut de: {requested_by_email}" if lng == "ro" else f"Requested by: {requested_by_email}")
         if note:
             lines.append(f"Notă: {note}" if lng == "ro" else f"Note: {note}")
-        try:
-            total_str = f"{float(getattr(order, 'total_amount', 0.0)):.2f} {currency}"
-        except Exception:
-            total_str = f"{getattr(order, 'total_amount', '')} {currency}"
-        lines.append(("Total: " if lng == "ro" else "Total: ") + total_str)
+        lines.append(("Total: " if lng == "ro" else "Total: ") + _money_str(getattr(order, "total_amount", 0), currency))
         return lines
 
     subject = _bilingual_subject(

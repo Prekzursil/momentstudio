@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class Totals(BaseModel):
     subtotal: Decimal
+    fee: Decimal = Decimal("0.00")
     tax: Decimal
     shipping: Decimal
     total: Decimal

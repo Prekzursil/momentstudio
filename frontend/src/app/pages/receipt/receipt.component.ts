@@ -51,6 +51,13 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
         </div>
 
         <ng-container *ngIf="!loading && receipt">
+          <div
+            *ngIf="receipt.pii_redacted"
+            class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+          >
+            This shared receipt hides personal details by default. / Această chitanță partajată ascunde datele personale în mod implicit.
+          </div>
+
           <div class="grid gap-4 sm:grid-cols-2" *ngIf="receipt.customer_name || receipt.customer_email">
             <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
               <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
@@ -157,8 +164,12 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
                 <span>Shipping / Livrare</span>
                 <span>{{ (receipt.shipping_amount || 0) | localizedCurrency: receipt.currency }}</span>
               </div>
+              <div class="flex items-center justify-between text-slate-600 dark:text-slate-300" *ngIf="(receipt.fee_amount || 0) > 0">
+                <span>Additional / Cost supl.</span>
+                <span>{{ (receipt.fee_amount || 0) | localizedCurrency: receipt.currency }}</span>
+              </div>
               <div class="flex items-center justify-between text-slate-600 dark:text-slate-300">
-                <span>Tax / Taxe</span>
+                <span>VAT / TVA</span>
                 <span>{{ (receipt.tax_amount || 0) | localizedCurrency: receipt.currency }}</span>
               </div>
               <div class="flex items-center justify-between pt-2 text-base font-semibold text-slate-900 dark:text-slate-50">
@@ -214,4 +225,3 @@ export class ReceiptComponent implements OnInit, OnDestroy {
     this.sub?.unsubscribe();
   }
 }
-

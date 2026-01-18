@@ -24,7 +24,7 @@ type CheckoutSuccessSummary = {
   delivery_type: 'home' | 'locker' | null;
   locker_name: string | null;
   locker_address: string | null;
-  totals: { subtotal: number; tax: number; shipping: number; total: number; currency: string; discount: number };
+  totals: { subtotal: number; fee?: number; tax: number; shipping: number; total: number; currency: string; discount: number };
   items: CheckoutSuccessItem[];
   created_at: string;
 };
@@ -88,6 +88,10 @@ const CHECKOUT_SUCCESS_KEY = 'checkout_last_order';
           <div class="flex items-center justify-between">
             <span>{{ 'checkout.subtotal' | translate }}</span>
             <span>{{ summary.totals.subtotal | localizedCurrency : summary.totals.currency }}</span>
+          </div>
+          <div class="flex items-center justify-between" *ngIf="(summary.totals.fee || 0) > 0">
+            <span>{{ 'checkout.additionalCost' | translate }}</span>
+            <span>{{ (summary.totals.fee || 0) | localizedCurrency : summary.totals.currency }}</span>
           </div>
           <div class="flex items-center justify-between">
             <span>{{ 'checkout.tax' | translate }}</span>

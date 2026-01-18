@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { ApiService } from './api.service';
 import { Address, Order, OrderItem } from './account.service';
+import { parseMoney } from '../shared/money';
 
 export interface AdminPaginationMeta {
   total_items: number;
@@ -60,18 +61,52 @@ export class AdminOrdersService {
     page?: number;
     limit?: number;
   }): Observable<AdminOrderListResponse> {
-    return this.api.get<AdminOrderListResponse>('/orders/admin/search', params as any);
+    return this.api.get<AdminOrderListResponse>('/orders/admin/search', params as any).pipe(
+      map((res: any) => ({
+        ...(res ?? {}),
+        items: (res?.items ?? []).map((o: any) => ({
+          ...o,
+          total_amount: parseMoney(o?.total_amount)
+        }))
+      }))
+    );
   }
 
   get(orderId: string): Observable<AdminOrderDetail> {
-    return this.api.get<AdminOrderDetail>(`/orders/admin/${orderId}`);
+    return this.api.get<AdminOrderDetail>(`/orders/admin/${orderId}`).pipe(
+      map((o: any) => ({
+        ...o,
+        total_amount: parseMoney(o?.total_amount),
+        tax_amount: parseMoney(o?.tax_amount),
+        fee_amount: parseMoney(o?.fee_amount),
+        shipping_amount: parseMoney(o?.shipping_amount),
+        items: (o?.items ?? []).map((it: any) => ({
+          ...it,
+          unit_price: parseMoney(it?.unit_price),
+          subtotal: parseMoney(it?.subtotal)
+        }))
+      }))
+    );
   }
 
   update(
     orderId: string,
     payload: { status?: string; cancel_reason?: string | null; tracking_number?: string | null; tracking_url?: string | null }
   ): Observable<AdminOrderDetail> {
-    return this.api.patch<AdminOrderDetail>(`/orders/admin/${orderId}`, payload);
+    return this.api.patch<AdminOrderDetail>(`/orders/admin/${orderId}`, payload).pipe(
+      map((o: any) => ({
+        ...o,
+        total_amount: parseMoney(o?.total_amount),
+        tax_amount: parseMoney(o?.tax_amount),
+        fee_amount: parseMoney(o?.fee_amount),
+        shipping_amount: parseMoney(o?.shipping_amount),
+        items: (o?.items ?? []).map((it: any) => ({
+          ...it,
+          unit_price: parseMoney(it?.unit_price),
+          subtotal: parseMoney(it?.subtotal)
+        }))
+      }))
+    );
   }
 
   uploadShippingLabel(orderId: string, file: File): Observable<AdminOrderDetail> {

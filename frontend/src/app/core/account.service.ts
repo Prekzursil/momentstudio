@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { ApiService } from './api.service';
 import { AuthUser } from './auth.service';
+import { parseMoney } from '../shared/money';
 
 export interface Address {
   id: string;
@@ -36,6 +37,7 @@ export interface Order {
   payment_retry_count?: number;
   total_amount: number;
   tax_amount?: number;
+  fee_amount?: number;
   shipping_amount?: number;
   currency: string;
   courier?: string | null;
@@ -86,7 +88,22 @@ export class AccountService {
   }
 
   getOrders(): Observable<Order[]> {
-    return this.api.get<Order[]>('/orders');
+    return this.api.get<Order[]>('/orders').pipe(
+      map((orders: any[]) =>
+        (orders ?? []).map((o) => ({
+          ...o,
+          total_amount: parseMoney(o?.total_amount),
+          tax_amount: parseMoney(o?.tax_amount),
+          fee_amount: parseMoney(o?.fee_amount),
+          shipping_amount: parseMoney(o?.shipping_amount),
+          items: (o?.items ?? []).map((it: any) => ({
+            ...it,
+            unit_price: parseMoney(it?.unit_price),
+            subtotal: parseMoney(it?.subtotal)
+          }))
+        }))
+      )
+    );
   }
 
   downloadExport(): Observable<Blob> {

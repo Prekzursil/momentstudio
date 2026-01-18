@@ -12,6 +12,7 @@ export interface CartApiItem {
 
 export interface CartTotals {
   subtotal: string;
+  fee?: string;
   tax: string;
   shipping: string;
   total: string;

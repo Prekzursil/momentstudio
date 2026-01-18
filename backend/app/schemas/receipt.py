@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -20,8 +21,8 @@ class ReceiptItemRead(BaseModel):
     slug: str | None = None
     name: str
     quantity: int
-    unit_price: float
-    subtotal: float
+    unit_price: Decimal
+    subtotal: Decimal
     product_url: str | None = None
 
 
@@ -41,10 +42,18 @@ class ReceiptRead(BaseModel):
     tracking_number: str | None = None
     customer_email: str | None = None
     customer_name: str | None = None
-    shipping_amount: float | None = None
-    tax_amount: float | None = None
-    total_amount: float | None = None
+    pii_redacted: bool = False
+    shipping_amount: Decimal | None = None
+    tax_amount: Decimal | None = None
+    fee_amount: Decimal | None = None
+    total_amount: Decimal | None = None
     shipping_address: ReceiptAddressRead | None = None
     billing_address: ReceiptAddressRead | None = None
     items: list[ReceiptItemRead] = Field(default_factory=list)
 
+
+class ReceiptShareTokenRead(BaseModel):
+    token: str
+    receipt_url: str
+    receipt_pdf_url: str
+    expires_at: datetime

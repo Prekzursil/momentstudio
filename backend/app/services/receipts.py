@@ -25,7 +25,40 @@ MoneyValue = str | SupportsFloat | SupportsIndex
 _REPORTLAB_FONTS_READY = False
 
 
-def build_order_receipt(order, items: Sequence | None = None) -> ReceiptRead:
+def _mask_email(email: str) -> str:
+    cleaned = (email or "").strip()
+    if "@" not in cleaned:
+        return "••••••"
+    local, _, domain = cleaned.partition("@")
+    local = local.strip()
+    domain = domain.strip()
+    if not local or not domain:
+        return "••••••"
+    prefix = local[0]
+    return f"{prefix}***@{domain}"
+
+
+def _mask_text(value: str) -> str:
+    cleaned = (value or "").strip()
+    if not cleaned:
+        return "••••••"
+    if len(cleaned) <= 1:
+        return "•"
+    return cleaned[0] + "•" * (len(cleaned) - 1)
+
+
+def _as_decimal(value: object | None) -> Decimal:
+    if value is None:
+        return Decimal("0.00")
+    if isinstance(value, Decimal):
+        return value
+    try:
+        return Decimal(str(value))
+    except Exception:
+        return Decimal("0.00")
+
+
+def build_order_receipt(order, items: Sequence | None = None, *, redacted: bool = False) -> ReceiptRead:
     items = items or getattr(order, "items", []) or []
     currency = getattr(order, "currency", "RON") or "RON"
     frontend_origin = settings.frontend_origin.rstrip("/")
@@ -39,9 +72,15 @@ def build_order_receipt(order, items: Sequence | None = None) -> ReceiptRead:
         country = (getattr(addr, "country", None) or "").strip()
         if not line1 or not city or not postal_code or not country:
             return None
+        if redacted:
+            line1 = "••••••"
+            postal_code = "•••••"
+            line2 = None
+        else:
+            line2 = (getattr(addr, "line2", None) or "").strip() or None
         return ReceiptAddressRead(
             line1=line1,
-            line2=(getattr(addr, "line2", None) or "").strip() or None,
+            line2=line2,
             city=city,
             region=(getattr(addr, "region", None) or "").strip() or None,
             postal_code=postal_code,
@@ -60,8 +99,8 @@ def build_order_receipt(order, items: Sequence | None = None) -> ReceiptRead:
                 slug=slug,
                 name=name,
                 quantity=int(getattr(item, "quantity", 0) or 0),
-                unit_price=float(getattr(item, "unit_price", 0.0) or 0.0),
-                subtotal=float(getattr(item, "subtotal", 0.0) or 0.0),
+                unit_price=_as_decimal(getattr(item, "unit_price", None)),
+                subtotal=_as_decimal(getattr(item, "subtotal", None)),
                 product_url=product_url,
             )
         )
@@ -69,6 +108,11 @@ def build_order_receipt(order, items: Sequence | None = None) -> ReceiptRead:
     created_at = getattr(order, "created_at", datetime.now(timezone.utc))
     status_raw = getattr(order, "status", "")
     status_value = getattr(status_raw, "value", status_raw) or ""
+    customer_email = (getattr(order, "customer_email", None) or "").strip() or None
+    customer_name = (getattr(order, "customer_name", None) or "").strip() or None
+    if redacted:
+        customer_email = _mask_email(customer_email or "")
+        customer_name = _mask_text(customer_name or "") if customer_name else None
 
     return ReceiptRead(
         order_id=getattr(order, "id"),
@@ -82,11 +126,13 @@ def build_order_receipt(order, items: Sequence | None = None) -> ReceiptRead:
         locker_name=getattr(order, "locker_name", None),
         locker_address=getattr(order, "locker_address", None),
         tracking_number=getattr(order, "tracking_number", None),
-        customer_email=(getattr(order, "customer_email", None) or "").strip() or None,
-        customer_name=(getattr(order, "customer_name", None) or "").strip() or None,
-        shipping_amount=float(getattr(order, "shipping_amount", 0.0) or 0.0),
-        tax_amount=float(getattr(order, "tax_amount", 0.0) or 0.0),
-        total_amount=float(getattr(order, "total_amount", 0.0) or 0.0),
+        customer_email=customer_email,
+        customer_name=customer_name,
+        pii_redacted=redacted,
+        shipping_amount=_as_decimal(getattr(order, "shipping_amount", None)),
+        tax_amount=_as_decimal(getattr(order, "tax_amount", None)),
+        fee_amount=_as_decimal(getattr(order, "fee_amount", None)),
+        total_amount=_as_decimal(getattr(order, "total_amount", None)),
         shipping_address=_addr(getattr(order, "shipping_address", None)),
         billing_address=_addr(getattr(order, "billing_address", None)),
         items=receipt_items,
@@ -120,11 +166,11 @@ def _register_reportlab_fonts() -> tuple[str, str]:
     return ("Helvetica", "Helvetica-Bold")
 
 
-def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None) -> bytes:
+def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None, *, redacted: bool = False) -> bytes:
     """Render a bilingual (RO/EN) receipt PDF with clickable product links."""
 
     items = items or getattr(order, "items", []) or []
-    receipt = build_order_receipt(order, items)
+    receipt = build_order_receipt(order, items, redacted=redacted)
 
     font_regular, font_bold = _register_reportlab_fonts()
     styles = getSampleStyleSheet()
@@ -307,12 +353,29 @@ def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None) ->
 
     # Totals
     totals_rows: list[list[object]] = []
-    totals_rows.append([Paragraph("Shipping / Livrare", small_muted), Paragraph(_money_cell(receipt.shipping_amount or 0.0), base_style)])
-    totals_rows.append([Paragraph("Tax / Taxe", small_muted), Paragraph(_money_cell(receipt.tax_amount or 0.0), base_style)])
+    totals_rows.append(
+        [
+            Paragraph("Shipping / Livrare", small_muted),
+            Paragraph(_money_cell(receipt.shipping_amount or Decimal("0.00")), base_style),
+        ]
+    )
+    if receipt.fee_amount and receipt.fee_amount != 0:
+        totals_rows.append(
+            [
+                Paragraph("Additional / Cost supl.", small_muted),
+                Paragraph(_money_cell(receipt.fee_amount), base_style),
+            ]
+        )
+    totals_rows.append(
+        [
+            Paragraph("VAT / TVA", small_muted),
+            Paragraph(_money_cell(receipt.tax_amount or Decimal("0.00")), base_style),
+        ]
+    )
     totals_rows.append(
         [
             Paragraph("<b>Total / Total</b>", base_style),
-            Paragraph(f"<b>{_money_cell(receipt.total_amount or 0.0)}</b>", base_style),
+            Paragraph(f"<b>{_money_cell(receipt.total_amount or Decimal('0.00'))}</b>", base_style),
         ]
     )
     totals = Table(totals_rows, colWidths=[doc.width * 0.75, doc.width * 0.25])
@@ -375,15 +438,15 @@ def _format_date(value: object) -> str:
     return str(value)
 
 
-def render_order_receipt_pdf(order, items: Sequence | None = None) -> bytes:
+def render_order_receipt_pdf(order, items: Sequence | None = None, *, redacted: bool = False) -> bytes:
     try:
-        return _render_order_receipt_pdf_reportlab(order, items)
+        return _render_order_receipt_pdf_reportlab(order, items, redacted=redacted)
     except Exception:
         # Fallback to the legacy raster implementation for maximum resilience.
-        return render_order_receipt_pdf_raster(order, items)
+        return render_order_receipt_pdf_raster(order, items, redacted=redacted)
 
 
-def render_order_receipt_pdf_raster(order, items: Sequence | None = None) -> bytes:
+def render_order_receipt_pdf_raster(order, items: Sequence | None = None, *, redacted: bool = False) -> bytes:
     """Legacy receipt renderer (PDF-embedded raster image).
 
     Kept as a fallback in case the PDF engine/font stack fails.
@@ -422,6 +485,9 @@ def render_order_receipt_pdf_raster(order, items: Sequence | None = None) -> byt
 
     customer_email = (getattr(order, "customer_email", None) or "").strip()
     customer_name = (getattr(order, "customer_name", None) or "").strip()
+    if redacted:
+        customer_email = _mask_email(customer_email) if customer_email else ""
+        customer_name = _mask_text(customer_name) if customer_name else ""
     if customer_name or customer_email:
         draw.text((margin, y), "Customer / Client", fill=fg, font=h_font)
         y += 26
@@ -436,13 +502,21 @@ def render_order_receipt_pdf_raster(order, items: Sequence | None = None) -> byt
     def _address_lines(addr) -> list[str]:
         if not addr:
             return []
+        line1 = (getattr(addr, "line1", None) or "").strip()
+        line2 = (getattr(addr, "line2", None) or "").strip()
+        postal_code = (getattr(addr, "postal_code", None) or "").strip()
+        city = (getattr(addr, "city", None) or "").strip()
+        if redacted and (line1 or postal_code):
+            line1 = "••••••"
+            line2 = ""
+            postal_code = "•••••"
         parts = [
-            (getattr(addr, "line1", None) or "").strip(),
-            (getattr(addr, "line2", None) or "").strip(),
+            line1,
+            line2,
             " ".join(
                 [
-                    (getattr(addr, "postal_code", None) or "").strip(),
-                    (getattr(addr, "city", None) or "").strip(),
+                    postal_code,
+                    city,
                 ]
             ).strip(),
             (getattr(addr, "region", None) or "").strip(),
@@ -534,6 +608,7 @@ def render_order_receipt_pdf_raster(order, items: Sequence | None = None) -> byt
 
     # Totals
     shipping_amount = getattr(order, "shipping_amount", None)
+    fee_amount = getattr(order, "fee_amount", None)
     tax_amount = getattr(order, "tax_amount", None)
     total_amount = getattr(order, "total_amount", None)
 
@@ -545,8 +620,10 @@ def render_order_receipt_pdf_raster(order, items: Sequence | None = None) -> byt
 
     if shipping_amount is not None:
         _right("Shipping / Livrare", shipping_amount)
+    if fee_amount is not None and Decimal(str(fee_amount or 0)) != 0:
+        _right("Additional / Cost supl.", fee_amount)
     if tax_amount is not None:
-        _right("Tax / Taxe", tax_amount)
+        _right("VAT / TVA", tax_amount)
     if total_amount is not None:
         draw.text((page_w - margin - 240, y), "Total / Total", fill=fg, font=h_font)
         draw.text((page_w - margin - 70, y + 2), _money(total_amount, currency), fill=fg, font=h_font, anchor="ra")

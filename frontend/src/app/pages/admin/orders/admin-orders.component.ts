@@ -12,7 +12,16 @@ import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { AdminOrderListItem, AdminOrderListResponse, AdminOrdersService } from '../../../core/admin-orders.service';
 import { orderStatusChipClass } from '../../../shared/order-status';
 
-type OrderStatusFilter = 'all' | 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+type OrderStatusFilter =
+  | 'all'
+  | 'pending'
+  | 'pending_payment'
+  | 'pending_acceptance'
+  | 'paid'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled'
+  | 'refunded';
 
 @Component({
   selector: 'app-admin-orders',
@@ -50,7 +59,8 @@ type OrderStatusFilter = 'all' | 'pending' | 'paid' | 'shipped' | 'delivered' | 
               [(ngModel)]="status"
             >
               <option value="all">{{ 'adminUi.orders.all' | translate }}</option>
-              <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
+              <option value="pending_payment">{{ 'adminUi.orders.pending_payment' | translate }}</option>
+              <option value="pending_acceptance">{{ 'adminUi.orders.pending_acceptance' | translate }}</option>
               <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
               <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
               <option value="delivered">{{ 'adminUi.orders.delivered' | translate }}</option>

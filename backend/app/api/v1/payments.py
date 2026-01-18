@@ -11,6 +11,7 @@ from app.models.order import Order, OrderItem, OrderStatus, OrderEvent
 from app.services import payments
 from app.services import auth as auth_service
 from app.services import email as email_service
+from app.services import checkout_settings as checkout_settings_service
 from app.services import notifications as notification_service
 from app.api.v1 import cart as cart_api
 
@@ -99,28 +100,34 @@ async def stripe_webhook(
                 .scalars()
                 .first()
             )
-            if order and order.status in {OrderStatus.pending, OrderStatus.paid}:
+            if order and order.status in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
                 captured_added = False
+                changed = False
                 if payment_intent_id and not order.stripe_payment_intent_id:
                     order.stripe_payment_intent_id = str(payment_intent_id)
-                    session.add(order)
-                    await session.commit()
-                    await session.refresh(order)
+                    changed = True
 
-                already_captured = any(
-                    getattr(evt, "event", None) == "payment_captured" for evt in (order.events or [])
-                )
-                if not already_captured:
+                if order.status == OrderStatus.pending_payment:
+                    order.status = OrderStatus.pending_acceptance
                     session.add(
                         OrderEvent(
                             order_id=order.id,
-                            event="payment_captured",
-                            note=f"Stripe checkout {session_id}",
+                            event="status_change",
+                            note="pending_payment -> pending_acceptance",
                         )
                     )
+                    changed = True
+
+                already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
+                if not already_captured:
+                    session.add(OrderEvent(order_id=order.id, event="payment_captured", note=f"Stripe checkout {session_id}"))
+                    captured_added = True
+                    changed = True
+
+                if changed:
+                    session.add(order)
                     await session.commit()
                     await session.refresh(order)
-                    captured_added = True
 
                 if order.user and order.user.id:
                     await notification_service.create_notification(
@@ -135,13 +142,19 @@ async def stripe_webhook(
                     )
 
                 if captured_added:
+                    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
                     customer_to = (order.user.email if order.user and order.user.email else None) or getattr(
                         order, "customer_email", None
                     )
                     customer_lang = order.user.preferred_language if order.user else None
                     if customer_to:
                         background_tasks.add_task(
-                            email_service.send_order_confirmation, customer_to, order, order.items, customer_lang
+                            email_service.send_order_confirmation,
+                            customer_to,
+                            order,
+                            order.items,
+                            customer_lang,
+                            receipt_share_days=checkout_settings.receipt_share_days,
                         )
                     owner = await auth_service.get_owner_user(session)
                     admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
@@ -177,16 +190,32 @@ async def stripe_webhook(
                 .scalars()
                 .first()
             )
-            if order and order.status in {OrderStatus.pending, OrderStatus.paid}:
+            if order and order.status in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
                 captured_added = False
+                changed = False
                 already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
                 if not already_captured:
                     session.add(OrderEvent(order_id=order.id, event="payment_captured", note=f"Stripe {intent_id}"))
+                    captured_added = True
+                    changed = True
+
+                if order.status == OrderStatus.pending_payment:
+                    order.status = OrderStatus.pending_acceptance
+                    session.add(
+                        OrderEvent(
+                            order_id=order.id,
+                            event="status_change",
+                            note="pending_payment -> pending_acceptance",
+                        )
+                    )
+                    changed = True
+
+                if changed:
+                    session.add(order)
                     await session.commit()
                     await session.refresh(order)
-                    captured_added = True
 
-                # Keep orders pending until an admin accepts them; still notify the customer of payment receipt.
+                # Keep orders pending_acceptance until an admin accepts them; still notify the customer of payment receipt.
                 if order.user and order.user.id:
                     await notification_service.create_notification(
                         session,
@@ -200,13 +229,19 @@ async def stripe_webhook(
                     )
 
                 if captured_added:
+                    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
                     customer_to = (order.user.email if order.user and order.user.email else None) or getattr(
                         order, "customer_email", None
                     )
                     customer_lang = order.user.preferred_language if order.user else None
                     if customer_to:
                         background_tasks.add_task(
-                            email_service.send_order_confirmation, customer_to, order, order.items, customer_lang
+                            email_service.send_order_confirmation,
+                            customer_to,
+                            order,
+                            order.items,
+                            customer_lang,
+                            receipt_share_days=checkout_settings.receipt_share_days,
                         )
                     owner = await auth_service.get_owner_user(session)
                     admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email

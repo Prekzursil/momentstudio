@@ -14,7 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import require_complete_profile, require_verified_email, require_admin, get_current_user_optional
 from app.core.config import settings
-from app.core.security import decode_receipt_token
+from app.core.security import create_receipt_token, decode_receipt_token
 from app.db.session import get_session
 from app.models.address import Address
 from app.models.cart import Cart
@@ -48,7 +48,7 @@ from app.services import paypal as paypal_service
 from app.services import address as address_service
 from app.api.v1 import cart as cart_api
 from app.schemas.order_admin import AdminOrderListItem, AdminOrderListResponse, AdminOrderRead, AdminPaginationMeta
-from app.schemas.receipt import ReceiptRead
+from app.schemas.receipt import ReceiptRead, ReceiptShareTokenRead
 from app.services import notifications as notification_service
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -129,8 +129,7 @@ async def create_order(
         cart,
         shipping_method=shipping_method,
         promo=None,
-        shipping_fee_ron=checkout_settings.shipping_fee_ron,
-        free_shipping_threshold_ron=checkout_settings.free_shipping_threshold_ron,
+        checkout_settings=checkout_settings,
     )
 
     order = await order_service.build_order_from_cart(
@@ -144,6 +143,7 @@ async def create_order(
         shipping_method=shipping_method,
         payment_method="cod",
         tax_amount=totals.tax,
+        fee_amount=totals.fee,
         shipping_amount=totals.shipping,
         total_amount=totals.total,
     )
@@ -161,6 +161,7 @@ async def create_order(
         order,
         order.items,
         current_user.preferred_language,
+        receipt_share_days=checkout_settings.receipt_share_days,
     )
     owner = await auth_service.get_owner_user(session)
     admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
@@ -247,8 +248,7 @@ async def checkout(
         user_cart,
         shipping_method=shipping_method,
         promo=promo,
-        shipping_fee_ron=checkout_settings.shipping_fee_ron,
-        free_shipping_threshold_ron=checkout_settings.free_shipping_threshold_ron,
+        checkout_settings=checkout_settings,
     )
     payment_method = payload.payment_method or "stripe"
     courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = _delivery_from_payload(
@@ -307,6 +307,7 @@ async def checkout(
         locker_lng=locker_lng,
         discount=discount_val,
         tax_amount=totals.tax,
+        fee_amount=totals.fee,
         shipping_amount=totals.shipping,
         total_amount=totals.total,
     )
@@ -325,6 +326,7 @@ async def checkout(
             order,
             order.items,
             current_user.preferred_language,
+            receipt_share_days=checkout_settings.receipt_share_days,
         )
         owner = await auth_service.get_owner_user(session)
         admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
@@ -400,20 +402,31 @@ async def capture_paypal_order(
             paypal_capture_id=order.paypal_capture_id,
         )
 
-    if order.status not in {OrderStatus.pending, OrderStatus.paid}:
+    if order.status not in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order cannot be captured")
 
     capture_id = await paypal_service.capture_order(paypal_order_id=paypal_order_id)
+    if order.status == OrderStatus.pending_payment:
+        order.status = OrderStatus.pending_acceptance
+        session.add(OrderEvent(order_id=order.id, event="status_change", note="pending_payment -> pending_acceptance"))
     order.paypal_capture_id = capture_id or order.paypal_capture_id
     session.add(order)
     session.add(OrderEvent(order_id=order.id, event="payment_captured", note=f"PayPal {capture_id}".strip()))
     await session.commit()
     await session.refresh(order)
 
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
     customer_to = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
     customer_lang = order.user.preferred_language if order.user else None
     if customer_to:
-        background_tasks.add_task(email_service.send_order_confirmation, customer_to, order, order.items, customer_lang)
+        background_tasks.add_task(
+            email_service.send_order_confirmation,
+            customer_to,
+            order,
+            order.items,
+            customer_lang,
+            receipt_share_days=checkout_settings.receipt_share_days,
+        )
     owner = await auth_service.get_owner_user(session)
     admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
     if admin_to:
@@ -519,6 +532,9 @@ async def confirm_stripe_checkout(
             )
         )
         captured_added = True
+    if order.status == OrderStatus.pending_payment:
+        order.status = OrderStatus.pending_acceptance
+        session.add(OrderEvent(order_id=order.id, event="status_change", note="pending_payment -> pending_acceptance"))
     session.add(order)
     await session.commit()
     await session.refresh(order)
@@ -594,7 +610,7 @@ async def admin_search_orders(
             id=order.id,
             reference_code=order.reference_code,
             status=order.status,
-            total_amount=float(order.total_amount),
+            total_amount=order.total_amount,
             currency=order.currency,
             created_at=order.created_at,
             customer_email=email,
@@ -879,8 +895,7 @@ async def guest_checkout(
         cart,
         shipping_method=shipping_method,
         promo=promo,
-        shipping_fee_ron=checkout_settings.shipping_fee_ron,
-        free_shipping_threshold_ron=checkout_settings.free_shipping_threshold_ron,
+        checkout_settings=checkout_settings,
     )
     payment_method = payload.payment_method or "stripe"
     courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = _delivery_from_payload(
@@ -939,6 +954,7 @@ async def guest_checkout(
         locker_lng=locker_lng,
         discount=discount_val,
         tax_amount=totals.tax,
+        fee_amount=totals.fee,
         shipping_amount=totals.shipping,
         total_amount=totals.total,
     )
@@ -950,6 +966,7 @@ async def guest_checkout(
             order,
             order.items,
             payload.preferred_language,
+            receipt_share_days=checkout_settings.receipt_share_days,
         )
         owner = await auth_service.get_owner_user(session)
         admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
@@ -1393,11 +1410,14 @@ async def download_receipt(
 @router.get("/receipt/{token}", response_model=ReceiptRead)
 async def read_receipt_by_token(
     token: str,
+    reveal: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user_optional),
 ) -> ReceiptRead:
-    order_id = decode_receipt_token(token)
-    if not order_id:
+    decoded = decode_receipt_token(token)
+    if not decoded:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid receipt token")
+    order_id, token_version = decoded
     try:
         order_uuid = UUID(order_id)
     except Exception:
@@ -1406,17 +1426,27 @@ async def read_receipt_by_token(
     order = await order_service.get_order_by_id(session, order_uuid)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Receipt not found")
-    return receipt_service.build_order_receipt(order, order.items)
+    if int(getattr(order, "receipt_token_version", 0) or 0) != int(token_version):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid receipt token")
+    role = getattr(current_user, "role", None) if current_user else None
+    role_value = (getattr(role, "value", None) or str(role or "")).strip().lower()
+    is_admin = role_value in {"admin", "owner"}
+    is_owner = bool(current_user and getattr(order, "user_id", None) and getattr(current_user, "id", None) == order.user_id)
+    allow_full = bool(reveal and (is_admin or is_owner))
+    return receipt_service.build_order_receipt(order, order.items, redacted=not allow_full)
 
 
 @router.get("/receipt/{token}/pdf")
 async def download_receipt_by_token(
     token: str,
+    reveal: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user_optional),
 ):
-    order_id = decode_receipt_token(token)
-    if not order_id:
+    decoded = decode_receipt_token(token)
+    if not decoded:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid receipt token")
+    order_id, token_version = decoded
     try:
         order_uuid = UUID(order_id)
     except Exception:
@@ -1425,11 +1455,80 @@ async def download_receipt_by_token(
     order = await order_service.get_order_by_id(session, order_uuid)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Receipt not found")
+    if int(getattr(order, "receipt_token_version", 0) or 0) != int(token_version):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid receipt token")
+    role = getattr(current_user, "role", None) if current_user else None
+    role_value = (getattr(role, "value", None) or str(role or "")).strip().lower()
+    is_admin = role_value in {"admin", "owner"}
+    is_owner = bool(current_user and getattr(order, "user_id", None) and getattr(current_user, "id", None) == order.user_id)
+    allow_full = bool(reveal and (is_admin or is_owner))
     ref = order.reference_code or str(order.id)
     filename = f"receipt-{ref}.pdf"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
-    pdf = receipt_service.render_order_receipt_pdf(order, order.items)
+    pdf = receipt_service.render_order_receipt_pdf(order, order.items, redacted=not allow_full)
     return StreamingResponse(io.BytesIO(pdf), media_type="application/pdf", headers=headers)
+
+
+@router.post("/{order_id}/receipt/share", response_model=ReceiptShareTokenRead)
+async def create_receipt_share_token(
+    order_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(require_complete_profile),
+) -> ReceiptShareTokenRead:
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    role = getattr(current_user, "role", None)
+    role_value = (getattr(role, "value", None) or str(role or "")).strip().lower()
+    is_admin = role_value in {"admin", "owner"}
+    is_owner = bool(getattr(order, "user_id", None) and getattr(current_user, "id", None) == order.user_id)
+    if not (is_admin or is_owner):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=int(checkout_settings.receipt_share_days))
+    token = create_receipt_token(
+        order_id=str(order.id),
+        expires_at=expires_at,
+        token_version=int(getattr(order, "receipt_token_version", 0) or 0),
+    )
+    receipt_url = f"{settings.frontend_origin.rstrip('/')}/receipt/{token}"
+    receipt_pdf_url = f"{settings.frontend_origin.rstrip('/')}/api/v1/orders/receipt/{token}/pdf"
+    return ReceiptShareTokenRead(token=token, receipt_url=receipt_url, receipt_pdf_url=receipt_pdf_url, expires_at=expires_at)
+
+
+@router.post("/{order_id}/receipt/revoke", response_model=ReceiptShareTokenRead)
+async def revoke_receipt_share_token(
+    order_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(require_complete_profile),
+) -> ReceiptShareTokenRead:
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    role = getattr(current_user, "role", None)
+    role_value = (getattr(role, "value", None) or str(role or "")).strip().lower()
+    is_admin = role_value in {"admin", "owner"}
+    is_owner = bool(getattr(order, "user_id", None) and getattr(current_user, "id", None) == order.user_id)
+    if not (is_admin or is_owner):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+
+    order.receipt_token_version = int(getattr(order, "receipt_token_version", 0) or 0) + 1
+    session.add(order)
+    session.add(OrderEvent(order_id=order.id, event="receipt_token_revoked", note=f"v{order.receipt_token_version}"))
+    await session.commit()
+    await session.refresh(order)
+
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=int(checkout_settings.receipt_share_days))
+    token = create_receipt_token(
+        order_id=str(order.id),
+        expires_at=expires_at,
+        token_version=int(getattr(order, "receipt_token_version", 0) or 0),
+    )
+    receipt_url = f"{settings.frontend_origin.rstrip('/')}/receipt/{token}"
+    receipt_pdf_url = f"{settings.frontend_origin.rstrip('/')}/api/v1/orders/receipt/{token}/pdf"
+    return ReceiptShareTokenRead(token=token, receipt_url=receipt_url, receipt_pdf_url=receipt_pdf_url, expires_at=expires_at)
 
 
 @router.post("/{order_id}/reorder", response_model=CartRead)
@@ -1439,4 +1538,5 @@ async def reorder_order(
     session: AsyncSession = Depends(get_session),
 ) -> CartRead:
     cart = await cart_service.reorder_from_order(session, current_user.id, order_id)
-    return await cart_service.serialize_cart(session, cart)
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+    return await cart_service.serialize_cart(session, cart, checkout_settings=checkout_settings)

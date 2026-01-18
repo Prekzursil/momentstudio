@@ -250,6 +250,72 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                 [(value)]="checkoutSettingsForm.free_shipping_threshold_ron"
               ></app-input>
             </div>
+
+            <div class="grid gap-3 text-sm">
+              <label class="flex items-center gap-2">
+                <input type="checkbox" [(ngModel)]="checkoutSettingsForm.fee_enabled" />
+                <span class="text-slate-700 dark:text-slate-200">{{ 'adminUi.site.checkout.feeEnabled' | translate }}</span>
+              </label>
+              <div class="grid md:grid-cols-2 gap-3" *ngIf="checkoutSettingsForm.fee_enabled">
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.site.checkout.feeType' | translate }}
+                  <select
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="checkoutSettingsForm.fee_type"
+                  >
+                    <option value="flat">{{ 'adminUi.site.checkout.feeTypeFlat' | translate }}</option>
+                    <option value="percent">{{ 'adminUi.site.checkout.feeTypePercent' | translate }}</option>
+                  </select>
+                </label>
+                <app-input
+                  [label]="'adminUi.site.checkout.feeValue' | translate"
+                  type="number"
+                  [min]="0"
+                  [step]="0.01"
+                  placeholder="0.00"
+                  [(value)]="checkoutSettingsForm.fee_value"
+                ></app-input>
+              </div>
+            </div>
+
+            <div class="grid gap-3 text-sm">
+              <label class="flex items-center gap-2">
+                <input type="checkbox" [(ngModel)]="checkoutSettingsForm.vat_enabled" />
+                <span class="text-slate-700 dark:text-slate-200">{{ 'adminUi.site.checkout.vatEnabled' | translate }}</span>
+              </label>
+              <div class="grid md:grid-cols-2 gap-3" *ngIf="checkoutSettingsForm.vat_enabled">
+                <app-input
+                  [label]="'adminUi.site.checkout.vatRatePercent' | translate"
+                  type="number"
+                  [min]="0"
+                  [max]="100"
+                  [step]="0.01"
+                  placeholder="10.00"
+                  [(value)]="checkoutSettingsForm.vat_rate_percent"
+                ></app-input>
+                <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
+                  <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                    <input type="checkbox" [(ngModel)]="checkoutSettingsForm.vat_apply_to_shipping" />
+                    <span>{{ 'adminUi.site.checkout.vatApplyToShipping' | translate }}</span>
+                  </label>
+                  <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                    <input type="checkbox" [(ngModel)]="checkoutSettingsForm.vat_apply_to_fee" />
+                    <span>{{ 'adminUi.site.checkout.vatApplyToFee' | translate }}</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-3 text-sm">
+              <app-input
+                [label]="'adminUi.site.checkout.receiptShareDays' | translate"
+                type="number"
+                [min]="1"
+                [step]="1"
+                placeholder="365"
+                [(value)]="checkoutSettingsForm.receipt_share_days"
+              ></app-input>
+            </div>
             <div class="flex items-center gap-2 text-sm">
               <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="checkoutSettingsMessage">{{ checkoutSettingsMessage }}</span>
               <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="checkoutSettingsError">{{ checkoutSettingsError }}</span>
@@ -1234,7 +1300,8 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                 {{ 'adminUi.orders.statusFilter' | translate }}
                 <select class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="orderFilter">
                   <option value="">{{ 'adminUi.orders.all' | translate }}</option>
-                  <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
+                  <option value="pending_payment">{{ 'adminUi.orders.pending_payment' | translate }}</option>
+                  <option value="pending_acceptance">{{ 'adminUi.orders.pending_acceptance' | translate }}</option>
                   <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
                   <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
                   <option value="refunded">{{ 'adminUi.orders.refunded' | translate }}</option>
@@ -1255,7 +1322,8 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                 <div class="flex items-center justify-between">
                   <h3 class="font-semibold text-slate-900 dark:text-slate-50">Order #{{ activeOrder.id }}</h3>
                   <select class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [ngModel]="activeOrder.status" (ngModelChange)="changeOrderStatus($event)">
-                    <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
+                    <option value="pending_payment">{{ 'adminUi.orders.pending_payment' | translate }}</option>
+                    <option value="pending_acceptance">{{ 'adminUi.orders.pending_acceptance' | translate }}</option>
                     <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
                     <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
                     <option value="cancelled">{{ 'adminUi.orders.cancelled' | translate }}</option>
@@ -2333,9 +2401,28 @@ export class AdminComponent implements OnInit, OnDestroy {
   socialError: string | null = null;
   socialThumbLoading: Record<string, boolean> = {};
   socialThumbErrors: Record<string, string> = {};
-  checkoutSettingsForm: { shipping_fee_ron: number | string; free_shipping_threshold_ron: number | string } = {
+  checkoutSettingsForm: {
+    shipping_fee_ron: number | string;
+    free_shipping_threshold_ron: number | string;
+    fee_enabled: boolean;
+    fee_type: 'flat' | 'percent';
+    fee_value: number | string;
+    vat_enabled: boolean;
+    vat_rate_percent: number | string;
+    vat_apply_to_shipping: boolean;
+    vat_apply_to_fee: boolean;
+    receipt_share_days: number | string;
+  } = {
     shipping_fee_ron: 20,
-    free_shipping_threshold_ron: 300
+    free_shipping_threshold_ron: 300,
+    fee_enabled: false,
+    fee_type: 'flat',
+    fee_value: 0,
+    vat_enabled: true,
+    vat_rate_percent: 10,
+    vat_apply_to_shipping: false,
+    vat_apply_to_fee: false,
+    receipt_share_days: 365
   };
   checkoutSettingsMessage: string | null = null;
   checkoutSettingsError: string | null = null;
@@ -3865,16 +3952,58 @@ export class AdminComponent implements OnInit, OnDestroy {
       next: (block) => {
         this.rememberContentVersion('site.checkout', block);
         const meta = (block.meta || {}) as Record<string, any>;
+        const parseBool = (value: any, fallback: boolean) => {
+          if (typeof value === 'boolean') return value;
+          if (typeof value === 'number') return Boolean(value);
+          if (typeof value === 'string') {
+            const v = value.trim().toLowerCase();
+            if (['1', 'true', 'yes', 'on'].includes(v)) return true;
+            if (['0', 'false', 'no', 'off'].includes(v)) return false;
+          }
+          return fallback;
+        };
         const shipping = Number(meta['shipping_fee_ron']);
         const threshold = Number(meta['free_shipping_threshold_ron']);
+        const feeEnabled = parseBool(meta['fee_enabled'], false);
+        const feeTypeRaw = String(meta['fee_type'] ?? 'flat').trim().toLowerCase();
+        const feeType = feeTypeRaw === 'percent' ? 'percent' : 'flat';
+        const feeValueRaw = Number(meta['fee_value']);
+        const feeValue = Number.isFinite(feeValueRaw) && feeValueRaw >= 0 ? feeValueRaw : 0;
+        const vatEnabled = parseBool(meta['vat_enabled'], true);
+        const vatRateRaw = Number(meta['vat_rate_percent']);
+        const vatRate = Number.isFinite(vatRateRaw) && vatRateRaw >= 0 && vatRateRaw <= 100 ? vatRateRaw : 10;
+        const vatApplyToShipping = parseBool(meta['vat_apply_to_shipping'], false);
+        const vatApplyToFee = parseBool(meta['vat_apply_to_fee'], false);
+        const receiptDaysRaw = Number(meta['receipt_share_days']);
+        const receiptShareDays =
+          Number.isFinite(receiptDaysRaw) && receiptDaysRaw >= 1 && receiptDaysRaw <= 3650 ? Math.trunc(receiptDaysRaw) : 365;
         this.checkoutSettingsForm = {
           shipping_fee_ron: Number.isFinite(shipping) && shipping >= 0 ? shipping : 20,
-          free_shipping_threshold_ron: Number.isFinite(threshold) && threshold >= 0 ? threshold : 300
+          free_shipping_threshold_ron: Number.isFinite(threshold) && threshold >= 0 ? threshold : 300,
+          fee_enabled: feeEnabled,
+          fee_type: feeType,
+          fee_value: feeValue,
+          vat_enabled: vatEnabled,
+          vat_rate_percent: vatRate,
+          vat_apply_to_shipping: vatApplyToShipping,
+          vat_apply_to_fee: vatApplyToFee,
+          receipt_share_days: receiptShareDays
         };
       },
       error: () => {
         delete this.contentVersions['site.checkout'];
-        this.checkoutSettingsForm = { shipping_fee_ron: 20, free_shipping_threshold_ron: 300 };
+        this.checkoutSettingsForm = {
+          shipping_fee_ron: 20,
+          free_shipping_threshold_ron: 300,
+          fee_enabled: false,
+          fee_type: 'flat',
+          fee_value: 0,
+          vat_enabled: true,
+          vat_rate_percent: 10,
+          vat_apply_to_shipping: false,
+          vat_apply_to_fee: false,
+          receipt_share_days: 365
+        };
       }
     });
   }
@@ -3887,11 +4016,40 @@ export class AdminComponent implements OnInit, OnDestroy {
     const shipping = Number.isFinite(shippingRaw) && shippingRaw >= 0 ? Math.round(shippingRaw * 100) / 100 : 20;
     const threshold = Number.isFinite(thresholdRaw) && thresholdRaw >= 0 ? Math.round(thresholdRaw * 100) / 100 : 300;
 
+    const feeEnabled = Boolean(this.checkoutSettingsForm.fee_enabled);
+    const feeType = this.checkoutSettingsForm.fee_type === 'percent' ? 'percent' : 'flat';
+    const feeValueRaw = Number(this.checkoutSettingsForm.fee_value);
+    const feeValue = Number.isFinite(feeValueRaw) && feeValueRaw >= 0 ? Math.round(feeValueRaw * 100) / 100 : 0;
+
+    const vatEnabled = Boolean(this.checkoutSettingsForm.vat_enabled);
+    const vatRateRaw = Number(this.checkoutSettingsForm.vat_rate_percent);
+    const vatRate =
+      Number.isFinite(vatRateRaw) && vatRateRaw >= 0 && vatRateRaw <= 100 ? Math.round(vatRateRaw * 100) / 100 : 10;
+    const vatApplyToShipping = Boolean(this.checkoutSettingsForm.vat_apply_to_shipping);
+    const vatApplyToFee = Boolean(this.checkoutSettingsForm.vat_apply_to_fee);
+
+    const receiptDaysRaw = Number(this.checkoutSettingsForm.receipt_share_days);
+    const receiptShareDays =
+      Number.isFinite(receiptDaysRaw) && receiptDaysRaw >= 1 && receiptDaysRaw <= 3650 ? Math.trunc(receiptDaysRaw) : 365;
+
     const payload = {
       title: 'Checkout settings',
-      body_markdown: 'Shipping fee and free-shipping threshold used at checkout.',
+      body_markdown:
+        'Checkout pricing settings (shipping, discounts, VAT, additional fees, and receipt sharing).',
       status: 'published',
-      meta: { version: 1, shipping_fee_ron: shipping, free_shipping_threshold_ron: threshold }
+      meta: {
+        version: 1,
+        shipping_fee_ron: shipping,
+        free_shipping_threshold_ron: threshold,
+        fee_enabled: feeEnabled,
+        fee_type: feeType,
+        fee_value: feeValue,
+        vat_enabled: vatEnabled,
+        vat_rate_percent: vatRate,
+        vat_apply_to_shipping: vatApplyToShipping,
+        vat_apply_to_fee: vatApplyToFee,
+        receipt_share_days: receiptShareDays
+      }
     };
 
     const onSuccess = (block?: { version?: number } | null) => {
