@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, s
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.dependencies import get_current_user_optional, require_admin
+from app.core.dependencies import get_current_user, get_current_user_optional, require_admin
 from app.db.session import get_session
 from app.models.support import ContactSubmissionStatus, ContactSubmissionTopic
 from app.models.user import User
@@ -17,12 +17,52 @@ from app.schemas.support import (
     ContactSubmissionListResponse,
     ContactSubmissionRead,
     ContactSubmissionUpdate,
+    TicketCreate,
+    TicketListItemRead,
+    TicketMessageCreate,
+    TicketMessageRead,
+    TicketRead,
 )
 from app.services import auth as auth_service
 from app.services import email as email_service
 from app.services import support as support_service
 
 router = APIRouter(prefix="/support", tags=["support"])
+
+
+def _submission_to_ticket(submission, *, include_thread: bool) -> TicketRead:
+    messages: list[TicketMessageRead] = []
+    if include_thread:
+        messages.append(
+            TicketMessageRead(
+                id=f"initial:{submission.id}",
+                from_admin=False,
+                message=submission.message,
+                created_at=submission.created_at,
+            )
+        )
+        for m in getattr(submission, "messages", []) or []:
+            messages.append(
+                TicketMessageRead(
+                    id=str(m.id),
+                    from_admin=bool(getattr(m, "from_admin", False)),
+                    message=m.message,
+                    created_at=m.created_at,
+                )
+            )
+
+    return TicketRead(
+        id=submission.id,
+        topic=submission.topic,
+        status=submission.status,
+        name=submission.name,
+        email=submission.email,
+        order_reference=submission.order_reference,
+        created_at=submission.created_at,
+        updated_at=submission.updated_at,
+        resolved_at=submission.resolved_at,
+        messages=messages,
+    )
 
 
 @router.post("/contact", response_model=ContactSubmissionRead, status_code=status.HTTP_201_CREATED)
@@ -57,7 +97,71 @@ async def submit_contact(
             lang=owner.preferred_language if owner else None,
         )
 
-    return ContactSubmissionRead.model_validate(record)
+    hydrated = await support_service.get_contact_submission_with_messages(session, record.id)
+    return ContactSubmissionRead.model_validate(hydrated or record)
+
+
+@router.get("/me/submissions", response_model=list[TicketListItemRead])
+async def list_my_tickets(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[TicketListItemRead]:
+    rows = await support_service.list_contact_submissions_for_user(session, user=user)
+    return [TicketListItemRead.model_validate(r) for r in rows]
+
+
+@router.post("/me/submissions", response_model=TicketRead, status_code=status.HTTP_201_CREATED)
+async def create_my_ticket(
+    payload: TicketCreate,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> TicketRead:
+    display_name = (getattr(user, "name", None) or "").strip() or (getattr(user, "username", None) or "").strip() or "Customer"
+    record = await support_service.create_contact_submission(
+        session,
+        topic=payload.topic,
+        name=display_name,
+        email=str(user.email),
+        message=payload.message,
+        order_reference=payload.order_reference,
+        user=user,
+    )
+    hydrated = await support_service.get_contact_submission_with_messages(session, record.id)
+    if not hydrated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+    return _submission_to_ticket(hydrated, include_thread=True)
+
+
+@router.get("/me/submissions/{submission_id}", response_model=TicketRead)
+async def get_my_ticket(
+    submission_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> TicketRead:
+    record = await support_service.get_contact_submission_with_messages(session, submission_id)
+    if not record or not record.user_id or record.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+    return _submission_to_ticket(record, include_thread=True)
+
+
+@router.post("/me/submissions/{submission_id}/messages", response_model=TicketRead)
+async def reply_my_ticket(
+    submission_id: UUID,
+    payload: TicketMessageCreate,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> TicketRead:
+    record = await support_service.get_contact_submission_with_messages(session, submission_id)
+    if not record or not record.user_id or record.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+    updated = await support_service.add_contact_submission_message(
+        session,
+        submission=record,
+        message=payload.message,
+        from_admin=False,
+        actor=user,
+    )
+    return _submission_to_ticket(updated, include_thread=True)
 
 
 @router.get("/admin/submissions", response_model=ContactSubmissionListResponse)
@@ -102,7 +206,7 @@ async def admin_get_contact_submission(
     session: AsyncSession = Depends(get_session),
     _: User = Depends(require_admin),
 ) -> ContactSubmissionRead:
-    record = await support_service.get_contact_submission(session, submission_id)
+    record = await support_service.get_contact_submission_with_messages(session, submission_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
     return ContactSubmissionRead.model_validate(record)
@@ -115,7 +219,7 @@ async def admin_update_contact_submission(
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin),
 ) -> ContactSubmissionRead:
-    record = await support_service.get_contact_submission(session, submission_id)
+    record = await support_service.get_contact_submission_with_messages(session, submission_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
     updated = await support_service.update_contact_submission(
@@ -123,6 +227,29 @@ async def admin_update_contact_submission(
         submission=record,
         status_value=payload.status,
         admin_note=payload.admin_note,
+        actor=admin,
+    )
+    hydrated = await support_service.get_contact_submission_with_messages(session, updated.id)
+    if not hydrated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+    return ContactSubmissionRead.model_validate(hydrated)
+
+
+@router.post("/admin/submissions/{submission_id}/messages", response_model=ContactSubmissionRead)
+async def admin_reply_contact_submission(
+    submission_id: UUID,
+    payload: TicketMessageCreate,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin),
+) -> ContactSubmissionRead:
+    record = await support_service.get_contact_submission_with_messages(session, submission_id)
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+    updated = await support_service.add_contact_submission_message(
+        session,
+        submission=record,
+        message=payload.message,
+        from_admin=True,
         actor=admin,
     )
     return ContactSubmissionRead.model_validate(updated)

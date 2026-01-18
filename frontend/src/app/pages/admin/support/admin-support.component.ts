@@ -200,6 +200,54 @@ import {
                 </div>
               </div>
 
+              <div *ngIf="selected()!.messages?.length" class="grid gap-1">
+                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.support.detail.thread' | translate }}
+                </div>
+                <div class="grid gap-3">
+                  <div
+                    *ngFor="let m of selected()!.messages"
+                    class="rounded-xl border border-slate-200 p-3 whitespace-pre-wrap leading-relaxed dark:border-slate-800"
+                    [ngClass]="m.from_admin ? 'bg-slate-50 dark:bg-slate-950/30' : 'bg-white dark:bg-slate-900'"
+                  >
+                    <div class="flex items-center justify-between gap-3">
+                      <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                        {{ m.from_admin ? ('adminUi.support.detail.fromSupport' | translate) : ('adminUi.support.detail.fromCustomer' | translate) }}
+                      </div>
+                      <div class="text-xs text-slate-500 dark:text-slate-400">{{ m.created_at | date: 'short' }}</div>
+                    </div>
+                    <div class="mt-2 text-slate-800 dark:text-slate-100">{{ m.message }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid gap-2">
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.support.detail.reply' | translate }}
+                  <textarea
+                    class="min-h-[120px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                    [(ngModel)]="replyMessage"
+                    name="replyMessage"
+                    maxlength="10000"
+                    [disabled]="selected()!.status === 'resolved'"
+                    [placeholder]="
+                      selected()!.status === 'resolved'
+                        ? ('adminUi.support.detail.solvedHint' | translate)
+                        : ('adminUi.support.detail.replyPlaceholder' | translate)
+                    "
+                  ></textarea>
+                </label>
+
+                <div class="flex justify-end">
+                  <app-button
+                    size="sm"
+                    [disabled]="replying() || selected()!.status === 'resolved'"
+                    [label]="'adminUi.support.detail.sendReply' | translate"
+                    (action)="sendReply()"
+                  ></app-button>
+                </div>
+              </div>
+
               <div class="grid gap-2">
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                   {{ 'adminUi.support.detail.statusLabel' | translate }}
@@ -247,6 +295,7 @@ export class AdminSupportComponent implements OnInit {
   loading = signal<boolean>(true);
   detailLoading = signal<boolean>(false);
   saving = signal<boolean>(false);
+  replying = signal<boolean>(false);
   error = signal<string>('');
 
   items = signal<AdminContactSubmissionListItem[]>([]);
@@ -262,6 +311,7 @@ export class AdminSupportComponent implements OnInit {
 
   editStatus: SupportStatus = 'new';
   editNote = '';
+  replyMessage = '';
 
   constructor(private api: AdminSupportService, private toast: ToastService, private translate: TranslateService) {}
 
@@ -309,6 +359,7 @@ export class AdminSupportComponent implements OnInit {
         this.selected.set(detail);
         this.editStatus = detail.status;
         this.editNote = detail.admin_note || '';
+        this.replyMessage = '';
       },
       error: () => {
         this.toast.error(this.translate.instant('adminUi.support.errors.loadDetail'));
@@ -345,6 +396,31 @@ export class AdminSupportComponent implements OnInit {
         },
         complete: () => this.saving.set(false)
       });
+  }
+
+  sendReply(): void {
+    const selected = this.selected();
+    if (!selected) return;
+    const message = (this.replyMessage || '').trim();
+    if (!message) {
+      this.toast.error(this.translate.instant('adminUi.support.errors.reply'));
+      return;
+    }
+    if (this.replying()) return;
+    this.replying.set(true);
+    this.api.addMessage(selected.id, message).subscribe({
+      next: (updated) => {
+        this.selected.set(updated);
+        this.replyMessage = '';
+        this.items.set(this.items().map((it) => (it.id === updated.id ? { ...it, status: updated.status } : it)));
+        this.toast.success(this.translate.instant('adminUi.support.success.replySent'));
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.support.errors.reply');
+        this.toast.error(msg);
+      },
+      complete: () => this.replying.set(false)
+    });
   }
 
   hasPrev(): boolean {

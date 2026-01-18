@@ -134,3 +134,76 @@ def test_support_admin_update_requires_admin(test_app: Dict[str, object]) -> Non
     )
     assert ok.status_code == 200, ok.text
     assert ok.json()["status"] == "resolved"
+
+
+def test_support_ticket_thread_user_and_admin_reply(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token, _ = create_user_token(SessionLocal, email="admin3@example.com", role=UserRole.admin, username="admin3")
+    user_token, user_id = create_user_token(SessionLocal, email="user3@example.com", role=UserRole.customer, username="user3")
+
+    created = client.post(
+        "/api/v1/support/me/submissions",
+        headers=auth_headers(user_token),
+        json={"topic": "support", "message": "Need help", "order_reference": "MS-100"},
+    )
+    assert created.status_code == 201, created.text
+    ticket = created.json()
+    ticket_id = ticket["id"]
+    assert len(ticket["messages"]) == 1
+    assert ticket["messages"][0]["from_admin"] is False
+    assert ticket["messages"][0]["message"] == "Need help"
+
+    listed = client.get("/api/v1/support/me/submissions", headers=auth_headers(user_token))
+    assert listed.status_code == 200, listed.text
+    assert any(row["id"] == ticket_id for row in listed.json())
+
+    admin_reply = client.post(
+        f"/api/v1/support/admin/submissions/{ticket_id}/messages",
+        headers=auth_headers(admin_token),
+        json={"message": "We can help"},
+    )
+    assert admin_reply.status_code == 200, admin_reply.text
+    admin_view = admin_reply.json()
+    assert admin_view["id"] == ticket_id
+    assert admin_view["message"] == "Need help"
+    assert len(admin_view["messages"]) == 1
+    assert admin_view["messages"][0]["from_admin"] is True
+
+    fetched = client.get(f"/api/v1/support/me/submissions/{ticket_id}", headers=auth_headers(user_token))
+    assert fetched.status_code == 200, fetched.text
+    thread = fetched.json()
+    assert thread["id"] == ticket_id
+    assert len(thread["messages"]) == 2
+    assert thread["messages"][1]["from_admin"] is True
+    assert thread["messages"][1]["message"] == "We can help"
+
+    user_reply = client.post(
+        f"/api/v1/support/me/submissions/{ticket_id}/messages",
+        headers=auth_headers(user_token),
+        json={"message": "Thanks"},
+    )
+    assert user_reply.status_code == 200, user_reply.text
+    assert len(user_reply.json()["messages"]) == 3
+
+    resolved = client.patch(
+        f"/api/v1/support/admin/submissions/{ticket_id}",
+        headers=auth_headers(admin_token),
+        json={"status": "resolved"},
+    )
+    assert resolved.status_code == 200, resolved.text
+
+    blocked = client.post(
+        f"/api/v1/support/me/submissions/{ticket_id}/messages",
+        headers=auth_headers(user_token),
+        json={"message": "One more thing"},
+    )
+    assert blocked.status_code == 400, blocked.text
+
+    async def _assert_ticket_owner() -> None:
+        async with SessionLocal() as session:
+            ticket_owner_id = await session.scalar(select(UserNotification.user_id).where(UserNotification.user_id == user_id))
+            assert ticket_owner_id is not None
+
+    asyncio.run(_assert_ticket_owner())

@@ -97,6 +97,12 @@ export const routes: Routes = [
     title: 'Change password | momentstudio'
   },
   {
+    path: 'tickets',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/tickets/tickets.component').then((m) => m.TicketsComponent),
+    title: 'Help center | momentstudio'
+  },
+  {
     path: 'admin',
     canActivate: [adminGuard],
     loadComponent: () => import('./pages/admin/admin-layout.component').then((m) => m.AdminLayoutComponent),
