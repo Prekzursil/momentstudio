@@ -45,6 +45,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Auth/Profile: add email change endpoint with 30-day cooldown + history tracking (disabled while Google is linked).
 - [x] Auth/Profile: support secondary emails (add/verify/remove, set primary, login via verified secondary) with global uniqueness enforcement.
 - [x] Auth: migrate frontend auth storage to cookie-based refresh sessions (avoid persisting refresh tokens in localStorage; wire “Keep me signed in” to cookie/session TTL).
+- [ ] Auth: make refresh token rotation multi-tab safe (tolerate concurrent refresh across tabs/devices without forcing a logout).
 - [x] Auth/Profile: enforce username (7d) + display name (1h) change cooldowns and reuse display name tags when reverting.
 - [x] Profile: add “use Google photo” + “remove avatar” endpoints; default to local placeholder avatar (Google photo opt-in).
 
