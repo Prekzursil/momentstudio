@@ -141,6 +141,78 @@ async def bootstrap_owner(*, email: str, password: str, username: str, display_n
         print(f"Owner set: {user.email} ({user.username}) id={user.id}")
 
 
+async def repair_owner(
+    *,
+    email: str | None,
+    password: str | None,
+    username: str | None,
+    display_name: str | None,
+    verify_email: bool,
+) -> None:
+    """Repair the existing owner account without transferring ownership.
+
+    This is meant for local/dev recovery when an owner accidentally changes
+    an email/username and gets blocked by cooldowns or unverified-email guards.
+    """
+
+    email_norm = (email or "").strip().lower() or None
+    username_norm = (username or "").strip() or None
+    display_name_norm = (display_name or "").strip() or None
+
+    if email_norm and "@" not in email_norm:
+        raise SystemExit("Invalid email")
+    if password is not None and len(password) < 6:
+        print("WARNING: setting owner password shorter than 6 characters; change it immediately.")
+
+    async with SessionLocal() as session:
+        owner = (await session.execute(select(User).where(User.role == UserRole.owner))).scalar_one_or_none()
+        if not owner:
+            raise SystemExit("No owner account found. Run bootstrap-owner first.")
+
+        now = datetime.now(timezone.utc)
+
+        if email_norm:
+            existing_email_user = (
+                await session.execute(select(User).where(func.lower(User.email) == email_norm))
+            ).scalar_one_or_none()
+            if existing_email_user and existing_email_user.id != owner.id:
+                raise SystemExit(f"Email already registered: {email_norm}")
+            if (owner.email or "").strip().lower() != email_norm:
+                owner.email = email_norm
+                session.add(UserEmailHistory(user_id=owner.id, email=email_norm, created_at=now))
+            if verify_email:
+                owner.email_verified = True
+            else:
+                owner.email_verified = owner.email_verified and (owner.email or "").strip().lower() == email_norm
+        elif verify_email:
+            owner.email_verified = True
+
+        if username_norm:
+            existing_username_user = (
+                await session.execute(select(User).where(User.username == username_norm))
+            ).scalar_one_or_none()
+            if existing_username_user and existing_username_user.id != owner.id:
+                raise SystemExit(f"Username already taken: {username_norm}")
+            if owner.username != username_norm:
+                owner.username = username_norm
+                session.add(UserUsernameHistory(user_id=owner.id, username=username_norm, created_at=now))
+
+        if display_name_norm and (owner.name or "") != display_name_norm:
+            tag = await _allocate_name_tag(session, name=display_name_norm, exclude_user_id=owner.id)
+            owner.name = display_name_norm
+            owner.name_tag = tag
+            session.add(UserDisplayNameHistory(user_id=owner.id, name=display_name_norm, name_tag=tag, created_at=now))
+
+        if password is not None:
+            owner.hashed_password = security.hash_password(password)
+
+        owner.role = UserRole.owner
+        session.add(owner)
+        await session.commit()
+        await session.refresh(owner)
+        print(f"Owner repaired: {owner.email} ({owner.username}) id={owner.id}")
+
+
 async def export_data(output: Path) -> None:
     data: Dict[str, Any] = {}
     async with SessionLocal() as session:
@@ -496,6 +568,16 @@ def main():
     owner.add_argument("--password", required=True, help="Owner password")
     owner.add_argument("--username", required=True, help="Owner username")
     owner.add_argument("--display-name", required=True, help="Owner display name")
+    repair = sub.add_parser("repair-owner", help="Repair the existing owner account (local/dev recovery)")
+    repair.add_argument("--email", help="Owner email (optional)")
+    repair.add_argument("--password", help="Owner password (optional; if omitted, keep existing)")
+    repair.add_argument("--username", help="Owner username (optional)")
+    repair.add_argument("--display-name", help="Owner display name (optional)")
+    repair.add_argument(
+        "--verify-email",
+        action="store_true",
+        help="Mark the owner email as verified (useful when SMTP is disabled in local dev)",
+    )
     args = parser.parse_args()
 
     if args.command == "export-data":
@@ -509,6 +591,16 @@ def main():
                 password=args.password,
                 username=args.username,
                 display_name=args.display_name,
+            )
+        )
+    elif args.command == "repair-owner":
+        asyncio.run(
+            repair_owner(
+                email=args.email,
+                password=args.password,
+                username=args.username,
+                display_name=args.display_name,
+                verify_email=bool(args.verify_email),
             )
         )
     else:

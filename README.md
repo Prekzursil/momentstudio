@@ -133,6 +133,15 @@ cd backend
 python -m app.cli bootstrap-owner --email owner@example.com --password 'ChangeMe123' --username owner --display-name 'Owner'
 ```
 
+Note: `bootstrap-owner` will overwrite the target user's **username**, **display name**, and **password** to the provided values. Use it only for initial setup or intentional resets.
+
+If you accidentally changed the owner email and got locked out by cooldowns/unverified-email guards in local dev, you can repair the existing owner without creating a new account:
+
+```bash
+cd backend
+python -m app.cli repair-owner --email owner@example.com --verify-email
+```
+
 ### Docker Compose DB persistence (local dev + E2E)
 
 - The Docker Compose stack uses a named Postgres volume (`db_data`) to persist the database.
