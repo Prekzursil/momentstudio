@@ -73,6 +73,18 @@ export class StripeReturnComponent implements OnInit {
     }
   }
 
+  private pendingOrderId(): string | null {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(CHECKOUT_STRIPE_PENDING_KEY);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as { order_id?: unknown } | null;
+      return typeof parsed?.order_id === 'string' ? parsed.order_id : null;
+    } catch {
+      return null;
+    }
+  }
+
   ngOnInit(): void {
     const sessionId = this.route.snapshot.queryParamMap.get('session_id') || '';
     if (!sessionId) {
@@ -81,7 +93,11 @@ export class StripeReturnComponent implements OnInit {
       return;
     }
 
-    this.api.post<{ order_id: string; reference_code?: string; status: string }>('/orders/stripe/confirm', { session_id: sessionId }).subscribe({
+    const orderId = this.pendingOrderId();
+    const payload: { session_id: string; order_id?: string } = { session_id: sessionId };
+    if (orderId) payload.order_id = orderId;
+
+    this.api.post<{ order_id: string; reference_code?: string; status: string }>('/orders/stripe/confirm', payload).subscribe({
       next: () => {
         this.loading = false;
         this.promotePendingSummary();
@@ -95,4 +111,3 @@ export class StripeReturnComponent implements OnInit {
     });
   }
 }
-

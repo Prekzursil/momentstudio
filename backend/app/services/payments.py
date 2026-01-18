@@ -1,3 +1,4 @@
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Literal, cast
 
 import stripe
@@ -28,7 +29,12 @@ async def create_payment_intent(session: AsyncSession, cart: Cart, amount_cents:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
 
     init_stripe()
-    computed_amount = int(sum(float(item.unit_price_at_add) * item.quantity for item in cart.items) * 100)
+    subtotal = sum(
+        (Decimal(str(item.unit_price_at_add)) * int(item.quantity or 0) for item in cart.items),
+        start=Decimal("0.00"),
+    )
+    subtotal = subtotal.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    computed_amount = int((subtotal * 100).to_integral_value(rounding=ROUND_HALF_UP))
     if amount_cents is None:
         amount_cents = computed_amount
     try:

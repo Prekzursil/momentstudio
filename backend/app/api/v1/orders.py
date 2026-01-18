@@ -18,7 +18,7 @@ from app.core.security import decode_receipt_token
 from app.db.session import get_session
 from app.models.address import Address
 from app.models.cart import Cart
-from app.models.order import Order, OrderStatus, OrderEvent
+from app.models.order import Order, OrderItem, OrderStatus, OrderEvent
 from app.schemas.cart import CartRead
 from app.schemas.order import OrderRead, OrderCreate, OrderUpdate, ShippingMethodCreate, ShippingMethodRead, OrderEventRead
 from app.services import cart as cart_service
@@ -317,23 +317,24 @@ async def checkout(
         body=f"Reference {order.reference_code}" if order.reference_code else None,
         url="/account",
     )
-    background_tasks.add_task(
-        email_service.send_order_confirmation,
-        current_user.email,
-        order,
-        order.items,
-        current_user.preferred_language,
-    )
-    owner = await auth_service.get_owner_user(session)
-    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
-    if admin_to:
+    if (payment_method or "").strip().lower() == "cod":
         background_tasks.add_task(
-            email_service.send_new_order_notification,
-            admin_to,
-            order,
+            email_service.send_order_confirmation,
             current_user.email,
-            owner.preferred_language if owner else None,
+            order,
+            order.items,
+            current_user.preferred_language,
         )
+        owner = await auth_service.get_owner_user(session)
+        admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+        if admin_to:
+            background_tasks.add_task(
+                email_service.send_new_order_notification,
+                admin_to,
+                order,
+                current_user.email,
+                owner.preferred_language if owner else None,
+            )
     return GuestCheckoutResponse(
         order_id=order.id,
         reference_code=order.reference_code,
@@ -357,16 +358,37 @@ async def capture_paypal_order(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="PayPal order id is required")
 
     order = (
-        (await session.execute(select(Order).where(Order.paypal_order_id == paypal_order_id))).scalars().first()
+        (
+            await session.execute(
+                select(Order)
+                .options(
+                    selectinload(Order.user),
+                    selectinload(Order.items).selectinload(OrderItem.product),
+                    selectinload(Order.events),
+                    selectinload(Order.shipping_address),
+                    selectinload(Order.billing_address),
+                )
+                .where(Order.paypal_order_id == paypal_order_id)
+            )
+        )
+        .scalars()
+        .first()
     )
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    if payload.order_id and order.id != payload.order_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order mismatch")
     if (order.payment_method or "").strip().lower() != "paypal":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order is not a PayPal order")
 
     # For signed-in checkouts, keep the capture bound to the same user.
     if order.user_id:
-        if not current_user or order.user_id != current_user.id:
+        if current_user and order.user_id == current_user.id:
+            pass
+        elif payload.order_id and order.id == payload.order_id:
+            # Allow guest checkout return flows (including "create account" during guest checkout).
+            pass
+        else:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
 
     if order.paypal_capture_id:
@@ -387,6 +409,30 @@ async def capture_paypal_order(
     await session.commit()
     await session.refresh(order)
 
+    customer_to = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
+    customer_lang = order.user.preferred_language if order.user else None
+    if customer_to:
+        background_tasks.add_task(email_service.send_order_confirmation, customer_to, order, order.items, customer_lang)
+    owner = await auth_service.get_owner_user(session)
+    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+    if admin_to:
+        background_tasks.add_task(
+            email_service.send_new_order_notification,
+            admin_to,
+            order,
+            customer_to,
+            owner.preferred_language if owner else None,
+        )
+    if order.user and order.user.id:
+        await notification_service.create_notification(
+            session,
+            user_id=order.user.id,
+            type="order",
+            title="Payment received" if (order.user.preferred_language or "en") != "ro" else "Plată confirmată",
+            body=f"Reference {order.reference_code}" if order.reference_code else None,
+            url="/account",
+        )
+
     return PayPalCaptureResponse(
         order_id=order.id,
         reference_code=order.reference_code,
@@ -398,6 +444,7 @@ async def capture_paypal_order(
 @router.post("/stripe/confirm", response_model=StripeConfirmResponse)
 async def confirm_stripe_checkout(
     payload: StripeConfirmRequest,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     current_user=Depends(get_current_user_optional),
 ) -> StripeConfirmResponse:
@@ -422,16 +469,35 @@ async def confirm_stripe_checkout(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment not completed")
 
     order = (
-        (await session.execute(select(Order).options(selectinload(Order.events)).where(Order.stripe_checkout_session_id == session_id)))
+        (
+            await session.execute(
+                select(Order)
+                .options(
+                    selectinload(Order.user),
+                    selectinload(Order.items).selectinload(OrderItem.product),
+                    selectinload(Order.events),
+                    selectinload(Order.shipping_address),
+                    selectinload(Order.billing_address),
+                )
+                .where(Order.stripe_checkout_session_id == session_id)
+            )
+        )
         .scalars()
         .first()
     )
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    if payload.order_id and order.id != payload.order_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order mismatch")
 
     # For signed-in checkouts, keep confirmation bound to the same user.
     if order.user_id:
-        if not current_user or order.user_id != getattr(current_user, "id", None):
+        if current_user and order.user_id == getattr(current_user, "id", None):
+            pass
+        elif payload.order_id and order.id == payload.order_id:
+            # Allow guest checkout return flows (including "create account" during guest checkout).
+            pass
+        else:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
 
     payment_intent_id = (
@@ -442,6 +508,7 @@ async def confirm_stripe_checkout(
         order.stripe_payment_intent_id = str(payment_intent_id)
 
     already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
+    captured_added = False
     if not already_captured:
         session.add(
             OrderEvent(
@@ -450,9 +517,43 @@ async def confirm_stripe_checkout(
                 note=f"Stripe session {session_id}",
             )
         )
+        captured_added = True
     session.add(order)
     await session.commit()
     await session.refresh(order)
+
+    if captured_added:
+        customer_to = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
+        customer_lang = order.user.preferred_language if order.user else None
+        if customer_to:
+            background_tasks.add_task(
+                email_service.send_order_confirmation,
+                customer_to,
+                order,
+                order.items,
+                customer_lang,
+            )
+        owner = await auth_service.get_owner_user(session)
+        admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+        if admin_to:
+            background_tasks.add_task(
+                email_service.send_new_order_notification,
+                admin_to,
+                order,
+                customer_to,
+                owner.preferred_language if owner else None,
+            )
+        if order.user and order.user.id:
+            await notification_service.create_notification(
+                session,
+                user_id=order.user.id,
+                type="order",
+                title="Payment received"
+                if (order.user.preferred_language or "en") != "ro"
+                else "Plată confirmată",
+                body=f"Reference {order.reference_code}" if order.reference_code else None,
+                url="/account",
+            )
 
     return StripeConfirmResponse(order_id=order.id, reference_code=order.reference_code, status=order.status)
 
@@ -840,23 +941,24 @@ async def guest_checkout(
         total_amount=totals.total,
     )
 
-    background_tasks.add_task(
-        email_service.send_order_confirmation,
-        email,
-        order,
-        order.items,
-        payload.preferred_language,
-    )
-    owner = await auth_service.get_owner_user(session)
-    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
-    if admin_to:
+    if (payment_method or "").strip().lower() == "cod":
         background_tasks.add_task(
-            email_service.send_new_order_notification,
-            admin_to,
-            order,
+            email_service.send_order_confirmation,
             email,
-            owner.preferred_language if owner else None,
+            order,
+            order.items,
+            payload.preferred_language,
         )
+        owner = await auth_service.get_owner_user(session)
+        admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+        if admin_to:
+            background_tasks.add_task(
+                email_service.send_new_order_notification,
+                admin_to,
+                order,
+                email,
+                owner.preferred_language if owner else None,
+            )
 
     return GuestCheckoutResponse(
         order_id=order.id,

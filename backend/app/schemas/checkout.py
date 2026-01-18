@@ -73,6 +73,7 @@ class GuestCheckoutResponse(BaseModel):
 
 class PayPalCaptureRequest(BaseModel):
     paypal_order_id: str = Field(min_length=1, max_length=255)
+    order_id: UUID | None = None
 
 
 class PayPalCaptureResponse(BaseModel):
@@ -84,6 +85,7 @@ class PayPalCaptureResponse(BaseModel):
 
 class StripeConfirmRequest(BaseModel):
     session_id: str = Field(min_length=1, max_length=255)
+    order_id: UUID | None = None
 
 
 class StripeConfirmResponse(BaseModel):

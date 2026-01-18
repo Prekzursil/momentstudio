@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.future import select
 
+from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
@@ -153,6 +154,19 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
     assert body["payment_method"] == "stripe"
     assert body["stripe_session_id"] == "cs_test_logged"
     assert body["stripe_checkout_url"].startswith("https://")
+    assert captured.get("email_sent") is None
+
+    monkeypatch.setattr(settings, "stripe_webhook_secret", "whsec_test")
+    monkeypatch.setattr(
+        "app.services.payments.stripe.Webhook.construct_event",
+        lambda payload, sig_header, secret: {
+            "id": "evt_full_flow_1",
+            "type": "checkout.session.completed",
+            "data": {"object": {"id": "cs_test_logged", "payment_intent": "pi_test", "payment_status": "paid"}},
+        },
+    )
+    webhook = client.post("/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"})
+    assert webhook.status_code == 200, webhook.text
     assert captured.get("email_sent") is True
 
     # Verify order is visible via API endpoints

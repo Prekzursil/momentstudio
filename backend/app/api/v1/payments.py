@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.core.dependencies import get_current_user_optional
 from app.db.session import get_session
 from app.models.cart import Cart
-from app.models.order import Order, OrderStatus, OrderEvent
+from app.models.order import Order, OrderItem, OrderStatus, OrderEvent
 from app.services import payments
 from app.services import auth as auth_service
 from app.services import email as email_service
@@ -86,7 +86,13 @@ async def stripe_webhook(
                 (
                     await session.execute(
                         select(Order)
-                        .options(selectinload(Order.user), selectinload(Order.events))
+                        .options(
+                            selectinload(Order.user),
+                            selectinload(Order.items).selectinload(OrderItem.product),
+                            selectinload(Order.events),
+                            selectinload(Order.shipping_address),
+                            selectinload(Order.billing_address),
+                        )
                         .where(Order.stripe_checkout_session_id == str(session_id))
                     )
                 )
@@ -94,6 +100,7 @@ async def stripe_webhook(
                 .first()
             )
             if order and order.status in {OrderStatus.pending, OrderStatus.paid}:
+                captured_added = False
                 if payment_intent_id and not order.stripe_payment_intent_id:
                     order.stripe_payment_intent_id = str(payment_intent_id)
                     session.add(order)
@@ -113,6 +120,7 @@ async def stripe_webhook(
                     )
                     await session.commit()
                     await session.refresh(order)
+                    captured_added = True
 
                 if order.user and order.user.id:
                     await notification_service.create_notification(
@@ -126,6 +134,26 @@ async def stripe_webhook(
                         url="/account",
                     )
 
+                if captured_added:
+                    customer_to = (order.user.email if order.user and order.user.email else None) or getattr(
+                        order, "customer_email", None
+                    )
+                    customer_lang = order.user.preferred_language if order.user else None
+                    if customer_to:
+                        background_tasks.add_task(
+                            email_service.send_order_confirmation, customer_to, order, order.items, customer_lang
+                        )
+                    owner = await auth_service.get_owner_user(session)
+                    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+                    if admin_to:
+                        background_tasks.add_task(
+                            email_service.send_new_order_notification,
+                            admin_to,
+                            order,
+                            customer_to,
+                            owner.preferred_language if owner else None,
+                        )
+
     if inserted and event_type == "payment_intent.succeeded":
         data = event.get("data")
         obj = data.get("object") if isinstance(data, dict) else None
@@ -136,7 +164,13 @@ async def stripe_webhook(
                 (
                     await session.execute(
                         select(Order)
-                        .options(selectinload(Order.user), selectinload(Order.events))
+                        .options(
+                            selectinload(Order.user),
+                            selectinload(Order.items).selectinload(OrderItem.product),
+                            selectinload(Order.events),
+                            selectinload(Order.shipping_address),
+                            selectinload(Order.billing_address),
+                        )
                         .where(Order.stripe_payment_intent_id == str(intent_id))
                     )
                 )
@@ -144,11 +178,13 @@ async def stripe_webhook(
                 .first()
             )
             if order and order.status in {OrderStatus.pending, OrderStatus.paid}:
+                captured_added = False
                 already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
                 if not already_captured:
                     session.add(OrderEvent(order_id=order.id, event="payment_captured", note=f"Stripe {intent_id}"))
                     await session.commit()
                     await session.refresh(order)
+                    captured_added = True
 
                 # Keep orders pending until an admin accepts them; still notify the customer of payment receipt.
                 if order.user and order.user.id:
@@ -162,5 +198,25 @@ async def stripe_webhook(
                         body=f"Reference {order.reference_code}" if order.reference_code else None,
                         url="/account",
                     )
+
+                if captured_added:
+                    customer_to = (order.user.email if order.user and order.user.email else None) or getattr(
+                        order, "customer_email", None
+                    )
+                    customer_lang = order.user.preferred_language if order.user else None
+                    if customer_to:
+                        background_tasks.add_task(
+                            email_service.send_order_confirmation, customer_to, order, order.items, customer_lang
+                        )
+                    owner = await auth_service.get_owner_user(session)
+                    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+                    if admin_to:
+                        background_tasks.add_task(
+                            email_service.send_new_order_notification,
+                            admin_to,
+                            order,
+                            customer_to,
+                            owner.preferred_language if owner else None,
+                        )
 
     return {"received": True, "type": event.get("type")}

@@ -243,14 +243,30 @@ def test_guest_checkout_email_verification_and_create_account(
     assert body["payment_method"] == "stripe"
     assert body["stripe_session_id"] == "cs_test"
     assert body["stripe_checkout_url"] == "https://stripe.example/checkout"
-    assert captured.get("email") == "guest2@example.com"
-    assert captured.get("admin_email") == "owner2@example.com"
-    assert captured.get("admin_customer_email") == "guest2@example.com"
+    # Order confirmations are sent only after payment capture.
+    assert captured.get("email") is None
+    assert captured.get("admin_email") is None
+    assert captured.get("admin_customer_email") is None
     # Subtotal 20.00 RON + tax 2.00 RON + shipping 20.00 RON (flat, CMS-configurable) => 42.00 RON
     assert captured.get("amount_cents") == 4200
     assert captured.get("welcome_email") == "guest2@example.com"
     assert captured.get("welcome_lang") == "en"
     assert captured.get("welcome_first_name") == "Guest"
+
+    monkeypatch.setattr(settings, "stripe_webhook_secret", "whsec_test")
+    monkeypatch.setattr(
+        "app.services.payments.stripe.Webhook.construct_event",
+        lambda payload, sig_header, secret: {
+            "id": "evt_guest_checkout_1",
+            "type": "checkout.session.completed",
+            "data": {"object": {"id": "cs_test", "payment_intent": "pi_test", "payment_status": "paid"}},
+        },
+    )
+    webhook = client.post("/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"})
+    assert webhook.status_code == 200, webhook.text
+    assert captured.get("email") == "guest2@example.com"
+    assert captured.get("admin_email") == "owner2@example.com"
+    assert captured.get("admin_customer_email") == "guest2@example.com"
 
     async def fetch_user() -> User:
         async with SessionLocal() as session:
@@ -473,6 +489,21 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
     assert body["stripe_checkout_url"] == "https://stripe.example/checkout"
     # Subtotal: 2 * 50 = 100; discount 10% => 10; taxable 90; tax 9; shipping 20 => total 119 => cents 11900
     assert captured.get("amount_cents") == 11900
+    assert captured.get("email") is None
+    assert captured.get("admin_email") is None
+    assert captured.get("admin_customer_email") is None
+
+    monkeypatch.setattr(settings, "stripe_webhook_secret", "whsec_test")
+    monkeypatch.setattr(
+        "app.services.payments.stripe.Webhook.construct_event",
+        lambda payload, sig_header, secret: {
+            "id": "evt_auth_checkout_1",
+            "type": "checkout.session.completed",
+            "data": {"object": {"id": "cs_test", "payment_intent": "pi_test", "payment_status": "paid"}},
+        },
+    )
+    webhook = client.post("/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"})
+    assert webhook.status_code == 200, webhook.text
     assert captured.get("email") == "buyer@example.com"
     assert captured.get("admin_email") == "owner@example.com"
     assert captured.get("admin_customer_email") == "buyer@example.com"
@@ -710,7 +741,13 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
 
     seeded = asyncio.run(seed())
 
-    called: dict[str, object] = {"stripe_called": False, "paypal_created": False, "paypal_captured": False}
+    called: dict[str, object] = {
+        "stripe_called": False,
+        "paypal_created": False,
+        "paypal_captured": False,
+        "order_email_sent": False,
+        "admin_email_sent": False,
+    }
 
     async def fake_create_checkout_session(*args, **kwargs) -> dict:
         called["stripe_called"] = True
@@ -729,9 +766,11 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
         return "CAPTURE-1"
 
     async def fake_send_order_confirmation(*args, **kwargs):
+        called["order_email_sent"] = True
         return True
 
     async def fake_send_new_order_notification(*args, **kwargs):
+        called["admin_email_sent"] = True
         return True
 
     from app.services import paypal as paypal_service  # imported by orders API
@@ -795,6 +834,8 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
     assert body["paypal_approval_url"] == "https://paypal.example/approve"
     assert called["stripe_called"] is False
     assert called["paypal_created"] is True
+    assert called["order_email_sent"] is False
+    assert called["admin_email_sent"] is False
 
     async def fetch_order() -> Order | None:
         async with SessionLocal() as session:
@@ -820,6 +861,8 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
     assert capture.json()["status"] == "pending"
     assert capture.json()["paypal_capture_id"] == "CAPTURE-1"
     assert called["paypal_captured"] is True
+    assert called["order_email_sent"] is True
+    assert called["admin_email_sent"] is True
 
     order2 = asyncio.run(fetch_order())
     assert order2 is not None
@@ -914,6 +957,7 @@ def test_checkout_sends_admin_alert_fallback_when_no_owner(
 
     monkeypatch.setattr(payments, "create_checkout_session", fake_create_checkout_session)
     monkeypatch.setattr(email_service, "send_new_order_notification", fake_send_new_order_notification)
+    monkeypatch.setattr(email_service, "send_order_confirmation", lambda *_args, **_kwargs: True)
 
     res = client.post(
         "/api/v1/orders/checkout",
@@ -931,5 +975,19 @@ def test_checkout_sends_admin_alert_fallback_when_no_owner(
         },
     )
     assert res.status_code == 201, res.text
+    assert captured.get("admin_email") is None
+    assert captured.get("admin_customer_email") is None
+
+    monkeypatch.setattr(settings, "stripe_webhook_secret", "whsec_test")
+    monkeypatch.setattr(
+        "app.services.payments.stripe.Webhook.construct_event",
+        lambda payload, sig_header, secret: {
+            "id": "evt_admin_fallback_1",
+            "type": "checkout.session.completed",
+            "data": {"object": {"id": "cs_test", "payment_intent": "pi_test", "payment_status": "paid"}},
+        },
+    )
+    webhook = client.post("/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"})
+    assert webhook.status_code == 200, webhook.text
     assert captured.get("admin_email") == "ops@example.com"
     assert captured.get("admin_customer_email") == "buyer2@example.com"

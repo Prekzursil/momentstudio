@@ -72,6 +72,18 @@ export class PayPalReturnComponent implements OnInit {
     }
   }
 
+  private pendingOrderId(): string | null {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(CHECKOUT_PAYPAL_PENDING_KEY);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as { order_id?: unknown } | null;
+      return typeof parsed?.order_id === 'string' ? parsed.order_id : null;
+    } catch {
+      return null;
+    }
+  }
+
   ngOnInit(): void {
     const token = this.route.snapshot.queryParamMap.get('token') || '';
     if (!token) {
@@ -80,10 +92,14 @@ export class PayPalReturnComponent implements OnInit {
       return;
     }
 
+    const orderId = this.pendingOrderId();
+    const payload: { paypal_order_id: string; order_id?: string } = { paypal_order_id: token };
+    if (orderId) payload.order_id = orderId;
+
     this.api
       .post<{ order_id: string; reference_code?: string; status: string; paypal_capture_id?: string | null }>(
         '/orders/paypal/capture',
-        { paypal_order_id: token }
+        payload
       )
       .subscribe({
         next: () => {
