@@ -17,6 +17,7 @@ if [ ! -d "${VENV_DIR}" ]; then
 fi
 # shellcheck disable=SC1091
 source "${VENV_DIR}/bin/activate"
+python -m pip install --upgrade pip
 pip install -r "${BACKEND_DIR}/requirements.txt"
 
 # Migrations

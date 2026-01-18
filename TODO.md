@@ -10,6 +10,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Add `.gitignore` for Python, Node, env files, build artifacts.
 - [x] GitHub Actions for backend (lint, tests, type-checks).
 - [x] GitHub Actions for frontend (lint, tests, build).
+- [x] CI: pin Node 24 + npm 11.7.0 in workflows/Dockerfiles.
+- [x] Frontend tooling: migrate ESLint to v9 flat config (`eslint.config.mjs`).
+- [x] CI: run frontend lint in `Frontend CI`.
+- [x] Repo hygiene: ignore local `.serena/` artifacts.
 - [x] CONTRIBUTING.md with branching, commit style, runbook.
 - [x] ARCHITECTURE.md with high-level design and data flow.
 - [x] DX: run `alembic upgrade head` in `start.sh` before starting the backend to avoid schema drift.

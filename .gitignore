@@ -35,6 +35,7 @@ backend/private_uploads/
 Thumbs.db
 *.swp
 *.swo
+.serena/
 
 # Docker
 *.log
