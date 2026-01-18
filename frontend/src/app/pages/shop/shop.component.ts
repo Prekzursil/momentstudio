@@ -509,6 +509,7 @@ export class ShopComponent implements OnInit, OnDestroy {
       if (!Number.isFinite(raw)) return undefined;
       return raw;
     }
+    if (typeof raw !== 'string') return undefined;
     const str = String(raw).trim();
     if (!str.length) return undefined;
     const n = Number(str);

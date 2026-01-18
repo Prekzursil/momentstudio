@@ -1100,8 +1100,8 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
     window.addEventListener('keydown', this.handleUserActivity);
   }
 
-  async ngAfterViewInit(): Promise<void> {
-    await this.setupStripe();
+  ngAfterViewInit(): void {
+    void this.setupStripe();
   }
 
   private loadData(): void {

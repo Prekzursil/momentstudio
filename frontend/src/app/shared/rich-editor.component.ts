@@ -24,11 +24,17 @@ export class RichEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
   private destroyed = false;
   private styles = inject(LazyStylesService);
 
-  async ngAfterViewInit(): Promise<void> {
+  ngAfterViewInit(): void {
+    void this.initEditor();
+  }
+
+  private async initEditor(): Promise<void> {
     await Promise.all([
       this.styles.ensure('toastui-editor', 'assets/vendor/toastui/toastui-editor.css'),
       this.styles.ensure('toastui-editor-dark', 'assets/vendor/toastui/toastui-editor-dark.css')
     ]);
+
+    if (this.destroyed) return;
 
     this.editor = new Editor({
       el: this.host.nativeElement,

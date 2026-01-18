@@ -76,7 +76,11 @@ export class CaptchaTurnstileComponent implements AfterViewInit, OnDestroy {
   errorKey: string | null = null;
   private widgetId: string | null = null;
 
-  async ngAfterViewInit(): Promise<void> {
+  ngAfterViewInit(): void {
+    void this.initTurnstile();
+  }
+
+  private async initTurnstile(): Promise<void> {
     if (!this.siteKey) return;
 
     try {

@@ -855,9 +855,18 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   private parseMoney(value: unknown): number {
-    const raw = typeof value === 'string' ? value : value == null ? '' : String(value);
-    const num = Number(raw);
-    return Number.isFinite(num) ? num : 0;
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : 0;
+    }
+    if (typeof value === 'string') {
+      const num = Number(value.trim());
+      return Number.isFinite(num) ? num : 0;
+    }
+    if (typeof value === 'bigint') {
+      const num = Number(value);
+      return Number.isFinite(num) ? num : 0;
+    }
+    return 0;
   }
 
   applyPromo(): void {
