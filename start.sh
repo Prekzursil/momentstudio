@@ -48,8 +48,8 @@ START_BACKEND=1
 if ! port_is_free "${UVICORN_PORT}"; then
   echo "Port ${UVICORN_PORT} is already in use; skipping backend start."
   print_port_diagnostics "${UVICORN_PORT}"
-  echo "Tip: if you want to run the backend from start.sh, stop anything using the port (often docker compose):"
-  echo "  docker compose -f infra/docker-compose.yml down"
+  echo "Tip: if you want to run the backend from start.sh, stop whatever is using the port."
+  echo "If it's this repo's Docker stack, it now binds backend on :8001 and frontend on :4201."
   START_BACKEND=0
 fi
 

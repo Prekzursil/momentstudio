@@ -392,6 +392,7 @@ docker compose up --build
 ```
 
 - Docker frontend available at: http://localhost:4201
+- Docker backend available at: http://localhost:8001 (docs at: http://localhost:8001/docs)
 
 ### Caching & CDN (guidance)
 
