@@ -259,7 +259,7 @@ async def _generate_unique_sku(session: AsyncSession, base: str) -> str:
             return candidate
 
 
-def _validate_price_currency(base_price: float, currency: str) -> None:
+def _validate_price_currency(base_price: Decimal | None, currency: str) -> None:
     if base_price is not None and base_price < 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Base price must be non-negative")
     cleaned = (currency or "").strip().upper()

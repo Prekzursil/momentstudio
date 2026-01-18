@@ -1,3 +1,4 @@
+from decimal import Decimal
 from datetime import datetime
 from uuid import UUID
 
@@ -59,9 +60,9 @@ class ProductFields(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     short_description: str | None = Field(default=None, max_length=280)
     long_description: str | None = None
-    base_price: float = Field(ge=0)
+    base_price: Decimal = Field(ge=0)
     sale_type: str | None = Field(default=None, pattern="^(percent|amount)$")
-    sale_value: float | None = Field(default=None, ge=0)
+    sale_value: Decimal | None = Field(default=None, ge=0)
     sale_start_at: datetime | None = None
     sale_end_at: datetime | None = None
     sale_auto_publish: bool = False
@@ -116,7 +117,7 @@ class ProductImageRead(ProductImageBase):
 
 class ProductVariantBase(BaseModel):
     name: str
-    additional_price_delta: float = 0
+    additional_price_delta: Decimal = Decimal("0.00")
     stock_quantity: int = 0
 
 
@@ -213,9 +214,9 @@ class ProductUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=160)
     short_description: str | None = Field(default=None, max_length=280)
     long_description: str | None = None
-    base_price: float | None = Field(default=None, ge=0)
+    base_price: Decimal | None = Field(default=None, ge=0)
     sale_type: str | None = Field(default=None, pattern="^(percent|amount)$")
-    sale_value: float | None = Field(default=None, ge=0)
+    sale_value: Decimal | None = Field(default=None, ge=0)
     sale_start_at: datetime | None = None
     sale_end_at: datetime | None = None
     sale_auto_publish: bool | None = None
@@ -294,9 +295,9 @@ class BackInStockStatus(BaseModel):
 
 class BulkProductUpdateItem(BaseModel):
     product_id: UUID
-    base_price: float | None = Field(default=None, ge=0)
+    base_price: Decimal | None = Field(default=None, ge=0)
     sale_type: str | None = Field(default=None, pattern="^(percent|amount)$")
-    sale_value: float | None = Field(default=None, ge=0)
+    sale_value: Decimal | None = Field(default=None, ge=0)
     sale_start_at: datetime | None = None
     sale_end_at: datetime | None = None
     sale_auto_publish: bool | None = None
@@ -315,7 +316,7 @@ class ProductRead(ProductBase):
     status: ProductStatus
     rating_average: float
     rating_count: int
-    sale_price: float | None = None
+    sale_price: Decimal | None = None
     images: list[ProductImageRead] = []
     category: CategoryRead
     variants: list[ProductVariantRead] = []
@@ -331,8 +332,8 @@ class ProductReadBrief(BaseModel):
     id: UUID
     slug: str
     name: str
-    base_price: float
-    sale_price: float | None = None
+    base_price: Decimal
+    sale_price: Decimal | None = None
     currency: str
     is_featured: bool
     status: ProductStatus
