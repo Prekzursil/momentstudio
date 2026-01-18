@@ -229,6 +229,7 @@ async def admin_search_orders(
     *,
     q: str | None = None,
     status: OrderStatus | None = None,
+    pending_any: bool = False,
     from_dt=None,
     to_dt=None,
     page: int = 1,
@@ -246,7 +247,9 @@ async def admin_search_orders(
     offset = (page - 1) * limit
 
     filters = []
-    if status:
+    if pending_any:
+        filters.append(Order.status.in_([OrderStatus.pending_payment, OrderStatus.pending_acceptance]))
+    elif status:
         filters.append(Order.status == status)
     if from_dt:
         filters.append(Order.created_at >= from_dt)

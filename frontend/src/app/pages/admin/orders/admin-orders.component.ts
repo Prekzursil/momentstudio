@@ -54,16 +54,17 @@ type OrderStatusFilter =
 
           <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
             {{ 'adminUi.orders.statusFilter' | translate }}
-            <select
-              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-              [(ngModel)]="status"
-            >
-              <option value="all">{{ 'adminUi.orders.all' | translate }}</option>
-              <option value="pending_payment">{{ 'adminUi.orders.pending_payment' | translate }}</option>
-              <option value="pending_acceptance">{{ 'adminUi.orders.pending_acceptance' | translate }}</option>
-              <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
-              <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
-              <option value="delivered">{{ 'adminUi.orders.delivered' | translate }}</option>
+	            <select
+	              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	              [(ngModel)]="status"
+	            >
+	              <option value="all">{{ 'adminUi.orders.all' | translate }}</option>
+	              <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
+	              <option value="pending_payment">{{ 'adminUi.orders.pending_payment' | translate }}</option>
+	              <option value="pending_acceptance">{{ 'adminUi.orders.pending_acceptance' | translate }}</option>
+	              <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
+	              <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
+	              <option value="delivered">{{ 'adminUi.orders.delivered' | translate }}</option>
               <option value="cancelled">{{ 'adminUi.orders.cancelled' | translate }}</option>
               <option value="refunded">{{ 'adminUi.orders.refunded' | translate }}</option>
             </select>

@@ -724,7 +724,7 @@ async def admin_list_orders(
 @router.get("/admin/search", response_model=AdminOrderListResponse)
 async def admin_search_orders(
     q: str | None = Query(default=None, max_length=200),
-    status: OrderStatus | None = Query(default=None),
+    status: str | None = Query(default=None),
     from_dt: datetime | None = Query(default=None, alias="from"),
     to_dt: datetime | None = Query(default=None, alias="to"),
     page: int = Query(default=1, ge=1),
@@ -732,8 +732,26 @@ async def admin_search_orders(
     session: AsyncSession = Depends(get_session),
     _: str = Depends(require_admin),
 ) -> AdminOrderListResponse:
+    status_clean = (status or "").strip().lower() if status else None
+    pending_any = False
+    parsed_status = None
+    if status_clean:
+        if status_clean == "pending":
+            pending_any = True
+        else:
+            try:
+                parsed_status = OrderStatus(status_clean)
+            except ValueError:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order status")
     rows, total_items = await order_service.admin_search_orders(
-        session, q=q, status=status, from_dt=from_dt, to_dt=to_dt, page=page, limit=limit
+        session,
+        q=q,
+        status=parsed_status,
+        pending_any=pending_any,
+        from_dt=from_dt,
+        to_dt=to_dt,
+        page=page,
+        limit=limit,
     )
     items = [
         AdminOrderListItem(
