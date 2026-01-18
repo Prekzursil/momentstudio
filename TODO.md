@@ -112,6 +112,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Service to build order from cart (price snapshot).
 - [x] Stripe integration: PaymentIntent create, return client secret.
 - [x] Stripe webhook: record payment capture/failure events; keep orders pending until admin acceptance.
+- [x] Payments: send order confirmation + owner alerts only after Stripe/PayPal payment capture (avoid pre-payment receipts).
+- [x] Checkout returns: include `order_id` in Stripe/PayPal confirm/capture to support guest “create account” flows and reduce token-only replay.
+- [x] Stripe PaymentIntent: compute `amount_cents` using Decimal (avoid float rounding drift).
 - [x] GET /orders and /orders/{id}.
 - [x] Admin order list/filter + status/tracking update.
 - [x] Order status enums and transitions (pending/paid/shipped/cancelled/refunded).
@@ -132,6 +135,12 @@ Below is a structured checklist you can turn into issues.
 - [x] Payments: add PayPal option in checkout (keep RON as primary currency) and document supported methods.
 - [x] Orders: include payment method + delivery details in customer/owner emails (COD vs card, courier/tracking).
 - [x] Orders: require a cancel reason when rejecting an order and surface it in emails + “My orders”; notify owner when a manual refund is required.
+- [ ] Orders: split “pending” into payment vs admin-acceptance states (e.g., `pending_payment` vs `pending_acceptance`) to avoid UX ambiguity.
+- [ ] Receipts: add a PII-redacted shareable receipt mode (hide full addresses/email by default) and configurable token TTL/revocation.
+- [ ] Payments: add PayPal webhooks to capture/settle orders even if the buyer never returns to the site.
+- [ ] Payments: itemize Stripe Checkout line items (products + shipping + discount) instead of a single aggregated line.
+- [ ] Money: migrate monetary fields to Decimal end-to-end (models + schemas + calculations), eliminating float casts.
+- [ ] Tax: make tax/VAT strategy configurable (rate, exemptions) instead of hard-coded `0.1`.
 
 ## Backend - CMS & Content
 - [x] ContentBlock model + migration.
