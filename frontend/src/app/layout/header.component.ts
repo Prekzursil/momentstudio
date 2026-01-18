@@ -25,7 +25,7 @@ import { NotificationsService, UserNotification } from '../core/notifications.se
     ThemeSegmentedControlComponent
   ],
   template: `
-    <header class="border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
+    <header class="relative z-50 border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
       <div class="max-w-7xl mx-auto px-4 sm:px-6">
         <div class="py-4 grid grid-cols-[auto,1fr,auto] items-center gap-4">
           <a routerLink="/" class="flex items-center gap-3 min-w-0">
