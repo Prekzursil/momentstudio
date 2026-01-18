@@ -1,9 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
 
+const OWNER_IDENTIFIER = process.env.E2E_OWNER_IDENTIFIER || 'owner';
+const OWNER_PASSWORD = process.env.E2E_OWNER_PASSWORD || 'Password123';
+
 async function loginAsOwner(page: Page): Promise<void> {
   await page.goto('/login');
-  await page.getByLabel('Email or username').fill('owner');
-  await page.getByLabel('Password').fill('Password123');
+  await page.getByLabel('Email or username').fill(OWNER_IDENTIFIER);
+  await page.getByLabel('Password').fill(OWNER_PASSWORD);
   await page.getByRole('button', { name: 'Login' }).click();
   await expect(page).toHaveURL(/\/account$/);
 }

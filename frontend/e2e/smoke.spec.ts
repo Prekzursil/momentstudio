@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
 
+const OWNER_IDENTIFIER = process.env.E2E_OWNER_IDENTIFIER || 'owner';
+const OWNER_PASSWORD = process.env.E2E_OWNER_PASSWORD || 'Password123';
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('lang', 'en');
@@ -49,8 +52,8 @@ test('guest checkout prompts for email verification', async ({ page }) => {
 
 test('owner can sign in and reach admin dashboard', async ({ page }) => {
   await page.goto('/login');
-  await page.getByLabel('Email or username').fill('owner');
-  await page.getByLabel('Password').fill('Password123');
+  await page.getByLabel('Email or username').fill(OWNER_IDENTIFIER);
+  await page.getByLabel('Password').fill(OWNER_PASSWORD);
   await page.getByRole('button', { name: 'Login' }).click();
 
   await expect(page).toHaveURL(/\/account$/);
