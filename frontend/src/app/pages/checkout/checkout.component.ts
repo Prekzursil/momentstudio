@@ -1249,20 +1249,37 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       this.guestEmailError = this.translate.instant('checkout.addressRequired');
       return;
     }
+
+    // Optimistically reveal the token input so the UI doesn't feel unresponsive while the request is in-flight.
+    this.guestVerificationSent = true;
+    this.guestEmailVerified = false;
+    this.lastGuestEmailRequested = email.toLowerCase();
+    this.lastGuestEmailVerified = null;
+
     this.guestSendingCode = true;
+    const timeoutId = setTimeout(() => {
+      if (!this.guestSendingCode) return;
+      this.guestSendingCode = false;
+      this.guestEmailError = this.guestEmailError || 'Could not send verification code';
+    }, 15_000);
+
     const lang = (this.translate.currentLang || 'en') === 'ro' ? 'ro' : 'en';
     const url = `/orders/guest-checkout/email/request?lang=${lang}`;
+
     this.api.post<void>(url, { email }, this.cartApi.headers()).subscribe({
       next: () => {
+        clearTimeout(timeoutId);
         this.guestSendingCode = false;
-        this.guestVerificationSent = true;
-        this.guestEmailVerified = false;
-        this.lastGuestEmailRequested = email.trim().toLowerCase();
-        this.lastGuestEmailVerified = null;
       },
       error: (err) => {
+        clearTimeout(timeoutId);
         this.guestSendingCode = false;
         this.guestEmailError = err?.error?.detail || 'Could not send verification code';
+      },
+      complete: () => {
+        // Some environments may not emit a `next` value. Treat completion as success.
+        clearTimeout(timeoutId);
+        this.guestSendingCode = false;
       }
     });
   }

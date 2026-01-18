@@ -193,7 +193,8 @@ def test_guest_checkout_email_verification_and_create_account(
         headers={"X-Session-Id": "guest-def"},
         json={"email": "guest2@example.com"},
     )
-    assert req.status_code == 204, req.text
+    assert req.status_code == 200, req.text
+    assert req.json()["sent"] is True
 
     async def fetch_token() -> str:
         async with SessionLocal() as session:
@@ -321,7 +322,8 @@ def test_guest_checkout_email_verification_rate_limited(
         headers={"X-Session-Id": "guest-ghi"},
         json={"email": "guest3@example.com"},
     )
-    assert req.status_code == 204, req.text
+    assert req.status_code == 200, req.text
+    assert req.json()["sent"] is True
 
     async def fetch_token() -> str:
         async with SessionLocal() as session:
@@ -354,7 +356,8 @@ def test_guest_checkout_email_verification_rate_limited(
         headers={"X-Session-Id": "guest-ghi"},
         json={"email": "guest3@example.com"},
     )
-    assert req2.status_code == 204, req2.text
+    assert req2.status_code == 200, req2.text
+    assert req2.json()["sent"] is True
 
     token2 = asyncio.run(fetch_token())
     confirm2 = client.post(

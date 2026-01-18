@@ -19,6 +19,10 @@ class GuestEmailVerificationStatus(BaseModel):
     verified: bool
 
 
+class GuestEmailVerificationRequestResponse(BaseModel):
+    sent: bool
+
+
 class GuestCheckoutRequest(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     email: EmailStr

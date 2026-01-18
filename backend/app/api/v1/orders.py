@@ -34,6 +34,7 @@ from app.schemas.checkout import (
     GuestCheckoutResponse,
     GuestEmailVerificationConfirmRequest,
     GuestEmailVerificationRequest,
+    GuestEmailVerificationRequestResponse,
     GuestEmailVerificationStatus,
     PayPalCaptureRequest,
     PayPalCaptureResponse,
@@ -657,14 +658,14 @@ async def admin_get_order(
     )
 
 
-@router.post("/guest-checkout/email/request", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/guest-checkout/email/request", response_model=GuestEmailVerificationRequestResponse)
 async def request_guest_email_verification(
     payload: GuestEmailVerificationRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     session_id: str | None = Depends(cart_api.session_header),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
-) -> None:
+) -> GuestEmailVerificationRequestResponse:
     if not session_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing guest session id")
 
@@ -690,6 +691,7 @@ async def request_guest_email_verification(
     await session.commit()
 
     background_tasks.add_task(email_service.send_verification_email, email, token, lang)
+    return GuestEmailVerificationRequestResponse(sent=True)
 
 
 @router.post("/guest-checkout/email/confirm", response_model=GuestEmailVerificationStatus)
