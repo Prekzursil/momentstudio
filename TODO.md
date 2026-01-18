@@ -135,12 +135,16 @@ Below is a structured checklist you can turn into issues.
 - [x] Payments: add PayPal option in checkout (keep RON as primary currency) and document supported methods.
 - [x] Orders: include payment method + delivery details in customer/owner emails (COD vs card, courier/tracking).
 - [x] Orders: require a cancel reason when rejecting an order and surface it in emails + “My orders”; notify owner when a manual refund is required.
-- [ ] Orders: split “pending” into payment vs admin-acceptance states (e.g., `pending_payment` vs `pending_acceptance`) to avoid UX ambiguity.
-- [ ] Receipts: add a PII-redacted shareable receipt mode (hide full addresses/email by default) and configurable token TTL/revocation.
+- [x] Orders: split “pending” into payment vs admin-acceptance states (e.g., `pending_payment` vs `pending_acceptance`) to avoid UX ambiguity.
+- [x] Receipts: add a PII-redacted shareable receipt mode (hide full addresses/email by default) and configurable token TTL/revocation.
 - [ ] Payments: add PayPal webhooks to capture/settle orders even if the buyer never returns to the site.
 - [ ] Payments: itemize Stripe Checkout line items (products + shipping + discount) instead of a single aggregated line.
-- [ ] Money: migrate monetary fields to Decimal end-to-end (models + schemas + calculations), eliminating float casts.
-- [ ] Tax: make tax/VAT strategy configurable (rate, exemptions) instead of hard-coded `0.1`.
+- [x] Money: migrate monetary fields to Decimal end-to-end (models + schemas + calculations), eliminating float casts.
+- [x] Tax: make tax/VAT strategy configurable (rate, exemptions) instead of hard-coded `0.1`.
+- [ ] Receipts: add Share/Revoke actions in Account + Admin UI (copy link, show expiry, revoke token).
+- [ ] Shipping: compute weight-based shipping from cart weight (sum `weight_grams`) instead of using subtotal as a proxy.
+- [ ] Money: migrate Product/Variant monetary fields to Decimal end-to-end (models + schemas + UI parsing), remove remaining float annotations.
+- [ ] Orders: add admin filters for “Pending (any)” (covers `pending_payment` + `pending_acceptance`) and optionally highlight “Awaiting payment” vs “Awaiting acceptance”.
 
 ## Backend - CMS & Content
 - [x] ContentBlock model + migration.
