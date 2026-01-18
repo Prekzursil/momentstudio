@@ -10,6 +10,7 @@ import uuid
 
 from app.core.config import settings
 from app.models.cart import Cart
+from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.webhook import StripeWebhookEvent
 from app.models.user import PaymentMethod, User
 from app.core import metrics
@@ -19,6 +20,74 @@ stripe = cast(Any, stripe)
 
 def init_stripe() -> None:
     stripe.api_key = settings.stripe_secret_key
+
+
+async def _get_or_create_cached_amount_off_coupon(
+    session: AsyncSession,
+    *,
+    promo_code: str,
+    discount_cents: int,
+    currency: str = "RON",
+) -> str | None:
+    cleaned_code = (promo_code or "").strip().upper()
+    if not cleaned_code:
+        return None
+    if discount_cents <= 0:
+        return None
+
+    promo_res = await session.execute(select(PromoCode).where(PromoCode.code == cleaned_code))
+    promo = promo_res.scalar_one_or_none()
+    if not promo:
+        return None
+
+    currency_clean = (getattr(promo, "currency", None) or currency or "RON").strip().upper() or "RON"
+    map_res = await session.execute(
+        select(StripeCouponMapping).where(
+            StripeCouponMapping.promo_code_id == promo.id,
+            StripeCouponMapping.discount_cents == int(discount_cents),
+            StripeCouponMapping.currency == currency_clean,
+        )
+    )
+    existing = map_res.scalar_one_or_none()
+    if existing:
+        return existing.stripe_coupon_id
+
+    try:
+        coupon_obj = stripe.Coupon.create(
+            duration="once",
+            amount_off=int(discount_cents),
+            currency=currency_clean.lower(),
+            metadata={"promo_code": cleaned_code, "discount_cents": str(int(discount_cents))},
+        )
+    except Exception:
+        return None
+
+    coupon_id = getattr(coupon_obj, "id", None) or (coupon_obj.get("id") if hasattr(coupon_obj, "get") else None)
+    if not coupon_id:
+        return None
+
+    record = StripeCouponMapping(
+        promo_code_id=promo.id,
+        discount_cents=int(discount_cents),
+        currency=currency_clean,
+        stripe_coupon_id=str(coupon_id),
+    )
+    session.add(record)
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        map_res = await session.execute(
+            select(StripeCouponMapping).where(
+                StripeCouponMapping.promo_code_id == promo.id,
+                StripeCouponMapping.discount_cents == int(discount_cents),
+                StripeCouponMapping.currency == currency_clean,
+            )
+        )
+        recovered = map_res.scalar_one_or_none()
+        if recovered:
+            return recovered.stripe_coupon_id
+    return str(coupon_id)
 
 
 async def create_payment_intent(session: AsyncSession, cart: Cart, amount_cents: int | None = None) -> dict:
@@ -56,6 +125,7 @@ async def create_payment_intent(session: AsyncSession, cart: Cart, amount_cents:
 
 async def create_checkout_session(
     *,
+    session: AsyncSession,
     amount_cents: int,
     customer_email: str,
     success_url: str,
@@ -64,6 +134,7 @@ async def create_checkout_session(
     metadata: dict[str, str] | None = None,
     line_items: list[dict[str, Any]] | None = None,
     discount_cents: int | None = None,
+    promo_code: str | None = None,
 ) -> dict:
     """Create a Stripe Checkout Session and return {session_id, checkout_url}.
 
@@ -113,8 +184,17 @@ async def create_checkout_session(
     try:
         discounts_param = None
         if discount_value:
-            coupon_obj = stripe.Coupon.create(duration="once", amount_off=discount_value, currency="ron")
-            coupon_id = getattr(coupon_obj, "id", None) or (coupon_obj.get("id") if hasattr(coupon_obj, "get") else None)
+            coupon_id = await _get_or_create_cached_amount_off_coupon(
+                session,
+                promo_code=str(promo_code or ""),
+                discount_cents=discount_value,
+                currency="RON",
+            )
+            if not coupon_id:
+                coupon_obj = stripe.Coupon.create(duration="once", amount_off=discount_value, currency="ron")
+                coupon_id = getattr(coupon_obj, "id", None) or (
+                    coupon_obj.get("id") if hasattr(coupon_obj, "get") else None
+                )
             if coupon_id:
                 discounts_param = [{"coupon": str(coupon_id)}]
 

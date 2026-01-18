@@ -388,6 +388,7 @@ async def checkout(
         stripe_line_items = _build_stripe_line_items(user_cart, totals, lang=current_user.preferred_language)
         discount_cents = _money_to_cents(discount_val) if discount_val and discount_val > 0 else None
         stripe_session = await payments.create_checkout_session(
+            session=session,
             amount_cents=_money_to_cents(totals.total),
             customer_email=current_user.email,
             success_url=f"{settings.frontend_origin.rstrip('/')}/checkout/stripe/return?session_id={{CHECKOUT_SESSION_ID}}",
@@ -396,6 +397,7 @@ async def checkout(
             metadata={"cart_id": str(user_cart.id), "user_id": str(current_user.id)},
             line_items=stripe_line_items,
             discount_cents=discount_cents,
+            promo_code=payload.promo_code,
         )
         stripe_session_id = str(stripe_session.get("session_id"))
         stripe_checkout_url = str(stripe_session.get("checkout_url"))
@@ -1062,6 +1064,7 @@ async def guest_checkout(
         stripe_line_items = _build_stripe_line_items(cart, totals, lang=payload.preferred_language)
         discount_cents = _money_to_cents(discount_val) if discount_val and discount_val > 0 else None
         stripe_session = await payments.create_checkout_session(
+            session=session,
             amount_cents=_money_to_cents(totals.total),
             customer_email=email,
             success_url=f"{settings.frontend_origin.rstrip('/')}/checkout/stripe/return?session_id={{CHECKOUT_SESSION_ID}}",
@@ -1070,6 +1073,7 @@ async def guest_checkout(
             metadata={"cart_id": str(cart.id), "user_id": str(user_id) if user_id else ""},
             line_items=stripe_line_items,
             discount_cents=discount_cents,
+            promo_code=payload.promo_code,
         )
         stripe_session_id = str(stripe_session.get("session_id"))
         stripe_checkout_url = str(stripe_session.get("checkout_url"))
