@@ -48,7 +48,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Auth/Profile: add email change endpoint with 30-day cooldown + history tracking (disabled while Google is linked).
 - [x] Auth/Profile: support secondary emails (add/verify/remove, set primary, login via verified secondary) with global uniqueness enforcement.
 - [x] Auth: migrate frontend auth storage to cookie-based refresh sessions (avoid persisting refresh tokens in localStorage; wire “Keep me signed in” to cookie/session TTL).
-- [ ] Auth: make refresh token rotation multi-tab safe (tolerate concurrent refresh across tabs/devices without forcing a logout).
+- [x] Auth: make refresh token rotation multi-tab safe (tolerate concurrent refresh across tabs/devices without forcing a logout).
 - [x] Auth/Profile: enforce username (7d) + display name (1h) change cooldowns and reuse display name tags when reverting.
 - [x] Profile: add “use Google photo” + “remove avatar” endpoints; default to local placeholder avatar (Google photo opt-in).
 
@@ -157,7 +157,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Sale: add a dedicated `on_sale` filter param (avoid reserving `category_slug=sale`).
 - [x] Money: migrate Product/Variant monetary fields to Decimal end-to-end (models + schemas + UI parsing), remove remaining float annotations.
 - [x] Orders: add admin filters for “Pending (any)” (covers `pending_payment` + `pending_acceptance`) and optionally highlight “Awaiting payment” vs “Awaiting acceptance”.
-- [ ] Payments: increment promo `times_used` on successful payment capture (and avoid counting abandoned checkouts).
+- [x] Payments: increment promo `times_used` on successful payment capture (and avoid counting abandoned checkouts).
 - [ ] Payments: add admin tooling to invalidate Stripe coupon mappings when a promo is edited/disabled.
 
 ## Backend - CMS & Content
@@ -420,9 +420,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Account UX: extend profile editor to manage first/middle/last name, DOB, and phone with country code.
 - [x] Tests: add/update frontend unit tests for registration wizard and profile field wiring.
 - [x] Account: manage secondary emails (add/verify/remove, set primary) and allow login via verified secondary emails.
-- [ ] Forms: audit and set proper HTML `autocomplete` attributes across checkout/profile/tickets/contact forms for better browser autofill.
-- [ ] Auth UX: ensure header/profile dropdown always reflects server auth state after restart (clear stale UI on 401/refresh failure) and sign-out works consistently in all menus.
-- [ ] Wishlist: investigate reports of add/remove not persisting and add e2e coverage for save/unsave flows.
+- [x] Forms: audit and set proper HTML `autocomplete` attributes across checkout/profile/tickets/contact forms for better browser autofill.
+- [x] Auth UX: ensure header/profile dropdown always reflects server auth state after restart (clear stale UI on 401/refresh failure) and sign-out works consistently in all menus.
+- [x] Wishlist: investigate reports of add/remove not persisting and add e2e coverage for save/unsave flows.
 
 ## Frontend - Admin Dashboard
 - [x] /admin layout with sidebar + guard.
