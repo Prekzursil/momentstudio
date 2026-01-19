@@ -13,167 +13,213 @@ import { AccountComponent } from './account.component';
   imports: [CommonModule, FormsModule, RouterLink, TranslateModule, ButtonComponent],
   template: `
     <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <div class="flex items-start justify-between gap-3">
-        <div class="grid gap-1">
-          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'account.sections.security' | translate }}</h2>
-          <p class="text-xs text-slate-500 dark:text-slate-400">Manage password and connected accounts.</p>
-        </div>
-        <app-button routerLink="/account/password" size="sm" variant="ghost" label="Change password"></app-button>
+      <div class="grid gap-1">
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'account.sections.security' | translate }}</h2>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Manage password, emails, and connected accounts.</p>
       </div>
 
       <div class="grid gap-3">
-        <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-3">
+        <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div class="grid gap-1">
-            <p class="font-semibold text-slate-900 dark:text-slate-50">Email</p>
-            <p class="text-xs text-slate-500 dark:text-slate-400">
-              Update your email address (max once every 30 days). Disabled while Google is linked.
-            </p>
+            <p class="font-semibold text-slate-900 dark:text-slate-50">Password</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Change your password to keep your account secure.</p>
           </div>
-          <div class="grid gap-2 sm:grid-cols-[2fr_1fr_auto] sm:items-end">
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              New email
-              <input
-                name="emailChange"
-                type="email"
-                autocomplete="email"
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                [disabled]="!!account.googleEmail() || account.emailChanging"
-                [(ngModel)]="account.emailChangeEmail"
-              />
-            </label>
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              Confirm password
-              <input
-                name="emailChangePassword"
-                type="password"
-                autocomplete="current-password"
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                [disabled]="!!account.googleEmail() || account.emailChanging"
-                [(ngModel)]="account.emailChangePassword"
-              />
-            </label>
-            <app-button
-              size="sm"
-              variant="ghost"
-              label="Update email"
-              [disabled]="!!account.googleEmail() || account.emailChanging || !account.emailChangeEmail.trim() || !account.emailChangePassword"
-              (action)="account.updateEmail()"
-            ></app-button>
-          </div>
-          <p *ngIf="account.emailChangeError" class="text-xs text-rose-700 dark:text-rose-300">{{ account.emailChangeError }}</p>
-          <p *ngIf="account.emailChangeSuccess" class="text-xs text-emerald-700 dark:text-emerald-300">{{ account.emailChangeSuccess }}</p>
+          <app-button routerLink="/account/password" size="sm" variant="ghost" label="Change password"></app-button>
         </div>
 
         <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-3">
           <div class="grid gap-1">
-            <p class="font-semibold text-slate-900 dark:text-slate-50">Secondary emails</p>
+            <p class="font-semibold text-slate-900 dark:text-slate-50">Emails</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Manage the emails you can use to sign in.</p>
+          </div>
+
+          <div
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-slate-900 dark:text-slate-50 truncate">{{ account.profile()?.email }}</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Primary • {{ account.emailVerified() ? 'Verified' : 'Unverified' }}
+              </p>
+            </div>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="showPrimaryEmailChange ? 'Cancel' : 'Change primary'"
+              (action)="showPrimaryEmailChange = !showPrimaryEmailChange"
+            ></app-button>
+          </div>
+
+          <div *ngIf="showPrimaryEmailChange" class="grid gap-3">
             <p class="text-xs text-slate-500 dark:text-slate-400">
-              Add extra sign-in emails. Verified secondary emails can be used to sign in and can be made primary.
+              Update your primary email (max once every 30 days). Disabled while Google is linked.
+            </p>
+            <div class="grid gap-2 sm:grid-cols-[2fr_1fr_auto] sm:items-end">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                New email
+                <input
+                  name="emailChange"
+                  type="email"
+                  autocomplete="email"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  [disabled]="!!account.googleEmail() || account.emailChanging"
+                  [(ngModel)]="account.emailChangeEmail"
+                />
+              </label>
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                Confirm password
+                <input
+                  name="emailChangePassword"
+                  type="password"
+                  autocomplete="current-password"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  [disabled]="!!account.googleEmail() || account.emailChanging"
+                  [(ngModel)]="account.emailChangePassword"
+                />
+              </label>
+              <app-button
+                size="sm"
+                variant="ghost"
+                label="Update email"
+                [disabled]="!!account.googleEmail() || account.emailChanging || !account.emailChangeEmail.trim() || !account.emailChangePassword"
+                (action)="account.updateEmail()"
+              ></app-button>
+            </div>
+            <p *ngIf="account.emailChangeError" class="text-xs text-rose-700 dark:text-rose-300">{{ account.emailChangeError }}</p>
+            <p *ngIf="account.emailChangeSuccess" class="text-xs text-emerald-700 dark:text-emerald-300">
+              {{ account.emailChangeSuccess }}
             </p>
           </div>
 
-          <div class="grid gap-2 sm:grid-cols-[2fr_auto] sm:items-end">
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              Add email
-              <input
-                name="secondaryEmailAdd"
-                type="email"
-                autocomplete="email"
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                [disabled]="account.addingSecondaryEmail"
-                [(ngModel)]="account.secondaryEmailToAdd"
-              />
-            </label>
-            <app-button
-              size="sm"
-              variant="ghost"
-              label="Add"
-              [disabled]="account.addingSecondaryEmail || !account.secondaryEmailToAdd.trim()"
-              (action)="account.addSecondaryEmail()"
-            ></app-button>
-          </div>
-
-          <p *ngIf="account.secondaryEmailsError()" class="text-xs text-rose-700 dark:text-rose-300">{{ account.secondaryEmailsError() }}</p>
-          <p *ngIf="account.secondaryEmailMessage" class="text-xs text-slate-600 dark:text-slate-300">{{ account.secondaryEmailMessage }}</p>
-
-          <div *ngIf="account.secondaryEmailsLoading()" class="text-sm text-slate-600 dark:text-slate-300">Loading…</div>
-
-          <ul *ngIf="!account.secondaryEmailsLoading() && account.secondaryEmails().length" class="grid gap-2">
-            <li
-              *ngFor="let e of account.secondaryEmails()"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900 flex flex-col gap-2 sm:flex-row sm:items-center"
-            >
-              <div class="min-w-0">
-                <p class="text-sm font-medium text-slate-900 dark:text-slate-50 truncate">{{ e.email }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ e.verified ? 'Verified' : 'Unverified' }}
-                </p>
-              </div>
-
-              <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
-                <app-button *ngIf="!e.verified" size="sm" variant="ghost" label="Resend code" (action)="account.resendSecondaryEmailVerification(e.id)"></app-button>
-
-                <app-button
-                  *ngIf="e.verified && account.makePrimarySecondaryEmailId !== e.id"
-                  size="sm"
-                  variant="ghost"
-                  label="Make primary"
-                  (action)="account.startMakePrimary(e.id)"
-                ></app-button>
-
-                <app-button size="sm" variant="ghost" label="Remove" (action)="account.deleteSecondaryEmail(e.id)"></app-button>
-              </div>
-
-              <div
-                *ngIf="account.makePrimarySecondaryEmailId === e.id"
-                class="w-full grid gap-2 sm:grid-cols-[2fr_auto_auto] sm:items-end"
-              >
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Confirm password
-                  <input
-                    name="makePrimaryPassword"
-                    type="password"
-                    autocomplete="current-password"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                    [disabled]="account.makingPrimaryEmail"
-                    [(ngModel)]="account.makePrimaryPassword"
-                  />
-                </label>
-                <app-button size="sm" variant="ghost" label="Confirm" [disabled]="account.makingPrimaryEmail" (action)="account.confirmMakePrimary()"></app-button>
-                <app-button size="sm" variant="ghost" label="Cancel" [disabled]="account.makingPrimaryEmail" (action)="account.cancelMakePrimary()"></app-button>
-              </div>
-              <p
-                *ngIf="account.makePrimarySecondaryEmailId === e.id && account.makePrimaryError"
-                class="w-full text-xs text-rose-700 dark:text-rose-300"
-              >
-                {{ account.makePrimaryError }}
+          <div class="border-t border-slate-200 dark:border-slate-800 pt-3 grid gap-3">
+            <div class="grid gap-1">
+              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">Additional emails</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Verified emails can be used to sign in and can be made primary.
               </p>
-            </li>
-          </ul>
+            </div>
 
-          <form class="grid gap-2 sm:grid-cols-[2fr_auto] sm:items-end" (ngSubmit)="account.confirmSecondaryEmailVerification()">
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              Verify code
-              <input
-                name="secondaryVerificationToken"
-                type="text"
-                autocomplete="one-time-code"
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                [disabled]="account.verifyingSecondaryEmail"
-                [(ngModel)]="account.secondaryVerificationToken"
-              />
-            </label>
-            <app-button
-              size="sm"
-              variant="ghost"
-              type="submit"
-              label="Verify"
-              [disabled]="account.verifyingSecondaryEmail || !account.secondaryVerificationToken.trim()"
-            ></app-button>
-          </form>
-          <p *ngIf="account.secondaryVerificationStatus" class="text-xs text-slate-600 dark:text-slate-300">
-            {{ account.secondaryVerificationStatus }}
-          </p>
+            <div class="grid gap-2 sm:grid-cols-[2fr_auto] sm:items-end">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                Add email
+                <input
+                  name="secondaryEmailAdd"
+                  type="email"
+                  autocomplete="email"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  [disabled]="account.addingSecondaryEmail"
+                  [(ngModel)]="account.secondaryEmailToAdd"
+                />
+              </label>
+              <app-button
+                size="sm"
+                variant="ghost"
+                label="Add"
+                [disabled]="account.addingSecondaryEmail || !account.secondaryEmailToAdd.trim()"
+                (action)="account.addSecondaryEmail()"
+              ></app-button>
+            </div>
+
+            <p *ngIf="account.secondaryEmailsError()" class="text-xs text-rose-700 dark:text-rose-300">{{ account.secondaryEmailsError() }}</p>
+            <p *ngIf="account.secondaryEmailMessage" class="text-xs text-slate-600 dark:text-slate-300">{{ account.secondaryEmailMessage }}</p>
+
+            <div *ngIf="account.secondaryEmailsLoading()" class="text-sm text-slate-600 dark:text-slate-300">Loading…</div>
+
+            <ul *ngIf="!account.secondaryEmailsLoading() && account.secondaryEmails().length" class="grid gap-2">
+              <li
+                *ngFor="let e of account.secondaryEmails()"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900 flex flex-col gap-2 sm:flex-row sm:items-center"
+              >
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-slate-900 dark:text-slate-50 truncate">{{ e.email }}</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ e.verified ? 'Verified' : 'Unverified' }}
+                  </p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
+                  <app-button
+                    *ngIf="!e.verified"
+                    size="sm"
+                    variant="ghost"
+                    label="Resend code"
+                    (action)="account.resendSecondaryEmailVerification(e.id)"
+                  ></app-button>
+
+                  <app-button
+                    *ngIf="e.verified && account.makePrimarySecondaryEmailId !== e.id"
+                    size="sm"
+                    variant="ghost"
+                    label="Make primary"
+                    (action)="account.startMakePrimary(e.id)"
+                  ></app-button>
+
+                  <app-button size="sm" variant="ghost" label="Remove" (action)="account.deleteSecondaryEmail(e.id)"></app-button>
+                </div>
+
+                <div
+                  *ngIf="account.makePrimarySecondaryEmailId === e.id"
+                  class="w-full grid gap-2 sm:grid-cols-[2fr_auto_auto] sm:items-end"
+                >
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Confirm password
+                    <input
+                      name="makePrimaryPassword"
+                      type="password"
+                      autocomplete="current-password"
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      [disabled]="account.makingPrimaryEmail"
+                      [(ngModel)]="account.makePrimaryPassword"
+                    />
+                  </label>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    label="Confirm"
+                    [disabled]="account.makingPrimaryEmail"
+                    (action)="account.confirmMakePrimary()"
+                  ></app-button>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    label="Cancel"
+                    [disabled]="account.makingPrimaryEmail"
+                    (action)="account.cancelMakePrimary()"
+                  ></app-button>
+                </div>
+                <p
+                  *ngIf="account.makePrimarySecondaryEmailId === e.id && account.makePrimaryError"
+                  class="w-full text-xs text-rose-700 dark:text-rose-300"
+                >
+                  {{ account.makePrimaryError }}
+                </p>
+              </li>
+            </ul>
+
+            <form class="grid gap-2 sm:grid-cols-[2fr_auto] sm:items-end" (ngSubmit)="account.confirmSecondaryEmailVerification()">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                Verify code
+                <input
+                  name="secondaryVerificationToken"
+                  type="text"
+                  autocomplete="one-time-code"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  [disabled]="account.verifyingSecondaryEmail"
+                  [(ngModel)]="account.secondaryVerificationToken"
+                />
+              </label>
+              <app-button
+                size="sm"
+                variant="ghost"
+                type="submit"
+                label="Verify"
+                [disabled]="account.verifyingSecondaryEmail || !account.secondaryVerificationToken.trim()"
+              ></app-button>
+            </form>
+            <p *ngIf="account.secondaryVerificationStatus" class="text-xs text-slate-600 dark:text-slate-300">
+              {{ account.secondaryVerificationStatus }}
+            </p>
+          </div>
         </div>
 
         <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-2">
@@ -267,6 +313,7 @@ import { AccountComponent } from './account.component';
 })
 export class AccountSecurityComponent implements OnDestroy {
   protected readonly account = inject(AccountComponent);
+  protected showPrimaryEmailChange = false;
 
   @ViewChild('cardHost')
   private set cardHost(cardHost: ElementRef<HTMLDivElement> | undefined) {

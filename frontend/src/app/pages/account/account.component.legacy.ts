@@ -4,7 +4,6 @@ import { Component, OnInit, AfterViewInit, OnDestroy, signal, ViewChild, Element
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
-import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { orderStatusChipClass } from '../../shared/order-status';
@@ -38,7 +37,6 @@ import { missingRequiredProfileFields as computeMissingRequiredProfileFields, ty
     RouterLink,
     TranslateModule,
     ContainerComponent,
-    BreadcrumbComponent,
     ButtonComponent,
     LocalizedCurrencyPipe,
     AddressFormComponent,
@@ -47,7 +45,6 @@ import { missingRequiredProfileFields as computeMissingRequiredProfileFields, ty
   ],
   template: `
     <app-container classes="py-10 grid gap-6">
-      <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
       <ng-container *ngIf="!loading(); else loadingTpl">
         <div *ngIf="error()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
           {{ error() }}
@@ -56,7 +53,7 @@ import { missingRequiredProfileFields as computeMissingRequiredProfileFields, ty
         <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div class="min-w-0">
             <p class="text-sm text-slate-500 dark:text-slate-400">Signed in as</p>
-            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50 truncate">{{ profile()?.email || '...' }}</h1>
+            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50 truncate">{{ accountHeaderLabel() }}</h1>
             <div
               *ngIf="!emailVerified()"
               class="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 text-sm grid gap-3 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
@@ -1081,11 +1078,6 @@ import { missingRequiredProfileFields as computeMissingRequiredProfileFields, ty
   `
 })
 export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
-  crumbs = [
-    { label: 'Home', url: '/' },
-    { label: 'Account' }
-  ];
-
   emailVerified = signal<boolean>(false);
   addresses = signal<Address[]>([]);
   avatar: string | null = null;
@@ -1896,6 +1888,17 @@ export class AccountComponent implements OnInit, AfterViewInit, OnDestroy {
   publicIdentityLabel(user?: AuthUser | null): string {
     const u = user ?? this.profile();
     return formatIdentity(u, '');
+  }
+
+  accountHeaderLabel(user?: AuthUser | null): string {
+    const u = user ?? this.profile();
+    const username = (u?.username ?? '').trim();
+    if (!username) return '...';
+    const name = (u?.name ?? '').trim();
+    const tag = u?.name_tag;
+    if (name && typeof tag === 'number') return `${username} (${name}#${tag})`;
+    if (name) return `${username} (${name})`;
+    return username;
   }
 
   lastOrderLabel(): string {

@@ -5,7 +5,6 @@ import { RouterLink } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
-import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { PasswordStrengthComponent } from '../../shared/password-strength.component';
 import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
@@ -20,12 +19,10 @@ import { AuthService } from '../../core/auth.service';
     TranslateModule,
     ContainerComponent,
     ButtonComponent,
-    BreadcrumbComponent,
     PasswordStrengthComponent
   ],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-xl">
-      <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
       <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">Change password</h1>
       <form #changeForm="ngForm" class="grid gap-4" (ngSubmit)="onSubmit(changeForm)">
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -101,12 +98,6 @@ import { AuthService } from '../../core/auth.service';
   `
 })
 export class ChangePasswordComponent {
-  crumbs = [
-    { label: 'Home', url: '/' },
-    { label: 'Account', url: '/account' },
-    { label: 'Change password' }
-  ];
-
   current = '';
   password = '';
   confirm = '';

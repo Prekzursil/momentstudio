@@ -14,7 +14,6 @@ import { ThemeService } from '../../core/theme.service';
 import { ToastService } from '../../core/toast.service';
 import { WishlistService } from '../../core/wishlist.service';
 import { ContainerComponent } from '../../layout/container.component';
-import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
 
@@ -28,14 +27,11 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
     RouterOutlet,
     TranslateModule,
     ContainerComponent,
-    BreadcrumbComponent,
     ButtonComponent,
     SkeletonComponent
   ],
   template: `
     <app-container classes="py-10 grid gap-6">
-      <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-
       <ng-container *ngIf="!loading(); else loadingTpl">
         <div
           *ngIf="error()"
@@ -49,7 +45,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
             <div class="min-w-0">
               <p class="text-sm text-slate-500 dark:text-slate-400">{{ 'account.header.signedInAs' | translate }}</p>
               <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50 truncate">
-                {{ profile()?.email || '...' }}
+                {{ accountHeaderLabel() }}
               </h1>
               <div
                 *ngIf="!emailVerified()"

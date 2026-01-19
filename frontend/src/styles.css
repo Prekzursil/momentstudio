@@ -108,6 +108,10 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
+html {
+  overflow-y: scroll;
+}
+
 :root {
   font-size: clamp(15px, 1.2vw + 12px, 18px);
 }
