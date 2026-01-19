@@ -752,7 +752,27 @@ type CouponForm = {
                   *ngIf="segmentJob()"
                   class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
                 >
-                  <div class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.couponsV2.bulk.segment.jobTitle' | translate }}</div>
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.couponsV2.bulk.segment.jobTitle' | translate }}</div>
+                    <div class="flex items-center gap-2">
+                      <app-button
+                        *ngIf="segmentJobInProgress()"
+                        size="xs"
+                        variant="ghost"
+                        [disabled]="segmentJobsBusy()"
+                        [label]="'adminUi.actions.cancel' | translate"
+                        (action)="cancelSegmentJob(segmentJob()!)"
+                      ></app-button>
+                      <app-button
+                        *ngIf="segmentJob()!.status === 'failed' || segmentJob()!.status === 'cancelled'"
+                        size="xs"
+                        variant="ghost"
+                        [disabled]="segmentJobInProgress() || segmentJobsBusy()"
+                        [label]="'adminUi.actions.retry' | translate"
+                        (action)="retrySegmentJob(segmentJob()!)"
+                      ></app-button>
+                    </div>
+                  </div>
                   <div class="mt-1 grid gap-1">
                     <div>{{ 'adminUi.couponsV2.bulk.segment.jobStatus' | translate:{ status: segmentJob()!.status } }}</div>
                     <div>
@@ -766,6 +786,76 @@ type CouponForm = {
                     <div *ngIf="segmentJob()!.not_assigned">{{ 'adminUi.couponsV2.bulk.resultNotAssigned' | translate:{ count: segmentJob()!.not_assigned } }}</div>
                     <div *ngIf="segmentJob()!.error_message" class="text-xs text-rose-700 dark:text-rose-200">
                       {{ segmentJob()!.error_message }}
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  class="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+                >
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.couponsV2.bulk.segment.jobsTitle' | translate }}</div>
+                    <app-button
+                      size="xs"
+                      variant="ghost"
+                      [disabled]="segmentJobsLoading() || segmentJobsBusy()"
+                      [label]="'adminUi.actions.refresh' | translate"
+                      (action)="loadSegmentJobs()"
+                    ></app-button>
+                  </div>
+
+                  <div *ngIf="segmentJobsError()" class="mt-2 text-xs text-rose-700 dark:text-rose-200">
+                    {{ segmentJobsError() }}
+                  </div>
+                  <div *ngIf="segmentJobsLoading()" class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.couponsV2.bulk.segment.jobsLoading' | translate }}
+                  </div>
+                  <div *ngIf="!segmentJobsLoading() && segmentJobs().length === 0" class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.couponsV2.bulk.segment.jobsEmpty' | translate }}
+                  </div>
+
+                  <div *ngFor="let j of segmentJobs(); let idx = index" class="mt-3 border-t border-slate-200 pt-3 dark:border-slate-800" [class.border-t-0]="idx === 0" [class.pt-0]="idx === 0">
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="grid gap-1">
+                        <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                          {{ j.action | uppercase }} · {{ j.status }}
+                        </div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">{{ j.created_at | date: 'short' }}</div>
+                        <div class="text-xs text-slate-600 dark:text-slate-300">
+                          {{ 'adminUi.couponsV2.bulk.segment.jobProgress' | translate:{ processed: j.processed, total: j.total_candidates } }}
+                        </div>
+                        <div *ngIf="j.action === 'assign'" class="text-xs text-slate-600 dark:text-slate-300">
+                          {{ 'adminUi.couponsV2.bulk.resultCreated' | translate:{ count: j.created } }} ·
+                          {{ 'adminUi.couponsV2.bulk.resultRestored' | translate:{ count: j.restored } }} ·
+                          {{ 'adminUi.couponsV2.bulk.resultAlreadyActive' | translate:{ count: j.already_active } }}
+                        </div>
+                        <div *ngIf="j.action === 'revoke'" class="text-xs text-slate-600 dark:text-slate-300">
+                          {{ 'adminUi.couponsV2.bulk.resultRevoked' | translate:{ count: j.revoked } }} ·
+                          {{ 'adminUi.couponsV2.bulk.resultAlreadyRevoked' | translate:{ count: j.already_revoked } }} ·
+                          {{ 'adminUi.couponsV2.bulk.resultNotAssigned' | translate:{ count: j.not_assigned } }}
+                        </div>
+                        <div *ngIf="j.error_message" class="text-xs text-rose-700 dark:text-rose-200">
+                          {{ j.error_message }}
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <app-button
+                          *ngIf="j.status === 'pending' || j.status === 'running'"
+                          size="xs"
+                          variant="ghost"
+                          [disabled]="segmentJobsBusy()"
+                          [label]="'adminUi.actions.cancel' | translate"
+                          (action)="cancelSegmentJob(j)"
+                        ></app-button>
+                        <app-button
+                          *ngIf="j.status === 'failed' || j.status === 'cancelled'"
+                          size="xs"
+                          variant="ghost"
+                          [disabled]="segmentJobInProgress() || segmentJobsBusy()"
+                          [label]="'adminUi.actions.retry' | translate"
+                          (action)="retrySegmentJob(j)"
+                        ></app-button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -886,6 +976,10 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
   segmentPreviewAssign = signal<CouponBulkSegmentPreview | null>(null);
   segmentPreviewRevoke = signal<CouponBulkSegmentPreview | null>(null);
   segmentJob = signal<CouponBulkJobRead | null>(null);
+  segmentJobsLoading = signal(false);
+  segmentJobsError = signal<string | null>(null);
+  segmentJobs = signal<CouponBulkJobRead[]>([]);
+  segmentJobsBusy = signal(false);
   private segmentJobPollHandle: number | null = null;
   private segmentJobLastStatus: string | null = null;
 
@@ -1066,6 +1160,7 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     this.resetBulkState();
     this.resetSegmentState();
     this.loadAssignments();
+    this.loadSegmentJobs();
   }
 
   startNewCoupon(): void {
@@ -1607,6 +1702,24 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     return preview.length ? `${preview.join(', ')}${suffix}` : '';
   }
 
+  loadSegmentJobs(): void {
+    const couponId = this.selectedCoupon()?.id;
+    if (!couponId) return;
+    this.segmentJobsLoading.set(true);
+    this.segmentJobsError.set(null);
+    this.adminCoupons.listBulkJobs(couponId, { limit: 10 }).subscribe({
+      next: (jobs) => {
+        this.segmentJobsLoading.set(false);
+        this.segmentJobs.set(Array.isArray(jobs) ? jobs : []);
+      },
+      error: (err) => {
+        this.segmentJobsLoading.set(false);
+        this.segmentJobsError.set(err?.error?.detail || this.t('adminUi.couponsV2.bulk.segment.jobsLoadError'));
+        this.segmentJobs.set([]);
+      }
+    });
+  }
+
   segmentPreview(): void {
     const couponId = this.selectedCoupon()?.id;
     if (!couponId) return;
@@ -1655,6 +1768,7 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (job) => {
           this.segmentJob.set(job);
+          this.upsertSegmentJob(job, { promote: true });
           this.toast.success(this.t('adminUi.couponsV2.bulk.segment.started'));
           this.startSegmentPolling(job.id);
         },
@@ -1682,6 +1796,7 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (job) => {
           this.segmentJob.set(job);
+          this.upsertSegmentJob(job, { promote: true });
           this.toast.success(this.t('adminUi.couponsV2.bulk.segment.started'));
           this.startSegmentPolling(job.id);
         },
@@ -1689,6 +1804,47 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
           this.toast.error(this.t('adminUi.couponsV2.errors.revoke'), err?.error?.detail || undefined);
         }
       });
+  }
+
+  cancelSegmentJob(job: CouponBulkJobRead): void {
+    if (!job?.id) return;
+    if (job.status !== 'pending' && job.status !== 'running') return;
+    this.segmentJobsBusy.set(true);
+    this.adminCoupons.cancelBulkJob(job.id).subscribe({
+      next: (updated) => {
+        this.segmentJobsBusy.set(false);
+        this.upsertSegmentJob(updated);
+        if (this.segmentJob()?.id === updated.id) {
+          this.segmentJob.set(updated);
+          this.stopSegmentPolling();
+        }
+        this.toast.success(this.t('adminUi.couponsV2.bulk.segment.cancelled'));
+      },
+      error: (err) => {
+        this.segmentJobsBusy.set(false);
+        this.toast.error(this.t('adminUi.couponsV2.bulk.segment.cancelError'), err?.error?.detail || undefined);
+      }
+    });
+  }
+
+  retrySegmentJob(job: CouponBulkJobRead): void {
+    if (!job?.id) return;
+    if (job.status !== 'failed' && job.status !== 'cancelled') return;
+    if (this.segmentJobInProgress()) return;
+    this.segmentJobsBusy.set(true);
+    this.adminCoupons.retryBulkJob(job.id).subscribe({
+      next: (newJob) => {
+        this.segmentJobsBusy.set(false);
+        this.segmentJob.set(newJob);
+        this.upsertSegmentJob(newJob, { promote: true });
+        this.toast.success(this.t('adminUi.couponsV2.bulk.segment.started'));
+        this.startSegmentPolling(newJob.id);
+      },
+      error: (err) => {
+        this.segmentJobsBusy.set(false);
+        this.toast.error(this.t('adminUi.couponsV2.bulk.segment.retryError'), err?.error?.detail || undefined);
+      }
+    });
   }
 
   private startSegmentPolling(jobId: string): void {
@@ -1710,8 +1866,9 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
         const prev = this.segmentJobLastStatus;
         this.segmentJobLastStatus = job.status;
         this.segmentJob.set(job);
+        this.upsertSegmentJob(job);
 
-        if (job.status === 'succeeded' || job.status === 'failed') {
+        if (job.status === 'succeeded' || job.status === 'failed' || job.status === 'cancelled') {
           this.stopSegmentPolling();
         }
         if (prev && prev !== job.status && job.status === 'succeeded') {
@@ -1723,6 +1880,22 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
         this.stopSegmentPolling();
       }
     });
+  }
+
+  private upsertSegmentJob(job: CouponBulkJobRead, opts?: { promote?: boolean }): void {
+    if (!job?.id) return;
+    const list = this.segmentJobs();
+    const idx = list.findIndex((j) => j.id === job.id);
+    let next: CouponBulkJobRead[];
+    if (idx === -1) {
+      next = opts?.promote ? [job, ...list] : [...list, job];
+    } else {
+      next = list.map((j) => (j.id === job.id ? job : j));
+      if (opts?.promote && idx > 0) {
+        next = [job, ...next.filter((j) => j.id !== job.id)];
+      }
+    }
+    this.segmentJobs.set(next.slice(0, 10));
   }
 
   private resetBulkState(): void {
@@ -1742,6 +1915,10 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     this.segmentJob.set(null);
     this.segmentJobLastStatus = null;
     this.segmentRevokeReason = '';
+    this.segmentJobsLoading.set(false);
+    this.segmentJobsError.set(null);
+    this.segmentJobs.set([]);
+    this.segmentJobsBusy.set(false);
   }
 
   private parseEmailsFromCsv(text: string): { emails: string[]; invalid: string[]; duplicates: number; truncated: number } {

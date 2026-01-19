@@ -3,7 +3,7 @@ import { Component } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
-import { AccountComponent as AccountLegacyComponent } from './account.component.legacy';
+import { AccountState } from './account.state';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { BlogService } from '../../core/blog.service';
@@ -171,7 +171,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
     </app-container>
   `
 })
-export class AccountComponent extends AccountLegacyComponent {
+export class AccountComponent extends AccountState {
   constructor(
     toast: ToastService,
     auth: AuthService,

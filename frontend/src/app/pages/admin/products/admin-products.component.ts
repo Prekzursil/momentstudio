@@ -33,7 +33,6 @@ type ProductForm = {
   long_description: string;
   publish_at: string;
   is_bestseller: boolean;
-  is_highlight: boolean;
 };
 
 type ProductTranslationForm = {
@@ -426,11 +425,6 @@ type ProductTranslationForm = {
           <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
             <input type="checkbox" [(ngModel)]="form.is_bestseller" />
             {{ 'adminUi.products.form.bestseller' | translate }}
-          </label>
-
-          <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-            <input type="checkbox" [(ngModel)]="form.is_highlight" />
-            {{ 'adminUi.products.form.highlight' | translate }}
           </label>
         </div>
 
@@ -844,8 +838,7 @@ export class AdminProductsComponent implements OnInit {
           short_description: (prod.short_description || '').toString(),
           long_description: (prod.long_description || '').toString(),
           publish_at: prod.publish_at ? this.toLocalDateTime(prod.publish_at) : '',
-          is_bestseller: Array.isArray(prod.tags) ? prod.tags.includes('bestseller') : false,
-          is_highlight: Array.isArray(prod.tags) ? prod.tags.includes('highlight') : false
+          is_bestseller: Array.isArray(prod.tags) ? prod.tags.includes('bestseller') : false
         };
         this.images.set(Array.isArray(prod.images) ? prod.images : []);
         this.loadTranslations((prod.slug || slug).toString());
@@ -1147,8 +1140,7 @@ export class AdminProductsComponent implements OnInit {
       short_description: '',
       long_description: '',
       publish_at: '',
-      is_bestseller: false,
-      is_highlight: false
+      is_bestseller: false
     };
   }
 
@@ -1204,7 +1196,6 @@ export class AdminProductsComponent implements OnInit {
   private buildTags(): string[] {
     const tags: string[] = [];
     if (this.form.is_bestseller) tags.push('bestseller');
-    if (this.form.is_highlight) tags.push('highlight');
     return tags;
   }
 

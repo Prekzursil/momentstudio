@@ -417,8 +417,7 @@ async def _log_product_action(
 
 
 async def create_category(session: AsyncSession, payload: CategoryCreate) -> Category:
-    requested = (payload.slug or "").strip()
-    base = (requested or slugify(payload.name or "") or "category")[:120]
+    base = (slugify(payload.name or "") or "category")[:120]
     candidate = base
     counter = 2
     while await get_category_by_slug(session, candidate):
@@ -748,11 +747,15 @@ async def _load_products_by_ids(session: AsyncSession, product_ids: list[uuid.UU
 
 
 async def create_featured_collection(session: AsyncSession, payload: FeaturedCollectionCreate) -> FeaturedCollection:
-    existing = await get_featured_collection_by_slug(session, payload.slug)
-    if existing:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Featured collection slug already exists")
+    base = (slugify(payload.name or "") or "collection")[:120]
+    candidate = base
+    counter = 2
+    while await get_featured_collection_by_slug(session, candidate):
+        suffix = f"-{counter}"
+        candidate = f"{base[: 120 - len(suffix)]}{suffix}"
+        counter += 1
     products = await _load_products_by_ids(session, payload.product_ids)
-    collection = FeaturedCollection(slug=payload.slug, name=payload.name, description=payload.description)
+    collection = FeaturedCollection(slug=candidate, name=payload.name, description=payload.description)
     collection.products = products
     session.add(collection)
     await session.commit()

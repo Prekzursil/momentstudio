@@ -1,20 +1,45 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 import httpx
 from fastapi import HTTPException, status
 
 from app.core.config import settings
+from app.services import fx_rates
 
 _token_cache: dict[str, dict[str, object]] = {}
+_SUPPORTED_CURRENCIES = {"EUR", "USD"}
 
 
 def _paypal_env() -> str:
     env = (settings.paypal_env or "sandbox").strip().lower()
     return "live" if env == "live" else "sandbox"
+
+
+def _paypal_currency(currency_code: str | None = None) -> str:
+    raw = (currency_code or settings.paypal_currency or "EUR").strip().upper()
+    if raw in _SUPPORTED_CURRENCIES:
+        return raw
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=f"Unsupported PayPal currency {raw!r}; configure PAYPAL_CURRENCY as EUR or USD",
+    )
+
+
+async def _fx_per_ron(currency_code: str, *, fx_eur_per_ron: float | None, fx_usd_per_ron: float | None) -> Decimal:
+    if currency_code == "EUR" and fx_eur_per_ron:
+        return Decimal(str(fx_eur_per_ron))
+    if currency_code == "USD" and fx_usd_per_ron:
+        return Decimal(str(fx_usd_per_ron))
+    fetched = await fx_rates.get_fx_rates()
+    return Decimal(str(fetched.usd_per_ron if currency_code == "USD" else fetched.eur_per_ron))
+
+
+def _convert_ron(value_ron: Decimal, fx_per_ron: Decimal) -> Decimal:
+    return (Decimal(value_ron) * fx_per_ron).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def _effective_client_id() -> str:
@@ -100,6 +125,9 @@ async def create_order(
     fee_ron: Decimal | None = None,
     discount_ron: Decimal | None = None,
     items: list[dict[str, Any]] | None = None,
+    currency_code: str | None = None,
+    fx_eur_per_ron: float | None = None,
+    fx_usd_per_ron: float | None = None,
 ) -> tuple[str, str]:
     """Create a PayPal order and return (paypal_order_id, approval_url)."""
     return await create_order_itemized(
@@ -113,6 +141,9 @@ async def create_order(
         fee_ron=fee_ron,
         discount_ron=discount_ron,
         items=items,
+        currency_code=currency_code,
+        fx_eur_per_ron=fx_eur_per_ron,
+        fx_usd_per_ron=fx_usd_per_ron,
     )
 
 
@@ -132,6 +163,9 @@ async def create_order_itemized(
     fee_ron: Decimal | None = None,
     discount_ron: Decimal | None = None,
     items: list[dict[str, Any]] | None = None,
+    currency_code: str | None = None,
+    fx_eur_per_ron: float | None = None,
+    fx_usd_per_ron: float | None = None,
 ) -> tuple[str, str]:
     """Create a PayPal order and return (paypal_order_id, approval_url).
 
@@ -141,9 +175,74 @@ async def create_order_itemized(
     token = await _get_access_token()
     orders_url = f"{_base_url()}/v2/checkout/orders"
 
+    currency = _paypal_currency(currency_code)
+    fx_per_ron = await _fx_per_ron(currency, fx_eur_per_ron=fx_eur_per_ron, fx_usd_per_ron=fx_usd_per_ron)
+
     # PayPal expects a string amount with 2 decimal places.
-    value = _format_amount(total_ron)
-    amount: dict[str, Any] = {"currency_code": "RON", "value": value}
+    converted_items: list[dict[str, Any]] | None = None
+    item_total_converted: Decimal | None = None
+    if items:
+        converted_items = []
+        item_total_converted = Decimal("0.00")
+        for raw_item in items:
+            if not isinstance(raw_item, dict):
+                continue
+            qty_raw = raw_item.get("quantity")
+            try:
+                qty_int = int(str(qty_raw))
+            except Exception:
+                continue
+            if qty_int <= 0:
+                continue
+            raw_unit_amount = raw_item.get("unit_amount")
+            if not isinstance(raw_unit_amount, dict):
+                continue
+            raw_value = raw_unit_amount.get("value")
+            try:
+                unit_ron = Decimal(str(raw_value))
+            except Exception:
+                continue
+            unit_converted = _convert_ron(unit_ron, fx_per_ron)
+            item_total_converted += unit_converted * qty_int
+            unit_amount = dict(raw_unit_amount)
+            unit_amount["currency_code"] = currency
+            unit_amount["value"] = _format_amount(unit_converted)
+            item = dict(raw_item)
+            item["quantity"] = str(qty_int)
+            item["unit_amount"] = unit_amount
+            converted_items.append(item)
+        if not converted_items:
+            converted_items = None
+            item_total_converted = None
+
+    shipping_converted = _convert_ron(Decimal(shipping_ron), fx_per_ron) if shipping_ron is not None else None
+    fee_converted = _convert_ron(Decimal(fee_ron), fx_per_ron) if fee_ron is not None else None
+    tax_converted = _convert_ron(Decimal(tax_ron), fx_per_ron) if tax_ron is not None else None
+    discount_converted = (
+        _convert_ron(Decimal(discount_ron), fx_per_ron)
+        if discount_ron is not None and Decimal(discount_ron) > 0
+        else None
+    )
+    item_total_ron_dec = Decimal(item_total_ron) if item_total_ron is not None else None
+    if item_total_converted is None and item_total_ron_dec is not None:
+        item_total_converted = _convert_ron(item_total_ron_dec, fx_per_ron)
+
+    # Compute a PayPal-compatible total in the settlement currency.
+    total_converted = Decimal("0.00")
+    if item_total_converted is not None:
+        total_converted += item_total_converted
+    if shipping_converted is not None:
+        total_converted += shipping_converted
+    if fee_converted is not None:
+        total_converted += fee_converted
+    if tax_converted is not None:
+        total_converted += tax_converted
+    if discount_converted is not None:
+        total_converted -= discount_converted
+    if total_converted <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid PayPal order total")
+
+    amount: dict[str, Any] = {"currency_code": currency, "value": _format_amount(total_converted)}
     if (
         item_total_ron is not None
         or shipping_ron is not None
@@ -152,16 +251,16 @@ async def create_order_itemized(
         or (discount_ron is not None and Decimal(discount_ron) > 0)
     ):
         breakdown: dict[str, Any] = {}
-        if item_total_ron is not None:
-            breakdown["item_total"] = {"currency_code": "RON", "value": _format_amount(item_total_ron)}
-        if shipping_ron is not None and Decimal(shipping_ron) > 0:
-            breakdown["shipping"] = {"currency_code": "RON", "value": _format_amount(shipping_ron)}
-        if fee_ron is not None and Decimal(fee_ron) > 0:
-            breakdown["handling"] = {"currency_code": "RON", "value": _format_amount(fee_ron)}
-        if tax_ron is not None and Decimal(tax_ron) > 0:
-            breakdown["tax_total"] = {"currency_code": "RON", "value": _format_amount(tax_ron)}
-        if discount_ron is not None and Decimal(discount_ron) > 0:
-            breakdown["discount"] = {"currency_code": "RON", "value": _format_amount(discount_ron)}
+        if item_total_converted is not None:
+            breakdown["item_total"] = {"currency_code": currency, "value": _format_amount(item_total_converted)}
+        if shipping_converted is not None and Decimal(shipping_converted) > 0:
+            breakdown["shipping"] = {"currency_code": currency, "value": _format_amount(shipping_converted)}
+        if fee_converted is not None and Decimal(fee_converted) > 0:
+            breakdown["handling"] = {"currency_code": currency, "value": _format_amount(fee_converted)}
+        if tax_converted is not None and Decimal(tax_converted) > 0:
+            breakdown["tax_total"] = {"currency_code": currency, "value": _format_amount(tax_converted)}
+        if discount_converted is not None and Decimal(discount_converted) > 0:
+            breakdown["discount"] = {"currency_code": currency, "value": _format_amount(discount_converted)}
         if breakdown:
             amount["breakdown"] = breakdown
 
@@ -182,8 +281,8 @@ async def create_order_itemized(
             "cancel_url": cancel_url,
         },
     }
-    if items:
-        payload["purchase_units"][0]["items"] = items
+    if converted_items:
+        payload["purchase_units"][0]["items"] = converted_items
 
     try:
         async with httpx.AsyncClient(timeout=15) as client:

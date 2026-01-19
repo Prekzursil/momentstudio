@@ -86,7 +86,7 @@ def test_catalog_admin_and_public_flows(test_app: Dict[str, object]) -> None:
     # Create category
     res = client.post(
         "/api/v1/catalog/categories",
-        json={"slug": "cups", "name": "Cups"},
+        json={"name": "Cups"},
         headers=auth_headers(admin_token),
     )
     assert res.status_code == 201, res.text
@@ -314,7 +314,7 @@ def test_catalog_translation_admin_endpoints(test_app: Dict[str, object]) -> Non
 
     category_res = client.post(
         "/api/v1/catalog/categories",
-        json={"slug": "t-cups", "name": "Cups"},
+        json={"name": "T Cups"},
         headers=auth_headers(admin_token),
     )
     assert category_res.status_code == 201, category_res.text
@@ -382,7 +382,7 @@ def test_product_price_bounds(test_app: Dict[str, object]) -> None:
 
     res = client.post(
         "/api/v1/catalog/categories",
-        json={"slug": "bounds-cups", "name": "Cups"},
+        json={"name": "Bounds Cups"},
         headers=auth_headers(admin_token),
     )
     assert res.status_code == 201
@@ -390,7 +390,7 @@ def test_product_price_bounds(test_app: Dict[str, object]) -> None:
 
     res = client.post(
         "/api/v1/catalog/categories",
-        json={"slug": "bounds-plates", "name": "Plates"},
+        json={"name": "Bounds Plates"},
         headers=auth_headers(admin_token),
     )
     assert res.status_code == 201
@@ -463,7 +463,7 @@ def test_sale_filter_and_effective_price_bounds(test_app: Dict[str, object]) -> 
 
     res = client.post(
         "/api/v1/catalog/categories",
-        json={"slug": "sale-cat", "name": "SaleCat"},
+        json={"name": "Sale Cat"},
         headers=auth_headers(admin_token),
     )
     assert res.status_code == 201, res.text
@@ -527,7 +527,7 @@ def test_product_image_upload_and_delete(tmp_path, test_app: Dict[str, object]) 
 
     res = client.post(
         "/api/v1/catalog/categories",
-        json={"slug": "plates", "name": "Plates"},
+        json={"name": "Plates"},
         headers=auth_headers(admin_token),
     )
     category_id = res.json()["id"]
@@ -572,7 +572,7 @@ def test_bulk_update_and_publish(test_app: Dict[str, object]) -> None:
 
     res = client.post(
         "/api/v1/catalog/categories",
-        json={"slug": "bulk-cat", "name": "Bulk"},
+        json={"name": "Bulk Cat"},
         headers=auth_headers(admin_token),
     )
     category_id = res.json()["id"]
@@ -617,7 +617,7 @@ def test_product_reviews_and_related(test_app: Dict[str, object]) -> None:
 
     res = client.post(
         "/api/v1/catalog/categories",
-        json={"slug": "pots", "name": "Pots"},
+        json={"name": "Pots"},
         headers=auth_headers(admin_token),
     )
     category_id = res.json()["id"]
@@ -682,7 +682,7 @@ def test_slug_history_recently_viewed_and_csv(test_app: Dict[str, object]) -> No
 
     res = client.post(
         "/api/v1/catalog/categories",
-        json={"slug": "history", "name": "History"},
+        json={"name": "History"},
         headers=auth_headers(admin_token),
     )
     category_id = res.json()["id"]
@@ -748,7 +748,7 @@ def test_preorder_shipping_meta_and_sort(test_app: Dict[str, object]) -> None:
 
     res = client.post(
         "/api/v1/catalog/categories",
-        json={"slug": "logistics", "name": "Logistics"},
+        json={"name": "Logistics"},
         headers=auth_headers(admin_token),
     )
     category_id = res.json()["id"]
@@ -826,7 +826,7 @@ def test_featured_collections_feed_and_audit(test_app: Dict[str, object]) -> Non
     # category
     res = client.post(
         "/api/v1/catalog/categories",
-        json={"slug": "feed-cat", "name": "Feed Cat"},
+        json={"name": "Feed Cat"},
         headers=auth_headers(admin_token),
     )
     cat_id = res.json()["id"]
@@ -853,16 +853,17 @@ def test_featured_collections_feed_and_audit(test_app: Dict[str, object]) -> Non
     # featured collection create and update
     coll = client.post(
         "/api/v1/catalog/collections/featured",
-        json={"slug": "featured-a", "name": "Featured A", "product_ids": [pub["id"]]},
+        json={"name": "Featured A", "product_ids": [pub["id"]]},
         headers=auth_headers(admin_token),
     )
     assert coll.status_code == 201
+    coll_slug = coll.json()["slug"]
     list_coll = client.get("/api/v1/catalog/collections/featured")
     assert list_coll.status_code == 200
-    assert list_coll.json()[0]["slug"] == "featured-a"
+    assert list_coll.json()[0]["slug"] == coll_slug
 
     upd = client.patch(
-        "/api/v1/catalog/collections/featured/featured-a",
+        f"/api/v1/catalog/collections/featured/{coll_slug}",
         json={"name": "Featured A Updated"},
         headers=auth_headers(admin_token),
     )
@@ -888,7 +889,7 @@ def test_back_in_stock_request_flow(test_app: Dict[str, object]) -> None:
 
     category = client.post(
         "/api/v1/catalog/categories",
-        json={"slug": "bis-cups", "name": "Cups"},
+        json={"name": "BIS Cups"},
         headers=auth_headers(admin_token),
     )
     assert category.status_code == 201, category.text
@@ -943,7 +944,7 @@ def test_back_in_stock_fulfilled_on_restock(test_app: Dict[str, object]) -> None
 
     category = client.post(
         "/api/v1/catalog/categories",
-        json={"slug": "restock-cat", "name": "Cups"},
+        json={"name": "Restock Cat"},
         headers=auth_headers(admin_token),
     )
     assert category.status_code == 201, category.text

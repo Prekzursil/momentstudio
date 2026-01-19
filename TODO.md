@@ -117,7 +117,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Coupons v2: admin UI – resolve scoped product IDs to names (avoid showing raw UUID chips).
 - [x] Coupons v2: admin UI – bulk assign/revoke coupons (CSV upload or segment-based selection).
 - [x] Coupons v2: bulk assign/revoke – add segment targeting (marketing opt-in, email verified) with preview + background job.
-- [ ] Coupons v2: bulk segment jobs – list recent jobs per coupon (status/progress) and allow cancel/retry.
+- [x] Coupons v2: bulk segment jobs – list recent jobs per coupon (status/progress) and allow cancel/retry.
 - [x] Abandoned cart job (email reminder) scaffold.
 - [x] Cart item note (gift message) support.
 - [x] Cart cleanup job for stale guest carts.
@@ -440,6 +440,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Forms: audit and set proper HTML `autocomplete` attributes across checkout/profile/tickets/contact forms for better browser autofill.
 - [x] Auth UX: ensure header/profile dropdown always reflects server auth state after restart (clear stale UI on 401/refresh failure) and sign-out works consistently in all menus.
 - [x] Wishlist: investigate reports of add/remove not persisting and add e2e coverage for save/unsave flows.
+- [ ] Account UX: unify email management UI in Security (single email section; reduce duplication; align Change password placement).
 
 ## Frontend - Admin Dashboard
 - [x] /admin layout with sidebar + guard.

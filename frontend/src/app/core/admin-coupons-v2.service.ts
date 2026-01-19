@@ -84,7 +84,7 @@ export interface CouponBulkSegmentPreview {
 }
 
 export type CouponBulkJobAction = 'assign' | 'revoke';
-export type CouponBulkJobStatus = 'pending' | 'running' | 'succeeded' | 'failed';
+export type CouponBulkJobStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 
 export interface CouponBulkJobRead {
   id: string;
@@ -196,5 +196,17 @@ export class AdminCouponsV2Service {
 
   getBulkJob(jobId: string): Observable<CouponBulkJobRead> {
     return this.api.get<CouponBulkJobRead>(`/coupons/admin/coupons/bulk-jobs/${jobId}`);
+  }
+
+  listBulkJobs(couponId: string, params?: { limit?: number }): Observable<CouponBulkJobRead[]> {
+    return this.api.get<CouponBulkJobRead[]>(`/coupons/admin/coupons/${couponId}/bulk-jobs`, params as any);
+  }
+
+  cancelBulkJob(jobId: string): Observable<CouponBulkJobRead> {
+    return this.api.post<CouponBulkJobRead>(`/coupons/admin/coupons/bulk-jobs/${jobId}/cancel`, {});
+  }
+
+  retryBulkJob(jobId: string): Observable<CouponBulkJobRead> {
+    return this.api.post<CouponBulkJobRead>(`/coupons/admin/coupons/bulk-jobs/${jobId}/retry`, {});
   }
 }
