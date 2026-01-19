@@ -7,11 +7,11 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('paypal payment option is available when enabled', async ({ page }) => {
-  test.skip(process.env.E2E_PAYPAL !== '1', 'Set E2E_PAYPAL=1 to enable PayPal UI checks.');
-
-  const sync = page.waitForResponse((res) => res.url().includes('/api/v1/cart/sync'));
+  const cartLoad = page.waitForResponse(
+    (res) => res.url().includes('/api/v1/cart') && res.request().method() === 'GET' && res.status() === 200
+  );
   await page.goto('/checkout');
-  await sync;
+  await cartLoad;
 
   const paypalOption = page.getByRole('button', { name: 'PayPal' });
   if (!(await paypalOption.isVisible())) {
