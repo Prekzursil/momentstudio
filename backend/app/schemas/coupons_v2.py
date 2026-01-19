@@ -21,6 +21,10 @@ class PromotionRead(BaseModel):
     amount_off: Decimal | None = None
     max_discount_amount: Decimal | None = None
     min_subtotal: Decimal | None = None
+    included_product_ids: list[UUID] = Field(default_factory=list)
+    excluded_product_ids: list[UUID] = Field(default_factory=list)
+    included_category_ids: list[UUID] = Field(default_factory=list)
+    excluded_category_ids: list[UUID] = Field(default_factory=list)
     allow_on_sale_items: bool
     is_active: bool
     starts_at: datetime | None = None
@@ -39,11 +43,35 @@ class PromotionCreate(BaseModel):
     amount_off: Decimal | None = Field(default=None, ge=0)
     max_discount_amount: Decimal | None = Field(default=None, ge=0)
     min_subtotal: Decimal | None = Field(default=None, ge=0)
+    included_product_ids: list[UUID] = Field(default_factory=list)
+    excluded_product_ids: list[UUID] = Field(default_factory=list)
+    included_category_ids: list[UUID] = Field(default_factory=list)
+    excluded_category_ids: list[UUID] = Field(default_factory=list)
     allow_on_sale_items: bool = True
     is_active: bool = True
     starts_at: datetime | None = None
     ends_at: datetime | None = None
     is_automatic: bool = False
+
+
+class PromotionUpdate(BaseModel):
+    key: str | None = Field(default=None, max_length=80)
+    name: str | None = Field(default=None, max_length=120)
+    description: str | None = None
+    discount_type: PromotionDiscountType | None = None
+    percentage_off: Decimal | None = Field(default=None, ge=0)
+    amount_off: Decimal | None = Field(default=None, ge=0)
+    max_discount_amount: Decimal | None = Field(default=None, ge=0)
+    min_subtotal: Decimal | None = Field(default=None, ge=0)
+    included_product_ids: list[UUID] | None = None
+    excluded_product_ids: list[UUID] | None = None
+    included_category_ids: list[UUID] | None = None
+    excluded_category_ids: list[UUID] | None = None
+    allow_on_sale_items: bool | None = None
+    is_active: bool | None = None
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    is_automatic: bool | None = None
 
 
 class CouponRead(BaseModel):
@@ -71,6 +99,27 @@ class CouponCreate(BaseModel):
     ends_at: datetime | None = None
     global_max_redemptions: int | None = Field(default=None, ge=1)
     per_customer_max_redemptions: int | None = Field(default=None, ge=1)
+
+
+class CouponUpdate(BaseModel):
+    is_active: bool | None = None
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    global_max_redemptions: int | None = Field(default=None, ge=1)
+    per_customer_max_redemptions: int | None = Field(default=None, ge=1)
+
+
+class CouponAssignmentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    coupon_id: UUID
+    user_id: UUID
+    issued_at: datetime
+    revoked_at: datetime | None = None
+    revoked_reason: str | None = None
+    user_email: str | None = None
+    user_username: str | None = None
 
 
 class CouponOffer(BaseModel):

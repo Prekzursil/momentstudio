@@ -5,18 +5,28 @@ from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import get_current_user, require_admin
 from app.db.session import get_session
-from app.models.coupons_v2 import Coupon, CouponAssignment, Promotion
+from app.models.catalog import Category, Product
+from app.models.coupons_v2 import (
+    Coupon,
+    CouponAssignment,
+    Promotion,
+    PromotionScope,
+    PromotionScopeEntityType,
+    PromotionScopeMode,
+)
 from app.models.order import ShippingMethod
 from app.models.user import User
 from app.schemas.coupons_v2 import (
     CouponAssignRequest,
+    CouponAssignmentRead,
     CouponCreate,
+    CouponUpdate,
     CouponEligibilityResponse,
     CouponOffer,
     CouponRead,
@@ -24,6 +34,7 @@ from app.schemas.coupons_v2 import (
     CouponValidateRequest,
     PromotionCreate,
     PromotionRead,
+    PromotionUpdate,
 )
 from app.services import checkout_settings as checkout_settings_service
 from app.services import coupons_v2 as coupons_service
@@ -43,10 +54,137 @@ async def _get_shipping_method(session: AsyncSession, shipping_method_id: UUID |
     return shipping_method
 
 
+def _to_promotion_read(promo: Promotion) -> PromotionRead:
+    include_products: list[UUID] = []
+    exclude_products: list[UUID] = []
+    include_categories: list[UUID] = []
+    exclude_categories: list[UUID] = []
+
+    for scope in getattr(promo, "scopes", None) or []:
+        if getattr(scope, "entity_type", None) == PromotionScopeEntityType.product:
+            if getattr(scope, "mode", None) == PromotionScopeMode.include:
+                include_products.append(scope.entity_id)
+            else:
+                exclude_products.append(scope.entity_id)
+        elif getattr(scope, "entity_type", None) == PromotionScopeEntityType.category:
+            if getattr(scope, "mode", None) == PromotionScopeMode.include:
+                include_categories.append(scope.entity_id)
+            else:
+                exclude_categories.append(scope.entity_id)
+
+    base = PromotionRead.model_validate(promo, from_attributes=True)
+    return base.model_copy(
+        update={
+            "included_product_ids": include_products,
+            "excluded_product_ids": exclude_products,
+            "included_category_ids": include_categories,
+            "excluded_category_ids": exclude_categories,
+        }
+    )
+
+
+async def _validate_scope_ids(
+    session: AsyncSession,
+    *,
+    product_ids: set[UUID],
+    category_ids: set[UUID],
+) -> None:
+    if product_ids:
+        found = (await session.execute(select(Product.id).where(Product.id.in_(product_ids)))).scalars().all()
+        missing = product_ids - set(found)
+        if missing:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more products in scope do not exist")
+
+    if category_ids:
+        found = (await session.execute(select(Category.id).where(Category.id.in_(category_ids)))).scalars().all()
+        missing = category_ids - set(found)
+        if missing:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more categories in scope do not exist")
+
+
+def _scopes_from_promotion(promo: Promotion) -> tuple[set[UUID], set[UUID], set[UUID], set[UUID]]:
+    include_products: set[UUID] = set()
+    exclude_products: set[UUID] = set()
+    include_categories: set[UUID] = set()
+    exclude_categories: set[UUID] = set()
+
+    for scope in getattr(promo, "scopes", None) or []:
+        if getattr(scope, "entity_type", None) == PromotionScopeEntityType.product:
+            target = include_products if getattr(scope, "mode", None) == PromotionScopeMode.include else exclude_products
+            target.add(scope.entity_id)
+        elif getattr(scope, "entity_type", None) == PromotionScopeEntityType.category:
+            target = include_categories if getattr(scope, "mode", None) == PromotionScopeMode.include else exclude_categories
+            target.add(scope.entity_id)
+
+    return include_products, exclude_products, include_categories, exclude_categories
+
+
+async def _replace_promotion_scopes(
+    session: AsyncSession,
+    *,
+    promotion_id: UUID,
+    include_product_ids: set[UUID],
+    exclude_product_ids: set[UUID],
+    include_category_ids: set[UUID],
+    exclude_category_ids: set[UUID],
+) -> None:
+    overlap_products = include_product_ids & exclude_product_ids
+    overlap_categories = include_category_ids & exclude_category_ids
+    if overlap_products:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Products cannot be both included and excluded")
+    if overlap_categories:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Categories cannot be both included and excluded")
+
+    await _validate_scope_ids(
+        session,
+        product_ids=set(include_product_ids) | set(exclude_product_ids),
+        category_ids=set(include_category_ids) | set(exclude_category_ids),
+    )
+
+    await session.execute(delete(PromotionScope).where(PromotionScope.promotion_id == promotion_id))
+
+    for product_id in sorted(include_product_ids):
+        session.add(
+            PromotionScope(
+                promotion_id=promotion_id,
+                entity_type=PromotionScopeEntityType.product,
+                entity_id=product_id,
+                mode=PromotionScopeMode.include,
+            )
+        )
+    for product_id in sorted(exclude_product_ids):
+        session.add(
+            PromotionScope(
+                promotion_id=promotion_id,
+                entity_type=PromotionScopeEntityType.product,
+                entity_id=product_id,
+                mode=PromotionScopeMode.exclude,
+            )
+        )
+    for category_id in sorted(include_category_ids):
+        session.add(
+            PromotionScope(
+                promotion_id=promotion_id,
+                entity_type=PromotionScopeEntityType.category,
+                entity_id=category_id,
+                mode=PromotionScopeMode.include,
+            )
+        )
+    for category_id in sorted(exclude_category_ids):
+        session.add(
+            PromotionScope(
+                promotion_id=promotion_id,
+                entity_type=PromotionScopeEntityType.category,
+                entity_id=category_id,
+                mode=PromotionScopeMode.exclude,
+            )
+        )
+
+
 def _to_offer(result: coupons_service.CouponEligibility) -> CouponOffer:
     coupon_read = CouponRead.model_validate(result.coupon, from_attributes=True)
     if result.coupon.promotion:
-        coupon_read.promotion = PromotionRead.model_validate(result.coupon.promotion, from_attributes=True)
+        coupon_read.promotion = _to_promotion_read(result.coupon.promotion)
     return CouponOffer(
         coupon=coupon_read,
         estimated_discount_ron=result.estimated_discount_ron,
@@ -118,10 +256,22 @@ async def my_coupons(
     coupons = await coupons_service.get_user_visible_coupons(session, user_id=current_user.id)
     return [
         CouponRead.model_validate(c, from_attributes=True).model_copy(
-            update={"promotion": PromotionRead.model_validate(c.promotion, from_attributes=True) if c.promotion else None}
+            update={"promotion": _to_promotion_read(c.promotion) if c.promotion else None}
         )
         for c in coupons
     ]
+
+
+@router.get("/admin/promotions", response_model=list[PromotionRead])
+async def admin_list_promotions(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> list[PromotionRead]:
+    result = await session.execute(
+        select(Promotion).options(selectinload(Promotion.scopes)).order_by(Promotion.created_at.desc())
+    )
+    promotions = list(result.scalars().all())
+    return [_to_promotion_read(p) for p in promotions]
 
 
 @router.post("/admin/promotions", response_model=PromotionRead, status_code=status.HTTP_201_CREATED)
@@ -149,11 +299,215 @@ async def admin_create_promotion(
         if exists:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Promotion key already exists")
 
-    promo = Promotion(**payload.model_dump(exclude={"key"}), key=key_clean)
+    promo = Promotion(
+        **payload.model_dump(
+            exclude={
+                "key",
+                "included_product_ids",
+                "excluded_product_ids",
+                "included_category_ids",
+                "excluded_category_ids",
+            }
+        ),
+        key=key_clean,
+    )
+    session.add(promo)
+    await session.flush()
+
+    await _replace_promotion_scopes(
+        session,
+        promotion_id=promo.id,
+        include_product_ids=set(payload.included_product_ids),
+        exclude_product_ids=set(payload.excluded_product_ids),
+        include_category_ids=set(payload.included_category_ids),
+        exclude_category_ids=set(payload.excluded_category_ids),
+    )
+
+    await session.commit()
+    await session.refresh(promo, attribute_names=["scopes"])
+    return _to_promotion_read(promo)
+
+
+@router.patch("/admin/promotions/{promotion_id}", response_model=PromotionRead)
+async def admin_update_promotion(
+    promotion_id: UUID,
+    payload: PromotionUpdate,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> PromotionRead:
+    promo = (
+        (await session.execute(select(Promotion).options(selectinload(Promotion.scopes)).where(Promotion.id == promotion_id)))
+        .scalars()
+        .first()
+    )
+    if not promo:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found")
+
+    data = payload.model_dump(exclude_unset=True)
+
+    discount_type = data.get("discount_type", promo.discount_type)
+    percentage_off = data.get("percentage_off", promo.percentage_off)
+    amount_off = data.get("amount_off", promo.amount_off)
+    if discount_type == "percent" and not percentage_off:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="percentage_off is required for percent promotions")
+    if discount_type == "amount" and not amount_off:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="amount_off is required for amount promotions")
+    if discount_type == "free_shipping":
+        if percentage_off or amount_off:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="free_shipping promotions cannot set percentage_off/amount_off")
+    if percentage_off and amount_off:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Choose percentage_off or amount_off, not both")
+
+    if "key" in data:
+        key_clean = (data.get("key") or "").strip() or None
+        if key_clean:
+            key_clean = key_clean[:80]
+            if key_clean != promo.key:
+                exists = (
+                    (await session.execute(select(Promotion).where(Promotion.key == key_clean, Promotion.id != promo.id)))
+                    .scalars()
+                    .first()
+                )
+                if exists:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Promotion key already exists")
+        promo.key = key_clean
+
+    for attr in [
+        "name",
+        "description",
+        "discount_type",
+        "percentage_off",
+        "amount_off",
+        "max_discount_amount",
+        "min_subtotal",
+        "allow_on_sale_items",
+        "is_active",
+        "starts_at",
+        "ends_at",
+        "is_automatic",
+    ]:
+        if attr in data:
+            setattr(promo, attr, data[attr])
+
+    scope_fields = {
+        "included_product_ids",
+        "excluded_product_ids",
+        "included_category_ids",
+        "excluded_category_ids",
+    }
+    if scope_fields & set(data.keys()):
+        current_in_products, current_ex_products, current_in_categories, current_ex_categories = _scopes_from_promotion(promo)
+        include_products = set(data.get("included_product_ids")) if "included_product_ids" in data else current_in_products
+        exclude_products = set(data.get("excluded_product_ids")) if "excluded_product_ids" in data else current_ex_products
+        include_categories = set(data.get("included_category_ids")) if "included_category_ids" in data else current_in_categories
+        exclude_categories = set(data.get("excluded_category_ids")) if "excluded_category_ids" in data else current_ex_categories
+
+        await _replace_promotion_scopes(
+            session,
+            promotion_id=promo.id,
+            include_product_ids=include_products,
+            exclude_product_ids=exclude_products,
+            include_category_ids=include_categories,
+            exclude_category_ids=exclude_categories,
+        )
+
     session.add(promo)
     await session.commit()
-    await session.refresh(promo)
-    return PromotionRead.model_validate(promo, from_attributes=True)
+    await session.refresh(promo, attribute_names=["scopes"])
+    return _to_promotion_read(promo)
+
+
+@router.get("/admin/coupons", response_model=list[CouponRead])
+async def admin_list_coupons(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+    promotion_id: UUID | None = Query(default=None),
+    q: str | None = Query(default=None),
+) -> list[CouponRead]:
+    query = select(Coupon).options(selectinload(Coupon.promotion).selectinload(Promotion.scopes))
+    if promotion_id:
+        query = query.where(Coupon.promotion_id == promotion_id)
+    if q:
+        query = query.where(Coupon.code.ilike(f"%{q.strip()}%"))
+    result = await session.execute(query.order_by(Coupon.created_at.desc()))
+    coupons = list(result.scalars().all())
+    return [
+        CouponRead.model_validate(c, from_attributes=True).model_copy(
+            update={"promotion": _to_promotion_read(c.promotion) if c.promotion else None}
+        )
+        for c in coupons
+    ]
+
+
+@router.patch("/admin/coupons/{coupon_id}", response_model=CouponRead)
+async def admin_update_coupon(
+    coupon_id: UUID,
+    payload: CouponUpdate,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> CouponRead:
+    coupon = (
+        (
+            await session.execute(
+                select(Coupon)
+                .options(selectinload(Coupon.promotion).selectinload(Promotion.scopes))
+                .where(Coupon.id == coupon_id)
+            )
+        )
+        .scalars()
+        .first()
+    )
+    if not coupon:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+
+    data = payload.model_dump(exclude_unset=True)
+    for attr in [
+        "is_active",
+        "starts_at",
+        "ends_at",
+        "global_max_redemptions",
+        "per_customer_max_redemptions",
+    ]:
+        if attr in data:
+            setattr(coupon, attr, data[attr])
+
+    session.add(coupon)
+    await session.commit()
+    await session.refresh(coupon, attribute_names=["promotion"])
+    coupon_read = CouponRead.model_validate(coupon, from_attributes=True)
+    coupon_read.promotion = _to_promotion_read(coupon.promotion) if coupon.promotion else None
+    return coupon_read
+
+
+@router.get("/admin/coupons/{coupon_id}/assignments", response_model=list[CouponAssignmentRead])
+async def admin_list_coupon_assignments(
+    coupon_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> list[CouponAssignmentRead]:
+    coupon = await session.get(Coupon, coupon_id)
+    if not coupon:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+
+    result = await session.execute(
+        select(CouponAssignment)
+        .options(selectinload(CouponAssignment.user))
+        .where(CouponAssignment.coupon_id == coupon_id)
+        .order_by(CouponAssignment.issued_at.desc())
+    )
+    assignments = list(result.scalars().all())
+    out: list[CouponAssignmentRead] = []
+    for row in assignments:
+        user = getattr(row, "user", None)
+        out.append(
+            CouponAssignmentRead.model_validate(row, from_attributes=True).model_copy(
+                update={
+                    "user_email": getattr(user, "email", None) if user else None,
+                    "user_username": getattr(user, "username", None) if user else None,
+                }
+            )
+        )
+    return out
 
 
 @router.post("/admin/coupons", response_model=CouponRead, status_code=status.HTTP_201_CREATED)
@@ -189,7 +543,11 @@ async def admin_create_coupon(
     await session.commit()
     await session.refresh(coupon)
     await session.refresh(coupon, attribute_names=["promotion"])
-    return CouponRead.model_validate(coupon, from_attributes=True)
+    if coupon.promotion:
+        await session.refresh(coupon.promotion, attribute_names=["scopes"])
+    coupon_read = CouponRead.model_validate(coupon, from_attributes=True)
+    coupon_read.promotion = _to_promotion_read(coupon.promotion) if coupon.promotion else None
+    return coupon_read
 
 
 async def _find_user(session: AsyncSession, *, user_id: UUID | None, email: str | None) -> User:

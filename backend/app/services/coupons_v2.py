@@ -22,6 +22,8 @@ from app.models.coupons_v2 import (
     CouponVisibility,
     Promotion,
     PromotionDiscountType,
+    PromotionScopeEntityType,
+    PromotionScopeMode,
 )
 from app.models.order import Order, OrderEvent, OrderStatus
 from app.models.user import User
@@ -53,14 +55,67 @@ def cart_subtotal(cart: Cart) -> Decimal:
     return _quantize_money(subtotal)
 
 
-def cart_eligible_subtotal(cart: Cart, *, allow_on_sale_items: bool) -> Decimal:
-    subtotal = Decimal("0.00")
-    for item in cart.items:
-        product = getattr(item, "product", None)
-        if not allow_on_sale_items and product is not None and is_sale_active(product):
+def _promotion_scope_sets(promotion: Promotion) -> tuple[set[UUID], set[UUID], set[UUID], set[UUID]]:
+    include_products: set[UUID] = set()
+    exclude_products: set[UUID] = set()
+    include_categories: set[UUID] = set()
+    exclude_categories: set[UUID] = set()
+
+    for scope in getattr(promotion, "scopes", None) or []:
+        entity_id = getattr(scope, "entity_id", None)
+        if not entity_id:
             continue
-        subtotal += Decimal(str(item.unit_price_at_add)) * int(item.quantity or 0)
-    return _quantize_money(subtotal)
+        entity_type = getattr(scope, "entity_type", None)
+        mode = getattr(scope, "mode", None)
+
+        if entity_type == PromotionScopeEntityType.product:
+            (include_products if mode == PromotionScopeMode.include else exclude_products).add(entity_id)
+        elif entity_type == PromotionScopeEntityType.category:
+            (include_categories if mode == PromotionScopeMode.include else exclude_categories).add(entity_id)
+
+    return include_products, exclude_products, include_categories, exclude_categories
+
+
+def cart_eligible_subtotals_for_promotion(cart: Cart, *, promotion: Promotion) -> tuple[Decimal, Decimal, bool, bool]:
+    include_products, exclude_products, include_categories, exclude_categories = _promotion_scope_sets(promotion)
+    has_includes = bool(include_products or include_categories)
+    has_excludes = bool(exclude_products or exclude_categories)
+
+    eligible_subtotal = Decimal("0.00")
+    scope_subtotal = Decimal("0.00")
+
+    for item in cart.items:
+        quantity = int(getattr(item, "quantity", 0) or 0)
+        if quantity <= 0:
+            continue
+        product = getattr(item, "product", None)
+        product_id = getattr(item, "product_id", None) or getattr(product, "id", None)
+        if not product_id:
+            continue
+        category_id = getattr(product, "category_id", None) if product is not None else None
+
+        if has_includes:
+            matched = product_id in include_products or (category_id is not None and category_id in include_categories)
+            if not matched:
+                continue
+
+        if product_id in exclude_products or (category_id is not None and category_id in exclude_categories):
+            continue
+
+        line_total = Decimal(str(item.unit_price_at_add)) * quantity
+        scope_subtotal += line_total
+
+        if not promotion.allow_on_sale_items and product is not None and is_sale_active(product):
+            continue
+
+        eligible_subtotal += line_total
+
+    return (
+        _quantize_money(eligible_subtotal),
+        _quantize_money(scope_subtotal),
+        has_includes,
+        has_excludes,
+    )
 
 
 def _calculate_shipping_amount(
@@ -93,7 +148,7 @@ def compute_coupon_savings(
     shipping_method_rate_per_kg: Decimal | None,
 ) -> CouponComputation:
     subtotal = cart_subtotal(cart)
-    eligible_subtotal = cart_eligible_subtotal(cart, allow_on_sale_items=promotion.allow_on_sale_items)
+    eligible_subtotal, _, _, _ = cart_eligible_subtotals_for_promotion(cart, promotion=promotion)
 
     # Compute shipping without this coupon (but with free-shipping threshold rules).
     shipping_fee = checkout.shipping_fee_ron
@@ -332,7 +387,11 @@ async def get_coupon_by_code(session: AsyncSession, *, code: str) -> Coupon | No
     cleaned = _normalize_code(code)
     if not cleaned:
         return None
-    res = await session.execute(select(Coupon).options(selectinload(Coupon.promotion)).where(Coupon.code == cleaned))
+    res = await session.execute(
+        select(Coupon)
+        .options(selectinload(Coupon.promotion).selectinload(Promotion.scopes))
+        .where(Coupon.code == cleaned)
+    )
     return res.scalar_one_or_none()
 
 
@@ -343,7 +402,7 @@ async def get_user_visible_coupons(session: AsyncSession, *, user_id: UUID) -> l
     )
     result = await session.execute(
         select(Coupon)
-        .options(selectinload(Coupon.promotion))
+        .options(selectinload(Coupon.promotion).selectinload(Promotion.scopes))
         .join(Promotion, Coupon.promotion_id == Promotion.id)
         .where(
             or_(
@@ -386,9 +445,16 @@ async def evaluate_coupon_for_cart(
     reasons.extend(_coupon_reasons(coupon, now))
 
     subtotal = cart_subtotal(cart)
-    eligible_subtotal = cart_eligible_subtotal(cart, allow_on_sale_items=promotion.allow_on_sale_items)
+    eligible_subtotal, scope_subtotal, has_includes, has_excludes = cart_eligible_subtotals_for_promotion(
+        cart, promotion=promotion
+    )
     if promotion.discount_type in {PromotionDiscountType.percent, PromotionDiscountType.amount} and eligible_subtotal <= 0:
         reasons.append("no_eligible_items")
+    if scope_subtotal <= 0:
+        if has_includes:
+            reasons.append("scope_no_match")
+        elif has_excludes:
+            reasons.append("scope_excluded")
 
     if promotion.min_subtotal is not None:
         min_required = Decimal(promotion.min_subtotal)

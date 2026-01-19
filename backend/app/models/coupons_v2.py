@@ -22,6 +22,15 @@ class CouponVisibility(str, enum.Enum):
     public = "public"
     assigned = "assigned"
 
+class PromotionScopeEntityType(str, enum.Enum):
+    product = "product"
+    category = "category"
+
+
+class PromotionScopeMode(str, enum.Enum):
+    include = "include"
+    exclude = "exclude"
+
 
 class Promotion(Base):
     __tablename__ = "promotions"
@@ -52,6 +61,9 @@ class Promotion(Base):
     coupons: Mapped[list["Coupon"]] = relationship(
         "Coupon", back_populates="promotion", cascade="all, delete-orphan", lazy="selectin"
     )
+    scopes: Mapped[list["PromotionScope"]] = relationship(
+        "PromotionScope", back_populates="promotion", cascade="all, delete-orphan", lazy="selectin"
+    )
 
 
 class Coupon(Base):
@@ -76,6 +88,29 @@ class Coupon(Base):
     assignments: Mapped[list["CouponAssignment"]] = relationship(
         "CouponAssignment", back_populates="coupon", cascade="all, delete-orphan", lazy="selectin"
     )
+
+
+class PromotionScope(Base):
+    __tablename__ = "promotion_scopes"
+    __table_args__ = (UniqueConstraint("promotion_id", "entity_type", "entity_id", name="uq_promotion_scopes_promotion_type_entity"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    promotion_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("promotions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    entity_type: Mapped[PromotionScopeEntityType] = mapped_column(
+        Enum(PromotionScopeEntityType, native_enum=False),
+        nullable=False,
+    )
+    entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    mode: Mapped[PromotionScopeMode] = mapped_column(
+        Enum(PromotionScopeMode, native_enum=False),
+        nullable=False,
+        default=PromotionScopeMode.include,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    promotion: Mapped[Promotion] = relationship("Promotion", back_populates="scopes")
 
 
 class CouponAssignment(Base):

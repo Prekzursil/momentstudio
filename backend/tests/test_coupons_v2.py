@@ -11,7 +11,18 @@ from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
 from app.models.catalog import Category, Product, ProductImage, ProductStatus
-from app.models.coupons_v2 import Coupon, CouponAssignment, CouponRedemption, CouponReservation, CouponVisibility, Promotion, PromotionDiscountType
+from app.models.coupons_v2 import (
+    Coupon,
+    CouponAssignment,
+    CouponRedemption,
+    CouponReservation,
+    CouponVisibility,
+    Promotion,
+    PromotionDiscountType,
+    PromotionScope,
+    PromotionScopeEntityType,
+    PromotionScopeMode,
+)
 from app.models.order import Order, OrderStatus
 from app.models.user import User
 from app.schemas.user import UserCreate
@@ -79,10 +90,14 @@ def seed_product(
     sku: str,
     base_price: Decimal,
     sale_price: Decimal | None = None,
+    category_slug: str = "decor",
+    category_name: str = "Decor",
 ) -> str:
     async def _seed() -> str:
         async with session_factory() as session:
-            category = Category(slug="decor", name="Decor")
+            category = (await session.execute(select(Category).where(Category.slug == category_slug))).scalars().first()
+            if not category:
+                category = Category(slug=category_slug, name=category_name)
             now = datetime.now(timezone.utc)
             product = Product(
                 category=category,
@@ -118,6 +133,10 @@ def create_promotion_and_coupon(
     visibility: CouponVisibility = CouponVisibility.public,
     global_max_redemptions: int | None = None,
     per_customer_max_redemptions: int | None = None,
+    included_product_ids: list[str] | None = None,
+    excluded_product_ids: list[str] | None = None,
+    included_category_ids: list[str] | None = None,
+    excluded_category_ids: list[str] | None = None,
 ) -> str:
     async def _create() -> str:
         async with session_factory() as session:
@@ -145,10 +164,59 @@ def create_promotion_and_coupon(
                 per_customer_max_redemptions=per_customer_max_redemptions,
             )
             session.add(coupon)
+            await session.flush()
+
+            for pid in included_product_ids or []:
+                session.add(
+                    PromotionScope(
+                        promotion_id=promo.id,
+                        entity_type=PromotionScopeEntityType.product,
+                        entity_id=UUID(pid),
+                        mode=PromotionScopeMode.include,
+                    )
+                )
+            for pid in excluded_product_ids or []:
+                session.add(
+                    PromotionScope(
+                        promotion_id=promo.id,
+                        entity_type=PromotionScopeEntityType.product,
+                        entity_id=UUID(pid),
+                        mode=PromotionScopeMode.exclude,
+                    )
+                )
+            for cid in included_category_ids or []:
+                session.add(
+                    PromotionScope(
+                        promotion_id=promo.id,
+                        entity_type=PromotionScopeEntityType.category,
+                        entity_id=UUID(cid),
+                        mode=PromotionScopeMode.include,
+                    )
+                )
+            for cid in excluded_category_ids or []:
+                session.add(
+                    PromotionScope(
+                        promotion_id=promo.id,
+                        entity_type=PromotionScopeEntityType.category,
+                        entity_id=UUID(cid),
+                        mode=PromotionScopeMode.exclude,
+                    )
+                )
+
             await session.commit()
             return coupon.code
 
     return asyncio.run(_create())
+
+
+def get_product_category_id(session_factory: async_sessionmaker, product_id: str) -> str:
+    async def _get() -> str:
+        async with session_factory() as session:
+            product = await session.get(Product, UUID(product_id))
+            assert product is not None
+            return str(product.category_id)
+
+    return asyncio.run(_get())
 
 
 def test_coupon_eligibility_and_validation() -> None:
@@ -265,6 +333,95 @@ def test_assigned_coupon_requires_assignment() -> None:
         validate2 = client.post("/api/v1/coupons/validate", json={"code": code}, headers=auth_headers(token))
         assert validate2.status_code == 200, validate2.text
         assert validate2.json()["eligible"] is True
+    finally:
+        client.close()
+        app.dependency_overrides.clear()
+
+
+def test_scope_rules_include_product_only_discounts_matching_items() -> None:
+    client, SessionLocal = make_test_client()
+    try:
+        token, _ = create_user_token(SessionLocal, email="scope1@example.com", username="scope1")
+        product_a = seed_product(
+            SessionLocal,
+            slug="scope-a",
+            sku="SKU-SCOPE-A",
+            base_price=Decimal("100.00"),
+            category_slug="decor",
+            category_name="Decor",
+        )
+        product_b = seed_product(
+            SessionLocal,
+            slug="scope-b",
+            sku="SKU-SCOPE-B",
+            base_price=Decimal("50.00"),
+            category_slug="prints",
+            category_name="Prints",
+        )
+
+        assert (
+            client.post("/api/v1/cart/items", json={"product_id": product_a, "quantity": 1}, headers=auth_headers(token)).status_code
+            == 201
+        )
+        assert (
+            client.post("/api/v1/cart/items", json={"product_id": product_b, "quantity": 1}, headers=auth_headers(token)).status_code
+            == 201
+        )
+
+        code = create_promotion_and_coupon(
+            SessionLocal,
+            name="Scope product include",
+            discount_type=PromotionDiscountType.percent,
+            percentage_off=Decimal("10.00"),
+            code="SCOPEPROD10",
+            included_product_ids=[product_a],
+        )
+
+        validate = client.post("/api/v1/coupons/validate", json={"code": code}, headers=auth_headers(token))
+        assert validate.status_code == 200, validate.text
+        payload = validate.json()
+        assert payload["eligible"] is True
+        assert Decimal(str(payload["estimated_discount_ron"])) == Decimal("10.00")
+    finally:
+        client.close()
+        app.dependency_overrides.clear()
+
+
+def test_scope_rules_excluded_category_blocks_coupon() -> None:
+    client, SessionLocal = make_test_client()
+    try:
+        token, _ = create_user_token(SessionLocal, email="scope2@example.com", username="scope2")
+        product_id = seed_product(
+            SessionLocal,
+            slug="scope-excluded",
+            sku="SKU-SCOPE-EX",
+            base_price=Decimal("100.00"),
+            category_slug="excluded",
+            category_name="Excluded",
+        )
+        category_id = get_product_category_id(SessionLocal, product_id)
+
+        assert (
+            client.post("/api/v1/cart/items", json={"product_id": product_id, "quantity": 1}, headers=auth_headers(token)).status_code
+            == 201
+        )
+
+        code = create_promotion_and_coupon(
+            SessionLocal,
+            name="Scope category exclude",
+            discount_type=PromotionDiscountType.percent,
+            percentage_off=Decimal("10.00"),
+            code="SCOPECATEX",
+            excluded_category_ids=[category_id],
+        )
+
+        validate = client.post("/api/v1/coupons/validate", json={"code": code}, headers=auth_headers(token))
+        assert validate.status_code == 200, validate.text
+        payload = validate.json()
+        assert payload["eligible"] is False
+        reasons = set(payload["reasons"])
+        assert "scope_excluded" in reasons
+        assert "no_eligible_items" in reasons
     finally:
         client.close()
         app.dependency_overrides.clear()
