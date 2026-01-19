@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     paypal_client_secret: str | None = None
     paypal_env: str = "sandbox"
     paypal_webhook_id: str | None = None
+    paypal_client_id_sandbox: str | None = None
+    paypal_client_secret_sandbox: str | None = None
+    paypal_webhook_id_sandbox: str | None = None
+    paypal_client_id_live: str | None = None
+    paypal_client_secret_live: str | None = None
+    paypal_webhook_id_live: str | None = None
     netopia_enabled: bool = False
     jwt_algorithm: str = "HS256"
     access_token_exp_minutes: int = 30

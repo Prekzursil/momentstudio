@@ -9,16 +9,42 @@ from fastapi import HTTPException, status
 
 from app.core.config import settings
 
-_token_cache: dict[str, object] = {"access_token": None, "expires_at": None}
+_token_cache: dict[str, dict[str, object]] = {}
+
+
+def _paypal_env() -> str:
+    env = (settings.paypal_env or "sandbox").strip().lower()
+    return "live" if env == "live" else "sandbox"
+
+
+def _effective_client_id() -> str:
+    if _paypal_env() == "live":
+        return (settings.paypal_client_id_live or settings.paypal_client_id or "").strip()
+    return (settings.paypal_client_id_sandbox or settings.paypal_client_id or "").strip()
+
+
+def _effective_client_secret() -> str:
+    if _paypal_env() == "live":
+        return (settings.paypal_client_secret_live or settings.paypal_client_secret or "").strip()
+    return (settings.paypal_client_secret_sandbox or settings.paypal_client_secret or "").strip()
+
+
+def _effective_webhook_id() -> str:
+    if _paypal_env() == "live":
+        return (settings.paypal_webhook_id_live or settings.paypal_webhook_id or "").strip()
+    return (settings.paypal_webhook_id_sandbox or settings.paypal_webhook_id or "").strip()
+
+
+def _cache_bucket() -> dict[str, object]:
+    return _token_cache.setdefault(_paypal_env(), {"access_token": None, "expires_at": None})
 
 
 def is_paypal_configured() -> bool:
-    return bool((settings.paypal_client_id or "").strip() and (settings.paypal_client_secret or "").strip())
+    return bool(_effective_client_id() and _effective_client_secret())
 
 
 def _base_url() -> str:
-    env = (settings.paypal_env or "sandbox").strip().lower()
-    return "https://api-m.paypal.com" if env == "live" else "https://api-m.sandbox.paypal.com"
+    return "https://api-m.paypal.com" if _paypal_env() == "live" else "https://api-m.sandbox.paypal.com"
 
 
 async def _get_access_token() -> str:
@@ -26,15 +52,16 @@ async def _get_access_token() -> str:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="PayPal not configured")
 
     now = datetime.now(timezone.utc)
-    cached_token = _token_cache.get("access_token")
-    cached_expires_at = _token_cache.get("expires_at")
+    bucket = _cache_bucket()
+    cached_token = bucket.get("access_token")
+    cached_expires_at = bucket.get("expires_at")
     if isinstance(cached_token, str) and isinstance(cached_expires_at, datetime):
         # Refresh a bit early to avoid edge-of-expiry failures.
         if cached_expires_at - now > timedelta(seconds=30):
             return cached_token
 
-    client_id = (settings.paypal_client_id or "").strip()
-    client_secret = (settings.paypal_client_secret or "").strip()
+    client_id = _effective_client_id()
+    client_secret = _effective_client_secret()
     token_url = f"{_base_url()}/v1/oauth2/token"
 
     try:
@@ -56,8 +83,8 @@ async def _get_access_token() -> str:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="PayPal token missing")
 
     expiry = now + timedelta(seconds=int(expires_in) if isinstance(expires_in, (int, float)) else 300)
-    _token_cache["access_token"] = access_token
-    _token_cache["expires_at"] = expiry
+    bucket["access_token"] = access_token
+    bucket["expires_at"] = expiry
     return access_token
 
 
@@ -243,7 +270,7 @@ def _get_header(headers: dict[str, str], name: str) -> str | None:
 
 
 async def verify_webhook_signature(*, headers: dict[str, str], event: dict[str, Any]) -> bool:
-    webhook_id = (settings.paypal_webhook_id or "").strip()
+    webhook_id = _effective_webhook_id()
     if not webhook_id:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="PayPal webhook id not configured")
 
