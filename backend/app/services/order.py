@@ -537,16 +537,22 @@ async def capture_payment(session: AsyncSession, order: Order, intent_id: str | 
     payment_intent_id = intent_id or order.stripe_payment_intent_id
     if not payment_intent_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent id required")
+    if (
+        intent_id
+        and (getattr(order, "stripe_payment_intent_id", None) or "").strip()
+        and intent_id != (getattr(order, "stripe_payment_intent_id", None) or "").strip()
+    ):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent mismatch")
     if order.status not in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Capture only allowed for pending_payment, pending_acceptance, or paid orders",
         )
-    await payments.capture_payment_intent(payment_intent_id)
     order.stripe_payment_intent_id = payment_intent_id
     await session.refresh(order, attribute_names=["events"])
     already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
     if not already_captured:
+        await payments.capture_payment_intent(payment_intent_id)
         session.add(OrderEvent(order_id=order.id, event="payment_captured", note=f"Intent {payment_intent_id}"))
         await promo_usage.record_promo_usage(session, order=order, note=f"Stripe {payment_intent_id}".strip())
     if order.status == OrderStatus.pending_payment:
@@ -562,6 +568,12 @@ async def void_payment(session: AsyncSession, order: Order, intent_id: str | Non
     payment_intent_id = intent_id or order.stripe_payment_intent_id
     if not payment_intent_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent id required")
+    if (
+        intent_id
+        and (getattr(order, "stripe_payment_intent_id", None) or "").strip()
+        and intent_id != (getattr(order, "stripe_payment_intent_id", None) or "").strip()
+    ):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent mismatch")
     if order.status not in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -141,6 +141,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Packing slip/invoice PDF stub.
 - [x] Order item fulfillment tracking (shipped qty).
 - [x] Capture/void support for Stripe intents.
+- [x] Coupons v2: redeem/release coupons on admin capture/void/refund actions (keep reservation/redemption consistent).
 - [x] Admin order export CSV.
 - [x] Reorder endpoint (copy past order to cart).
 - [x] Address validation hook (country/postal rules).

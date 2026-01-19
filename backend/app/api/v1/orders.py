@@ -1457,6 +1457,7 @@ async def admin_refund_order(
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
     updated = await order_service.refund_order(session, order, note=note)
+    await coupons_service.release_coupon_for_order(session, order=updated, reason="refunded")
     customer_to = (updated.user.email if updated.user and updated.user.email else None) or getattr(updated, "customer_email", None)
     customer_lang = updated.user.preferred_language if updated.user else None
     if customer_to:
@@ -1552,6 +1553,11 @@ async def admin_capture_payment(
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
     updated = await order_service.capture_payment(session, order, intent_id=intent_id)
+    await coupons_service.redeem_coupon_for_order(
+        session,
+        order=updated,
+        note=f"Stripe {intent_id or updated.stripe_payment_intent_id}".strip(),
+    )
     customer_to = (updated.user.email if updated.user and updated.user.email else None) or getattr(updated, "customer_email", None)
     customer_lang = updated.user.preferred_language if updated.user else None
     if customer_to:
@@ -1580,6 +1586,7 @@ async def admin_void_payment(
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
     updated = await order_service.void_payment(session, order, intent_id=intent_id)
+    await coupons_service.release_coupon_for_order(session, order=updated, reason="payment_voided")
     customer_to = (updated.user.email if updated.user and updated.user.email else None) or getattr(updated, "customer_email", None)
     customer_lang = updated.user.preferred_language if updated.user else None
     if customer_to:
