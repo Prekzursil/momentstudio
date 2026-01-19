@@ -411,7 +411,7 @@
     "paymentStripeHint": "Pay with Stripe (you’ll be redirected).",
     "paymentNetopiaHint": "Pay with Netopia (you’ll be redirected).",
     "paymentNetopiaDisabled": "Netopia is not configured yet.",
-    "paymentPayPalHint": "Pay with PayPal (you’ll be redirected).",
+    "paymentPayPalHint": "Pay with PayPal (you’ll be redirected). PayPal charges in EUR and the total is converted at checkout.",
     "paymentCashHint": "Pay in cash upon delivery (RON).",
     "paypalReturnTitle": "PayPal",
     "paypalCapturing": "Confirming your PayPal payment…",

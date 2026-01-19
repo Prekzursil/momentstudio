@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     paypal_client_id: str | None = None
     paypal_client_secret: str | None = None
     paypal_env: str = "sandbox"
+    paypal_currency: str = "EUR"
     paypal_webhook_id: str | None = None
     paypal_client_id_sandbox: str | None = None
     paypal_client_secret_sandbox: str | None = None
