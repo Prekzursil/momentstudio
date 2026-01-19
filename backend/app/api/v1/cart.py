@@ -33,11 +33,6 @@ async def get_cart(
         session_id = f"guest-{uuid.uuid4()}"
     cart = await cart_service.get_cart(session, getattr(current_user, "id", None) if current_user else None, session_id)
     await session.refresh(cart)
-    if not current_user and session_id and not cart.session_id:
-        cart.session_id = session_id
-        session.add(cart)
-        await session.commit()
-        await session.refresh(cart)
     shipping_method = None
     if shipping_method_id:
         shipping_method = await order_service.get_shipping_method(session, shipping_method_id)
