@@ -13,15 +13,27 @@ import { shopCategoriesResolver } from './core/shop.resolver';
 export const routes: Routes = [
   { path: '', component: HomeComponent, title: 'momentstudio' },
   {
-    path: 'shop',
+    path: 'shop/:category',
     component: ShopComponent,
     title: 'Shop | momentstudio',
     resolve: { categories: shopCategoriesResolver }
+  },
+  {
+    path: 'shop',
+    component: ShopComponent,
+    title: 'Shop | momentstudio',
+    resolve: { categories: shopCategoriesResolver },
+    pathMatch: 'full'
   },
   { path: 'about', component: AboutComponent, title: 'About | momentstudio' },
   { path: 'contact', component: ContactComponent, title: 'Contact | momentstudio' },
   { path: 'blog', component: BlogListComponent, title: 'Blog | momentstudio' },
   { path: 'blog/:slug', component: BlogPostComponent, title: 'Blog | momentstudio' },
+  {
+    path: 'pages/:slug',
+    loadComponent: () => import('./pages/page/page.component').then((m) => m.CmsPageComponent),
+    title: 'Page | momentstudio'
+  },
   {
     path: 'products/:slug',
     loadComponent: () => import('./pages/product/product.component').then((m) => m.ProductComponent),

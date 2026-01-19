@@ -12,6 +12,7 @@ class CategoryFields(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     description: str | None = None
     sort_order: int = 0
+    parent_id: UUID | None = None
 
 
 class CategoryBase(CategoryFields):
@@ -30,6 +31,7 @@ class CategoryUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=120)
     description: str | None = None
     sort_order: int | None = None
+    parent_id: UUID | None = None
 
 
 class CategoryReorderItem(BaseModel):

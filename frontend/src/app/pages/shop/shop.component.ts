@@ -11,7 +11,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
 import { ToastService } from '../../core/toast.service';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { Subscription } from 'rxjs';
+import { Subscription, combineLatest } from 'rxjs';
 import { Meta, Title } from '@angular/platform-browser';
 
 @Component({
@@ -58,36 +58,63 @@ import { Meta, Title } from '@angular/platform-browser';
 	                  type="radio"
 	                  name="category"
 	                  class="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
-	                  value="sale"
+	                  value=""
 	                  [(ngModel)]="categorySelection"
-	                  (change)="applyFilters()"
+	                  (change)="onCategorySelected()"
 	                />
-	                <span>{{ 'shop.sale' | translate }}</span>
-	              </label>
-	              <label
-	                *ngFor="let category of categories"
-	                class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300"
-	              >
-	                <input
-	                  type="radio"
-	                  name="category"
-	                  class="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
-	                  [value]="category.slug"
-	                  [(ngModel)]="categorySelection"
-	                  (change)="applyFilters()"
-	                />
-	                <span>{{ category.name }}</span>
+	                <span>{{ 'shop.allCategories' | translate }}</span>
 	              </label>
 	              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
 	                <input
 	                  type="radio"
 	                  name="category"
 	                  class="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
-	                  value=""
+	                  value="sale"
 	                  [(ngModel)]="categorySelection"
-	                  (change)="applyFilters()"
+	                  (change)="onCategorySelected()"
 	                />
-	                <span>{{ 'shop.allCategories' | translate }}</span>
+	                <span>{{ 'shop.sale' | translate }}</span>
+	              </label>
+	              <label
+	                *ngFor="let category of rootCategories"
+	                class="grid gap-2"
+	              >
+	                <span class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+	                  <input
+	                    type="radio"
+	                    name="category"
+	                    class="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
+	                    [value]="category.slug"
+	                    [(ngModel)]="categorySelection"
+	                    (change)="onCategorySelected()"
+	                  />
+	                  <span>{{ category.name }}</span>
+	                </span>
+	                <div
+	                  *ngIf="categorySelection === category.slug && getSubcategories(category).length"
+	                  class="ml-6 grid gap-2"
+	                >
+	                  <p class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'shop.subcategories' | translate }}</p>
+	                  <div class="flex flex-wrap gap-2">
+	                    <button
+	                      type="button"
+	                      class="rounded-full border px-3 py-1 text-xs font-medium transition"
+	                      [ngClass]="!activeSubcategorySlug ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:border-slate-50' : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-slate-50'"
+	                      (click)="setSubcategory('')"
+	                    >
+	                      {{ 'shop.all' | translate }}
+	                    </button>
+	                    <button
+	                      *ngFor="let sub of getSubcategories(category)"
+	                      type="button"
+	                      class="rounded-full border px-3 py-1 text-xs font-medium transition"
+	                      [ngClass]="activeSubcategorySlug === sub.slug ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:border-slate-50' : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-slate-50'"
+	                      (click)="setSubcategory(sub.slug)"
+	                    >
+	                      {{ sub.name }}
+	                    </button>
+	                  </div>
+	                </div>
 	              </label>
 	            </div>
 	          </div>
@@ -254,8 +281,6 @@ export class ShopComponent implements OnInit, OnDestroy {
 
 	  filters: {
 	    search: string;
-	    category_slug: string;
-	    on_sale: boolean;
 	    min_price: number;
 	    max_price: number;
 	    tags: Set<string>;
@@ -264,8 +289,6 @@ export class ShopComponent implements OnInit, OnDestroy {
 	    limit: number;
 	  } = {
 	    search: '',
-	    category_slug: '',
-	    on_sale: false,
 	    min_price: 1,
 	    max_price: 500,
 	    tags: new Set<string>(),
@@ -274,26 +297,20 @@ export class ShopComponent implements OnInit, OnDestroy {
     limit: 12
   };
 
+  categorySelection = '';
+  activeCategorySlug = '';
+  activeSubcategorySlug = '';
+  rootCategories: Category[] = [];
+  private categoriesBySlug = new Map<string, Category>();
+  private categoriesById = new Map<string, Category>();
+  private childrenByParentId = new Map<string, Category[]>();
+
   readonly priceMinBound = 1;
   priceMaxBound = 500;
   readonly priceStep = 1;
   private filterDebounce?: ReturnType<typeof setTimeout>;
   private readonly filterDebounceMs = 350;
-	  private suppressNextQueryLoad = false;
-
-	  get categorySelection(): string {
-	    return this.filters.on_sale ? 'sale' : this.filters.category_slug;
-	  }
-
-	  set categorySelection(value: string) {
-	    if (value === 'sale') {
-	      this.filters.on_sale = true;
-	      this.filters.category_slug = '';
-	      return;
-	    }
-	    this.filters.on_sale = false;
-	    this.filters.category_slug = value || '';
-	  }
+	  private suppressNextUrlSync = false;
 
   sortOptions: { label: string; value: SortOption }[] = [
     { label: 'shop.sortNew', value: 'newest' },
@@ -321,15 +338,20 @@ export class ShopComponent implements OnInit, OnDestroy {
     const dataCategories = (this.route.snapshot.data['categories'] as Category[]) ?? [];
     if (dataCategories.length) {
       this.categories = dataCategories;
+      this.rebuildCategoryTree();
     } else {
       this.fetchCategories();
     }
-    this.route.queryParams.subscribe((params) => {
-      if (this.suppressNextQueryLoad) {
-        this.suppressNextQueryLoad = false;
+    combineLatest([this.route.paramMap, this.route.queryParams]).subscribe(([paramMap, params]) => {
+      if (this.suppressNextUrlSync) {
+        this.suppressNextUrlSync = false;
         return;
       }
-      this.syncFiltersFromQuery(params);
+      const canonicalize = this.syncStateFromUrl(paramMap.get('category'), params);
+      if (canonicalize) {
+        this.loadProducts(true, true);
+        return;
+      }
       this.loadProducts(false);
     });
   }
@@ -342,26 +364,29 @@ export class ShopComponent implements OnInit, OnDestroy {
   fetchCategories(): void {
     this.catalog.listCategories().subscribe((data) => {
       this.categories = data;
+      this.rebuildCategoryTree();
     });
   }
 
-  loadProducts(pushQuery = true): void {
+  loadProducts(pushUrl = true, replaceUrl = false): void {
     this.normalizePriceRange();
     this.loading.set(true);
     this.hasError.set(false);
-    if (pushQuery) {
-      this.suppressNextQueryLoad = true;
-      this.updateQueryParams();
+    if (pushUrl) {
+      this.suppressNextUrlSync = true;
+      this.pushUrlState(replaceUrl);
     }
     this.fetchProducts();
   }
 
 	  private fetchProducts(): void {
+	    const isSale = this.activeCategorySlug === 'sale';
+	    const categorySlug = isSale ? undefined : (this.activeSubcategorySlug || this.activeCategorySlug || undefined);
 	    this.catalog
 	      .listProducts({
 	        search: this.filters.search || undefined,
-	        category_slug: this.filters.category_slug || undefined,
-	        on_sale: this.filters.on_sale ? true : undefined,
+	        category_slug: categorySlug,
+	        on_sale: isSale ? true : undefined,
 	        min_price: this.filters.min_price > this.priceMinBound ? this.filters.min_price : undefined,
 	        max_price: this.filters.max_price < this.priceMaxBound ? this.filters.max_price : undefined,
 	        tags: Array.from(this.filters.tags),
@@ -383,18 +408,22 @@ export class ShopComponent implements OnInit, OnDestroy {
             }
 	          }
 	          this.normalizePriceRange();
-	          if (this.filters.on_sale) {
+	          if (isSale) {
 	            this.crumbs = [
 	              { label: 'nav.home', url: '/' },
 	              { label: 'nav.shop', url: '/shop' },
 	              { label: 'shop.sale' }
 	            ];
-	          } else if (this.filters.category_slug) {
-	            const cat = this.categories.find((c) => c.slug === this.filters.category_slug);
+	          } else if (this.activeCategorySlug) {
+	            const cat = this.categories.find((c) => c.slug === this.activeCategorySlug);
+	            const sub = this.activeSubcategorySlug
+	              ? this.categories.find((c) => c.slug === this.activeSubcategorySlug)
+	              : undefined;
 	            this.crumbs = [
 	              { label: 'nav.home', url: '/' },
 	              { label: 'nav.shop', url: '/shop' },
-              { label: cat?.name ?? this.filters.category_slug }
+              { label: cat?.name ?? this.activeCategorySlug, url: `/shop/${this.activeCategorySlug}` },
+              ...(sub ? [{ label: sub.name ?? sub.slug }] : [])
             ];
           } else {
             this.crumbs = [
@@ -490,8 +519,9 @@ export class ShopComponent implements OnInit, OnDestroy {
 	  resetFilters(): void {
 	    this.cancelFilterDebounce();
 	    this.filters.search = '';
-	    this.filters.category_slug = '';
-	    this.filters.on_sale = false;
+	    this.activeCategorySlug = '';
+	    this.activeSubcategorySlug = '';
+	    this.categorySelection = '';
 	    this.filters.min_price = this.priceMinBound;
 	    this.filters.max_price = this.priceMaxBound;
 	    this.filters.tags = new Set<string>();
@@ -509,38 +539,154 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.metaService.updateTag({ name: 'description', content: description });
   }
 
-	  private updateQueryParams(): void {
-	    const params: Params = {
-	      q: this.filters.search || undefined,
-	      cat: this.filters.category_slug || undefined,
-	      on_sale: this.filters.on_sale ? 1 : undefined,
-	      min: this.filters.min_price > this.priceMinBound ? this.filters.min_price : undefined,
-	      max: this.filters.max_price < this.priceMaxBound ? this.filters.max_price : undefined,
-	      sort: this.filters.sort !== 'newest' ? this.filters.sort : undefined,
-	      page: this.filters.page !== 1 ? this.filters.page : undefined,
-      tags: this.filters.tags.size ? Array.from(this.filters.tags).join(',') : undefined
-    };
-    void this.router.navigate([], { relativeTo: this.route, queryParams: params, queryParamsHandling: 'merge' });
+  onCategorySelected(): void {
+    this.cancelFilterDebounce();
+    this.filters.page = 1;
+    this.activeCategorySlug = this.categorySelection || '';
+    this.activeSubcategorySlug = '';
+    this.loadProducts();
   }
 
-	  private syncFiltersFromQuery(params: Params): void {
-	    this.filters.search = params['q'] ?? '';
-	    const rawCat = params['cat'] ?? '';
-	    const onSale = this.parseBoolean(params['on_sale']);
-	    this.filters.on_sale = onSale || rawCat === 'sale';
-	    this.filters.category_slug = this.filters.on_sale ? '' : rawCat;
-	    const min = this.parsePrice(params['min']);
-	    const max = this.parsePrice(params['max']);
-	    this.filters.min_price = min ?? this.priceMinBound;
-	    this.filters.max_price = max ?? this.priceMaxBound;
+  setSubcategory(slug: string): void {
+    this.cancelFilterDebounce();
+    const parent = this.categoriesBySlug.get(this.activeCategorySlug);
+    if (!parent) return;
+    if (slug) {
+      const allowed = this.getSubcategories(parent).some((c) => c.slug === slug);
+      if (!allowed) return;
+    }
+    this.filters.page = 1;
+    this.activeSubcategorySlug = slug || '';
+    this.loadProducts();
+  }
+
+  getSubcategories(category: Category): Category[] {
+    return this.childrenByParentId.get(category.id) ?? [];
+  }
+
+  private rebuildCategoryTree(): void {
+    this.categoriesBySlug.clear();
+    this.categoriesById.clear();
+    this.childrenByParentId.clear();
+
+    for (const cat of this.categories) {
+      this.categoriesBySlug.set(cat.slug, cat);
+      this.categoriesById.set(cat.id, cat);
+    }
+
+    for (const cat of this.categories) {
+      const parentId = cat.parent_id;
+      if (!parentId) continue;
+      const bucket = this.childrenByParentId.get(parentId);
+      if (bucket) {
+        bucket.push(cat);
+      } else {
+        this.childrenByParentId.set(parentId, [cat]);
+      }
+    }
+
+    const sortByOrderThenName = (a: Category, b: Category) => {
+      const orderA = Number.isFinite(a.sort_order as any) ? Number(a.sort_order) : 0;
+      const orderB = Number.isFinite(b.sort_order as any) ? Number(b.sort_order) : 0;
+      if (orderA !== orderB) return orderA - orderB;
+      return (a.name ?? '').localeCompare(b.name ?? '');
+    };
+
+    for (const [key, list] of this.childrenByParentId.entries()) {
+      this.childrenByParentId.set(key, [...list].sort(sortByOrderThenName));
+    }
+
+    this.rootCategories = this.categories
+      .filter((c) => !c.parent_id)
+      .sort(sortByOrderThenName);
+  }
+
+  private syncStateFromUrl(routeCategory: string | null, params: Params): boolean {
+    this.syncFiltersFromQuery(params);
+
+    const legacyCat = typeof params['cat'] === 'string' ? params['cat'].trim() : '';
+    const legacyOnSale = this.parseBoolean(params['on_sale']);
+
+    let categorySlug = (routeCategory ?? '').trim();
+    let subSlug = typeof params['sub'] === 'string' ? params['sub'].trim() : '';
+    let shouldCanonicalize = false;
+
+    if (!categorySlug && legacyCat) {
+      categorySlug = legacyCat;
+      shouldCanonicalize = true;
+    }
+    if (!categorySlug && legacyOnSale) {
+      categorySlug = 'sale';
+      shouldCanonicalize = true;
+    }
+
+    const isSale = categorySlug === 'sale';
+    if (isSale) {
+      subSlug = '';
+    }
+
+    const selected = categorySlug ? this.categoriesBySlug.get(categorySlug) : undefined;
+    if (!isSale && selected?.parent_id) {
+      const parent = this.categoriesById.get(selected.parent_id);
+      if (parent) {
+        subSlug = subSlug || selected.slug;
+        categorySlug = parent.slug;
+        shouldCanonicalize = true;
+      }
+    }
+
+    if (!isSale && categorySlug && subSlug) {
+      const parent = this.categoriesBySlug.get(categorySlug);
+      const sub = this.categoriesBySlug.get(subSlug);
+      if (!parent || !sub || sub.parent_id !== parent.id) {
+        subSlug = '';
+        shouldCanonicalize = true;
+      }
+    }
+
+    this.activeCategorySlug = isSale ? 'sale' : categorySlug;
+    this.activeSubcategorySlug = isSale ? '' : subSlug;
+    this.categorySelection = this.activeCategorySlug === 'sale' ? 'sale' : this.activeCategorySlug;
+
+    if (!this.activeCategorySlug && this.activeSubcategorySlug) {
+      this.activeSubcategorySlug = '';
+      shouldCanonicalize = true;
+    }
+
+    return shouldCanonicalize;
+  }
+
+  private buildQueryParams(): Params {
+    return {
+      q: this.filters.search || undefined,
+      sub: this.activeCategorySlug && this.activeCategorySlug !== 'sale' ? (this.activeSubcategorySlug || undefined) : undefined,
+      min: this.filters.min_price > this.priceMinBound ? this.filters.min_price : undefined,
+      max: this.filters.max_price < this.priceMaxBound ? this.filters.max_price : undefined,
+      sort: this.filters.sort !== 'newest' ? this.filters.sort : undefined,
+      page: this.filters.page !== 1 ? this.filters.page : undefined,
+      tags: this.filters.tags.size ? Array.from(this.filters.tags).join(',') : undefined
+    };
+  }
+
+  private pushUrlState(replaceUrl: boolean): void {
+    const commands = this.activeCategorySlug ? ['/shop', this.activeCategorySlug] : ['/shop'];
+    void this.router.navigate(commands, { queryParams: this.buildQueryParams(), replaceUrl });
+  }
+
+  private syncFiltersFromQuery(params: Params): void {
+    this.filters.search = params['q'] ?? '';
+    const min = this.parsePrice(params['min']);
+    const max = this.parsePrice(params['max']);
+    this.filters.min_price = min ?? this.priceMinBound;
+    this.filters.max_price = max ?? this.priceMaxBound;
     this.filters.sort = (params['sort'] as SortOption) ?? 'newest';
     this.filters.page = params['page'] ? Number(params['page']) : 1;
     const tagParam = params['tags'];
     this.filters.tags = new Set<string>(
       typeof tagParam === 'string' && tagParam.length ? tagParam.split(',') : []
     );
-	    this.normalizePriceRange();
-	  }
+    this.normalizePriceRange();
+  }
 
 		  private parseBoolean(raw: unknown): boolean {
 		    if (raw === true) return true;

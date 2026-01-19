@@ -7,8 +7,11 @@ import { map } from 'rxjs/operators';
 export type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc';
 
 export interface Category {
+  id: string;
   slug: string;
   name: string;
+  parent_id?: string | null;
+  sort_order?: number;
 }
 
 export interface ProductImage {

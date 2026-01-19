@@ -8,7 +8,7 @@ import string
 import uuid
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, delete, func, select, update, or_, case
+from sqlalchemy import and_, delete, func, select, update, or_, case, false
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -58,6 +58,55 @@ from app.models.user import User
 async def get_category_by_slug(session: AsyncSession, slug: str) -> Category | None:
     result = await session.execute(select(Category).where(Category.slug == slug))
     return result.scalar_one_or_none()
+
+
+async def _get_category_descendant_ids(session: AsyncSession, root_id: uuid.UUID) -> list[uuid.UUID]:
+    result = await session.execute(select(Category.id, Category.parent_id))
+    children_by_parent: dict[uuid.UUID, list[uuid.UUID]] = {}
+    for cat_id, parent_id in result.all():
+        if parent_id is None:
+            continue
+        children_by_parent.setdefault(parent_id, []).append(cat_id)
+    resolved: list[uuid.UUID] = []
+    stack = [root_id]
+    seen: set[uuid.UUID] = set()
+    while stack:
+        current = stack.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        resolved.append(current)
+        stack.extend(children_by_parent.get(current, []))
+    return resolved
+
+
+async def _get_category_and_descendant_ids_by_slug(session: AsyncSession, slug: str) -> list[uuid.UUID]:
+    category = await get_category_by_slug(session, slug)
+    if not category:
+        return []
+    return await _get_category_descendant_ids(session, category.id)
+
+
+async def _validate_category_parent_assignment(
+    session: AsyncSession, *, category_id: uuid.UUID, parent_id: uuid.UUID | None
+) -> None:
+    if parent_id is None:
+        return
+    if parent_id == category_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category cannot be its own parent")
+    result = await session.execute(select(Category.id, Category.parent_id))
+    parent_by_id: dict[uuid.UUID, uuid.UUID | None] = {cat_id: parent for cat_id, parent in result.all()}
+    if parent_id not in parent_by_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Parent category not found")
+    current: uuid.UUID | None = parent_id
+    hops = 0
+    while current is not None:
+        if current == category_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category parent would create a cycle")
+        current = parent_by_id.get(current)
+        hops += 1
+        if hops > len(parent_by_id) + 1:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid category hierarchy")
 
 
 def apply_category_translation(category: Category, lang: str | None) -> None:
@@ -425,11 +474,17 @@ async def create_category(session: AsyncSession, payload: CategoryCreate) -> Cat
         candidate = f"{base[: 120 - len(suffix)]}{suffix}"
         counter += 1
 
+    if payload.parent_id is not None:
+        parent = await session.get(Category, payload.parent_id)
+        if not parent:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Parent category not found")
+
     category = Category(
         slug=candidate,
         name=payload.name,
         description=payload.description,
         sort_order=payload.sort_order,
+        parent_id=payload.parent_id,
     )
     session.add(category)
     await session.commit()
@@ -444,6 +499,8 @@ async def update_category(session: AsyncSession, category: Category, payload: Ca
         if requested_slug and requested_slug != category.slug:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category slug cannot be changed")
         data.pop("slug", None)
+    if "parent_id" in data:
+        await _validate_category_parent_assignment(session, category_id=category.id, parent_id=data.get("parent_id"))
     for field, value in data.items():
         setattr(category, field, value)
     session.add(category)
@@ -478,6 +535,7 @@ async def reorder_categories(session: AsyncSession, payload: list[CategoryReorde
             name=cat.name,
             description=cat.description,
             sort_order=cat.sort_order,
+            parent_id=cat.parent_id,
             created_at=cat.created_at,
             updated_at=cat.updated_at,
         )
@@ -860,7 +918,11 @@ async def get_product_price_bounds(
     )
 
     if category_slug:
-        query = query.join(Category).where(Category.slug == category_slug)
+        category_ids = await _get_category_and_descendant_ids_by_slug(session, category_slug)
+        if category_ids:
+            query = query.where(Product.category_id.in_(category_ids))
+        else:
+            query = query.where(false())
     if on_sale is not None:
         query = query.where(sale_active if on_sale else ~sale_active)
     if is_featured is not None:
@@ -913,7 +975,11 @@ async def list_products_with_filters(
         .where(Product.is_deleted.is_(False), Product.is_active.is_(True), Product.status == ProductStatus.published)
     )
     if category_slug:
-        base_query = base_query.join(Category).where(Category.slug == category_slug)
+        category_ids = await _get_category_and_descendant_ids_by_slug(session, category_slug)
+        if category_ids:
+            base_query = base_query.where(Product.category_id.in_(category_ids))
+        else:
+            base_query = base_query.where(false())
     if on_sale is not None:
         base_query = base_query.where(sale_active if on_sale else ~sale_active)
     if is_featured is not None:

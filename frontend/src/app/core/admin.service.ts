@@ -104,6 +104,7 @@ export interface AdminCategory {
   name: string;
   slug: string;
   description?: string | null;
+  parent_id?: string | null;
   sort_order?: number;
 }
 
@@ -236,6 +237,15 @@ export interface ContentBlockVersionRead extends ContentBlockVersionListItem {
   translations?: ContentTranslationSnapshot[] | null;
 }
 
+export interface ContentPageListItem {
+  key: string;
+  slug: string;
+  title: string;
+  status: 'draft' | 'published';
+  updated_at: string;
+  published_at?: string | null;
+}
+
 export interface ContentImageAssetRead {
   id: string;
   url: string;
@@ -362,6 +372,10 @@ export class AdminService {
 
   createCategory(payload: Partial<AdminCategory>): Observable<AdminCategory> {
     return this.api.post<AdminCategory>('/catalog/categories', payload);
+  }
+
+  updateCategory(slug: string, payload: Partial<AdminCategory>): Observable<AdminCategory> {
+    return this.api.patch<AdminCategory>(`/catalog/categories/${slug}`, payload);
   }
 
   getCategoryTranslations(slug: string): Observable<AdminCategoryTranslation[]> {
@@ -513,5 +527,9 @@ export class AdminService {
 
   fetchSocialThumbnail(url: string): Observable<SocialThumbnailResponse> {
     return this.api.post<SocialThumbnailResponse>('/content/admin/social/thumbnail', { url });
+  }
+
+  listContentPages(): Observable<ContentPageListItem[]> {
+    return this.api.get<ContentPageListItem[]>('/content/admin/pages/list');
   }
 }

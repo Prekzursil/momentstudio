@@ -15,6 +15,8 @@ import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { CardComponent } from '../../shared/card.component';
 import { ImgFallbackDirective } from '../../shared/img-fallback.directive';
 import { PageBlock, pageBlocksToPlainText, parsePageBlocks } from '../../shared/page-blocks';
+import { BannerBlockComponent } from '../../shared/banner-block.component';
+import { CarouselBlockComponent } from '../../shared/carousel-block.component';
 
 interface ContentBlock {
   title: string;
@@ -32,7 +34,9 @@ interface ContentBlock {
     BreadcrumbComponent,
     CardComponent,
     TranslateModule,
-    ImgFallbackDirective
+    ImgFallbackDirective,
+    BannerBlockComponent,
+    CarouselBlockComponent
   ],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-3xl">
@@ -106,6 +110,20 @@ interface ContentBlock {
                           <p *ngIf="img.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ img.caption }}</p>
                         </div>
                       </div>
+                    </div>
+
+                    <div *ngSwitchCase="'banner'" class="grid gap-2">
+                      <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                        {{ b.title }}
+                      </h2>
+                      <app-banner-block [slide]="b.slide"></app-banner-block>
+                    </div>
+
+                    <div *ngSwitchCase="'carousel'" class="grid gap-2">
+                      <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                        {{ b.title }}
+                      </h2>
+                      <app-carousel-block [slides]="b.slides" [settings]="b.settings"></app-carousel-block>
                     </div>
                   </ng-container>
                 </ng-container>

@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
 import { Subscription } from 'rxjs';
 import { ApiService } from '../../core/api.service';
@@ -25,13 +26,21 @@ interface ContentBlock {
 }
 
 @Component({
-  selector: 'app-about',
+  selector: 'app-cms-page',
   standalone: true,
-  imports: [CommonModule, ContainerComponent, BreadcrumbComponent, CardComponent, TranslateModule, BannerBlockComponent, CarouselBlockComponent],
+  imports: [
+    CommonModule,
+    ContainerComponent,
+    BreadcrumbComponent,
+    CardComponent,
+    TranslateModule,
+    BannerBlockComponent,
+    CarouselBlockComponent
+  ],
   template: `
-    <app-container classes="py-10 grid gap-6 max-w-3xl">
-      <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ block()?.title || ('nav.about' | translate) }}</h1>
+    <app-container classes="py-10 grid gap-6 max-w-4xl">
+      <app-breadcrumb [crumbs]="crumbs()"></app-breadcrumb>
+      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ block()?.title || ('nav.page' | translate) }}</h1>
 
       <app-card>
         <div *ngIf="loading()" class="text-sm text-slate-600 dark:text-slate-300">
@@ -134,22 +143,24 @@ interface ContentBlock {
     </app-container>
   `
 })
-export class AboutComponent implements OnInit, OnDestroy {
-  crumbs = [
-    { label: 'nav.home', url: '/' },
-    { label: 'nav.about' }
-  ];
-
+export class CmsPageComponent implements OnInit, OnDestroy {
   block = signal<ContentBlock | null>(null);
   loading = signal<boolean>(true);
   hasError = signal<boolean>(false);
   bodyHtml = signal<string>('');
   pageBlocks = signal<PageBlock[]>([]);
+  crumbs = signal<{ label: string; url?: string }[]>([
+    { label: 'nav.home', url: '/' },
+    { label: 'nav.page' }
+  ]);
 
   private langSub?: Subscription;
+  private slugSub?: Subscription;
+  private slug = '';
 
   constructor(
     private api: ApiService,
+    private route: ActivatedRoute,
     private translate: TranslateService,
     private title: Title,
     private meta: Meta,
@@ -157,20 +168,32 @@ export class AboutComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.load();
+    this.slugSub = this.route.paramMap.subscribe((params) => {
+      this.slug = params.get('slug') || '';
+      this.load();
+    });
     this.langSub = this.translate.onLangChange.subscribe(() => this.load());
   }
 
   ngOnDestroy(): void {
     this.langSub?.unsubscribe();
+    this.slugSub?.unsubscribe();
   }
 
   private load(): void {
+    const slug = (this.slug || '').trim();
+    if (!slug) {
+      this.block.set(null);
+      this.loading.set(false);
+      this.hasError.set(true);
+      return;
+    }
+
     this.loading.set(true);
     this.hasError.set(false);
     this.pageBlocks.set([]);
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-    this.api.get<ContentBlock>('/content/pages/about', { lang }).subscribe({
+    this.api.get<ContentBlock>(`/content/pages/${encodeURIComponent(slug)}`, { lang }).subscribe({
       next: (block) => {
         this.block.set(block);
         this.bodyHtml.set(this.markdown.render(block.body_markdown));
@@ -178,7 +201,11 @@ export class AboutComponent implements OnInit, OnDestroy {
         this.loading.set(false);
         this.hasError.set(false);
         const metaBody = this.pageBlocks().length ? pageBlocksToPlainText(this.pageBlocks()) : block.body_markdown;
-        this.setMetaTags(block.title, metaBody);
+        this.crumbs.set([
+          { label: 'nav.home', url: '/' },
+          { label: block.title || slug }
+        ]);
+        this.setMetaTags(block.title || slug, metaBody);
       },
       error: () => {
         this.block.set(null);
@@ -186,13 +213,17 @@ export class AboutComponent implements OnInit, OnDestroy {
         this.pageBlocks.set([]);
         this.loading.set(false);
         this.hasError.set(true);
-        this.setMetaTags(this.translate.instant('about.metaTitle'), this.translate.instant('about.metaDescription'));
+        this.crumbs.set([
+          { label: 'nav.home', url: '/' },
+          { label: slug }
+        ]);
+        this.setMetaTags(slug, this.translate.instant('about.metaDescription'));
       }
     });
   }
 
   private setMetaTags(title: string, body: string): void {
-    const pageTitle = title ? `${title} | momentstudio` : 'About | momentstudio';
+    const pageTitle = title ? `${title} | momentstudio` : 'Page | momentstudio';
     const description = (body || '').replace(/\s+/g, ' ').trim().slice(0, 160);
     this.title.setTitle(pageTitle);
     if (description) {
@@ -202,3 +233,4 @@ export class AboutComponent implements OnInit, OnDestroy {
     this.meta.updateTag({ name: 'og:title', content: pageTitle });
   }
 }
+

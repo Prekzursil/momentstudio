@@ -10,6 +10,7 @@
     "shop": "Magazin",
     "about": "Povestea noastră",
     "contact": "Contact",
+    "page": "Pagină",
     "admin": "Admin",
     "viewAdmin": "Vezi admin",
     "account": "Cont",
@@ -280,7 +281,9 @@
     "searchPlaceholder": "Caută produse",
     "search": "Căutare",
     "categories": "Categorii",
+    "subcategories": "Subcategorii",
     "sale": "La reducere",
+    "all": "Toate",
     "allCategories": "Toate categoriile",
     "priceRange": "Interval de preț",
     "ariaMinPrice": "Preț minim",
@@ -617,7 +620,9 @@
       "copy": "Copiază",
       "use": "Folosește",
       "prev": "Anterior",
-      "next": "Înainte"
+      "next": "Înainte",
+      "up": "Sus",
+      "down": "Jos"
     },
     "support": {
       "title": "Inbox suport",
@@ -849,13 +854,22 @@
         "builder": {
           "title": "Blocuri tip page builder",
           "hint": "Opțional: construiește pagini mai bogate (Povestea noastră/Contact) din blocuri. Dacă există blocuri, magazinul le afișează în locul conținutului Markdown.",
+          "newPageTitle": "Titlu pagină nouă",
+          "status": "Stare",
+          "createPage": "Creează pagină",
           "page": "Pagină",
           "addBlock": "Adaugă bloc",
           "success": { "save": "Blocurile au fost salvate." },
-          "errors": { "save": "Nu am putut salva blocurile." }
+          "errors": { "load": "Nu am putut încărca blocurile.", "save": "Nu am putut salva blocurile." }
         },
-        "success": { "save": "Conținut salvat." },
-        "errors": { "save": "Nu am putut salva conținutul." }
+        "success": { "save": "Conținut salvat.", "created": "Pagina a fost creată." },
+        "errors": {
+          "load": "Nu am putut încărca paginile.",
+          "save": "Nu am putut salva conținutul.",
+          "create": "Nu am putut crea pagina.",
+          "reservedTitle": "URL rezervat",
+          "reservedCopy": "Alege un titlu diferit."
+        }
       }
     },
     "home": {
@@ -890,7 +904,9 @@
           "why": "De ce",
           "text": "Text",
           "image": "Imagine",
-          "gallery": "Galerie"
+          "gallery": "Galerie",
+          "banner": "Banner",
+          "carousel": "Carusel"
         },
         "enabled": "Activată",
         "drag": "trage",
@@ -904,7 +920,30 @@
           "caption": "Legendă (opțional)",
           "gallery": "Imagini galerie",
           "galleryEmpty": "Nu există imagini încă. Adaugă una pentru a afișa acest bloc.",
-          "image": "Imagine"
+          "image": "Imagine",
+          "variant": "Aspect",
+          "size": "Dimensiune",
+          "textStyle": "Stil text",
+          "slides": "Slide-uri",
+          "slide": "Slide",
+          "autoplay": "Redare automată",
+          "interval": "Interval (ms)",
+          "arrows": "Săgeți",
+          "dots": "Puncte",
+          "pauseOnHover": "Pauză la hover"
+        },
+        "variants": {
+          "split": "Împărțit",
+          "full": "Lățime completă"
+        },
+        "sizes": {
+          "s": "Mic",
+          "m": "Mediu",
+          "l": "Mare"
+        },
+        "textStyle": {
+          "dark": "Text închis",
+          "light": "Text deschis"
         },
         "success": {
           "save": "Ordinea secțiunilor a fost salvată."
@@ -1232,6 +1271,8 @@
       "add": "Adaugă categorie",
       "slug": "Slug",
       "slugAutoHint": "Slug-ul este generat automat din nume.",
+      "parent": "Categorie părinte",
+      "parentNone": "Fără părinte",
       "description": "Descriere",
       "translations": {
         "button": "Traduceri",
@@ -1251,12 +1292,14 @@
       "success": {
         "add": "Categorie adăugată",
         "delete": "Categorie ștearsă",
-        "reorder": "Ordinea categoriilor a fost salvată"
+        "reorder": "Ordinea categoriilor a fost salvată",
+        "updateParent": "Categoria părinte a fost actualizată"
       },
       "errors": {
         "add": "Nu am putut adăuga categoria",
         "delete": "Nu am putut șterge categoria",
-        "reorder": "Nu am putut reordona categoriile"
+        "reorder": "Nu am putut reordona categoriile",
+        "updateParent": "Nu am putut actualiza categoria părinte"
       }
     },
     "orders": {

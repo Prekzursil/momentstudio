@@ -122,7 +122,6 @@ describe('HomeComponent', () => {
           body_markdown: '',
           meta: {
             sections: [
-              { id: 'hero', enabled: true },
               { id: 'featured_products', enabled: true },
               { id: 'new_arrivals', enabled: true },
               { id: 'featured_collections', enabled: true },
@@ -131,10 +130,6 @@ describe('HomeComponent', () => {
           },
           images: []
         } as unknown as T);
-      }
-      if (url === '/content/home.hero') {
-        expect(params).toEqual({ lang: 'en' });
-        return of({ title: 'Hero', body_markdown: 'Hero copy', meta: {}, images: [] } as unknown as T);
       }
       if (url === '/content/home.story') {
         expect(params).toEqual({ lang: 'en' });
@@ -179,7 +174,7 @@ describe('HomeComponent', () => {
     expect(catalog.listProducts.calls.argsFor(1)[0]).toEqual(jasmine.objectContaining({ limit: 6, sort: 'newest', page: 1 }));
 
     expect(catalog.listFeaturedCollections.calls.count()).toBe(1);
-    expect(api.get).toHaveBeenCalledWith('/content/home.hero', { lang: 'en' });
+    expect(api.get).toHaveBeenCalledWith('/content/home.sections');
     expect(api.get).toHaveBeenCalledWith('/content/home.story', { lang: 'en' });
   });
 });

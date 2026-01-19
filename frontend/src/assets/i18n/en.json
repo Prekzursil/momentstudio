@@ -10,6 +10,7 @@
     "shop": "Shop",
     "about": "Our story",
     "contact": "Contact",
+    "page": "Page",
     "admin": "Admin",
     "viewAdmin": "View admin",
     "account": "Account",
@@ -280,7 +281,9 @@
     "searchPlaceholder": "Search products",
     "search": "Search",
     "categories": "Categories",
+    "subcategories": "Subcategories",
     "sale": "On sale",
+    "all": "All",
     "allCategories": "All categories",
     "priceRange": "Price range",
     "ariaMinPrice": "Minimum price",
@@ -617,7 +620,9 @@
       "copy": "Copy",
       "use": "Use",
       "prev": "Prev",
-      "next": "Next"
+      "next": "Next",
+      "up": "Up",
+      "down": "Down"
     },
     "support": {
       "title": "Support inbox",
@@ -849,13 +854,22 @@
         "builder": {
           "title": "Page builder blocks",
           "hint": "Optional: build richer About/Contact pages with blocks. If blocks are present, the storefront renders them instead of the Markdown body.",
+          "newPageTitle": "New page title",
+          "status": "Status",
+          "createPage": "Create page",
           "page": "Page",
           "addBlock": "Add block",
           "success": { "save": "Blocks saved." },
-          "errors": { "save": "Could not save blocks." }
+          "errors": { "load": "Could not load page blocks.", "save": "Could not save blocks." }
         },
-        "success": { "save": "Content saved." },
-        "errors": { "save": "Could not save content." }
+        "success": { "save": "Content saved.", "created": "Page created." },
+        "errors": {
+          "load": "Could not load pages.",
+          "save": "Could not save content.",
+          "create": "Could not create page.",
+          "reservedTitle": "Reserved URL",
+          "reservedCopy": "Please choose a different title."
+        }
       }
     },
     "home": {
@@ -890,7 +904,9 @@
           "why": "Why",
           "text": "Text",
           "image": "Image",
-          "gallery": "Gallery"
+          "gallery": "Gallery",
+          "banner": "Banner",
+          "carousel": "Carousel"
         },
         "enabled": "Enabled",
         "drag": "drag",
@@ -904,7 +920,30 @@
           "caption": "Caption (optional)",
           "gallery": "Gallery images",
           "galleryEmpty": "No images yet. Add one to display this block.",
-          "image": "Image"
+          "image": "Image",
+          "variant": "Layout",
+          "size": "Size",
+          "textStyle": "Text style",
+          "slides": "Slides",
+          "slide": "Slide",
+          "autoplay": "Autoplay",
+          "interval": "Interval (ms)",
+          "arrows": "Arrows",
+          "dots": "Dots",
+          "pauseOnHover": "Pause on hover"
+        },
+        "variants": {
+          "split": "Split",
+          "full": "Full width"
+        },
+        "sizes": {
+          "s": "Small",
+          "m": "Medium",
+          "l": "Large"
+        },
+        "textStyle": {
+          "dark": "Dark text",
+          "light": "Light text"
         },
         "success": {
           "save": "Sections order saved."
@@ -1232,6 +1271,8 @@
       "add": "Add category",
       "slug": "Slug",
       "slugAutoHint": "Slug is auto-generated from the name.",
+      "parent": "Parent category",
+      "parentNone": "No parent",
       "description": "Description",
       "translations": {
         "button": "Translations",
@@ -1251,12 +1292,14 @@
       "success": {
         "add": "Category added",
         "delete": "Category deleted",
-        "reorder": "Category order saved"
+        "reorder": "Category order saved",
+        "updateParent": "Category parent updated"
       },
       "errors": {
         "add": "Failed to add category",
         "delete": "Failed to delete category",
-        "reorder": "Failed to reorder categories"
+        "reorder": "Failed to reorder categories",
+        "updateParent": "Failed to update category parent"
       }
     },
     "orders": {

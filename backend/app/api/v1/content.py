@@ -13,6 +13,7 @@ from app.schemas.content import (
     ContentBlockUpdate,
     ContentImageAssetListResponse,
     ContentImageAssetRead,
+    ContentPageListItem,
     ContentBlockVersionListItem,
     ContentBlockVersionRead,
 )
@@ -174,6 +175,28 @@ async def admin_list_content_images(
         items=items,
         meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
     )
+
+
+@router.get("/admin/pages/list", response_model=list[ContentPageListItem])
+async def admin_list_pages(
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> list[ContentPageListItem]:
+    result = await session.execute(select(ContentBlock).where(ContentBlock.key.like("page.%")).order_by(ContentBlock.key))
+    items: list[ContentPageListItem] = []
+    for block in result.scalars().all():
+        slug = block.key.split(".", 1)[1] if "." in block.key else block.key
+        items.append(
+            ContentPageListItem(
+                key=block.key,
+                slug=slug,
+                title=block.title,
+                status=block.status,
+                updated_at=block.updated_at,
+                published_at=block.published_at,
+            )
+        )
+    return items
 
 
 @router.get("/admin/{key}/preview", response_model=ContentBlockRead)

@@ -65,6 +65,15 @@ class ContentBlockRead(BaseModel):
     audits: list["ContentAuditRead"] = Field(default_factory=list)
 
 
+class ContentPageListItem(BaseModel):
+    key: str
+    slug: str
+    title: str
+    status: ContentStatus
+    updated_at: datetime
+    published_at: datetime | None = None
+
+
 class ContentImageRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -12,9 +12,11 @@ import { Meta, Title } from '@angular/platform-browser';
 import { AuthService } from '../../core/auth.service';
 import { ApiService } from '../../core/api.service';
 import { MarkdownService } from '../../core/markdown.service';
+import { BannerBlockComponent } from '../../shared/banner-block.component';
+import { CarouselBlockComponent } from '../../shared/carousel-block.component';
+import { CarouselSettings, Slide } from '../../shared/page-blocks';
 
 type HomeSectionId =
-  | 'hero'
   | 'featured_products'
   | 'sale_products'
   | 'new_arrivals'
@@ -23,7 +25,7 @@ type HomeSectionId =
   | 'recently_viewed'
   | 'why';
 
-type HomeBlockType = HomeSectionId | 'text' | 'image' | 'gallery';
+type HomeBlockType = HomeSectionId | 'text' | 'image' | 'gallery' | 'banner' | 'carousel';
 
 interface HomeBlockBase {
   key: string;
@@ -58,7 +60,20 @@ interface HomeGalleryBlock extends HomeBlockBase {
   images: HomeGalleryImage[];
 }
 
-type HomeBlock = HomeBlockBase | HomeTextBlock | HomeImageBlock | HomeGalleryBlock;
+interface HomeBannerBlock extends HomeBlockBase {
+  type: 'banner';
+  title?: string | null;
+  slide: Slide;
+}
+
+interface HomeCarouselBlock extends HomeBlockBase {
+  type: 'carousel';
+  title?: string | null;
+  slides: Slide[];
+  settings: CarouselSettings;
+}
+
+type HomeBlock = HomeBlockBase | HomeTextBlock | HomeImageBlock | HomeGalleryBlock | HomeBannerBlock | HomeCarouselBlock;
 
 interface ContentImage {
   url: string;
@@ -73,7 +88,6 @@ interface ContentBlockRead {
 }
 
 const DEFAULT_BLOCKS: HomeBlock[] = [
-  { key: 'hero', type: 'hero', enabled: true },
   { key: 'featured_products', type: 'featured_products', enabled: true },
   { key: 'sale_products', type: 'sale_products', enabled: false },
   { key: 'new_arrivals', type: 'new_arrivals', enabled: true },
@@ -86,46 +100,37 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, ButtonComponent, CardComponent, ProductCardComponent, SkeletonComponent, TranslateModule],
+  imports: [
+    CommonModule,
+    ButtonComponent,
+    CardComponent,
+    ProductCardComponent,
+    SkeletonComponent,
+    TranslateModule,
+    BannerBlockComponent,
+    CarouselBlockComponent
+  ],
   template: `
     <section class="grid gap-10">
       <ng-container *ngFor="let block of enabledBlocks()">
         <ng-container [ngSwitch]="block.type">
-          <ng-container *ngSwitchCase="'hero'">
-            <div class="grid gap-6 lg:grid-cols-[1.2fr_1fr] items-center">
-              <div class="grid gap-4">
-                <p class="font-cinzel font-semibold text-[28px] tracking-[0.3em] text-slate-500 dark:text-slate-400">
-                  {{ 'app.tagline' | translate }}
-                </p>
-                <h1 class="text-3xl sm:text-4xl lg:text-5xl font-semibold leading-tight text-slate-900 dark:text-slate-50">
-                  {{ heroHeadline() || ('home.headline' | translate) }}
-                </h1>
-                <p class="text-lg text-slate-600 dark:text-slate-300">
-                  {{ heroSubtitle() || ('home.subhead' | translate) }}
-                </p>
-                <div class="flex flex-wrap gap-3">
-                  <app-button [label]="heroCtaLabel() || ('home.ctaShop' | translate)" [routerLink]="[heroCtaUrl() || '/shop']"></app-button>
-                </div>
-              </div>
-              <div class="relative">
-                <div class="absolute -inset-4 rounded-3xl bg-slate-900/5 blur-xl dark:bg-slate-50/10"></div>
-                <app-card class="relative">
-                  <img
-                    *ngIf="heroImage()"
-                    class="aspect-video w-full rounded-2xl object-cover"
-                    [src]="heroImage()"
-                    [alt]="heroHeadline() || ('home.headline' | translate)"
-                    loading="lazy"
-                  />
-                  <div
-                    *ngIf="!heroImage()"
-                    class="aspect-video rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 grid place-items-center text-white text-xl font-semibold"
-                  >
-                    Hero image slot
-                  </div>
-                </app-card>
-              </div>
-            </div>
+          <ng-container *ngSwitchCase="'banner'">
+            <ng-container *ngIf="asBannerBlock(block) as banner">
+              <app-banner-block
+                [slide]="banner.slide"
+                [tagline]="banner.key === firstHeroLikeKey() ? ('app.tagline' | translate) : null"
+              ></app-banner-block>
+            </ng-container>
+          </ng-container>
+
+          <ng-container *ngSwitchCase="'carousel'">
+            <ng-container *ngIf="asCarouselBlock(block) as carousel">
+              <app-carousel-block
+                [slides]="carousel.slides"
+                [settings]="carousel.settings"
+                [tagline]="carousel.key === firstHeroLikeKey() ? ('app.tagline' | translate) : null"
+              ></app-carousel-block>
+            </ng-container>
           </ng-container>
 
           <ng-container *ngSwitchCase="'featured_products'">
@@ -365,9 +370,6 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
 export class HomeComponent implements OnInit, OnDestroy {
   blocks = signal<HomeBlock[]>(DEFAULT_BLOCKS);
 
-  heroBlock = signal<ContentBlockRead | null>(null);
-  heroLoading = signal<boolean>(true);
-
   featured: Product[] = [];
   featuredLoading = signal<boolean>(true);
   featuredError = signal<boolean>(false);
@@ -393,6 +395,10 @@ export class HomeComponent implements OnInit, OnDestroy {
   skeletons = Array.from({ length: 3 });
   readonly isAdmin = computed(() => this.auth.isAdmin());
   readonly enabledBlocks = computed(() => this.blocks().filter((b) => b.enabled));
+  readonly firstHeroLikeKey = computed(() => {
+    const first = this.enabledBlocks().find((b) => b.type === 'banner' || b.type === 'carousel');
+    return first?.key ?? null;
+  });
 
   private langSub?: Subscription;
 
@@ -459,6 +465,72 @@ export class HomeComponent implements OnInit, OnDestroy {
       return fallback || null;
     };
 
+    const readString = (value: unknown): string | null => {
+      if (typeof value !== 'string') return null;
+      const trimmed = value.trim();
+      return trimmed ? trimmed : null;
+    };
+
+    const readBoolean = (value: unknown, fallback = false): boolean => {
+      if (typeof value === 'boolean') return value;
+      if (typeof value === 'number') return value === 1;
+      if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on') return true;
+        if (normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off') return false;
+      }
+      return fallback;
+    };
+
+    const readNumber = (value: unknown, fallback: number): number => {
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      if (typeof value === 'string') {
+        const parsed = Number(value.trim());
+        if (Number.isFinite(parsed)) return parsed;
+      }
+      return fallback;
+    };
+
+    const normalizeVariant = (value: unknown): 'full' | 'split' => (readString(value) === 'full' ? 'full' : 'split');
+
+    const normalizeSize = (value: unknown): 'S' | 'M' | 'L' => {
+      const raw = readString(value);
+      if (raw === 'S' || raw === 'M' || raw === 'L') return raw;
+      if (!raw) return 'M';
+      const normalized = raw.toLowerCase();
+      if (normalized === 's' || normalized === 'small') return 'S';
+      if (normalized === 'l' || normalized === 'large') return 'L';
+      return 'M';
+    };
+
+    const normalizeTextStyle = (value: unknown): 'light' | 'dark' => (readString(value) === 'light' ? 'light' : 'dark');
+
+    const parseSlide = (raw: unknown): Slide => {
+      const rec = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+      return {
+        image_url: readString(rec['image_url']) || readString(rec['image']) || '',
+        alt: readLocalized(rec['alt']),
+        headline: readLocalized(rec['headline']),
+        subheadline: readLocalized(rec['subheadline']),
+        cta_label: readLocalized(rec['cta_label']),
+        cta_url: readString(rec['cta_url']),
+        variant: normalizeVariant(rec['variant']),
+        size: normalizeSize(rec['size']),
+        text_style: normalizeTextStyle(rec['text_style'])
+      };
+    };
+
+    const parseCarouselSettings = (raw: unknown): CarouselSettings => {
+      const rec = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+      return {
+        autoplay: readBoolean(rec['autoplay'], false),
+        interval_ms: Math.max(1000, readNumber(rec['interval_ms'], 5000)),
+        show_dots: readBoolean(rec['show_dots'], true),
+        show_arrows: readBoolean(rec['show_arrows'], true),
+        pause_on_hover: readBoolean(rec['pause_on_hover'], true)
+      };
+    };
+
     const rawBlocks = meta?.['blocks'];
     if (Array.isArray(rawBlocks) && rawBlocks.length) {
       for (const raw of rawBlocks) {
@@ -471,7 +543,13 @@ export class HomeComponent implements OnInit, OnDestroy {
 
         const type: HomeBlockType | null =
           normalizedBuiltIn ||
-          (typeRaw === 'text' || typeRaw === 'image' || typeRaw === 'gallery' ? (typeRaw as HomeBlockType) : null);
+          (typeRaw === 'text' ||
+          typeRaw === 'image' ||
+          typeRaw === 'gallery' ||
+          typeRaw === 'banner' ||
+          typeRaw === 'carousel'
+            ? (typeRaw as HomeBlockType)
+            : null);
         if (!type) continue;
 
         const key = ensureUniqueKey(rec['key'], type);
@@ -512,6 +590,29 @@ export class HomeComponent implements OnInit, OnDestroy {
           }
           if (!images.length) continue;
           configured.push({ key, type, enabled, title: readLocalized(rec['title']), images });
+          continue;
+        }
+
+        if (type === 'banner') {
+          configured.push({ key, type, enabled, title: readLocalized(rec['title']), slide: parseSlide(rec['slide']) });
+          continue;
+        }
+
+        if (type === 'carousel') {
+          const slidesRaw = rec['slides'];
+          const slides: Slide[] = [];
+          if (Array.isArray(slidesRaw)) {
+            for (const slideRaw of slidesRaw) slides.push(parseSlide(slideRaw));
+          }
+          if (!slides.length) slides.push(parseSlide({}));
+          configured.push({
+            key,
+            type,
+            enabled,
+            title: readLocalized(rec['title']),
+            slides,
+            settings: parseCarouselSettings(rec['settings'])
+          });
           continue;
         }
 
@@ -569,7 +670,6 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private isHomeSectionId(value: unknown): value is HomeSectionId {
     return (
-      value === 'hero' ||
       value === 'featured_products' ||
       value === 'sale_products' ||
       value === 'new_arrivals' ||
@@ -606,7 +706,6 @@ export class HomeComponent implements OnInit, OnDestroy {
         .map((b) => (this.isHomeSectionId(b.type) ? (b.type as HomeSectionId) : null))
         .filter((x): x is HomeSectionId => Boolean(x))
     );
-    if (ids.has('hero')) this.loadHero();
     if (ids.has('featured_products')) this.loadFeatured();
     if (ids.has('sale_products')) this.loadSaleProducts();
     if (ids.has('new_arrivals')) this.loadNewArrivals();
@@ -624,6 +723,14 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   asGalleryBlock(block: HomeBlock): HomeGalleryBlock | null {
     return block.type === 'gallery' ? (block as HomeGalleryBlock) : null;
+  }
+
+  asBannerBlock(block: HomeBlock): HomeBannerBlock | null {
+    return block.type === 'banner' ? (block as HomeBannerBlock) : null;
+  }
+
+  asCarouselBlock(block: HomeBlock): HomeCarouselBlock | null {
+    return block.type === 'carousel' ? (block as HomeCarouselBlock) : null;
   }
 
   loadFeatured(): void {
@@ -710,21 +817,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     });
   }
 
-  private loadHero(): void {
-    this.heroLoading.set(true);
-    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-    this.api.get<ContentBlockRead>('/content/home.hero', { lang }).subscribe({
-      next: (block) => {
-        this.heroBlock.set(block);
-        this.heroLoading.set(false);
-      },
-      error: () => {
-        this.heroBlock.set(null);
-        this.heroLoading.set(false);
-      }
-    });
-  }
-
   private loadStory(): void {
     this.storyLoading.set(true);
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
@@ -740,42 +832,6 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.storyLoading.set(false);
       }
     });
-  }
-
-  heroHeadline(): string {
-    const block = this.heroBlock();
-    const meta = (block?.meta ?? {}) as Record<string, unknown>;
-    const headline = (meta['headline'] ?? block?.title ?? '') as string;
-    return typeof headline === 'string' ? headline.trim() : '';
-  }
-
-  heroSubtitle(): string {
-    const subtitle = (this.heroBlock()?.body_markdown ?? '') as string;
-    return typeof subtitle === 'string' ? subtitle.trim() : '';
-  }
-
-  heroCtaLabel(): string {
-    const meta = (this.heroBlock()?.meta ?? {}) as Record<string, unknown>;
-    const label = meta['cta_label'] ?? meta['cta'];
-    return typeof label === 'string' ? label.trim() : '';
-  }
-
-  heroCtaUrl(): string {
-    const meta = (this.heroBlock()?.meta ?? {}) as Record<string, unknown>;
-    const url = meta['cta_url'] ?? meta['cta_link'];
-    return typeof url === 'string' ? url.trim() : '';
-  }
-
-  heroImage(): string {
-    const block = this.heroBlock();
-    if (!block) return '';
-    const fromImages = block.images?.[0]?.url;
-    if (typeof fromImages === 'string' && fromImages.trim()) {
-      return fromImages.trim();
-    }
-    const meta = (block.meta ?? {}) as Record<string, unknown>;
-    const img = meta['image'];
-    return typeof img === 'string' ? img.trim() : '';
   }
 
   private setMetaTags(): void {

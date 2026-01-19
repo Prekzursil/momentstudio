@@ -54,6 +54,7 @@ Below is a structured checklist you can turn into issues.
 
 ## Backend - Catalog & Products
 - [x] Category model + migration.
+- [x] Categories: add parent/child hierarchy (subcategories) and include descendants when filtering products by category.
 - [x] Product model + migration.
 - [x] ProductImage model + migration.
 - [x] (Optional) ProductVariant model + migration.
@@ -187,6 +188,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin preview endpoint with token.
 - [x] Content change audit log.
 - [x] Static page slugs for SEO (about/faq/shipping/returns/care).
+- [x] CMS: add dynamic pages under `/pages/:slug` (content keys `page.<slug>`).
+- [x] CMS: add banner + carousel blocks (shared slide schema) and migrate legacy homepage hero to a banner block.
+- [ ] CMS: allow changing page URLs with redirects (advanced).
 
 ## Backend - Email & Notifications
 - [x] Email settings (SMTP).
@@ -305,13 +309,14 @@ Below is a structured checklist you can turn into issues.
 - [x] Tag/label pills (featured/new/limited).
 - [x] Product gallery zoom/lightbox.
 - [x] Persist filters in query params.
+- [x] Shop: support `/shop/:category` route + `sub=<slug>` query param for subcategories.
 - [x] Empty state for product lists.
 - [x] Error state/retry for product lists.
 - [x] Breadcrumbs for category/product pages.
 - [x] Recently viewed carousel.
 - [x] Localized currency display.
 - [x] SEO meta tags per product/category.
-- [x] CMS/Home: render homepage hero from `home.hero` content block (headline/subtitle/CTA/image) with RO/EN support and sensible fallbacks.
+- [x] CMS/Home: render homepage banners/carousels from `home.sections` (shared slide schema) with RO/EN support and sensible fallbacks.
 - [x] CMS/Home: drive homepage section ordering from `home.sections` content block and support enabling/disabling sections.
 - [x] CMS/Home: add a CMS-editable “Our story” teaser section via `home.story` (markdown + CTA to `/about`).
 - [x] CMS/Site settings: manage Instagram/Facebook links (labels + URLs + optional thumbnails) via a `site.social` content block (meta JSON) and reuse in footer/contact/home.
