@@ -114,8 +114,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Coupons v2: issue first-order reward coupon after first delivered order (+ email).
 - [x] Coupons v2: add admin UI for promotions/coupons assignment and revocation.
 - [x] Coupons v2: add scope rules (product/category inclusion/exclusion).
-- [ ] Coupons v2: admin UI – resolve scoped product IDs to names (avoid showing raw UUID chips).
-- [ ] Coupons v2: admin UI – bulk assign/revoke coupons (CSV upload or segment-based selection).
+- [x] Coupons v2: admin UI – resolve scoped product IDs to names (avoid showing raw UUID chips).
+- [x] Coupons v2: admin UI – bulk assign/revoke coupons (CSV upload or segment-based selection).
+- [ ] Coupons v2: bulk assign/revoke – add segment targeting (marketing opt-in, email verified) with preview + background job.
 - [x] Abandoned cart job (email reminder) scaffold.
 - [x] Cart item note (gift message) support.
 - [x] Cart cleanup job for stale guest carts.
