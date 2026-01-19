@@ -58,6 +58,14 @@ describe('AdminService', () => {
     expect(updateReq.request.method).toBe('PATCH');
     expect(updateReq.request.body).toEqual({ active: false, code: 'SAVE11' });
     updateReq.flush(update);
+
+    service.invalidateCouponStripeMappings('c1').subscribe((res) => {
+      expect(res.deleted_mappings).toBe(2);
+    });
+    const invalidateReq = httpMock.expectOne('/api/v1/admin/dashboard/coupons/c1/stripe/invalidate');
+    expect(invalidateReq.request.method).toBe('POST');
+    expect(invalidateReq.request.body).toEqual({});
+    invalidateReq.flush({ deleted_mappings: 2 });
   });
 
   it('should reorder categories', () => {

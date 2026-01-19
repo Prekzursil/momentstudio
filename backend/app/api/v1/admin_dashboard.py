@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import String, Text, cast, func, literal, or_, select, union_all
+from sqlalchemy import String, Text, cast, delete, func, literal, or_, select, union_all
 from sqlalchemy.orm import aliased
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +18,7 @@ from app.schemas.catalog_admin import AdminProductListItem, AdminProductListResp
 from app.services import exporter as exporter_service
 from app.models.order import Order
 from app.models.user import AdminAuditLog, User, RefreshSession, UserRole
-from app.models.promo import PromoCode
+from app.models.promo import PromoCode, StripeCouponMapping
 from app.services import auth as auth_service
 from app.schemas.user_admin import AdminUserListItem, AdminUserListResponse
 
@@ -272,6 +272,14 @@ async def admin_content(session: AsyncSession = Depends(get_session), _: str = D
     ]
 
 
+async def _invalidate_stripe_coupon_mappings(session: AsyncSession, promo_id: UUID) -> int:
+    total = await session.scalar(
+        select(func.count()).select_from(StripeCouponMapping).where(StripeCouponMapping.promo_code_id == promo_id)
+    )
+    await session.execute(delete(StripeCouponMapping).where(StripeCouponMapping.promo_code_id == promo_id))
+    return int(total or 0)
+
+
 @router.get("/coupons")
 async def admin_coupons(session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)) -> list[dict]:
     result = await session.execute(select(PromoCode).order_by(PromoCode.created_at.desc()).limit(20))
@@ -290,6 +298,20 @@ async def admin_coupons(session: AsyncSession = Depends(get_session), _: str = D
         }
         for p in promos
     ]
+
+
+@router.post("/coupons/{coupon_id}/stripe/invalidate")
+async def admin_invalidate_coupon_stripe(
+    coupon_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> dict:
+    promo = await session.get(PromoCode, coupon_id)
+    if not promo:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+    deleted = await _invalidate_stripe_coupon_mappings(session, promo.id)
+    await session.commit()
+    return {"deleted_mappings": deleted}
 
 
 @router.post("/coupons", status_code=status.HTTP_201_CREATED)
@@ -340,6 +362,7 @@ async def admin_update_coupon(
     promo = await session.get(PromoCode, coupon_id)
     if not promo:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+    invalidate_stripe = any(field in payload for field in ["percentage_off", "amount_off", "currency", "active"])
     for field in ["percentage_off", "amount_off", "expires_at", "max_uses", "active", "code"]:
         if field in payload:
             setattr(promo, field, payload[field])
@@ -352,6 +375,8 @@ async def admin_update_coupon(
             promo.currency = currency
         else:
             promo.currency = None
+    if invalidate_stripe:
+        await _invalidate_stripe_coupon_mappings(session, promo.id)
     session.add(promo)
     await session.flush()
     await session.commit()

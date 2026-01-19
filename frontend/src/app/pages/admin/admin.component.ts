@@ -1968,15 +1968,18 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     <ng-container *ngIf="!coupon.percentage_off && !coupon.amount_off">{{ 'adminUi.coupons.none' | translate }}</ng-container>
                   </p>
                 </div>
-                <button
-                  type="button"
-                  class="text-xs rounded-full px-2 py-1 border border-slate-200 dark:border-slate-700"
-                  [class.bg-emerald-100]="coupon.active"
-                  [class.text-emerald-800]="coupon.active"
-                  (click)="toggleCoupon(coupon)"
-                >
-                  {{ coupon.active ? ('adminUi.coupons.active' | translate) : ('adminUi.coupons.inactive' | translate) }}
-                </button>
+                <div class="flex items-center gap-2">
+                  <app-button size="sm" variant="ghost" [label]="'adminUi.coupons.invalidateStripe' | translate" (action)="invalidateCouponStripe(coupon)"></app-button>
+                  <button
+                    type="button"
+                    class="text-xs rounded-full px-2 py-1 border border-slate-200 dark:border-slate-700"
+                    [class.bg-emerald-100]="coupon.active"
+                    [class.text-emerald-800]="coupon.active"
+                    (click)="toggleCoupon(coupon)"
+                  >
+                    {{ coupon.active ? ('adminUi.coupons.active' | translate) : ('adminUi.coupons.inactive' | translate) }}
+                  </button>
+                </div>
               </div>
             </div>
           </section>
@@ -3251,6 +3254,15 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.toast.success(this.t('adminUi.coupons.success.update'));
       },
       error: () => this.toast.error(this.t('adminUi.coupons.errors.update'))
+    });
+  }
+
+  invalidateCouponStripe(coupon: AdminCoupon): void {
+    this.admin.invalidateCouponStripeMappings(coupon.id).subscribe({
+      next: (res) => {
+        this.toast.success(this.t('adminUi.coupons.success.invalidateStripe', { count: res.deleted_mappings }));
+      },
+      error: () => this.toast.error(this.t('adminUi.coupons.errors.invalidateStripe'))
     });
   }
 

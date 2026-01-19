@@ -1440,17 +1440,20 @@
       "code": "Code",
       "percentOff": "% off",
       "add": "Add coupon",
+      "invalidateStripe": "Reset Stripe cache",
       "none": "No discount set",
       "active": "Active",
       "inactive": "Inactive",
       "success": {
         "create": "Coupon created",
-        "update": "Coupon updated"
+        "update": "Coupon updated",
+        "invalidateStripe": "Stripe coupon cache cleared ({{count}})"
       },
       "errors": {
         "required": "Coupon code is required",
         "create": "Failed to create coupon",
-        "update": "Failed to update coupon"
+        "update": "Failed to update coupon",
+        "invalidateStripe": "Failed to reset Stripe coupon cache"
       }
     },
     "audit": {

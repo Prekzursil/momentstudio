@@ -158,7 +158,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Money: migrate Product/Variant monetary fields to Decimal end-to-end (models + schemas + UI parsing), remove remaining float annotations.
 - [x] Orders: add admin filters for “Pending (any)” (covers `pending_payment` + `pending_acceptance`) and optionally highlight “Awaiting payment” vs “Awaiting acceptance”.
 - [x] Payments: increment promo `times_used` on successful payment capture (and avoid counting abandoned checkouts).
-- [ ] Payments: add admin tooling to invalidate Stripe coupon mappings when a promo is edited/disabled.
+- [x] Payments: add admin tooling to invalidate Stripe coupon mappings when a promo is edited/disabled.
 
 ## Backend - CMS & Content
 - [x] ContentBlock model + migration.

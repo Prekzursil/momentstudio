@@ -1440,17 +1440,20 @@
       "code": "Cod",
       "percentOff": "% reducere",
       "add": "Adaugă cupon",
+      "invalidateStripe": "Resetează cache Stripe",
       "none": "Fără reducere setată",
       "active": "Activ",
       "inactive": "Inactiv",
       "success": {
         "create": "Cupon creat",
-        "update": "Cupon actualizat"
+        "update": "Cupon actualizat",
+        "invalidateStripe": "Cache-ul de cupoane Stripe a fost resetat ({{count}})"
       },
       "errors": {
         "required": "Codul cuponului este obligatoriu",
         "create": "Nu am putut crea cuponul",
-        "update": "Nu am putut actualiza cuponul"
+        "update": "Nu am putut actualiza cuponul",
+        "invalidateStripe": "Nu am putut reseta cache-ul de cupoane Stripe"
       }
     },
     "audit": {
