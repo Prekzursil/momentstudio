@@ -4332,7 +4332,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   loadInfo(): void {
     const loadKey = async (key: string, target: 'about' | 'faq' | 'shipping' | 'contact'): Promise<void> => {
-      const next: LocalizedText = { en: '', ro: '' };
+      const next: LocalizedText = { ...this.infoForm[target] };
       let meta: Record<string, unknown> | null | undefined;
 
       try {
@@ -4340,6 +4340,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.rememberContentVersion(key, enBlock);
         next.en = enBlock.body_markdown || '';
         meta = (enBlock as { meta?: Record<string, unknown> | null }).meta;
+        this.infoForm[target] = { ...this.infoForm[target], en: next.en };
       } catch {
         delete this.contentVersions[key];
       }
@@ -4350,11 +4351,10 @@ export class AdminComponent implements OnInit, OnDestroy {
         if (!meta) {
           meta = (roBlock as { meta?: Record<string, unknown> | null }).meta;
         }
+        this.infoForm[target] = { ...this.infoForm[target], ro: next.ro };
       } catch {
         // ignore
       }
-
-      this.infoForm[target] = next;
 
       if (key === 'page.about' || key === 'page.contact') {
         const pageKey = key as PageBuilderKey;
