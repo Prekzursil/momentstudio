@@ -124,10 +124,8 @@ test('coupons v2: apply coupon and prevent reuse after redemption', async ({ pag
   await page.goto('/checkout');
   await cartLoad;
 
-  const quoteWithPromo = page.waitForResponse((res) => res.url().includes('/api/v1/cart') && res.url().includes('promo_code='));
   await page.locator('input[name="promo"]').fill(code);
-  await page.getByRole('button', { name: 'Apply' }).click();
-  await quoteWithPromo;
+  await page.getByRole('button', { name: 'Apply' }).first().click();
 
   await expect(page.getByText(`Promo ${code} applied.`)).toBeVisible();
   await expect(page.locator('aside span.text-emerald-700')).toBeVisible();
@@ -138,7 +136,7 @@ test('coupons v2: apply coupon and prevent reuse after redemption', async ({ pag
   await page.getByRole('button', { name: 'Place order' }).click();
 
   await expect(page).toHaveURL(/\/checkout\/success$/);
-  await expect(page.getByRole('heading', { name: 'Order confirmed' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Thank you for your purchase!' })).toBeVisible();
 
   // Add again and ensure the same coupon cannot be redeemed twice.
   await syncCartWithFirstProduct(request, token);

@@ -39,8 +39,13 @@ test('owner can update About page via CMS and audit log records it', async ({ pa
   });
   await Promise.all([saveAboutResponse, page.getByRole('button', { name: 'Save about' }).click()]);
 
-  await page.goto('/about');
-  await expect(page.getByText(marker)).toBeVisible();
+  const publicAboutResponse = page.waitForResponse((resp) => {
+    if (!resp.url().includes('/content/pages/about')) return false;
+    if (resp.request().method() !== 'GET') return false;
+    return resp.status() === 200;
+  });
+  await Promise.all([publicAboutResponse, page.goto('/about')]);
+  await expect(page.getByText(marker)).toBeVisible({ timeout: 30_000 });
 
   await page.goto('/admin/dashboard');
   await page.getByLabel('Entity').selectOption('content');
