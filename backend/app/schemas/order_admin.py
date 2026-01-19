@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -15,7 +16,7 @@ class AdminOrderListItem(BaseModel):
     id: UUID
     reference_code: str | None
     status: OrderStatus
-    total_amount: float
+    total_amount: Decimal
     currency: str
     created_at: datetime
     customer_email: str | None = None

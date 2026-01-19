@@ -1,6 +1,7 @@
 import { DOCUMENT } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnChanges, OnDestroy, Output, SimpleChanges, ViewChild, inject } from '@angular/core';
 import Editor from '@toast-ui/editor';
+import { LazyStylesService } from '../core/lazy-styles.service';
 
 @Component({
   selector: 'app-rich-editor',
@@ -21,8 +22,20 @@ export class RichEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
   private isApplyingExternalUpdate = false;
   private themeObserver?: MutationObserver;
   private destroyed = false;
+  private styles = inject(LazyStylesService);
 
   ngAfterViewInit(): void {
+    void this.initEditor();
+  }
+
+  private async initEditor(): Promise<void> {
+    await Promise.all([
+      this.styles.ensure('toastui-editor', 'assets/vendor/toastui/toastui-editor.css'),
+      this.styles.ensure('toastui-editor-dark', 'assets/vendor/toastui/toastui-editor-dark.css')
+    ]);
+
+    if (this.destroyed) return;
+
     this.editor = new Editor({
       el: this.host.nativeElement,
       height: this.height,

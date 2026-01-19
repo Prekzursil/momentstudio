@@ -3,12 +3,14 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone, date
 from urllib.parse import urlencode
+from uuid import UUID
 
 from jose import jwt
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, EmailStr, field_validator
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
@@ -17,16 +19,21 @@ from app.core.dependencies import get_current_user, get_google_completion_user, 
 from app.core.rate_limit import limiter, per_identifier_limiter
 from app.core.security import decode_token
 from app.db.session import get_session
-from app.models.user import User
+from app.models.user import RefreshSession, User, UserSecondaryEmail
 from app.schemas.auth import (
     AuthResponse,
     GoogleCallbackResponse,
     AccountDeletionStatus,
     EmailVerificationConfirm,
+    SecondaryEmailConfirmRequest,
+    SecondaryEmailCreateRequest,
+    SecondaryEmailMakePrimaryRequest,
+    SecondaryEmailResponse,
     PasswordResetConfirm,
     PasswordResetRequest,
     RefreshRequest,
     TokenPair,
+    UserEmailsResponse,
     UserResponse,
 )
 from app.schemas.user import UserCreate
@@ -73,16 +80,16 @@ def _validate_google_state(state: str, expected_type: str, expected_user_id: str
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid state")
 
 
-def set_refresh_cookie(response: Response, token: str) -> None:
-    response.set_cookie(
-        "refresh_token",
-        token,
-        httponly=True,
-        secure=settings.secure_cookies,
-        samesite=settings.cookie_samesite.lower(),
-        max_age=settings.refresh_token_exp_days * 24 * 60 * 60,
-        path="/",
-    )
+def set_refresh_cookie(response: Response, token: str, *, persistent: bool = True) -> None:
+    payload = {
+        "httponly": True,
+        "secure": settings.secure_cookies,
+        "samesite": settings.cookie_samesite.lower(),
+        "path": "/",
+    }
+    if persistent:
+        payload["max_age"] = settings.refresh_token_exp_days * 24 * 60 * 60
+    response.set_cookie("refresh_token", token, **payload)
 
 
 def clear_refresh_cookie(response: Response) -> None:
@@ -216,6 +223,7 @@ class LoginRequest(BaseModel):
     email: str | None = None
     password: str = Field(min_length=1, max_length=128)
     captcha_token: str | None = None
+    remember: bool = False
 
 
 class UsernameUpdateRequest(BaseModel):
@@ -248,8 +256,10 @@ class UserAliasesResponse(BaseModel):
 async def register(
     payload: RegisterRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(register_rate_limit),
+    response: Response = None,
 ) -> AuthResponse:
     await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
     user = await auth_service.create_user(
@@ -268,7 +278,22 @@ async def register(
         ),
     )
     metrics.record_signup()
-    tokens = await auth_service.issue_tokens_for_user(session, user)
+    record = await auth_service.create_email_verification(session, user)
+    background_tasks.add_task(
+        email_service.send_verification_email,
+        user.email,
+        record.token,
+        user.preferred_language,
+    )
+    background_tasks.add_task(
+        email_service.send_welcome_email,
+        user.email,
+        first_name=user.first_name,
+        lang=user.preferred_language,
+    )
+    tokens = await auth_service.issue_tokens_for_user(session, user, persistent=False)
+    if response:
+        set_refresh_cookie(response, tokens["refresh_token"], persistent=False)
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 
@@ -298,20 +323,50 @@ async def login(
         metrics.record_login_failure()
         raise
     metrics.record_login_success()
-    tokens = await auth_service.issue_tokens_for_user(session, user)
+    persistent = bool(payload.remember)
+    tokens = await auth_service.issue_tokens_for_user(session, user, persistent=persistent)
     if response:
-        set_refresh_cookie(response, tokens["refresh_token"])
+        set_refresh_cookie(response, tokens["refresh_token"], persistent=persistent)
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 
 @router.post("/refresh", response_model=TokenPair)
 async def refresh_tokens(
     refresh_request: RefreshRequest,
+    request: Request,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(refresh_rate_limit),
     response: Response = None,
 ) -> TokenPair:
-    stored = await auth_service.validate_refresh_token(session, refresh_request.refresh_token)
+    refresh_token = (refresh_request.refresh_token or "").strip()
+    if not refresh_token:
+        refresh_token = (request.cookies.get("refresh_token") or "").strip()
+    if not refresh_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token missing")
+
+    payload = security.decode_token(refresh_token)
+    if not payload or payload.get("type") != "refresh":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    jti = str(payload.get("jti") or "").strip()
+    sub = payload.get("sub")
+    if not jti or not sub:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    try:
+        token_user_id = UUID(str(sub))
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+
+    # Lock the refresh session row during rotation to make concurrent refreshes multi-tab safe.
+    stored = (
+        await session.execute(select(RefreshSession).where(RefreshSession.jti == jti).with_for_update())
+    ).scalar_one_or_none()
+    now = datetime.now(timezone.utc)
+    stored_expires_at = stored.expires_at if stored else None
+    if stored_expires_at and stored_expires_at.tzinfo is None:
+        stored_expires_at = stored_expires_at.replace(tzinfo=timezone.utc)
+    if not stored or stored.user_id != token_user_id or not stored_expires_at or stored_expires_at < now:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+
     user = await session.get(User, stored.user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
@@ -320,25 +375,75 @@ async def refresh_tokens(
     if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
         await self_service.execute_account_deletion(session, user)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
-    # rotate token
+
+    # If the token was already rotated very recently (multi-tab refresh), allow
+    # reusing it by issuing tokens for the replacement session without rotating again.
+    if stored.revoked:
+        grace_seconds = max(0, int(settings.refresh_token_rotation_grace_seconds or 0))
+        rotated_at = getattr(stored, "rotated_at", None)
+        replaced_by = (getattr(stored, "replaced_by_jti", None) or "").strip()
+        if stored.revoked_reason == "rotated" and grace_seconds > 0 and rotated_at and replaced_by:
+            rotated_at_norm = rotated_at
+            if rotated_at_norm.tzinfo is None:
+                rotated_at_norm = rotated_at_norm.replace(tzinfo=timezone.utc)
+            if rotated_at_norm + timedelta(seconds=grace_seconds) >= now:
+                replacement = (
+                    await session.execute(select(RefreshSession).where(RefreshSession.jti == replaced_by))
+                ).scalar_one_or_none()
+                replacement_expires_at = replacement.expires_at if replacement else None
+                if replacement_expires_at and replacement_expires_at.tzinfo is None:
+                    replacement_expires_at = replacement_expires_at.replace(tzinfo=timezone.utc)
+                if (
+                    replacement
+                    and replacement.user_id == stored.user_id
+                    and not replacement.revoked
+                    and replacement_expires_at
+                    and replacement_expires_at >= now
+                ):
+                    persistent = bool(getattr(replacement, "persistent", True))
+                    access = security.create_access_token(str(user.id), replacement.jti)
+                    refresh = security.create_refresh_token(str(user.id), replacement.jti, replacement_expires_at)
+                    if response:
+                        set_refresh_cookie(response, refresh, persistent=persistent)
+                    return TokenPair(access_token=access, refresh_token=refresh)
+
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+
+    persistent = bool(getattr(stored, "persistent", True))
+    if not settings.refresh_token_rotation:
+        access = security.create_access_token(str(user.id), stored.jti)
+        refresh = security.create_refresh_token(str(user.id), stored.jti, stored_expires_at)
+        if response:
+            set_refresh_cookie(response, refresh, persistent=persistent)
+        return TokenPair(access_token=access, refresh_token=refresh)
+
+    # Rotate the token by revoking the current refresh session and issuing a replacement.
+    replacement_session = await auth_service.create_refresh_session(session, user.id, persistent=persistent)
     stored.revoked = True
     stored.revoked_reason = "rotated"
+    stored.rotated_at = now
+    stored.replaced_by_jti = replacement_session.jti
     session.add(stored)
     await session.flush()
-    tokens = await auth_service.issue_tokens_for_user(session, user)
+    access = security.create_access_token(str(user.id), replacement_session.jti)
+    refresh = security.create_refresh_token(str(user.id), replacement_session.jti, replacement_session.expires_at)
+    await session.commit()
     if response:
-        set_refresh_cookie(response, tokens["refresh_token"])
-    return TokenPair(**tokens)
+        set_refresh_cookie(response, refresh, persistent=persistent)
+    return TokenPair(access_token=access, refresh_token=refresh)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
     payload: RefreshRequest,
+    request: Request,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(get_current_user),
     response: Response = None,
 ) -> None:
-    payload_data = decode_token(payload.refresh_token)
+    refresh_token = (payload.refresh_token or "").strip()
+    if not refresh_token:
+        refresh_token = (request.cookies.get("refresh_token") or "").strip()
+    payload_data = decode_token(refresh_token) if refresh_token else None
     if payload_data and payload_data.get("jti"):
         await auth_service.revoke_refresh_token(session, payload_data["jti"], reason="logout")
     if response:
@@ -349,6 +454,7 @@ async def logout(
 @router.post("/password/change", status_code=status.HTTP_200_OK)
 async def change_password(
     payload: ChangePasswordRequest,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> dict:
@@ -357,6 +463,7 @@ async def change_password(
     current_user.hashed_password = security.hash_password(payload.new_password)
     session.add(current_user)
     await session.commit()
+    background_tasks.add_task(email_service.send_password_changed, current_user.email, lang=current_user.preferred_language)
     return {"detail": "Password updated"}
 
 
@@ -367,7 +474,12 @@ async def request_email_verification(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     record = await auth_service.create_email_verification(session, current_user)
-    background_tasks.add_task(email_service.send_verification_email, current_user.email, record.token)
+    background_tasks.add_task(
+        email_service.send_verification_email,
+        current_user.email,
+        record.token,
+        current_user.preferred_language,
+    )
     return {"detail": "Verification email sent"}
 
 
@@ -436,10 +548,109 @@ async def update_email(
 ) -> UserResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+    old_email = current_user.email
     user = await auth_service.update_email(session, current_user, str(payload.email))
     record = await auth_service.create_email_verification(session, user)
-    background_tasks.add_task(email_service.send_verification_email, user.email, record.token)
+    background_tasks.add_task(email_service.send_email_changed, old_email, old_email=old_email, new_email=user.email, lang=user.preferred_language)
+    background_tasks.add_task(email_service.send_email_changed, user.email, old_email=old_email, new_email=user.email, lang=user.preferred_language)
+    background_tasks.add_task(email_service.send_verification_email, user.email, record.token, user.preferred_language)
     return UserResponse.model_validate(user)
+
+
+@router.get(
+    "/me/emails",
+    response_model=UserEmailsResponse,
+    summary="List my emails",
+    description="Returns primary email and any secondary emails (verified/unverified).",
+)
+async def list_my_emails(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserEmailsResponse:
+    secondary = await auth_service.list_secondary_emails(session, current_user.id)
+    return UserEmailsResponse(
+        primary_email=current_user.email,
+        primary_verified=bool(current_user.email_verified),
+        secondary_emails=[SecondaryEmailResponse.model_validate(e) for e in secondary],
+    )
+
+
+@router.post(
+    "/me/emails",
+    response_model=SecondaryEmailResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a secondary email",
+)
+async def add_my_secondary_email(
+    payload: SecondaryEmailCreateRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> SecondaryEmailResponse:
+    secondary, token = await auth_service.add_secondary_email(session, current_user, str(payload.email))
+    background_tasks.add_task(email_service.send_verification_email, secondary.email, token.token, current_user.preferred_language)
+    return SecondaryEmailResponse.model_validate(secondary)
+
+
+@router.post(
+    "/me/emails/{secondary_email_id}/verify/request",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Resend verification for a secondary email",
+)
+async def request_secondary_email_verification(
+    secondary_email_id: UUID,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    token = await auth_service.request_secondary_email_verification(session, current_user, secondary_email_id)
+    secondary = await session.get(UserSecondaryEmail, secondary_email_id)
+    if secondary:
+        background_tasks.add_task(email_service.send_verification_email, secondary.email, token.token, current_user.preferred_language)
+    return {"detail": "Verification email sent"}
+
+
+@router.post(
+    "/me/emails/verify/confirm",
+    response_model=SecondaryEmailResponse,
+    summary="Confirm secondary email verification",
+)
+async def confirm_secondary_email_verification(
+    payload: SecondaryEmailConfirmRequest,
+    session: AsyncSession = Depends(get_session),
+) -> SecondaryEmailResponse:
+    secondary = await auth_service.confirm_secondary_email_verification(session, payload.token)
+    return SecondaryEmailResponse.model_validate(secondary)
+
+
+@router.post(
+    "/me/emails/{secondary_email_id}/make-primary",
+    response_model=UserResponse,
+    summary="Make a verified secondary email the primary email",
+)
+async def make_secondary_email_primary(
+    secondary_email_id: UUID,
+    payload: SecondaryEmailMakePrimaryRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+    user = await auth_service.make_secondary_email_primary(session, current_user, secondary_email_id)
+    return UserResponse.model_validate(user)
+
+
+@router.delete(
+    "/me/emails/{secondary_email_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a secondary email",
+)
+async def delete_secondary_email(
+    secondary_email_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    await auth_service.delete_secondary_email(session, current_user, secondary_email_id)
 
 
 @router.get("/me/export")
@@ -656,17 +867,20 @@ async def request_password_reset(
     _: None = Depends(reset_request_rate_limit),
 ) -> dict[str, str]:
     reset = await auth_service.create_reset_token(session, payload.email)
-    background_tasks.add_task(email_service.send_password_reset, payload.email, reset.token)
+    user = await session.get(User, reset.user_id)
+    background_tasks.add_task(email_service.send_password_reset, payload.email, reset.token, getattr(user, "preferred_language", None))
     return {"status": "sent"}
 
 
 @router.post("/password-reset/confirm", status_code=status.HTTP_200_OK)
 async def confirm_password_reset(
     payload: PasswordResetConfirm,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(reset_confirm_rate_limit),
 ) -> dict[str, str]:
-    await auth_service.confirm_reset_token(session, payload.token, payload.new_password)
+    user = await auth_service.confirm_reset_token(session, payload.token, payload.new_password)
+    background_tasks.add_task(email_service.send_password_changed, user.email, lang=user.preferred_language)
     return {"status": "updated"}
 
 
@@ -720,7 +934,7 @@ async def google_callback(
         if auth_service.is_profile_complete(existing_sub):
             tokens = await auth_service.issue_tokens_for_user(session, existing_sub)
             if response:
-                set_refresh_cookie(response, tokens["refresh_token"])
+                set_refresh_cookie(response, tokens["refresh_token"], persistent=True)
             logger.info("google_login_existing", extra={"user_id": str(existing_sub.id)})
             return GoogleCallbackResponse(user=UserResponse.model_validate(existing_sub), tokens=TokenPair(**tokens))
 
@@ -732,7 +946,7 @@ async def google_callback(
             completion_token=completion_token,
         )
 
-    existing_email = await auth_service.get_user_by_email(session, email)
+    existing_email = await auth_service.get_user_by_any_email(session, email)
     if existing_email and existing_email.google_sub and existing_email.google_sub != sub:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Google account already linked elsewhere")
     if existing_email and not existing_email.google_sub:
@@ -809,6 +1023,7 @@ class GoogleCompleteRequest(BaseModel):
 @router.post("/google/complete", response_model=AuthResponse)
 async def google_complete_registration(
     payload: GoogleCompleteRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_google_completion_user),
     session: AsyncSession = Depends(get_session),
     response: Response = None,
@@ -826,9 +1041,18 @@ async def google_complete_registration(
         password=payload.password,
         preferred_language=payload.preferred_language,
     )
+    background_tasks.add_task(
+        email_service.send_welcome_email,
+        user.email,
+        first_name=user.first_name,
+        lang=user.preferred_language,
+    )
+    if not user.email_verified:
+        record = await auth_service.create_email_verification(session, user)
+        background_tasks.add_task(email_service.send_verification_email, user.email, record.token, user.preferred_language)
     tokens = await auth_service.issue_tokens_for_user(session, user)
     if response:
-        set_refresh_cookie(response, tokens["refresh_token"])
+        set_refresh_cookie(response, tokens["refresh_token"], persistent=True)
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 

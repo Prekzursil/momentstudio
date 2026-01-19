@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -14,7 +15,7 @@ class AdminProductListItem(BaseModel):
     slug: str
     sku: str
     name: str
-    base_price: float
+    base_price: Decimal
     currency: str
     status: ProductStatus
     is_active: bool
@@ -30,3 +31,6 @@ class AdminProductListResponse(BaseModel):
     items: list[AdminProductListItem]
     meta: AdminPaginationMeta
 
+
+class AdminProductByIdsRequest(BaseModel):
+    ids: list[UUID]

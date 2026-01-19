@@ -1,9 +1,10 @@
 import asyncio
 from typing import Dict
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core import security
@@ -14,7 +15,7 @@ from app.main import app
 from app.models.catalog import Category, Product, ProductImage, ProductStatus, ProductAuditLog
 from app.models.content import ContentBlock, ContentStatus, ContentAuditLog
 from app.models.order import Order, OrderStatus
-from app.models.promo import PromoCode
+from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.user import User, UserRole
 
 
@@ -94,7 +95,7 @@ async def seed(session_factory):
 
         order = Order(
             user_id=customer.id,
-            status=OrderStatus.pending,
+            status=OrderStatus.pending_acceptance,
             total_amount=50,
             currency="RON",
             tax_amount=0,
@@ -141,9 +142,9 @@ def test_admin_filters_and_low_stock(test_app: Dict[str, object]) -> None:
     asyncio.run(seed(session_factory))
     headers = auth_headers(client)
 
-    orders = client.get("/api/v1/orders/admin", params={"status": "pending"}, headers=headers)
+    orders = client.get("/api/v1/orders/admin", params={"status": "pending_acceptance"}, headers=headers)
     assert orders.status_code == 200
-    assert orders.json()[0]["status"] == "pending"
+    assert orders.json()[0]["status"] == "pending_acceptance"
 
     low_stock = client.get("/api/v1/admin/dashboard/low-stock", headers=headers)
     assert low_stock.status_code == 200
@@ -170,6 +171,56 @@ def test_coupon_lifecycle_and_audit(test_app: Dict[str, object]) -> None:
     assert audit.status_code == 200
     assert audit.json()["products"]  # seeded audit exists
     assert audit.json()["content"]  # seeded content audit exists
+
+
+def test_coupon_stripe_mapping_invalidation(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    asyncio.run(seed(session_factory))
+    headers = auth_headers(client)
+
+    created = client.post("/api/v1/admin/dashboard/coupons", headers=headers, json={"code": "NEW", "percentage_off": 10, "active": True})
+    assert created.status_code == 201, created.text
+    coupon_id = created.json()["id"]
+    coupon_uuid = UUID(coupon_id)
+
+    async def add_mapping(stripe_coupon_id: str) -> None:
+        async with session_factory() as session:
+            session.add(
+                StripeCouponMapping(
+                    promo_code_id=coupon_uuid,
+                    discount_cents=500,
+                    currency="RON",
+                    stripe_coupon_id=stripe_coupon_id,
+                )
+            )
+            await session.commit()
+
+    async def count_mappings() -> int:
+        async with session_factory() as session:
+            total = await session.scalar(
+                select(func.count())
+                .select_from(StripeCouponMapping)
+                .where(StripeCouponMapping.promo_code_id == coupon_uuid)
+            )
+            return int(total or 0)
+
+    asyncio.run(add_mapping("stripe-coupon-1"))
+    assert asyncio.run(count_mappings()) == 1
+
+    updated = client.patch(f"/api/v1/admin/dashboard/coupons/{coupon_id}", headers=headers, json={"percentage_off": 15})
+    assert updated.status_code == 200, updated.text
+    assert asyncio.run(count_mappings()) == 0
+
+    asyncio.run(add_mapping("stripe-coupon-2"))
+    assert asyncio.run(count_mappings()) == 1
+
+    invalidated = client.post(f"/api/v1/admin/dashboard/coupons/{coupon_id}/stripe/invalidate", headers=headers, json={})
+    assert invalidated.status_code == 200, invalidated.text
+    assert invalidated.json()["deleted_mappings"] == 1
+    assert asyncio.run(count_mappings()) == 0
 
 
 def test_image_reorder(test_app: Dict[str, object]) -> None:

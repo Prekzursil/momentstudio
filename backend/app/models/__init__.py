@@ -25,6 +25,15 @@ from app.models.catalog import (
 )  # noqa: F401
 from app.models.cart import Cart, CartItem  # noqa: F401
 from app.models.promo import PromoCode  # noqa: F401
+from app.models.coupons_v2 import (  # noqa: F401
+    Promotion,
+    Coupon,
+    CouponAssignment,
+    CouponReservation,
+    CouponRedemption,
+    PromotionDiscountType,
+    CouponVisibility,
+)
 from app.models.address import Address  # noqa: F401
 from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod, OrderEvent  # noqa: F401
 from app.models.content import ContentBlock, ContentBlockVersion, ContentStatus, ContentImage, ContentAuditLog, ContentBlockTranslation  # noqa: F401
@@ -33,7 +42,7 @@ from app.models.webhook import StripeWebhookEvent  # noqa: F401
 from app.models.blog import BlogComment, BlogCommentFlag  # noqa: F401
 from app.models.fx import FxRate  # noqa: F401
 from app.models.notification import UserNotification  # noqa: F401
-from app.models.support import ContactSubmission, ContactSubmissionStatus, ContactSubmissionTopic  # noqa: F401
+from app.models.support import ContactSubmission, ContactSubmissionMessage, ContactSubmissionStatus, ContactSubmissionTopic  # noqa: F401
 from app.models.returns import ReturnRequest, ReturnRequestItem, ReturnRequestStatus  # noqa: F401
 
 __all__ = [
@@ -60,6 +69,13 @@ __all__ = [
     "Tag",
     "Cart",
     "CartItem",
+    "Promotion",
+    "Coupon",
+    "CouponAssignment",
+    "CouponReservation",
+    "CouponRedemption",
+    "PromotionDiscountType",
+    "CouponVisibility",
     "Address",
     "Order",
     "OrderItem",
@@ -79,6 +95,7 @@ __all__ = [
     "FxRate",
     "UserNotification",
     "ContactSubmission",
+    "ContactSubmissionMessage",
     "ContactSubmissionStatus",
     "ContactSubmissionTopic",
     "ReturnRequest",

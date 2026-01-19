@@ -3,9 +3,13 @@ import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ApiService } from '../../core/api.service';
+import { CartStore } from '../../core/cart.store';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { ContainerComponent } from '../../layout/container.component';
+
+const CHECKOUT_SUCCESS_KEY = 'checkout_last_order';
+const CHECKOUT_PAYPAL_PENDING_KEY = 'checkout_paypal_pending';
 
 @Component({
   selector: 'app-paypal-return',
@@ -52,8 +56,33 @@ export class PayPalReturnComponent implements OnInit {
     private route: ActivatedRoute,
     private api: ApiService,
     private router: Router,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private cart: CartStore
   ) {}
+
+  private promotePendingSummary(): void {
+    if (typeof localStorage === 'undefined') return;
+    const raw = localStorage.getItem(CHECKOUT_PAYPAL_PENDING_KEY);
+    if (!raw) return;
+    try {
+      localStorage.setItem(CHECKOUT_SUCCESS_KEY, raw);
+      localStorage.removeItem(CHECKOUT_PAYPAL_PENDING_KEY);
+    } catch {
+      // best-effort only
+    }
+  }
+
+  private pendingOrderId(): string | null {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(CHECKOUT_PAYPAL_PENDING_KEY);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as { order_id?: unknown } | null;
+      return typeof parsed?.order_id === 'string' ? parsed.order_id : null;
+    } catch {
+      return null;
+    }
+  }
 
   ngOnInit(): void {
     const token = this.route.snapshot.queryParamMap.get('token') || '';
@@ -63,14 +92,20 @@ export class PayPalReturnComponent implements OnInit {
       return;
     }
 
+    const orderId = this.pendingOrderId();
+    const payload: { paypal_order_id: string; order_id?: string } = { paypal_order_id: token };
+    if (orderId) payload.order_id = orderId;
+
     this.api
       .post<{ order_id: string; reference_code?: string; status: string; paypal_capture_id?: string | null }>(
         '/orders/paypal/capture',
-        { paypal_order_id: token }
+        payload
       )
       .subscribe({
         next: () => {
           this.loading = false;
+          this.promotePendingSummary();
+          this.cart.clear();
           void this.router.navigate(['/checkout/success']);
         },
         error: (err) => {
@@ -80,4 +115,3 @@ export class PayPalReturnComponent implements OnInit {
       });
   }
 }
-

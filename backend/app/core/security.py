@@ -57,3 +57,20 @@ def decode_content_preview_token(token: str) -> str | None:
         return None
     key = payload.get("key")
     return str(key) if isinstance(key, str) and key else None
+
+
+def create_receipt_token(*, order_id: str, expires_at: datetime, token_version: int = 0) -> str:
+    to_encode = {"type": "receipt", "order_id": str(order_id), "ver": int(token_version), "exp": expires_at}
+    return jwt.encode(to_encode, settings.secret_key, algorithm=settings.jwt_algorithm)
+
+
+def decode_receipt_token(token: str) -> tuple[str, int] | None:
+    payload = decode_token(token)
+    if not payload or payload.get("type") != "receipt":
+        return None
+    order_id = payload.get("order_id")
+    if not isinstance(order_id, str) or not order_id:
+        return None
+    ver_raw = payload.get("ver")
+    ver = int(ver_raw) if isinstance(ver_raw, (int, float, str)) and str(ver_raw).strip() else 0
+    return str(order_id), max(0, ver)

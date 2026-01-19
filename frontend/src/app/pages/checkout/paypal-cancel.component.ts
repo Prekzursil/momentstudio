@@ -6,6 +6,8 @@ import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { ContainerComponent } from '../../layout/container.component';
 
+const CHECKOUT_PAYPAL_PENDING_KEY = 'checkout_paypal_pending';
+
 @Component({
   selector: 'app-paypal-cancel',
   standalone: true,
@@ -35,5 +37,13 @@ export class PayPalCancelComponent {
     { label: 'checkout.title', url: '/checkout' },
     { label: 'checkout.paypalCancelled' }
   ];
-}
 
+  constructor() {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      localStorage.removeItem(CHECKOUT_PAYPAL_PENDING_KEY);
+    } catch {
+      // ignore
+    }
+  }
+}

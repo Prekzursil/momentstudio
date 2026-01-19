@@ -14,6 +14,7 @@ if not exist "%VENV%\Scripts\python.exe" (
   python -m venv "%VENV%"
 )
 call "%VENV%\Scripts\activate.bat"
+python -m pip install --upgrade pip
 pip install -r "%BACKEND%\requirements.txt"
 
 if not exist "%FRONTEND%\node_modules" (

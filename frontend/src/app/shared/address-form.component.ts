@@ -1,26 +1,29 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AddressCreateRequest } from '../core/account.service';
 import { ButtonComponent } from './button.component';
+import { listPhoneCountries, PhoneCountryOption } from './phone';
+import { RO_CITIES, RO_COUNTIES } from './ro-geo';
 
 @Component({
   selector: 'app-address-form',
   standalone: true,
-  imports: [CommonModule, FormsModule, ButtonComponent],
+  imports: [CommonModule, FormsModule, ButtonComponent, TranslateModule],
   template: `
     <form #addrForm="ngForm" class="grid gap-3" (ngSubmit)="submit(addrForm)">
       <div class="grid gap-1 text-sm">
-        <label class="font-medium text-slate-700 dark:text-slate-200">Label</label>
+        <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'addressForm.label' | translate }}</label>
         <input
           class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
           name="label"
-          autocomplete="address-level1"
+          autocomplete="off"
           [(ngModel)]="model.label"
         />
       </div>
       <div class="grid gap-1 text-sm">
-        <label class="font-medium text-slate-700 dark:text-slate-200">Address line 1</label>
+        <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'addressForm.line1' | translate }}</label>
         <input
           class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
           name="line1"
@@ -28,12 +31,10 @@ import { ButtonComponent } from './button.component';
           [(ngModel)]="model.line1"
           required
         />
-        <p *ngIf="addrForm.submitted && addrForm.controls.line1?.invalid" class="text-xs text-rose-700 dark:text-rose-300">
-          Address line 1 is required.
-        </p>
+        <p *ngIf="addrForm.submitted && addrForm.controls.line1?.invalid" class="text-xs text-rose-700 dark:text-rose-300">{{ 'validation.required' | translate }}</p>
       </div>
       <div class="grid gap-1 text-sm">
-        <label class="font-medium text-slate-700 dark:text-slate-200">Address line 2</label>
+        <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'addressForm.line2' | translate }}</label>
         <input
           class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
           name="line2"
@@ -43,31 +44,44 @@ import { ButtonComponent } from './button.component';
       </div>
       <div class="grid gap-3 sm:grid-cols-2">
         <div class="grid gap-1 text-sm">
-          <label class="font-medium text-slate-700 dark:text-slate-200">City</label>
+          <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'checkout.city' | translate }}</label>
           <input
             class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
             name="city"
             autocomplete="address-level2"
             [(ngModel)]="model.city"
+            [attr.list]="model.country === 'RO' ? 'roCities' : null"
             required
           />
-          <p *ngIf="addrForm.submitted && addrForm.controls.city?.invalid" class="text-xs text-rose-700 dark:text-rose-300">
-            City is required.
-          </p>
+          <p *ngIf="addrForm.submitted && addrForm.controls.city?.invalid" class="text-xs text-rose-700 dark:text-rose-300">{{ 'validation.required' | translate }}</p>
         </div>
         <div class="grid gap-1 text-sm">
-          <label class="font-medium text-slate-700 dark:text-slate-200">Region/State</label>
-          <input
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-            name="region"
-            autocomplete="address-level1"
-            [(ngModel)]="model.region"
-          />
+          <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'checkout.region' | translate }}</label>
+          <ng-container *ngIf="model.country === 'RO'; else freeRegion">
+            <select
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              name="region"
+              autocomplete="address-level1"
+              [(ngModel)]="model.region"
+              required
+            >
+              <option value="">{{ 'checkout.regionSelect' | translate }}</option>
+              <option *ngFor="let r of roCounties" [value]="r">{{ r }}</option>
+            </select>
+          </ng-container>
+          <ng-template #freeRegion>
+            <input
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              name="region"
+              autocomplete="address-level1"
+              [(ngModel)]="model.region"
+            />
+          </ng-template>
         </div>
       </div>
       <div class="grid gap-3 sm:grid-cols-2">
         <div class="grid gap-1 text-sm">
-          <label class="font-medium text-slate-700 dark:text-slate-200">Postal code</label>
+          <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'checkout.postal' | translate }}</label>
           <input
             class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
             name="postal_code"
@@ -75,36 +89,34 @@ import { ButtonComponent } from './button.component';
             [(ngModel)]="model.postal_code"
             required
           />
-          <p
-            *ngIf="addrForm.submitted && addrForm.controls.postal_code?.invalid"
-            class="text-xs text-rose-700 dark:text-rose-300"
-          >
-            Postal code is required.
-          </p>
+          <p *ngIf="addrForm.submitted && addrForm.controls.postal_code?.invalid" class="text-xs text-rose-700 dark:text-rose-300">{{ 'validation.required' | translate }}</p>
         </div>
         <div class="grid gap-1 text-sm">
-          <label class="font-medium text-slate-700 dark:text-slate-200">Country (ISO code)</label>
-          <input
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm uppercase dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+          <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'checkout.country' | translate }}</label>
+          <select
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             name="country"
             autocomplete="country"
-            maxlength="2"
-            [(ngModel)]="model.country"
             required
-          />
-          <p *ngIf="addrForm.submitted && addrForm.controls.country?.invalid" class="text-xs text-rose-700 dark:text-rose-300">
-            Country code is required (2 letters).
-          </p>
+            [(ngModel)]="model.country"
+          >
+            <option value="">{{ 'checkout.countrySelect' | translate }}</option>
+            <option *ngFor="let c of countries" [value]="c.code">{{ c.flag }} {{ c.name }}</option>
+          </select>
+          <p *ngIf="addrForm.submitted && addrForm.controls.country?.invalid" class="text-xs text-rose-700 dark:text-rose-300">{{ 'validation.required' | translate }}</p>
         </div>
       </div>
+      <datalist id="roCities">
+        <option *ngFor="let c of roCities" [value]="c"></option>
+      </datalist>
       <div class="grid gap-2 pt-2">
         <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
           <input type="checkbox" name="is_default_shipping" [(ngModel)]="model.is_default_shipping" />
-          <span>Set as default shipping</span>
+          <span>{{ 'addressForm.defaultShipping' | translate }}</span>
         </label>
         <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
           <input type="checkbox" name="is_default_billing" [(ngModel)]="model.is_default_billing" />
-          <span>Set as default billing</span>
+          <span>{{ 'addressForm.defaultBilling' | translate }}</span>
         </label>
         <button
           *ngIf="model.is_default_shipping && !model.is_default_billing"
@@ -112,12 +124,12 @@ import { ButtonComponent } from './button.component';
           class="text-left text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
           (click)="model.is_default_billing = true"
         >
-          Use as billing too
+          {{ 'addressForm.useAsBillingToo' | translate }}
         </button>
       </div>
       <div class="flex justify-end gap-2 pt-2">
-        <app-button type="button" variant="ghost" label="Cancel" (action)="cancel.emit()"></app-button>
-        <app-button type="submit" label="Save"></app-button>
+        <app-button type="button" variant="ghost" [label]="'addressForm.cancel' | translate" (action)="cancel.emit()"></app-button>
+        <app-button type="submit" [label]="'addressForm.save' | translate"></app-button>
       </div>
     </form>
   `
@@ -127,10 +139,17 @@ export class AddressFormComponent {
     line1: '',
     city: '',
     postal_code: '',
-    country: 'US'
+    country: 'RO'
   };
+  readonly roCounties = RO_COUNTIES;
+  readonly roCities = RO_CITIES;
+  readonly countries: PhoneCountryOption[];
   @Output() save = new EventEmitter<AddressCreateRequest>();
   @Output() cancel = new EventEmitter<void>();
+
+  constructor(translate: TranslateService) {
+    this.countries = listPhoneCountries(translate.currentLang || 'en');
+  }
 
   submit(form: NgForm): void {
     if (form.valid) {

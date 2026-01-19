@@ -36,6 +36,9 @@ import { appConfig } from '../../core/app-config';
             type="text"
             class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
             required
+            autocomplete="username"
+            autocapitalize="none"
+            spellcheck="false"
             [(ngModel)]="identifier"
           />
         </label>
@@ -49,6 +52,15 @@ import { appConfig } from '../../core/app-config';
             autocomplete="current-password"
             [(ngModel)]="password"
           />
+        </label>
+        <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+          <input
+            type="checkbox"
+            name="keepSignedIn"
+            class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/40 dark:border-slate-600 dark:bg-slate-800"
+            [(ngModel)]="keepSignedIn"
+          />
+          {{ 'auth.keepSignedIn' | translate }}
         </label>
         <app-captcha-turnstile
           *ngIf="captchaEnabled"
@@ -75,6 +87,7 @@ export class LoginComponent {
   ];
   identifier = '';
   password = '';
+  keepSignedIn = false;
   captchaToken: string | null = null;
   loading = false;
   captchaSiteKey = appConfig.captchaSiteKey || '';
@@ -105,7 +118,9 @@ export class LoginComponent {
       return;
     }
     this.loading = true;
-    this.auth.login(this.identifier, this.password, this.captchaToken ?? undefined).subscribe({
+    this.auth
+      .login(this.identifier, this.password, this.captchaToken ?? undefined, { remember: this.keepSignedIn })
+      .subscribe({
       next: (res) => {
         this.toast.success(this.translate.instant('auth.successLogin'), res.user.email);
         void this.router.navigateByUrl('/account');

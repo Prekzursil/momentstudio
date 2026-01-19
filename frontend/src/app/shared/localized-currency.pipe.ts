@@ -12,6 +12,11 @@ export class LocalizedCurrencyPipe implements PipeTransform {
   private readonly fxRates = inject(FxRatesService);
   private readonly formatters = new Map<string, Intl.NumberFormat>();
 
+  private formatRon(value: number): string {
+    if (!Number.isFinite(value)) return `0.00 RON`;
+    return `${value.toFixed(2)} RON`;
+  }
+
   private getFormatter(
     locale: string,
     currency: string,
@@ -32,13 +37,14 @@ export class LocalizedCurrencyPipe implements PipeTransform {
   }
 
   transform(value: number, currency: string, locale?: string): string {
+    const normalizedCurrency = (currency ?? '').toUpperCase();
     const fromLang = this.translate?.currentLang === 'ro' ? 'ro-RO' : this.translate?.currentLang === 'en' ? 'en-US' : undefined;
     const loc = locale || fromLang || (typeof navigator !== 'undefined' ? navigator.language : 'en-US');
-    const base = this.getFormatter(loc, currency).format(value);
+    const base = normalizedCurrency === 'RON' ? this.formatRon(value) : this.getFormatter(loc, currency).format(value);
 
     const shouldApproximate =
       (this.translate?.currentLang ?? '').toLowerCase() === 'en' &&
-      (currency ?? '').toUpperCase() === 'RON';
+      normalizedCurrency === 'RON';
 
     if (!shouldApproximate) {
       return base;

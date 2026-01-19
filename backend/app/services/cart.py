@@ -4,12 +4,13 @@ from uuid import UUID
 import logging
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.models.cart import Cart, CartItem
-from app.models.catalog import Product, ProductVariant
+from app.models.catalog import Product, ProductVariant, ProductStatus
 from app.schemas.cart import CartItemCreate, CartItemUpdate, CartRead, CartItemRead, Totals
 from app.schemas.promo import PromoCodeRead, PromoCodeCreate
 from app.schemas.cart_sync import CartSyncItem
@@ -18,6 +19,9 @@ from app.models.order import Order
 from app.models.user import User
 from app.models.order import ShippingMethod
 from app.services import email as email_service
+from app.services.checkout_settings import CheckoutSettings
+from app.services.catalog import is_sale_active
+from app.services import pricing
 from app.core.config import settings
 from app.core.logging_config import request_id_ctx_var
 
@@ -38,6 +42,18 @@ def _log_cart(event: str, cart: Cart, user_id: UUID | None = None) -> None:
 
 
 async def _get_or_create_cart(session: AsyncSession, user_id: UUID | None, session_id: str | None) -> Cart:
+    async def _load_by_session_id(sid: str) -> Cart | None:
+        result = await session.execute(
+            select(Cart)
+            .options(
+                selectinload(Cart.items)
+                .selectinload(CartItem.product)
+                .selectinload(Product.images)
+            )
+            .where(Cart.session_id == sid)
+        )
+        return result.scalar_one_or_none()
+
     if user_id:
         result = await session.execute(
             select(Cart)
@@ -52,21 +68,23 @@ async def _get_or_create_cart(session: AsyncSession, user_id: UUID | None, sessi
         if cart:
             return cart
     if session_id:
-        result = await session.execute(
-            select(Cart)
-            .options(
-                selectinload(Cart.items)
-                .selectinload(CartItem.product)
-                .selectinload(Product.images)
-            )
-            .where(Cart.session_id == session_id)
-        )
-        cart = result.scalar_one_or_none()
+        cart = await _load_by_session_id(session_id)
         if cart:
             return cart
     cart = Cart(user_id=user_id, session_id=session_id)
     session.add(cart)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        # Under concurrent requests, two carts may race on the same `session_id`.
+        # Recover by loading the existing cart instead of surfacing a 500.
+        if session_id:
+            cart = await _load_by_session_id(session_id)
+            if cart:
+                _log_cart("cart_race_recovered", cart, user_id=user_id)
+                return cart
+        raise
     await session.refresh(cart)
     return cart
 
@@ -97,7 +115,14 @@ def _get_first_image(product: Product | None) -> str | None:
     return first[0].url if first else None
 
 
-def _calculate_shipping_amount(subtotal: Decimal, shipping_method: ShippingMethod | None) -> Decimal:
+def _calculate_shipping_amount(
+    subtotal: Decimal,
+    shipping_method: ShippingMethod | None,
+    *,
+    shipping_fee_ron: Decimal | None = None,
+) -> Decimal:
+    if shipping_fee_ron is not None:
+        return shipping_fee_ron
     if not shipping_method:
         return Decimal("0")
     base = Decimal(shipping_method.rate_flat or 0)
@@ -133,31 +158,72 @@ def _calculate_totals(
     cart: Cart,
     shipping_method: ShippingMethod | None = None,
     promo: PromoCodeRead | None = None,
+    *,
+    checkout_settings: CheckoutSettings | None = None,
+    shipping_fee_ron: Decimal | None = None,
+    free_shipping_threshold_ron: Decimal | None = None,
     currency: str | None = "RON",
 ) -> Totals:
+    checkout = checkout_settings or CheckoutSettings()
     subtotal = sum(_to_decimal(item.unit_price_at_add) * item.quantity for item in cart.items)
     subtotal = _to_decimal(subtotal)
     discount_val = _compute_discount(subtotal, promo)
-    taxable = subtotal - discount_val
-    if taxable < 0:
-        taxable = Decimal("0")
-    tax = _to_decimal(taxable * Decimal("0.1"))
-    shipping = _to_decimal(_calculate_shipping_amount(subtotal, shipping_method))
-    total = _to_decimal(taxable + tax + shipping)
-    if total < 0:
-        total = Decimal("0.00")
-    return Totals(subtotal=subtotal, tax=tax, shipping=shipping, total=total, currency=currency)
+
+    shipping_fee = shipping_fee_ron if shipping_fee_ron is not None else checkout.shipping_fee_ron
+    threshold = (
+        free_shipping_threshold_ron if free_shipping_threshold_ron is not None else checkout.free_shipping_threshold_ron
+    )
+    shipping_amount = _calculate_shipping_amount(subtotal, shipping_method, shipping_fee_ron=shipping_fee)
+    shipping = _to_decimal(shipping_amount)
+    if threshold is not None and threshold >= 0 and (subtotal - discount_val) >= threshold:
+        shipping = Decimal("0.00")
+
+    breakdown = pricing.compute_totals(
+        subtotal=subtotal,
+        discount=discount_val,
+        shipping=shipping,
+        fee_enabled=checkout.fee_enabled,
+        fee_type=checkout.fee_type,
+        fee_value=checkout.fee_value,
+        vat_enabled=checkout.vat_enabled,
+        vat_rate_percent=checkout.vat_rate_percent,
+        vat_apply_to_shipping=checkout.vat_apply_to_shipping,
+        vat_apply_to_fee=checkout.vat_apply_to_fee,
+    )
+
+    return Totals(
+        subtotal=breakdown.subtotal,
+        fee=breakdown.fee,
+        tax=breakdown.vat,
+        shipping=breakdown.shipping,
+        total=breakdown.total,
+        currency=currency,
+    )
 
 
 def calculate_totals(
-    cart: Cart, shipping_method: ShippingMethod | None = None, promo: PromoCodeRead | None = None
+    cart: Cart,
+    shipping_method: ShippingMethod | None = None,
+    promo: PromoCodeRead | None = None,
+    *,
+    checkout_settings: CheckoutSettings | None = None,
+    shipping_fee_ron: Decimal | None = None,
+    free_shipping_threshold_ron: Decimal | None = None,
 ) -> tuple[Totals, Decimal]:
     subtotal = sum(_to_decimal(item.unit_price_at_add) * item.quantity for item in cart.items)
     discount_val = _compute_discount(_to_decimal(subtotal), promo)
-    currency = next(
-        (getattr(item.product, "currency", None) for item in cart.items if getattr(item, "product", None)), "RON"
-    ) or "RON"
-    totals = _calculate_totals(cart, shipping_method=shipping_method, promo=promo, currency=currency)
+    # The app enforces a single-currency policy (RON). Avoid accessing lazy-loaded
+    # product relationships here, since this function is used in sync contexts.
+    currency = "RON"
+    totals = _calculate_totals(
+        cart,
+        shipping_method=shipping_method,
+        promo=promo,
+        checkout_settings=checkout_settings,
+        shipping_fee_ron=shipping_fee_ron,
+        free_shipping_threshold_ron=free_shipping_threshold_ron,
+        currency=currency,
+    )
     return totals, discount_val
 
 
@@ -166,6 +232,11 @@ async def serialize_cart(
     cart: Cart,
     shipping_method: ShippingMethod | None = None,
     promo: PromoCodeRead | None = None,
+    *,
+    checkout_settings: CheckoutSettings | None = None,
+    shipping_fee_ron: Decimal | None = None,
+    free_shipping_threshold_ron: Decimal | None = None,
+    totals_override: Totals | None = None,
 ) -> CartRead:
     result = await session.execute(
         select(Cart)
@@ -180,7 +251,17 @@ async def serialize_cart(
     currency = next(
         (getattr(item.product, "currency", None) for item in hydrated.items if getattr(item, "product", None)), "RON"
     ) or "RON"
-    totals = _calculate_totals(hydrated, shipping_method=shipping_method, promo=promo, currency=currency)
+    totals = totals_override or _calculate_totals(
+        hydrated,
+        shipping_method=shipping_method,
+        promo=promo,
+        checkout_settings=checkout_settings,
+        shipping_fee_ron=shipping_fee_ron,
+        free_shipping_threshold_ron=free_shipping_threshold_ron,
+        currency=currency,
+    )
+    if totals_override and getattr(totals_override, "currency", None) is None:
+        totals = Totals(**totals_override.model_dump(), currency=currency)
     return CartRead(
         id=hydrated.id,
         user_id=hydrated.user_id,
@@ -211,7 +292,12 @@ async def add_item(
     payload: CartItemCreate,
 ) -> CartItem:
     product = await session.get(Product, payload.product_id)
-    if not product or product.is_deleted or not product.is_active:
+    if (
+        not product
+        or product.is_deleted
+        or not product.is_active
+        or getattr(product, "status", None) != ProductStatus.published
+    ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
     variant = None
@@ -224,7 +310,9 @@ async def add_item(
     limit = payload.max_quantity or (variant.stock_quantity if variant else product.stock_quantity)
     _enforce_max_quantity(payload.quantity, limit)
 
-    unit_price = _to_decimal(product.base_price)
+    sale_price = product.sale_price if is_sale_active(product) else None
+    base_price = sale_price if sale_price is not None else product.base_price
+    unit_price = _to_decimal(base_price)
     if variant:
         unit_price += _to_decimal(variant.additional_price_delta)
 

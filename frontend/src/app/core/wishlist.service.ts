@@ -1,4 +1,4 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { EffectRef, Injectable, computed, effect, signal } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { ApiService } from './api.service';
@@ -13,11 +13,23 @@ export class WishlistService {
 
   private loaded = false;
   private loading = false;
+  private authEffect?: EffectRef;
+  private activeUserId: string | null = null;
 
   constructor(
     private api: ApiService,
     private auth: AuthService
-  ) {}
+  ) {
+    this.authEffect = effect(() => {
+      const userId = this.auth.user()?.id ?? null;
+      if (userId === this.activeUserId) return;
+      this.activeUserId = userId;
+      this.clear();
+      if (userId) {
+        this.ensureLoaded();
+      }
+    });
+  }
 
   isLoaded(): boolean {
     return this.loaded;
@@ -35,7 +47,7 @@ export class WishlistService {
       },
       error: () => {
         this.itemsSignal.set([]);
-        this.loaded = true;
+        this.loaded = false;
         this.loading = false;
       }
     });

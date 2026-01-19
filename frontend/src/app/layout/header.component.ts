@@ -25,7 +25,7 @@ import { NotificationsService, UserNotification } from '../core/notifications.se
     ThemeSegmentedControlComponent
   ],
   template: `
-    <header class="border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
+    <header class="sticky top-0 z-[100] isolate border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
       <div class="max-w-7xl mx-auto px-4 sm:px-6">
         <div class="py-4 grid grid-cols-[auto,1fr,auto] items-center gap-4">
           <a routerLink="/" class="flex items-center gap-3 min-w-0">
@@ -106,28 +106,61 @@ import { NotificationsService, UserNotification } from '../core/notifications.se
                 <span class="truncate max-w-[160px]">{{ currentUser()?.username }}</span>
                 <span class="text-slate-500 dark:text-slate-300">▾</span>
               </button>
-              <div
-                *ngIf="userMenuOpen"
-                class="absolute right-0 mt-2 w-48 rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900 z-50"
-                role="menu"
-              >
-                <a
-                  routerLink="/account"
-                  role="menuitem"
-                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
-                  (click)="closeUserMenu()"
-                >
-                  {{ 'nav.myProfile' | translate }}
-                </a>
-                <button
-                  type="button"
-                  role="menuitem"
-                  class="w-full text-left rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
-                  (click)="signOut()"
-                >
-                  {{ 'nav.signOut' | translate }}
-                </button>
-              </div>
+	              <div
+	                *ngIf="userMenuOpen"
+	                class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900 z-[110]"
+	                role="menu"
+	              >
+	                <a
+	                  routerLink="/account/profile"
+	                  role="menuitem"
+	                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+	                  (click)="closeUserMenu()"
+	                >
+	                  {{ 'nav.myProfile' | translate }}
+	                </a>
+	                <a
+	                  routerLink="/account/orders"
+	                  role="menuitem"
+	                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+	                  (click)="closeUserMenu()"
+	                >
+	                  {{ 'nav.myOrders' | translate }}
+	                </a>
+		                <a
+		                  routerLink="/account/wishlist"
+		                  role="menuitem"
+		                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+		                  (click)="closeUserMenu()"
+		                >
+		                  {{ 'nav.myWishlist' | translate }}
+		                </a>
+		                <a
+		                  routerLink="/account/coupons"
+		                  role="menuitem"
+		                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+		                  (click)="closeUserMenu()"
+		                >
+		                  {{ 'nav.myCoupons' | translate }}
+		                </a>
+		                <a
+		                  routerLink="/tickets"
+		                  role="menuitem"
+		                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+		                  (click)="closeUserMenu()"
+	                >
+	                  {{ 'nav.helpCenter' | translate }}
+	                </a>
+	                <div class="my-1 border-t border-slate-200 dark:border-slate-800"></div>
+	                <button
+	                  type="button"
+	                  role="menuitem"
+	                  class="w-full text-left rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+	                  (click)="signOut()"
+	                >
+	                  {{ 'nav.signOut' | translate }}
+	                </button>
+	              </div>
             </div>
             <div *ngIf="isAuthenticated()" class="relative">
               <button
@@ -306,7 +339,7 @@ export class HeaderComponent implements OnDestroy {
   private unreadPoll?: number;
   private authEffect?: EffectRef;
 
-  readonly isAuthenticated = computed(() => Boolean(this.auth.user()));
+  readonly isAuthenticated = computed(() => this.auth.isAuthenticated());
   readonly currentUser = computed(() => this.auth.user());
   readonly isAdmin = computed(() => this.auth.isAdmin());
   readonly notifications = computed(() => this.notificationsService.items());
@@ -328,7 +361,7 @@ export class HeaderComponent implements OnDestroy {
       links.push({ label: 'nav.signIn', path: '/login' });
       links.push({ label: 'nav.register', path: '/register' });
     }
-    if (this.auth.isAdmin()) {
+    if (authenticated && this.auth.isAdmin()) {
       links.push({ label: 'nav.admin', path: '/admin' });
     }
     return links;

@@ -92,7 +92,8 @@ describe('AccountComponent', () => {
       'logout',
       'role',
       'isAdmin',
-      'getAliases'
+      'getAliases',
+      'listEmails'
     ]);
     auth.isAuthenticated.and.returnValue(true);
     auth.role.and.returnValue('customer');
@@ -100,6 +101,7 @@ describe('AccountComponent', () => {
     auth.updateNotificationPreferences.and.returnValue(of({ ...profile, notify_marketing: true } as any));
     auth.logout.and.returnValue(of(void 0));
     auth.getAliases.and.returnValue(of({ usernames: [], display_names: [] } as any));
+    auth.listEmails.and.returnValue(of({ primary_email: profile.email, primary_verified: true, secondary_emails: [] } as any));
 
     account = jasmine.createSpyObj<AccountService>('AccountService', [
       'getProfile',
@@ -174,19 +176,19 @@ describe('AccountComponent', () => {
     });
   });
 
-  it('renders overview summaries from last order and default shipping address', () => {
+  it('computes overview summaries from last order and default shipping address', () => {
     const fixture = TestBed.createComponent(AccountComponent);
+    const cmp = fixture.componentInstance;
     fixture.detectChanges();
     fixture.detectChanges();
 
     expect(account.getProfile).toHaveBeenCalled();
     expect(wishlist.refresh).toHaveBeenCalled();
 
-    const text = (fixture.nativeElement.textContent ?? '') as string;
-    expect(text).toContain('#REF123');
-    expect(text).toContain('· shipped');
-    expect(text).toContain('Home');
-    expect(text).toContain('2 saved items');
+    expect(cmp.lastOrderLabel()).toContain('#REF123');
+    expect(cmp.lastOrderLabel()).toContain('shipped');
+    expect(cmp.defaultAddressLabel()).toContain('Home');
+    expect(cmp.wishlistCountLabel()).toContain('2 saved items');
   });
 
   it('saves notification preferences via AuthService', () => {

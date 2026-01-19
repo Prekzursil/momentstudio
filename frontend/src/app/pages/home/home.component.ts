@@ -3,7 +3,6 @@ import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { ButtonComponent } from '../../shared/button.component';
 import { CardComponent } from '../../shared/card.component';
-import { ContainerComponent } from '../../layout/container.component';
 import { CatalogService, Product, FeaturedCollection } from '../../core/catalog.service';
 import { RecentlyViewedService } from '../../core/recently-viewed.service';
 import { ProductCardComponent } from '../../shared/product-card.component';
@@ -17,6 +16,7 @@ import { MarkdownService } from '../../core/markdown.service';
 type HomeSectionId =
   | 'hero'
   | 'featured_products'
+  | 'sale_products'
   | 'new_arrivals'
   | 'featured_collections'
   | 'story'
@@ -75,6 +75,7 @@ interface ContentBlockRead {
 const DEFAULT_BLOCKS: HomeBlock[] = [
   { key: 'hero', type: 'hero', enabled: true },
   { key: 'featured_products', type: 'featured_products', enabled: true },
+  { key: 'sale_products', type: 'sale_products', enabled: false },
   { key: 'new_arrivals', type: 'new_arrivals', enabled: true },
   { key: 'featured_collections', type: 'featured_collections', enabled: true },
   { key: 'story', type: 'story', enabled: true },
@@ -85,7 +86,7 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, ButtonComponent, CardComponent, ContainerComponent, ProductCardComponent, SkeletonComponent, TranslateModule],
+  imports: [CommonModule, ButtonComponent, CardComponent, ProductCardComponent, SkeletonComponent, TranslateModule],
   template: `
     <section class="grid gap-10">
       <ng-container *ngFor="let block of enabledBlocks()">
@@ -155,6 +156,46 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
 
               <div *ngIf="!featuredLoading() && !featuredError() && !featured.length" class="text-sm text-slate-600 dark:text-slate-300">
                 {{ 'home.noFeatured' | translate }}
+              </div>
+            </div>
+          </ng-container>
+
+          <ng-container *ngSwitchCase="'sale_products'">
+            <div class="grid gap-4">
+              <div class="flex items-center justify-between">
+                <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ 'home.saleProducts' | translate }}</h2>
+	                <app-button
+	                  [label]="'home.viewAll' | translate"
+	                  variant="ghost"
+	                  [routerLink]="['/shop']"
+	                  [queryParams]="{ on_sale: 1 }"
+	                ></app-button>
+              </div>
+
+              <div *ngIf="saleLoading()" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <app-skeleton *ngFor="let i of skeletons" height="260px"></app-skeleton>
+              </div>
+
+              <div
+                *ngIf="saleError()"
+                class="border border-amber-200 bg-amber-50 rounded-2xl p-4 flex items-center justify-between dark:border-amber-900/40 dark:bg-amber-950/30"
+              >
+                <div>
+                  <p class="font-semibold text-amber-900 dark:text-amber-100">{{ 'home.saleError.title' | translate }}</p>
+                  <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'home.saleError.copy' | translate }}</p>
+                </div>
+                <app-button [label]="'shop.retry' | translate" size="sm" (action)="loadSaleProducts()"></app-button>
+              </div>
+
+              <div
+                *ngIf="!saleLoading() && !saleError() && saleProducts.length"
+                class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"
+              >
+                <app-product-card *ngFor="let product of saleProducts" [product]="product"></app-product-card>
+              </div>
+
+              <div *ngIf="!saleLoading() && !saleError() && !saleProducts.length" class="text-sm text-slate-600 dark:text-slate-300">
+                {{ 'home.saleEmpty' | translate }}
               </div>
             </div>
           </ng-container>
@@ -330,6 +371,10 @@ export class HomeComponent implements OnInit, OnDestroy {
   featured: Product[] = [];
   featuredLoading = signal<boolean>(true);
   featuredError = signal<boolean>(false);
+
+  saleProducts: Product[] = [];
+  saleLoading = signal<boolean>(true);
+  saleError = signal<boolean>(false);
 
   newArrivals: Product[] = [];
   newArrivalsLoading = signal<boolean>(true);
@@ -515,8 +560,9 @@ export class HomeComponent implements OnInit, OnDestroy {
   private ensureAllDefaultBlocks(blocks: HomeBlock[]): HomeBlock[] {
     const out = [...blocks];
     const existing = new Set(out.filter((b) => this.isHomeSectionId(b.type)).map((b) => b.type as HomeSectionId));
-    for (const id of DEFAULT_BLOCKS.filter((b) => this.isHomeSectionId(b.type)).map((b) => b.type as HomeSectionId)) {
-      if (!existing.has(id)) out.push({ key: id, type: id, enabled: true });
+    for (const block of DEFAULT_BLOCKS.filter((b) => this.isHomeSectionId(b.type))) {
+      const id = block.type as HomeSectionId;
+      if (!existing.has(id)) out.push({ key: id, type: id, enabled: block.enabled });
     }
     return out;
   }
@@ -525,6 +571,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     return (
       value === 'hero' ||
       value === 'featured_products' ||
+      value === 'sale_products' ||
       value === 'new_arrivals' ||
       value === 'featured_collections' ||
       value === 'story' ||
@@ -546,6 +593,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (key === 'collections') return 'featured_collections';
     if (key === 'featured') return 'featured_products';
     if (key === 'bestsellers') return 'featured_products';
+    if (key === 'sale' || key === 'sales') return 'sale_products';
     if (key === 'new') return 'new_arrivals';
     if (key === 'recent') return 'recently_viewed';
     if (key === 'recentlyviewed') return 'recently_viewed';
@@ -560,6 +608,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     );
     if (ids.has('hero')) this.loadHero();
     if (ids.has('featured_products')) this.loadFeatured();
+    if (ids.has('sale_products')) this.loadSaleProducts();
     if (ids.has('new_arrivals')) this.loadNewArrivals();
     if (ids.has('featured_collections')) this.loadCollections();
     if (ids.has('story')) this.loadStory();
@@ -596,6 +645,29 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.featured = [];
           this.featuredLoading.set(false);
           this.featuredError.set(true);
+        }
+      });
+  }
+
+	  loadSaleProducts(): void {
+	    this.saleLoading.set(true);
+	    this.saleError.set(false);
+	    this.catalog
+	      .listProducts({
+	        on_sale: true,
+	        limit: 6,
+	        sort: 'newest',
+	        page: 1
+	      })
+      .subscribe({
+        next: (resp) => {
+          this.saleProducts = resp.items;
+          this.saleLoading.set(false);
+        },
+        error: () => {
+          this.saleProducts = [];
+          this.saleLoading.set(false);
+          this.saleError.set(true);
         }
       });
   }

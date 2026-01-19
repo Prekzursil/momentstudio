@@ -19,14 +19,14 @@ describe('PasswordStrengthComponent', () => {
   });
 
   it('renders strength meter only when password has content', () => {
-    const fixture = TestBed.createComponent(PasswordStrengthComponent);
-    const cmp = fixture.componentInstance;
-    cmp.password = '';
-    fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('input[type="range"]')).toBeFalsy();
+    const emptyFixture = TestBed.createComponent(PasswordStrengthComponent);
+    emptyFixture.componentInstance.password = '';
+    emptyFixture.detectChanges();
+    expect(emptyFixture.nativeElement.querySelector('input[type="range"]')).toBeFalsy();
 
-    cmp.password = 'Password1';
-    fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('input[type="range"]')).toBeTruthy();
+    const filledFixture = TestBed.createComponent(PasswordStrengthComponent);
+    filledFixture.componentInstance.password = 'Password1';
+    filledFixture.detectChanges();
+    expect(filledFixture.nativeElement.querySelector('input[type="range"]')).toBeTruthy();
   });
 });

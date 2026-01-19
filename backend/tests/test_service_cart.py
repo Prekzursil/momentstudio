@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.db.base import Base
 from app.models.cart import Cart
-from app.models.catalog import Category, Product
+from app.models.catalog import Category, Product, ProductStatus
 from app.services import cart as cart_service
 from app.schemas.cart import CartItemCreate
 
@@ -27,6 +27,7 @@ def test_cart_service_add_and_totals():
                 base_price=Decimal("10.00"),
                 currency="RON",
                 stock_quantity=5,
+                status=ProductStatus.published,
             )
             cart = Cart(user_id=None)
             session.add_all([product, cart])

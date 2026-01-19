@@ -3,6 +3,7 @@ import asyncio
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app.core.security import decode_token
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
@@ -44,9 +45,16 @@ def test_refresh_token_rotation() -> None:
     new_refresh = first.json()["refresh_token"]
     assert new_refresh != refresh_token
 
-    # old token should now be rejected
+    new_payload = decode_token(new_refresh) or {}
+    new_jti = new_payload.get("jti")
+    assert new_jti
+
+    # old token can be reused briefly (multi-tab refresh) and should resolve to the same replacement session
     second = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
-    assert second.status_code == 401
+    assert second.status_code == 200, second.text
+    second_payload = decode_token(second.json()["refresh_token"]) or {}
+    second_jti = second_payload.get("jti")
+    assert second_jti == new_jti
 
     client.close()
     app.dependency_overrides.clear()

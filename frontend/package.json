@@ -3,25 +3,26 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "postinstall": "node scripts/patch-node-deprecations.mjs",
     "prestart": "node scripts/generate-config.mjs",
     "start": "ng serve --proxy-config proxy.conf.json",
     "prebuild": "node scripts/generate-config.mjs",
     "build": "ng build",
     "pretest": "node scripts/generate-config.mjs",
     "test": "ng test",
-    "lint": "eslint . --ext .ts",
+    "lint": "eslint .",
     "e2e": "playwright test"
   },
   "private": true,
   "dependencies": {
-    "@angular/animations": "^18.0.0",
-    "@angular/common": "^18.0.0",
-    "@angular/compiler": "^18.0.0",
-    "@angular/core": "^18.0.0",
-    "@angular/forms": "^18.0.0",
-    "@angular/platform-browser": "^18.0.0",
-    "@angular/platform-browser-dynamic": "^18.0.0",
-    "@angular/router": "^18.0.0",
+    "@angular/animations": "^21.1.0",
+    "@angular/common": "^21.1.0",
+    "@angular/compiler": "^21.1.0",
+    "@angular/core": "^21.1.0",
+    "@angular/forms": "^21.1.0",
+    "@angular/platform-browser": "^21.1.0",
+    "@angular/platform-browser-dynamic": "^21.1.0",
+    "@angular/router": "^21.1.0",
     "@ngx-translate/core": "^16.0.0",
     "@ngx-translate/http-loader": "^16.0.0",
     "@sentry/browser": "^10.32.1",
@@ -33,23 +34,23 @@
     "libphonenumber-js": "^1.12.33",
     "marked": "^17.0.1",
     "rxjs": "^7.8.1",
-    "zone.js": "^0.14.4"
+    "zone.js": "~0.15.1"
   },
   "devDependencies": {
-    "@angular-devkit/build-angular": "^18.0.0",
-    "@angular/cli": "^18.0.0",
-    "@angular/compiler-cli": "^18.0.0",
+    "@angular-devkit/build-angular": "^21.1.0",
+    "@angular/cli": "^21.1.0",
+    "@angular/compiler-cli": "^21.1.0",
+    "@eslint/js": "^9.39.2",
     "@playwright/test": "^1.55.0",
     "@types/jasmine": "~5.1.0",
     "@types/leaflet": "^1.9.21",
-    "@types/node": "^20.11.30",
+    "@types/node": "^24.10.9",
     "@types/uuid": "^9.0.7",
-    "@typescript-eslint/eslint-plugin": "^7.17.0",
-    "@typescript-eslint/parser": "^7.17.0",
+    "typescript-eslint": "^8.53.0",
     "autoprefixer": "^10.4.19",
     "chokidar": "^3.6.0",
-    "eslint": "^8.57.0",
-    "eslint-config-prettier": "^9.1.0",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
     "glob-parent": "^5.1.2",
     "jasmine-core": "~5.1.0",
     "karma": "~6.4.0",
@@ -61,6 +62,12 @@
     "prettier": "^3.3.3",
     "readdirp": "^3.6.0",
     "tailwindcss": "^3.4.4",
-    "typescript": "^5.4.5"
+    "typescript": "~5.9.3"
+  },
+  "overrides": {
+    "@toast-ui/editor": {
+      "dompurify": "3.3.1"
+    },
+    "undici": "7.18.2"
   }
 }

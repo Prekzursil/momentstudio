@@ -37,9 +37,17 @@ export interface AdminContactSubmissionRead {
   message: string;
   order_reference?: string | null;
   admin_note?: string | null;
+  messages?: AdminContactSubmissionMessage[];
   created_at: string;
   updated_at: string;
   resolved_at?: string | null;
+}
+
+export interface AdminContactSubmissionMessage {
+  id: string;
+  from_admin: boolean;
+  message: string;
+  created_at: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -66,5 +74,8 @@ export class AdminSupportService {
   ): Observable<AdminContactSubmissionRead> {
     return this.api.patch<AdminContactSubmissionRead>(`/support/admin/submissions/${id}`, payload);
   }
-}
 
+  addMessage(id: string, message: string): Observable<AdminContactSubmissionRead> {
+    return this.api.post<AdminContactSubmissionRead>(`/support/admin/submissions/${id}/messages`, { message });
+  }
+}

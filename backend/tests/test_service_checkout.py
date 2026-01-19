@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.db.base import Base
 from app.models.cart import Cart, CartItem
-from app.models.catalog import Category, Product
+from app.models.catalog import Category, Product, ProductStatus
 from app.services import order as order_service
 from app.schemas.order import ShippingMethodCreate
 
@@ -27,6 +27,7 @@ def test_checkout_build_order():
                 base_price=Decimal("12.00"),
                 currency="RON",
                 stock_quantity=10,
+                status=ProductStatus.published,
             )
             cart = Cart(user_id=None)
             cart.items = [CartItem(product=product, quantity=1, unit_price_at_add=Decimal("12.00"))]

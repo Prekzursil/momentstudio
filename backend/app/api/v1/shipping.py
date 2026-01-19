@@ -16,6 +16,7 @@ async def list_lockers(
 ) -> list[LockerRead]:
     try:
         return await lockers_service.list_lockers(provider=provider, lat=lat, lng=lng, radius_km=radius_km, limit=limit)
+    except lockers_service.LockersNotConfiguredError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to load lockers") from exc
-

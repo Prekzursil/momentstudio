@@ -14,6 +14,10 @@
     "viewAdmin": "View admin",
     "account": "Account",
     "myProfile": "My profile",
+    "myOrders": "My orders",
+    "myWishlist": "My wishlist",
+    "myCoupons": "My coupons",
+    "helpCenter": "Help center",
     "cart": "Cart",
     "signIn": "Sign in",
     "register": "Register",
@@ -76,6 +80,68 @@
     }
   },
   "account": {
+    "header": {
+      "signedInAs": "Signed in as"
+    },
+    "sections": {
+      "overview": "Overview",
+      "profile": "Profile",
+      "addresses": "Addresses",
+      "notifications": "Notifications",
+      "security": "Security",
+      "comments": "My comments",
+      "privacy": "Privacy & data"
+    },
+    "overview": {
+      "title": "Overview",
+      "quickLinks": "Quick links",
+      "wishlistHint": "Saved items ready for later.",
+      "notificationsHint": "Control email updates.",
+      "securityHint": "Password, Google link, verification."
+    },
+    "orders": {
+      "shopNew": "Shop new",
+      "statusLabel": "Status",
+      "empty": "No orders yet.",
+      "browse": "Browse products",
+      "reorder": "Reorder",
+      "receiptPdf": "Receipt (PDF)",
+      "receiptShare": "Share receipt",
+      "receiptRevoke": "Revoke share"
+    },
+    "wishlist": {
+      "browse": "Browse products",
+      "empty": "No saved items yet."
+    },
+    "coupons": {
+      "coupon": "Coupon",
+      "goToCheckout": "Checkout",
+      "useInCheckout": "Use in checkout",
+      "empty": "No coupons yet.",
+      "loadError": "Could not load your coupons.",
+      "copy": "Copy code",
+      "copiedTitle": "Coupon code copied",
+      "copiedCopy": "Paste it in the checkout promo box.",
+      "validUntil": "Valid until",
+      "expired": "Expired",
+      "inactive": "Inactive",
+      "minSubtotal": "Min subtotal",
+      "allowOnSale": "Works on sale items",
+      "excludeOnSale": "Excludes sale items",
+      "percentOff": "{{value}}% off",
+      "amountOff": "{{value}} RON off",
+      "freeShipping": "Free shipping"
+    },
+    "addresses": {
+      "add": "Add address",
+      "empty": "No addresses yet.",
+      "defaultShipping": "Default shipping",
+      "defaultBilling": "Default billing",
+      "makeDefaultShipping": "Make default shipping",
+      "makeDefaultBilling": "Make default billing",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
     "completeProfile": {
       "title": "Complete your profile",
       "copy": "To continue, please fill in the required details below.",
@@ -171,12 +237,18 @@
     "ctaShop": "Shop now",
     "ctaAdmin": "View admin",
     "featured": "Featured pieces",
+    "saleProducts": "On sale",
     "newArrivals": "New arrivals",
     "viewAll": "View all",
     "noFeatured": "No featured products right now.",
+    "saleEmpty": "No sale items right now.",
     "newArrivalsEmpty": "No new arrivals right now.",
     "featuredError": {
       "title": "Could not load featured products.",
+      "copy": "Check your connection and retry."
+    },
+    "saleError": {
+      "title": "Could not load sale items.",
       "copy": "Check your connection and retry."
     },
     "newArrivalsError": {
@@ -208,6 +280,7 @@
     "searchPlaceholder": "Search products",
     "search": "Search",
     "categories": "Categories",
+    "sale": "On sale",
     "allCategories": "All categories",
     "priceRange": "Price range",
     "ariaMinPrice": "Minimum price",
@@ -274,7 +347,7 @@
     "summary": "Order summary",
     "subtotal": "Subtotal",
     "shipping": "Shipping",
-    "tax": "Tax",
+    "tax": "VAT",
     "calcAtCheckout": "Calculated at checkout",
     "estimatedTotal": "Estimated total",
     "checkout": "Proceed to checkout",
@@ -298,6 +371,8 @@
     "emailVerifyVerified": "Verified",
     "line1": "Address line",
     "city": "City",
+    "region": "County / State",
+    "regionSelect": "Select a county",
     "postal": "Postal code",
     "country": "Country",
     "countrySelect": "Select a country",
@@ -310,6 +385,7 @@
     "courier": "Courier",
     "courierSameday": "Sameday",
     "courierFanCourier": "Fan Courier",
+    "locker": "Locker",
     "lockers": {
       "useMyLocation": "Use my location",
       "searchArea": "Search this area",
@@ -327,9 +403,14 @@
     "apply": "Apply",
     "step4": "Payment",
     "paymentCard": "Card",
+    "paymentStripe": "Stripe",
+    "paymentNetopia": "Netopia",
     "paymentPayPal": "PayPal",
     "paymentCash": "Cash on delivery",
     "paymentCardHint": "Pay by card (processed securely).",
+    "paymentStripeHint": "Pay with Stripe (you’ll be redirected).",
+    "paymentNetopiaHint": "Pay with Netopia (you’ll be redirected).",
+    "paymentNetopiaDisabled": "Netopia is not configured yet.",
     "paymentPayPalHint": "Pay with PayPal (you’ll be redirected).",
     "paymentCashHint": "Pay in cash upon delivery (RON).",
     "paypalReturnTitle": "PayPal",
@@ -338,13 +419,49 @@
     "paypalCaptureFailed": "Could not confirm PayPal payment. Please try again.",
     "paypalCancelled": "PayPal checkout cancelled",
     "paypalCancelledCopy": "No payment was made. You can return to checkout and try another method.",
+    "stripeReturnTitle": "Stripe",
+    "stripeConfirming": "Confirming your Stripe payment…",
+    "stripeMissingSession": "Missing Stripe session id.",
+    "stripeConfirmFailed": "Could not confirm Stripe payment. Please try again.",
+    "stripeCancelled": "Stripe checkout cancelled",
+    "stripeCancelledCopy": "No payment was made. You can return to checkout and try another method.",
     "backToCheckout": "Back to checkout",
     "placeOrder": "Place order",
     "backToCart": "Back to cart",
+    "successTitle": "Order confirmed",
+    "successHeadline": "Thank you for your purchase!",
+    "successCopy": "We emailed you a confirmation. You can continue shopping or view your orders.",
+    "successContinue": "Continue shopping",
+    "successViewOrders": "View my orders",
+    "successReference": "Reference {{ref}}",
+    "successNoSummary": "Order summary is not available yet. Please check your account for details.",
     "summary": "Order summary",
     "subtotal": "Subtotal",
+    "additionalCost": "Additional cost",
+    "tax": "VAT",
     "shipping": "Shipping",
     "promo": "Promo",
+    "promoApplied": "Promo {{code}} applied.",
+    "promoPending": "Promo {{code}} will be validated at checkout.",
+    "couponsLoginRequired": "Sign in to use coupons.",
+    "couponsLoading": "Loading available coupons…",
+    "couponsLoadError": "Could not load coupons.",
+    "availableCoupons": "Available coupons",
+    "unavailableCoupons": "Unavailable coupons",
+    "couponNotEligible": "Coupon not eligible",
+    "couponReasons": {
+      "inactive": "Inactive",
+      "not_started": "Not started yet",
+      "expired": "Expired",
+      "no_eligible_items": "No eligible items in your cart",
+      "scope_no_match": "No eligible products in your cart",
+      "scope_excluded": "Cart items are excluded",
+      "min_subtotal_not_met": "Minimum subtotal not met",
+      "shipping_already_free": "Shipping is already free",
+      "sold_out": "No redemptions left",
+      "per_customer_limit_reached": "You already used this coupon",
+      "not_assigned": "Not available for your account"
+    },
     "estimatedTotal": "Estimated total"
   },
   "auth": {
@@ -361,6 +478,7 @@
     "email": "Email",
     "username": "Username",
     "password": "Password",
+    "keepSignedIn": "Keep me signed in",
     "show": "Show",
     "hide": "Hide",
     "showPassword": "Show password",
@@ -442,6 +560,16 @@
     "passwordMismatch": "Passwords do not match.",
     "phoneInvalid": "Enter a valid phone number."
   },
+  "addressForm": {
+    "label": "Label",
+    "line1": "Address line 1",
+    "line2": "Address line 2",
+    "defaultShipping": "Set as default shipping",
+    "defaultBilling": "Set as default billing",
+    "useAsBillingToo": "Use as billing too",
+    "cancel": "Cancel",
+    "save": "Save"
+  },
   "adminUi": {
     "errors": {
       "generic": "Something went wrong. Please try again."
@@ -452,6 +580,7 @@
       "products": "Products",
       "orders": "Orders",
       "returns": "Returns",
+      "coupons": "Coupons",
       "users": "Users",
       "support": "Support",
       "content": "Content"
@@ -483,6 +612,7 @@
       "cancel": "Cancel",
       "edit": "Edit",
       "refresh": "Refresh",
+      "search": "Search",
       "copy": "Copy",
       "use": "Use",
       "prev": "Prev",
@@ -528,18 +658,27 @@
         "meta": "Details",
         "order": "Order",
         "message": "Message",
+        "thread": "Thread",
+        "fromSupport": "Support",
+        "fromCustomer": "Customer",
+        "reply": "Reply",
+        "replyPlaceholder": "Write a reply to the customer…",
+        "solvedHint": "This ticket is marked as resolved.",
+        "sendReply": "Send reply",
         "statusLabel": "Status",
         "adminNote": "Admin note",
         "adminNotePlaceholder": "Internal notes (not visible to customer)…",
         "save": "Save"
       },
       "success": {
-        "saved": "Saved."
+        "saved": "Saved.",
+        "replySent": "Reply sent."
       },
       "errors": {
         "load": "Could not load submissions.",
         "loadDetail": "Could not load submission details.",
-        "save": "Could not save changes."
+        "save": "Could not save changes.",
+        "reply": "Could not send reply."
       }
     },
     "returns": {
@@ -662,6 +801,24 @@
           "fetchFailed": "Could not fetch thumbnail."
         }
       },
+      "checkout": {
+        "title": "Checkout settings",
+        "hint": "Shipping uses these values. Free shipping applies when subtotal minus discounts is at or above the threshold.",
+        "shippingFee": "Shipping fee (RON)",
+        "freeShippingThreshold": "Free shipping threshold (RON)",
+        "feeEnabled": "Additional cost enabled",
+        "feeType": "Additional cost type",
+        "feeTypeFlat": "Flat amount (RON)",
+        "feeTypePercent": "Percent (%)",
+        "feeValue": "Additional cost value",
+        "vatEnabled": "VAT enabled",
+        "vatRatePercent": "VAT rate (%)",
+        "vatApplyToShipping": "Apply VAT to shipping",
+        "vatApplyToFee": "Apply VAT to additional cost",
+        "receiptShareDays": "Receipt share TTL (days)",
+        "success": { "save": "Checkout settings saved." },
+        "errors": { "save": "Could not save checkout settings." }
+      },
       "seo": {
         "title": "SEO meta",
         "page": "Page",
@@ -724,6 +881,7 @@
         "blocks": {
           "hero": "Hero",
           "featured_products": "Featured products",
+          "sale_products": "On sale",
           "new_arrivals": "New arrivals",
           "featured_collections": "Featured collections",
           "story": "Our story",
@@ -984,6 +1142,7 @@
       "form": {
         "slug": "Slug",
         "slugAutoHint": "Auto-generated after save.",
+        "priceFormatHint": "Use numbers and a dot with up to 2 decimals (example: 123.45).",
         "sku": "SKU",
         "shortDescription": "Short description",
         "shortDescriptionHint": "Shown in product cards and listings (max 280 characters).",
@@ -999,6 +1158,34 @@
         "highlight": "Highlight",
         "publishAt": "Publish at",
         "noImages": "No images yet."
+      },
+      "sale": {
+        "title": "Sale",
+        "enabled": "Enable sale pricing",
+        "type": "Discount type",
+        "typePercent": "% off",
+        "typeAmount": "Amount off",
+        "value": "Discount",
+        "startAt": "Start at",
+        "endAt": "End at",
+        "autoPublish": "Auto-publish when sale starts",
+        "note": "Changing sale pricing forces the product back to Draft until republished.",
+        "startRequired": "Choose a sale start date when auto-publish is enabled.",
+        "valueHint": "Use numbers and a dot with up to 2 decimals (example: 10.00).",
+        "percentHint": "Enter a percentage between 0 and 100."
+      },
+      "bulk": {
+        "selected": "{{count}} selected",
+        "clearSelection": "Clear selection",
+        "saleValue": "Sale value",
+        "applySale": "Apply sale",
+        "clearSale": "Clear sale",
+        "publish": "Publish",
+        "note": "Applying sale pricing forces products back to Draft. Use “Publish” once you're ready.",
+        "valueRequired": "Enter a sale value.",
+        "success": "Updated selected products.",
+        "published": "Published selected products.",
+        "error": "Bulk update failed."
       },
       "success": {
         "save": "Product saved",
@@ -1098,19 +1285,33 @@
       "shippingLabelDelete": "Delete",
       "confirmDeleteLabel": "Delete the shipping label for this order?",
       "save": "Save changes",
-      "saveHint": "Updates status and tracking; emails send on shipped.",
+      "saveHint": "Updates status and tracking; emails send on status changes.",
       "actionsTitle": "Actions",
+      "receiptLinks": {
+        "title": "Receipt links",
+        "share": "Share receipt link",
+        "revoke": "Revoke receipt links",
+        "expires": "Expires",
+        "confirmRevoke": "Revoke all shared receipt links for this order?",
+        "copied": "Receipt link copied",
+        "ready": "Receipt link ready",
+        "revoked": "Receipt links revoked"
+      },
       "paymentTitle": "Payment",
       "paymentMethod": "Payment method",
-      "paymentStripe": "Card (Stripe)",
+      "paymentStripe": "Stripe",
       "paymentCod": "Cash on delivery",
       "paymentPaypal": "PayPal",
+      "paymentNetopia": "Netopia",
       "customerCommsTitle": "Customer",
       "paymentIntent": "Payment intent",
       "deliveryMethod": "Delivery",
       "deliveryHome": "Home delivery",
       "deliveryLocker": "Locker pickup",
       "locker": "Locker",
+      "cancelReason": "Cancel reason",
+      "cancelReasonPlaceholder": "Why was the order cancelled?",
+      "cancelReasonHint": "Required when cancelling. Shown to the customer and included in the cancellation email.",
       "refundNote": "Refund note (optional)",
       "refundNotePlaceholder": "Add a note for audit/email (optional)",
       "refundHint": "Refund is manual; this records an event and notifies the owner inbox.",
@@ -1149,8 +1350,11 @@
       "next": "Next",
       "all": "All",
       "pending": "Pending",
-      "paid": "Paid",
+      "pending_payment": "Pending payment",
+      "pending_acceptance": "Pending acceptance",
+      "paid": "In progress",
       "shipped": "Shipped",
+      "delivered": "Complete",
       "cancelled": "Cancelled",
       "refunded": "Refunded",
       "success": {
@@ -1167,6 +1371,7 @@
         "load": "Could not load orders.",
         "export": "Could not export orders.",
         "status": "Failed to update order",
+        "cancelReasonRequired": "Cancel reason is required to cancel an order.",
         "retry": "Could not retry payment.",
         "capture": "Could not capture payment.",
         "void": "Could not void payment.",
@@ -1175,7 +1380,9 @@
         "packingSlip": "Could not download packing slip.",
         "shippingLabelUpload": "Could not upload shipping label.",
         "shippingLabelDownload": "Could not download shipping label.",
-        "shippingLabelDelete": "Could not delete shipping label."
+        "shippingLabelDelete": "Could not delete shipping label.",
+        "receiptShare": "Could not generate receipt link.",
+        "receiptRevoke": "Could not revoke receipt links."
       }
     },
     "users": {
@@ -1274,17 +1481,201 @@
       "code": "Code",
       "percentOff": "% off",
       "add": "Add coupon",
+      "invalidateStripe": "Reset Stripe cache",
       "none": "No discount set",
       "active": "Active",
       "inactive": "Inactive",
       "success": {
         "create": "Coupon created",
-        "update": "Coupon updated"
+        "update": "Coupon updated",
+        "invalidateStripe": "Stripe coupon cache cleared ({{count}})"
       },
       "errors": {
         "required": "Coupon code is required",
         "create": "Failed to create coupon",
-        "update": "Failed to update coupon"
+        "update": "Failed to update coupon",
+        "invalidateStripe": "Failed to reset Stripe coupon cache"
+      }
+    },
+    "couponsV2": {
+      "title": "Coupons",
+      "subtitle": "Manage promotions, coupons, and coupon assignments.",
+      "common": {
+        "active": "Active",
+        "inactive": "Inactive",
+        "saving": "Saving…"
+      },
+      "discountTypes": {
+        "percent": "Percent off",
+        "amount": "Amount off",
+        "free_shipping": "Free shipping"
+      },
+      "discountSummary": {
+        "freeShipping": "Free shipping",
+        "amountOff": "-{{value}} RON",
+        "percentOff": "-{{value}}%"
+      },
+      "fields": {
+        "key": "Key (optional)",
+        "name": "Name",
+        "description": "Description",
+        "discountType": "Discount type",
+        "percentageOff": "% off",
+        "amountOff": "Amount off (RON)",
+        "maxDiscount": "Max discount (RON)",
+        "minSubtotal": "Min subtotal (RON)",
+        "allowOnSale": "Allow on-sale items",
+        "startsAt": "Starts at",
+        "endsAt": "Ends at",
+        "active": "Active",
+        "automatic": "Automatic"
+      },
+      "scopes": {
+        "title": "Scope rules",
+        "includedCategories": "Included categories",
+        "excludedCategories": "Excluded categories",
+        "searchProducts": "Search products",
+        "loadingProducts": "Searching products…",
+        "resolvingProducts": "Resolving product names…",
+        "include": "Include",
+        "exclude": "Exclude",
+        "includedProducts": "Included products",
+        "excludedProducts": "Excluded products",
+        "none": "None"
+      },
+      "promotions": {
+        "title": "Promotions",
+        "hint": "Configure discount rules and their scope.",
+        "new": "New promotion",
+        "empty": "No promotions yet.",
+        "createTitle": "Create promotion",
+        "editTitle": "Edit promotion",
+        "create": "Create promotion",
+        "save": "Save promotion"
+      },
+      "coupons": {
+        "title": "Coupons",
+        "hint": "Create and manage coupon codes for a promotion.",
+        "new": "New coupon",
+        "search": "Search by code",
+        "empty": "No coupons for this promotion.",
+        "selectPromotion": "Select a promotion to view its coupons.",
+        "createTitle": "Create coupon",
+        "editTitle": "Edit coupon",
+        "create": "Create coupon",
+        "save": "Save coupon",
+        "fields": {
+          "promotion": "Promotion",
+          "code": "Code",
+          "visibility": "Visibility",
+          "active": "Active",
+          "startsAt": "Starts at",
+          "endsAt": "Ends at",
+          "globalMax": "Global max redemptions",
+          "perCustomerMax": "Per-customer max redemptions"
+        },
+        "visibility": {
+          "public": "Public",
+          "assigned": "Assigned"
+        },
+        "table": {
+          "code": "Code",
+          "visibility": "Visibility",
+          "active": "Active",
+          "ends": "Ends",
+          "actions": "Actions"
+        }
+      },
+      "assignments": {
+        "title": "Assignments",
+        "hint": "Assign coupons to users by email and revoke when needed.",
+        "loading": "Loading assignments…",
+        "empty": "No assignments yet.",
+        "assignTitle": "Assign",
+        "revokeTitle": "Revoke",
+        "email": "Customer email",
+        "reason": "Reason (optional)",
+        "sendEmail": "Send email notification",
+        "assign": "Assign coupon",
+        "revoke": "Revoke coupon",
+        "active": "Active",
+        "revoked": "Revoked",
+        "table": {
+          "user": "User",
+          "issued": "Issued",
+          "status": "Status",
+          "reason": "Reason"
+        }
+      },
+      "bulk": {
+        "title": "Bulk actions",
+        "hint": "Upload a CSV of customer emails (first column) to assign or revoke this coupon in bulk.",
+        "clear": "Clear",
+        "parsed": "{{count}} emails ready",
+        "duplicates": "{{count}} duplicates skipped",
+        "invalid": "{{count}} invalid emails",
+        "truncated": "{{count}} ignored (max 500)",
+        "revokeReason": "Revoke reason (optional)",
+        "sendEmailAssign": "Send assignment email",
+        "sendEmailRevoke": "Send revocation email",
+        "assign": "Bulk assign",
+        "revoke": "Bulk revoke",
+        "resultTitle": "Result",
+        "resultCreated": "{{count}} assigned",
+        "resultRestored": "{{count}} restored",
+        "resultAlreadyActive": "{{count}} already assigned",
+        "resultRevoked": "{{count}} revoked",
+        "resultAlreadyRevoked": "{{count}} already revoked",
+        "resultNotAssigned": "{{count}} not assigned",
+        "resultNotFound": "{{count}} users not found",
+        "resultInvalid": "{{count}} invalid emails",
+        "noEmails": "No emails loaded",
+        "parseError": "Could not parse CSV",
+        "successAssign": "Bulk assignment completed",
+        "successRevoke": "Bulk revocation completed",
+        "segment": {
+          "title": "Segment targeting",
+          "hint": "Target users by preferences (marketing opt-in, email verified). Runs in the background for large lists.",
+          "filterMarketing": "Marketing opt-in",
+          "filterVerified": "Email verified",
+          "preview": "Preview",
+          "assign": "Segment assign",
+          "revoke": "Segment revoke",
+          "previewTitle": "Preview",
+          "candidates": "{{count}} candidates",
+          "sample": "Sample: {{emails}}",
+          "jobTitle": "Background job",
+          "jobStatus": "Status: {{status}}",
+          "jobProgress": "Processed {{processed}} / {{total}}",
+          "previewError": "Could not preview segment",
+          "started": "Segment job started",
+          "completed": "Segment job completed"
+        }
+      },
+      "success": {
+        "savePromotion": "Promotion saved",
+        "saveCoupon": "Coupon saved",
+        "assign": "Coupon assigned",
+        "revoke": "Coupon revoked"
+      },
+      "errors": {
+        "validation": "Please check the form",
+        "promotionNameRequired": "Promotion name is required",
+        "invalidDateRange": "Ends at must be after starts at",
+        "percentRequired": "Percentage off must be between 0 and 100",
+        "amountRequired": "Amount off must be greater than 0",
+        "couponPromotionRequired": "Promotion is required",
+        "couponCodeRequired": "Coupon code is required",
+        "emailRequired": "Email is required",
+        "loadPromotions": "Could not load promotions",
+        "savePromotion": "Could not save promotion",
+        "loadCoupons": "Could not load coupons",
+        "saveCoupon": "Could not save coupon",
+        "loadAssignments": "Could not load assignments",
+        "assign": "Could not assign coupon",
+        "revoke": "Could not revoke coupon",
+        "searchProducts": "Could not search products",
+        "resolveProducts": "Could not resolve products"
       }
     },
     "audit": {
@@ -1367,5 +1758,50 @@
     "addedBody": "{{name}} was added to your wishlist.",
     "removedTitle": "Removed from wishlist",
     "removedBody": "{{name}} was removed from your wishlist."
+  },
+  "tickets": {
+    "title": "Help center",
+    "subtitle": "Track your support requests and replies.",
+    "contactLink": "Prefer the contact form?",
+    "inbox": "My tickets",
+    "refresh": "Refresh",
+    "loading": "Loading tickets…",
+    "empty": "No tickets yet.",
+    "order": "Order",
+    "newTitle": "New ticket",
+    "category": "Issue category",
+    "categories": {
+      "refund": "Return / refund",
+      "product": "Product / delivery issue",
+      "payments": "Payment issue",
+      "other": "Other"
+    },
+    "orderOptional": "Order (optional)",
+    "orderSearchPlaceholder": "Search your orders…",
+    "noOrder": "No specific order",
+    "orderHint": "Selecting an order helps us locate the purchase faster.",
+    "description": "Description",
+    "descriptionPlaceholder": "Describe the issue and what you need help with…",
+    "send": "Send",
+    "thread": "Conversation",
+    "threadEmpty": "Select a ticket to see the conversation.",
+    "created": "Created",
+    "fromSupport": "Support",
+    "fromYou": "You",
+    "reply": "Reply",
+    "solvedHint": "This ticket is marked as solved.",
+    "replyPlaceholder": "Write a message…",
+    "sendReply": "Send reply",
+    "success": {
+      "created": "Ticket created.",
+      "sent": "Reply sent."
+    },
+    "errors": {
+      "load": "Could not load tickets.",
+      "loadDetail": "Could not load ticket.",
+      "form": "Please fill out the form.",
+      "create": "Could not create ticket.",
+      "reply": "Could not send reply."
+    }
   }
 }

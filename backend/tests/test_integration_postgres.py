@@ -1,3 +1,4 @@
+import asyncio
 import os
 import uuid
 
@@ -5,9 +6,12 @@ import httpx
 import pytest
 from httpx import AsyncClient
 
+from sqlalchemy import select
+
 from app.core.config import settings
 from app.db.session import SessionLocal, engine as app_engine
 from app.main import app
+from app.models.cart import Cart
 from app.models.catalog import Category, Product, ProductStatus
 from app.models.content import ContentBlock, ContentBlockTranslation, ContentStatus
 
@@ -88,6 +92,168 @@ async def test_postgres_core_flow_wishlist() -> None:
 
         removed = await client.delete(f"/api/v1/wishlist/{product_id}", headers=auth_headers(token))
         assert removed.status_code == 204, removed.text
+
+
+@pytest.mark.anyio
+async def test_postgres_cart_session_race_does_not_500() -> None:
+    """Guard against unique violations under concurrent cart creation."""
+    transport = httpx.ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        session_id = f"guest-{uuid.uuid4().hex}"
+        async with SessionLocal() as session:
+            cart = Cart(session_id=session_id)
+            session.add(cart)
+            await session.flush()  # Keep uncommitted row to force a race window.
+
+            task = asyncio.create_task(
+                client.post(
+                    "/api/v1/cart/sync",
+                    json={"items": []},
+                    headers={"X-Session-Id": session_id},
+                )
+            )
+            await asyncio.sleep(0.1)
+            await session.commit()
+
+        response = await task
+        assert response.status_code == 200, response.text
+
+
+@pytest.mark.anyio
+async def test_postgres_coupon_global_cap_reservation_race() -> None:
+    """Ensure coupon global usage caps stay correct under concurrent reserves."""
+    from datetime import datetime, timedelta, timezone
+    from decimal import Decimal
+
+    from fastapi import HTTPException
+
+    from app.models.coupons_v2 import Coupon, CouponReservation, CouponVisibility, Promotion, PromotionDiscountType
+    from app.models.order import Order, OrderStatus
+    from app.models.user import User
+    from app.schemas.user import UserCreate
+    from app.services.auth import create_user
+    from app.services.coupons_v2 import reserve_coupon_for_order
+
+    async with SessionLocal() as session:
+        u1 = await create_user(
+            session,
+            UserCreate(
+                email=f"pgcoupon-{uuid.uuid4().hex[:8]}@example.com",
+                username=f"pgcoupon{uuid.uuid4().hex[:8]}",
+                password="supersecret",
+                name="PG Coupon",
+                first_name="PG",
+                last_name="Coupon",
+                date_of_birth="2000-01-01",
+                phone="+40723204204",
+            ),
+        )
+        u2 = await create_user(
+            session,
+            UserCreate(
+                email=f"pgcoupon2-{uuid.uuid4().hex[:8]}@example.com",
+                username=f"pgcoupon2{uuid.uuid4().hex[:8]}",
+                password="supersecret",
+                name="PG Coupon 2",
+                first_name="PG",
+                last_name="Coupon 2",
+                date_of_birth="2000-01-01",
+                phone="+40723204204",
+            ),
+        )
+
+        promo = Promotion(
+            name="Cap race",
+            description="Global cap race test",
+            discount_type=PromotionDiscountType.amount,
+            amount_off=Decimal("1.00"),
+            allow_on_sale_items=True,
+            is_active=True,
+            is_automatic=False,
+        )
+        session.add(promo)
+        await session.commit()
+        await session.refresh(promo)
+
+        code = f"CAP{uuid.uuid4().hex[:8]}".upper()
+        coupon = Coupon(
+            promotion_id=promo.id,
+            code=code,
+            visibility=CouponVisibility.public,
+            is_active=True,
+            global_max_redemptions=1,
+        )
+        session.add(coupon)
+        await session.commit()
+        await session.refresh(coupon)
+
+        order1 = Order(
+            user_id=u1.id,
+            status=OrderStatus.pending_payment,
+            customer_email=u1.email,
+            customer_name="PG Coupon 1",
+            total_amount=Decimal("0.00"),
+            payment_method="stripe",
+            currency="RON",
+            promo_code=code,
+        )
+        order2 = Order(
+            user_id=u2.id,
+            status=OrderStatus.pending_payment,
+            customer_email=u2.email,
+            customer_name="PG Coupon 2",
+            total_amount=Decimal("0.00"),
+            payment_method="stripe",
+            currency="RON",
+            promo_code=code,
+        )
+        session.add_all([order1, order2])
+        await session.commit()
+        await session.refresh(order1)
+        await session.refresh(order2)
+
+        # Hold a lock and stage an uncommitted reservation to force a race window.
+        now = datetime.now(timezone.utc)
+        await session.execute(select(Coupon).where(Coupon.id == coupon.id).with_for_update())
+        session.add(
+            CouponReservation(
+                coupon_id=coupon.id,
+                user_id=u1.id,
+                order_id=order1.id,
+                expires_at=now + timedelta(minutes=30),
+                discount_ron=Decimal("0.00"),
+                shipping_discount_ron=Decimal("0.00"),
+            )
+        )
+        await session.flush()
+
+        async def reserve_other_order():
+            async with SessionLocal() as session2:
+                user = await session2.get(User, u2.id)
+                order = await session2.get(Order, order2.id)
+                coupon_row = await session2.get(Coupon, coupon.id)
+                assert user and order and coupon_row
+                try:
+                    await reserve_coupon_for_order(
+                        session2,
+                        user=user,
+                        order=order,
+                        coupon=coupon_row,
+                        discount_ron=Decimal("0.00"),
+                        shipping_discount_ron=Decimal("0.00"),
+                    )
+                except HTTPException as exc:
+                    await session2.rollback()
+                    return exc.status_code, exc.detail
+                return 204, "reserved"
+
+        task = asyncio.create_task(reserve_other_order())
+        await asyncio.sleep(0.2)
+        await session.commit()
+
+    status_code, detail = await task
+    assert status_code == 400
+    assert detail == "Coupon usage limit reached"
 
 
 @pytest.mark.anyio

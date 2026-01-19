@@ -33,8 +33,10 @@ export interface NavDrawerUser {
     <aside
       class="fixed inset-y-0 left-0 z-50 w-72 overflow-x-hidden bg-white shadow-xl border-r border-slate-200 transform transition-transform dark:bg-slate-900 dark:border-slate-700"
       [ngClass]="{ '-translate-x-full': !open, 'translate-x-0': open }"
-      role="dialog"
-      aria-modal="true"
+      [attr.role]="open ? 'dialog' : null"
+      [attr.aria-modal]="open ? 'true' : null"
+      [attr.aria-hidden]="open ? null : 'true'"
+      [attr.inert]="open ? null : ''"
     >
       <div class="p-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
         <span class="font-semibold text-slate-900 dark:text-slate-50">{{ 'nav.menu' | translate }}</span>

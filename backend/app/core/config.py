@@ -19,10 +19,19 @@ class Settings(BaseSettings):
     paypal_client_id: str | None = None
     paypal_client_secret: str | None = None
     paypal_env: str = "sandbox"
+    paypal_webhook_id: str | None = None
+    paypal_client_id_sandbox: str | None = None
+    paypal_client_secret_sandbox: str | None = None
+    paypal_webhook_id_sandbox: str | None = None
+    paypal_client_id_live: str | None = None
+    paypal_client_secret_live: str | None = None
+    paypal_webhook_id_live: str | None = None
+    netopia_enabled: bool = False
     jwt_algorithm: str = "HS256"
     access_token_exp_minutes: int = 30
     refresh_token_exp_days: int = 7
     refresh_token_rotation: bool = True
+    refresh_token_rotation_grace_seconds: int = 60
     account_deletion_cooldown_hours: int = 24
     secure_cookies: bool = False
     cookie_samesite: str = "lax"
@@ -30,6 +39,8 @@ class Settings(BaseSettings):
     maintenance_bypass_token: str = "bypass-token"
     max_concurrent_requests: int = 100
     enforce_decimal_prices: bool = True
+    coupon_reservation_ttl_minutes: int = 60 * 24
+    first_order_reward_coupon_validity_days: int = 30
 
     media_root: str = "uploads"
     private_media_root: str = "private_uploads"
@@ -81,6 +92,17 @@ class Settings(BaseSettings):
     fx_rates_cache_ttl_seconds: int = 60 * 60 * 6
     fx_refresh_enabled: bool = False
     fx_refresh_interval_seconds: int = 60 * 60 * 6
+
+    # Locker lookup (Sameday/FANbox)
+    # In production you should configure official courier credentials.
+    # For local development, Overpass (OpenStreetMap) can be used as a best-effort fallback.
+    lockers_use_overpass_fallback: bool = True
+    sameday_api_base_url: str | None = None
+    sameday_api_username: str | None = None
+    sameday_api_password: str | None = None
+    fan_api_base_url: str = "https://api.fancourier.ro"
+    fan_api_username: str | None = None
+    fan_api_password: str | None = None
 
 
 @lru_cache

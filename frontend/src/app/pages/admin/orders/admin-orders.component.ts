@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
@@ -10,8 +10,18 @@ import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { ToastService } from '../../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { AdminOrderListItem, AdminOrderListResponse, AdminOrdersService } from '../../../core/admin-orders.service';
+import { orderStatusChipClass } from '../../../shared/order-status';
 
-type OrderStatusFilter = 'all' | 'pending' | 'paid' | 'shipped' | 'cancelled' | 'refunded';
+type OrderStatusFilter =
+  | 'all'
+  | 'pending'
+  | 'pending_payment'
+  | 'pending_acceptance'
+  | 'paid'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled'
+  | 'refunded';
 
 @Component({
   selector: 'app-admin-orders',
@@ -19,7 +29,6 @@ type OrderStatusFilter = 'all' | 'pending' | 'paid' | 'shipped' | 'cancelled' | 
   imports: [
     CommonModule,
     FormsModule,
-    RouterLink,
     TranslateModule,
     BreadcrumbComponent,
     ButtonComponent,
@@ -45,14 +54,17 @@ type OrderStatusFilter = 'all' | 'pending' | 'paid' | 'shipped' | 'cancelled' | 
 
           <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
             {{ 'adminUi.orders.statusFilter' | translate }}
-            <select
-              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-              [(ngModel)]="status"
-            >
-              <option value="all">{{ 'adminUi.orders.all' | translate }}</option>
-              <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
-              <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
-              <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
+	            <select
+	              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	              [(ngModel)]="status"
+	            >
+	              <option value="all">{{ 'adminUi.orders.all' | translate }}</option>
+	              <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
+	              <option value="pending_payment">{{ 'adminUi.orders.pending_payment' | translate }}</option>
+	              <option value="pending_acceptance">{{ 'adminUi.orders.pending_acceptance' | translate }}</option>
+	              <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
+	              <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
+	              <option value="delivered">{{ 'adminUi.orders.delivered' | translate }}</option>
               <option value="cancelled">{{ 'adminUi.orders.cancelled' | translate }}</option>
               <option value="refunded">{{ 'adminUi.orders.refunded' | translate }}</option>
             </select>
@@ -247,18 +259,7 @@ export class AdminOrdersComponent implements OnInit {
   }
 
   statusPillClass(status: string): string {
-    switch (status) {
-      case 'paid':
-        return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-200';
-      case 'shipped':
-        return 'bg-indigo-100 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-200';
-      case 'cancelled':
-        return 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100';
-      case 'refunded':
-        return 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200';
-      default:
-        return 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100';
-    }
+    return orderStatusChipClass(status);
   }
 
   private load(): void {

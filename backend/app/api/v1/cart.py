@@ -10,7 +10,9 @@ from app.db.session import get_session
 from app.schemas.cart import CartItemCreate, CartItemRead, CartItemUpdate, CartRead
 from app.schemas.promo import PromoCodeRead, PromoCodeCreate
 from app.services import cart as cart_service
+from app.services import checkout_settings as checkout_settings_service
 from app.services import order as order_service
+from app.services import coupons_v2 as coupons_service
 from app.schemas.cart_sync import CartSyncRequest
 
 router = APIRouter(prefix="/cart", tags=["cart"])
@@ -32,20 +34,45 @@ async def get_cart(
         session_id = f"guest-{uuid.uuid4()}"
     cart = await cart_service.get_cart(session, getattr(current_user, "id", None) if current_user else None, session_id)
     await session.refresh(cart)
-    if session_id and not cart.session_id:
-        cart.session_id = session_id
-        session.add(cart)
-        await session.commit()
-        await session.refresh(cart)
     shipping_method = None
     if shipping_method_id:
         shipping_method = await order_service.get_shipping_method(session, shipping_method_id)
         if not shipping_method:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+
     promo = None
+    totals_override = None
     if promo_code:
-        promo = await cart_service.validate_promo(session, promo_code, currency=None)
-    return await cart_service.serialize_cart(session, cart, shipping_method=shipping_method, promo=promo)
+        if not current_user:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sign in to use coupons.")
+        rate_flat = Decimal(getattr(shipping_method, "rate_flat", None) or 0) if shipping_method else None
+        rate_per = Decimal(getattr(shipping_method, "rate_per_kg", None) or 0) if shipping_method else None
+        try:
+            applied = await coupons_service.apply_discount_code_to_cart(
+                session,
+                user=current_user,
+                cart=cart,
+                checkout=checkout_settings,
+                shipping_method_rate_flat=rate_flat,
+                shipping_method_rate_per_kg=rate_per,
+                code=promo_code,
+            )
+            totals_override = applied.totals
+        except HTTPException as exc:
+            if exc.status_code == status.HTTP_404_NOT_FOUND:
+                promo = await cart_service.validate_promo(session, promo_code, currency=None)
+            else:
+                raise
+
+    return await cart_service.serialize_cart(
+        session,
+        cart,
+        shipping_method=shipping_method,
+        promo=promo,
+        checkout_settings=checkout_settings,
+        totals_override=totals_override,
+    )
 
 
 @router.post("/items", response_model=CartItemRead, status_code=status.HTTP_201_CREATED)
@@ -111,7 +138,12 @@ async def merge_guest_cart(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Auth required to merge guest cart")
     user_cart = await cart_service.get_cart(session, current_user.id, None)
     merged_cart = await cart_service.merge_guest_cart(session, user_cart, session_id)
-    return await cart_service.serialize_cart(session, merged_cart)
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+    return await cart_service.serialize_cart(
+        session,
+        merged_cart,
+        checkout_settings=checkout_settings,
+    )
 
 
 @router.post("/promo/validate", response_model=PromoCodeRead)
@@ -133,4 +165,9 @@ async def sync_cart(
         session_id = f"guest-{uuid.uuid4()}"
     cart = await cart_service.get_cart(session, getattr(current_user, "id", None) if current_user else None, session_id)
     await cart_service.sync_cart(session, cart, payload.items)
-    return await cart_service.serialize_cart(session, cart)
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+    return await cart_service.serialize_cart(
+        session,
+        cart,
+        checkout_settings=checkout_settings,
+    )

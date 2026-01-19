@@ -10,11 +10,18 @@ Below is a structured checklist you can turn into issues.
 - [x] Add `.gitignore` for Python, Node, env files, build artifacts.
 - [x] GitHub Actions for backend (lint, tests, type-checks).
 - [x] GitHub Actions for frontend (lint, tests, build).
+- [x] CI: pin Node 24 + npm 11.7.0 in workflows/Dockerfiles.
+- [x] Frontend tooling: migrate ESLint to v9 flat config (`eslint.config.mjs`).
+- [x] CI: run frontend lint in `Frontend CI`.
+- [x] Repo hygiene: ignore local `.serena/` artifacts.
 - [x] CONTRIBUTING.md with branching, commit style, runbook.
 - [x] ARCHITECTURE.md with high-level design and data flow.
 - [x] DX: run `alembic upgrade head` in `start.sh` before starting the backend to avoid schema drift.
 - [x] CI: add deployment/release job (e.g., container build + push) once runtime code lands.
 - [x] E2E: add real browser tests (Playwright) for checkout + admin flows and wire them into CI (Docker-backed).
+- [x] DX: detect port collisions in `start.sh` (e.g., `docker compose` already bound to `4200`) and pick a free port or print a clear remediation hint.
+- [x] Frontend: eliminate Node 24 `DEP0060 util._extend` deprecation warning (identify dependency via `--trace-deprecation` and upgrade/replace).
+- [x] Docs: document seeded owner credentials and that `docker compose down -v` resets the DB (owner needs `bootstrap-owner` again).
 
 ## Backend - Core & Auth
 - [x] Scaffold FastAPI app with versioned `/api/v1` router.
@@ -39,6 +46,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Tests: update auth + Postgres integration tests for new registration/profile fields.
 - [x] Auth: add optional CAPTCHA verification for login/register (Cloudflare Turnstile) via env config (backend + frontend).
 - [x] Auth/Profile: add email change endpoint with 30-day cooldown + history tracking (disabled while Google is linked).
+- [x] Auth/Profile: support secondary emails (add/verify/remove, set primary, login via verified secondary) with global uniqueness enforcement.
+- [x] Auth: migrate frontend auth storage to cookie-based refresh sessions (avoid persisting refresh tokens in localStorage; wire “Keep me signed in” to cookie/session TTL).
+- [x] Auth: make refresh token rotation multi-tab safe (tolerate concurrent refresh across tabs/devices without forcing a logout).
 - [x] Auth/Profile: enforce username (7d) + display name (1h) change cooldowns and reuse display name tags when reverting.
 - [x] Profile: add “use Google photo” + “remove avatar” endpoints; default to local placeholder avatar (Google photo opt-in).
 
@@ -96,6 +106,18 @@ Below is a structured checklist you can turn into issues.
 - [x] Reserve stock on checkout start (optional).
 - [x] Cart subtotal/tax/shipping calculation helper.
 - [x] Promo code model + validation hook.
+- [x] Coupons v2: add Promotion/Coupon models + migrations (public/assigned, limits, validity).
+- [x] Coupons v2: add eligibility + validate endpoints (auth-only).
+- [x] Coupons v2: reserve/redeem/void coupons per order (caps enforced with row locks).
+- [x] Coupons v2: apply coupons to cart totals (including free shipping).
+- [x] Coupons v2: require login to apply coupons (no guest coupons).
+- [x] Coupons v2: issue first-order reward coupon after first delivered order (+ email).
+- [x] Coupons v2: add admin UI for promotions/coupons assignment and revocation.
+- [x] Coupons v2: add scope rules (product/category inclusion/exclusion).
+- [x] Coupons v2: admin UI – resolve scoped product IDs to names (avoid showing raw UUID chips).
+- [x] Coupons v2: admin UI – bulk assign/revoke coupons (CSV upload or segment-based selection).
+- [x] Coupons v2: bulk assign/revoke – add segment targeting (marketing opt-in, email verified) with preview + background job.
+- [ ] Coupons v2: bulk segment jobs – list recent jobs per coupon (status/progress) and allow cancel/retry.
 - [x] Abandoned cart job (email reminder) scaffold.
 - [x] Cart item note (gift message) support.
 - [x] Cart cleanup job for stale guest carts.
@@ -107,7 +129,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Order + OrderItem models + migrations.
 - [x] Service to build order from cart (price snapshot).
 - [x] Stripe integration: PaymentIntent create, return client secret.
-- [x] Stripe webhook for payment succeeded/failed; update status.
+- [x] Stripe webhook: record payment capture/failure events; keep orders pending until admin acceptance.
+- [x] Payments: send order confirmation + owner alerts only after Stripe/PayPal payment capture (avoid pre-payment receipts).
+- [x] Checkout returns: include `order_id` in Stripe/PayPal confirm/capture to support guest “create account” flows and reduce token-only replay.
+- [x] Stripe PaymentIntent: compute `amount_cents` using Decimal (avoid float rounding drift).
 - [x] GET /orders and /orders/{id}.
 - [x] Admin order list/filter + status/tracking update.
 - [x] Order status enums and transitions (pending/paid/shipped/cancelled/refunded).
@@ -120,6 +145,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Packing slip/invoice PDF stub.
 - [x] Order item fulfillment tracking (shipped qty).
 - [x] Capture/void support for Stripe intents.
+- [x] Coupons v2: redeem/release coupons on admin capture/void/refund actions (keep reservation/redemption consistent).
 - [x] Admin order export CSV.
 - [x] Reorder endpoint (copy past order to cart).
 - [x] Address validation hook (country/postal rules).
@@ -127,6 +153,25 @@ Below is a structured checklist you can turn into issues.
 - [x] Payments: add Cash on delivery (RON) option stored on orders (payment_method) and allow admin to ship COD orders from pending.
 - [x] Payments: add PayPal option in checkout (keep RON as primary currency) and document supported methods.
 - [x] Orders: include payment method + delivery details in customer/owner emails (COD vs card, courier/tracking).
+- [x] Orders: require a cancel reason when rejecting an order and surface it in emails + “My orders”; notify owner when a manual refund is required.
+- [x] Orders: split “pending” into payment vs admin-acceptance states (e.g., `pending_payment` vs `pending_acceptance`) to avoid UX ambiguity.
+- [x] Receipts: add a PII-redacted shareable receipt mode (hide full addresses/email by default) and configurable token TTL/revocation.
+- [x] Payments: add PayPal webhooks to capture/settle orders even if the buyer never returns to the site.
+- [x] Payments: itemize Stripe Checkout line items (products + shipping + discount) instead of a single aggregated line.
+- [x] Payments: map internal promo codes to reusable Stripe coupons/promotion codes (avoid per-checkout coupon creation).
+- [ ] Payments: implement Netopia callback/webhook settlement + signature verification once enabled.
+- [x] Money: migrate monetary fields to Decimal end-to-end (models + schemas + calculations), eliminating float casts.
+- [x] Tax: make tax/VAT strategy configurable (rate, exemptions) instead of hard-coded `0.1`.
+- [x] Receipts: add Share/Revoke actions in Account + Admin UI (copy link, show expiry, revoke token).
+- [x] Sale: add per-product + bulk sale pricing (percent/amount) and show effective price in storefront.
+- [x] Sale: add “Sale” filter in shop and optional homepage “Sale products” block (CMS toggle).
+- [x] Catalog/Cart: prevent purchasing draft/unpublished products (cart add + order build validation).
+- [x] Sale: add sale scheduling (start/end) and optional auto-publish at start.
+- [x] Sale: add a dedicated `on_sale` filter param (avoid reserving `category_slug=sale`).
+- [x] Money: migrate Product/Variant monetary fields to Decimal end-to-end (models + schemas + UI parsing), remove remaining float annotations.
+- [x] Orders: add admin filters for “Pending (any)” (covers `pending_payment` + `pending_acceptance`) and optionally highlight “Awaiting payment” vs “Awaiting acceptance”.
+- [x] Payments: increment promo `times_used` on successful payment capture (and avoid counting abandoned checkouts).
+- [x] Payments: add admin tooling to invalidate Stripe coupon mappings when a promo is edited/disabled.
 
 ## Backend - CMS & Content
 - [x] ContentBlock model + migration.
@@ -159,6 +204,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Template system for emails with variables.
 - [x] Email preview endpoint (dev-only).
 - [x] Rate limiting for email sends per user/session.
+- [x] Emails: send bilingual (RO+EN) content in a single email for transactional notifications (welcome, verification, password reset/changed, email change, order status updates, owner alerts).
+- [x] Emails: include product links in the order confirmation email (links to `/products/:slug`).
+- [x] Emails: send welcome email when a guest checkout creates an account.
+- [x] Emails: send coupon assignment/revocation notifications (bilingual) with an account link.
+- [x] Receipt UX: add a shareable HTML receipt view (`/receipt/:token`) with clickable product links + a real PDF renderer with embedded hyperlinks (token PDF endpoint).
 
 ## Backend - Security, Observability, Testing
 - [x] CORS config for dev/prod.
@@ -308,12 +358,15 @@ Below is a structured checklist you can turn into issues.
 
 ## Frontend - Cart & Checkout
 - [x] Cart page/drawer with quantities and totals.
+- [x] Cart UX: make cart item image/title link to the product page (`/products/:slug`).
 - [x] Update quantity/remove items; stock error messaging.
 - [x] Checkout steps: shipping address, promo, payment (Stripe).
 - [x] Order summary during checkout.
 - [x] Success page with order summary + continue shopping.
 - [x] Guest cart persistence in localStorage.
 - [x] Apply promo code UI.
+- [x] Coupons v2: show eligible coupons in checkout (signed-in only).
+- [x] Coupons v2: block guest coupon entry and require sign-in.
 - [x] Shipping method selection UI.
 - [x] Address form with validation and country selector.
 - [x] Payment form with Stripe elements.
@@ -325,6 +378,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Save address checkbox for checkout.
 - [x] Order confirmation page with next steps.
 - [x] Cart mini-icon badge with item count.
+- [x] Pricing UI: show RON amounts with `.` and max 2 decimals (no locale comma); EN may include ≈EUR/USD hints.
 - [x] Edge cases: out-of-stock and price changes during checkout.
 - [x] Checkout totals driven by backend shipping/promo validation (no hardcoded amounts).
 - [x] Checkout: require verified email before placing an order (signed-in or guest).
@@ -343,13 +397,14 @@ Below is a structured checklist you can turn into issues.
 - [x] Frontend test: ProductComponent “Add to cart” posts to backend and shows toast (mock CartStore).
 - [x] Checkout: add courier selection (home delivery vs locker) and show it in order details/emails.
 - [x] Payments UX: add PayPal (optional) and show all payment options with icons + clear copy.
-- [ ] Shipping: integrate official locker APIs for Sameday + Fan Courier (replace Overpass fallback; credentials required).
+- [x] Shipping: integrate official locker APIs for Sameday + Fan Courier (env-configured; optional Overpass fallback for local dev).
 
 ## Frontend - Auth & Account
 - [x] Login page with validation.
 - [x] Registration page.
 - [x] Password reset request + reset form.
 - [x] Account dashboard (profile, address book, order history, order detail).
+- [x] Account: add "My coupons" page (list, copy, and deep-link to checkout).
 - [x] Change password form.
 - [x] Auth UX: add show/hide toggles for password inputs (register + change password).
 - [x] Email verification flow UI.
@@ -381,6 +436,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Auth UX: add live format validation for email/username/phone and show “already used” errors only on submit (avoid enumeration).
 - [x] Account UX: extend profile editor to manage first/middle/last name, DOB, and phone with country code.
 - [x] Tests: add/update frontend unit tests for registration wizard and profile field wiring.
+- [x] Account: manage secondary emails (add/verify/remove, set primary) and allow login via verified secondary emails.
+- [x] Forms: audit and set proper HTML `autocomplete` attributes across checkout/profile/tickets/contact forms for better browser autofill.
+- [x] Auth UX: ensure header/profile dropdown always reflects server auth state after restart (clear stale UI on 401/refresh failure) and sign-out works consistently in all menus.
+- [x] Wishlist: investigate reports of add/remove not persisting and add e2e coverage for save/unsave flows.
 
 ## Frontend - Admin Dashboard
 - [x] /admin layout with sidebar + guard.
@@ -389,6 +448,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin UX: add `/admin/users` page (users + security workflows) and wire it into the admin sidebar.
 - [x] Product list table (sort/search).
 - [x] Product create/edit form (slug auto-generated, category, price, stock, description, images, variants).
+- [x] Admin products: validate price input as `123.45` (digits + `.` with max 2 decimals) and show a hint/placeholder.
 - [x] Admin orders list with filters + order detail/status update.
 - [x] Admin orders: add actions (retry/capture/void/refund note, delivery email, packing slip download).
 - [x] Content editor for hero and static pages.

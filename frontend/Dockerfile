@@ -1,8 +1,10 @@
-FROM node:20-alpine AS build
+FROM node:24-alpine AS build
 
 WORKDIR /app
 
 COPY frontend/package.json frontend/package-lock.json ./
+COPY frontend/scripts ./scripts
+RUN npm i -g npm@11.7.0
 RUN npm ci
 
 COPY frontend/ ./
@@ -18,4 +20,3 @@ COPY --from=build /app/dist/app /usr/share/nginx/html
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
-

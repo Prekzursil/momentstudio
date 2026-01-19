@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { ApiService } from './api.service';
 import { AuthUser } from './auth.service';
+import { parseMoney } from '../shared/money';
 
 export interface Address {
   id: string;
@@ -31,10 +32,12 @@ export interface Order {
   id: string;
   reference_code?: string | null;
   status: string;
+  cancel_reason?: string | null;
   payment_method?: string;
   payment_retry_count?: number;
   total_amount: number;
   tax_amount?: number;
+  fee_amount?: number;
   shipping_amount?: number;
   currency: string;
   courier?: string | null;
@@ -72,6 +75,13 @@ export interface AccountDeletionStatus {
   cooldown_hours: number;
 }
 
+export interface ReceiptShareToken {
+  token: string;
+  receipt_url: string;
+  receipt_pdf_url: string;
+  expires_at: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AccountService {
   constructor(private api: ApiService) {}
@@ -85,7 +95,22 @@ export class AccountService {
   }
 
   getOrders(): Observable<Order[]> {
-    return this.api.get<Order[]>('/orders');
+    return this.api.get<Order[]>('/orders').pipe(
+      map((orders: any[]) =>
+        (orders ?? []).map((o) => ({
+          ...o,
+          total_amount: parseMoney(o?.total_amount),
+          tax_amount: parseMoney(o?.tax_amount),
+          fee_amount: parseMoney(o?.fee_amount),
+          shipping_amount: parseMoney(o?.shipping_amount),
+          items: (o?.items ?? []).map((it: any) => ({
+            ...it,
+            unit_price: parseMoney(it?.unit_price),
+            subtotal: parseMoney(it?.subtotal)
+          }))
+        }))
+      )
+    );
   }
 
   downloadExport(): Observable<Blob> {
@@ -110,6 +135,14 @@ export class AccountService {
 
   downloadReceipt(orderId: string): Observable<Blob> {
     return this.api.getBlob(`/orders/${orderId}/receipt`);
+  }
+
+  shareReceipt(orderId: string): Observable<ReceiptShareToken> {
+    return this.api.post<ReceiptShareToken>(`/orders/${orderId}/receipt/share`, {});
+  }
+
+  revokeReceiptShare(orderId: string): Observable<ReceiptShareToken> {
+    return this.api.post<ReceiptShareToken>(`/orders/${orderId}/receipt/revoke`, {});
   }
 
   createAddress(payload: AddressCreateRequest): Observable<Address> {

@@ -9,10 +9,20 @@ import { InputComponent } from '../../../shared/input.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { ToastService } from '../../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
+import { ReceiptShareToken } from '../../../core/account.service';
 import { AdminOrderDetail, AdminOrdersService } from '../../../core/admin-orders.service';
 import { AdminReturnsService, ReturnRequestRead } from '../../../core/admin-returns.service';
+import { orderStatusChipClass } from '../../../shared/order-status';
 
-type OrderStatus = 'pending' | 'paid' | 'shipped' | 'cancelled' | 'refunded';
+type OrderStatus =
+  | 'pending'
+  | 'pending_payment'
+  | 'pending_acceptance'
+  | 'paid'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled'
+  | 'refunded';
 type OrderAction =
   | 'save'
   | 'retry'
@@ -23,7 +33,9 @@ type OrderAction =
   | 'packingSlip'
   | 'labelUpload'
   | 'labelDownload'
-  | 'labelDelete';
+  | 'labelDelete'
+  | 'receiptShare'
+  | 'receiptRevoke';
 
 @Component({
   selector: 'app-admin-order-detail',
@@ -71,8 +83,13 @@ type OrderAction =
             <div class="grid md:grid-cols-3 gap-3 text-sm">
               <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
                 <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.table.status' | translate }}</div>
-                <div class="mt-1 font-semibold text-slate-900 dark:text-slate-50">
-                  {{ ('adminUi.orders.' + order()!.status) | translate }}
+                <div class="mt-2">
+                  <span
+                    class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                    [ngClass]="statusChipClass(order()!.status)"
+                  >
+                    {{ ('adminUi.orders.' + order()!.status) | translate }}
+                  </span>
                 </div>
               </div>
               <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
@@ -105,9 +122,11 @@ type OrderAction =
                   class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   [(ngModel)]="statusValue"
                 >
-                  <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
+                  <option value="pending_payment">{{ 'adminUi.orders.pending_payment' | translate }}</option>
+                  <option value="pending_acceptance">{{ 'adminUi.orders.pending_acceptance' | translate }}</option>
                   <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
                   <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
+                  <option value="delivered">{{ 'adminUi.orders.delivered' | translate }}</option>
                   <option value="cancelled">{{ 'adminUi.orders.cancelled' | translate }}</option>
                   <option value="refunded">{{ 'adminUi.orders.refunded' | translate }}</option>
                 </select>
@@ -115,6 +134,19 @@ type OrderAction =
 
               <app-input [label]="'adminUi.orders.trackingNumber' | translate" [(value)]="trackingNumber"></app-input>
             </div>
+
+            <label
+              *ngIf="statusValue === 'cancelled' || order()!.status === 'cancelled'"
+              class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
+            >
+              {{ 'adminUi.orders.cancelReason' | translate }}
+              <textarea
+                class="min-h-[92px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                [placeholder]="'adminUi.orders.cancelReasonPlaceholder' | translate"
+                [(ngModel)]="cancelReason"
+              ></textarea>
+              <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.cancelReasonHint' | translate }}</span>
+            </label>
 
             <app-input
               [label]="'adminUi.orders.trackingUrl' | translate"
@@ -191,11 +223,11 @@ type OrderAction =
             <div class="grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
               <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.actionsTitle' | translate }}</div>
 
-              <div class="grid gap-3 md:grid-cols-2">
-                <div class="grid gap-2">
-                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-                    {{ 'adminUi.orders.paymentTitle' | translate }}
-                  </div>
+	              <div class="grid gap-3 md:grid-cols-2">
+	                <div class="grid gap-2">
+	                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+	                    {{ 'adminUi.orders.paymentTitle' | translate }}
+	                  </div>
                   <div class="flex flex-wrap items-center gap-2">
                     <app-button
                       size="sm"
@@ -203,13 +235,6 @@ type OrderAction =
                       [label]="'adminUi.orders.actions.retryPayment' | translate"
                       [disabled]="action() !== null"
                       (action)="retryPayment()"
-                    ></app-button>
-                    <app-button
-                      size="sm"
-                      variant="ghost"
-                      [label]="'adminUi.orders.actions.capturePayment' | translate"
-                      [disabled]="action() !== null"
-                      (action)="capturePayment()"
                     ></app-button>
                     <app-button
                       size="sm"
@@ -224,10 +249,10 @@ type OrderAction =
                   </div>
                 </div>
 
-                <div class="grid gap-2">
-                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-                    {{ 'adminUi.orders.customerCommsTitle' | translate }}
-                  </div>
+	                <div class="grid gap-2">
+	                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+	                    {{ 'adminUi.orders.customerCommsTitle' | translate }}
+	                  </div>
                   <div class="flex flex-wrap items-center gap-2">
                     <app-button
                       size="sm"
@@ -243,9 +268,34 @@ type OrderAction =
                       [disabled]="action() !== null"
                       (action)="downloadPackingSlip()"
                     ></app-button>
-                  </div>
-                </div>
-              </div>
+	                  </div>
+	                </div>
+
+	                <div class="grid gap-2">
+	                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+	                    {{ 'adminUi.orders.receiptLinks.title' | translate }}
+	                  </div>
+	                  <div class="flex flex-wrap items-center gap-2">
+	                    <app-button
+	                      size="sm"
+	                      variant="ghost"
+	                      [label]="'adminUi.orders.receiptLinks.share' | translate"
+	                      [disabled]="action() !== null"
+	                      (action)="shareReceipt()"
+	                    ></app-button>
+	                    <app-button
+	                      size="sm"
+	                      variant="ghost"
+	                      [label]="'adminUi.orders.receiptLinks.revoke' | translate"
+	                      [disabled]="action() !== null"
+	                      (action)="revokeReceiptShare()"
+	                    ></app-button>
+	                  </div>
+	                  <div *ngIf="receiptShare() as share" class="text-xs text-slate-600 dark:text-slate-300">
+	                    {{ 'adminUi.orders.receiptLinks.expires' | translate }}: {{ share.expires_at | date: 'short' }}
+	                  </div>
+	                </div>
+	              </div>
 
               <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
                 <app-input
@@ -490,10 +540,12 @@ export class AdminOrderDetailComponent implements OnInit {
   showReturnCreate = signal(false);
   creatingReturn = signal(false);
   returnCreateError = signal<string | null>(null);
+  receiptShare = signal<ReceiptShareToken | null>(null);
 
-  statusValue: OrderStatus = 'pending';
+  statusValue: OrderStatus = 'pending_acceptance';
   trackingNumber = '';
   trackingUrl = '';
+  cancelReason = '';
   refundNote = '';
   returnReason = '';
   returnCustomerMessage = '';
@@ -511,6 +563,10 @@ export class AdminOrderDetailComponent implements OnInit {
     private toast: ToastService,
     private translate: TranslateService
   ) {}
+
+  statusChipClass(status: string): string {
+    return orderStatusChipClass(status);
+  }
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('orderId');
@@ -587,19 +643,26 @@ export class AdminOrderDetailComponent implements OnInit {
   save(): void {
     const orderId = this.order()?.id;
     if (!orderId) return;
+    const currentStatus = ((this.order()?.status as OrderStatus) || 'pending_acceptance') as OrderStatus;
+    if (this.statusValue === 'cancelled' && !this.cancelReason.trim()) {
+      this.toast.error(this.translate.instant('adminUi.orders.errors.cancelReasonRequired'));
+      return;
+    }
     this.action.set('save');
     this.api
       .update(orderId, {
-        status: this.statusValue,
+        status: this.statusValue !== currentStatus ? this.statusValue : undefined,
+        cancel_reason: this.statusValue === 'cancelled' ? this.cancelReason.trim() : undefined,
         tracking_number: this.trackingNumber.trim() || null,
         tracking_url: this.trackingUrl.trim() || null
       })
       .subscribe({
         next: (o) => {
           this.order.set(o);
-          this.statusValue = (o.status as OrderStatus) || 'pending';
+          this.statusValue = (o.status as OrderStatus) || 'pending_acceptance';
           this.trackingNumber = o.tracking_number ?? '';
           this.trackingUrl = o.tracking_url ?? '';
+          this.cancelReason = o.cancel_reason ?? '';
           this.action.set(null);
           this.toast.success(this.translate.instant('adminUi.orders.success.status'));
         },
@@ -706,23 +769,6 @@ export class AdminOrderDetailComponent implements OnInit {
     });
   }
 
-  capturePayment(): void {
-    const orderId = this.orderId;
-    if (!orderId) return;
-    this.action.set('capture');
-    this.api.capturePayment(orderId).subscribe({
-      next: () => {
-        this.toast.success(this.translate.instant('adminUi.orders.success.capture'));
-        this.load(orderId);
-        this.action.set(null);
-      },
-      error: () => {
-        this.toast.error(this.translate.instant('adminUi.orders.errors.capture'));
-        this.action.set(null);
-      }
-    });
-  }
-
   voidPayment(): void {
     const orderId = this.orderId;
     if (!orderId) return;
@@ -797,15 +843,68 @@ export class AdminOrderDetailComponent implements OnInit {
     });
   }
 
+  shareReceipt(): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    const cached = this.receiptShare();
+    const expiresAt = cached?.expires_at ? new Date(cached.expires_at) : null;
+    if (cached?.receipt_url && expiresAt && expiresAt.getTime() > Date.now() + 30_000) {
+      void this.copyToClipboard(cached.receipt_url).then((ok) => {
+        this.toast.success(
+          ok ? this.translate.instant('adminUi.orders.receiptLinks.copied') : this.translate.instant('adminUi.orders.receiptLinks.ready')
+        );
+      });
+      return;
+    }
+    this.action.set('receiptShare');
+    this.api.shareReceipt(orderId).subscribe({
+      next: (token) => {
+        this.receiptShare.set(token);
+        void this.copyToClipboard(token.receipt_url).then((ok) => {
+          this.toast.success(
+            ok ? this.translate.instant('adminUi.orders.receiptLinks.copied') : this.translate.instant('adminUi.orders.receiptLinks.ready')
+          );
+        });
+        this.action.set(null);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.errors.receiptShare');
+        this.toast.error(msg);
+        this.action.set(null);
+      }
+    });
+  }
+
+  revokeReceiptShare(): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    if (!confirm(this.translate.instant('adminUi.orders.receiptLinks.confirmRevoke'))) return;
+    this.action.set('receiptRevoke');
+    this.api.revokeReceiptShare(orderId).subscribe({
+      next: () => {
+        this.receiptShare.set(null);
+        this.toast.success(this.translate.instant('adminUi.orders.receiptLinks.revoked'));
+        this.action.set(null);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.errors.receiptRevoke');
+        this.toast.error(msg);
+        this.action.set(null);
+      }
+    });
+  }
+
   private load(orderId: string): void {
     this.loading.set(true);
     this.error.set(null);
+    this.receiptShare.set(null);
     this.api.get(orderId).subscribe({
       next: (o) => {
         this.order.set(o);
-        this.statusValue = (o.status as OrderStatus) || 'pending';
+        this.statusValue = (o.status as OrderStatus) || 'pending_acceptance';
         this.trackingNumber = o.tracking_number ?? '';
         this.trackingUrl = o.tracking_url ?? '';
+        this.cancelReason = o.cancel_reason ?? '';
         this.returnQty = {};
         (o.items || []).forEach((it) => (this.returnQty[it.id] = 0));
         this.loadReturns(o.id);
@@ -816,6 +915,17 @@ export class AdminOrderDetailComponent implements OnInit {
         this.loading.set(false);
       }
     });
+  }
+
+  private async copyToClipboard(text: string): Promise<boolean> {
+    try {
+      if (typeof navigator === 'undefined') return false;
+      if (!navigator.clipboard?.writeText) return false;
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   toggleReturnCreate(): void {

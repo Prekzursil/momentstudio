@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -54,3 +54,24 @@ class ContactSubmission(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped[User | None] = relationship("User", lazy="joined")
+    messages: Mapped[list["ContactSubmissionMessage"]] = relationship(
+        "ContactSubmissionMessage",
+        back_populates="submission",
+        cascade="all, delete-orphan",
+        order_by="ContactSubmissionMessage.created_at",
+        lazy="selectin",
+    )
+
+
+class ContactSubmissionMessage(Base):
+    __tablename__ = "contact_submission_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    submission_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("contact_submissions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    from_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    submission: Mapped[ContactSubmission] = relationship("ContactSubmission", back_populates="messages")

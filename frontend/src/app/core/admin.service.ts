@@ -95,6 +95,10 @@ export interface AdminCoupon {
   max_uses?: number | null;
 }
 
+export interface AdminCouponStripeInvalidationResult {
+  deleted_mappings: number;
+}
+
 export interface AdminCategory {
   id: string;
   name: string;
@@ -341,8 +345,15 @@ export class AdminService {
     return this.api.patch<AdminOrder>(`/orders/admin/${orderId}`, { status });
   }
 
-  bulkUpdateProducts(payload: { slug: string; status?: string }[]): Observable<AdminProduct[]> {
-    return this.api.post<AdminProduct[]>('/catalog/products/bulk-update', payload);
+  bulkUpdateProducts(payload: {
+    product_id: string;
+    base_price?: number | null;
+    sale_type?: 'percent' | 'amount' | null;
+    sale_value?: number | null;
+    stock_quantity?: number | null;
+    status?: string | null;
+  }[]): Observable<any[]> {
+    return this.api.post<any[]>('/catalog/products/bulk-update', payload);
   }
 
   getCategories(): Observable<AdminCategory[]> {
@@ -421,6 +432,10 @@ export class AdminService {
 
   updateCoupon(id: string, payload: Partial<AdminCoupon>): Observable<AdminCoupon> {
     return this.api.patch<AdminCoupon>(`/admin/dashboard/coupons/${id}`, payload);
+  }
+
+  invalidateCouponStripeMappings(id: string): Observable<AdminCouponStripeInvalidationResult> {
+    return this.api.post<AdminCouponStripeInvalidationResult>(`/admin/dashboard/coupons/${id}/stripe/invalidate`, {});
   }
 
   uploadProductImage(slug: string, file: File): Observable<AdminProductDetail> {

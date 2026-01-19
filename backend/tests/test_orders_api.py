@@ -1,10 +1,12 @@
 import asyncio
 from decimal import Decimal
+from datetime import datetime, timedelta, timezone
 from typing import Dict
 from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.future import select
 
@@ -12,9 +14,10 @@ from app.main import app
 from app.db.base import Base
 from app.db.session import get_session
 from app.models.address import Address
-from app.models.catalog import Category, Product
+from app.models.catalog import Category, Product, ProductStatus
 from app.models.cart import Cart, CartItem
-from app.models.order import Order, OrderStatus
+from app.models.coupons_v2 import Coupon, CouponRedemption, CouponReservation, CouponVisibility, Promotion, PromotionDiscountType
+from app.models.order import Order, OrderEvent, OrderStatus
 from app.models.user import User, UserRole
 from app.services.auth import create_user, issue_tokens_for_user
 from app.schemas.user import UserCreate
@@ -23,6 +26,7 @@ from app.services import payments as payments_service
 from app.services import email as email_service
 from app.schemas.order import ShippingMethodCreate
 from app.core.config import settings
+from app.core.security import create_receipt_token
 
 
 @pytest.fixture
@@ -113,6 +117,7 @@ def seed_cart_with_product(session_factory, user_id: UUID) -> UUID:
                 base_price=Decimal("20.00"),
                 currency="RON",
                 stock_quantity=5,
+                status=ProductStatus.published,
             )
             cart = Cart(user_id=user_id)
             cart.items = [
@@ -256,11 +261,11 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     sent = {"count": 0, "shipped": 0, "delivered": 0, "refund": 0}
     refund_meta: dict[str, str | None] = {"to": None, "requested_by": None, "note": None}
 
-    async def fake_send_order_confirmation(to_email, order, items=None):
+    async def fake_send_order_confirmation(to_email, order, items=None, lang=None, *, receipt_share_days=None):
         sent["count"] += 1
         return True
 
-    async def fake_send_shipping_update(to_email, order, tracking=None):
+    async def fake_send_shipping_update(to_email, order, tracking=None, lang=None):
         sent["shipped"] += 1
         return True
 
@@ -289,14 +294,35 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     )
     assert res.status_code == 201, res.text
     order = res.json()
-    assert order["status"] == "pending"
+    assert order["status"] == "pending_acceptance"
     assert order["reference_code"]
     assert float(order["shipping_amount"]) >= 0
     order_id = order["id"]
     item_id = order["items"][0]["id"]
     assert sent["count"] == 1
 
-    retry = client.post(f"/api/v1/orders/admin/{order_id}/retry-payment", headers=auth_headers(admin_token))
+    async def seed_stripe_pending_payment_order() -> str:
+        async with SessionLocal() as session:
+            order = Order(
+                user_id=user_id,
+                status=OrderStatus.pending_payment,
+                reference_code="RETRY1",
+                customer_email="buyer@example.com",
+                customer_name="Buyer",
+                total_amount=Decimal("10.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+                payment_method="stripe",
+                stripe_payment_intent_id="pi_retry_1",
+            )
+            session.add(order)
+            await session.commit()
+            await session.refresh(order)
+            return str(order.id)
+
+    stripe_order_id = asyncio.run(seed_stripe_pending_payment_order())
+    retry = client.post(f"/api/v1/orders/admin/{stripe_order_id}/retry-payment", headers=auth_headers(admin_token))
     assert retry.status_code == 200
     assert retry.json()["payment_retry_count"] == 1
     assert any(evt["event"] == "payment_retry" for evt in retry.json()["events"])
@@ -338,6 +364,51 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     assert final.status_code == 200
     assert final.json()["status"] == "shipped"
 
+    async def attach_coupon_redemption() -> None:
+        async with SessionLocal() as session:
+            promo = Promotion(
+                name="Test coupon",
+                description="Test coupon",
+                discount_type=PromotionDiscountType.amount,
+                amount_off=Decimal("5.00"),
+                allow_on_sale_items=True,
+                is_active=True,
+                is_automatic=False,
+            )
+            session.add(promo)
+            await session.commit()
+            await session.refresh(promo)
+
+            coupon = Coupon(
+                promotion_id=promo.id,
+                code="TEST-REFUND-5",
+                visibility=CouponVisibility.public,
+                is_active=True,
+                per_customer_max_redemptions=1,
+            )
+            session.add(coupon)
+            await session.commit()
+            await session.refresh(coupon)
+
+            db_order = await session.get(Order, UUID(order_id))
+            assert db_order
+            db_order.promo_code = coupon.code
+            session.add(db_order)
+            await session.commit()
+
+            session.add(
+                CouponRedemption(
+                    coupon_id=coupon.id,
+                    user_id=user_id,
+                    order_id=db_order.id,
+                    discount_ron=Decimal("5.00"),
+                    shipping_discount_ron=Decimal("0.00"),
+                )
+            )
+            await session.commit()
+
+    asyncio.run(attach_coupon_redemption())
+
     refund = client.post(
         f"/api/v1/orders/admin/{order_id}/refund",
         params={"note": "Customer requested refund"},
@@ -346,6 +417,22 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     assert refund.status_code == 200
     assert refund.json()["status"] == "refunded"
     assert any(evt["event"] == "refund_requested" for evt in refund.json()["events"])
+    async def assert_coupon_voided() -> None:
+        async with SessionLocal() as session:
+            redemption = (
+                (
+                    await session.execute(
+                        select(CouponRedemption).where(CouponRedemption.order_id == UUID(order_id))
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            assert redemption is not None
+            assert redemption.voided_at is not None
+            assert redemption.void_reason == "refunded"
+
+    asyncio.run(assert_coupon_voided())
     assert sent["refund"] == 1
     assert refund_meta["to"] == "owner@example.com"
     assert refund_meta["requested_by"] == "admin@example.com"
@@ -365,11 +452,24 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     assert receipt.status_code == 200
     assert receipt.headers.get("content-type", "").startswith("application/pdf")
     assert receipt.headers.get("content-disposition", "").startswith("attachment;")
-    assert "Receipt for order" in receipt.text
+    assert receipt.content.startswith(b"%PDF")
 
     other_token, _ = create_user_token(SessionLocal, email="otherbuyer@example.com")
     forbidden = client.get(f"/api/v1/orders/{order_id}/receipt", headers=auth_headers(other_token))
     assert forbidden.status_code == 404
+
+    token = create_receipt_token(order_id=order_id, expires_at=datetime.now(timezone.utc) + timedelta(days=1))
+    public_json = client.get(f"/api/v1/orders/receipt/{token}")
+    assert public_json.status_code == 200
+    assert public_json.json()["order_id"] == order_id
+
+    public_pdf = client.get(f"/api/v1/orders/receipt/{token}/pdf")
+    assert public_pdf.status_code == 200
+    assert public_pdf.headers.get("content-type", "").startswith("application/pdf")
+    assert public_pdf.content.startswith(b"%PDF")
+
+    bad_token = client.get("/api/v1/orders/receipt/invalid-token")
+    assert bad_token.status_code == 403
 
     delivery = client.post(f"/api/v1/orders/admin/{order_id}/delivery-email", headers=auth_headers(admin_token))
     assert delivery.status_code == 200
@@ -393,7 +493,7 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
 
     shipping_method_id = asyncio.run(seed_shipping())
 
-    async def fake_email(to_email, order, items=None):
+    async def fake_email(to_email, order, items=None, lang=None, *, receipt_share_days=None):
         return True
 
     monkeypatch.setattr(email_service, "send_order_confirmation", fake_email)
@@ -416,6 +516,52 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
 
     asyncio.run(attach_intent())
 
+    async def attach_coupon_reservation() -> None:
+        async with SessionLocal() as session:
+            promo = Promotion(
+                name="Test coupon",
+                description="Test coupon",
+                discount_type=PromotionDiscountType.amount,
+                amount_off=Decimal("3.00"),
+                allow_on_sale_items=True,
+                is_active=True,
+                is_automatic=False,
+            )
+            session.add(promo)
+            await session.commit()
+            await session.refresh(promo)
+
+            coupon = Coupon(
+                promotion_id=promo.id,
+                code="TEST-CAPTURE-3",
+                visibility=CouponVisibility.public,
+                is_active=True,
+                per_customer_max_redemptions=1,
+            )
+            session.add(coupon)
+            await session.commit()
+            await session.refresh(coupon)
+
+            db_order = await session.get(Order, UUID(order_id))
+            assert db_order
+            db_order.promo_code = coupon.code
+            session.add(db_order)
+            await session.commit()
+
+            session.add(
+                CouponReservation(
+                    coupon_id=coupon.id,
+                    user_id=user_id,
+                    order_id=db_order.id,
+                    expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+                    discount_ron=Decimal("3.00"),
+                    shipping_discount_ron=Decimal("0.00"),
+                )
+            )
+            await session.commit()
+
+    asyncio.run(attach_coupon_reservation())
+
     async def fake_capture(intent_id: str):
         return {"id": intent_id, "status": "succeeded"}
 
@@ -430,8 +576,36 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
         headers=auth_headers(admin_token),
     )
     assert capture.status_code == 200
-    assert capture.json()["status"] == "paid"
+    assert capture.json()["status"] == "pending_acceptance"
     assert capture.json()["stripe_payment_intent_id"] == "pi_test_123"
+    assert any(evt["event"] == "payment_captured" for evt in capture.json()["events"])
+    async def assert_coupon_redeemed() -> None:
+        async with SessionLocal() as session:
+            redemption = (
+                (
+                    await session.execute(
+                        select(CouponRedemption).where(CouponRedemption.order_id == UUID(order_id))
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            assert redemption is not None
+            assert redemption.discount_ron == Decimal("3.00")
+            assert redemption.voided_at is None
+
+            reservation_count = int(
+                (
+                    await session.execute(
+                        select(func.count())
+                        .select_from(CouponReservation)
+                        .where(CouponReservation.order_id == UUID(order_id))
+                    )
+                ).scalar_one()
+            )
+            assert reservation_count == 0
+
+    asyncio.run(assert_coupon_redeemed())
 
     void = client.post(
         f"/api/v1/orders/admin/{order_id}/void-payment",
@@ -440,6 +614,22 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
     assert void.status_code == 200
     assert void.json()["status"] == "cancelled"
     assert any(evt["event"] == "payment_voided" for evt in void.json()["events"])
+    async def assert_coupon_voided() -> None:
+        async with SessionLocal() as session:
+            redemption = (
+                (
+                    await session.execute(
+                        select(CouponRedemption).where(CouponRedemption.order_id == UUID(order_id))
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            assert redemption is not None
+            assert redemption.voided_at is not None
+            assert redemption.void_reason == "payment_voided"
+
+    asyncio.run(assert_coupon_voided())
 
     export_resp = client.get("/api/v1/orders/admin/export", headers=auth_headers(admin_token))
     assert export_resp.status_code == 200
@@ -450,6 +640,135 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
     assert reorder_resp.status_code == 200
     assert len(reorder_resp.json()["items"]) == 1
     assert reorder_resp.json()["items"][0]["product_id"]
+
+
+def test_admin_accept_requires_payment_capture_and_cancel_reason(
+    test_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    async def fake_email(*_args, **_kwargs):
+        return True
+
+    monkeypatch.setattr(email_service, "send_order_processing_update", fake_email)
+    monkeypatch.setattr(email_service, "send_order_cancelled_update", fake_email)
+    monkeypatch.setattr(email_service, "send_order_refunded_update", fake_email)
+    monkeypatch.setattr(email_service, "send_shipping_update", fake_email)
+    monkeypatch.setattr(email_service, "send_delivery_confirmation", fake_email)
+
+    token, user_id = create_user_token(SessionLocal, email="buyer-paycap@example.com")
+    admin_token, _ = create_user_token(SessionLocal, email="admin-paycap@example.com", admin=True)
+
+    async def seed_stripe_order() -> UUID:
+        async with SessionLocal() as session:
+            order = Order(
+                user_id=user_id,
+                status=OrderStatus.pending_acceptance,
+                reference_code="PAYCAP",
+                customer_email="buyer-paycap@example.com",
+                customer_name="Buyer",
+                total_amount=Decimal("10.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+                payment_method="stripe",
+                stripe_payment_intent_id="pi_paycap",
+            )
+            session.add(order)
+            await session.commit()
+            await session.refresh(order)
+            return order.id
+
+    stripe_order_id = asyncio.run(seed_stripe_order())
+    stripe_order_id_str = str(stripe_order_id)
+
+    accept_without_capture = client.patch(
+        f"/api/v1/orders/admin/{stripe_order_id_str}",
+        headers=auth_headers(admin_token),
+        json={"status": "paid"},
+    )
+    assert accept_without_capture.status_code == 400, accept_without_capture.text
+    assert "Payment is not captured" in accept_without_capture.text
+
+    async def seed_capture_event() -> None:
+        async with SessionLocal() as session:
+            session.add(OrderEvent(order_id=stripe_order_id, event="payment_captured", note="test"))
+            await session.commit()
+
+    asyncio.run(seed_capture_event())
+
+    accept_with_capture = client.patch(
+        f"/api/v1/orders/admin/{stripe_order_id_str}",
+        headers=auth_headers(admin_token),
+        json={"status": "paid"},
+    )
+    assert accept_with_capture.status_code == 200, accept_with_capture.text
+    assert accept_with_capture.json()["status"] == "paid"
+
+    cancel_paid_missing_reason = client.patch(
+        f"/api/v1/orders/admin/{stripe_order_id_str}",
+        headers=auth_headers(admin_token),
+        json={"status": "cancelled"},
+    )
+    assert cancel_paid_missing_reason.status_code == 400, cancel_paid_missing_reason.text
+    assert "Cancel reason is required" in cancel_paid_missing_reason.text
+
+    cancel_paid = client.patch(
+        f"/api/v1/orders/admin/{stripe_order_id_str}",
+        headers=auth_headers(admin_token),
+        json={"status": "cancelled", "cancel_reason": "Customer requested cancellation"},
+    )
+    assert cancel_paid.status_code == 200, cancel_paid.text
+    assert cancel_paid.json()["status"] == "cancelled"
+    assert cancel_paid.json()["cancel_reason"] == "Customer requested cancellation"
+
+    async def seed_pending_order() -> UUID:
+        async with SessionLocal() as session:
+            order = Order(
+                user_id=user_id,
+                status=OrderStatus.pending_acceptance,
+                reference_code="CANCEL1",
+                customer_email="buyer-paycap@example.com",
+                customer_name="Buyer",
+                total_amount=Decimal("11.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+                payment_method="cod",
+            )
+            session.add(order)
+            await session.commit()
+            await session.refresh(order)
+            return order.id
+
+    pending_id = asyncio.run(seed_pending_order())
+    pending_id_str = str(pending_id)
+
+    cancel_missing_reason = client.patch(
+        f"/api/v1/orders/admin/{pending_id_str}",
+        headers=auth_headers(admin_token),
+        json={"status": "cancelled"},
+    )
+    assert cancel_missing_reason.status_code == 400, cancel_missing_reason.text
+    assert "Cancel reason is required" in cancel_missing_reason.text
+
+    cancel = client.patch(
+        f"/api/v1/orders/admin/{pending_id_str}",
+        headers=auth_headers(admin_token),
+        json={"status": "cancelled", "cancel_reason": "Out of stock"},
+    )
+    assert cancel.status_code == 200, cancel.text
+    assert cancel.json()["status"] == "cancelled"
+    assert cancel.json()["cancel_reason"] == "Out of stock"
+
+    edit_reason = client.patch(
+        f"/api/v1/orders/admin/{pending_id_str}",
+        headers=auth_headers(admin_token),
+        json={"cancel_reason": "Out of stock (refund issued)"},
+    )
+    assert edit_reason.status_code == 200, edit_reason.text
+    assert edit_reason.json()["cancel_reason"] == "Out of stock (refund issued)"
 
 
 def test_admin_shipping_label_upload_download_and_delete(
@@ -467,7 +786,7 @@ def test_admin_shipping_label_upload_download_and_delete(
         async with SessionLocal() as session:
             order = Order(
                 user_id=user_id,
-                status=OrderStatus.pending,
+                status=OrderStatus.pending_acceptance,
                 reference_code="SHIPLABEL",
                 customer_email="buyer2@example.com",
                 customer_name="Buyer Two",

@@ -1,6 +1,8 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
+import { parseMoney } from '../shared/money';
+import { map } from 'rxjs/operators';
 
 export type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc';
 
@@ -27,6 +29,9 @@ export interface Product {
   short_description?: string;
   long_description?: string;
   base_price: number;
+  sale_price?: number | null;
+  sale_type?: 'percent' | 'amount' | null;
+  sale_value?: number | null;
   currency: string;
   stock_quantity?: number | null;
   allow_backorder?: boolean | null;
@@ -67,6 +72,7 @@ export interface ProductPriceBounds {
 
 export interface ProductFilterParams {
   category_slug?: string;
+  on_sale?: boolean;
   search?: string;
   min_price?: number;
   max_price?: number;
@@ -94,13 +100,24 @@ export interface BackInStockStatus {
 export class CatalogService {
   constructor(private api: ApiService) {}
 
+  private normalizeProduct(raw: any): Product {
+    return {
+      ...(raw ?? {}),
+      base_price: parseMoney(raw?.base_price),
+      sale_price: raw?.sale_price == null ? null : parseMoney(raw.sale_price),
+      sale_value: raw?.sale_value == null ? null : parseMoney(raw.sale_value)
+    } as Product;
+  }
+
   listCategories(): Observable<Category[]> {
     return this.api.get<Category[]>('/catalog/categories');
   }
 
   listProducts(params: ProductFilterParams): Observable<ProductListResponse> {
-    return this.api.get<ProductListResponse>('/catalog/products', {
+    return this.api
+      .get<ProductListResponse>('/catalog/products', {
       category_slug: params.category_slug,
+      on_sale: params.on_sale,
       search: params.search,
       min_price: params.min_price,
       max_price: params.max_price,
@@ -109,11 +126,17 @@ export class CatalogService {
       sort: params.sort,
       page: params.page ?? 1,
       limit: params.limit ?? 12
-    });
+    })
+      .pipe(
+        map((res: any) => ({
+          ...(res ?? {}),
+          items: (res?.items ?? []).map((p: any) => this.normalizeProduct(p))
+        }))
+      );
   }
 
   getProduct(slug: string): Observable<Product> {
-    return this.api.get<Product>(`/catalog/products/${slug}`);
+    return this.api.get<Product>(`/catalog/products/${slug}`).pipe(map((p: any) => this.normalizeProduct(p)));
   }
 
   getBackInStockStatus(slug: string): Observable<BackInStockStatus> {
@@ -128,9 +151,12 @@ export class CatalogService {
     return this.api.delete<void>(`/catalog/products/${slug}/back-in-stock`);
   }
 
-  getProductPriceBounds(params: Pick<ProductFilterParams, 'category_slug' | 'search' | 'is_featured' | 'tags'>): Observable<ProductPriceBounds> {
+  getProductPriceBounds(
+    params: Pick<ProductFilterParams, 'category_slug' | 'on_sale' | 'search' | 'is_featured' | 'tags'>
+  ): Observable<ProductPriceBounds> {
     return this.api.get<ProductPriceBounds>('/catalog/products/price-bounds', {
       category_slug: params.category_slug,
+      on_sale: params.on_sale,
       search: params.search,
       is_featured: params.is_featured,
       tags: params.tags?.length ? params.tags : undefined
@@ -138,6 +164,13 @@ export class CatalogService {
   }
 
   listFeaturedCollections(): Observable<FeaturedCollection[]> {
-    return this.api.get<FeaturedCollection[]>('/catalog/collections/featured');
+    return this.api.get<FeaturedCollection[]>('/catalog/collections/featured').pipe(
+      map((rows: any) =>
+        (rows ?? []).map((c: any) => ({
+          ...(c ?? {}),
+          products: (c?.products ?? []).map((p: any) => this.normalizeProduct(p))
+        }))
+      )
+    );
   }
 }

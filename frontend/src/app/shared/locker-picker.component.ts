@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, Input, OnChanges, OnDestroy, Output, EventEmitter, SimpleChanges, ViewChild } from '@angular/core';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ShippingService, LockerProvider, LockerRead } from '../core/shipping.service';
+import { LazyStylesService } from '../core/lazy-styles.service';
 
 type Leaflet = typeof import('leaflet');
 
@@ -94,7 +95,7 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
   private initialized = false;
   private lastCenter: { lat: number; lng: number } = { lat: 44.4268, lng: 26.1025 }; // Bucharest default
 
-  constructor(private shipping: ShippingService, private translate: TranslateService) {}
+  constructor(private shipping: ShippingService, private translate: TranslateService, private styles: LazyStylesService) {}
 
   ngAfterViewInit(): void {
     void this.initMap();
@@ -127,6 +128,7 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
     if (this.initialized) return;
     if (!this.mapHost?.nativeElement) return;
 
+    await this.styles.ensure('leaflet', 'assets/vendor/leaflet/leaflet.css');
     const L = await import('leaflet');
     this.leaflet = L;
 
@@ -224,4 +226,3 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
     }
   }
 }
-

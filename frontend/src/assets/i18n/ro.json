@@ -14,6 +14,10 @@
     "viewAdmin": "Vezi admin",
     "account": "Cont",
     "myProfile": "Profilul meu",
+    "myOrders": "Comenzile mele",
+    "myWishlist": "Lista de dorințe",
+    "myCoupons": "Cupoanele mele",
+    "helpCenter": "Ajutor",
     "cart": "Coș",
     "signIn": "Autentificare",
     "register": "Înregistrare",
@@ -76,6 +80,68 @@
     }
   },
   "account": {
+    "header": {
+      "signedInAs": "Conectat ca"
+    },
+    "sections": {
+      "overview": "Prezentare",
+      "profile": "Profil",
+      "addresses": "Adrese",
+      "notifications": "Notificări",
+      "security": "Securitate",
+      "comments": "Comentariile mele",
+      "privacy": "Confidențialitate & date"
+    },
+    "overview": {
+      "title": "Prezentare",
+      "quickLinks": "Acces rapid",
+      "wishlistHint": "Produse salvate pentru mai târziu.",
+      "notificationsHint": "Controlează actualizările pe email.",
+      "securityHint": "Parolă, Google, verificare."
+    },
+    "orders": {
+      "shopNew": "Vezi produse",
+      "statusLabel": "Stare",
+      "empty": "Nu ai comenzi încă.",
+      "browse": "Explorează produsele",
+      "reorder": "Recomandă din nou",
+      "receiptPdf": "Chitanță (PDF)",
+      "receiptShare": "Partajează chitanța",
+      "receiptRevoke": "Revocă partajarea"
+    },
+    "wishlist": {
+      "browse": "Explorează produsele",
+      "empty": "Nu ai produse salvate încă."
+    },
+    "coupons": {
+      "coupon": "Cupon",
+      "goToCheckout": "Finalizează comanda",
+      "useInCheckout": "Folosește la checkout",
+      "empty": "Nu ai cupoane încă.",
+      "loadError": "Nu am putut încărca cupoanele tale.",
+      "copy": "Copiază codul",
+      "copiedTitle": "Cod copiat",
+      "copiedCopy": "Lipește-l în câmpul de promoție din checkout.",
+      "validUntil": "Valabil până la",
+      "expired": "Expirat",
+      "inactive": "Inactiv",
+      "minSubtotal": "Subtotal minim",
+      "allowOnSale": "Se aplică și la produse la reducere",
+      "excludeOnSale": "Exclude produsele la reducere",
+      "percentOff": "{{value}}% reducere",
+      "amountOff": "{{value}} RON reducere",
+      "freeShipping": "Livrare gratuită"
+    },
+    "addresses": {
+      "add": "Adaugă adresă",
+      "empty": "Nu ai adrese încă.",
+      "defaultShipping": "Livrare implicită",
+      "defaultBilling": "Facturare implicită",
+      "makeDefaultShipping": "Setează ca livrare implicită",
+      "makeDefaultBilling": "Setează ca facturare implicită",
+      "edit": "Editează",
+      "delete": "Șterge"
+    },
     "completeProfile": {
       "title": "Completează profilul",
       "copy": "Pentru a continua, completează detaliile obligatorii de mai jos.",
@@ -171,12 +237,18 @@
     "ctaShop": "Cumpără acum",
     "ctaAdmin": "Vezi admin",
     "featured": "Produse recomandate",
+    "saleProducts": "La reducere",
     "newArrivals": "Cele mai noi",
     "viewAll": "Vezi toate",
     "noFeatured": "Nu există produse recomandate acum.",
+    "saleEmpty": "Nu există produse la reducere acum.",
     "newArrivalsEmpty": "Nu există noutăți acum.",
     "featuredError": {
       "title": "Nu am putut încărca produsele recomandate.",
+      "copy": "Verifică conexiunea și încearcă din nou."
+    },
+    "saleError": {
+      "title": "Nu am putut încărca produsele la reducere.",
       "copy": "Verifică conexiunea și încearcă din nou."
     },
     "newArrivalsError": {
@@ -208,6 +280,7 @@
     "searchPlaceholder": "Caută produse",
     "search": "Căutare",
     "categories": "Categorii",
+    "sale": "La reducere",
     "allCategories": "Toate categoriile",
     "priceRange": "Interval de preț",
     "ariaMinPrice": "Preț minim",
@@ -274,7 +347,7 @@
     "summary": "Sumar comandă",
     "subtotal": "Subtotal",
     "shipping": "Livrare",
-    "tax": "Taxe",
+    "tax": "TVA",
     "calcAtCheckout": "Calculat la checkout",
     "estimatedTotal": "Total estimat",
     "checkout": "Continuă la checkout",
@@ -298,6 +371,8 @@
     "emailVerifyVerified": "Verificat",
     "line1": "Adresă",
     "city": "Oraș",
+    "region": "Județ / Stat",
+    "regionSelect": "Selectează județul",
     "postal": "Cod poștal",
     "country": "Țară",
     "countrySelect": "Selectează țara",
@@ -310,6 +385,7 @@
     "courier": "Curier",
     "courierSameday": "Sameday",
     "courierFanCourier": "Fan Courier",
+    "locker": "Locker",
     "lockers": {
       "useMyLocation": "Folosește locația mea",
       "searchArea": "Caută în această zonă",
@@ -327,9 +403,14 @@
     "apply": "Aplică",
     "step4": "Plată",
     "paymentCard": "Card",
+    "paymentStripe": "Stripe",
+    "paymentNetopia": "Netopia",
     "paymentPayPal": "PayPal",
     "paymentCash": "Ramburs (cash)",
     "paymentCardHint": "Plătește cu cardul (procesare securizată).",
+    "paymentStripeHint": "Plătește cu Stripe (vei fi redirecționat).",
+    "paymentNetopiaHint": "Plătește cu Netopia (vei fi redirecționat).",
+    "paymentNetopiaDisabled": "Netopia nu este încă configurat.",
     "paymentPayPalHint": "Plătește cu PayPal (vei fi redirecționat).",
     "paymentCashHint": "Plătești cash la livrare (RON).",
     "paypalReturnTitle": "PayPal",
@@ -338,13 +419,49 @@
     "paypalCaptureFailed": "Nu am putut confirma plata PayPal. Încearcă din nou.",
     "paypalCancelled": "Plata PayPal a fost anulată",
     "paypalCancelledCopy": "Nu a fost efectuată nicio plată. Poți reveni la checkout și alege o altă metodă.",
+    "stripeReturnTitle": "Stripe",
+    "stripeConfirming": "Confirmăm plata Stripe…",
+    "stripeMissingSession": "Lipsește id-ul sesiunii Stripe.",
+    "stripeConfirmFailed": "Nu am putut confirma plata Stripe. Încearcă din nou.",
+    "stripeCancelled": "Plata Stripe a fost anulată",
+    "stripeCancelledCopy": "Nu a fost efectuată nicio plată. Poți reveni la checkout și alege o altă metodă.",
     "backToCheckout": "Înapoi la checkout",
     "placeOrder": "Plasează comanda",
     "backToCart": "Înapoi la coș",
+    "successTitle": "Comandă confirmată",
+    "successHeadline": "Mulțumim pentru comandă!",
+    "successCopy": "Ți-am trimis un email de confirmare. Poți continua cumpărăturile sau îți poți vedea comenzile.",
+    "successContinue": "Continuă cumpărăturile",
+    "successViewOrders": "Vezi comenzile mele",
+    "successReference": "Referință {{ref}}",
+    "successNoSummary": "Sumarul comenzii nu este încă disponibil. Verifică în cont pentru detalii.",
     "summary": "Sumar comandă",
     "subtotal": "Subtotal",
+    "additionalCost": "Cost suplimentar",
+    "tax": "TVA",
     "shipping": "Livrare",
     "promo": "Promo",
+    "promoApplied": "Codul {{code}} a fost aplicat.",
+    "promoPending": "Codul {{code}} va fi validat la checkout.",
+    "couponsLoginRequired": "Autentifică-te pentru a folosi cupoane.",
+    "couponsLoading": "Se încarcă cupoanele disponibile…",
+    "couponsLoadError": "Nu am putut încărca cupoanele.",
+    "availableCoupons": "Cupoane disponibile",
+    "unavailableCoupons": "Cupoane indisponibile",
+    "couponNotEligible": "Cupon neeligibil",
+    "couponReasons": {
+      "inactive": "Inactiv",
+      "not_started": "Nu a început încă",
+      "expired": "Expirat",
+      "no_eligible_items": "Nu există produse eligibile în coș",
+      "scope_no_match": "Nu există produse eligibile în coș",
+      "scope_excluded": "Produsele din coș sunt excluse",
+      "min_subtotal_not_met": "Subtotal minim neîndeplinit",
+      "shipping_already_free": "Livrarea este deja gratuită",
+      "sold_out": "Cupon epuizat",
+      "per_customer_limit_reached": "Ai folosit deja acest cupon",
+      "not_assigned": "Nu este disponibil pentru contul tău"
+    },
     "estimatedTotal": "Total estimat"
   },
   "auth": {
@@ -361,6 +478,7 @@
     "email": "Email",
     "username": "Utilizator",
     "password": "Parolă",
+    "keepSignedIn": "Păstrează-mă autentificat(ă)",
     "show": "Arată",
     "hide": "Ascunde",
     "showPassword": "Arată parola",
@@ -442,6 +560,16 @@
     "passwordMismatch": "Parolele nu coincid.",
     "phoneInvalid": "Introdu un număr de telefon valid."
   },
+  "addressForm": {
+    "label": "Etichetă",
+    "line1": "Adresă (linia 1)",
+    "line2": "Adresă (linia 2)",
+    "defaultShipping": "Setează ca livrare implicită",
+    "defaultBilling": "Setează ca facturare implicită",
+    "useAsBillingToo": "Folosește și ca facturare",
+    "cancel": "Anulează",
+    "save": "Salvează"
+  },
   "adminUi": {
     "errors": {
       "generic": "A apărut o problemă. Încearcă din nou."
@@ -452,6 +580,7 @@
       "products": "Produse",
       "orders": "Comenzi",
       "returns": "Retururi",
+      "coupons": "Cupoane",
       "users": "Utilizatori",
       "support": "Suport",
       "content": "Conținut"
@@ -483,6 +612,7 @@
       "cancel": "Anulează",
       "edit": "Editează",
       "refresh": "Reîncarcă",
+      "search": "Caută",
       "copy": "Copiază",
       "use": "Folosește",
       "prev": "Anterior",
@@ -528,18 +658,27 @@
         "meta": "Detalii",
         "order": "Comandă",
         "message": "Mesaj",
+        "thread": "Conversație",
+        "fromSupport": "Suport",
+        "fromCustomer": "Client",
+        "reply": "Răspunde",
+        "replyPlaceholder": "Scrie un răspuns pentru client…",
+        "solvedHint": "Acest tichet este marcat ca rezolvat.",
+        "sendReply": "Trimite răspuns",
         "statusLabel": "Stare",
         "adminNote": "Notă admin",
         "adminNotePlaceholder": "Notițe interne (nu sunt vizibile pentru client)…",
         "save": "Salvează"
       },
       "success": {
-        "saved": "Salvat."
+        "saved": "Salvat.",
+        "replySent": "Răspuns trimis."
       },
       "errors": {
         "load": "Nu am putut încărca mesajele.",
         "loadDetail": "Nu am putut încărca detaliile mesajului.",
-        "save": "Nu am putut salva modificările."
+        "save": "Nu am putut salva modificările.",
+        "reply": "Nu am putut trimite răspunsul."
       }
     },
     "returns": {
@@ -662,6 +801,24 @@
           "fetchFailed": "Nu s-a putut prelua miniatura."
         }
       },
+      "checkout": {
+        "title": "Setări checkout",
+        "hint": "Livrarea folosește aceste valori. Transportul gratuit se aplică atunci când subtotalul minus reducerile este cel puțin pragul.",
+        "shippingFee": "Taxă livrare (RON)",
+        "freeShippingThreshold": "Prag transport gratuit (RON)",
+        "feeEnabled": "Cost suplimentar activ",
+        "feeType": "Tip cost suplimentar",
+        "feeTypeFlat": "Sumă fixă (RON)",
+        "feeTypePercent": "Procent (%)",
+        "feeValue": "Valoare cost suplimentar",
+        "vatEnabled": "TVA activ",
+        "vatRatePercent": "Cota TVA (%)",
+        "vatApplyToShipping": "Aplică TVA la livrare",
+        "vatApplyToFee": "Aplică TVA la cost suplimentar",
+        "receiptShareDays": "Durată link chitanță (zile)",
+        "success": { "save": "Setările de checkout au fost salvate." },
+        "errors": { "save": "Nu am putut salva setările de checkout." }
+      },
       "seo": {
         "title": "Meta SEO",
         "page": "Pagină",
@@ -724,6 +881,7 @@
         "blocks": {
           "hero": "Erou",
           "featured_products": "Produse recomandate",
+          "sale_products": "La reducere",
           "new_arrivals": "Cele mai noi",
           "featured_collections": "Colecții recomandate",
           "story": "Povestea noastră",
@@ -984,6 +1142,7 @@
       "form": {
         "slug": "Slug",
         "slugAutoHint": "Generat automat după salvare.",
+        "priceFormatHint": "Folosește doar cifre și punct, cu maxim 2 zecimale (exemplu: 123.45).",
         "sku": "SKU",
         "shortDescription": "Descriere scurtă",
         "shortDescriptionHint": "Apare în carduri și liste (max 280 caractere).",
@@ -999,6 +1158,34 @@
         "highlight": "Evidențiat",
         "publishAt": "Publică la",
         "noImages": "Nu există imagini."
+      },
+      "sale": {
+        "title": "Reducere",
+        "enabled": "Activează reducerea",
+        "type": "Tip reducere",
+        "typePercent": "Procent",
+        "typeAmount": "Sumă",
+        "value": "Valoare",
+        "startAt": "Începe la",
+        "endAt": "Se termină la",
+        "autoPublish": "Publică automat când începe reducerea",
+        "note": "Modificarea reducerii mută produsul în Draft până la republicare.",
+        "startRequired": "Alege o dată de început atunci când publicarea automată este activată.",
+        "valueHint": "Folosește doar cifre și punct, cu maxim 2 zecimale (exemplu: 10.00).",
+        "percentHint": "Introdu un procent între 0 și 100."
+      },
+      "bulk": {
+        "selected": "{{count}} selectate",
+        "clearSelection": "Golește selecția",
+        "saleValue": "Valoare reducere",
+        "applySale": "Aplică reducerea",
+        "clearSale": "Șterge reducerea",
+        "publish": "Publică",
+        "note": "Aplicarea reducerii mută produsele în Draft. Folosește „Publică” când ești gata.",
+        "valueRequired": "Introdu valoarea reducerii.",
+        "success": "Produsele selectate au fost actualizate.",
+        "published": "Produsele selectate au fost publicate.",
+        "error": "Actualizarea în masă a eșuat."
       },
       "success": {
         "save": "Produs salvat",
@@ -1098,19 +1285,33 @@
       "shippingLabelDelete": "Șterge",
       "confirmDeleteLabel": "Ștergi eticheta de livrare pentru această comandă?",
       "save": "Salvează modificările",
-      "saveHint": "Actualizează statusul și tracking-ul; emailul se trimite la expediere.",
+      "saveHint": "Actualizează statusul și tracking-ul; emailurile se trimit la schimbări de status.",
       "actionsTitle": "Acțiuni",
+      "receiptLinks": {
+        "title": "Link-uri chitanță",
+        "share": "Generează link chitanță",
+        "revoke": "Revocă link-urile",
+        "expires": "Expiră",
+        "confirmRevoke": "Revoci toate link-urile de chitanță pentru această comandă?",
+        "copied": "Link chitanță copiat",
+        "ready": "Link chitanță pregătit",
+        "revoked": "Link-urile au fost revocate"
+      },
       "paymentTitle": "Plată",
       "paymentMethod": "Metodă de plată",
-      "paymentStripe": "Card (Stripe)",
+      "paymentStripe": "Stripe",
       "paymentCod": "Ramburs",
       "paymentPaypal": "PayPal",
+      "paymentNetopia": "Netopia",
       "customerCommsTitle": "Client",
       "paymentIntent": "Intent plată",
       "deliveryMethod": "Livrare",
       "deliveryHome": "Livrare la adresă",
       "deliveryLocker": "Ridicare din locker",
       "locker": "Locker",
+      "cancelReason": "Motiv anulare",
+      "cancelReasonPlaceholder": "De ce a fost anulată comanda?",
+      "cancelReasonHint": "Obligatoriu la anulare. Se afișează clientului și este inclus în emailul de anulare.",
       "refundNote": "Notă rambursare (opțional)",
       "refundNotePlaceholder": "Adaugă o notă pentru audit/email (opțional)",
       "refundHint": "Rambursarea este manuală; se înregistrează un eveniment și se notifică inbox-ul proprietarului.",
@@ -1149,8 +1350,11 @@
       "next": "Următor",
       "all": "Toate",
       "pending": "În așteptare",
-      "paid": "Plătită",
+      "pending_payment": "În așteptarea plății",
+      "pending_acceptance": "În așteptarea acceptării",
+      "paid": "În proces",
       "shipped": "Expediată",
+      "delivered": "Finalizată",
       "cancelled": "Anulată",
       "refunded": "Rambursată",
       "success": {
@@ -1167,6 +1371,7 @@
         "load": "Nu am putut încărca comenzile.",
         "export": "Nu am putut exporta comenzile.",
         "status": "Nu am putut actualiza comanda",
+        "cancelReasonRequired": "Motivul anulării este obligatoriu.",
         "retry": "Nu am putut reîncerca plata.",
         "capture": "Nu am putut captura plata.",
         "void": "Nu am putut anula plata.",
@@ -1175,7 +1380,9 @@
         "packingSlip": "Nu am putut descărca packing slip-ul.",
         "shippingLabelUpload": "Nu am putut încărca eticheta.",
         "shippingLabelDownload": "Nu am putut descărca eticheta.",
-        "shippingLabelDelete": "Nu am putut șterge eticheta."
+        "shippingLabelDelete": "Nu am putut șterge eticheta.",
+        "receiptShare": "Nu am putut genera link-ul de chitanță.",
+        "receiptRevoke": "Nu am putut revoca link-urile de chitanță."
       }
     },
     "users": {
@@ -1274,17 +1481,201 @@
       "code": "Cod",
       "percentOff": "% reducere",
       "add": "Adaugă cupon",
+      "invalidateStripe": "Resetează cache Stripe",
       "none": "Fără reducere setată",
       "active": "Activ",
       "inactive": "Inactiv",
       "success": {
         "create": "Cupon creat",
-        "update": "Cupon actualizat"
+        "update": "Cupon actualizat",
+        "invalidateStripe": "Cache-ul de cupoane Stripe a fost resetat ({{count}})"
       },
       "errors": {
         "required": "Codul cuponului este obligatoriu",
         "create": "Nu am putut crea cuponul",
-        "update": "Nu am putut actualiza cuponul"
+        "update": "Nu am putut actualiza cuponul",
+        "invalidateStripe": "Nu am putut reseta cache-ul de cupoane Stripe"
+      }
+    },
+    "couponsV2": {
+      "title": "Cupoane",
+      "subtitle": "Gestionează promoțiile, cupoanele și atribuirea cupoanelor.",
+      "common": {
+        "active": "Activ",
+        "inactive": "Inactiv",
+        "saving": "Se salvează…"
+      },
+      "discountTypes": {
+        "percent": "Reducere procentuală",
+        "amount": "Reducere sumă fixă",
+        "free_shipping": "Livrare gratuită"
+      },
+      "discountSummary": {
+        "freeShipping": "Livrare gratuită",
+        "amountOff": "-{{value}} RON",
+        "percentOff": "-{{value}}%"
+      },
+      "fields": {
+        "key": "Cheie (opțional)",
+        "name": "Nume",
+        "description": "Descriere",
+        "discountType": "Tip reducere",
+        "percentageOff": "% reducere",
+        "amountOff": "Reducere (RON)",
+        "maxDiscount": "Reducere maximă (RON)",
+        "minSubtotal": "Subtotal minim (RON)",
+        "allowOnSale": "Permite produse la reducere",
+        "startsAt": "Începe la",
+        "endsAt": "Se termină la",
+        "active": "Activ",
+        "automatic": "Automat"
+      },
+      "scopes": {
+        "title": "Reguli de aplicare",
+        "includedCategories": "Categorii incluse",
+        "excludedCategories": "Categorii excluse",
+        "searchProducts": "Caută produse",
+        "loadingProducts": "Se caută produse…",
+        "resolvingProducts": "Se încarcă numele produselor…",
+        "include": "Include",
+        "exclude": "Exclude",
+        "includedProducts": "Produse incluse",
+        "excludedProducts": "Produse excluse",
+        "none": "Niciunul"
+      },
+      "promotions": {
+        "title": "Promoții",
+        "hint": "Configurează regulile de reducere și aria de aplicare.",
+        "new": "Promoție nouă",
+        "empty": "Nu există promoții.",
+        "createTitle": "Creează promoție",
+        "editTitle": "Editează promoție",
+        "create": "Creează promoție",
+        "save": "Salvează promoția"
+      },
+      "coupons": {
+        "title": "Cupoane",
+        "hint": "Creează și gestionează coduri de cupon pentru o promoție.",
+        "new": "Cupon nou",
+        "search": "Caută după cod",
+        "empty": "Nu există cupoane pentru această promoție.",
+        "selectPromotion": "Selectează o promoție pentru a vedea cupoanele.",
+        "createTitle": "Creează cupon",
+        "editTitle": "Editează cupon",
+        "create": "Creează cupon",
+        "save": "Salvează cupon",
+        "fields": {
+          "promotion": "Promoție",
+          "code": "Cod",
+          "visibility": "Vizibilitate",
+          "active": "Activ",
+          "startsAt": "Începe la",
+          "endsAt": "Se termină la",
+          "globalMax": "Număr maxim global de utilizări",
+          "perCustomerMax": "Număr maxim per client"
+        },
+        "visibility": {
+          "public": "Public",
+          "assigned": "Atribuit"
+        },
+        "table": {
+          "code": "Cod",
+          "visibility": "Vizibilitate",
+          "active": "Activ",
+          "ends": "Se termină",
+          "actions": "Acțiuni"
+        }
+      },
+      "assignments": {
+        "title": "Atribuiri",
+        "hint": "Atribuie cupoane utilizatorilor prin email și revocă atunci când este necesar.",
+        "loading": "Se încarcă atribuiri…",
+        "empty": "Nu există atribuiri.",
+        "assignTitle": "Atribuire",
+        "revokeTitle": "Revocare",
+        "email": "Email client",
+        "reason": "Motiv (opțional)",
+        "sendEmail": "Trimite notificare prin email",
+        "assign": "Atribuie cupon",
+        "revoke": "Revocă cupon",
+        "active": "Activ",
+        "revoked": "Revocat",
+        "table": {
+          "user": "Utilizator",
+          "issued": "Atribuit",
+          "status": "Stare",
+          "reason": "Motiv"
+        }
+      },
+      "bulk": {
+        "title": "Acțiuni în masă",
+        "hint": "Încarcă un CSV cu emailurile clienților (prima coloană) pentru a atribui sau revoca acest cupon în masă.",
+        "clear": "Golește",
+        "parsed": "{{count}} emailuri pregătite",
+        "duplicates": "{{count}} duplicate ignorate",
+        "invalid": "{{count}} emailuri invalide",
+        "truncated": "{{count}} ignorate (max 500)",
+        "revokeReason": "Motiv revocare (opțional)",
+        "sendEmailAssign": "Trimite email de atribuire",
+        "sendEmailRevoke": "Trimite email de revocare",
+        "assign": "Atribuire în masă",
+        "revoke": "Revocare în masă",
+        "resultTitle": "Rezultat",
+        "resultCreated": "{{count}} atribuite",
+        "resultRestored": "{{count}} reactivate",
+        "resultAlreadyActive": "{{count}} deja atribuite",
+        "resultRevoked": "{{count}} revocate",
+        "resultAlreadyRevoked": "{{count}} deja revocate",
+        "resultNotAssigned": "{{count}} neatribuite",
+        "resultNotFound": "{{count}} utilizatori negăsiți",
+        "resultInvalid": "{{count}} emailuri invalide",
+        "noEmails": "Nu există emailuri încărcate",
+        "parseError": "Nu am putut interpreta CSV-ul",
+        "successAssign": "Atribuirea în masă a fost finalizată",
+        "successRevoke": "Revocarea în masă a fost finalizată",
+        "segment": {
+          "title": "Țintire pe segment",
+          "hint": "Țintește utilizatorii după preferințe (opt-in marketing, email verificat). Rulează în fundal pentru liste mari.",
+          "filterMarketing": "Opt-in marketing",
+          "filterVerified": "Email verificat",
+          "preview": "Previzualizează",
+          "assign": "Atribuire pe segment",
+          "revoke": "Revocare pe segment",
+          "previewTitle": "Previzualizare",
+          "candidates": "{{count}} eligibili",
+          "sample": "Exemple: {{emails}}",
+          "jobTitle": "Job în fundal",
+          "jobStatus": "Status: {{status}}",
+          "jobProgress": "Procesate {{processed}} / {{total}}",
+          "previewError": "Nu s-a putut previzualiza segmentul",
+          "started": "Jobul pe segment a pornit",
+          "completed": "Jobul pe segment s-a terminat"
+        }
+      },
+      "success": {
+        "savePromotion": "Promoția a fost salvată",
+        "saveCoupon": "Cuponul a fost salvat",
+        "assign": "Cupon atribuit",
+        "revoke": "Cupon revocat"
+      },
+      "errors": {
+        "validation": "Verifică formularul",
+        "promotionNameRequired": "Numele promoției este obligatoriu",
+        "invalidDateRange": "Data de final trebuie să fie după data de început",
+        "percentRequired": "Procentul trebuie să fie între 0 și 100",
+        "amountRequired": "Suma trebuie să fie mai mare decât 0",
+        "couponPromotionRequired": "Promoția este obligatorie",
+        "couponCodeRequired": "Codul cuponului este obligatoriu",
+        "emailRequired": "Emailul este obligatoriu",
+        "loadPromotions": "Nu s-au putut încărca promoțiile",
+        "savePromotion": "Nu s-a putut salva promoția",
+        "loadCoupons": "Nu s-au putut încărca cupoanele",
+        "saveCoupon": "Nu s-a putut salva cuponul",
+        "loadAssignments": "Nu s-au putut încărca atribuiri",
+        "assign": "Nu s-a putut atribui cuponul",
+        "revoke": "Nu s-a putut revoca cuponul",
+        "searchProducts": "Nu s-au putut căuta produsele",
+        "resolveProducts": "Nu s-au putut încărca produsele"
       }
     },
     "audit": {
@@ -1367,5 +1758,50 @@
     "addedBody": "{{name}} a fost adăugat la favorite.",
     "removedTitle": "Eliminat din favorite",
     "removedBody": "{{name}} a fost eliminat din favorite."
+  },
+  "tickets": {
+    "title": "Centru de ajutor",
+    "subtitle": "Urmărește solicitările de suport și răspunsurile.",
+    "contactLink": "Preferi formularul de contact?",
+    "inbox": "Tichetele mele",
+    "refresh": "Reîmprospătează",
+    "loading": "Se încarcă tichetele…",
+    "empty": "Nu există tichete.",
+    "order": "Comandă",
+    "newTitle": "Tichet nou",
+    "category": "Categoria problemei",
+    "categories": {
+      "refund": "Retur / ramburs",
+      "product": "Problemă produs / livrare",
+      "payments": "Problemă plată",
+      "other": "Altele"
+    },
+    "orderOptional": "Comandă (opțional)",
+    "orderSearchPlaceholder": "Caută în comenzile tale…",
+    "noOrder": "Fără comandă",
+    "orderHint": "Alegerea unei comenzi ne ajută să identificăm mai rapid achiziția.",
+    "description": "Descriere",
+    "descriptionPlaceholder": "Descrie problema și ce ajutor ai nevoie…",
+    "send": "Trimite",
+    "thread": "Conversație",
+    "threadEmpty": "Selectează un tichet pentru a vedea conversația.",
+    "created": "Creat",
+    "fromSupport": "Suport",
+    "fromYou": "Tu",
+    "reply": "Răspuns",
+    "solvedHint": "Acest tichet este marcat ca rezolvat.",
+    "replyPlaceholder": "Scrie un mesaj…",
+    "sendReply": "Trimite răspuns",
+    "success": {
+      "created": "Tichet creat.",
+      "sent": "Răspuns trimis."
+    },
+    "errors": {
+      "load": "Nu am putut încărca tichetele.",
+      "loadDetail": "Nu am putut încărca tichetul.",
+      "form": "Completează formularul.",
+      "create": "Nu am putut crea tichetul.",
+      "reply": "Nu am putut trimite răspunsul."
+    }
   }
 }

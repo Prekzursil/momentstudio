@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 import enum
 
 from sqlalchemy import DateTime, ForeignKey, Numeric, String, func, Enum
@@ -13,9 +14,11 @@ from app.models.user import User
 
 
 class OrderStatus(str, enum.Enum):
-    pending = "pending"
+    pending_payment = "pending_payment"
+    pending_acceptance = "pending_acceptance"
     paid = "paid"
     shipped = "shipped"
+    delivered = "delivered"
     cancelled = "cancelled"
     refunded = "refunded"
 
@@ -25,7 +28,10 @@ class Order(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), nullable=False, default=OrderStatus.pending)
+    status: Mapped[OrderStatus] = mapped_column(
+        Enum(OrderStatus, native_enum=False), nullable=False, default=OrderStatus.pending_acceptance
+    )
+    cancel_reason: Mapped[str | None] = mapped_column(String, nullable=True)
     reference_code: Mapped[str | None] = mapped_column(String(20), unique=True, nullable=True)
     customer_email: Mapped[str] = mapped_column(String(255), nullable=False)
     customer_name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -35,12 +41,14 @@ class Order(Base):
     shipping_label_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     shipping_label_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
     shipping_label_uploaded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    tax_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
-    shipping_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
-    total_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    tax_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    fee_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    shipping_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    total_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     payment_retry_count: Mapped[int] = mapped_column(default=0, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="RON")
     payment_method: Mapped[str] = mapped_column(String(20), nullable=False, default="stripe")
+    promo_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
     courier: Mapped[str | None] = mapped_column(String(30), nullable=True)
     delivery_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     locker_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
@@ -49,8 +57,10 @@ class Order(Base):
     locker_lat: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
     locker_lng: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
     stripe_payment_intent_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    stripe_checkout_session_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     paypal_order_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     paypal_capture_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    receipt_token_version: Mapped[int] = mapped_column(nullable=False, default=0)
     shipping_address_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("addresses.id"), nullable=True
     )
@@ -89,8 +99,8 @@ class OrderItem(Base):
     variant_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("product_variants.id"), nullable=True)
     quantity: Mapped[int] = mapped_column(nullable=False, default=1)
     shipped_quantity: Mapped[int] = mapped_column(nullable=False, default=0)
-    unit_price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
-    subtotal: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    unit_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    subtotal: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

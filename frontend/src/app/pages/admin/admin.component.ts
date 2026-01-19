@@ -1,9 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
-import { CardComponent } from '../../shared/card.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { InputComponent } from '../../shared/input.component';
 import { RichEditorComponent } from '../../shared/rich-editor.component';
@@ -44,6 +43,7 @@ type UiLang = 'en' | 'ro';
 type HomeSectionId =
   | 'hero'
   | 'featured_products'
+  | 'sale_products'
   | 'new_arrivals'
   | 'featured_collections'
   | 'story'
@@ -83,9 +83,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
   imports: [
     CommonModule,
     FormsModule,
-    RouterLink,
     BreadcrumbComponent,
-    CardComponent,
     ButtonComponent,
     InputComponent,
     RichEditorComponent,
@@ -221,6 +219,107 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
             <div class="flex items-center gap-2 text-sm">
               <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="socialMessage">{{ socialMessage }}</span>
               <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="socialError">{{ socialError }}</span>
+            </div>
+          </section>
+
+          <section *ngIf="section() === 'settings'" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex items-center justify-between gap-3">
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.checkout.title' | translate }}</h2>
+              <div class="flex items-center gap-2">
+                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadCheckoutSettings()"></app-button>
+                <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="saveCheckoutSettings()"></app-button>
+              </div>
+            </div>
+            <p class="text-xs text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.site.checkout.hint' | translate }}
+            </p>
+            <div class="grid md:grid-cols-2 gap-3 text-sm">
+              <app-input
+                [label]="'adminUi.site.checkout.shippingFee' | translate"
+                type="number"
+                [min]="0"
+                [step]="0.01"
+                placeholder="20.00"
+                [(value)]="checkoutSettingsForm.shipping_fee_ron"
+              ></app-input>
+              <app-input
+                [label]="'adminUi.site.checkout.freeShippingThreshold' | translate"
+                type="number"
+                [min]="0"
+                [step]="0.01"
+                placeholder="300.00"
+                [(value)]="checkoutSettingsForm.free_shipping_threshold_ron"
+              ></app-input>
+            </div>
+
+            <div class="grid gap-3 text-sm">
+              <label class="flex items-center gap-2">
+                <input type="checkbox" [(ngModel)]="checkoutSettingsForm.fee_enabled" />
+                <span class="text-slate-700 dark:text-slate-200">{{ 'adminUi.site.checkout.feeEnabled' | translate }}</span>
+              </label>
+              <div class="grid md:grid-cols-2 gap-3" *ngIf="checkoutSettingsForm.fee_enabled">
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.site.checkout.feeType' | translate }}
+                  <select
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="checkoutSettingsForm.fee_type"
+                  >
+                    <option value="flat">{{ 'adminUi.site.checkout.feeTypeFlat' | translate }}</option>
+                    <option value="percent">{{ 'adminUi.site.checkout.feeTypePercent' | translate }}</option>
+                  </select>
+                </label>
+                <app-input
+                  [label]="'adminUi.site.checkout.feeValue' | translate"
+                  type="number"
+                  [min]="0"
+                  [step]="0.01"
+                  placeholder="0.00"
+                  [(value)]="checkoutSettingsForm.fee_value"
+                ></app-input>
+              </div>
+            </div>
+
+            <div class="grid gap-3 text-sm">
+              <label class="flex items-center gap-2">
+                <input type="checkbox" [(ngModel)]="checkoutSettingsForm.vat_enabled" />
+                <span class="text-slate-700 dark:text-slate-200">{{ 'adminUi.site.checkout.vatEnabled' | translate }}</span>
+              </label>
+              <div class="grid md:grid-cols-2 gap-3" *ngIf="checkoutSettingsForm.vat_enabled">
+                <app-input
+                  [label]="'adminUi.site.checkout.vatRatePercent' | translate"
+                  type="number"
+                  [min]="0"
+                  [max]="100"
+                  [step]="0.01"
+                  placeholder="10.00"
+                  [(value)]="checkoutSettingsForm.vat_rate_percent"
+                ></app-input>
+                <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
+                  <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                    <input type="checkbox" [(ngModel)]="checkoutSettingsForm.vat_apply_to_shipping" />
+                    <span>{{ 'adminUi.site.checkout.vatApplyToShipping' | translate }}</span>
+                  </label>
+                  <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                    <input type="checkbox" [(ngModel)]="checkoutSettingsForm.vat_apply_to_fee" />
+                    <span>{{ 'adminUi.site.checkout.vatApplyToFee' | translate }}</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-3 text-sm">
+              <app-input
+                [label]="'adminUi.site.checkout.receiptShareDays' | translate"
+                type="number"
+                [min]="1"
+                [step]="1"
+                placeholder="365"
+                [(value)]="checkoutSettingsForm.receipt_share_days"
+              ></app-input>
+            </div>
+            <div class="flex items-center gap-2 text-sm">
+              <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="checkoutSettingsMessage">{{ checkoutSettingsMessage }}</span>
+              <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="checkoutSettingsError">{{ checkoutSettingsError }}</span>
             </div>
           </section>
 
@@ -1202,7 +1301,8 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                 {{ 'adminUi.orders.statusFilter' | translate }}
                 <select class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="orderFilter">
                   <option value="">{{ 'adminUi.orders.all' | translate }}</option>
-                  <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
+                  <option value="pending_payment">{{ 'adminUi.orders.pending_payment' | translate }}</option>
+                  <option value="pending_acceptance">{{ 'adminUi.orders.pending_acceptance' | translate }}</option>
                   <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
                   <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
                   <option value="refunded">{{ 'adminUi.orders.refunded' | translate }}</option>
@@ -1223,7 +1323,8 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                 <div class="flex items-center justify-between">
                   <h3 class="font-semibold text-slate-900 dark:text-slate-50">Order #{{ activeOrder.id }}</h3>
                   <select class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [ngModel]="activeOrder.status" (ngModelChange)="changeOrderStatus($event)">
-                    <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
+                    <option value="pending_payment">{{ 'adminUi.orders.pending_payment' | translate }}</option>
+                    <option value="pending_acceptance">{{ 'adminUi.orders.pending_acceptance' | translate }}</option>
                     <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
                     <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
                     <option value="cancelled">{{ 'adminUi.orders.cancelled' | translate }}</option>
@@ -1867,15 +1968,18 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     <ng-container *ngIf="!coupon.percentage_off && !coupon.amount_off">{{ 'adminUi.coupons.none' | translate }}</ng-container>
                   </p>
                 </div>
-                <button
-                  type="button"
-                  class="text-xs rounded-full px-2 py-1 border border-slate-200 dark:border-slate-700"
-                  [class.bg-emerald-100]="coupon.active"
-                  [class.text-emerald-800]="coupon.active"
-                  (click)="toggleCoupon(coupon)"
-                >
-                  {{ coupon.active ? ('adminUi.coupons.active' | translate) : ('adminUi.coupons.inactive' | translate) }}
-                </button>
+                <div class="flex items-center gap-2">
+                  <app-button size="sm" variant="ghost" [label]="'adminUi.coupons.invalidateStripe' | translate" (action)="invalidateCouponStripe(coupon)"></app-button>
+                  <button
+                    type="button"
+                    class="text-xs rounded-full px-2 py-1 border border-slate-200 dark:border-slate-700"
+                    [class.bg-emerald-100]="coupon.active"
+                    [class.text-emerald-800]="coupon.active"
+                    (click)="toggleCoupon(coupon)"
+                  >
+                    {{ coupon.active ? ('adminUi.coupons.active' | translate) : ('adminUi.coupons.inactive' | translate) }}
+                  </button>
+                </div>
               </div>
             </div>
           </section>
@@ -2104,6 +2208,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                   >
                     <option [ngValue]="'site.assets'">{{ 'adminUi.site.assets.title' | translate }}</option>
                     <option [ngValue]="'site.social'">{{ 'adminUi.site.social.title' | translate }}</option>
+                    <option [ngValue]="'site.checkout'">{{ 'adminUi.site.checkout.title' | translate }}</option>
                     <option [ngValue]="'seo.' + seoPage">{{ ('adminUi.site.seo.title' | translate) + ' · ' + seoPage.toUpperCase() }}</option>
                   </select>
                 </label>
@@ -2300,6 +2405,31 @@ export class AdminComponent implements OnInit, OnDestroy {
   socialError: string | null = null;
   socialThumbLoading: Record<string, boolean> = {};
   socialThumbErrors: Record<string, string> = {};
+  checkoutSettingsForm: {
+    shipping_fee_ron: number | string;
+    free_shipping_threshold_ron: number | string;
+    fee_enabled: boolean;
+    fee_type: 'flat' | 'percent';
+    fee_value: number | string;
+    vat_enabled: boolean;
+    vat_rate_percent: number | string;
+    vat_apply_to_shipping: boolean;
+    vat_apply_to_fee: boolean;
+    receipt_share_days: number | string;
+  } = {
+    shipping_fee_ron: 20,
+    free_shipping_threshold_ron: 300,
+    fee_enabled: false,
+    fee_type: 'flat',
+    fee_value: 0,
+    vat_enabled: true,
+    vat_rate_percent: 10,
+    vat_apply_to_shipping: false,
+    vat_apply_to_fee: false,
+    receipt_share_days: 365
+  };
+  checkoutSettingsMessage: string | null = null;
+  checkoutSettingsError: string | null = null;
   seoLang: 'en' | 'ro' = 'en';
   seoPage: 'home' | 'shop' | 'product' | 'category' | 'about' = 'home';
   seoForm = { title: '', description: '' };
@@ -2420,6 +2550,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         return 'adminUi.site.assets.title';
       case 'site.social':
         return 'adminUi.site.social.title';
+      case 'site.checkout':
+        return 'adminUi.site.checkout.title';
       default:
         return 'adminUi.content.revisions.title';
     }
@@ -2529,6 +2661,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
     this.loadAssets();
     this.loadSocial();
+    this.loadCheckoutSettings();
     this.loadSeo();
     this.loadFxStatus();
     this.admin.getMaintenance().subscribe({
@@ -3121,6 +3254,15 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.toast.success(this.t('adminUi.coupons.success.update'));
       },
       error: () => this.toast.error(this.t('adminUi.coupons.errors.update'))
+    });
+  }
+
+  invalidateCouponStripe(coupon: AdminCoupon): void {
+    this.admin.invalidateCouponStripeMappings(coupon.id).subscribe({
+      next: (res) => {
+        this.toast.success(this.t('adminUi.coupons.success.invalidateStripe', { count: res.deleted_mappings }));
+      },
+      error: () => this.toast.error(this.t('adminUi.coupons.errors.invalidateStripe'))
     });
   }
 
@@ -3816,6 +3958,138 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
+  loadCheckoutSettings(): void {
+    this.checkoutSettingsError = null;
+    this.checkoutSettingsMessage = null;
+    this.admin.getContent('site.checkout').subscribe({
+      next: (block) => {
+        this.rememberContentVersion('site.checkout', block);
+        const meta = (block.meta || {}) as Record<string, any>;
+        const parseBool = (value: any, fallback: boolean) => {
+          if (typeof value === 'boolean') return value;
+          if (typeof value === 'number') return Boolean(value);
+          if (typeof value === 'string') {
+            const v = value.trim().toLowerCase();
+            if (['1', 'true', 'yes', 'on'].includes(v)) return true;
+            if (['0', 'false', 'no', 'off'].includes(v)) return false;
+          }
+          return fallback;
+        };
+        const shipping = Number(meta['shipping_fee_ron']);
+        const threshold = Number(meta['free_shipping_threshold_ron']);
+        const feeEnabled = parseBool(meta['fee_enabled'], false);
+        const feeTypeRaw = String(meta['fee_type'] ?? 'flat').trim().toLowerCase();
+        const feeType = feeTypeRaw === 'percent' ? 'percent' : 'flat';
+        const feeValueRaw = Number(meta['fee_value']);
+        const feeValue = Number.isFinite(feeValueRaw) && feeValueRaw >= 0 ? feeValueRaw : 0;
+        const vatEnabled = parseBool(meta['vat_enabled'], true);
+        const vatRateRaw = Number(meta['vat_rate_percent']);
+        const vatRate = Number.isFinite(vatRateRaw) && vatRateRaw >= 0 && vatRateRaw <= 100 ? vatRateRaw : 10;
+        const vatApplyToShipping = parseBool(meta['vat_apply_to_shipping'], false);
+        const vatApplyToFee = parseBool(meta['vat_apply_to_fee'], false);
+        const receiptDaysRaw = Number(meta['receipt_share_days']);
+        const receiptShareDays =
+          Number.isFinite(receiptDaysRaw) && receiptDaysRaw >= 1 && receiptDaysRaw <= 3650 ? Math.trunc(receiptDaysRaw) : 365;
+        this.checkoutSettingsForm = {
+          shipping_fee_ron: Number.isFinite(shipping) && shipping >= 0 ? shipping : 20,
+          free_shipping_threshold_ron: Number.isFinite(threshold) && threshold >= 0 ? threshold : 300,
+          fee_enabled: feeEnabled,
+          fee_type: feeType,
+          fee_value: feeValue,
+          vat_enabled: vatEnabled,
+          vat_rate_percent: vatRate,
+          vat_apply_to_shipping: vatApplyToShipping,
+          vat_apply_to_fee: vatApplyToFee,
+          receipt_share_days: receiptShareDays
+        };
+      },
+      error: () => {
+        delete this.contentVersions['site.checkout'];
+        this.checkoutSettingsForm = {
+          shipping_fee_ron: 20,
+          free_shipping_threshold_ron: 300,
+          fee_enabled: false,
+          fee_type: 'flat',
+          fee_value: 0,
+          vat_enabled: true,
+          vat_rate_percent: 10,
+          vat_apply_to_shipping: false,
+          vat_apply_to_fee: false,
+          receipt_share_days: 365
+        };
+      }
+    });
+  }
+
+  saveCheckoutSettings(): void {
+    this.checkoutSettingsMessage = null;
+    this.checkoutSettingsError = null;
+    const shippingRaw = Number(this.checkoutSettingsForm.shipping_fee_ron);
+    const thresholdRaw = Number(this.checkoutSettingsForm.free_shipping_threshold_ron);
+    const shipping = Number.isFinite(shippingRaw) && shippingRaw >= 0 ? Math.round(shippingRaw * 100) / 100 : 20;
+    const threshold = Number.isFinite(thresholdRaw) && thresholdRaw >= 0 ? Math.round(thresholdRaw * 100) / 100 : 300;
+
+    const feeEnabled = Boolean(this.checkoutSettingsForm.fee_enabled);
+    const feeType = this.checkoutSettingsForm.fee_type === 'percent' ? 'percent' : 'flat';
+    const feeValueRaw = Number(this.checkoutSettingsForm.fee_value);
+    const feeValue = Number.isFinite(feeValueRaw) && feeValueRaw >= 0 ? Math.round(feeValueRaw * 100) / 100 : 0;
+
+    const vatEnabled = Boolean(this.checkoutSettingsForm.vat_enabled);
+    const vatRateRaw = Number(this.checkoutSettingsForm.vat_rate_percent);
+    const vatRate =
+      Number.isFinite(vatRateRaw) && vatRateRaw >= 0 && vatRateRaw <= 100 ? Math.round(vatRateRaw * 100) / 100 : 10;
+    const vatApplyToShipping = Boolean(this.checkoutSettingsForm.vat_apply_to_shipping);
+    const vatApplyToFee = Boolean(this.checkoutSettingsForm.vat_apply_to_fee);
+
+    const receiptDaysRaw = Number(this.checkoutSettingsForm.receipt_share_days);
+    const receiptShareDays =
+      Number.isFinite(receiptDaysRaw) && receiptDaysRaw >= 1 && receiptDaysRaw <= 3650 ? Math.trunc(receiptDaysRaw) : 365;
+
+    const payload = {
+      title: 'Checkout settings',
+      body_markdown:
+        'Checkout pricing settings (shipping, discounts, VAT, additional fees, and receipt sharing).',
+      status: 'published',
+      meta: {
+        version: 1,
+        shipping_fee_ron: shipping,
+        free_shipping_threshold_ron: threshold,
+        fee_enabled: feeEnabled,
+        fee_type: feeType,
+        fee_value: feeValue,
+        vat_enabled: vatEnabled,
+        vat_rate_percent: vatRate,
+        vat_apply_to_shipping: vatApplyToShipping,
+        vat_apply_to_fee: vatApplyToFee,
+        receipt_share_days: receiptShareDays
+      }
+    };
+
+    const onSuccess = (block?: { version?: number } | null) => {
+      this.rememberContentVersion('site.checkout', block);
+      this.checkoutSettingsMessage = this.t('adminUi.site.checkout.success.save');
+      this.checkoutSettingsError = null;
+    };
+
+    this.admin.updateContentBlock('site.checkout', this.withExpectedVersion('site.checkout', payload)).subscribe({
+      next: (block) => onSuccess(block),
+      error: (err) => {
+        if (this.handleContentConflict(err, 'site.checkout', () => this.loadCheckoutSettings())) {
+          this.checkoutSettingsError = this.t('adminUi.site.checkout.errors.save');
+          this.checkoutSettingsMessage = null;
+          return;
+        }
+        this.admin.createContent('site.checkout', payload).subscribe({
+          next: (created) => onSuccess(created),
+          error: () => {
+            this.checkoutSettingsError = this.t('adminUi.site.checkout.errors.save');
+            this.checkoutSettingsMessage = null;
+          }
+        });
+      }
+    });
+  }
+
 	  saveAssets(): void {
 	    const payload = {
 	      title: 'Site assets',
@@ -4058,7 +4332,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   loadInfo(): void {
     const loadKey = async (key: string, target: 'about' | 'faq' | 'shipping' | 'contact'): Promise<void> => {
-      const next: LocalizedText = { en: '', ro: '' };
+      const next: LocalizedText = { ...this.infoForm[target] };
       let meta: Record<string, unknown> | null | undefined;
 
       try {
@@ -4066,6 +4340,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.rememberContentVersion(key, enBlock);
         next.en = enBlock.body_markdown || '';
         meta = (enBlock as { meta?: Record<string, unknown> | null }).meta;
+        this.infoForm[target] = { ...this.infoForm[target], en: next.en };
       } catch {
         delete this.contentVersions[key];
       }
@@ -4076,11 +4351,10 @@ export class AdminComponent implements OnInit, OnDestroy {
         if (!meta) {
           meta = (roBlock as { meta?: Record<string, unknown> | null }).meta;
         }
+        this.infoForm[target] = { ...this.infoForm[target], ro: next.ro };
       } catch {
         // ignore
       }
-
-      this.infoForm[target] = next;
 
       if (key === 'page.about' || key === 'page.contact') {
         const pageKey = key as PageBuilderKey;
@@ -4485,6 +4759,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     return (
       value === 'hero' ||
       value === 'featured_products' ||
+      value === 'sale_products' ||
       value === 'new_arrivals' ||
       value === 'featured_collections' ||
       value === 'story' ||
@@ -4506,14 +4781,24 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (key === 'collections') return 'featured_collections';
     if (key === 'featured') return 'featured_products';
     if (key === 'bestsellers') return 'featured_products';
+    if (key === 'sale' || key === 'sales') return 'sale_products';
     if (key === 'new') return 'new_arrivals';
     if (key === 'recent') return 'recently_viewed';
     if (key === 'recentlyviewed') return 'recently_viewed';
     return null;
   }
 
-  private defaultHomeSectionIds(): HomeSectionId[] {
-    return ['hero', 'featured_products', 'new_arrivals', 'featured_collections', 'story', 'recently_viewed', 'why'];
+  private defaultHomeSections(): { id: HomeSectionId; enabled: boolean }[] {
+    return [
+      { id: 'hero', enabled: true },
+      { id: 'featured_products', enabled: true },
+      { id: 'sale_products', enabled: false },
+      { id: 'new_arrivals', enabled: true },
+      { id: 'featured_collections', enabled: true },
+      { id: 'story', enabled: true },
+      { id: 'recently_viewed', enabled: true },
+      { id: 'why', enabled: true }
+    ];
   }
 
   private makeHomeBlockDraft(key: string, type: HomeBlockType, enabled: boolean): HomeBlockDraft {
@@ -4534,9 +4819,9 @@ export class AdminComponent implements OnInit, OnDestroy {
   private ensureAllDefaultHomeBlocks(blocks: HomeBlockDraft[]): HomeBlockDraft[] {
     const out = [...blocks];
     const existing = new Set(out.filter((b) => this.isHomeSectionId(b.type)).map((b) => b.type as HomeSectionId));
-    for (const id of this.defaultHomeSectionIds()) {
+    for (const { id, enabled } of this.defaultHomeSections()) {
       if (existing.has(id)) continue;
-      out.push(this.makeHomeBlockDraft(id, id, true));
+      out.push(this.makeHomeBlockDraft(id, id, enabled));
     }
     return out;
   }

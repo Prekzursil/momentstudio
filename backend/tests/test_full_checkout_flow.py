@@ -8,13 +8,17 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.future import select
 
+from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
-from app.models.catalog import Category, Product, ProductImage
+from app.models.catalog import Category, Product, ProductImage, ProductStatus
 from app.models.order import Order
+from app.models.promo import PromoCode
 from app.models.user import User
 from app.schemas.order import ShippingMethodCreate
+from app.schemas.promo import PromoCodeCreate
+from app.services import cart as cart_service
 from app.services import payments
 from app.services import email as email_service
 from app.services import order as order_service
@@ -58,11 +62,13 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
                 base_price=Decimal("25.00"),
                 currency="RON",
                 stock_quantity=5,
+                status=ProductStatus.published,
                 images=[ProductImage(url="/media/flow.png", alt_text="flow")],
             )
             shipping = await order_service.create_shipping_method(
                 session, ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0)
             )
+            await cart_service.create_promo(session, PromoCodeCreate(code="SAVE10", percentage_off=10, currency="RON"))
             session.add_all([product])
             await session.commit()
             await session.refresh(product)
@@ -72,15 +78,35 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
 
     captured: dict[str, object] = {}
 
-    async def fake_create_payment_intent(session, cart, amount_cents=None):
+    async def fake_create_checkout_session(
+        *,
+        session: object,
+        amount_cents: int,
+        customer_email: str,
+        success_url: str,
+        cancel_url: str,
+        lang: str | None = None,
+        metadata: dict[str, str] | None = None,
+        line_items: list[dict[str, object]] | None = None,
+        discount_cents: int | None = None,
+        promo_code: str | None = None,
+    ) -> dict:
+        captured["promo_code"] = promo_code
         captured["amount_cents"] = amount_cents
-        return {"client_secret": "secret_logged", "intent_id": "pi_logged"}
+        captured["customer_email"] = customer_email
+        captured["success_url"] = success_url
+        captured["cancel_url"] = cancel_url
+        captured["lang"] = lang
+        captured["metadata"] = metadata
+        captured["line_items"] = line_items or []
+        captured["discount_cents"] = discount_cents
+        return {"session_id": "cs_test_logged", "checkout_url": "https://checkout.stripe.test/session/cs_test_logged"}
 
     async def fake_order_email(*args, **kwargs):
         captured["email_sent"] = True
         return True
 
-    monkeypatch.setattr(payments, "create_payment_intent", fake_create_payment_intent)
+    monkeypatch.setattr(payments, "create_checkout_session", fake_create_checkout_session)
     monkeypatch.setattr(email_service, "send_order_confirmation", fake_order_email)
 
     # Register and login
@@ -119,7 +145,7 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
     )
     assert add_res.status_code in (200, 201), add_res.text
 
-    # Checkout as authenticated user (returns order_id + client_secret)
+    # Checkout as authenticated user (returns order_id + Stripe checkout URL)
     order_res = client.post(
         "/api/v1/orders/checkout",
         headers={"Authorization": f"Bearer {token}"},
@@ -131,14 +157,37 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
             "region": "FT",
             "postal_code": "12345",
             "country": "US",
-            "promo_code": None,
+            "promo_code": "SAVE10",
         },
     )
     assert order_res.status_code == 201, order_res.text
     body = order_res.json()
     assert body["order_id"]
-    assert body["client_secret"]
+    assert body["payment_method"] == "stripe"
+    assert body["stripe_session_id"] == "cs_test_logged"
+    assert body["stripe_checkout_url"].startswith("https://")
+    assert captured.get("email_sent") is None
+
+    async def promo_times_used() -> int:
+        async with SessionLocal() as session:
+            promo = (await session.execute(select(PromoCode).where(PromoCode.code == "SAVE10"))).scalar_one()
+            return int(promo.times_used)
+
+    assert asyncio.run(promo_times_used()) == 0
+
+    monkeypatch.setattr(settings, "stripe_webhook_secret", "whsec_test")
+    monkeypatch.setattr(
+        "app.services.payments.stripe.Webhook.construct_event",
+        lambda payload, sig_header, secret: {
+            "id": "evt_full_flow_1",
+            "type": "checkout.session.completed",
+            "data": {"object": {"id": "cs_test_logged", "payment_intent": "pi_test", "payment_status": "paid"}},
+        },
+    )
+    webhook = client.post("/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"})
+    assert webhook.status_code == 200, webhook.text
     assert captured.get("email_sent") is True
+    assert asyncio.run(promo_times_used()) == 1
 
     # Verify order is visible via API endpoints
     list_res = client.get("/api/v1/orders", headers={"Authorization": f"Bearer {token}"})

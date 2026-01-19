@@ -133,6 +133,31 @@ cd backend
 python -m app.cli bootstrap-owner --email owner@example.com --password 'ChangeMe123' --username owner --display-name 'Owner'
 ```
 
+Note: `bootstrap-owner` will overwrite the target user's **username**, **display name**, and **password** to the provided values. Use it only for initial setup or intentional resets.
+
+If you accidentally changed the owner email and got locked out by cooldowns/unverified-email guards in local dev, you can repair the existing owner without creating a new account:
+
+```bash
+cd backend
+python -m app.cli repair-owner --email owner@example.com --verify-email
+```
+
+### Docker Compose DB persistence (local dev + E2E)
+
+- The Docker Compose stack uses a named Postgres volume (`db_data`) to persist the database.
+- `docker compose -f infra/docker-compose.yml down` stops containers but keeps the DB.
+- `docker compose -f infra/docker-compose.yml down -v` deletes the DB volume (full reset). After a reset you must re-run:
+  - `docker compose -f infra/docker-compose.yml exec -T backend alembic upgrade head`
+  - `docker compose -f infra/docker-compose.yml exec -T backend python -m app.seeds`
+  - `docker compose -f infra/docker-compose.yml exec -T backend python -m app.cli bootstrap-owner --email owner@example.com --password 'ChangeMe123' --username owner --display-name 'Owner'`
+
+Playwright E2E defaults to `owner` / `Password123` unless overridden:
+
+```bash
+cd frontend
+E2E_BASE_URL=http://localhost:4201 E2E_OWNER_IDENTIFIER=owner E2E_OWNER_PASSWORD=Password123 npm run e2e
+```
+
 ## 3. Features Overview
 
 ### Customer‑Facing
@@ -390,6 +415,9 @@ npm start
 cd infra
 docker compose up --build
 ```
+
+- Docker frontend available at: http://localhost:4201
+- Docker backend available at: http://localhost:8001 (docs at: http://localhost:8001/docs)
 
 ### Caching & CDN (guidance)
 

@@ -2,13 +2,14 @@ import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { CheckoutComponent } from './checkout.component';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
-import { Router } from '@angular/router';
+import { Router, convertToParamMap } from '@angular/router';
 import { CartStore } from '../../core/cart.store';
 import { CartApi } from '../../core/cart.api';
 import { ApiService } from '../../core/api.service';
 import { ActivatedRoute } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { AuthService } from '../../core/auth.service';
+import { RouterTestingModule } from '@angular/router/testing';
 
 describe('CheckoutComponent', () => {
   const itemsSignal = signal([
@@ -29,7 +30,6 @@ describe('CheckoutComponent', () => {
 
   let cartApi: any;
   let apiService: any;
-  let router: any;
   let auth: any;
 
   beforeEach(() => {
@@ -37,28 +37,31 @@ describe('CheckoutComponent', () => {
     cartApi.sync.and.returnValue(of({}));
     cartApi.headers.and.returnValue({});
 
-    apiService = jasmine.createSpyObj('ApiService', ['post']);
+    apiService = jasmine.createSpyObj('ApiService', ['post', 'get']);
     apiService.post.and.returnValue(of({ order_id: 'order1', reference_code: 'REF', client_secret: 'pi_secret' }));
+    apiService.get.and.returnValue(of({ eligible: [], ineligible: [] }));
 
-    router = jasmine.createSpyObj('Router', ['navigate']);
     auth = jasmine.createSpyObj('AuthService', ['isAuthenticated', 'user']);
     auth.isAuthenticated.and.returnValue(true);
     auth.user.and.returnValue({ email_verified: true });
 
+    const emptyQueryParamMap = convertToParamMap({});
+
     TestBed.configureTestingModule({
-      imports: [CheckoutComponent, TranslateModule.forRoot()],
+      imports: [RouterTestingModule, CheckoutComponent, TranslateModule.forRoot()],
       providers: [
-        { provide: Router, useValue: router },
-        { provide: CartStore, useValue: { items: itemsSignal, subtotal: subtotalSignal } },
+        { provide: CartStore, useValue: { items: itemsSignal, subtotal: subtotalSignal, clear: jasmine.createSpy('clear'), hydrateFromBackend: jasmine.createSpy('hydrateFromBackend') } },
         { provide: CartApi, useValue: cartApi },
         { provide: ApiService, useValue: apiService },
         { provide: AuthService, useValue: auth },
-        { provide: ActivatedRoute, useValue: { snapshot: { params: {} } } }
+        { provide: ActivatedRoute, useValue: { snapshot: { params: {}, queryParamMap: emptyQueryParamMap }, queryParamMap: of(emptyQueryParamMap) } }
       ]
     });
   });
 
   it('submits authenticated checkout via /orders/checkout', fakeAsync(() => {
+    const router = TestBed.inject(Router);
+    spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
     const fixture = TestBed.createComponent(CheckoutComponent);
     const cmp = fixture.componentInstance;
     cmp.paymentMethod = 'cod';

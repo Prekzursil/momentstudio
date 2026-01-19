@@ -5,7 +5,7 @@ import { of } from 'rxjs';
 import { CartStore } from '../../core/cart.store';
 import { CartApi } from '../../core/cart.api';
 import { ApiService } from '../../core/api.service';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { AuthService } from '../../core/auth.service';
 import { RouterTestingModule } from '@angular/router/testing';
@@ -36,42 +36,44 @@ describe('Checkout auth gating', () => {
     cartApi.sync.and.returnValue(of({}));
     cartApi.headers.and.returnValue({});
 
-    apiService = jasmine.createSpyObj('ApiService', ['post']);
-    apiService.post.and.returnValue(of({ order_id: 'order1', reference_code: 'REF', client_secret: 'pi_secret' }));
+    apiService = jasmine.createSpyObj('ApiService', ['post', 'get']);
+    apiService.post.and.returnValue(of({ order_id: 'order1', reference_code: 'REF', payment_method: 'cod' }));
+    apiService.get.and.returnValue(of({ email: null, verified: false }));
 
     auth = jasmine.createSpyObj('AuthService', ['isAuthenticated', 'user']);
     auth.isAuthenticated.and.returnValue(false);
     auth.user.and.returnValue(null);
 
+    const emptyQueryParamMap = convertToParamMap({});
+
     TestBed.configureTestingModule({
       imports: [RouterTestingModule, CheckoutComponent, TranslateModule.forRoot()],
       providers: [
-        { provide: CartStore, useValue: { items: itemsSignal, subtotal: subtotalSignal } },
+        { provide: CartStore, useValue: { items: itemsSignal, subtotal: subtotalSignal, clear: jasmine.createSpy('clear'), hydrateFromBackend: jasmine.createSpy('hydrateFromBackend') } },
         { provide: CartApi, useValue: cartApi },
         { provide: ApiService, useValue: apiService },
         { provide: AuthService, useValue: auth },
-        { provide: ActivatedRoute, useValue: { snapshot: { params: {} } } }
+        { provide: ActivatedRoute, useValue: { snapshot: { params: {}, queryParamMap: emptyQueryParamMap }, queryParamMap: of(emptyQueryParamMap) } }
       ]
     });
   });
 
   it('renders login/register actions when signed out', fakeAsync(() => {
-    spyOn(CheckoutComponent.prototype, 'ngAfterViewInit').and.returnValue(Promise.resolve());
     const fixture = TestBed.createComponent(CheckoutComponent);
     fixture.detectChanges();
     tick();
 
     const links = Array.from(fixture.nativeElement.querySelectorAll('a')) as HTMLAnchorElement[];
-    const routes = links
-      .map((el) => el.getAttribute('ng-reflect-router-link'))
+    const hrefs = links
+      .map((el) => el.getAttribute('href'))
       .filter((v): v is string => Boolean(v));
-    expect(routes).toContain('/login');
-    expect(routes).toContain('/register');
+    expect(hrefs.some((h) => h.includes('/login'))).toBeTrue();
+    expect(hrefs.some((h) => h.includes('/register'))).toBeTrue();
     expect(apiService.post).not.toHaveBeenCalled();
   }));
 
   it('submits guest checkout via /orders/guest-checkout when verified', fakeAsync(() => {
-    spyOn(CheckoutComponent.prototype, 'ngAfterViewInit').and.returnValue(Promise.resolve());
+    apiService.get.and.returnValue(of({ email: 'guest@example.com', verified: true }));
     const router = TestBed.inject(Router);
     spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
     const fixture = TestBed.createComponent(CheckoutComponent);
@@ -87,10 +89,6 @@ describe('Checkout auth gating', () => {
       line2: ''
     } as any;
     cmp.guestEmailVerified = true;
-    (cmp as any).stripe = {
-      confirmCardPayment: () => Promise.resolve({ error: null })
-    } as any;
-    (cmp as any).card = { destroy: () => {}, update: () => {} } as any;
 
     fixture.detectChanges();
     tick();

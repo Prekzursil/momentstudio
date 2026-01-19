@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.main import app
 from app.db.base import Base
 from app.db.session import get_session
-from app.models.catalog import Category, Product, ProductImage
+from app.models.catalog import Category, Product, ProductImage, ProductStatus
 from app.services.auth import create_user
 from app.schemas.user import UserCreate
 from app.services import cart as cart_service
@@ -68,6 +68,7 @@ def seed_product(session_factory) -> UUID:
                 base_price=10,
                 currency="RON",
                 stock_quantity=5,
+                status=ProductStatus.published,
                 images=[ProductImage(url="/media/cup.png", alt_text="cup")],
             )
             session.add_all([category, product])
@@ -210,9 +211,16 @@ def test_cart_sync_metadata_and_totals(test_app: Dict[str, object]) -> None:
     )
     assert sync.status_code == 200
 
-    res = client.get(
+    res_forbidden = client.get(
         "/api/v1/cart",
         params={"shipping_method_id": str(shipping_method_id), "promo_code": "SAVE5"},
+        headers={"X-Session-Id": session_id},
+    )
+    assert res_forbidden.status_code == 403
+
+    res = client.get(
+        "/api/v1/cart",
+        params={"shipping_method_id": str(shipping_method_id)},
         headers={"X-Session-Id": session_id},
     )
     assert res.status_code == 200
@@ -224,6 +232,6 @@ def test_cart_sync_metadata_and_totals(test_app: Dict[str, object]) -> None:
     assert item["currency"] == "RON"
 
     totals = body["totals"]
-    # subtotal 10*2=20, discount 5% =>1, taxable 19, tax 1.9, shipping 5 => total 25.9
+    # subtotal 10*2=20, tax 10% =>2, shipping 20 => total 42
     assert float(totals["subtotal"]) == pytest.approx(20.0)
-    assert float(totals["total"]) == pytest.approx(25.9, rel=1e-2)
+    assert float(totals["total"]) == pytest.approx(42.0, rel=1e-2)
