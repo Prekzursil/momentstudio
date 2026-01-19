@@ -3,7 +3,7 @@ import io
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
 from sqlalchemy import String, Text, cast, delete, func, literal, or_, select, union_all
 from sqlalchemy.orm import aliased
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +14,7 @@ from app.core.dependencies import require_admin, require_owner
 from app.db.session import get_session
 from app.models.catalog import Product, ProductAuditLog, Category, ProductStatus
 from app.models.content import ContentBlock, ContentAuditLog
-from app.schemas.catalog_admin import AdminProductListItem, AdminProductListResponse
+from app.schemas.catalog_admin import AdminProductByIdsRequest, AdminProductListItem, AdminProductListResponse
 from app.services import exporter as exporter_service
 from app.models.order import Order
 from app.models.user import AdminAuditLog, User, RefreshSession, UserRole
@@ -138,6 +138,46 @@ async def search_products(
         items=items,
         meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
     )
+
+
+@router.post("/products/by-ids", response_model=list[AdminProductListItem])
+async def products_by_ids(
+    payload: AdminProductByIdsRequest = Body(...),
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> list[AdminProductListItem]:
+    ids = list(dict.fromkeys(payload.ids or []))
+    if not ids:
+        return []
+    if len(ids) > 200:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many product ids (max 200)")
+
+    stmt = (
+        select(Product, Category)
+        .join(Category, Product.category_id == Category.id)
+        .where(Product.is_deleted.is_(False), Product.id.in_(ids))
+        .order_by(Product.updated_at.desc())
+    )
+    rows = (await session.execute(stmt)).all()
+    return [
+        AdminProductListItem(
+            id=prod.id,
+            slug=prod.slug,
+            sku=prod.sku,
+            name=prod.name,
+            base_price=prod.base_price,
+            currency=prod.currency,
+            status=prod.status,
+            is_active=prod.is_active,
+            is_featured=prod.is_featured,
+            stock_quantity=prod.stock_quantity,
+            category_slug=cat.slug,
+            category_name=cat.name,
+            updated_at=prod.updated_at,
+            publish_at=prod.publish_at,
+        )
+        for prod, cat in rows
+    ]
 
 
 @router.get("/orders")

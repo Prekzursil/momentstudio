@@ -26,6 +26,9 @@ from app.schemas.coupons_v2 import (
     CouponAssignRequest,
     CouponAssignmentRead,
     CouponCreate,
+    CouponBulkAssignRequest,
+    CouponBulkRevokeRequest,
+    CouponBulkResult,
     CouponUpdate,
     CouponEligibilityResponse,
     CouponOffer,
@@ -565,6 +568,33 @@ async def _find_user(session: AsyncSession, *, user_id: UUID | None, email: str 
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provide user_id or email")
 
 
+def _normalize_bulk_emails(raw: list[str]) -> tuple[list[str], list[str]]:
+    invalid: list[str] = []
+    seen: set[str] = set()
+    emails: list[str] = []
+    for value in raw or []:
+        if not isinstance(value, str):
+            continue
+        clean = value.strip().lower()
+        if not clean:
+            continue
+        if len(clean) > 255:
+            invalid.append(value)
+            continue
+        if "@" not in clean:
+            invalid.append(value)
+            continue
+        _, domain = clean.split("@", 1)
+        if "." not in domain:
+            invalid.append(value)
+            continue
+        if clean in seen:
+            continue
+        seen.add(clean)
+        emails.append(clean)
+    return emails, invalid
+
+
 @router.post("/admin/coupons/{coupon_id}/assign", status_code=status.HTTP_204_NO_CONTENT)
 async def admin_assign_coupon(
     coupon_id: UUID,
@@ -618,6 +648,100 @@ async def admin_assign_coupon(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.post("/admin/coupons/{coupon_id}/assign/bulk", response_model=CouponBulkResult)
+async def admin_bulk_assign_coupon(
+    coupon_id: UUID,
+    payload: CouponBulkAssignRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> CouponBulkResult:
+    requested = len(payload.emails or [])
+    emails, invalid = _normalize_bulk_emails(payload.emails or [])
+    if not emails:
+        return CouponBulkResult(requested=requested, unique=0, invalid_emails=invalid)
+    if len(emails) > 500:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many emails (max 500)")
+
+    coupon = (
+        (
+            await session.execute(select(Coupon).options(selectinload(Coupon.promotion)).where(Coupon.id == coupon_id))
+        )
+        .scalars()
+        .first()
+    )
+    if not coupon:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+
+    users = (await session.execute(select(User).where(User.email.in_(emails)))).scalars().all()
+    users_by_email = {u.email: u for u in users if u.email}
+    not_found = [e for e in emails if e not in users_by_email]
+    user_ids = [u.id for u in users_by_email.values()]
+
+    assignments_by_user_id: dict[UUID, CouponAssignment] = {}
+    if user_ids:
+        existing = (
+            (
+                await session.execute(
+                    select(CouponAssignment).where(CouponAssignment.coupon_id == coupon.id, CouponAssignment.user_id.in_(user_ids))
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assignments_by_user_id = {a.user_id: a for a in existing}
+
+    created = 0
+    restored = 0
+    already_active = 0
+    notify_user_ids: set[UUID] = set()
+    for email in emails:
+        user = users_by_email.get(email)
+        if not user:
+            continue
+        assignment = assignments_by_user_id.get(user.id)
+        if assignment and assignment.revoked_at is None:
+            already_active += 1
+            continue
+        if assignment and assignment.revoked_at is not None:
+            assignment.revoked_at = None
+            assignment.revoked_reason = None
+            session.add(assignment)
+            restored += 1
+            notify_user_ids.add(user.id)
+        else:
+            session.add(CouponAssignment(coupon_id=coupon.id, user_id=user.id))
+            created += 1
+            notify_user_ids.add(user.id)
+
+    await session.commit()
+
+    if payload.send_email and notify_user_ids:
+        ends_at = getattr(coupon, "ends_at", None)
+        for user in users_by_email.values():
+            if user.id not in notify_user_ids or not user.email:
+                continue
+            background_tasks.add_task(
+                email_service.send_coupon_assigned,
+                user.email,
+                coupon_code=coupon.code,
+                promotion_name=coupon.promotion.name if coupon.promotion else "Coupon",
+                promotion_description=coupon.promotion.description if coupon.promotion else None,
+                ends_at=ends_at,
+                lang=user.preferred_language,
+            )
+
+    return CouponBulkResult(
+        requested=requested,
+        unique=len(emails),
+        invalid_emails=invalid,
+        not_found_emails=not_found,
+        created=created,
+        restored=restored,
+        already_active=already_active,
+    )
+
+
 @router.post("/admin/coupons/{coupon_id}/revoke", status_code=status.HTTP_204_NO_CONTENT)
 async def admin_revoke_coupon(
     coupon_id: UUID,
@@ -664,3 +788,95 @@ async def admin_revoke_coupon(
             lang=user.preferred_language,
         )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/admin/coupons/{coupon_id}/revoke/bulk", response_model=CouponBulkResult)
+async def admin_bulk_revoke_coupon(
+    coupon_id: UUID,
+    payload: CouponBulkRevokeRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> CouponBulkResult:
+    requested = len(payload.emails or [])
+    emails, invalid = _normalize_bulk_emails(payload.emails or [])
+    if not emails:
+        return CouponBulkResult(requested=requested, unique=0, invalid_emails=invalid)
+    if len(emails) > 500:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many emails (max 500)")
+
+    coupon = (
+        (
+            await session.execute(select(Coupon).options(selectinload(Coupon.promotion)).where(Coupon.id == coupon_id))
+        )
+        .scalars()
+        .first()
+    )
+    if not coupon:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+
+    users = (await session.execute(select(User).where(User.email.in_(emails)))).scalars().all()
+    users_by_email = {u.email: u for u in users if u.email}
+    not_found = [e for e in emails if e not in users_by_email]
+    user_ids = [u.id for u in users_by_email.values()]
+
+    assignments_by_user_id: dict[UUID, CouponAssignment] = {}
+    if user_ids:
+        existing = (
+            (
+                await session.execute(
+                    select(CouponAssignment).where(CouponAssignment.coupon_id == coupon.id, CouponAssignment.user_id.in_(user_ids))
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assignments_by_user_id = {a.user_id: a for a in existing}
+
+    revoked = 0
+    already_revoked = 0
+    not_assigned = 0
+    revoked_user_ids: set[UUID] = set()
+    now = datetime.now(timezone.utc)
+    reason = (payload.reason or "").strip()[:255] or None
+    for email in emails:
+        user = users_by_email.get(email)
+        if not user:
+            continue
+        assignment = assignments_by_user_id.get(user.id)
+        if not assignment:
+            not_assigned += 1
+            continue
+        if assignment.revoked_at is not None:
+            already_revoked += 1
+            continue
+        assignment.revoked_at = now
+        assignment.revoked_reason = reason
+        session.add(assignment)
+        revoked += 1
+        revoked_user_ids.add(user.id)
+
+    await session.commit()
+
+    if payload.send_email and revoked_user_ids:
+        for user in users_by_email.values():
+            if user.id not in revoked_user_ids or not user.email:
+                continue
+            background_tasks.add_task(
+                email_service.send_coupon_revoked,
+                user.email,
+                coupon_code=coupon.code,
+                promotion_name=coupon.promotion.name if coupon.promotion else "Coupon",
+                reason=reason,
+                lang=user.preferred_language,
+            )
+
+    return CouponBulkResult(
+        requested=requested,
+        unique=len(emails),
+        invalid_emails=invalid,
+        not_found_emails=not_found,
+        revoked=revoked,
+        already_revoked=already_revoked,
+        not_assigned=not_assigned,
+    )

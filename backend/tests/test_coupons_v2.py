@@ -24,7 +24,7 @@ from app.models.coupons_v2 import (
     PromotionScopeMode,
 )
 from app.models.order import Order, OrderStatus
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.user import UserCreate
 from app.services import cart as cart_service
 from app.services import checkout_settings as checkout_settings_service
@@ -81,6 +81,18 @@ def create_user_token(session_factory: async_sessionmaker, *, email: str, userna
             return tokens["access_token"], user.id
 
     return asyncio.run(_create())
+
+
+def promote_user(session_factory: async_sessionmaker, *, user_id: UUID, role: UserRole) -> None:
+    async def _promote() -> None:
+        async with session_factory() as session:
+            user = await session.get(User, user_id)
+            assert user is not None
+            user.role = role
+            session.add(user)
+            await session.commit()
+
+    asyncio.run(_promote())
 
 
 def seed_product(
@@ -215,6 +227,16 @@ def get_product_category_id(session_factory: async_sessionmaker, product_id: str
             product = await session.get(Product, UUID(product_id))
             assert product is not None
             return str(product.category_id)
+
+    return asyncio.run(_get())
+
+
+def get_coupon_id(session_factory: async_sessionmaker, code: str) -> str:
+    async def _get() -> str:
+        async with session_factory() as session:
+            coupon = (await session.execute(select(Coupon).where(Coupon.code == code.strip().upper()))).scalars().first()
+            assert coupon is not None
+            return str(coupon.id)
 
     return asyncio.run(_get())
 
@@ -726,3 +748,78 @@ def test_first_order_reward_issued_on_first_delivered_order() -> None:
             assert assigned_count == 1
 
     asyncio.run(run())
+
+
+def test_admin_products_by_ids_endpoint() -> None:
+    client, SessionLocal = make_test_client()
+    try:
+        token, user_id = create_user_token(SessionLocal, email="admin@example.com", username="admin_user")
+        promote_user(SessionLocal, user_id=user_id, role=UserRole.admin)
+
+        product1 = seed_product(SessionLocal, slug="p1", sku="SKU-P1", base_price=Decimal("10.00"), category_slug="decor")
+        product2 = seed_product(SessionLocal, slug="p2", sku="SKU-P2", base_price=Decimal("20.00"), category_slug="sale", category_name="Sale")
+
+        res = client.post(
+            "/api/v1/admin/dashboard/products/by-ids",
+            json={"ids": [product1, product2]},
+            headers=auth_headers(token),
+        )
+        assert res.status_code == 200, res.text
+        rows = res.json()
+        ids = {row["id"] for row in rows}
+        assert product1 in ids
+        assert product2 in ids
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_admin_bulk_assign_and_revoke_coupon() -> None:
+    client, SessionLocal = make_test_client()
+    try:
+        admin_token, admin_id = create_user_token(SessionLocal, email="admin2@example.com", username="admin_user2")
+        promote_user(SessionLocal, user_id=admin_id, role=UserRole.admin)
+
+        user_token, _ = create_user_token(SessionLocal, email="bulk-user@example.com", username="bulk_user")
+        # Ensure the user exists in DB before bulk operations.
+        assert user_token
+
+        code = create_promotion_and_coupon(
+            SessionLocal,
+            name="Bulk promo",
+            discount_type=PromotionDiscountType.percent,
+            percentage_off=Decimal("10"),
+            code="BULK10",
+        )
+        coupon_id = get_coupon_id(SessionLocal, code)
+
+        res = client.post(
+            f"/api/v1/coupons/admin/coupons/{coupon_id}/assign/bulk",
+            json={"emails": ["bulk-user@example.com", "missing@example.com", "not-an-email"], "send_email": False},
+            headers=auth_headers(admin_token),
+        )
+        assert res.status_code == 200, res.text
+        payload = res.json()
+        assert payload["created"] == 1
+        assert "missing@example.com" in payload["not_found_emails"]
+        assert "not-an-email" in payload["invalid_emails"]
+
+        res = client.post(
+            f"/api/v1/coupons/admin/coupons/{coupon_id}/revoke/bulk",
+            json={"emails": ["bulk-user@example.com"], "reason": "test revoke", "send_email": False},
+            headers=auth_headers(admin_token),
+        )
+        assert res.status_code == 200, res.text
+        payload = res.json()
+        assert payload["revoked"] == 1
+
+        # Revoking again is idempotent (counts as already revoked).
+        res = client.post(
+            f"/api/v1/coupons/admin/coupons/{coupon_id}/revoke/bulk",
+            json={"emails": ["bulk-user@example.com"], "reason": "test revoke", "send_email": False},
+            headers=auth_headers(admin_token),
+        )
+        assert res.status_code == 200, res.text
+        payload = res.json()
+        assert payload["already_revoked"] == 1
+    finally:
+        app.dependency_overrides.clear()

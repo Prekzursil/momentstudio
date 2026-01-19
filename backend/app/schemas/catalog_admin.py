@@ -30,3 +30,7 @@ class AdminProductListItem(BaseModel):
 class AdminProductListResponse(BaseModel):
     items: list[AdminProductListItem]
     meta: AdminPaginationMeta
+
+
+class AdminProductByIdsRequest(BaseModel):
+    ids: list[UUID]

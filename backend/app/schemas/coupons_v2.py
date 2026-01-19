@@ -152,3 +152,27 @@ class CouponRevokeRequest(BaseModel):
     email: str | None = None
     reason: str | None = Field(default=None, max_length=255)
     send_email: bool = True
+
+
+class CouponBulkAssignRequest(BaseModel):
+    emails: list[str] = Field(default_factory=list)
+    send_email: bool = True
+
+
+class CouponBulkRevokeRequest(BaseModel):
+    emails: list[str] = Field(default_factory=list)
+    reason: str | None = Field(default=None, max_length=255)
+    send_email: bool = True
+
+
+class CouponBulkResult(BaseModel):
+    requested: int
+    unique: int
+    invalid_emails: list[str] = Field(default_factory=list)
+    not_found_emails: list[str] = Field(default_factory=list)
+    created: int = 0
+    restored: int = 0
+    already_active: int = 0
+    revoked: int = 0
+    already_revoked: int = 0
+    not_assigned: int = 0
