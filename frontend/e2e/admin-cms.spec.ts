@@ -109,14 +109,14 @@ test('owner can toggle homepage sections via CMS', async ({ page }) => {
 test('owner can create a published blog post from CMS', async ({ page }) => {
   await loginAsOwner(page);
 
-  const slug = `e2e-post-${Date.now()}`;
-  const title = `E2E post ${Date.now()}`;
+  const now = Date.now();
+  const slug = `e2e-post-${now}`;
+  const title = `E2E post ${now}`;
 
   await page.goto('/admin/content/blog');
   await page.getByRole('button', { name: 'New post' }).click();
   await expect(page.getByText('Create blog post')).toBeVisible();
 
-  await page.getByLabel('Slug').fill(slug);
   await page.getByLabel('Status').selectOption('published');
   await page.getByLabel('Title').fill(title);
 

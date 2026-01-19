@@ -17,6 +17,7 @@ import { buildE164, listPhoneCountries, PhoneCountryOption } from '../../shared/
 import { LockerPickerComponent } from '../../shared/locker-picker.component';
 import { LockerProvider, LockerRead } from '../../core/shipping.service';
 import { RO_CITIES, RO_COUNTIES } from '../../shared/ro-geo';
+import { parseMoney } from '../../shared/money';
 
 type CheckoutShippingAddress = {
   name: string;
@@ -979,17 +980,17 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     return labels.join(' • ');
   }
 
-  private couponShippingDiscount(): number {
-    const offer = this.appliedCouponOffer;
-    if (!offer || !offer.eligible) return 0;
-    const currentCode = (this.promo || '').trim().toUpperCase();
-    if (!currentCode || offer.coupon.code.toUpperCase() !== currentCode) return 0;
-    return this.parseMoney(offer.estimated_shipping_discount_ron);
-  }
+	  private couponShippingDiscount(): number {
+	    const offer = this.appliedCouponOffer;
+	    if (!offer || !offer.eligible) return 0;
+	    const currentCode = (this.promo || '').trim().toUpperCase();
+	    if (!currentCode || offer.coupon.code.toUpperCase() !== currentCode) return 0;
+	    return parseMoney(offer.estimated_shipping_discount_ron);
+	  }
 
-  private couponOfferSavings(offer: CouponOffer): number {
-    return this.parseMoney(offer.estimated_discount_ron) + this.parseMoney(offer.estimated_shipping_discount_ron);
-  }
+	  private couponOfferSavings(offer: CouponOffer): number {
+	    return parseMoney(offer.estimated_discount_ron) + parseMoney(offer.estimated_shipping_discount_ron);
+	  }
 
   private buildSuccessSummary(orderId: string, referenceCode: string | null, paymentMethod: CheckoutPaymentMethod): CheckoutSuccessSummary {
     const quote = this.quote ?? { subtotal: this.subtotal(), fee: 0, tax: 0, shipping: 0, total: this.subtotal(), currency: this.currency };
@@ -1035,38 +1036,23 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     this.setQuote(res);
   }
 
-  private setQuote(res: CartResponse): void {
-    const totals = res?.totals ?? ({} as any);
-    const subtotal = this.parseMoney(totals.subtotal);
-    const fee = this.parseMoney(totals.fee);
-    const tax = this.parseMoney(totals.tax);
-    const shipping = this.parseMoney(totals.shipping);
-    const total = this.parseMoney(totals.total);
-    const currency = (totals.currency ?? 'RON') as string;
-    this.quote = { subtotal, fee, tax, shipping, total, currency };
-    this.currency = currency || 'RON';
-    this.loadCouponsEligibility();
-    this.applyPendingPromoCode();
-  }
+	  private setQuote(res: CartResponse): void {
+	    const totals = res?.totals ?? ({} as any);
+	    const subtotal = parseMoney(totals.subtotal);
+	    const fee = parseMoney(totals.fee);
+	    const tax = parseMoney(totals.tax);
+	    const shipping = parseMoney(totals.shipping);
+	    const total = parseMoney(totals.total);
+	    const currency = (totals.currency ?? 'RON') as string;
+	    this.quote = { subtotal, fee, tax, shipping, total, currency };
+	    this.currency = currency || 'RON';
+	    this.loadCouponsEligibility();
+	    this.applyPendingPromoCode();
+	  }
 
-  private parseMoney(value: unknown): number {
-    if (typeof value === 'number') {
-      return Number.isFinite(value) ? value : 0;
-    }
-    if (typeof value === 'string') {
-      const num = Number(value.trim());
-      return Number.isFinite(num) ? num : 0;
-    }
-    if (typeof value === 'bigint') {
-      const num = Number(value);
-      return Number.isFinite(num) ? num : 0;
-    }
-    return 0;
-  }
-
-  private loadCouponsEligibility(): void {
-    if (!this.auth.isAuthenticated()) {
-      this.couponEligibility = null;
+	  private loadCouponsEligibility(): void {
+	    if (!this.auth.isAuthenticated()) {
+	      this.couponEligibility = null;
       this.couponEligibilityError = '';
       this.couponEligibilityLoading = false;
       return;

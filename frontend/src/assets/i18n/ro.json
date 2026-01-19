@@ -610,6 +610,7 @@
       "remove": "Elimină",
       "save": "Salvează",
       "cancel": "Anulează",
+      "retry": "Reîncearcă",
       "edit": "Editează",
       "refresh": "Reîncarcă",
       "search": "Caută",
@@ -1064,8 +1065,8 @@
         "translationSaved": "Traducere salvată"
       },
       "errors": {
-        "slugRequiredTitle": "Slug-ul este obligatoriu",
-        "slugRequiredCopy": "Folosește litere/cifre/cratime, ex. \"primul-meu-articol\".",
+        "slugRequiredTitle": "Nu s-a putut genera slug-ul",
+        "slugRequiredCopy": "Ajustează titlul astfel încât să conțină litere sau cifre (slug-ul se generează automat).",
         "titleBodyRequired": "Titlul și conținutul sunt obligatorii",
         "create": "Nu am putut crea articolul",
         "loadContent": "Nu am putut încărca conținutul articolului",
@@ -1645,11 +1646,18 @@
           "candidates": "{{count}} eligibili",
           "sample": "Exemple: {{emails}}",
           "jobTitle": "Job în fundal",
+          "jobsTitle": "Joburi recente",
+          "jobsLoading": "Se încarcă joburi…",
+          "jobsEmpty": "Nu există joburi pe segment încă.",
           "jobStatus": "Status: {{status}}",
           "jobProgress": "Procesate {{processed}} / {{total}}",
           "previewError": "Nu s-a putut previzualiza segmentul",
           "started": "Jobul pe segment a pornit",
-          "completed": "Jobul pe segment s-a terminat"
+          "completed": "Jobul pe segment s-a terminat",
+          "jobsLoadError": "Nu s-au putut încărca joburile",
+          "cancelled": "Jobul pe segment a fost anulat",
+          "cancelError": "Nu s-a putut anula jobul",
+          "retryError": "Nu s-a putut reîncerca jobul"
         }
       },
       "success": {

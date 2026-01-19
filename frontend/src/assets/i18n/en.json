@@ -610,6 +610,7 @@
       "remove": "Remove",
       "save": "Save",
       "cancel": "Cancel",
+      "retry": "Retry",
       "edit": "Edit",
       "refresh": "Refresh",
       "search": "Search",
@@ -1064,8 +1065,8 @@
         "translationSaved": "Saved translation"
       },
       "errors": {
-        "slugRequiredTitle": "Slug is required",
-        "slugRequiredCopy": "Use letters/numbers/dashes, e.g. \"my-first-post\".",
+        "slugRequiredTitle": "Could not generate slug",
+        "slugRequiredCopy": "Adjust the title to include letters or numbers (slug is auto-generated).",
         "titleBodyRequired": "Title and body are required",
         "create": "Could not create blog post",
         "loadContent": "Could not load blog post content",
@@ -1645,11 +1646,18 @@
           "candidates": "{{count}} candidates",
           "sample": "Sample: {{emails}}",
           "jobTitle": "Background job",
+          "jobsTitle": "Recent jobs",
+          "jobsLoading": "Loading jobs…",
+          "jobsEmpty": "No segment jobs yet.",
           "jobStatus": "Status: {{status}}",
           "jobProgress": "Processed {{processed}} / {{total}}",
           "previewError": "Could not preview segment",
+          "jobsLoadError": "Could not load jobs",
           "started": "Segment job started",
-          "completed": "Segment job completed"
+          "completed": "Segment job completed",
+          "cancelled": "Segment job cancelled",
+          "cancelError": "Could not cancel job",
+          "retryError": "Could not retry job"
         }
       },
       "success": {

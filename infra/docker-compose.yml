@@ -62,9 +62,9 @@ services:
       backend:
         condition: service_healthy
     environment:
-      - PAYPAL_ENABLED
-      - NETOPIA_ENABLED
-      - CAPTCHA_SITE_KEY
+      PAYPAL_ENABLED: ${PAYPAL_ENABLED:-1}
+      NETOPIA_ENABLED: ${NETOPIA_ENABLED:-0}
+      CAPTCHA_SITE_KEY: ${CAPTCHA_SITE_KEY:-}
     ports:
       - "4201:80"
     healthcheck:

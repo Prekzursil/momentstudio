@@ -471,7 +471,7 @@ export class AdminService {
     return this.api.get<FeaturedCollection[]>('/catalog/collections/featured');
   }
 
-  createFeaturedCollection(payload: Partial<FeaturedCollection> & { product_ids?: string[] }): Observable<FeaturedCollection> {
+  createFeaturedCollection(payload: { name: string; description?: string | null; product_ids?: string[] }): Observable<FeaturedCollection> {
     return this.api.post<FeaturedCollection>('/catalog/collections/featured', payload);
   }
 

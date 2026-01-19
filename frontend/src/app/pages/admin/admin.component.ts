@@ -1004,7 +1004,15 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
               <app-button size="sm" variant="ghost" [label]="'adminUi.actions.reset' | translate" (action)="resetCollectionForm()"></app-button>
             </div>
             <div class="grid md:grid-cols-2 gap-3 text-sm">
-              <app-input [label]="'adminUi.home.collections.slug' | translate" [(value)]="collectionForm.slug"></app-input>
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.home.collections.slug' | translate }}
+                <div class="h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 flex items-center font-mono text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200">
+                  <span *ngIf="editingCollection; else collectionSlugHint">{{ editingCollection }}</span>
+                  <ng-template #collectionSlugHint>
+                    <span class="text-slate-500 dark:text-slate-400">{{ 'adminUi.products.form.slugAutoHint' | translate }}</span>
+                  </ng-template>
+                </div>
+              </label>
               <app-input [label]="'adminUi.home.collections.name' | translate" [(value)]="collectionForm.name"></app-input>
               <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
                 {{ 'adminUi.home.collections.description' | translate }}
@@ -1081,7 +1089,6 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     <td class="py-2 font-semibold text-slate-900 dark:text-slate-50">
                       {{ product.name }}
                       <span *ngIf="product.tags?.includes('bestseller')" class="ml-2 text-[10px] uppercase bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Bestseller</span>
-                      <span *ngIf="product.tags?.includes('highlight')" class="ml-1 text-[10px] uppercase bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">Highlight</span>
                     </td>
                     <td>{{ product.price | localizedCurrency : product.currency || 'RON' }}</td>
                     <td><span class="text-xs rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-800">{{ product.status }}</span></td>
@@ -1125,7 +1132,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
             </div>
             <div class="grid md:grid-cols-2 gap-3 text-sm">
               <app-input [label]="'adminUi.products.table.name' | translate" [(value)]="form.name"></app-input>
-              <app-input [label]="'adminUi.products.form.slug' | translate" [(value)]="form.slug"></app-input>
+              <app-input [label]="'adminUi.products.form.slug' | translate" [value]="form.slug" [disabled]="true"></app-input>
               <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200">
                 {{ 'adminUi.products.table.category' | translate }}
                 <select class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="form.category_id">
@@ -1152,9 +1159,6 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
             <div class="flex items-center gap-4 text-sm">
               <label class="flex items-center gap-2">
                 <input type="checkbox" [(ngModel)]="form.is_bestseller" /> Bestseller badge
-              </label>
-              <label class="flex items-center gap-2">
-                <input type="checkbox" [(ngModel)]="form.is_highlight" /> Highlight badge
               </label>
             </div>
             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -1467,18 +1471,22 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
               </div>
             </div>
 
-            <div *ngIf="showBlogCreate" class="grid gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
-              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.blog.create.title' | translate }}</p>
-              <div class="grid md:grid-cols-2 gap-3 text-sm">
-                <app-input
-                  [label]="'adminUi.blog.fields.slug' | translate"
-                  [(value)]="blogCreate.slug"
-                  [placeholder]="'adminUi.blog.fields.slugPlaceholder' | translate"
-                ></app-input>
-                <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.blog.fields.baseLanguage' | translate }}
-                  <select
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	            <div *ngIf="showBlogCreate" class="grid gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+	              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.blog.create.title' | translate }}</p>
+	              <div class="grid md:grid-cols-2 gap-3 text-sm">
+	                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                  {{ 'adminUi.blog.fields.slug' | translate }}
+	                  <div
+	                    class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-300"
+	                  >
+	                    {{ blogCreateSlug() || '—' }}
+	                  </div>
+	                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.products.form.slugAutoHint' | translate }}</span>
+	                </label>
+	                <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200">
+	                  {{ 'adminUi.blog.fields.baseLanguage' | translate }}
+	                  <select
+	                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="blogCreate.baseLang"
                   >
                     <option value="en">EN</option>
@@ -2277,8 +2285,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   heroError = signal<string | null>(null);
 
   featuredCollections: FeaturedCollection[] = [];
-  collectionForm: { slug: string; name: string; description?: string | null; product_ids: string[] } = {
-    slug: '',
+  collectionForm: { name: string; description?: string | null; product_ids: string[] } = {
     name: '',
     description: '',
     product_ids: []
@@ -2301,8 +2308,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     image: '',
     description: '',
     publish_at: '',
-    is_bestseller: false,
-    is_highlight: false
+    is_bestseller: false
   };
 
   orders: AdminOrder[] = [];
@@ -2325,27 +2331,25 @@ export class AdminComponent implements OnInit, OnDestroy {
   };
   showContentPreview = false;
 
-  showBlogCreate = false;
-  blogCreate: {
-    slug: string;
-    baseLang: 'en' | 'ro';
-    status: 'draft' | 'published';
-    published_at: string;
-    title: string;
+	  showBlogCreate = false;
+	  blogCreate: {
+	    baseLang: 'en' | 'ro';
+	    status: 'draft' | 'published';
+	    published_at: string;
+	    title: string;
     body_markdown: string;
     summary: string;
     tags: string;
     cover_image_url: string;
     reading_time_minutes: string;
-    includeTranslation: boolean;
-    translationTitle: string;
-    translationBody: string;
-  } = {
-    slug: '',
-    baseLang: 'en',
-    status: 'draft',
-    published_at: '',
-    title: '',
+	    includeTranslation: boolean;
+	    translationTitle: string;
+	    translationBody: string;
+	  } = {
+	    baseLang: 'en',
+	    status: 'draft',
+	    published_at: '',
+	    title: '',
     body_markdown: '',
     summary: '',
     tags: '',
@@ -2802,8 +2806,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       image: '',
       description: '',
       publish_at: '',
-      is_bestseller: false,
-      is_highlight: false
+      is_bestseller: false
     };
   }
 
@@ -2823,8 +2826,7 @@ export class AdminComponent implements OnInit, OnDestroy {
           image: '',
           description: prod.long_description || '',
           publish_at: prod.publish_at ? this.toLocalDateTime(prod.publish_at) : '',
-          is_bestseller: (prod.tags || []).includes('bestseller'),
-          is_highlight: (prod.tags || []).includes('highlight')
+          is_bestseller: (prod.tags || []).includes('bestseller')
         };
         this.productImages.set((prod as any).images || []);
       },
@@ -3033,7 +3035,6 @@ export class AdminComponent implements OnInit, OnDestroy {
   buildTags(): string[] {
     const tags = new Set<string>();
     if (this.form.is_bestseller) tags.add('bestseller');
-    if (this.form.is_highlight) tags.add('highlight');
     if (this.productDetail?.tags) this.productDetail.tags.forEach((t) => tags.add(t));
     return Array.from(tags);
   }
@@ -3320,16 +3321,15 @@ export class AdminComponent implements OnInit, OnDestroy {
     return this.selectedBlogKey ? this.extractBlogSlug(this.selectedBlogKey) : '';
   }
 
-  startBlogCreate(): void {
-    this.showBlogCreate = true;
-    this.selectedBlogKey = null;
-    this.blogImages = [];
-    this.blogCreate = {
-      slug: '',
-      baseLang: 'en',
-      status: 'draft',
-      published_at: '',
-      title: '',
+	  startBlogCreate(): void {
+	    this.showBlogCreate = true;
+	    this.selectedBlogKey = null;
+	    this.blogImages = [];
+	    this.blogCreate = {
+	      baseLang: 'en',
+	      status: 'draft',
+	      published_at: '',
+	      title: '',
       body_markdown: '',
       summary: '',
       tags: '',
@@ -3356,21 +3356,20 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.resetBlogForm();
   }
 
-  async createBlogPost(): Promise<void> {
-    const slug = this.normalizeBlogSlug(this.blogCreate.slug);
-    if (!slug) {
-      this.toast.error(this.t('adminUi.blog.errors.slugRequiredTitle'), this.t('adminUi.blog.errors.slugRequiredCopy'));
-      return;
-    }
-    if (!this.blogCreate.title.trim() || !this.blogCreate.body_markdown.trim()) {
-      this.toast.error(this.t('adminUi.blog.errors.titleBodyRequired'));
-      return;
-    }
+	  async createBlogPost(): Promise<void> {
+	    const baseSlug = this.blogCreateSlug();
+	    if (!baseSlug) {
+	      this.toast.error(this.t('adminUi.blog.errors.slugRequiredTitle'), this.t('adminUi.blog.errors.slugRequiredCopy'));
+	      return;
+	    }
+	    if (!this.blogCreate.title.trim() || !this.blogCreate.body_markdown.trim()) {
+	      this.toast.error(this.t('adminUi.blog.errors.titleBodyRequired'));
+	      return;
+	    }
 
-    const key = `blog.${slug}`;
-    const baseLang = this.blogCreate.baseLang;
-    const translationLang: 'en' | 'ro' = baseLang === 'en' ? 'ro' : 'en';
-    const meta: Record<string, any> = {};
+	    const baseLang = this.blogCreate.baseLang;
+	    const translationLang: 'en' | 'ro' = baseLang === 'en' ? 'ro' : 'en';
+	    const meta: Record<string, any> = {};
     const summary = this.blogCreate.summary.trim();
     if (summary) {
       meta['summary'] = { [baseLang]: summary };
@@ -3387,22 +3386,38 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (Number.isFinite(rt) && rt > 0) {
       meta['reading_time_minutes'] = Math.trunc(rt);
     }
-    const published_at = this.blogCreate.published_at ? new Date(this.blogCreate.published_at).toISOString() : undefined;
+	    const published_at = this.blogCreate.published_at ? new Date(this.blogCreate.published_at).toISOString() : undefined;
 
-    try {
-      const created = await firstValueFrom(
-        this.admin.createContent(key, {
-          title: this.blogCreate.title.trim(),
-          body_markdown: this.blogCreate.body_markdown,
-          status: this.blogCreate.status,
-          lang: baseLang,
-          published_at,
-          meta: Object.keys(meta).length ? meta : undefined
-        })
-      );
-      this.rememberContentVersion(key, created);
+	    try {
+	      const payload = {
+	        title: this.blogCreate.title.trim(),
+	        body_markdown: this.blogCreate.body_markdown,
+	        status: this.blogCreate.status,
+	        lang: baseLang,
+	        published_at,
+	        meta: Object.keys(meta).length ? meta : undefined
+	      };
 
-      if (this.blogCreate.includeTranslation) {
+	      let slug = baseSlug;
+	      let key = `blog.${slug}`;
+	      let created = null as any;
+	      for (let attempt = 0; attempt < 5; attempt += 1) {
+	        try {
+	          created = await firstValueFrom(this.admin.createContent(key, payload));
+	          break;
+	        } catch (err: any) {
+	          const detail = String(err?.error?.detail || '').trim();
+	          if (detail === 'Content key exists' && attempt < 4) {
+	            slug = `${baseSlug}-${attempt + 2}`;
+	            key = `blog.${slug}`;
+	            continue;
+	          }
+	          throw err;
+	        }
+	      }
+	      this.rememberContentVersion(key, created);
+
+	      if (this.blogCreate.includeTranslation) {
         const tTitle = this.blogCreate.translationTitle.trim();
         const tBody = this.blogCreate.translationBody.trim();
         if (tTitle || tBody) {
@@ -3851,15 +3866,21 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.blogMeta = {};
   }
 
-  private normalizeBlogSlug(raw: string): string {
-    return raw
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, '-')
-      .replace(/[^a-z0-9-]/g, '')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
-  }
+	  private normalizeBlogSlug(raw: string): string {
+	    return raw
+	      .normalize('NFD')
+	      .replace(/[\u0300-\u036f]/g, '')
+	      .trim()
+	      .toLowerCase()
+	      .replace(/\s+/g, '-')
+	      .replace(/[^a-z0-9-]/g, '')
+	      .replace(/-+/g, '-')
+	      .replace(/^-|-$/g, '');
+	  }
+
+	  blogCreateSlug(): string {
+	    return this.normalizeBlogSlug(this.blogCreate.title || '');
+	  }
 
   private parseTags(raw: string): string[] {
     const parts = (raw || '')
@@ -5132,14 +5153,13 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   resetCollectionForm(): void {
     this.editingCollection = null;
-    this.collectionForm = { slug: '', name: '', description: '', product_ids: [] };
+    this.collectionForm = { name: '', description: '', product_ids: [] };
     this.collectionMessage = '';
   }
 
   editCollection(col: FeaturedCollection): void {
     this.editingCollection = col.slug;
     this.collectionForm = {
-      slug: col.slug,
       name: col.name,
       description: col.description || '',
       product_ids: col.product_ids || []
@@ -5147,12 +5167,11 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   saveCollection(): void {
-    if (!this.collectionForm.slug || !this.collectionForm.name) {
+    if (!this.collectionForm.name) {
       this.toast.error(this.t('adminUi.home.collections.errors.required'));
       return;
     }
     const payload = {
-      slug: this.collectionForm.slug,
       name: this.collectionForm.name,
       description: this.collectionForm.description,
       product_ids: this.collectionForm.product_ids
