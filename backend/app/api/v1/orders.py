@@ -24,6 +24,7 @@ from app.schemas.cart import CartRead
 from app.schemas.cart import Totals
 from app.schemas.order import OrderRead, OrderCreate, OrderUpdate, ShippingMethodCreate, ShippingMethodRead, OrderEventRead
 from app.services import cart as cart_service
+from app.services import coupons_v2 as coupons_service
 from app.services import order as order_service
 from app.services import email as email_service
 from app.services import checkout_settings as checkout_settings_service
@@ -313,9 +314,32 @@ async def checkout(
         if not shipping_method:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
 
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+
     promo = None
+    applied_discount = None
+    applied_coupon = None
+    coupon_shipping_discount = Decimal("0.00")
     if payload.promo_code:
-        promo = await cart_service.validate_promo(session, payload.promo_code, currency=None)
+        rate_flat = Decimal(getattr(shipping_method, "rate_flat", None) or 0) if shipping_method else None
+        rate_per = Decimal(getattr(shipping_method, "rate_per_kg", None) or 0) if shipping_method else None
+        try:
+            applied_discount = await coupons_service.apply_discount_code_to_cart(
+                session,
+                user=current_user,
+                cart=user_cart,
+                checkout=checkout_settings,
+                shipping_method_rate_flat=rate_flat,
+                shipping_method_rate_per_kg=rate_per,
+                code=payload.promo_code,
+            )
+            applied_coupon = applied_discount.coupon if applied_discount else None
+            coupon_shipping_discount = applied_discount.shipping_discount_ron if applied_discount else Decimal("0.00")
+        except HTTPException as exc:
+            if exc.status_code == status.HTTP_404_NOT_FOUND:
+                promo = await cart_service.validate_promo(session, payload.promo_code, currency=None)
+            else:
+                raise
 
     has_billing = bool((payload.billing_line1 or "").strip())
     billing_same_as_shipping = not has_billing
@@ -363,13 +387,15 @@ async def checkout(
             ),
         )
 
-    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
-    totals, discount_val = cart_service.calculate_totals(
-        user_cart,
-        shipping_method=shipping_method,
-        promo=promo,
-        checkout_settings=checkout_settings,
-    )
+    if applied_coupon and applied_discount:
+        totals, discount_val = applied_discount.totals, applied_discount.discount_ron
+    else:
+        totals, discount_val = cart_service.calculate_totals(
+            user_cart,
+            shipping_method=shipping_method,
+            promo=promo,
+            checkout_settings=checkout_settings,
+        )
     payment_method = payload.payment_method or "stripe"
     courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = _delivery_from_payload(
         courier=payload.courier,
@@ -445,6 +471,17 @@ async def checkout(
         shipping_amount=totals.shipping,
         total_amount=totals.total,
     )
+    if applied_coupon:
+        await coupons_service.reserve_coupon_for_order(
+            session,
+            user=current_user,
+            order=order,
+            coupon=applied_coupon,
+            discount_ron=discount_val,
+            shipping_discount_ron=coupon_shipping_discount,
+        )
+        if (payment_method or "").strip().lower() == "cod":
+            await coupons_service.redeem_coupon_for_order(session, order=order, note="COD checkout")
     await notification_service.create_notification(
         session,
         user_id=current_user.id,
@@ -549,6 +586,7 @@ async def capture_paypal_order(
     await promo_usage.record_promo_usage(session, order=order, note=f"PayPal {capture_id}".strip())
     await session.commit()
     await session.refresh(order)
+    await coupons_service.redeem_coupon_for_order(session, order=order, note=f"PayPal {capture_id}".strip())
 
     checkout_settings = await checkout_settings_service.get_checkout_settings(session)
     customer_to = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
@@ -674,6 +712,7 @@ async def confirm_stripe_checkout(
     session.add(order)
     await session.commit()
     await session.refresh(order)
+    await coupons_service.redeem_coupon_for_order(session, order=order, note=f"Stripe session {session_id}")
 
     if captured_added:
         customer_to = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
@@ -994,9 +1033,9 @@ async def guest_checkout(
         if not shipping_method:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
 
+    if (payload.promo_code or "").strip():
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sign in to use coupons.")
     promo = None
-    if payload.promo_code:
-        promo = await cart_service.validate_promo(session, payload.promo_code, currency=None)
 
     has_billing = bool((payload.billing_line1 or "").strip())
     billing_same_as_shipping = not has_billing
@@ -1077,7 +1116,7 @@ async def guest_checkout(
             metadata={"cart_id": str(cart.id), "user_id": str(user_id) if user_id else ""},
             line_items=stripe_line_items,
             discount_cents=discount_cents,
-            promo_code=payload.promo_code,
+            promo_code=None,
         )
         stripe_session_id = str(stripe_session.get("session_id"))
         stripe_checkout_url = str(stripe_session.get("checkout_url"))
@@ -1118,7 +1157,7 @@ async def guest_checkout(
         locker_lat=locker_lat,
         locker_lng=locker_lng,
         discount=discount_val,
-        promo_code=payload.promo_code,
+        promo_code=None,
         tax_amount=totals.tax,
         fee_amount=totals.fee,
         shipping_amount=totals.shipping,
@@ -1176,6 +1215,13 @@ async def admin_update_order(
     updated = await order_service.update_order(session, order, payload, shipping_method=shipping_method)
     if previous_status != updated.status:
         if updated.status == OrderStatus.cancelled:
+            await coupons_service.release_coupon_for_order(
+                session, order=updated, reason=(payload.cancel_reason or "cancelled")[:255]
+            )
+        elif updated.status == OrderStatus.refunded:
+            await coupons_service.release_coupon_for_order(session, order=updated, reason="refunded")
+
+        if updated.status == OrderStatus.cancelled:
             payment_method = (updated.payment_method or "").strip().lower()
             refund_needed = False
             if payment_method == "paypal" and updated.paypal_capture_id:
@@ -1226,6 +1272,23 @@ async def admin_update_order(
                     updated,
                     customer_lang,
                 )
+                if updated.user and updated.user.email:
+                    coupon = await coupons_service.issue_first_order_reward_if_eligible(
+                        session,
+                        user=updated.user,
+                        order=updated,
+                        validity_days=int(getattr(settings, "first_order_reward_coupon_validity_days", 30) or 30),
+                    )
+                    if coupon:
+                        background_tasks.add_task(
+                            email_service.send_coupon_assigned,
+                            updated.user.email,
+                            coupon_code=coupon.code,
+                            promotion_name="First order reward",
+                            promotion_description="20% off your next order (one-time).",
+                            ends_at=getattr(coupon, "ends_at", None),
+                            lang=customer_lang,
+                        )
             elif updated.status == OrderStatus.cancelled:
                 background_tasks.add_task(
                     email_service.send_order_cancelled_update,

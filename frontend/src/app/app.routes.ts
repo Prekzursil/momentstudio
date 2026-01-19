@@ -94,6 +94,7 @@ export const routes: Routes = [
       { path: 'orders', loadComponent: () => import('./pages/account/account-orders.component').then((m) => m.AccountOrdersComponent) },
       { path: 'addresses', loadComponent: () => import('./pages/account/account-addresses.component').then((m) => m.AccountAddressesComponent) },
       { path: 'wishlist', loadComponent: () => import('./pages/account/account-wishlist.component').then((m) => m.AccountWishlistComponent) },
+      { path: 'coupons', loadComponent: () => import('./pages/account/account-coupons.component').then((m) => m.AccountCouponsComponent) },
       {
         path: 'notifications',
         loadComponent: () => import('./pages/account/account-notifications.component').then((m) => m.AccountNotificationsComponent)

@@ -211,9 +211,16 @@ def test_cart_sync_metadata_and_totals(test_app: Dict[str, object]) -> None:
     )
     assert sync.status_code == 200
 
-    res = client.get(
+    res_forbidden = client.get(
         "/api/v1/cart",
         params={"shipping_method_id": str(shipping_method_id), "promo_code": "SAVE5"},
+        headers={"X-Session-Id": session_id},
+    )
+    assert res_forbidden.status_code == 403
+
+    res = client.get(
+        "/api/v1/cart",
+        params={"shipping_method_id": str(shipping_method_id)},
         headers={"X-Session-Id": session_id},
     )
     assert res.status_code == 200
@@ -225,6 +232,6 @@ def test_cart_sync_metadata_and_totals(test_app: Dict[str, object]) -> None:
     assert item["currency"] == "RON"
 
     totals = body["totals"]
-    # subtotal 10*2=20, discount 5% =>1, taxable 19, tax 1.9, shipping 20 => total 40.9
+    # subtotal 10*2=20, tax 10% =>2, shipping 20 => total 42
     assert float(totals["subtotal"]) == pytest.approx(20.0)
-    assert float(totals["total"]) == pytest.approx(40.9, rel=1e-2)
+    assert float(totals["total"]) == pytest.approx(42.0, rel=1e-2)

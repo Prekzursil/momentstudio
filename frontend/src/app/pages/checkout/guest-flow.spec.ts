@@ -5,7 +5,7 @@ import { of } from 'rxjs';
 import { CartStore } from '../../core/cart.store';
 import { CartApi } from '../../core/cart.api';
 import { ApiService } from '../../core/api.service';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { AuthService } from '../../core/auth.service';
 import { RouterTestingModule } from '@angular/router/testing';
@@ -44,14 +44,16 @@ describe('Checkout auth gating', () => {
     auth.isAuthenticated.and.returnValue(false);
     auth.user.and.returnValue(null);
 
+    const emptyQueryParamMap = convertToParamMap({});
+
     TestBed.configureTestingModule({
       imports: [RouterTestingModule, CheckoutComponent, TranslateModule.forRoot()],
       providers: [
-        { provide: CartStore, useValue: { items: itemsSignal, subtotal: subtotalSignal, clear: jasmine.createSpy('clear') } },
+        { provide: CartStore, useValue: { items: itemsSignal, subtotal: subtotalSignal, clear: jasmine.createSpy('clear'), hydrateFromBackend: jasmine.createSpy('hydrateFromBackend') } },
         { provide: CartApi, useValue: cartApi },
         { provide: ApiService, useValue: apiService },
         { provide: AuthService, useValue: auth },
-        { provide: ActivatedRoute, useValue: { snapshot: { params: {} } } }
+        { provide: ActivatedRoute, useValue: { snapshot: { params: {}, queryParamMap: emptyQueryParamMap }, queryParamMap: of(emptyQueryParamMap) } }
       ]
     });
   });

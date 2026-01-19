@@ -1,0 +1,17 @@
+{% if lang == "ro" -%}
+Un cupon a fost revocat:
+
+Cod: {{ coupon_code }}
+Promoție: {{ promotion_name }}
+{% if reason %}Motiv: {{ reason }}{% endif %}
+
+Dacă ai întrebări, contactează suportul.
+{%- else -%}
+A coupon was revoked:
+
+Code: {{ coupon_code }}
+Promotion: {{ promotion_name }}
+{% if reason %}Reason: {{ reason }}{% endif %}
+
+If you have questions, contact support.
+{%- endif %}

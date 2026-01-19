@@ -2,7 +2,7 @@ import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { CheckoutComponent } from './checkout.component';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
-import { Router } from '@angular/router';
+import { Router, convertToParamMap } from '@angular/router';
 import { CartStore } from '../../core/cart.store';
 import { CartApi } from '../../core/cart.api';
 import { ApiService } from '../../core/api.service';
@@ -37,21 +37,24 @@ describe('CheckoutComponent', () => {
     cartApi.sync.and.returnValue(of({}));
     cartApi.headers.and.returnValue({});
 
-    apiService = jasmine.createSpyObj('ApiService', ['post']);
+    apiService = jasmine.createSpyObj('ApiService', ['post', 'get']);
     apiService.post.and.returnValue(of({ order_id: 'order1', reference_code: 'REF', client_secret: 'pi_secret' }));
+    apiService.get.and.returnValue(of({ eligible: [], ineligible: [] }));
 
     auth = jasmine.createSpyObj('AuthService', ['isAuthenticated', 'user']);
     auth.isAuthenticated.and.returnValue(true);
     auth.user.and.returnValue({ email_verified: true });
 
+    const emptyQueryParamMap = convertToParamMap({});
+
     TestBed.configureTestingModule({
       imports: [RouterTestingModule, CheckoutComponent, TranslateModule.forRoot()],
       providers: [
-        { provide: CartStore, useValue: { items: itemsSignal, subtotal: subtotalSignal, clear: jasmine.createSpy('clear') } },
+        { provide: CartStore, useValue: { items: itemsSignal, subtotal: subtotalSignal, clear: jasmine.createSpy('clear'), hydrateFromBackend: jasmine.createSpy('hydrateFromBackend') } },
         { provide: CartApi, useValue: cartApi },
         { provide: ApiService, useValue: apiService },
         { provide: AuthService, useValue: auth },
-        { provide: ActivatedRoute, useValue: { snapshot: { params: {} } } }
+        { provide: ActivatedRoute, useValue: { snapshot: { params: {}, queryParamMap: emptyQueryParamMap }, queryParamMap: of(emptyQueryParamMap) } }
       ]
     });
   });

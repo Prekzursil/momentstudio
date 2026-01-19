@@ -22,11 +22,15 @@ test('owner can update About page via CMS and audit log records it', async ({ pa
 
   const marker = `E2E Our story ${Date.now()}`;
 
-  await page.goto('/admin/content/pages');
+  const aboutLoadResponse = page.waitForResponse((resp) => {
+    if (!resp.url().includes('/content/admin/page.about')) return false;
+    if (resp.request().method() !== 'GET') return false;
+    return [200, 404].includes(resp.status());
+  });
+  await Promise.all([aboutLoadResponse, page.goto('/admin/content/pages')]);
   const aboutField = page.getByRole('textbox', { name: 'Our story (About)' });
   await expect(aboutField).toBeVisible();
   // Wait for the CMS content to finish loading so it doesn't overwrite our edits.
-  await expect(aboutField).not.toHaveValue('');
   await aboutField.fill(marker);
   const saveAboutResponse = page.waitForResponse((resp) => {
     if (!resp.url().includes('/content/admin/page.about')) return false;

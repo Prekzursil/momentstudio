@@ -21,6 +21,7 @@ test('wishlist add/remove persists across account wishlist', async ({ page }) =>
   await loginAsOwner(page);
 
   await page.goto('/shop');
+  await expect(page.locator('app-header').getByRole('link', { name: 'Sign in' })).toBeHidden({ timeout: 20_000 });
   const productCard = page.locator('app-product-card').first();
   const emptyState = page.getByText('No products found');
   const errorState = page.getByText('We hit a snag loading products.');
@@ -83,4 +84,3 @@ test('wishlist add/remove persists across account wishlist', async ({ page }) =>
 
   await expect(page.getByRole('link', { name: productName })).not.toBeVisible();
 });
-

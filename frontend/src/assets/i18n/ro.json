@@ -16,6 +16,7 @@
     "myProfile": "Profilul meu",
     "myOrders": "Comenzile mele",
     "myWishlist": "Lista de dorințe",
+    "myCoupons": "Cupoanele mele",
     "helpCenter": "Ajutor",
     "cart": "Coș",
     "signIn": "Autentificare",
@@ -111,6 +112,25 @@
     "wishlist": {
       "browse": "Explorează produsele",
       "empty": "Nu ai produse salvate încă."
+    },
+    "coupons": {
+      "coupon": "Cupon",
+      "goToCheckout": "Finalizează comanda",
+      "useInCheckout": "Folosește la checkout",
+      "empty": "Nu ai cupoane încă.",
+      "loadError": "Nu am putut încărca cupoanele tale.",
+      "copy": "Copiază codul",
+      "copiedTitle": "Cod copiat",
+      "copiedCopy": "Lipește-l în câmpul de promoție din checkout.",
+      "validUntil": "Valabil până la",
+      "expired": "Expirat",
+      "inactive": "Inactiv",
+      "minSubtotal": "Subtotal minim",
+      "allowOnSale": "Se aplică și la produse la reducere",
+      "excludeOnSale": "Exclude produsele la reducere",
+      "percentOff": "{{value}}% reducere",
+      "amountOff": "{{value}} RON reducere",
+      "freeShipping": "Livrare gratuită"
     },
     "addresses": {
       "add": "Adaugă adresă",
@@ -423,6 +443,23 @@
     "promo": "Promo",
     "promoApplied": "Codul {{code}} a fost aplicat.",
     "promoPending": "Codul {{code}} va fi validat la checkout.",
+    "couponsLoginRequired": "Autentifică-te pentru a folosi cupoane.",
+    "couponsLoading": "Se încarcă cupoanele disponibile…",
+    "couponsLoadError": "Nu am putut încărca cupoanele.",
+    "availableCoupons": "Cupoane disponibile",
+    "unavailableCoupons": "Cupoane indisponibile",
+    "couponNotEligible": "Cupon neeligibil",
+    "couponReasons": {
+      "inactive": "Inactiv",
+      "not_started": "Nu a început încă",
+      "expired": "Expirat",
+      "no_eligible_items": "Nu există produse eligibile în coș",
+      "min_subtotal_not_met": "Subtotal minim neîndeplinit",
+      "shipping_already_free": "Livrarea este deja gratuită",
+      "sold_out": "Cupon epuizat",
+      "per_customer_limit_reached": "Ai folosit deja acest cupon",
+      "not_assigned": "Nu este disponibil pentru contul tău"
+    },
     "estimatedTotal": "Total estimat"
   },
   "auth": {

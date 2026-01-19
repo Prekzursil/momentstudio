@@ -1,0 +1,13 @@
+{% if lang == "ro" -%}
+<p style="margin:0 0 8px 0;">Un cupon a fost revocat:</p>
+<p style="margin:0 0 4px 0;"><strong>Cod:</strong> {{ coupon_code }}</p>
+<p style="margin:0 0 4px 0;"><strong>Promoție:</strong> {{ promotion_name }}</p>
+{% if reason %}<p style="margin:0 0 8px 0;"><strong>Motiv:</strong> {{ reason }}</p>{% endif %}
+<p style="margin:0;">Dacă ai întrebări, contactează suportul.</p>
+{%- else -%}
+<p style="margin:0 0 8px 0;">A coupon was revoked:</p>
+<p style="margin:0 0 4px 0;"><strong>Code:</strong> {{ coupon_code }}</p>
+<p style="margin:0 0 4px 0;"><strong>Promotion:</strong> {{ promotion_name }}</p>
+{% if reason %}<p style="margin:0 0 8px 0;"><strong>Reason:</strong> {{ reason }}</p>{% endif %}
+<p style="margin:0;">If you have questions, contact support.</p>
+{%- endif %}

@@ -31,6 +31,12 @@ export class CartStore {
 
   constructor(private api: CartApi) {}
 
+  hydrateFromBackend(res: { items: any[]; totals: any }): void {
+    const items = this.fromApi(res);
+    this.itemsSignal.set(items);
+    this.persist(items);
+  }
+
   loadFromBackend(): void {
     this.api.get().pipe(map((res) => this.fromApi(res))).subscribe({
       next: (items) => {

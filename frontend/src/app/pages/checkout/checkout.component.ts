@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
@@ -9,6 +9,7 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { CartStore, CartItem } from '../../core/cart.store';
 import { CartApi, CartResponse } from '../../core/cart.api';
 import { ApiService } from '../../core/api.service';
+import { CouponsService, type CouponEligibilityResponse, type CouponOffer } from '../../core/coupons.service';
 import { appConfig } from '../../core/app-config';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthService } from '../../core/auth.service';
@@ -540,34 +541,109 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                 <p *ngIf="addressError" class="text-sm text-amber-700 dark:text-amber-300">{{ addressError }}</p>
               </div>
 
-              <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step3' | translate }}</p>
-                <div class="flex gap-3">
-                <input
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 flex-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                  [(ngModel)]="promo"
-                  name="promo"
-                  [placeholder]="'checkout.promoPlaceholder' | translate"
-                />
-                <app-button size="sm" [label]="'checkout.apply' | translate" (action)="applyPromo()"></app-button>
-              </div>
-              <p
-                class="text-sm"
-                [ngClass]="
-                  promoMessage.startsWith('Applied')
-                    ? 'text-emerald-700 dark:text-emerald-300'
-                    : promoMessage.startsWith('Invalid')
-                      ? 'text-amber-700 dark:text-amber-300'
-                      : 'text-slate-700 dark:text-slate-300'
-                "
-                *ngIf="promoMessage"
-              >
-                {{ promoMessage }}
-              </p>
-            </div>
+	              <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	                <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step3' | translate }}</p>
+	                <ng-container *ngIf="auth.isAuthenticated(); else guestCoupons">
+	                  <div class="flex gap-3">
+	                    <input
+	                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 flex-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                      [(ngModel)]="promo"
+	                      name="promo"
+	                      [placeholder]="'checkout.promoPlaceholder' | translate"
+	                    />
+	                    <app-button size="sm" [label]="'checkout.apply' | translate" (action)="applyPromo()"></app-button>
+	                  </div>
+	                  <p
+	                    class="text-sm"
+	                    [ngClass]="
+	                      promoStatus === 'success'
+	                        ? 'text-emerald-700 dark:text-emerald-300'
+	                        : promoStatus === 'warn'
+	                          ? 'text-amber-700 dark:text-amber-300'
+	                          : 'text-slate-700 dark:text-slate-300'
+	                    "
+	                    *ngIf="promoMessage"
+	                  >
+	                    {{ promoMessage }}
+	                  </p>
 
-            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step4' | translate }}</p>
+	                  <div class="grid gap-2 pt-2">
+	                    <p *ngIf="couponEligibilityLoading" class="text-xs text-slate-500 dark:text-slate-400">
+	                      {{ 'checkout.couponsLoading' | translate }}
+	                    </p>
+	                    <p *ngIf="couponEligibilityError" class="text-xs text-amber-700 dark:text-amber-300">
+	                      {{ couponEligibilityError }}
+	                    </p>
+
+	                    <ng-container *ngIf="!couponEligibilityLoading && !couponEligibilityError && couponEligibility">
+	                      <div *ngIf="couponEligibility.eligible.length" class="grid gap-2">
+	                        <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+	                          {{ 'checkout.availableCoupons' | translate }}
+	                        </p>
+	                        <div class="grid gap-2">
+	                          <div
+	                            *ngFor="let offer of couponEligibility.eligible"
+	                            class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-950/30"
+	                          >
+	                            <div class="min-w-0">
+	                              <p class="text-sm font-medium text-slate-900 dark:text-slate-50">
+	                                {{ offer.coupon.promotion?.name || offer.coupon.code }}
+	                              </p>
+	                              <p class="text-xs text-slate-600 dark:text-slate-300">
+	                                {{ describeCouponOffer(offer) }}
+	                              </p>
+	                            </div>
+	                            <app-button
+	                              size="sm"
+	                              variant="ghost"
+	                              [label]="'checkout.apply' | translate"
+	                              (action)="applyCouponOffer(offer)"
+	                            ></app-button>
+	                          </div>
+	                        </div>
+	                      </div>
+
+	                      <details *ngIf="couponEligibility.ineligible.length" class="grid gap-2">
+	                        <summary class="cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200">
+	                          {{ 'checkout.unavailableCoupons' | translate }}
+	                        </summary>
+	                        <div class="grid gap-2">
+	                          <div
+	                            *ngFor="let offer of couponEligibility.ineligible"
+	                            class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+	                          >
+	                            <div class="min-w-0">
+	                              <p class="text-sm font-medium text-slate-900 dark:text-slate-50">
+	                                {{ offer.coupon.promotion?.name || offer.coupon.code }}
+	                              </p>
+	                              <p class="text-xs text-slate-600 dark:text-slate-300">
+	                                {{ describeCouponOffer(offer) }}
+	                              </p>
+	                              <p *ngIf="offer.reasons?.length" class="text-xs text-amber-700 dark:text-amber-300 pt-1">
+	                                {{ describeCouponReasons(offer.reasons) }}
+	                              </p>
+	                            </div>
+	                            <span class="font-mono text-xs text-slate-500 dark:text-slate-400">{{ offer.coupon.code }}</span>
+	                          </div>
+	                        </div>
+	                      </details>
+	                    </ng-container>
+	                  </div>
+	                </ng-container>
+
+	                <ng-template #guestCoupons>
+	                  <div class="grid gap-2">
+	                    <p class="text-sm text-slate-700 dark:text-slate-300">{{ 'checkout.couponsLoginRequired' | translate }}</p>
+	                    <div class="flex flex-wrap gap-2">
+	                      <app-button size="sm" variant="ghost" [label]="'nav.signIn' | translate" routerLink="/login"></app-button>
+	                      <app-button size="sm" variant="ghost" [label]="'nav.register' | translate" routerLink="/register"></app-button>
+	                    </div>
+	                  </div>
+	                </ng-template>
+	            </div>
+
+	            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step4' | translate }}</p>
               <div class="flex flex-wrap gap-3">
                 <button
                   type="button"
@@ -685,9 +761,9 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
             <span>{{ 'checkout.shipping' | translate }}</span>
             <span>{{ quoteShipping() | localizedCurrency : currency }}</span>
           </div>
-          <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
+          <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200" *ngIf="quotePromoSavings() > 0">
             <span>{{ 'checkout.promo' | translate }}</span>
-            <span class="text-emerald-700 dark:text-emerald-300">-{{ quoteDiscount() | localizedCurrency : currency }}</span>
+            <span class="text-emerald-700 dark:text-emerald-300">-{{ quotePromoSavings() | localizedCurrency : currency }}</span>
           </div>
           <div class="border-t border-slate-200 pt-3 flex items-center justify-between text-base font-semibold text-slate-900 dark:border-slate-800 dark:text-slate-50">
             <span>{{ 'checkout.estimatedTotal' | translate }}</span>
@@ -706,6 +782,14 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   ];
   promo = '';
   promoMessage = '';
+  promoStatus: 'success' | 'warn' | 'info' = 'info';
+  promoValid = true;
+
+  couponEligibility: CouponEligibilityResponse | null = null;
+  couponEligibilityLoading = false;
+  couponEligibilityError = '';
+  appliedCouponOffer: CouponOffer | null = null;
+  private pendingPromoCode: string | null = null;
   countries: PhoneCountryOption[] = [];
   readonly roCounties = RO_COUNTIES;
   readonly roCities = RO_CITIES;
@@ -769,8 +853,10 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   constructor(
     private cart: CartStore,
     private router: Router,
+    private route: ActivatedRoute,
     private cartApi: CartApi,
     private api: ApiService,
+    private couponsService: CouponsService,
     private translate: TranslateService,
     public auth: AuthService
   ) {
@@ -852,6 +938,59 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     return Math.max(0, q.subtotal + q.fee + q.tax + q.shipping - q.total);
   }
 
+  quotePromoSavings(): number {
+    const discount = this.quoteDiscount();
+    return Math.max(0, discount + this.couponShippingDiscount());
+  }
+
+  applyCouponOffer(offer: CouponOffer): void {
+    this.promo = offer.coupon.code;
+    this.appliedCouponOffer = offer;
+    this.applyPromo();
+  }
+
+  describeCouponOffer(offer: CouponOffer): string {
+    const promo = offer.coupon.promotion;
+    if (!promo) return offer.coupon.code;
+
+    let label = this.translate.instant('account.coupons.coupon');
+    if (promo.discount_type === 'free_shipping') {
+      label = this.translate.instant('account.coupons.freeShipping');
+    } else if (promo.discount_type === 'amount') {
+      label = this.translate.instant('account.coupons.amountOff', { value: promo.amount_off ?? '0' });
+    } else {
+      label = this.translate.instant('account.coupons.percentOff', { value: promo.percentage_off ?? '0' });
+    }
+
+    const savings = this.couponOfferSavings(offer);
+    if (savings <= 0) return `${offer.coupon.code} · ${label}`;
+    return `${offer.coupon.code} · ${label} · ≈${savings.toFixed(2)} RON`;
+  }
+
+  describeCouponReasons(reasons: string[]): string {
+    if (!reasons || reasons.length === 0) {
+      return this.translate.instant('checkout.couponNotEligible');
+    }
+    const labels = reasons.map((reason) => {
+      const key = `checkout.couponReasons.${reason}`;
+      const translated = this.translate.instant(key);
+      return translated === key ? reason : translated;
+    });
+    return labels.join(' • ');
+  }
+
+  private couponShippingDiscount(): number {
+    const offer = this.appliedCouponOffer;
+    if (!offer || !offer.eligible) return 0;
+    const currentCode = (this.promo || '').trim().toUpperCase();
+    if (!currentCode || offer.coupon.code.toUpperCase() !== currentCode) return 0;
+    return this.parseMoney(offer.estimated_shipping_discount_ron);
+  }
+
+  private couponOfferSavings(offer: CouponOffer): number {
+    return this.parseMoney(offer.estimated_discount_ron) + this.parseMoney(offer.estimated_shipping_discount_ron);
+  }
+
   private buildSuccessSummary(orderId: string, referenceCode: string | null, paymentMethod: CheckoutPaymentMethod): CheckoutSuccessSummary {
     const quote = this.quote ?? { subtotal: this.subtotal(), fee: 0, tax: 0, shipping: 0, total: this.subtotal(), currency: this.currency };
     const discount = Math.max(0, quote.subtotal + quote.fee + quote.tax + quote.shipping - quote.total);
@@ -891,6 +1030,11 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     localStorage.setItem(CHECKOUT_STRIPE_PENDING_KEY, JSON.stringify(summary));
   }
 
+  private hydrateCartAndQuote(res: CartResponse): void {
+    this.cart.hydrateFromBackend(res);
+    this.setQuote(res);
+  }
+
   private setQuote(res: CartResponse): void {
     const totals = res?.totals ?? ({} as any);
     const subtotal = this.parseMoney(totals.subtotal);
@@ -901,6 +1045,8 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     const currency = (totals.currency ?? 'RON') as string;
     this.quote = { subtotal, fee, tax, shipping, total, currency };
     this.currency = currency || 'RON';
+    this.loadCouponsEligibility();
+    this.applyPendingPromoCode();
   }
 
   private parseMoney(value: unknown): number {
@@ -918,12 +1064,107 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     return 0;
   }
 
-  applyPromo(): void {
-    const code = this.promo.trim();
-    if (!code) {
-      this.promoMessage = '';
+  private loadCouponsEligibility(): void {
+    if (!this.auth.isAuthenticated()) {
+      this.couponEligibility = null;
+      this.couponEligibilityError = '';
+      this.couponEligibilityLoading = false;
+      return;
     }
-    this.refreshQuote();
+
+    this.couponEligibilityLoading = true;
+    this.couponEligibilityError = '';
+    this.couponsService.eligibility().subscribe({
+      next: (res) => {
+        this.couponEligibility = res ?? { eligible: [], ineligible: [] };
+        this.couponEligibilityLoading = false;
+
+        const current = (this.promo || '').trim().toUpperCase();
+        if (!current) {
+          this.appliedCouponOffer = null;
+          return;
+        }
+        const offers = [...(this.couponEligibility.eligible ?? []), ...(this.couponEligibility.ineligible ?? [])];
+        const match = offers.find((offer) => offer.coupon?.code?.toUpperCase() === current) ?? null;
+        this.appliedCouponOffer = match;
+      },
+      error: (err) => {
+        this.couponEligibilityLoading = false;
+        this.couponEligibilityError =
+          err?.error?.detail || this.translate.instant('checkout.couponsLoadError');
+      }
+    });
+  }
+
+  private applyPendingPromoCode(): void {
+    const pending = (this.pendingPromoCode || '').trim().toUpperCase();
+    if (!pending) return;
+    if (!this.auth.isAuthenticated()) return;
+
+    const current = (this.promo || '').trim().toUpperCase();
+    if (current === pending) {
+      this.pendingPromoCode = null;
+      return;
+    }
+
+    this.pendingPromoCode = null;
+    this.promo = pending;
+    this.applyPromo();
+  }
+
+  applyPromo(): void {
+    const normalized = (this.promo || '').trim().toUpperCase();
+    this.promo = normalized;
+    this.promoValid = true;
+
+    if (!normalized) {
+      this.appliedCouponOffer = null;
+      this.promoMessage = '';
+      this.promoStatus = 'info';
+      this.refreshQuote(null);
+      return;
+    }
+
+    if (this.auth.isAuthenticated()) {
+      this.couponsService.validate(normalized).subscribe({
+        next: (offer) => {
+          this.appliedCouponOffer = offer;
+          if (!offer.eligible) {
+            this.promoStatus = 'warn';
+            this.promoValid = false;
+            const reasons = this.describeCouponReasons(offer.reasons ?? []);
+            this.promoMessage = `${this.translate.instant('checkout.couponNotEligible')}: ${reasons}`;
+            this.refreshQuote(null);
+            return;
+          }
+          this.promoStatus = 'success';
+          this.promoMessage = this.translate.instant('checkout.promoApplied', { code: normalized });
+          this.refreshQuote(normalized);
+        },
+        error: (err) => {
+          if (err?.status === 404) {
+            this.appliedCouponOffer = null;
+            this.applyLegacyPromo(normalized);
+            return;
+          }
+
+          this.appliedCouponOffer = null;
+          this.promoStatus = 'warn';
+          this.promoValid = false;
+          this.promoMessage =
+            err?.error?.detail || this.translate.instant('checkout.promoPending', { code: normalized });
+          this.refreshQuote(null);
+        }
+      });
+      return;
+    }
+
+    this.appliedCouponOffer = null;
+    this.promoStatus = 'warn';
+    this.promoValid = false;
+    this.promoMessage = this.translate.instant('checkout.couponsLoginRequired');
+    this.promo = '';
+    this.refreshQuote(null);
   }
 
   placeOrder(form: NgForm): void {
@@ -1119,7 +1360,20 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.syncBackendCart(this.items());
+    this.route.queryParamMap.subscribe((params) => {
+      const promo = (params.get('promo') || '').trim();
+      if (!promo) return;
+      const normalized = promo.toUpperCase();
+      if (normalized && normalized !== this.promo.trim().toUpperCase()) {
+        this.pendingPromoCode = normalized;
+      }
+    });
+    const items = this.items();
+    if (items.length) {
+      this.syncBackendCart(items);
+    } else {
+      this.loadCartFromServer();
+    }
     this.loadGuestEmailVerificationStatus();
   }
 
@@ -1157,7 +1411,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       )
       .subscribe({
         next: (res) => {
-          this.setQuote(res);
+          this.hydrateCartAndQuote(res);
           this.syncing = false;
         },
         error: () => {
@@ -1167,29 +1421,73 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       });
   }
 
-  private refreshQuote(): void {
-    const promo = this.promo.trim();
-    const params = promo ? { promo_code: promo } : undefined;
+  private loadCartFromServer(): void {
+    this.syncing = true;
+    this.auth.ensureAuthenticated({ silent: true }).subscribe({
+      next: () => {
+        this.cartApi.get().subscribe({
+          next: (res) => {
+            this.hydrateCartAndQuote(res);
+            this.syncing = false;
+          },
+          error: () => {
+            this.syncing = false;
+            this.errorMessage = 'Could not load cart from server';
+          }
+        });
+      },
+      error: () => {
+        this.syncing = false;
+        this.errorMessage = 'Could not load cart from server';
+      }
+    });
+  }
+
+  private refreshQuote(promo: string | null): void {
+    const code = (promo || '').trim();
+    const params = code ? { promo_code: code } : undefined;
     this.cartApi.get(params).subscribe({
       next: (res) => {
-        this.setQuote(res);
-        if (promo) {
-          const discount = this.quoteDiscount();
-          this.promoMessage =
-            discount > 0
-              ? this.translate.instant('checkout.promoApplied', { code: promo.toUpperCase() })
-              : this.translate.instant('checkout.promoPending', { code: promo.toUpperCase() });
-        } else {
-          this.promoMessage = '';
-        }
+        this.hydrateCartAndQuote(res);
       },
       error: (err) => {
         // Don't block checkout on promo quote; checkout will validate server-side.
-        if (promo) {
-          this.promoMessage = err?.error?.detail || this.translate.instant('checkout.promoPending', { code: promo.toUpperCase() });
-        } else {
-          this.promoMessage = '';
+        if (code) {
+          this.promoStatus = 'warn';
+          this.promoValid = false;
+          this.promoMessage = err?.error?.detail || this.translate.instant('checkout.promoPending', { code });
+          this.cartApi.get().subscribe({
+            next: (res) => this.hydrateCartAndQuote(res),
+            error: () => {}
+          });
         }
+      }
+    });
+  }
+
+  private applyLegacyPromo(code: string): void {
+    this.cartApi.get({ promo_code: code }).subscribe({
+      next: (res) => {
+        this.hydrateCartAndQuote(res);
+        const savings = this.quotePromoSavings();
+        if (savings > 0) {
+          this.promoStatus = 'success';
+          this.promoValid = true;
+          this.promoMessage = this.translate.instant('checkout.promoApplied', { code });
+        } else {
+          this.promoStatus = 'warn';
+          this.promoValid = false;
+          this.promoMessage = this.translate.instant('checkout.promoPending', { code });
+        }
+      },
+      error: (err) => {
+        this.promoStatus = 'warn';
+        this.promoValid = false;
+        this.promoMessage = err?.error?.detail || this.translate.instant('checkout.promoPending', { code });
+        this.cartApi.get().subscribe({
+          next: (res) => this.hydrateCartAndQuote(res),
+          error: () => {}
+        });
       }
     });
   }
@@ -1411,7 +1709,6 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       billing_postal_code: this.billingSameAsShipping ? null : this.billing.postal,
       billing_country: this.billingSameAsShipping ? null : this.billing.country || this.address.country || 'RO',
       shipping_method_id: null,
-      promo_code: this.promo || null,
       save_address: this.saveAddress,
       payment_method: this.paymentMethod,
       create_account: this.guestCreateAccount,

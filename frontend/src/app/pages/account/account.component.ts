@@ -121,6 +121,12 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
                 >{{ 'nav.myWishlist' | translate }}</a
               >
               <a
+                routerLink="/account/coupons"
+                routerLinkActive="bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-50"
+                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition"
+                >{{ 'nav.myCoupons' | translate }}</a
+              >
+              <a
                 routerLink="/account/notifications"
                 routerLinkActive="bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-50"
                 class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition"
@@ -187,4 +193,3 @@ export class AccountComponent extends AccountLegacyComponent {
     super(toast, auth, account, blog, cart, router, route, api, wishlist, theme, lang, translate);
   }
 }
-

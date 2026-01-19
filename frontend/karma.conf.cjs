@@ -1,4 +1,13 @@
 module.exports = function (config) {
+  if (!process.env.CHROME_BIN) {
+    try {
+      // Prefer Playwright's bundled Chromium in environments without system Chrome.
+      const { chromium } = require('playwright');
+      process.env.CHROME_BIN = chromium.executablePath();
+    } catch (_) {
+      // Fall back to system Chrome resolution via karma-chrome-launcher.
+    }
+  }
   config.set({
     basePath: '',
     frameworks: ['jasmine', '@angular-devkit/build-angular'],

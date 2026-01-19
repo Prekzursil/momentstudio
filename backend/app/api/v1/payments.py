@@ -16,6 +16,7 @@ from app.services import auth as auth_service
 from app.services import email as email_service
 from app.services import checkout_settings as checkout_settings_service
 from app.services import notifications as notification_service
+from app.services import coupons_v2 as coupons_service
 from app.services import promo_usage
 from app.api.v1 import cart as cart_api
 
@@ -133,6 +134,9 @@ async def stripe_webhook(
                     session.add(order)
                     await session.commit()
                     await session.refresh(order)
+                await coupons_service.redeem_coupon_for_order(
+                    session, order=order, note=f"Stripe checkout {session_id}"
+                )
 
                 if order.user and order.user.id:
                     await notification_service.create_notification(
@@ -220,6 +224,7 @@ async def stripe_webhook(
                     session.add(order)
                     await session.commit()
                     await session.refresh(order)
+                await coupons_service.redeem_coupon_for_order(session, order=order, note=f"Stripe {intent_id}".strip())
 
                 # Keep orders pending_acceptance until an admin accepts them; still notify the customer of payment receipt.
                 if order.user and order.user.id:
@@ -351,6 +356,9 @@ async def paypal_webhook(
                     session.add(order)
                     await session.commit()
                     await session.refresh(order)
+                    await coupons_service.redeem_coupon_for_order(
+                        session, order=order, note=f"PayPal {capture_id}".strip()
+                    )
 
                     if order.user and order.user.id:
                         await notification_service.create_notification(

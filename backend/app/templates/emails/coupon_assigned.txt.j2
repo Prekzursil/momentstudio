@@ -1,0 +1,19 @@
+{% if lang == "ro" -%}
+Ai primit un cupon nou:
+
+Cod: {{ coupon_code }}
+Promoție: {{ promotion_name }}
+{% if promotion_description %}Detalii: {{ promotion_description }}{% endif %}
+{% if ends_at %}Valabil până la: {{ ends_at }}{% endif %}
+
+Îl poți vedea și folosi din contul tău: {{ account_url }}
+{%- else -%}
+You received a new coupon:
+
+Code: {{ coupon_code }}
+Promotion: {{ promotion_name }}
+{% if promotion_description %}Details: {{ promotion_description }}{% endif %}
+{% if ends_at %}Valid until: {{ ends_at }}{% endif %}
+
+You can view and use it from your account: {{ account_url }}
+{%- endif %}

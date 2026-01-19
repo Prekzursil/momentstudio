@@ -17,6 +17,7 @@ from app.api.v1 import notifications
 from app.api.v1 import support
 from app.api.v1 import returns
 from app.api.v1 import shipping
+from app.api.v1 import coupons_v2
 from app.models.catalog import Product, Category
 from app.models.content import ContentBlock, ContentStatus
 from datetime import datetime, timezone
@@ -46,6 +47,7 @@ api_router.include_router(notifications.router)
 api_router.include_router(support.router)
 api_router.include_router(returns.router)
 api_router.include_router(shipping.router)
+api_router.include_router(coupons_v2.router)
 
 
 @api_router.get("/health", tags=["health"])

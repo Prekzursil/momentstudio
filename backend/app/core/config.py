@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     maintenance_bypass_token: str = "bypass-token"
     max_concurrent_requests: int = 100
     enforce_decimal_prices: bool = True
+    coupon_reservation_ttl_minutes: int = 60 * 24
+    first_order_reward_coupon_validity_days: int = 30
 
     media_root: str = "uploads"
     private_media_root: str = "private_uploads"

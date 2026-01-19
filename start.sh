@@ -17,19 +17,34 @@ FRONTEND_PORT="${FRONTEND_PORT:-4200}"
 
 port_is_free() {
   python3 - "$1" <<'PY'
+import errno
 import socket
 import sys
 
 port = int(sys.argv[1])
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-try:
-    s.bind(("127.0.0.1", port))
-except OSError:
-    sys.exit(1)
-finally:
-    s.close()
-sys.exit(0)
+
+def can_bind(family: int, addr: str) -> bool:
+    s = socket.socket(family, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        s.bind((addr, port))
+    except OSError as exc:
+        if exc.errno == errno.EADDRINUSE:
+            return False
+        # IPv6 might be disabled or unsupported; treat as non-fatal.
+        return True
+    finally:
+        s.close()
+    return True
+
+free = can_bind(socket.AF_INET, "127.0.0.1")
+if socket.has_ipv6:
+    try:
+        free = free and can_bind(socket.AF_INET6, "::1")
+    except OSError:
+        pass
+
+sys.exit(0 if free else 1)
 PY
 }
 

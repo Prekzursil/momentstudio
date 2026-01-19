@@ -1,0 +1,15 @@
+{% if lang == "ro" -%}
+<p style="margin:0 0 8px 0;">Ai primit un cupon nou:</p>
+<p style="margin:0 0 4px 0;"><strong>Cod:</strong> {{ coupon_code }}</p>
+<p style="margin:0 0 4px 0;"><strong>Promoție:</strong> {{ promotion_name }}</p>
+{% if promotion_description %}<p style="margin:0 0 4px 0;"><strong>Detalii:</strong> {{ promotion_description }}</p>{% endif %}
+{% if ends_at %}<p style="margin:0 0 8px 0;"><strong>Valabil până la:</strong> {{ ends_at }}</p>{% endif %}
+<p style="margin:0;">Îl poți vedea și folosi din contul tău: <a href="{{ account_url }}">{{ account_url }}</a></p>
+{%- else -%}
+<p style="margin:0 0 8px 0;">You received a new coupon:</p>
+<p style="margin:0 0 4px 0;"><strong>Code:</strong> {{ coupon_code }}</p>
+<p style="margin:0 0 4px 0;"><strong>Promotion:</strong> {{ promotion_name }}</p>
+{% if promotion_description %}<p style="margin:0 0 4px 0;"><strong>Details:</strong> {{ promotion_description }}</p>{% endif %}
+{% if ends_at %}<p style="margin:0 0 8px 0;"><strong>Valid until:</strong> {{ ends_at }}</p>{% endif %}
+<p style="margin:0;">You can view and use it from your account: <a href="{{ account_url }}">{{ account_url }}</a></p>
+{%- endif %}

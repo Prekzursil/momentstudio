@@ -106,6 +106,14 @@ Below is a structured checklist you can turn into issues.
 - [x] Reserve stock on checkout start (optional).
 - [x] Cart subtotal/tax/shipping calculation helper.
 - [x] Promo code model + validation hook.
+- [x] Coupons v2: add Promotion/Coupon models + migrations (public/assigned, limits, validity).
+- [x] Coupons v2: add eligibility + validate endpoints (auth-only).
+- [x] Coupons v2: reserve/redeem/void coupons per order (caps enforced with row locks).
+- [x] Coupons v2: apply coupons to cart totals (including free shipping).
+- [x] Coupons v2: require login to apply coupons (no guest coupons).
+- [x] Coupons v2: issue first-order reward coupon after first delivered order (+ email).
+- [ ] Coupons v2: add admin UI for promotions/coupons assignment and revocation.
+- [ ] Coupons v2: add scope rules (product/category inclusion/exclusion).
 - [x] Abandoned cart job (email reminder) scaffold.
 - [x] Cart item note (gift message) support.
 - [x] Cart cleanup job for stale guest carts.
@@ -194,6 +202,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Emails: send bilingual (RO+EN) content in a single email for transactional notifications (welcome, verification, password reset/changed, email change, order status updates, owner alerts).
 - [x] Emails: include product links in the order confirmation email (links to `/products/:slug`).
 - [x] Emails: send welcome email when a guest checkout creates an account.
+- [x] Emails: send coupon assignment/revocation notifications (bilingual) with an account link.
 - [x] Receipt UX: add a shareable HTML receipt view (`/receipt/:token`) with clickable product links + a real PDF renderer with embedded hyperlinks (token PDF endpoint).
 
 ## Backend - Security, Observability, Testing
@@ -351,6 +360,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Success page with order summary + continue shopping.
 - [x] Guest cart persistence in localStorage.
 - [x] Apply promo code UI.
+- [x] Coupons v2: show eligible coupons in checkout (signed-in only).
+- [x] Coupons v2: block guest coupon entry and require sign-in.
 - [x] Shipping method selection UI.
 - [x] Address form with validation and country selector.
 - [x] Payment form with Stripe elements.
@@ -388,6 +399,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Registration page.
 - [x] Password reset request + reset form.
 - [x] Account dashboard (profile, address book, order history, order detail).
+- [x] Account: add "My coupons" page (list, copy, and deep-link to checkout).
 - [x] Change password form.
 - [x] Auth UX: add show/hide toggles for password inputs (register + change password).
 - [x] Email verification flow UI.

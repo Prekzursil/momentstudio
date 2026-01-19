@@ -127,19 +127,27 @@ import { NotificationsService, UserNotification } from '../core/notifications.se
 	                >
 	                  {{ 'nav.myOrders' | translate }}
 	                </a>
-	                <a
-	                  routerLink="/account/wishlist"
-	                  role="menuitem"
-	                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
-	                  (click)="closeUserMenu()"
-	                >
-	                  {{ 'nav.myWishlist' | translate }}
-	                </a>
-	                <a
-	                  routerLink="/tickets"
-	                  role="menuitem"
-	                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
-	                  (click)="closeUserMenu()"
+		                <a
+		                  routerLink="/account/wishlist"
+		                  role="menuitem"
+		                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+		                  (click)="closeUserMenu()"
+		                >
+		                  {{ 'nav.myWishlist' | translate }}
+		                </a>
+		                <a
+		                  routerLink="/account/coupons"
+		                  role="menuitem"
+		                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+		                  (click)="closeUserMenu()"
+		                >
+		                  {{ 'nav.myCoupons' | translate }}
+		                </a>
+		                <a
+		                  routerLink="/tickets"
+		                  role="menuitem"
+		                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+		                  (click)="closeUserMenu()"
 	                >
 	                  {{ 'nav.helpCenter' | translate }}
 	                </a>

@@ -16,6 +16,7 @@
     "myProfile": "My profile",
     "myOrders": "My orders",
     "myWishlist": "My wishlist",
+    "myCoupons": "My coupons",
     "helpCenter": "Help center",
     "cart": "Cart",
     "signIn": "Sign in",
@@ -111,6 +112,25 @@
     "wishlist": {
       "browse": "Browse products",
       "empty": "No saved items yet."
+    },
+    "coupons": {
+      "coupon": "Coupon",
+      "goToCheckout": "Checkout",
+      "useInCheckout": "Use in checkout",
+      "empty": "No coupons yet.",
+      "loadError": "Could not load your coupons.",
+      "copy": "Copy code",
+      "copiedTitle": "Coupon code copied",
+      "copiedCopy": "Paste it in the checkout promo box.",
+      "validUntil": "Valid until",
+      "expired": "Expired",
+      "inactive": "Inactive",
+      "minSubtotal": "Min subtotal",
+      "allowOnSale": "Works on sale items",
+      "excludeOnSale": "Excludes sale items",
+      "percentOff": "{{value}}% off",
+      "amountOff": "{{value}} RON off",
+      "freeShipping": "Free shipping"
     },
     "addresses": {
       "add": "Add address",
@@ -423,6 +443,23 @@
     "promo": "Promo",
     "promoApplied": "Promo {{code}} applied.",
     "promoPending": "Promo {{code}} will be validated at checkout.",
+    "couponsLoginRequired": "Sign in to use coupons.",
+    "couponsLoading": "Loading available coupons…",
+    "couponsLoadError": "Could not load coupons.",
+    "availableCoupons": "Available coupons",
+    "unavailableCoupons": "Unavailable coupons",
+    "couponNotEligible": "Coupon not eligible",
+    "couponReasons": {
+      "inactive": "Inactive",
+      "not_started": "Not started yet",
+      "expired": "Expired",
+      "no_eligible_items": "No eligible items in your cart",
+      "min_subtotal_not_met": "Minimum subtotal not met",
+      "shipping_already_free": "Shipping is already free",
+      "sold_out": "No redemptions left",
+      "per_customer_limit_reached": "You already used this coupon",
+      "not_assigned": "Not available for your account"
+    },
     "estimatedTotal": "Estimated total"
   },
   "auth": {

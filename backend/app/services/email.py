@@ -766,6 +766,53 @@ async def send_low_stock_alert(to_email: str, product_name: str, stock: int, *, 
     return await send_email(to_email, subject, text_body, html_body)
 
 
+async def send_coupon_assigned(
+    to_email: str,
+    *,
+    coupon_code: str,
+    promotion_name: str,
+    promotion_description: str | None = None,
+    ends_at: datetime | None = None,
+    lang: str | None = None,
+) -> bool:
+    subject = _bilingual_subject("Cupon nou", "New coupon", preferred_language=lang)
+    ends_str = ends_at.strftime("%Y-%m-%d") if ends_at else None
+    account_url = f"{settings.frontend_origin.rstrip('/')}/account/coupons"
+    text_body, html_body = render_bilingual_template(
+        "coupon_assigned.txt.j2",
+        {
+            "coupon_code": str(coupon_code or "").strip().upper(),
+            "promotion_name": promotion_name,
+            "promotion_description": promotion_description,
+            "ends_at": ends_str,
+            "account_url": account_url,
+        },
+        preferred_language=lang,
+    )
+    return await send_email(to_email, subject, text_body, html_body)
+
+
+async def send_coupon_revoked(
+    to_email: str,
+    *,
+    coupon_code: str,
+    promotion_name: str,
+    reason: str | None = None,
+    lang: str | None = None,
+) -> bool:
+    subject = _bilingual_subject("Cupon revocat", "Coupon revoked", preferred_language=lang)
+    text_body, html_body = render_bilingual_template(
+        "coupon_revoked.txt.j2",
+        {
+            "coupon_code": str(coupon_code or "").strip().upper(),
+            "promotion_name": promotion_name,
+            "reason": (reason or "").strip() or None,
+        },
+        preferred_language=lang,
+    )
+    return await send_email(to_email, subject, text_body, html_body)
+
+
 async def send_error_alert(to_email: str, message: str) -> bool:
     subject = _bilingual_subject("Alertă critică", "Critical error alert", preferred_language=None)
     text_ro = f"A apărut o eroare critică:\n\n{message}"
