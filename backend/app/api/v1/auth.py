@@ -10,6 +10,7 @@ from jose import jwt
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, EmailStr, field_validator
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
@@ -18,7 +19,7 @@ from app.core.dependencies import get_current_user, get_google_completion_user, 
 from app.core.rate_limit import limiter, per_identifier_limiter
 from app.core.security import decode_token
 from app.db.session import get_session
-from app.models.user import User, UserSecondaryEmail
+from app.models.user import RefreshSession, User, UserSecondaryEmail
 from app.schemas.auth import (
     AuthResponse,
     GoogleCallbackResponse,
@@ -343,7 +344,29 @@ async def refresh_tokens(
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token missing")
 
-    stored = await auth_service.validate_refresh_token(session, refresh_token)
+    payload = security.decode_token(refresh_token)
+    if not payload or payload.get("type") != "refresh":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    jti = str(payload.get("jti") or "").strip()
+    sub = payload.get("sub")
+    if not jti or not sub:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    try:
+        token_user_id = UUID(str(sub))
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+
+    # Lock the refresh session row during rotation to make concurrent refreshes multi-tab safe.
+    stored = (
+        await session.execute(select(RefreshSession).where(RefreshSession.jti == jti).with_for_update())
+    ).scalar_one_or_none()
+    now = datetime.now(timezone.utc)
+    stored_expires_at = stored.expires_at if stored else None
+    if stored_expires_at and stored_expires_at.tzinfo is None:
+        stored_expires_at = stored_expires_at.replace(tzinfo=timezone.utc)
+    if not stored or stored.user_id != token_user_id or not stored_expires_at or stored_expires_at < now:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+
     user = await session.get(User, stored.user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
@@ -352,16 +375,62 @@ async def refresh_tokens(
     if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
         await self_service.execute_account_deletion(session, user)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
-    # rotate token
+
+    # If the token was already rotated very recently (multi-tab refresh), allow
+    # reusing it by issuing tokens for the replacement session without rotating again.
+    if stored.revoked:
+        grace_seconds = max(0, int(settings.refresh_token_rotation_grace_seconds or 0))
+        rotated_at = getattr(stored, "rotated_at", None)
+        replaced_by = (getattr(stored, "replaced_by_jti", None) or "").strip()
+        if stored.revoked_reason == "rotated" and grace_seconds > 0 and rotated_at and replaced_by:
+            rotated_at_norm = rotated_at
+            if rotated_at_norm.tzinfo is None:
+                rotated_at_norm = rotated_at_norm.replace(tzinfo=timezone.utc)
+            if rotated_at_norm + timedelta(seconds=grace_seconds) >= now:
+                replacement = (
+                    await session.execute(select(RefreshSession).where(RefreshSession.jti == replaced_by))
+                ).scalar_one_or_none()
+                replacement_expires_at = replacement.expires_at if replacement else None
+                if replacement_expires_at and replacement_expires_at.tzinfo is None:
+                    replacement_expires_at = replacement_expires_at.replace(tzinfo=timezone.utc)
+                if (
+                    replacement
+                    and replacement.user_id == stored.user_id
+                    and not replacement.revoked
+                    and replacement_expires_at
+                    and replacement_expires_at >= now
+                ):
+                    persistent = bool(getattr(replacement, "persistent", True))
+                    access = security.create_access_token(str(user.id), replacement.jti)
+                    refresh = security.create_refresh_token(str(user.id), replacement.jti, replacement_expires_at)
+                    if response:
+                        set_refresh_cookie(response, refresh, persistent=persistent)
+                    return TokenPair(access_token=access, refresh_token=refresh)
+
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+
+    persistent = bool(getattr(stored, "persistent", True))
+    if not settings.refresh_token_rotation:
+        access = security.create_access_token(str(user.id), stored.jti)
+        refresh = security.create_refresh_token(str(user.id), stored.jti, stored_expires_at)
+        if response:
+            set_refresh_cookie(response, refresh, persistent=persistent)
+        return TokenPair(access_token=access, refresh_token=refresh)
+
+    # Rotate the token by revoking the current refresh session and issuing a replacement.
+    replacement_session = await auth_service.create_refresh_session(session, user.id, persistent=persistent)
     stored.revoked = True
     stored.revoked_reason = "rotated"
+    stored.rotated_at = now
+    stored.replaced_by_jti = replacement_session.jti
     session.add(stored)
     await session.flush()
-    persistent = bool(getattr(stored, "persistent", True))
-    tokens = await auth_service.issue_tokens_for_user(session, user, persistent=persistent)
+    access = security.create_access_token(str(user.id), replacement_session.jti)
+    refresh = security.create_refresh_token(str(user.id), replacement_session.jti, replacement_session.expires_at)
+    await session.commit()
     if response:
-        set_refresh_cookie(response, tokens["refresh_token"], persistent=persistent)
-    return TokenPair(**tokens)
+        set_refresh_cookie(response, refresh, persistent=persistent)
+    return TokenPair(access_token=access, refresh_token=refresh)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

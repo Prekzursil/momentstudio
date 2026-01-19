@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     access_token_exp_minutes: int = 30
     refresh_token_exp_days: int = 7
     refresh_token_rotation: bool = True
+    refresh_token_rotation_grace_seconds: int = 60
     account_deletion_cooldown_hours: int = 24
     secure_cookies: bool = False
     cookie_samesite: str = "lax"

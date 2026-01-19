@@ -183,6 +183,8 @@ class RefreshSession(Base):
     persistent: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default="true")
     revoked: Mapped[bool] = mapped_column(default=False, nullable=False)
     revoked_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    rotated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    replaced_by_jti: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     user: Mapped[User] = relationship("User", back_populates="refresh_sessions")
