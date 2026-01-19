@@ -48,6 +48,7 @@ export class AdminLayoutComponent {
     { path: '/admin/products', labelKey: 'adminUi.nav.products' },
     { path: '/admin/orders', labelKey: 'adminUi.nav.orders' },
     { path: '/admin/returns', labelKey: 'adminUi.nav.returns' },
+    { path: '/admin/coupons', labelKey: 'adminUi.nav.coupons' },
     { path: '/admin/users', labelKey: 'adminUi.nav.users' },
     { path: '/admin/support', labelKey: 'adminUi.nav.support' }
   ];

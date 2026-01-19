@@ -176,6 +176,11 @@ export const routes: Routes = [
         title: 'Returns | Admin | momentstudio'
       },
       {
+        path: 'coupons',
+        loadComponent: () => import('./pages/admin/coupons/admin-coupons.component').then((m) => m.AdminCouponsComponent),
+        title: 'Coupons | Admin | momentstudio'
+      },
+      {
         path: 'products',
         loadComponent: () => import('./pages/admin/products/admin-products.component').then((m) => m.AdminProductsComponent),
         title: 'Products | Admin | momentstudio'

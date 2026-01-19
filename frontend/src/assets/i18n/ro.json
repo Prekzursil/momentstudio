@@ -454,6 +454,8 @@
       "not_started": "Nu a început încă",
       "expired": "Expirat",
       "no_eligible_items": "Nu există produse eligibile în coș",
+      "scope_no_match": "Nu există produse eligibile în coș",
+      "scope_excluded": "Produsele din coș sunt excluse",
       "min_subtotal_not_met": "Subtotal minim neîndeplinit",
       "shipping_already_free": "Livrarea este deja gratuită",
       "sold_out": "Cupon epuizat",
@@ -578,6 +580,7 @@
       "products": "Produse",
       "orders": "Comenzi",
       "returns": "Retururi",
+      "coupons": "Cupoane",
       "users": "Utilizatori",
       "support": "Suport",
       "content": "Conținut"
@@ -609,6 +612,7 @@
       "cancel": "Anulează",
       "edit": "Editează",
       "refresh": "Reîncarcă",
+      "search": "Caută",
       "copy": "Copiază",
       "use": "Folosește",
       "prev": "Anterior",
@@ -1491,6 +1495,140 @@
         "create": "Nu am putut crea cuponul",
         "update": "Nu am putut actualiza cuponul",
         "invalidateStripe": "Nu am putut reseta cache-ul de cupoane Stripe"
+      }
+    },
+    "couponsV2": {
+      "title": "Cupoane",
+      "subtitle": "Gestionează promoțiile, cupoanele și atribuirea cupoanelor.",
+      "common": {
+        "active": "Activ",
+        "inactive": "Inactiv",
+        "saving": "Se salvează…"
+      },
+      "discountTypes": {
+        "percent": "Reducere procentuală",
+        "amount": "Reducere sumă fixă",
+        "free_shipping": "Livrare gratuită"
+      },
+      "discountSummary": {
+        "freeShipping": "Livrare gratuită",
+        "amountOff": "-{{value}} RON",
+        "percentOff": "-{{value}}%"
+      },
+      "fields": {
+        "key": "Cheie (opțional)",
+        "name": "Nume",
+        "description": "Descriere",
+        "discountType": "Tip reducere",
+        "percentageOff": "% reducere",
+        "amountOff": "Reducere (RON)",
+        "maxDiscount": "Reducere maximă (RON)",
+        "minSubtotal": "Subtotal minim (RON)",
+        "allowOnSale": "Permite produse la reducere",
+        "startsAt": "Începe la",
+        "endsAt": "Se termină la",
+        "active": "Activ",
+        "automatic": "Automat"
+      },
+      "scopes": {
+        "title": "Reguli de aplicare",
+        "includedCategories": "Categorii incluse",
+        "excludedCategories": "Categorii excluse",
+        "searchProducts": "Caută produse",
+        "loadingProducts": "Se caută produse…",
+        "include": "Include",
+        "exclude": "Exclude",
+        "includedProducts": "Produse incluse",
+        "excludedProducts": "Produse excluse",
+        "none": "Niciunul"
+      },
+      "promotions": {
+        "title": "Promoții",
+        "hint": "Configurează regulile de reducere și aria de aplicare.",
+        "new": "Promoție nouă",
+        "empty": "Nu există promoții.",
+        "createTitle": "Creează promoție",
+        "editTitle": "Editează promoție",
+        "create": "Creează promoție",
+        "save": "Salvează promoția"
+      },
+      "coupons": {
+        "title": "Cupoane",
+        "hint": "Creează și gestionează coduri de cupon pentru o promoție.",
+        "new": "Cupon nou",
+        "search": "Caută după cod",
+        "empty": "Nu există cupoane pentru această promoție.",
+        "selectPromotion": "Selectează o promoție pentru a vedea cupoanele.",
+        "createTitle": "Creează cupon",
+        "editTitle": "Editează cupon",
+        "create": "Creează cupon",
+        "save": "Salvează cupon",
+        "fields": {
+          "promotion": "Promoție",
+          "code": "Cod",
+          "visibility": "Vizibilitate",
+          "active": "Activ",
+          "startsAt": "Începe la",
+          "endsAt": "Se termină la",
+          "globalMax": "Număr maxim global de utilizări",
+          "perCustomerMax": "Număr maxim per client"
+        },
+        "visibility": {
+          "public": "Public",
+          "assigned": "Atribuit"
+        },
+        "table": {
+          "code": "Cod",
+          "visibility": "Vizibilitate",
+          "active": "Activ",
+          "ends": "Se termină",
+          "actions": "Acțiuni"
+        }
+      },
+      "assignments": {
+        "title": "Atribuiri",
+        "hint": "Atribuie cupoane utilizatorilor prin email și revocă atunci când este necesar.",
+        "loading": "Se încarcă atribuiri…",
+        "empty": "Nu există atribuiri.",
+        "assignTitle": "Atribuire",
+        "revokeTitle": "Revocare",
+        "email": "Email client",
+        "reason": "Motiv (opțional)",
+        "sendEmail": "Trimite notificare prin email",
+        "assign": "Atribuie cupon",
+        "revoke": "Revocă cupon",
+        "active": "Activ",
+        "revoked": "Revocat",
+        "table": {
+          "user": "Utilizator",
+          "issued": "Atribuit",
+          "status": "Stare",
+          "reason": "Motiv"
+        }
+      },
+      "success": {
+        "savePromotion": "Promoția a fost salvată",
+        "saveCoupon": "Cuponul a fost salvat",
+        "assign": "Cupon atribuit",
+        "revoke": "Cupon revocat"
+      },
+      "errors": {
+        "validation": "Verifică formularul",
+        "promotionNameRequired": "Numele promoției este obligatoriu",
+        "invalidDateRange": "Data de final trebuie să fie după data de început",
+        "percentRequired": "Procentul trebuie să fie între 0 și 100",
+        "amountRequired": "Suma trebuie să fie mai mare decât 0",
+        "couponPromotionRequired": "Promoția este obligatorie",
+        "couponCodeRequired": "Codul cuponului este obligatoriu",
+        "emailRequired": "Emailul este obligatoriu",
+        "loadPromotions": "Nu s-au putut încărca promoțiile",
+        "savePromotion": "Nu s-a putut salva promoția",
+        "loadCoupons": "Nu s-au putut încărca cupoanele",
+        "saveCoupon": "Nu s-a putut salva cuponul",
+        "loadAssignments": "Nu s-au putut încărca atribuiri",
+        "assign": "Nu s-a putut atribui cuponul",
+        "revoke": "Nu s-a putut revoca cuponul",
+        "searchProducts": "Nu s-au putut căuta produsele"
       }
     },
     "audit": {

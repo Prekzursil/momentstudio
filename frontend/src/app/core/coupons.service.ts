@@ -16,6 +16,10 @@ export interface PromotionRead {
   max_discount_amount?: string | null;
   allow_on_sale_items: boolean;
   min_subtotal?: string | null;
+  included_product_ids?: string[];
+  excluded_product_ids?: string[];
+  included_category_ids?: string[];
+  excluded_category_ids?: string[];
   starts_at?: string | null;
   ends_at?: string | null;
   is_active: boolean;
@@ -72,4 +76,3 @@ export class CouponsService {
     return this.api.get<CouponRead[]>('/coupons/me');
   }
 }
-

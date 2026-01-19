@@ -6,6 +6,10 @@ const filesToPatch = [
   'node_modules/http-proxy/lib/http-proxy/common.js'
 ];
 
+// Node 24 deprecates `util._extend` (DEP0060) and some versions of `http-proxy`
+// still use it. This postinstall patch keeps local dev + CI quiet until
+// upstream dependencies stop referencing `util._extend`.
+// TODO: Remove once `http-proxy` no longer references `util._extend`.
 const needle = "require('util')._extend";
 const replacement = 'Object.assign';
 

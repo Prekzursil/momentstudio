@@ -454,6 +454,8 @@
       "not_started": "Not started yet",
       "expired": "Expired",
       "no_eligible_items": "No eligible items in your cart",
+      "scope_no_match": "No eligible products in your cart",
+      "scope_excluded": "Cart items are excluded",
       "min_subtotal_not_met": "Minimum subtotal not met",
       "shipping_already_free": "Shipping is already free",
       "sold_out": "No redemptions left",
@@ -578,6 +580,7 @@
       "products": "Products",
       "orders": "Orders",
       "returns": "Returns",
+      "coupons": "Coupons",
       "users": "Users",
       "support": "Support",
       "content": "Content"
@@ -609,6 +612,7 @@
       "cancel": "Cancel",
       "edit": "Edit",
       "refresh": "Refresh",
+      "search": "Search",
       "copy": "Copy",
       "use": "Use",
       "prev": "Prev",
@@ -1491,6 +1495,140 @@
         "create": "Failed to create coupon",
         "update": "Failed to update coupon",
         "invalidateStripe": "Failed to reset Stripe coupon cache"
+      }
+    },
+    "couponsV2": {
+      "title": "Coupons",
+      "subtitle": "Manage promotions, coupons, and coupon assignments.",
+      "common": {
+        "active": "Active",
+        "inactive": "Inactive",
+        "saving": "Saving…"
+      },
+      "discountTypes": {
+        "percent": "Percent off",
+        "amount": "Amount off",
+        "free_shipping": "Free shipping"
+      },
+      "discountSummary": {
+        "freeShipping": "Free shipping",
+        "amountOff": "-{{value}} RON",
+        "percentOff": "-{{value}}%"
+      },
+      "fields": {
+        "key": "Key (optional)",
+        "name": "Name",
+        "description": "Description",
+        "discountType": "Discount type",
+        "percentageOff": "% off",
+        "amountOff": "Amount off (RON)",
+        "maxDiscount": "Max discount (RON)",
+        "minSubtotal": "Min subtotal (RON)",
+        "allowOnSale": "Allow on-sale items",
+        "startsAt": "Starts at",
+        "endsAt": "Ends at",
+        "active": "Active",
+        "automatic": "Automatic"
+      },
+      "scopes": {
+        "title": "Scope rules",
+        "includedCategories": "Included categories",
+        "excludedCategories": "Excluded categories",
+        "searchProducts": "Search products",
+        "loadingProducts": "Searching products…",
+        "include": "Include",
+        "exclude": "Exclude",
+        "includedProducts": "Included products",
+        "excludedProducts": "Excluded products",
+        "none": "None"
+      },
+      "promotions": {
+        "title": "Promotions",
+        "hint": "Configure discount rules and their scope.",
+        "new": "New promotion",
+        "empty": "No promotions yet.",
+        "createTitle": "Create promotion",
+        "editTitle": "Edit promotion",
+        "create": "Create promotion",
+        "save": "Save promotion"
+      },
+      "coupons": {
+        "title": "Coupons",
+        "hint": "Create and manage coupon codes for a promotion.",
+        "new": "New coupon",
+        "search": "Search by code",
+        "empty": "No coupons for this promotion.",
+        "selectPromotion": "Select a promotion to view its coupons.",
+        "createTitle": "Create coupon",
+        "editTitle": "Edit coupon",
+        "create": "Create coupon",
+        "save": "Save coupon",
+        "fields": {
+          "promotion": "Promotion",
+          "code": "Code",
+          "visibility": "Visibility",
+          "active": "Active",
+          "startsAt": "Starts at",
+          "endsAt": "Ends at",
+          "globalMax": "Global max redemptions",
+          "perCustomerMax": "Per-customer max redemptions"
+        },
+        "visibility": {
+          "public": "Public",
+          "assigned": "Assigned"
+        },
+        "table": {
+          "code": "Code",
+          "visibility": "Visibility",
+          "active": "Active",
+          "ends": "Ends",
+          "actions": "Actions"
+        }
+      },
+      "assignments": {
+        "title": "Assignments",
+        "hint": "Assign coupons to users by email and revoke when needed.",
+        "loading": "Loading assignments…",
+        "empty": "No assignments yet.",
+        "assignTitle": "Assign",
+        "revokeTitle": "Revoke",
+        "email": "Customer email",
+        "reason": "Reason (optional)",
+        "sendEmail": "Send email notification",
+        "assign": "Assign coupon",
+        "revoke": "Revoke coupon",
+        "active": "Active",
+        "revoked": "Revoked",
+        "table": {
+          "user": "User",
+          "issued": "Issued",
+          "status": "Status",
+          "reason": "Reason"
+        }
+      },
+      "success": {
+        "savePromotion": "Promotion saved",
+        "saveCoupon": "Coupon saved",
+        "assign": "Coupon assigned",
+        "revoke": "Coupon revoked"
+      },
+      "errors": {
+        "validation": "Please check the form",
+        "promotionNameRequired": "Promotion name is required",
+        "invalidDateRange": "Ends at must be after starts at",
+        "percentRequired": "Percentage off must be between 0 and 100",
+        "amountRequired": "Amount off must be greater than 0",
+        "couponPromotionRequired": "Promotion is required",
+        "couponCodeRequired": "Coupon code is required",
+        "emailRequired": "Email is required",
+        "loadPromotions": "Could not load promotions",
+        "savePromotion": "Could not save promotion",
+        "loadCoupons": "Could not load coupons",
+        "saveCoupon": "Could not save coupon",
+        "loadAssignments": "Could not load assignments",
+        "assign": "Could not assign coupon",
+        "revoke": "Could not revoke coupon",
+        "searchProducts": "Could not search products"
       }
     },
     "audit": {
