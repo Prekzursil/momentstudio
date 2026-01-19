@@ -19,7 +19,10 @@ class CategoryBase(CategoryFields):
 
 
 class CategoryCreate(CategoryFields):
-    slug: str | None = Field(default=None, min_length=1, max_length=120)
+    """Category create payload.
+
+    Category slugs are auto-generated from the name and are not user-editable.
+    """
 
 
 class CategoryUpdate(BaseModel):
@@ -160,8 +163,15 @@ class FeaturedCollectionBase(BaseModel):
     description: str | None = None
 
 
-class FeaturedCollectionCreate(FeaturedCollectionBase):
-    product_ids: list[UUID] = []
+class FeaturedCollectionCreate(BaseModel):
+    """Featured collection create payload.
+
+    Collection slugs are auto-generated from the name and are not user-editable.
+    """
+
+    name: str = Field(min_length=1, max_length=160)
+    description: str | None = None
+    product_ids: list[UUID] = Field(default_factory=list)
 
 
 class FeaturedCollectionUpdate(BaseModel):

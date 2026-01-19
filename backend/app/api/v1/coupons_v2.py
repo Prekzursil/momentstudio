@@ -743,6 +743,12 @@ async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
             now = datetime.now(timezone.utc)
 
             while True:
+                await session.refresh(job, attribute_names=["status"])
+                if job.status == CouponBulkJobStatus.cancelled:
+                    job.finished_at = datetime.now(timezone.utc)
+                    await session.commit()
+                    return
+
                 q = select(User.id, User.email, User.preferred_language).where(*filters).order_by(User.id).limit(_BULK_SEGMENT_BATCH_SIZE)
                 if last_id is not None:
                     q = q.where(User.id > last_id)
@@ -801,6 +807,12 @@ async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
 
                 await session.commit()
 
+                await session.refresh(job, attribute_names=["status"])
+                if job.status == CouponBulkJobStatus.cancelled:
+                    job.finished_at = datetime.now(timezone.utc)
+                    await session.commit()
+                    return
+
                 if notify:
                     if job.action == CouponBulkJobAction.assign:
                         for to_email, lang in notify:
@@ -824,10 +836,21 @@ async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
 
                 last_id = rows[-1][0]
 
+            await session.refresh(job, attribute_names=["status"])
+            if job.status == CouponBulkJobStatus.cancelled:
+                job.finished_at = datetime.now(timezone.utc)
+                await session.commit()
+                return
+
             job.status = CouponBulkJobStatus.succeeded
             job.finished_at = datetime.now(timezone.utc)
             await session.commit()
         except Exception as exc:
+            await session.refresh(job, attribute_names=["status"])
+            if job.status == CouponBulkJobStatus.cancelled:
+                job.finished_at = datetime.now(timezone.utc)
+                await session.commit()
+                return
             job.status = CouponBulkJobStatus.failed
             job.error_message = str(exc)[:1000]
             job.finished_at = datetime.now(timezone.utc)
@@ -1232,3 +1255,88 @@ async def admin_get_bulk_job(
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
     return CouponBulkJobRead.model_validate(job, from_attributes=True)
+
+
+@router.get("/admin/coupons/{coupon_id}/bulk-jobs", response_model=list[CouponBulkJobRead])
+async def admin_list_bulk_jobs(
+    coupon_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=10, ge=1, le=50),
+    _: User = Depends(require_admin),
+) -> list[CouponBulkJobRead]:
+    jobs = (
+        (
+            await session.execute(
+                select(CouponBulkJob)
+                .where(CouponBulkJob.coupon_id == coupon_id)
+                .order_by(CouponBulkJob.created_at.desc())
+                .limit(limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [CouponBulkJobRead.model_validate(job, from_attributes=True) for job in jobs]
+
+
+@router.post("/admin/coupons/bulk-jobs/{job_id}/cancel", response_model=CouponBulkJobRead)
+async def admin_cancel_bulk_job(
+    job_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> CouponBulkJobRead:
+    job = await session.get(CouponBulkJob, job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    if job.status in (CouponBulkJobStatus.succeeded, CouponBulkJobStatus.failed, CouponBulkJobStatus.cancelled):
+        return CouponBulkJobRead.model_validate(job, from_attributes=True)
+    job.status = CouponBulkJobStatus.cancelled
+    job.finished_at = datetime.now(timezone.utc)
+    await session.commit()
+    await session.refresh(job)
+    return CouponBulkJobRead.model_validate(job, from_attributes=True)
+
+
+@router.post(
+    "/admin/coupons/bulk-jobs/{job_id}/retry",
+    response_model=CouponBulkJobRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def admin_retry_bulk_job(
+    job_id: UUID,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    admin_user: User = Depends(require_admin),
+) -> CouponBulkJobRead:
+    job = await session.get(CouponBulkJob, job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    if job.status in (CouponBulkJobStatus.pending, CouponBulkJobStatus.running):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Job is still in progress")
+
+    filters = _segment_user_filters(job)
+    if job.action == CouponBulkJobAction.assign:
+        preview = await _preview_segment_assign(session, coupon_id=job.coupon_id, filters=filters)
+    else:
+        preview = await _preview_segment_revoke(session, coupon_id=job.coupon_id, filters=filters)
+
+    new_job = CouponBulkJob(
+        coupon_id=job.coupon_id,
+        created_by_user_id=admin_user.id,
+        action=job.action,
+        status=CouponBulkJobStatus.pending,
+        require_marketing_opt_in=job.require_marketing_opt_in,
+        require_email_verified=job.require_email_verified,
+        send_email=job.send_email,
+        revoke_reason=job.revoke_reason,
+        total_candidates=preview.total_candidates,
+    )
+    session.add(new_job)
+    await session.commit()
+    await session.refresh(new_job)
+
+    engine = session.bind
+    if engine is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
+    background_tasks.add_task(_run_bulk_segment_job, engine, job_id=new_job.id)
+    return CouponBulkJobRead.model_validate(new_job, from_attributes=True)

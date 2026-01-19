@@ -33,6 +33,8 @@ class CouponBulkJobStatus(str, enum.Enum):
     running = "running"
     succeeded = "succeeded"
     failed = "failed"
+    cancelled = "cancelled"
+
 
 class PromotionScopeEntityType(str, enum.Enum):
     product = "product"
