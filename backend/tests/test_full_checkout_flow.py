@@ -14,8 +14,11 @@ from app.db.session import get_session
 from app.main import app
 from app.models.catalog import Category, Product, ProductImage, ProductStatus
 from app.models.order import Order
+from app.models.promo import PromoCode
 from app.models.user import User
 from app.schemas.order import ShippingMethodCreate
+from app.schemas.promo import PromoCodeCreate
+from app.services import cart as cart_service
 from app.services import payments
 from app.services import email as email_service
 from app.services import order as order_service
@@ -65,6 +68,7 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
             shipping = await order_service.create_shipping_method(
                 session, ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0)
             )
+            await cart_service.create_promo(session, PromoCodeCreate(code="SAVE10", percentage_off=10, currency="RON"))
             session.add_all([product])
             await session.commit()
             await session.refresh(product)
@@ -153,7 +157,7 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
             "region": "FT",
             "postal_code": "12345",
             "country": "US",
-            "promo_code": None,
+            "promo_code": "SAVE10",
         },
     )
     assert order_res.status_code == 201, order_res.text
@@ -163,6 +167,13 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
     assert body["stripe_session_id"] == "cs_test_logged"
     assert body["stripe_checkout_url"].startswith("https://")
     assert captured.get("email_sent") is None
+
+    async def promo_times_used() -> int:
+        async with SessionLocal() as session:
+            promo = (await session.execute(select(PromoCode).where(PromoCode.code == "SAVE10"))).scalar_one()
+            return int(promo.times_used)
+
+    assert asyncio.run(promo_times_used()) == 0
 
     monkeypatch.setattr(settings, "stripe_webhook_secret", "whsec_test")
     monkeypatch.setattr(
@@ -176,6 +187,7 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
     webhook = client.post("/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"})
     assert webhook.status_code == 200, webhook.text
     assert captured.get("email_sent") is True
+    assert asyncio.run(promo_times_used()) == 1
 
     # Verify order is visible via API endpoints
     list_res = client.get("/api/v1/orders", headers={"Authorization": f"Bearer {token}"})

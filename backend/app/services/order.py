@@ -18,6 +18,7 @@ from app.schemas.order import OrderUpdate, ShippingMethodCreate
 from app.services import checkout_settings as checkout_settings_service
 from app.services import pricing
 from app.services import payments
+from app.services import promo_usage
 
 
 async def build_order_from_cart(
@@ -46,6 +47,7 @@ async def build_order_from_cart(
     locker_lat: float | None = None,
     locker_lng: float | None = None,
     discount: Decimal | None = None,
+    promo_code: str | None = None,
 ) -> Order:
     if not cart.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
@@ -127,6 +129,9 @@ async def build_order_from_cart(
     initial_status = (
         OrderStatus.pending_payment if method in {"stripe", "paypal", "netopia"} else OrderStatus.pending_acceptance
     )
+    promo_clean = (promo_code or "").strip().upper() or None
+    if promo_clean and len(promo_clean) > 40:
+        promo_clean = promo_clean[:40]
     order = Order(
         user_id=user_id,
         reference_code=ref,
@@ -139,6 +144,7 @@ async def build_order_from_cart(
         shipping_amount=computed_shipping,
         currency="RON",
         payment_method=payment_method,
+        promo_code=promo_clean,
         courier=courier,
         delivery_type=delivery_type,
         locker_id=locker_id,
@@ -542,6 +548,7 @@ async def capture_payment(session: AsyncSession, order: Order, intent_id: str | 
     already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
     if not already_captured:
         session.add(OrderEvent(order_id=order.id, event="payment_captured", note=f"Intent {payment_intent_id}"))
+        await promo_usage.record_promo_usage(session, order=order, note=f"Stripe {payment_intent_id}".strip())
     if order.status == OrderStatus.pending_payment:
         order.status = OrderStatus.pending_acceptance
         session.add(OrderEvent(order_id=order.id, event="status_change", note="pending_payment -> pending_acceptance"))

@@ -67,6 +67,7 @@ class OrderRead(BaseModel):
     shipping_amount: Decimal
     currency: str
     payment_method: str
+    promo_code: str | None = None
     stripe_payment_intent_id: str | None = None
     paypal_order_id: str | None = None
     paypal_capture_id: str | None = None

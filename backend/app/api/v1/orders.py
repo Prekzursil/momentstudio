@@ -52,6 +52,7 @@ from app.api.v1 import cart as cart_api
 from app.schemas.order_admin import AdminOrderListItem, AdminOrderListResponse, AdminOrderRead, AdminPaginationMeta
 from app.schemas.receipt import ReceiptRead, ReceiptShareTokenRead
 from app.services import notifications as notification_service
+from app.services import promo_usage
 from app.services import pricing
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -438,6 +439,7 @@ async def checkout(
         locker_lat=locker_lat,
         locker_lng=locker_lng,
         discount=discount_val,
+        promo_code=payload.promo_code,
         tax_amount=totals.tax,
         fee_amount=totals.fee,
         shipping_amount=totals.shipping,
@@ -544,6 +546,7 @@ async def capture_paypal_order(
     order.paypal_capture_id = capture_id or order.paypal_capture_id
     session.add(order)
     session.add(OrderEvent(order_id=order.id, event="payment_captured", note=f"PayPal {capture_id}".strip()))
+    await promo_usage.record_promo_usage(session, order=order, note=f"PayPal {capture_id}".strip())
     await session.commit()
     await session.refresh(order)
 
@@ -664,6 +667,7 @@ async def confirm_stripe_checkout(
             )
         )
         captured_added = True
+        await promo_usage.record_promo_usage(session, order=order, note=f"Stripe session {session_id}")
     if order.status == OrderStatus.pending_payment:
         order.status = OrderStatus.pending_acceptance
         session.add(OrderEvent(order_id=order.id, event="status_change", note="pending_payment -> pending_acceptance"))
@@ -1114,6 +1118,7 @@ async def guest_checkout(
         locker_lat=locker_lat,
         locker_lng=locker_lng,
         discount=discount_val,
+        promo_code=payload.promo_code,
         tax_amount=totals.tax,
         fee_amount=totals.fee,
         shipping_amount=totals.shipping,

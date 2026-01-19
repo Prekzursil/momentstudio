@@ -48,6 +48,7 @@ class Order(Base):
     payment_retry_count: Mapped[int] = mapped_column(default=0, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="RON")
     payment_method: Mapped[str] = mapped_column(String(20), nullable=False, default="stripe")
+    promo_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
     courier: Mapped[str | None] = mapped_column(String(30), nullable=True)
     delivery_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     locker_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
