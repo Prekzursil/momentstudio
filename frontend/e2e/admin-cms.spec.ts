@@ -22,22 +22,33 @@ test('owner can update About page via CMS and audit log records it', async ({ pa
 
   const marker = `E2E Our story ${Date.now()}`;
 
-  const aboutLoadResponse = page.waitForResponse((resp) => {
-    if (!resp.url().includes('/content/admin/page.about')) return false;
+  // The admin UI loads EN then RO and only updates the textbox once both complete.
+  // If we type too early, the RO fetch can overwrite our edits (flake on CI).
+  const aboutLoadEn = page.waitForResponse((resp) => {
+    if (!resp.url().includes('/content/admin/page.about?lang=en')) return false;
     if (resp.request().method() !== 'GET') return false;
     return [200, 404].includes(resp.status());
   });
-  await Promise.all([aboutLoadResponse, page.goto('/admin/content/pages')]);
+  const aboutLoadRo = page.waitForResponse((resp) => {
+    if (!resp.url().includes('/content/admin/page.about?lang=ro')) return false;
+    if (resp.request().method() !== 'GET') return false;
+    return [200, 404].includes(resp.status());
+  });
+  await Promise.all([aboutLoadEn, aboutLoadRo, page.goto('/admin/content/pages')]);
+
   const aboutField = page.getByRole('textbox', { name: 'Our story (About)' });
   await expect(aboutField).toBeVisible();
-  // Wait for the CMS content to finish loading so it doesn't overwrite our edits.
   await aboutField.fill(marker);
+  await expect(aboutField).toHaveValue(marker);
+
   const saveAboutResponse = page.waitForResponse((resp) => {
     if (!resp.url().includes('/content/admin/page.about')) return false;
     if (![200, 201].includes(resp.status())) return false;
     return ['PATCH', 'POST'].includes(resp.request().method());
   });
   await Promise.all([saveAboutResponse, page.getByRole('button', { name: 'Save about' }).click()]);
+  const saved = await (await saveAboutResponse).json();
+  expect(String(saved?.body_markdown || '')).toContain(marker);
 
   const publicAboutResponse = page.waitForResponse((resp) => {
     if (!resp.url().includes('/content/pages/about')) return false;
