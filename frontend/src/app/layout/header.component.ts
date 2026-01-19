@@ -25,7 +25,7 @@ import { NotificationsService, UserNotification } from '../core/notifications.se
     ThemeSegmentedControlComponent
   ],
   template: `
-    <header class="relative z-50 border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
+    <header class="sticky top-0 z-[100] isolate border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
       <div class="max-w-7xl mx-auto px-4 sm:px-6">
         <div class="py-4 grid grid-cols-[auto,1fr,auto] items-center gap-4">
           <a routerLink="/" class="flex items-center gap-3 min-w-0">
@@ -108,11 +108,11 @@ import { NotificationsService, UserNotification } from '../core/notifications.se
               </button>
 	              <div
 	                *ngIf="userMenuOpen"
-	                class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900 z-50"
+	                class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900 z-[110]"
 	                role="menu"
 	              >
 	                <a
-	                  routerLink="/account"
+	                  routerLink="/account/profile"
 	                  role="menuitem"
 	                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
 	                  (click)="closeUserMenu()"
@@ -120,8 +120,7 @@ import { NotificationsService, UserNotification } from '../core/notifications.se
 	                  {{ 'nav.myProfile' | translate }}
 	                </a>
 	                <a
-	                  routerLink="/account"
-	                  [fragment]="'orders'"
+	                  routerLink="/account/orders"
 	                  role="menuitem"
 	                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
 	                  (click)="closeUserMenu()"
@@ -129,8 +128,7 @@ import { NotificationsService, UserNotification } from '../core/notifications.se
 	                  {{ 'nav.myOrders' | translate }}
 	                </a>
 	                <a
-	                  routerLink="/account"
-	                  [fragment]="'wishlist'"
+	                  routerLink="/account/wishlist"
 	                  role="menuitem"
 	                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
 	                  (click)="closeUserMenu()"

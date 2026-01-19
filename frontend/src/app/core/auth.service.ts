@@ -86,9 +86,11 @@ export class AuthService {
   private tokens: AuthTokens | null = null;
   private refreshInFlight: Observable<AuthTokens | null> | null = null;
   private ensureInFlight: Observable<boolean> | null = null;
+  private lastRevalidateAt = 0;
 
   constructor(private api: ApiService, private router: Router) {
     this.bootstrap();
+    this.installRevalidationHooks();
   }
 
   user = () => this.userSignal();
@@ -436,6 +438,24 @@ export class AuthService {
         this.clearSession();
       }
     }
+  }
+
+  private installRevalidationHooks(): void {
+    if (typeof window === 'undefined') return;
+    const cooldownMs = 10_000;
+    const revalidate = () => {
+      const now = Date.now();
+      if (now - this.lastRevalidateAt < cooldownMs) return;
+      this.lastRevalidateAt = now;
+      this.ensureAuthenticated({ silent: true }).subscribe({ error: () => void 0 });
+    };
+
+    window.addEventListener('focus', revalidate);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        revalidate();
+      }
+    });
   }
 
   private persist(res: AuthResponse, remember: boolean): void {
