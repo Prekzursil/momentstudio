@@ -1632,7 +1632,25 @@
         "noEmails": "Nu există emailuri încărcate",
         "parseError": "Nu am putut interpreta CSV-ul",
         "successAssign": "Atribuirea în masă a fost finalizată",
-        "successRevoke": "Revocarea în masă a fost finalizată"
+        "successRevoke": "Revocarea în masă a fost finalizată",
+        "segment": {
+          "title": "Țintire pe segment",
+          "hint": "Țintește utilizatorii după preferințe (opt-in marketing, email verificat). Rulează în fundal pentru liste mari.",
+          "filterMarketing": "Opt-in marketing",
+          "filterVerified": "Email verificat",
+          "preview": "Previzualizează",
+          "assign": "Atribuire pe segment",
+          "revoke": "Revocare pe segment",
+          "previewTitle": "Previzualizare",
+          "candidates": "{{count}} eligibili",
+          "sample": "Exemple: {{emails}}",
+          "jobTitle": "Job în fundal",
+          "jobStatus": "Status: {{status}}",
+          "jobProgress": "Procesate {{processed}} / {{total}}",
+          "previewError": "Nu s-a putut previzualiza segmentul",
+          "started": "Jobul pe segment a pornit",
+          "completed": "Jobul pe segment s-a terminat"
+        }
       },
       "success": {
         "savePromotion": "Promoția a fost salvată",

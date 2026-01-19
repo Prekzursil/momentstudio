@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.coupons_v2 import CouponVisibility, PromotionDiscountType
+from app.models.coupons_v2 import CouponBulkJobAction, CouponBulkJobStatus, CouponVisibility, PromotionDiscountType
 
 
 class PromotionRead(BaseModel):
@@ -176,3 +176,54 @@ class CouponBulkResult(BaseModel):
     revoked: int = 0
     already_revoked: int = 0
     not_assigned: int = 0
+
+
+class CouponBulkSegmentFilters(BaseModel):
+    require_marketing_opt_in: bool = False
+    require_email_verified: bool = False
+
+
+class CouponBulkSegmentAssignRequest(CouponBulkSegmentFilters):
+    send_email: bool = True
+
+
+class CouponBulkSegmentRevokeRequest(CouponBulkSegmentFilters):
+    reason: str | None = Field(default=None, max_length=255)
+    send_email: bool = True
+
+
+class CouponBulkSegmentPreview(BaseModel):
+    total_candidates: int = 0
+    sample_emails: list[str] = Field(default_factory=list)
+    created: int = 0
+    restored: int = 0
+    already_active: int = 0
+    revoked: int = 0
+    already_revoked: int = 0
+    not_assigned: int = 0
+
+
+class CouponBulkJobRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    coupon_id: UUID
+    created_by_user_id: UUID | None = None
+    action: CouponBulkJobAction
+    status: CouponBulkJobStatus
+    require_marketing_opt_in: bool
+    require_email_verified: bool
+    send_email: bool
+    revoke_reason: str | None = None
+    total_candidates: int
+    processed: int
+    created: int
+    restored: int
+    already_active: int
+    revoked: int
+    already_revoked: int
+    not_assigned: int
+    error_message: str | None = None
+    created_at: datetime
+    started_at: datetime | None = None
+    finished_at: datetime | None = None

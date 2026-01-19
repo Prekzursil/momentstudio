@@ -14,6 +14,7 @@ from app.models.catalog import Category, Product, ProductImage, ProductStatus
 from app.models.coupons_v2 import (
     Coupon,
     CouponAssignment,
+    CouponBulkJobStatus,
     CouponRedemption,
     CouponReservation,
     CouponVisibility,
@@ -93,6 +94,27 @@ def promote_user(session_factory: async_sessionmaker, *, user_id: UUID, role: Us
             await session.commit()
 
     asyncio.run(_promote())
+
+
+def set_user_flags(
+    session_factory: async_sessionmaker,
+    *,
+    user_id: UUID,
+    notify_marketing: bool | None = None,
+    email_verified: bool | None = None,
+) -> None:
+    async def _update() -> None:
+        async with session_factory() as session:
+            user = await session.get(User, user_id)
+            assert user is not None
+            if notify_marketing is not None:
+                user.notify_marketing = bool(notify_marketing)
+            if email_verified is not None:
+                user.email_verified = bool(email_verified)
+            session.add(user)
+            await session.commit()
+
+    asyncio.run(_update())
 
 
 def seed_product(
@@ -821,5 +843,131 @@ def test_admin_bulk_assign_and_revoke_coupon() -> None:
         assert res.status_code == 200, res.text
         payload = res.json()
         assert payload["already_revoked"] == 1
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_admin_segment_bulk_job_assign_and_revoke() -> None:
+    client, SessionLocal = make_test_client()
+    try:
+        admin_token, admin_id = create_user_token(SessionLocal, email="admin-seg@example.com", username="admin_seg")
+        promote_user(SessionLocal, user_id=admin_id, role=UserRole.admin)
+
+        _, u1 = create_user_token(SessionLocal, email="seg1@example.com", username="seg1")
+        _, u2 = create_user_token(SessionLocal, email="seg2@example.com", username="seg2")
+        _, u3 = create_user_token(SessionLocal, email="seg3@example.com", username="seg3")
+
+        set_user_flags(SessionLocal, user_id=u1, notify_marketing=True, email_verified=True)
+        set_user_flags(SessionLocal, user_id=u2, notify_marketing=True, email_verified=False)
+        set_user_flags(SessionLocal, user_id=u3, notify_marketing=False, email_verified=True)
+
+        code = create_promotion_and_coupon(
+            SessionLocal,
+            name="Segment promo",
+            discount_type=PromotionDiscountType.percent,
+            percentage_off=Decimal("10"),
+            code="SEG10",
+        )
+        coupon_id = get_coupon_id(SessionLocal, code)
+
+        preview = client.post(
+            f"/api/v1/coupons/admin/coupons/{coupon_id}/assign/segment/preview",
+            json={"require_marketing_opt_in": True, "require_email_verified": True, "send_email": False},
+            headers=auth_headers(admin_token),
+        )
+        assert preview.status_code == 200, preview.text
+        body = preview.json()
+        assert body["total_candidates"] == 1
+        assert body["created"] == 1
+
+        start = client.post(
+            f"/api/v1/coupons/admin/coupons/{coupon_id}/assign/segment",
+            json={"require_marketing_opt_in": True, "require_email_verified": True, "send_email": False},
+            headers=auth_headers(admin_token),
+        )
+        assert start.status_code == 201, start.text
+        job_id = start.json()["id"]
+
+        for _ in range(20):
+            job_res = client.get(
+                f"/api/v1/coupons/admin/coupons/bulk-jobs/{job_id}",
+                headers=auth_headers(admin_token),
+            )
+            assert job_res.status_code == 200, job_res.text
+            status_val = job_res.json()["status"]
+            if status_val == CouponBulkJobStatus.succeeded.value:
+                break
+        else:
+            raise AssertionError(f"job did not finish: {job_res.json()}")
+
+        async def _assert_assigned() -> None:
+            async with SessionLocal() as session:
+                assigned = (
+                    (
+                        await session.execute(
+                            select(CouponAssignment).where(
+                                CouponAssignment.coupon_id == UUID(str(coupon_id)),
+                                CouponAssignment.user_id == UUID(str(u1)),
+                            )
+                        )
+                    )
+                    .scalars()
+                    .first()
+                )
+                assert assigned is not None
+                assert assigned.revoked_at is None
+                other = (
+                    (
+                        await session.execute(
+                            select(func.count())
+                            .select_from(CouponAssignment)
+                            .where(CouponAssignment.coupon_id == UUID(str(coupon_id)))
+                        )
+                    )
+                    .scalar_one()
+                )
+                assert int(other) == 1
+
+        asyncio.run(_assert_assigned())
+
+        revoke = client.post(
+            f"/api/v1/coupons/admin/coupons/{coupon_id}/revoke/segment",
+            json={"require_marketing_opt_in": True, "require_email_verified": True, "send_email": False, "reason": "cleanup"},
+            headers=auth_headers(admin_token),
+        )
+        assert revoke.status_code == 201, revoke.text
+        revoke_job_id = revoke.json()["id"]
+
+        for _ in range(20):
+            job_res = client.get(
+                f"/api/v1/coupons/admin/coupons/bulk-jobs/{revoke_job_id}",
+                headers=auth_headers(admin_token),
+            )
+            assert job_res.status_code == 200, job_res.text
+            status_val = job_res.json()["status"]
+            if status_val == CouponBulkJobStatus.succeeded.value:
+                break
+        else:
+            raise AssertionError(f"revoke job did not finish: {job_res.json()}")
+
+        async def _assert_revoked() -> None:
+            async with SessionLocal() as session:
+                assigned = (
+                    (
+                        await session.execute(
+                            select(CouponAssignment).where(
+                                CouponAssignment.coupon_id == UUID(str(coupon_id)),
+                                CouponAssignment.user_id == UUID(str(u1)),
+                            )
+                        )
+                    )
+                    .scalars()
+                    .first()
+                )
+                assert assigned is not None
+                assert assigned.revoked_at is not None
+                assert (assigned.revoked_reason or "").startswith("cleanup")
+
+        asyncio.run(_assert_revoked())
     finally:
         app.dependency_overrides.clear()

@@ -5,8 +5,8 @@ from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
-from sqlalchemy import delete, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import delete, func, select
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import get_current_user, require_admin
@@ -15,6 +15,9 @@ from app.models.catalog import Category, Product
 from app.models.coupons_v2 import (
     Coupon,
     CouponAssignment,
+    CouponBulkJob,
+    CouponBulkJobAction,
+    CouponBulkJobStatus,
     Promotion,
     PromotionScope,
     PromotionScopeEntityType,
@@ -26,9 +29,13 @@ from app.schemas.coupons_v2 import (
     CouponAssignRequest,
     CouponAssignmentRead,
     CouponCreate,
+    CouponBulkJobRead,
     CouponBulkAssignRequest,
     CouponBulkRevokeRequest,
     CouponBulkResult,
+    CouponBulkSegmentAssignRequest,
+    CouponBulkSegmentPreview,
+    CouponBulkSegmentRevokeRequest,
     CouponUpdate,
     CouponEligibilityResponse,
     CouponOffer,
@@ -46,6 +53,7 @@ from app.services import cart as cart_service
 
 
 router = APIRouter(prefix="/coupons", tags=["coupons"])
+_BULK_SEGMENT_BATCH_SIZE = 500
 
 
 async def _get_shipping_method(session: AsyncSession, shipping_method_id: UUID | None) -> ShippingMethod | None:
@@ -595,6 +603,237 @@ def _normalize_bulk_emails(raw: list[str]) -> tuple[list[str], list[str]]:
     return emails, invalid
 
 
+def _segment_user_filters(payload: object) -> list[object]:
+    filters: list[object] = [User.deleted_at.is_(None)]
+    require_marketing = bool(getattr(payload, "require_marketing_opt_in", False))
+    require_verified = bool(getattr(payload, "require_email_verified", False))
+    if require_marketing:
+        filters.append(User.notify_marketing.is_(True))
+    if require_verified:
+        filters.append(User.email_verified.is_(True))
+    return filters
+
+
+async def _segment_sample_emails(session: AsyncSession, *, filters: list[object], limit: int = 10) -> list[str]:
+    rows = (await session.execute(select(User.email).where(*filters).order_by(User.created_at.desc()).limit(limit))).scalars().all()
+    return [str(e) for e in rows if e]
+
+
+async def _preview_segment_assign(
+    session: AsyncSession,
+    *,
+    coupon_id: UUID,
+    filters: list[object],
+) -> CouponBulkSegmentPreview:
+    total = int((await session.execute(select(func.count()).select_from(User).where(*filters))).scalar_one())
+    already_active = int(
+        (
+            await session.execute(
+                select(func.count())
+                .select_from(CouponAssignment)
+                .join(User, CouponAssignment.user_id == User.id)
+                .where(CouponAssignment.coupon_id == coupon_id, CouponAssignment.revoked_at.is_(None), *filters)
+            )
+        ).scalar_one()
+    )
+    restored = int(
+        (
+            await session.execute(
+                select(func.count())
+                .select_from(CouponAssignment)
+                .join(User, CouponAssignment.user_id == User.id)
+                .where(CouponAssignment.coupon_id == coupon_id, CouponAssignment.revoked_at.is_not(None), *filters)
+            )
+        ).scalar_one()
+    )
+    created = max(total - already_active - restored, 0)
+    sample = await _segment_sample_emails(session, filters=filters)
+    return CouponBulkSegmentPreview(
+        total_candidates=total,
+        sample_emails=sample,
+        created=created,
+        restored=restored,
+        already_active=already_active,
+    )
+
+
+async def _preview_segment_revoke(
+    session: AsyncSession,
+    *,
+    coupon_id: UUID,
+    filters: list[object],
+) -> CouponBulkSegmentPreview:
+    total = int((await session.execute(select(func.count()).select_from(User).where(*filters))).scalar_one())
+    revoked = int(
+        (
+            await session.execute(
+                select(func.count())
+                .select_from(CouponAssignment)
+                .join(User, CouponAssignment.user_id == User.id)
+                .where(CouponAssignment.coupon_id == coupon_id, CouponAssignment.revoked_at.is_(None), *filters)
+            )
+        ).scalar_one()
+    )
+    already_revoked = int(
+        (
+            await session.execute(
+                select(func.count())
+                .select_from(CouponAssignment)
+                .join(User, CouponAssignment.user_id == User.id)
+                .where(CouponAssignment.coupon_id == coupon_id, CouponAssignment.revoked_at.is_not(None), *filters)
+            )
+        ).scalar_one()
+    )
+    not_assigned = max(total - revoked - already_revoked, 0)
+    sample = await _segment_sample_emails(session, filters=filters)
+    return CouponBulkSegmentPreview(
+        total_candidates=total,
+        sample_emails=sample,
+        revoked=revoked,
+        already_revoked=already_revoked,
+        not_assigned=not_assigned,
+    )
+
+
+async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
+    SessionLocal = async_sessionmaker(engine, expire_on_commit=False, autoflush=False, class_=AsyncSession)
+    async with SessionLocal() as session:
+        job = (
+            (
+                await session.execute(
+                    select(CouponBulkJob)
+                    .options(selectinload(CouponBulkJob.coupon).selectinload(Coupon.promotion))
+                    .where(CouponBulkJob.id == job_id)
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if not job:
+            return
+        if job.status not in (CouponBulkJobStatus.pending, CouponBulkJobStatus.running):
+            return
+
+        try:
+            job.status = CouponBulkJobStatus.running
+            job.started_at = datetime.now(timezone.utc)
+            job.error_message = None
+            await session.commit()
+
+            filters = _segment_user_filters(job)
+            total = int((await session.execute(select(func.count()).select_from(User).where(*filters))).scalar_one())
+            job.total_candidates = total
+            job.processed = 0
+            job.created = 0
+            job.restored = 0
+            job.already_active = 0
+            job.revoked = 0
+            job.already_revoked = 0
+            job.not_assigned = 0
+            await session.commit()
+
+            coupon = job.coupon
+            promotion = getattr(coupon, "promotion", None) if coupon else None
+            coupon_code = getattr(coupon, "code", "") if coupon else ""
+            promo_name = getattr(promotion, "name", None) or "Coupon"
+            promo_desc = getattr(promotion, "description", None) if promotion else None
+            ends_at = getattr(coupon, "ends_at", None)
+
+            last_id: UUID | None = None
+            now = datetime.now(timezone.utc)
+
+            while True:
+                q = select(User.id, User.email, User.preferred_language).where(*filters).order_by(User.id).limit(_BULK_SEGMENT_BATCH_SIZE)
+                if last_id is not None:
+                    q = q.where(User.id > last_id)
+                rows = (await session.execute(q)).all()
+                if not rows:
+                    break
+
+                user_ids = [row[0] for row in rows]
+                existing = (
+                    (
+                        await session.execute(
+                            select(CouponAssignment).where(
+                                CouponAssignment.coupon_id == job.coupon_id,
+                                CouponAssignment.user_id.in_(user_ids),
+                            )
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+                assignments_by_user_id = {a.user_id: a for a in existing}
+
+                notify: list[tuple[str, str | None]] = []
+
+                for user_id, email, preferred_language in rows:
+                    assignment = assignments_by_user_id.get(user_id)
+                    if job.action == CouponBulkJobAction.assign:
+                        if assignment and assignment.revoked_at is None:
+                            job.already_active += 1
+                        elif assignment and assignment.revoked_at is not None:
+                            assignment.revoked_at = None
+                            assignment.revoked_reason = None
+                            session.add(assignment)
+                            job.restored += 1
+                            if job.send_email and email:
+                                notify.append((email, preferred_language))
+                        else:
+                            session.add(CouponAssignment(coupon_id=job.coupon_id, user_id=user_id))
+                            job.created += 1
+                            if job.send_email and email:
+                                notify.append((email, preferred_language))
+                    else:
+                        if not assignment:
+                            job.not_assigned += 1
+                        elif assignment.revoked_at is not None:
+                            job.already_revoked += 1
+                        else:
+                            assignment.revoked_at = now
+                            assignment.revoked_reason = (job.revoke_reason or "").strip()[:255] or None
+                            session.add(assignment)
+                            job.revoked += 1
+                            if job.send_email and email:
+                                notify.append((email, preferred_language))
+
+                    job.processed += 1
+
+                await session.commit()
+
+                if notify:
+                    if job.action == CouponBulkJobAction.assign:
+                        for to_email, lang in notify:
+                            await email_service.send_coupon_assigned(
+                                to_email,
+                                coupon_code=coupon_code,
+                                promotion_name=promo_name,
+                                promotion_description=promo_desc,
+                                ends_at=ends_at,
+                                lang=lang,
+                            )
+                    else:
+                        for to_email, lang in notify:
+                            await email_service.send_coupon_revoked(
+                                to_email,
+                                coupon_code=coupon_code,
+                                promotion_name=promo_name,
+                                reason=(job.revoke_reason or "").strip() or None,
+                                lang=lang,
+                            )
+
+                last_id = rows[-1][0]
+
+            job.status = CouponBulkJobStatus.succeeded
+            job.finished_at = datetime.now(timezone.utc)
+            await session.commit()
+        except Exception as exc:
+            job.status = CouponBulkJobStatus.failed
+            job.error_message = str(exc)[:1000]
+            job.finished_at = datetime.now(timezone.utc)
+            await session.commit()
+
+
 @router.post("/admin/coupons/{coupon_id}/assign", status_code=status.HTTP_204_NO_CONTENT)
 async def admin_assign_coupon(
     coupon_id: UUID,
@@ -880,3 +1119,116 @@ async def admin_bulk_revoke_coupon(
         already_revoked=already_revoked,
         not_assigned=not_assigned,
     )
+
+
+@router.post("/admin/coupons/{coupon_id}/assign/segment/preview", response_model=CouponBulkSegmentPreview)
+async def admin_preview_segment_assign(
+    coupon_id: UUID,
+    payload: CouponBulkSegmentAssignRequest,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> CouponBulkSegmentPreview:
+    coupon = await session.get(Coupon, coupon_id)
+    if not coupon:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+    filters = _segment_user_filters(payload)
+    return await _preview_segment_assign(session, coupon_id=coupon_id, filters=filters)
+
+
+@router.post("/admin/coupons/{coupon_id}/revoke/segment/preview", response_model=CouponBulkSegmentPreview)
+async def admin_preview_segment_revoke(
+    coupon_id: UUID,
+    payload: CouponBulkSegmentRevokeRequest,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> CouponBulkSegmentPreview:
+    coupon = await session.get(Coupon, coupon_id)
+    if not coupon:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+    filters = _segment_user_filters(payload)
+    return await _preview_segment_revoke(session, coupon_id=coupon_id, filters=filters)
+
+
+@router.post("/admin/coupons/{coupon_id}/assign/segment", response_model=CouponBulkJobRead, status_code=status.HTTP_201_CREATED)
+async def admin_start_segment_assign_job(
+    coupon_id: UUID,
+    payload: CouponBulkSegmentAssignRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    admin_user: User = Depends(require_admin),
+) -> CouponBulkJobRead:
+    coupon = await session.get(Coupon, coupon_id)
+    if not coupon:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+
+    filters = _segment_user_filters(payload)
+    preview = await _preview_segment_assign(session, coupon_id=coupon_id, filters=filters)
+
+    job = CouponBulkJob(
+        coupon_id=coupon_id,
+        created_by_user_id=admin_user.id,
+        action=CouponBulkJobAction.assign,
+        status=CouponBulkJobStatus.pending,
+        require_marketing_opt_in=payload.require_marketing_opt_in,
+        require_email_verified=payload.require_email_verified,
+        send_email=payload.send_email,
+        total_candidates=preview.total_candidates,
+    )
+    session.add(job)
+    await session.commit()
+    await session.refresh(job)
+
+    engine = session.bind
+    if engine is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
+    background_tasks.add_task(_run_bulk_segment_job, engine, job_id=job.id)
+    return CouponBulkJobRead.model_validate(job, from_attributes=True)
+
+
+@router.post("/admin/coupons/{coupon_id}/revoke/segment", response_model=CouponBulkJobRead, status_code=status.HTTP_201_CREATED)
+async def admin_start_segment_revoke_job(
+    coupon_id: UUID,
+    payload: CouponBulkSegmentRevokeRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    admin_user: User = Depends(require_admin),
+) -> CouponBulkJobRead:
+    coupon = await session.get(Coupon, coupon_id)
+    if not coupon:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+
+    filters = _segment_user_filters(payload)
+    preview = await _preview_segment_revoke(session, coupon_id=coupon_id, filters=filters)
+
+    job = CouponBulkJob(
+        coupon_id=coupon_id,
+        created_by_user_id=admin_user.id,
+        action=CouponBulkJobAction.revoke,
+        status=CouponBulkJobStatus.pending,
+        require_marketing_opt_in=payload.require_marketing_opt_in,
+        require_email_verified=payload.require_email_verified,
+        send_email=payload.send_email,
+        revoke_reason=(payload.reason or "").strip()[:255] or None,
+        total_candidates=preview.total_candidates,
+    )
+    session.add(job)
+    await session.commit()
+    await session.refresh(job)
+
+    engine = session.bind
+    if engine is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
+    background_tasks.add_task(_run_bulk_segment_job, engine, job_id=job.id)
+    return CouponBulkJobRead.model_validate(job, from_attributes=True)
+
+
+@router.get("/admin/coupons/bulk-jobs/{job_id}", response_model=CouponBulkJobRead)
+async def admin_get_bulk_job(
+    job_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> CouponBulkJobRead:
+    job = await session.get(CouponBulkJob, job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    return CouponBulkJobRead.model_validate(job, from_attributes=True)

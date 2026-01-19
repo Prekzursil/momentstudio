@@ -22,6 +22,18 @@ class CouponVisibility(str, enum.Enum):
     public = "public"
     assigned = "assigned"
 
+
+class CouponBulkJobAction(str, enum.Enum):
+    assign = "assign"
+    revoke = "revoke"
+
+
+class CouponBulkJobStatus(str, enum.Enum):
+    pending = "pending"
+    running = "running"
+    succeeded = "succeeded"
+    failed = "failed"
+
 class PromotionScopeEntityType(str, enum.Enum):
     product = "product"
     category = "category"
@@ -163,3 +175,44 @@ class CouponRedemption(Base):
     coupon: Mapped[Coupon] = relationship("Coupon")
     user: Mapped[User] = relationship("User")
     order: Mapped[Order] = relationship("Order")
+
+
+class CouponBulkJob(Base):
+    __tablename__ = "coupon_bulk_jobs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    coupon_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("coupons.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    action: Mapped[CouponBulkJobAction] = mapped_column(
+        Enum(CouponBulkJobAction, native_enum=False),
+        nullable=False,
+        default=CouponBulkJobAction.assign,
+    )
+    status: Mapped[CouponBulkJobStatus] = mapped_column(
+        Enum(CouponBulkJobStatus, native_enum=False),
+        nullable=False,
+        default=CouponBulkJobStatus.pending,
+    )
+    require_marketing_opt_in: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    require_email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    send_email: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    revoke_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    total_candidates: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    processed: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    created: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    restored: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    already_active: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    revoked: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    already_revoked: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    not_assigned: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+
+    error_message: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    coupon: Mapped[Coupon] = relationship("Coupon")
+    created_by: Mapped[User | None] = relationship("User")

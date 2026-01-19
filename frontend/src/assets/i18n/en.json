@@ -1632,7 +1632,25 @@
         "noEmails": "No emails loaded",
         "parseError": "Could not parse CSV",
         "successAssign": "Bulk assignment completed",
-        "successRevoke": "Bulk revocation completed"
+        "successRevoke": "Bulk revocation completed",
+        "segment": {
+          "title": "Segment targeting",
+          "hint": "Target users by preferences (marketing opt-in, email verified). Runs in the background for large lists.",
+          "filterMarketing": "Marketing opt-in",
+          "filterVerified": "Email verified",
+          "preview": "Preview",
+          "assign": "Segment assign",
+          "revoke": "Segment revoke",
+          "previewTitle": "Preview",
+          "candidates": "{{count}} candidates",
+          "sample": "Sample: {{emails}}",
+          "jobTitle": "Background job",
+          "jobStatus": "Status: {{status}}",
+          "jobProgress": "Processed {{processed}} / {{total}}",
+          "previewError": "Could not preview segment",
+          "started": "Segment job started",
+          "completed": "Segment job completed"
+        }
       },
       "success": {
         "savePromotion": "Promotion saved",

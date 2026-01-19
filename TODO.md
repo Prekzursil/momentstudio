@@ -116,7 +116,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Coupons v2: add scope rules (product/category inclusion/exclusion).
 - [x] Coupons v2: admin UI – resolve scoped product IDs to names (avoid showing raw UUID chips).
 - [x] Coupons v2: admin UI – bulk assign/revoke coupons (CSV upload or segment-based selection).
-- [ ] Coupons v2: bulk assign/revoke – add segment targeting (marketing opt-in, email verified) with preview + background job.
+- [x] Coupons v2: bulk assign/revoke – add segment targeting (marketing opt-in, email verified) with preview + background job.
+- [ ] Coupons v2: bulk segment jobs – list recent jobs per coupon (status/progress) and allow cancel/retry.
 - [x] Abandoned cart job (email reminder) scaffold.
 - [x] Cart item note (gift message) support.
 - [x] Cart cleanup job for stale guest carts.

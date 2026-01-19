@@ -1,9 +1,16 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { forkJoin } from 'rxjs';
 
-import { AdminCouponsV2Service, type CouponAssignmentRead, type CouponBulkResult } from '../../../core/admin-coupons-v2.service';
+import {
+  AdminCouponsV2Service,
+  type CouponAssignmentRead,
+  type CouponBulkJobRead,
+  type CouponBulkResult,
+  type CouponBulkSegmentPreview
+} from '../../../core/admin-coupons-v2.service';
 import { AdminProductsService, type AdminProductListItem } from '../../../core/admin-products.service';
 import { type AdminCategory, AdminService } from '../../../core/admin.service';
 import { ToastService } from '../../../core/toast.service';
@@ -661,6 +668,108 @@ type CouponForm = {
                   <div *ngIf="bulkResult()!.invalid_emails?.length">{{ 'adminUi.couponsV2.bulk.resultInvalid' | translate:{ count: bulkResult()!.invalid_emails.length } }}</div>
                 </div>
               </div>
+
+              <div class="border-t border-slate-200 pt-4 grid gap-3 dark:border-slate-800">
+                <div class="grid gap-1">
+                  <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.couponsV2.bulk.segment.title' | translate }}</div>
+                  <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.couponsV2.bulk.segment.hint' | translate }}</p>
+                </div>
+
+                <div class="grid gap-2 lg:grid-cols-2">
+                  <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    <input type="checkbox" class="h-5 w-5 accent-indigo-600" [(ngModel)]="segmentRequireMarketingOptIn" />
+                    {{ 'adminUi.couponsV2.bulk.segment.filterMarketing' | translate }}
+                  </label>
+                  <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    <input type="checkbox" class="h-5 w-5 accent-indigo-600" [(ngModel)]="segmentRequireEmailVerified" />
+                    {{ 'adminUi.couponsV2.bulk.segment.filterVerified' | translate }}
+                  </label>
+                </div>
+
+                <app-input [label]="'adminUi.couponsV2.bulk.revokeReason' | translate" [(value)]="segmentRevokeReason"></app-input>
+
+                <div class="grid gap-3 lg:grid-cols-2">
+                  <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    <input type="checkbox" class="h-5 w-5 accent-indigo-600" [(ngModel)]="segmentAssignSendEmail" />
+                    {{ 'adminUi.couponsV2.bulk.sendEmailAssign' | translate }}
+                  </label>
+                  <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    <input type="checkbox" class="h-5 w-5 accent-indigo-600" [(ngModel)]="segmentRevokeSendEmail" />
+                    {{ 'adminUi.couponsV2.bulk.sendEmailRevoke' | translate }}
+                  </label>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [disabled]="segmentPreviewBusy() || segmentJobInProgress()"
+                    [label]="'adminUi.couponsV2.bulk.segment.preview' | translate"
+                    (action)="segmentPreview()"
+                  ></app-button>
+                  <app-button
+                    size="sm"
+                    [disabled]="segmentJobInProgress()"
+                    [label]="'adminUi.couponsV2.bulk.segment.assign' | translate"
+                    (action)="segmentAssign()"
+                  ></app-button>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [disabled]="segmentJobInProgress()"
+                    [label]="'adminUi.couponsV2.bulk.segment.revoke' | translate"
+                    (action)="segmentRevoke()"
+                  ></app-button>
+                  <span *ngIf="segmentPreviewBusy() || segmentJobInProgress()" class="text-sm text-slate-600 dark:text-slate-300">{{
+                    'adminUi.couponsV2.common.saving' | translate
+                  }}</span>
+                </div>
+
+                <div
+                  *ngIf="segmentPreviewAssign() || segmentPreviewRevoke()"
+                  class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
+                >
+                  <div class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.couponsV2.bulk.segment.previewTitle' | translate }}</div>
+                  <div class="mt-1 grid gap-1">
+                    <div>{{ 'adminUi.couponsV2.bulk.segment.candidates' | translate:{ count: segmentCandidatesCount() } }}</div>
+                    <div *ngIf="segmentPreviewAssign()">
+                      {{ 'adminUi.couponsV2.bulk.resultCreated' | translate:{ count: segmentPreviewAssign()!.created } }} ·
+                      {{ 'adminUi.couponsV2.bulk.resultRestored' | translate:{ count: segmentPreviewAssign()!.restored } }} ·
+                      {{ 'adminUi.couponsV2.bulk.resultAlreadyActive' | translate:{ count: segmentPreviewAssign()!.already_active } }}
+                    </div>
+                    <div *ngIf="segmentPreviewRevoke()">
+                      {{ 'adminUi.couponsV2.bulk.resultRevoked' | translate:{ count: segmentPreviewRevoke()!.revoked } }} ·
+                      {{ 'adminUi.couponsV2.bulk.resultAlreadyRevoked' | translate:{ count: segmentPreviewRevoke()!.already_revoked } }} ·
+                      {{ 'adminUi.couponsV2.bulk.resultNotAssigned' | translate:{ count: segmentPreviewRevoke()!.not_assigned } }}
+                    </div>
+                    <div *ngIf="segmentPreviewSample()" class="text-xs text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.couponsV2.bulk.segment.sample' | translate:{ emails: segmentPreviewSample() } }}
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  *ngIf="segmentJob()"
+                  class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
+                >
+                  <div class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.couponsV2.bulk.segment.jobTitle' | translate }}</div>
+                  <div class="mt-1 grid gap-1">
+                    <div>{{ 'adminUi.couponsV2.bulk.segment.jobStatus' | translate:{ status: segmentJob()!.status } }}</div>
+                    <div>
+                      {{ 'adminUi.couponsV2.bulk.segment.jobProgress' | translate:{ processed: segmentJob()!.processed, total: segmentJob()!.total_candidates } }}
+                    </div>
+                    <div *ngIf="segmentJob()!.created">{{ 'adminUi.couponsV2.bulk.resultCreated' | translate:{ count: segmentJob()!.created } }}</div>
+                    <div *ngIf="segmentJob()!.restored">{{ 'adminUi.couponsV2.bulk.resultRestored' | translate:{ count: segmentJob()!.restored } }}</div>
+                    <div *ngIf="segmentJob()!.already_active">{{ 'adminUi.couponsV2.bulk.resultAlreadyActive' | translate:{ count: segmentJob()!.already_active } }}</div>
+                    <div *ngIf="segmentJob()!.revoked">{{ 'adminUi.couponsV2.bulk.resultRevoked' | translate:{ count: segmentJob()!.revoked } }}</div>
+                    <div *ngIf="segmentJob()!.already_revoked">{{ 'adminUi.couponsV2.bulk.resultAlreadyRevoked' | translate:{ count: segmentJob()!.already_revoked } }}</div>
+                    <div *ngIf="segmentJob()!.not_assigned">{{ 'adminUi.couponsV2.bulk.resultNotAssigned' | translate:{ count: segmentJob()!.not_assigned } }}</div>
+                    <div *ngIf="segmentJob()!.error_message" class="text-xs text-rose-700 dark:text-rose-200">
+                      {{ segmentJob()!.error_message }}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div
@@ -717,7 +826,7 @@ type CouponForm = {
     </div>
   `
 })
-export class AdminCouponsComponent implements OnInit {
+export class AdminCouponsComponent implements OnInit, OnDestroy {
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'nav.admin', url: '/admin/dashboard' },
@@ -768,6 +877,18 @@ export class AdminCouponsComponent implements OnInit {
   bulkRevokeSendEmail = true;
   bulkRevokeReason = '';
 
+  segmentRequireMarketingOptIn = false;
+  segmentRequireEmailVerified = false;
+  segmentAssignSendEmail = true;
+  segmentRevokeSendEmail = true;
+  segmentRevokeReason = '';
+  segmentPreviewBusy = signal(false);
+  segmentPreviewAssign = signal<CouponBulkSegmentPreview | null>(null);
+  segmentPreviewRevoke = signal<CouponBulkSegmentPreview | null>(null);
+  segmentJob = signal<CouponBulkJobRead | null>(null);
+  private segmentJobPollHandle: number | null = null;
+  private segmentJobLastStatus: string | null = null;
+
   promotionForm: PromotionForm = this.blankPromotionForm();
   couponForm: CouponForm = this.blankCouponForm();
 
@@ -782,6 +903,10 @@ export class AdminCouponsComponent implements OnInit {
   ngOnInit(): void {
     this.loadCategories();
     this.loadPromotions();
+  }
+
+  ngOnDestroy(): void {
+    this.stopSegmentPolling();
   }
 
   loadCategories(): void {
@@ -939,6 +1064,7 @@ export class AdminCouponsComponent implements OnInit {
     this.revokeEmail = '';
     this.revokeReason = '';
     this.resetBulkState();
+    this.resetSegmentState();
     this.loadAssignments();
   }
 
@@ -949,6 +1075,7 @@ export class AdminCouponsComponent implements OnInit {
     if (promoId) this.couponForm.promotion_id = promoId;
     this.assignments.set([]);
     this.resetBulkState();
+    this.resetSegmentState();
   }
 
   saveCoupon(): void {
@@ -1456,6 +1583,148 @@ export class AdminCouponsComponent implements OnInit {
       });
   }
 
+  segmentJobInProgress(): boolean {
+    const status = this.segmentJob()?.status;
+    return status === 'pending' || status === 'running';
+  }
+
+  segmentCandidatesCount(): number {
+    return (
+      this.segmentPreviewAssign()?.total_candidates ??
+      this.segmentPreviewRevoke()?.total_candidates ??
+      this.segmentJob()?.total_candidates ??
+      0
+    );
+  }
+
+  segmentPreviewSample(): string {
+    const sample =
+      this.segmentPreviewAssign()?.sample_emails ??
+      this.segmentPreviewRevoke()?.sample_emails ??
+      [];
+    const preview = sample.slice(0, 6);
+    const suffix = sample.length > preview.length ? '…' : '';
+    return preview.length ? `${preview.join(', ')}${suffix}` : '';
+  }
+
+  segmentPreview(): void {
+    const couponId = this.selectedCoupon()?.id;
+    if (!couponId) return;
+    this.segmentPreviewBusy.set(true);
+    this.segmentPreviewAssign.set(null);
+    this.segmentPreviewRevoke.set(null);
+
+    const payloadBase = {
+      require_marketing_opt_in: this.segmentRequireMarketingOptIn,
+      require_email_verified: this.segmentRequireEmailVerified
+    };
+    forkJoin({
+      assign: this.adminCoupons.previewSegmentAssign(couponId, { ...payloadBase, send_email: this.segmentAssignSendEmail }),
+      revoke: this.adminCoupons.previewSegmentRevoke(couponId, {
+        ...payloadBase,
+        reason: (this.segmentRevokeReason || '').trim() || null,
+        send_email: this.segmentRevokeSendEmail
+      })
+    }).subscribe({
+      next: ({ assign, revoke }) => {
+        this.segmentPreviewBusy.set(false);
+        this.segmentPreviewAssign.set(assign);
+        this.segmentPreviewRevoke.set(revoke);
+      },
+      error: (err) => {
+        this.segmentPreviewBusy.set(false);
+        this.toast.error(this.t('adminUi.couponsV2.bulk.segment.previewError'), err?.error?.detail || undefined);
+      }
+    });
+  }
+
+  segmentAssign(): void {
+    const couponId = this.selectedCoupon()?.id;
+    if (!couponId) return;
+    this.segmentJob.set(null);
+    this.segmentJobLastStatus = null;
+    this.segmentPreviewAssign.set(null);
+    this.segmentPreviewRevoke.set(null);
+
+    this.adminCoupons
+      .startSegmentAssignJob(couponId, {
+        require_marketing_opt_in: this.segmentRequireMarketingOptIn,
+        require_email_verified: this.segmentRequireEmailVerified,
+        send_email: this.segmentAssignSendEmail
+      })
+      .subscribe({
+        next: (job) => {
+          this.segmentJob.set(job);
+          this.toast.success(this.t('adminUi.couponsV2.bulk.segment.started'));
+          this.startSegmentPolling(job.id);
+        },
+        error: (err) => {
+          this.toast.error(this.t('adminUi.couponsV2.errors.assign'), err?.error?.detail || undefined);
+        }
+      });
+  }
+
+  segmentRevoke(): void {
+    const couponId = this.selectedCoupon()?.id;
+    if (!couponId) return;
+    this.segmentJob.set(null);
+    this.segmentJobLastStatus = null;
+    this.segmentPreviewAssign.set(null);
+    this.segmentPreviewRevoke.set(null);
+
+    this.adminCoupons
+      .startSegmentRevokeJob(couponId, {
+        require_marketing_opt_in: this.segmentRequireMarketingOptIn,
+        require_email_verified: this.segmentRequireEmailVerified,
+        reason: (this.segmentRevokeReason || '').trim() || null,
+        send_email: this.segmentRevokeSendEmail
+      })
+      .subscribe({
+        next: (job) => {
+          this.segmentJob.set(job);
+          this.toast.success(this.t('adminUi.couponsV2.bulk.segment.started'));
+          this.startSegmentPolling(job.id);
+        },
+        error: (err) => {
+          this.toast.error(this.t('adminUi.couponsV2.errors.revoke'), err?.error?.detail || undefined);
+        }
+      });
+  }
+
+  private startSegmentPolling(jobId: string): void {
+    this.stopSegmentPolling();
+    this.refreshSegmentJob(jobId);
+    this.segmentJobPollHandle = window.setInterval(() => this.refreshSegmentJob(jobId), 2000);
+  }
+
+  private stopSegmentPolling(): void {
+    if (this.segmentJobPollHandle !== null) {
+      window.clearInterval(this.segmentJobPollHandle);
+      this.segmentJobPollHandle = null;
+    }
+  }
+
+  private refreshSegmentJob(jobId: string): void {
+    this.adminCoupons.getBulkJob(jobId).subscribe({
+      next: (job) => {
+        const prev = this.segmentJobLastStatus;
+        this.segmentJobLastStatus = job.status;
+        this.segmentJob.set(job);
+
+        if (job.status === 'succeeded' || job.status === 'failed') {
+          this.stopSegmentPolling();
+        }
+        if (prev && prev !== job.status && job.status === 'succeeded') {
+          this.toast.success(this.t('adminUi.couponsV2.bulk.segment.completed'));
+          this.loadAssignments();
+        }
+      },
+      error: () => {
+        this.stopSegmentPolling();
+      }
+    });
+  }
+
   private resetBulkState(): void {
     this.bulkEmails = [];
     this.bulkInvalid = [];
@@ -1464,6 +1733,15 @@ export class AdminCouponsComponent implements OnInit {
     this.bulkParseError = '';
     this.bulkRevokeReason = '';
     this.bulkResult.set(null);
+  }
+
+  private resetSegmentState(): void {
+    this.stopSegmentPolling();
+    this.segmentPreviewAssign.set(null);
+    this.segmentPreviewRevoke.set(null);
+    this.segmentJob.set(null);
+    this.segmentJobLastStatus = null;
+    this.segmentRevokeReason = '';
   }
 
   private parseEmailsFromCsv(text: string): { emails: string[]; invalid: string[]; duplicates: number; truncated: number } {
