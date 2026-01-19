@@ -38,5 +38,8 @@ export class AdminProductsService {
   }): Observable<AdminProductListResponse> {
     return this.api.get<AdminProductListResponse>('/admin/dashboard/products/search', params as any);
   }
-}
 
+  byIds(ids: string[]): Observable<AdminProductListItem[]> {
+    return this.api.post<AdminProductListItem[]>('/admin/dashboard/products/by-ids', { ids });
+  }
+}

@@ -1536,6 +1536,7 @@
         "excludedCategories": "Excluded categories",
         "searchProducts": "Search products",
         "loadingProducts": "Searching products…",
+        "resolvingProducts": "Resolving product names…",
         "include": "Include",
         "exclude": "Exclude",
         "includedProducts": "Included products",
@@ -1606,6 +1607,33 @@
           "reason": "Reason"
         }
       },
+      "bulk": {
+        "title": "Bulk actions",
+        "hint": "Upload a CSV of customer emails (first column) to assign or revoke this coupon in bulk.",
+        "clear": "Clear",
+        "parsed": "{{count}} emails ready",
+        "duplicates": "{{count}} duplicates skipped",
+        "invalid": "{{count}} invalid emails",
+        "truncated": "{{count}} ignored (max 500)",
+        "revokeReason": "Revoke reason (optional)",
+        "sendEmailAssign": "Send assignment email",
+        "sendEmailRevoke": "Send revocation email",
+        "assign": "Bulk assign",
+        "revoke": "Bulk revoke",
+        "resultTitle": "Result",
+        "resultCreated": "{{count}} assigned",
+        "resultRestored": "{{count}} restored",
+        "resultAlreadyActive": "{{count}} already assigned",
+        "resultRevoked": "{{count}} revoked",
+        "resultAlreadyRevoked": "{{count}} already revoked",
+        "resultNotAssigned": "{{count}} not assigned",
+        "resultNotFound": "{{count}} users not found",
+        "resultInvalid": "{{count}} invalid emails",
+        "noEmails": "No emails loaded",
+        "parseError": "Could not parse CSV",
+        "successAssign": "Bulk assignment completed",
+        "successRevoke": "Bulk revocation completed"
+      },
       "success": {
         "savePromotion": "Promotion saved",
         "saveCoupon": "Coupon saved",
@@ -1628,7 +1656,8 @@
         "loadAssignments": "Could not load assignments",
         "assign": "Could not assign coupon",
         "revoke": "Could not revoke coupon",
-        "searchProducts": "Could not search products"
+        "searchProducts": "Could not search products",
+        "resolveProducts": "Could not resolve products"
       }
     },
     "audit": {

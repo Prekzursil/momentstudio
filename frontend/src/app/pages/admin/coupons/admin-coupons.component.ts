@@ -3,7 +3,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
-import { AdminCouponsV2Service, type CouponAssignmentRead } from '../../../core/admin-coupons-v2.service';
+import { AdminCouponsV2Service, type CouponAssignmentRead, type CouponBulkResult } from '../../../core/admin-coupons-v2.service';
 import { AdminProductsService, type AdminProductListItem } from '../../../core/admin-products.service';
 import { type AdminCategory, AdminService } from '../../../core/admin.service';
 import { ToastService } from '../../../core/toast.service';
@@ -323,6 +323,13 @@ type CouponForm = {
                     </div>
                   </div>
 
+                  <div *ngIf="scopeProductsLoading()" class="text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.couponsV2.scopes.resolvingProducts' | translate }}
+                  </div>
+                  <div *ngIf="scopeProductsError()" class="text-sm text-rose-700 dark:text-rose-200">
+                    {{ scopeProductsError() }}
+                  </div>
+
                   <div class="grid gap-3 lg:grid-cols-2">
                     <div class="grid gap-2">
                       <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
@@ -577,6 +584,85 @@ type CouponForm = {
               </div>
             </div>
 
+            <div class="rounded-xl border border-slate-200 p-3 grid gap-3 dark:border-slate-800">
+              <div class="flex items-start justify-between gap-3">
+                <div class="grid gap-1">
+                  <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.couponsV2.bulk.title' | translate }}</div>
+                  <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.couponsV2.bulk.hint' | translate }}</p>
+                </div>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.couponsV2.bulk.clear' | translate"
+                  [disabled]="bulkBusy()"
+                  (action)="clearBulkSelection(bulkFile)"
+                ></app-button>
+              </div>
+
+              <input
+                #bulkFile
+                type="file"
+                accept=".csv,text/csv"
+                class="block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-900 hover:file:bg-slate-200 dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-100 dark:hover:file:bg-slate-700"
+                (change)="onBulkFileChange($event)"
+              />
+
+              <div *ngIf="bulkParseError" class="text-sm text-rose-700 dark:text-rose-200">
+                {{ bulkParseError }}
+              </div>
+
+              <div *ngIf="bulkEmails.length" class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+                <div>
+                  {{ 'adminUi.couponsV2.bulk.parsed' | translate:{ count: bulkEmails.length } }}
+                  <span *ngIf="bulkDuplicates" class="text-slate-500 dark:text-slate-400">
+                    · {{ 'adminUi.couponsV2.bulk.duplicates' | translate:{ count: bulkDuplicates } }}
+                  </span>
+                  <span *ngIf="bulkInvalid.length" class="text-slate-500 dark:text-slate-400">
+                    · {{ 'adminUi.couponsV2.bulk.invalid' | translate:{ count: bulkInvalid.length } }}
+                  </span>
+                  <span *ngIf="bulkTruncated" class="text-amber-700 dark:text-amber-200">
+                    · {{ 'adminUi.couponsV2.bulk.truncated' | translate:{ count: bulkTruncated } }}
+                  </span>
+                </div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ bulkEmailsPreview() }}
+                </div>
+              </div>
+
+              <app-input [label]="'adminUi.couponsV2.bulk.revokeReason' | translate" [(value)]="bulkRevokeReason"></app-input>
+
+              <div class="grid gap-3 lg:grid-cols-2">
+                <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  <input type="checkbox" class="h-5 w-5 accent-indigo-600" [(ngModel)]="bulkAssignSendEmail" />
+                  {{ 'adminUi.couponsV2.bulk.sendEmailAssign' | translate }}
+                </label>
+                <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  <input type="checkbox" class="h-5 w-5 accent-indigo-600" [(ngModel)]="bulkRevokeSendEmail" />
+                  {{ 'adminUi.couponsV2.bulk.sendEmailRevoke' | translate }}
+                </label>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2">
+                <app-button size="sm" [disabled]="bulkBusy() || bulkEmails.length === 0" [label]="'adminUi.couponsV2.bulk.assign' | translate" (action)="bulkAssign()"></app-button>
+                <app-button size="sm" variant="ghost" [disabled]="bulkBusy() || bulkEmails.length === 0" [label]="'adminUi.couponsV2.bulk.revoke' | translate" (action)="bulkRevoke()"></app-button>
+                <span *ngIf="bulkBusy()" class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.couponsV2.common.saving' | translate }}</span>
+              </div>
+
+              <div *ngIf="bulkResult()" class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200">
+                <div class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.couponsV2.bulk.resultTitle' | translate }}</div>
+                <div class="mt-1 grid gap-1">
+                  <div *ngIf="bulkResult()!.created">{{ 'adminUi.couponsV2.bulk.resultCreated' | translate:{ count: bulkResult()!.created } }}</div>
+                  <div *ngIf="bulkResult()!.restored">{{ 'adminUi.couponsV2.bulk.resultRestored' | translate:{ count: bulkResult()!.restored } }}</div>
+                  <div *ngIf="bulkResult()!.already_active">{{ 'adminUi.couponsV2.bulk.resultAlreadyActive' | translate:{ count: bulkResult()!.already_active } }}</div>
+                  <div *ngIf="bulkResult()!.revoked">{{ 'adminUi.couponsV2.bulk.resultRevoked' | translate:{ count: bulkResult()!.revoked } }}</div>
+                  <div *ngIf="bulkResult()!.already_revoked">{{ 'adminUi.couponsV2.bulk.resultAlreadyRevoked' | translate:{ count: bulkResult()!.already_revoked } }}</div>
+                  <div *ngIf="bulkResult()!.not_assigned">{{ 'adminUi.couponsV2.bulk.resultNotAssigned' | translate:{ count: bulkResult()!.not_assigned } }}</div>
+                  <div *ngIf="bulkResult()!.not_found_emails?.length">{{ 'adminUi.couponsV2.bulk.resultNotFound' | translate:{ count: bulkResult()!.not_found_emails.length } }}</div>
+                  <div *ngIf="bulkResult()!.invalid_emails?.length">{{ 'adminUi.couponsV2.bulk.resultInvalid' | translate:{ count: bulkResult()!.invalid_emails.length } }}</div>
+                </div>
+              </div>
+            </div>
+
             <div
               *ngIf="assignmentsError()"
               class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
@@ -651,6 +737,8 @@ export class AdminCouponsComponent implements OnInit {
   productsError = signal<string | null>(null);
   products = signal<AdminProductListItem[]>([]);
   private productCache: Record<string, AdminProductListItem> = {};
+  scopeProductsLoading = signal(false);
+  scopeProductsError = signal<string | null>(null);
 
   couponsLoading = signal(false);
   couponsError = signal<string | null>(null);
@@ -668,6 +756,17 @@ export class AdminCouponsComponent implements OnInit {
   revokeEmail = '';
   revokeReason = '';
   revokeSendEmail = true;
+
+  bulkEmails: string[] = [];
+  bulkInvalid: string[] = [];
+  bulkDuplicates = 0;
+  bulkTruncated = 0;
+  bulkParseError = '';
+  bulkBusy = signal(false);
+  bulkResult = signal<CouponBulkResult | null>(null);
+  bulkAssignSendEmail = true;
+  bulkRevokeSendEmail = true;
+  bulkRevokeReason = '';
 
   promotionForm: PromotionForm = this.blankPromotionForm();
   couponForm: CouponForm = this.blankCouponForm();
@@ -727,6 +826,7 @@ export class AdminCouponsComponent implements OnInit {
     this.promotionForm = this.promotionToForm(promo);
     this.couponQuery = '';
     this.resetProductSearch();
+    this.loadScopedProducts();
     this.startNewCoupon();
     this.loadCoupons();
   }
@@ -736,6 +836,8 @@ export class AdminCouponsComponent implements OnInit {
     this.promotionForm = this.blankPromotionForm();
     this.couponQuery = '';
     this.resetProductSearch();
+    this.scopeProductsError.set(null);
+    this.scopeProductsLoading.set(false);
     this.coupons.set([]);
     this.selectedCoupon.set(null);
     this.assignments.set([]);
@@ -836,6 +938,7 @@ export class AdminCouponsComponent implements OnInit {
     this.assignEmail = '';
     this.revokeEmail = '';
     this.revokeReason = '';
+    this.resetBulkState();
     this.loadAssignments();
   }
 
@@ -845,6 +948,7 @@ export class AdminCouponsComponent implements OnInit {
     const promoId = this.selectedPromotion()?.id;
     if (promoId) this.couponForm.promotion_id = promoId;
     this.assignments.set([]);
+    this.resetBulkState();
   }
 
   saveCoupon(): void {
@@ -1067,6 +1171,43 @@ export class AdminCouponsComponent implements OnInit {
     return id;
   }
 
+  private loadScopedProducts(): void {
+    const ids = this.uniqueIds([...this.promotionForm.included_product_ids, ...this.promotionForm.excluded_product_ids]);
+    const missing = ids.filter((id) => !this.productCache[id]);
+    if (missing.length === 0) {
+      this.scopeProductsLoading.set(false);
+      this.scopeProductsError.set(null);
+      return;
+    }
+
+    this.scopeProductsLoading.set(true);
+    this.scopeProductsError.set(null);
+    const chunks: string[][] = [];
+    for (let i = 0; i < missing.length; i += 200) {
+      chunks.push(missing.slice(i, i + 200));
+    }
+    let remaining = chunks.length;
+    const done = () => {
+      remaining -= 1;
+      if (remaining <= 0) this.scopeProductsLoading.set(false);
+    };
+
+    for (const chunk of chunks) {
+      this.adminProducts.byIds(chunk).subscribe({
+        next: (items) => {
+          for (const it of items ?? []) {
+            if (it?.id) this.productCache[it.id] = it;
+          }
+        },
+        error: () => {
+          this.scopeProductsError.set(this.t('adminUi.couponsV2.errors.resolveProducts'));
+          done();
+        },
+        complete: () => done()
+      });
+    }
+  }
+
   private validatePromotionForm(): string | null {
     const name = (this.promotionForm.name || '').trim();
     if (!name) return this.t('adminUi.couponsV2.errors.promotionNameRequired');
@@ -1231,5 +1372,140 @@ export class AdminCouponsComponent implements OnInit {
 
   private t(key: string, params?: Record<string, any>): string {
     return this.translate.instant(key, params) as string;
+  }
+
+  async onBulkFileChange(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.[0];
+    if (!file) return;
+    this.resetBulkState();
+    try {
+      const text = await file.text();
+      const { emails, invalid, duplicates, truncated } = this.parseEmailsFromCsv(text);
+      this.bulkEmails = emails;
+      this.bulkInvalid = invalid;
+      this.bulkDuplicates = duplicates;
+      this.bulkTruncated = truncated;
+    } catch {
+      this.bulkParseError = this.t('adminUi.couponsV2.bulk.parseError');
+    }
+  }
+
+  clearBulkSelection(fileInput?: HTMLInputElement): void {
+    if (fileInput) fileInput.value = '';
+    this.resetBulkState();
+  }
+
+  bulkEmailsPreview(): string {
+    const preview = this.bulkEmails.slice(0, 6);
+    if (preview.length === 0) return '';
+    const suffix = this.bulkEmails.length > preview.length ? '…' : '';
+    return `${preview.join(', ')}${suffix}`;
+  }
+
+  bulkAssign(): void {
+    const couponId = this.selectedCoupon()?.id;
+    if (!couponId) return;
+    const emails = this.bulkEmails.slice(0, 500);
+    if (emails.length === 0) {
+      this.toast.error(this.t('adminUi.couponsV2.errors.validation'), this.t('adminUi.couponsV2.bulk.noEmails'));
+      return;
+    }
+
+    this.bulkBusy.set(true);
+    this.bulkResult.set(null);
+    this.adminCoupons.bulkAssignCoupon(couponId, { emails, send_email: this.bulkAssignSendEmail }).subscribe({
+      next: (res) => {
+        this.bulkBusy.set(false);
+        this.bulkResult.set(res);
+        this.toast.success(this.t('adminUi.couponsV2.bulk.successAssign'));
+        this.loadAssignments();
+      },
+      error: (err) => {
+        this.bulkBusy.set(false);
+        this.toast.error(this.t('adminUi.couponsV2.errors.assign'), err?.error?.detail || undefined);
+      }
+    });
+  }
+
+  bulkRevoke(): void {
+    const couponId = this.selectedCoupon()?.id;
+    if (!couponId) return;
+    const emails = this.bulkEmails.slice(0, 500);
+    if (emails.length === 0) {
+      this.toast.error(this.t('adminUi.couponsV2.errors.validation'), this.t('adminUi.couponsV2.bulk.noEmails'));
+      return;
+    }
+
+    const reason = (this.bulkRevokeReason || '').trim();
+    this.bulkBusy.set(true);
+    this.bulkResult.set(null);
+    this.adminCoupons
+      .bulkRevokeCoupon(couponId, { emails, reason: reason || null, send_email: this.bulkRevokeSendEmail })
+      .subscribe({
+        next: (res) => {
+          this.bulkBusy.set(false);
+          this.bulkResult.set(res);
+          this.toast.success(this.t('adminUi.couponsV2.bulk.successRevoke'));
+          this.loadAssignments();
+        },
+        error: (err) => {
+          this.bulkBusy.set(false);
+          this.toast.error(this.t('adminUi.couponsV2.errors.revoke'), err?.error?.detail || undefined);
+        }
+      });
+  }
+
+  private resetBulkState(): void {
+    this.bulkEmails = [];
+    this.bulkInvalid = [];
+    this.bulkDuplicates = 0;
+    this.bulkTruncated = 0;
+    this.bulkParseError = '';
+    this.bulkRevokeReason = '';
+    this.bulkResult.set(null);
+  }
+
+  private parseEmailsFromCsv(text: string): { emails: string[]; invalid: string[]; duplicates: number; truncated: number } {
+    const lines = (text || '').split(/\r?\n/);
+    const emails: string[] = [];
+    const invalid: string[] = [];
+    const seen = new Set<string>();
+    let duplicates = 0;
+
+    for (let idx = 0; idx < lines.length; idx += 1) {
+      const rawLine = (lines[idx] || '').trim();
+      if (!rawLine) continue;
+      const firstCell = rawLine.split(/[,;\t]/)[0] ?? '';
+      const cell = firstCell.trim().replace(/^"|"$/g, '');
+      if (!cell) continue;
+      if (idx === 0 && cell.toLowerCase().includes('email')) continue;
+
+      const email = cell.trim().toLowerCase();
+      if (!this.isValidEmail(email)) {
+        invalid.push(cell);
+        continue;
+      }
+      if (seen.has(email)) {
+        duplicates += 1;
+        continue;
+      }
+      seen.add(email);
+      emails.push(email);
+    }
+
+    const max = 500;
+    const truncated = emails.length > max ? emails.length - max : 0;
+    return { emails: emails.slice(0, max), invalid, duplicates, truncated };
+  }
+
+  private isValidEmail(email: string): boolean {
+    const value = (email || '').trim();
+    if (!value || value.length > 255) return false;
+    const at = value.indexOf('@');
+    if (at <= 0 || at === value.length - 1) return false;
+    const domain = value.slice(at + 1);
+    if (!domain.includes('.')) return false;
+    return true;
   }
 }

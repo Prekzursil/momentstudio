@@ -59,6 +59,19 @@ export interface CouponRevokePayload extends CouponAssignPayload {
   reason?: string | null;
 }
 
+export interface CouponBulkResult {
+  requested: number;
+  unique: number;
+  invalid_emails: string[];
+  not_found_emails: string[];
+  created: number;
+  restored: number;
+  already_active: number;
+  revoked: number;
+  already_revoked: number;
+  not_assigned: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdminCouponsV2Service {
   constructor(private api: ApiService) {}
@@ -98,5 +111,15 @@ export class AdminCouponsV2Service {
   revokeCoupon(couponId: string, payload: CouponRevokePayload): Observable<void> {
     return this.api.post<void>(`/coupons/admin/coupons/${couponId}/revoke`, payload);
   }
-}
 
+  bulkAssignCoupon(couponId: string, payload: { emails: string[]; send_email?: boolean }): Observable<CouponBulkResult> {
+    return this.api.post<CouponBulkResult>(`/coupons/admin/coupons/${couponId}/assign/bulk`, payload);
+  }
+
+  bulkRevokeCoupon(
+    couponId: string,
+    payload: { emails: string[]; reason?: string | null; send_email?: boolean }
+  ): Observable<CouponBulkResult> {
+    return this.api.post<CouponBulkResult>(`/coupons/admin/coupons/${couponId}/revoke/bulk`, payload);
+  }
+}

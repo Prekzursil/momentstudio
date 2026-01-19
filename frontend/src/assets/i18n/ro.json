@@ -1536,6 +1536,7 @@
         "excludedCategories": "Categorii excluse",
         "searchProducts": "Caută produse",
         "loadingProducts": "Se caută produse…",
+        "resolvingProducts": "Se încarcă numele produselor…",
         "include": "Include",
         "exclude": "Exclude",
         "includedProducts": "Produse incluse",
@@ -1606,6 +1607,33 @@
           "reason": "Motiv"
         }
       },
+      "bulk": {
+        "title": "Acțiuni în masă",
+        "hint": "Încarcă un CSV cu emailurile clienților (prima coloană) pentru a atribui sau revoca acest cupon în masă.",
+        "clear": "Golește",
+        "parsed": "{{count}} emailuri pregătite",
+        "duplicates": "{{count}} duplicate ignorate",
+        "invalid": "{{count}} emailuri invalide",
+        "truncated": "{{count}} ignorate (max 500)",
+        "revokeReason": "Motiv revocare (opțional)",
+        "sendEmailAssign": "Trimite email de atribuire",
+        "sendEmailRevoke": "Trimite email de revocare",
+        "assign": "Atribuire în masă",
+        "revoke": "Revocare în masă",
+        "resultTitle": "Rezultat",
+        "resultCreated": "{{count}} atribuite",
+        "resultRestored": "{{count}} reactivate",
+        "resultAlreadyActive": "{{count}} deja atribuite",
+        "resultRevoked": "{{count}} revocate",
+        "resultAlreadyRevoked": "{{count}} deja revocate",
+        "resultNotAssigned": "{{count}} neatribuite",
+        "resultNotFound": "{{count}} utilizatori negăsiți",
+        "resultInvalid": "{{count}} emailuri invalide",
+        "noEmails": "Nu există emailuri încărcate",
+        "parseError": "Nu am putut interpreta CSV-ul",
+        "successAssign": "Atribuirea în masă a fost finalizată",
+        "successRevoke": "Revocarea în masă a fost finalizată"
+      },
       "success": {
         "savePromotion": "Promoția a fost salvată",
         "saveCoupon": "Cuponul a fost salvat",
@@ -1628,7 +1656,8 @@
         "loadAssignments": "Nu s-au putut încărca atribuiri",
         "assign": "Nu s-a putut atribui cuponul",
         "revoke": "Nu s-a putut revoca cuponul",
-        "searchProducts": "Nu s-au putut căuta produsele"
+        "searchProducts": "Nu s-au putut căuta produsele",
+        "resolveProducts": "Nu s-au putut încărca produsele"
       }
     },
     "audit": {
