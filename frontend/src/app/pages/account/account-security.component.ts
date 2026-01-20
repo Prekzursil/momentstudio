@@ -105,14 +105,24 @@ import { AccountComponent } from './account.component';
             <div class="grid gap-2 sm:grid-cols-[2fr_2fr_auto_auto] sm:items-end">
               <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                 {{ 'account.security.twoFactor.managePasswordLabel' | translate }}
-                <input
-                  name="twoFactorManagePassword"
-                  type="password"
-                  autocomplete="current-password"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                  [disabled]="account.regeneratingTwoFactorCodes || account.disablingTwoFactor"
-                  [(ngModel)]="account.twoFactorManagePassword"
-                />
+                <div class="relative">
+                  <input
+                    name="twoFactorManagePassword"
+                    [type]="showTwoFactorManagePassword ? 'text' : 'password'"
+                    autocomplete="current-password"
+                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                    [disabled]="account.regeneratingTwoFactorCodes || account.disablingTwoFactor"
+                    [(ngModel)]="account.twoFactorManagePassword"
+                  />
+                  <button
+                    type="button"
+                    class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
+                    (click)="showTwoFactorManagePassword = !showTwoFactorManagePassword"
+                    [attr.aria-label]="(showTwoFactorManagePassword ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+                  >
+                    {{ (showTwoFactorManagePassword ? 'auth.hide' : 'auth.show') | translate }}
+                  </button>
+                </div>
               </label>
 
               <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -225,14 +235,24 @@ import { AccountComponent } from './account.component';
               <div class="grid gap-2 sm:grid-cols-[2fr_auto] sm:items-end">
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                   {{ 'account.security.twoFactor.setupPasswordLabel' | translate }}
-                  <input
-                    name="twoFactorSetupPassword"
-                    type="password"
-                    autocomplete="current-password"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                    [disabled]="account.startingTwoFactor"
-                    [(ngModel)]="account.twoFactorSetupPassword"
-                  />
+                  <div class="relative">
+                    <input
+                      name="twoFactorSetupPassword"
+                      [type]="showTwoFactorSetupPassword ? 'text' : 'password'"
+                      autocomplete="current-password"
+                      class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      [disabled]="account.startingTwoFactor"
+                      [(ngModel)]="account.twoFactorSetupPassword"
+                    />
+                    <button
+                      type="button"
+                      class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
+                      (click)="showTwoFactorSetupPassword = !showTwoFactorSetupPassword"
+                      [attr.aria-label]="(showTwoFactorSetupPassword ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+                    >
+                      {{ (showTwoFactorSetupPassword ? 'auth.hide' : 'auth.show') | translate }}
+                    </button>
+                  </div>
                 </label>
                 <app-button
                   size="sm"
@@ -343,14 +363,24 @@ import { AccountComponent } from './account.component';
               >
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                   {{ 'account.security.emails.confirmPassword' | translate }}
-                  <input
-                    name="makePrimaryPassword"
-                    type="password"
-                    autocomplete="current-password"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                    [disabled]="account.makingPrimaryEmail"
-                    [(ngModel)]="account.makePrimaryPassword"
-                  />
+                  <div class="relative">
+                    <input
+                      name="makePrimaryPassword"
+                      [type]="showMakePrimaryPassword ? 'text' : 'password'"
+                      autocomplete="current-password"
+                      class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      [disabled]="account.makingPrimaryEmail"
+                      [(ngModel)]="account.makePrimaryPassword"
+                    />
+                    <button
+                      type="button"
+                      class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
+                      (click)="showMakePrimaryPassword = !showMakePrimaryPassword"
+                      [attr.aria-label]="(showMakePrimaryPassword ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+                    >
+                      {{ (showMakePrimaryPassword ? 'auth.hide' : 'auth.show') | translate }}
+                    </button>
+                  </div>
                 </label>
                 <app-button
                   size="sm"
@@ -414,15 +444,25 @@ import { AccountComponent } from './account.component';
               <p class="text-slate-600 dark:text-slate-300 truncate">{{ account.googleEmail() || ('account.security.google.none' | translate) }}</p>
             </div>
             <div class="flex flex-col sm:flex-row gap-2 sm:ml-auto w-full sm:w-auto">
-              <input
-                type="password"
-                name="googlePassword"
-                [(ngModel)]="account.googlePassword"
-                autocomplete="current-password"
-                [placeholder]="'account.security.google.passwordPlaceholder' | translate"
-                [attr.aria-label]="'account.security.google.passwordAria' | translate"
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-              />
+              <div class="relative w-full sm:w-auto">
+                <input
+                  [type]="showGooglePassword ? 'text' : 'password'"
+                  name="googlePassword"
+                  [(ngModel)]="account.googlePassword"
+                  autocomplete="current-password"
+                  [placeholder]="'account.security.google.passwordPlaceholder' | translate"
+                  [attr.aria-label]="'account.security.google.passwordAria' | translate"
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                />
+                <button
+                  type="button"
+                  class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
+                  (click)="showGooglePassword = !showGooglePassword"
+                  [attr.aria-label]="(showGooglePassword ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+                >
+                  {{ (showGooglePassword ? 'auth.hide' : 'auth.show') | translate }}
+                </button>
+              </div>
               <app-button
                 size="sm"
                 variant="ghost"
@@ -612,6 +652,10 @@ import { AccountComponent } from './account.component';
 })
 export class AccountSecurityComponent implements OnDestroy {
   protected readonly account = inject(AccountComponent);
+  showTwoFactorManagePassword = false;
+  showTwoFactorSetupPassword = false;
+  showMakePrimaryPassword = false;
+  showGooglePassword = false;
 
   @ViewChild('cardHost')
   private set cardHost(cardHost: ElementRef<HTMLDivElement> | undefined) {

@@ -34,25 +34,47 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
         </label>
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           {{ 'auth.password' | translate }}
-          <input
-            name="password"
-            type="password"
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-            required
-            minlength="6"
-            [(ngModel)]="password"
-          />
+          <div class="relative">
+            <input
+              name="password"
+              [type]="showPassword ? 'text' : 'password'"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              required
+              minlength="6"
+              autocomplete="new-password"
+              [(ngModel)]="password"
+            />
+            <button
+              type="button"
+              class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
+              (click)="showPassword = !showPassword"
+              [attr.aria-label]="(showPassword ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+            >
+              {{ (showPassword ? 'auth.hide' : 'auth.show') | translate }}
+            </button>
+          </div>
         </label>
         <app-password-strength [password]="password"></app-password-strength>
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           {{ 'auth.confirmPassword' | translate }}
-          <input
-            name="confirm"
-            type="password"
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-            required
-            [(ngModel)]="confirmPassword"
-          />
+          <div class="relative">
+            <input
+              name="confirm"
+              [type]="showConfirmPassword ? 'text' : 'password'"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              required
+              autocomplete="new-password"
+              [(ngModel)]="confirmPassword"
+            />
+            <button
+              type="button"
+              class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
+              (click)="showConfirmPassword = !showConfirmPassword"
+              [attr.aria-label]="(showConfirmPassword ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+            >
+              {{ (showConfirmPassword ? 'auth.hide' : 'auth.show') | translate }}
+            </button>
+          </div>
         </label>
         <p *ngIf="error" class="text-sm text-amber-700 dark:text-amber-300">{{ error }}</p>
         <app-button [label]="'auth.setPassword' | translate" type="submit"></app-button>
@@ -69,6 +91,8 @@ export class PasswordResetComponent {
   token = '';
   password = '';
   confirmPassword = '';
+  showPassword = false;
+  showConfirmPassword = false;
   error = '';
   loading = false;
 

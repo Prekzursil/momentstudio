@@ -119,14 +119,24 @@ import { AccountComponent } from './account.component';
 
         <label *ngIf="account.usernameChanged()" class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           {{ 'auth.currentPassword' | translate }}
-          <input
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-            name="profileUsernamePassword"
-            type="password"
-            autocomplete="current-password"
-            required
-            [(ngModel)]="account.profileUsernamePassword"
-          />
+          <div class="relative">
+            <input
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              name="profileUsernamePassword"
+              [type]="showUsernamePassword ? 'text' : 'password'"
+              autocomplete="current-password"
+              required
+              [(ngModel)]="account.profileUsernamePassword"
+            />
+            <button
+              type="button"
+              class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
+              (click)="showUsernamePassword = !showUsernamePassword"
+              [attr.aria-label]="(showUsernamePassword ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+            >
+              {{ (showUsernamePassword ? 'auth.hide' : 'auth.show') | translate }}
+            </button>
+          </div>
           <span class="text-xs font-normal text-slate-500 dark:text-slate-400">Required to change your username.</span>
         </label>
 
@@ -270,6 +280,7 @@ import { AccountComponent } from './account.component';
 })
 export class AccountProfileComponent {
   protected readonly account = inject(AccountComponent);
+  showUsernamePassword = false;
 
   hasUnsavedChanges(): boolean {
     return this.account.profileHasUnsavedChanges();

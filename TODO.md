@@ -487,7 +487,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Security: show a recent security activity feed (logins/email changes/password changes).
 - [x] Security: add 2FA (TOTP) + recovery codes.
 - [ ] Security: add passkeys (WebAuthn) for sign-in.
-- [ ] Security: add password strength meter + show/hide toggles where missing.
+- [x] Security: add password strength meter + show/hide toggles where missing.
 - [ ] Security: show cooldown timers (username/display name/email changes).
 - [ ] Emails: improve per-email verification state/actions UX (clearer status + inline actions).
 - [ ] Emails: add resend-verification cooldown countdown (anti-spam UX).
