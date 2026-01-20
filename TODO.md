@@ -497,9 +497,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Profile: improve phone input UX (formatting preview, validation hints).
 - [x] Profile: add avatar crop/preview UI before upload.
 - [x] Profile: add a public-profile preview card (how you appear in comments).
-- [ ] Privacy: show export progress + notify when ready (background job UX).
-- [ ] Privacy: show deletion cooldown progress + consequences checklist.
-- [ ] Support: show recent tickets inside Account (overview or dedicated section).
+- [x] Privacy: show export progress + notify when ready (background job UX).
+- [x] Privacy: show deletion cooldown progress + consequences checklist.
+- [x] Support: show recent tickets inside Account (overview or dedicated section).
 
 ## Frontend - Admin Dashboard
 - [x] /admin layout with sidebar + guard.

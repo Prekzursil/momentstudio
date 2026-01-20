@@ -32,7 +32,8 @@ import {
   AddressCreateRequest,
   Order,
   OrderPaginationMeta,
-  ReceiptShareToken
+  ReceiptShareToken,
+  UserDataExportJob
 } from '../../core/account.service';
 import { BlogMyComment, BlogService, PaginationMeta } from '../../core/blog.service';
 import { CartStore } from '../../core/cart.store';
@@ -40,6 +41,7 @@ import { LanguageService } from '../../core/language.service';
 import { NotificationsService } from '../../core/notifications.service';
 import { ThemeMode, ThemePreference, ThemeService } from '../../core/theme.service';
 import { ToastService } from '../../core/toast.service';
+import { TicketListItem, TicketsService } from '../../core/tickets.service';
 import { WishlistService } from '../../core/wishlist.service';
 import { CouponsService, type CouponRead } from '../../core/coupons.service';
 import { orderStatusChipClass } from '../../shared/order-status';
@@ -102,6 +104,10 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   addressesLoaded = signal<boolean>(false);
   addressesLoading = signal<boolean>(false);
   addressesError = signal<string | null>(null);
+  tickets = signal<TicketListItem[]>([]);
+  ticketsLoaded = signal<boolean>(false);
+  ticketsLoading = signal<boolean>(false);
+  ticketsError = signal<string | null>(null);
   avatar: string | null = null;
   avatarBusy = false;
   placeholderAvatar = 'assets/placeholder/avatar-placeholder.svg';
@@ -272,6 +278,11 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
 
   exportingData = false;
   exportError: string | null = null;
+  exportJob = signal<UserDataExportJob | null>(null);
+  exportJobLoading = signal<boolean>(false);
+  private exportJobPoll?: number;
+  private exportJobPollInFlight = false;
+  private exportReadyToastShownForJobId: string | null = null;
 
   deletionStatus = signal<AccountDeletionStatus | null>(null);
   deletionLoading = signal<boolean>(false);
@@ -308,6 +319,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     private api: ApiService,
     public wishlist: WishlistService,
     private notificationsService: NotificationsService,
+    private ticketsService: TicketsService,
     private couponsService: CouponsService,
     private theme: ThemeService,
     private lang: LanguageService,
@@ -441,6 +453,9 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private ensureLoadedForSection(section: AccountSection): void {
+    if (section !== 'privacy') {
+      this.stopExportJobPolling();
+    }
     switch (section) {
       case 'profile':
         this.loadCooldowns();
@@ -477,11 +492,13 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         if (!this.deletionStatus()) {
           this.loadDeletionStatus();
         }
+        this.loadLatestExportJob();
         return;
       case 'overview':
       default:
         this.loadOrders();
         this.loadAddresses();
+        this.loadTickets();
         this.wishlist.ensureLoaded();
         return;
     }
@@ -683,6 +700,30 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.addressesLoading.set(false);
       },
       complete: () => this.addressesLoading.set(false)
+    });
+  }
+
+  loadTickets(force: boolean = false): void {
+    if (!this.auth.isAuthenticated()) return;
+    if (this.ticketsLoading() && !force) return;
+    if (this.ticketsLoaded() && !force) return;
+
+    this.ticketsLoading.set(true);
+    this.ticketsError.set(null);
+    this.ticketsService.listMine().subscribe({
+      next: (items) => {
+        const list = Array.isArray(items) ? items : [];
+        list.sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''));
+        this.tickets.set(list);
+        this.ticketsLoaded.set(true);
+      },
+      error: () => {
+        this.tickets.set([]);
+        this.ticketsLoaded.set(true);
+        this.ticketsError.set('account.overview.support.loadError');
+        this.ticketsLoading.set(false);
+      },
+      complete: () => this.ticketsLoading.set(false)
     });
   }
 
@@ -1721,6 +1762,28 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     return `${verified} · ${google}`;
   }
 
+  supportTicketsLabel(): string {
+    if (this.ticketsLoading() && !this.ticketsLoaded()) return this.t('notifications.loading');
+    if (!this.ticketsLoaded()) return '...';
+    const errorKey = this.ticketsError();
+    if (errorKey) return this.t(errorKey);
+    const list = this.tickets();
+    if (!list.length) return this.t('account.overview.support.none');
+    const open = list.filter((t) => (t.status || '').toLowerCase() !== 'resolved').length;
+    if (open === 0) return this.t('account.overview.support.allResolved');
+    if (open === 1) return this.t('account.overview.support.openOne');
+    return this.t('account.overview.support.openMany', { count: open });
+  }
+
+  supportTicketsSubcopy(): string {
+    if (this.ticketsLoading() && !this.ticketsLoaded()) return this.t('notifications.loading');
+    if (!this.ticketsLoaded()) return '';
+    if (this.ticketsError()) return this.t('account.overview.support.loadErrorCopy');
+    const list = this.tickets();
+    if (!list.length) return this.t('account.overview.support.noneCopy');
+    return this.t('account.overview.support.hint');
+  }
+
   saveNotifications(): void {
     if (!this.auth.isAuthenticated()) return;
     this.savingNotifications = true;
@@ -1766,11 +1829,104 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  downloadMyData(): void {
-    if (this.exportingData || !this.auth.isAuthenticated()) return;
+  private loadLatestExportJob(): void {
+    if (!this.auth.isAuthenticated()) return;
+    if (this.exportJobLoading()) return;
+    this.exportJobLoading.set(true);
+    this.exportError = null;
+    this.account.getLatestExportJob().subscribe({
+      next: (job) => {
+        this.exportJob.set(job);
+        if (job?.id && (job.status === 'pending' || job.status === 'running')) {
+          this.startExportJobPolling(job.id);
+        }
+      },
+      error: (err) => {
+        if (Number(err?.status) === 404) {
+          this.exportJob.set(null);
+          this.exportJobLoading.set(false);
+          return;
+        }
+        const message = err?.error?.detail || this.t('account.privacy.export.loadError');
+        this.exportError = message;
+        this.toast.error(message);
+        this.exportJobLoading.set(false);
+      },
+      complete: () => this.exportJobLoading.set(false)
+    });
+  }
+
+  private startExportJobPolling(jobId: string): void {
+    if (!jobId) return;
+    if (this.exportJobPoll && this.exportJob()?.id === jobId) return;
+    this.stopExportJobPolling();
+    this.exportJobPoll = window.setInterval(() => {
+      if (!this.auth.isAuthenticated() || this.exportJobPollInFlight) return;
+      this.exportJobPollInFlight = true;
+      this.account.getExportJob(jobId).subscribe({
+        next: (job) => {
+          const prev = this.exportJob();
+          this.exportJob.set(job);
+          if (job.status === 'succeeded' || job.status === 'failed') {
+            this.stopExportJobPolling();
+            if (job.status === 'succeeded' && job.id && this.exportReadyToastShownForJobId !== job.id) {
+              this.exportReadyToastShownForJobId = job.id;
+              this.toast.success(this.t('account.privacy.export.readyToast'));
+              this.notificationsService.refreshUnreadCount();
+            }
+          } else if (prev?.status !== job.status) {
+            // Keep polling as status transitions between pending/running.
+          }
+        },
+        error: () => {
+          // Keep polling; a transient API error should not stop the UI.
+        },
+        complete: () => {
+          this.exportJobPollInFlight = false;
+        }
+      });
+    }, 2_000);
+  }
+
+  private stopExportJobPolling(): void {
+    if (!this.exportJobPoll) return;
+    window.clearInterval(this.exportJobPoll);
+    this.exportJobPoll = undefined;
+    this.exportJobPollInFlight = false;
+  }
+
+  requestDataExport(): void {
+    if (!this.auth.isAuthenticated()) return;
+    if (this.exportJobLoading() || this.exportingData) return;
+    this.exportJobLoading.set(true);
+    this.exportError = null;
+    this.account.startExportJob().subscribe({
+      next: (job) => {
+        this.exportJob.set(job);
+        if (job.status === 'pending' || job.status === 'running') {
+          this.toast.success(this.t('account.privacy.export.startedToast'));
+          this.startExportJobPolling(job.id);
+        }
+        if (job.status === 'succeeded') {
+          this.exportReadyToastShownForJobId = job.id;
+        }
+      },
+      error: (err) => {
+        const message = err?.error?.detail || this.t('account.privacy.export.startError');
+        this.exportError = message;
+        this.toast.error(message);
+        this.exportJobLoading.set(false);
+      },
+      complete: () => this.exportJobLoading.set(false)
+    });
+  }
+
+  downloadExportJob(): void {
+    const job = this.exportJob();
+    if (this.exportingData || !this.auth.isAuthenticated() || !job?.id || job.status !== 'succeeded') return;
     this.exportingData = true;
     this.exportError = null;
-    this.account.downloadExport().subscribe({
+    this.account.downloadExportJob(job.id).subscribe({
       next: (blob) => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -1790,6 +1946,30 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.exportingData = false;
       }
     });
+  }
+
+  downloadMyData(): void {
+    const job = this.exportJob();
+    if (job?.status === 'succeeded') {
+      this.downloadExportJob();
+      return;
+    }
+    this.requestDataExport();
+  }
+
+  exportActionLabelKey(): string {
+    const job = this.exportJob();
+    if (this.exportJobLoading()) return 'account.privacy.export.actionWorking';
+    if (!job) return 'account.privacy.export.actionGenerate';
+    if (job.status === 'succeeded') return this.exportingData ? 'account.privacy.export.actionDownloading' : 'account.privacy.export.actionDownload';
+    if (job.status === 'failed') return 'account.privacy.export.actionRetry';
+    return 'account.privacy.export.actionGenerating';
+  }
+
+  exportActionDisabled(): boolean {
+    const job = this.exportJob();
+    if (this.exportingData || this.exportJobLoading()) return true;
+    return job?.status === 'pending' || job?.status === 'running';
   }
 
   requestDeletion(): void {
@@ -1839,6 +2019,40 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.cancellingDeletion = false;
       }
     });
+  }
+
+  deletionCooldownRemainingMs(): number | null {
+    const status = this.deletionStatus();
+    const scheduled = this.parseTimestampMs(status?.scheduled_for);
+    if (!scheduled) return null;
+    const remaining = scheduled - this.now();
+    return remaining > 0 ? remaining : 0;
+  }
+
+  deletionCooldownProgressPercent(): number {
+    const status = this.deletionStatus();
+    const start = this.parseTimestampMs(status?.requested_at);
+    const end = this.parseTimestampMs(status?.scheduled_for);
+    if (!start || !end || end <= start) return 0;
+    const pct = ((this.now() - start) / (end - start)) * 100;
+    if (!Number.isFinite(pct)) return 0;
+    return Math.min(100, Math.max(0, pct));
+  }
+
+  formatDurationShort(ms: number): string {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    if (minutes > 0) return `${minutes}m ${seconds}s`;
+    return `${seconds}s`;
+  }
+
+  private parseTimestampMs(value: string | null | undefined): number | null {
+    if (!value) return null;
+    const parsed = new Date(value).getTime();
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
   loadMyComments(page: number = 1): void {
@@ -1913,6 +2127,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     if (this.nowInterval) {
       clearInterval(this.nowInterval);
     }
+    this.stopExportJobPolling();
     if (this.idleTimer) {
       clearTimeout(this.idleTimer);
     }

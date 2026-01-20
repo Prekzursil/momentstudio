@@ -1,3 +1,5 @@
+import asyncio
+import json
 from pathlib import Path
 import logging
 import re
@@ -8,10 +10,10 @@ from uuid import UUID
 from jose import jwt
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field, EmailStr, field_validator
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from webauthn.helpers import base64url_to_bytes
 
 from app.core import security
@@ -29,10 +31,12 @@ from app.models.user import (
     UserSecurityEvent,
     UserUsernameHistory,
 )
+from app.models.user_export import UserDataExportJob, UserDataExportStatus
 from app.schemas.auth import (
     AuthResponse,
     GoogleCallbackResponse,
     AccountDeletionStatus,
+    UserDataExportJobResponse,
     RefreshSessionResponse,
     RefreshSessionsRevokeResponse,
     UserSecurityEventResponse,
@@ -59,7 +63,9 @@ from app.schemas.user import UserCreate
 from app.services import auth as auth_service
 from app.services import captcha as captcha_service
 from app.services import email as email_service
+from app.services import notifications as notification_service
 from app.services import passkeys as passkeys_service
+from app.services import private_storage
 from app.services import self_service
 from app.services import storage
 from app.core import metrics
@@ -1287,6 +1293,188 @@ async def export_me(
         content=data,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+def _export_ready_copy(lang: str | None) -> tuple[str, str]:
+    if (lang or "").strip().lower().startswith("ro"):
+        return (
+            "Exportul tău de date este gata",
+            "Îl poți descărca din cont → Confidențialitate.",
+        )
+    return ("Your data export is ready", "Download it from Account → Privacy.")
+
+
+async def _run_user_export_job(engine: AsyncEngine, *, job_id: UUID) -> None:
+    SessionLocal = async_sessionmaker(engine, expire_on_commit=False, autoflush=False, class_=AsyncSession)
+    async with SessionLocal() as session:
+        job = await session.get(UserDataExportJob, job_id)
+        if not job:
+            return
+        if job.status not in (UserDataExportStatus.pending, UserDataExportStatus.running):
+            return
+
+        now = datetime.now(timezone.utc)
+        try:
+            job.status = UserDataExportStatus.running
+            job.started_at = job.started_at or now
+            job.finished_at = None
+            job.error_message = None
+            job.progress = max(int(job.progress or 0), 1)
+            session.add(job)
+            await session.commit()
+
+            user = await session.get(User, job.user_id)
+            if not user:
+                raise RuntimeError("User not found")
+
+            job.progress = max(int(job.progress or 0), 5)
+            session.add(job)
+            await session.commit()
+
+            payload = await self_service.export_user_data(session, user)
+
+            job.progress = max(int(job.progress or 0), 70)
+            session.add(job)
+            await session.commit()
+
+            private_root = private_storage.ensure_private_root().resolve()
+            export_dir = (private_root / "exports" / str(user.id)).resolve()
+            export_dir.mkdir(parents=True, exist_ok=True)
+            export_path = export_dir / f"{job.id}.json"
+
+            content = json.dumps(payload, ensure_ascii=False, indent=2)
+            await asyncio.to_thread(export_path.write_text, content, encoding="utf-8")
+
+            job.file_path = export_path.relative_to(private_root).as_posix()
+            job.progress = 100
+            job.status = UserDataExportStatus.succeeded
+            job.finished_at = datetime.now(timezone.utc)
+            job.expires_at = job.finished_at + timedelta(days=7)
+            session.add(job)
+            await session.commit()
+
+            title, body = _export_ready_copy(getattr(user, "preferred_language", None))
+            await notification_service.create_notification(
+                session,
+                user_id=user.id,
+                type="privacy",
+                title=title,
+                body=body,
+                url="/account/privacy",
+            )
+        except Exception as exc:  # pragma: no cover
+            job.status = UserDataExportStatus.failed
+            job.error_message = str(exc)[:1000]
+            job.finished_at = datetime.now(timezone.utc)
+            job.progress = min(int(job.progress or 0), 99)
+            session.add(job)
+            await session.commit()
+
+
+@router.post("/me/export/jobs", response_model=UserDataExportJobResponse, status_code=status.HTTP_201_CREATED)
+async def start_export_job(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserDataExportJobResponse:
+    latest = (
+        (
+            await session.execute(
+                select(UserDataExportJob)
+                .where(UserDataExportJob.user_id == current_user.id)
+                .order_by(UserDataExportJob.created_at.desc())
+                .limit(1)
+            )
+        )
+        .scalars()
+        .first()
+    )
+    if latest and latest.status in (UserDataExportStatus.pending, UserDataExportStatus.running):
+        if latest.status == UserDataExportStatus.pending:
+            engine = session.bind
+            if engine is None:
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
+            background_tasks.add_task(_run_user_export_job, engine, job_id=latest.id)
+        return UserDataExportJobResponse.model_validate(latest, from_attributes=True)
+
+    if latest and latest.status == UserDataExportStatus.succeeded:
+        expires_at = latest.expires_at
+        if expires_at and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if not expires_at or expires_at > datetime.now(timezone.utc):
+            return UserDataExportJobResponse.model_validate(latest, from_attributes=True)
+
+    job = UserDataExportJob(user_id=current_user.id, status=UserDataExportStatus.pending, progress=0)
+    session.add(job)
+    await session.commit()
+    await session.refresh(job)
+
+    engine = session.bind
+    if engine is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
+    background_tasks.add_task(_run_user_export_job, engine, job_id=job.id)
+    return UserDataExportJobResponse.model_validate(job, from_attributes=True)
+
+
+@router.get("/me/export/jobs/latest", response_model=UserDataExportJobResponse)
+async def latest_export_job(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserDataExportJobResponse:
+    job = (
+        (
+            await session.execute(
+                select(UserDataExportJob)
+                .where(UserDataExportJob.user_id == current_user.id)
+                .order_by(UserDataExportJob.created_at.desc())
+                .limit(1)
+            )
+        )
+        .scalars()
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+    return UserDataExportJobResponse.model_validate(job, from_attributes=True)
+
+
+@router.get("/me/export/jobs/{job_id}", response_model=UserDataExportJobResponse)
+async def get_export_job(
+    job_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserDataExportJobResponse:
+    job = await session.get(UserDataExportJob, job_id)
+    if not job or job.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+    return UserDataExportJobResponse.model_validate(job, from_attributes=True)
+
+
+@router.get("/me/export/jobs/{job_id}/download")
+async def download_export_job(
+    job_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> FileResponse:
+    job = await session.get(UserDataExportJob, job_id)
+    if not job or job.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+    if job.status != UserDataExportStatus.succeeded or not job.file_path:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Export is not ready")
+
+    expires_at = job.expires_at
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at and expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+
+    path = private_storage.resolve_private_path(job.file_path)
+    if not path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export file not found")
+
+    stamp = (job.finished_at or job.created_at or datetime.now(timezone.utc)).date().isoformat()
+    filename = f"moment-studio-export-{stamp}.json"
+    return FileResponse(path, media_type="application/json", filename=filename, headers={"Cache-Control": "no-store"})
 
 
 @router.get("/me/delete/status", response_model=AccountDeletionStatus)

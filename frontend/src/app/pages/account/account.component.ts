@@ -14,6 +14,7 @@ import { AccountService } from '../../core/account.service';
 import { CouponsService } from '../../core/coupons.service';
 import { ThemeService } from '../../core/theme.service';
 import { ToastService } from '../../core/toast.service';
+import { TicketsService } from '../../core/tickets.service';
 import { WishlistService } from '../../core/wishlist.service';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
@@ -244,11 +245,12 @@ export class AccountComponent extends AccountState {
     api: ApiService,
     wishlist: WishlistService,
     notifications: NotificationsService,
+    tickets: TicketsService,
     coupons: CouponsService,
     theme: ThemeService,
     lang: LanguageService,
     translate: TranslateService
   ) {
-    super(toast, auth, account, blog, cart, router, route, api, wishlist, notifications, coupons, theme, lang, translate);
+    super(toast, auth, account, blog, cart, router, route, api, wishlist, notifications, tickets, coupons, theme, lang, translate);
   }
 }

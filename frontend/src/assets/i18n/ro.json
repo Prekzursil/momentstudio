@@ -145,11 +145,52 @@
       }
     },
     "privacy": {
+      "title": "Confidențialitate și date",
       "export": {
+        "title": "Descarcă datele mele",
+        "copy": "Exportă profilul, comenzile, lista de dorințe și activitatea pe blog ca JSON.",
+        "notifyCopy": "Te vom anunța când exportul este gata.",
+        "ready": "Exportul este gata.",
+        "readyWithExpiry": "Exportul este gata. Expiră {{date}}.",
+        "failedCopy": "Export eșuat. Te rugăm să încerci din nou.",
+        "loadError": "Nu am putut încărca statusul exportului.",
+        "startedToast": "Export pornit",
+        "startError": "Nu am putut porni exportul.",
+        "readyToast": "Export gata",
+        "actionGenerate": "Generează export",
+        "actionGenerating": "Se generează…",
+        "actionDownload": "Descarcă",
+        "actionDownloading": "Se descarcă…",
+        "actionRetry": "Reîncearcă",
+        "actionWorking": "Se lucrează…",
+        "status": {
+          "pending": "În așteptare",
+          "running": "Se generează",
+          "succeeded": "Gata",
+          "failed": "Eșuat"
+        },
         "downloaded": "Export descărcat",
         "downloadError": "Nu am putut descărca exportul."
       },
       "deletion": {
+        "title": "Șterge contul",
+        "scheduledBadge": "Programată",
+        "copy": "Cererea de ștergere programează eliminarea contului după {{hours}} ore.",
+        "scheduledFor": "Programată pentru {{date}}.",
+        "remaining": "Timp rămas: {{time}}",
+        "cancelAction": "Anulează ștergerea",
+        "confirmCopy": "Tastează DELETE pentru confirmare. Poți anula în fereastra de {{hours}}h.",
+        "consequencesTitle": "Înainte să continui",
+        "consequences": {
+          "logout": "Vei fi deconectat de pe toate dispozitivele.",
+          "anonymize": "Datele personale vor fi anonimizate.",
+          "noAccess": "Vei pierde accesul la cont, comenzi și cupoane.",
+          "irreversible": "Această acțiune nu poate fi anulată după finalizare."
+        },
+        "confirmPlaceholder": "DELETE",
+        "confirmAria": "Confirmă ștergerea contului",
+        "passwordAria": "Confirmă parola pentru ștergerea contului",
+        "requestAction": "Cere ștergerea",
         "loadError": "Nu am putut încărca statusul de ștergere.",
         "scheduled": "Ștergere programată",
         "requestError": "Nu am putut cere ștergerea contului.",
@@ -368,6 +409,17 @@
         "emailUnverified": "Email neverificat",
         "googleLinked": "Google conectat",
         "googleUnlinked": "Google deconectat"
+      },
+      "support": {
+        "title": "Suport",
+        "hint": "Vezi tichetele și răspunsurile.",
+        "none": "Niciun tichet încă",
+        "noneCopy": "Discuțiile tale de suport vor apărea aici.",
+        "openOne": "1 tichet deschis",
+        "openMany": "{{count}} tichete deschise",
+        "allResolved": "Toate rezolvate",
+        "loadError": "Nu am putut încărca tichetele.",
+        "loadErrorCopy": "Deschide inboxul de suport pentru a vedea conversațiile."
       }
     },
     "orders": {

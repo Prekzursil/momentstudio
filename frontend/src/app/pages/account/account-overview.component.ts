@@ -136,6 +136,29 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
             <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ 'account.overview.securityHint' | translate }}</p>
           </a>
         </ng-template>
+
+        <ng-container *ngIf="!account.ticketsLoaded(); else ticketsCard">
+          <div
+            class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40"
+            aria-label="Support tickets summary loading"
+          >
+            <app-skeleton height="12px" width="90px"></app-skeleton>
+            <div class="mt-3 grid gap-2">
+              <app-skeleton height="18px" width="80%"></app-skeleton>
+              <app-skeleton height="14px" width="70%"></app-skeleton>
+            </div>
+          </div>
+        </ng-container>
+        <ng-template #ticketsCard>
+          <a
+            routerLink="/tickets"
+            class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-slate-700"
+          >
+            <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{{ 'account.overview.support.title' | translate }}</p>
+            <p class="mt-1 font-semibold text-slate-900 dark:text-slate-50">{{ account.supportTicketsLabel() }}</p>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ account.supportTicketsSubcopy() }}</p>
+          </a>
+        </ng-template>
       </div>
     </section>
   `

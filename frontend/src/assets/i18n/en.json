@@ -145,11 +145,52 @@
       }
     },
     "privacy": {
+      "title": "Privacy & data",
       "export": {
+        "title": "Download my data",
+        "copy": "Export your profile, orders, wishlist, and blog activity as JSON.",
+        "notifyCopy": "We'll notify you when your export is ready.",
+        "ready": "Your export is ready.",
+        "readyWithExpiry": "Your export is ready. Expires {{date}}.",
+        "failedCopy": "Export failed. Please try again.",
+        "loadError": "Could not load export status.",
+        "startedToast": "Export started",
+        "startError": "Could not start export.",
+        "readyToast": "Export ready",
+        "actionGenerate": "Generate export",
+        "actionGenerating": "Generating…",
+        "actionDownload": "Download",
+        "actionDownloading": "Downloading…",
+        "actionRetry": "Retry",
+        "actionWorking": "Working…",
+        "status": {
+          "pending": "Queued",
+          "running": "Generating",
+          "succeeded": "Ready",
+          "failed": "Failed"
+        },
         "downloaded": "Export downloaded",
         "downloadError": "Could not download export."
       },
       "deletion": {
+        "title": "Delete account",
+        "scheduledBadge": "Scheduled",
+        "copy": "Requesting deletion schedules your account to be removed after {{hours}} hours.",
+        "scheduledFor": "Scheduled for {{date}}.",
+        "remaining": "Time remaining: {{time}}",
+        "cancelAction": "Cancel deletion",
+        "confirmCopy": "Type DELETE to confirm. You can cancel during the {{hours}}h cooldown window.",
+        "consequencesTitle": "Before you continue",
+        "consequences": {
+          "logout": "You'll be signed out from all devices.",
+          "anonymize": "Your personal data will be anonymized.",
+          "noAccess": "You will lose access to your account, orders, and coupons.",
+          "irreversible": "This action can't be undone once completed."
+        },
+        "confirmPlaceholder": "DELETE",
+        "confirmAria": "Confirm account deletion",
+        "passwordAria": "Confirm password for account deletion",
+        "requestAction": "Request deletion",
         "loadError": "Could not load deletion status.",
         "scheduled": "Deletion scheduled",
         "requestError": "Could not request account deletion.",
@@ -368,6 +409,17 @@
         "emailUnverified": "Email unverified",
         "googleLinked": "Google linked",
         "googleUnlinked": "Google unlinked"
+      },
+      "support": {
+        "title": "Support",
+        "hint": "View your ticket threads and replies.",
+        "none": "No tickets yet",
+        "noneCopy": "Your support threads will appear here.",
+        "openOne": "1 open ticket",
+        "openMany": "{{count}} open tickets",
+        "allResolved": "All resolved",
+        "loadError": "Could not load tickets.",
+        "loadErrorCopy": "Open your support inbox to see your threads."
       }
     },
     "orders": {

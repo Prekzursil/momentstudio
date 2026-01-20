@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.user import UserRole
+from app.models.user_export import UserDataExportStatus
 
 
 class TokenPair(BaseModel):
@@ -153,6 +154,20 @@ class AccountDeletionStatus(BaseModel):
     scheduled_for: datetime | None = None
     deleted_at: datetime | None = None
     cooldown_hours: int
+
+
+class UserDataExportJobResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    status: UserDataExportStatus
+    progress: int = 0
+    error_message: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    expires_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
 
 
 class RefreshSessionResponse(BaseModel):

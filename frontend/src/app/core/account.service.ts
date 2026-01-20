@@ -113,6 +113,20 @@ export interface AccountDeletionStatus {
   cooldown_hours: number;
 }
 
+export type UserDataExportStatus = 'pending' | 'running' | 'succeeded' | 'failed';
+
+export interface UserDataExportJob {
+  id: string;
+  status: UserDataExportStatus;
+  progress: number;
+  error_message?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  expires_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ReceiptShareToken {
   token: string;
   receipt_url: string;
@@ -192,6 +206,22 @@ export class AccountService {
 
   downloadExport(): Observable<Blob> {
     return this.api.getBlob('/auth/me/export');
+  }
+
+  startExportJob(): Observable<UserDataExportJob> {
+    return this.api.post<UserDataExportJob>('/auth/me/export/jobs', {});
+  }
+
+  getLatestExportJob(): Observable<UserDataExportJob> {
+    return this.api.get<UserDataExportJob>('/auth/me/export/jobs/latest');
+  }
+
+  getExportJob(jobId: string): Observable<UserDataExportJob> {
+    return this.api.get<UserDataExportJob>(`/auth/me/export/jobs/${encodeURIComponent(jobId)}`);
+  }
+
+  downloadExportJob(jobId: string): Observable<Blob> {
+    return this.api.getBlob(`/auth/me/export/jobs/${encodeURIComponent(jobId)}/download`);
   }
 
   getDeletionStatus(): Observable<AccountDeletionStatus> {
