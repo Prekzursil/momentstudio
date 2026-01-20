@@ -93,6 +93,63 @@
       "comments": "Comentariile mele",
       "privacy": "Confidențialitate & date"
     },
+    "security": {
+      "subtitle": "Gestionează parola, emailurile și conturile conectate.",
+      "password": {
+        "title": "Parolă",
+        "copy": "Schimbă parola pentru a-ți păstra contul în siguranță.",
+        "action": "Schimbă parola"
+      },
+      "emails": {
+        "title": "Emailuri",
+        "copy": "Gestionează emailurile pe care le poți folosi pentru autentificare.",
+        "primaryHint": "Pentru a schimba emailul principal, adaugă și verifică un alt email, apoi setează-l ca principal (necesită parola).",
+        "googleWarning": "Deconectează Google înainte de a schimba emailul principal.",
+        "addLabel": "Adaugă email",
+        "addAction": "Adaugă",
+        "primary": "Principal",
+        "secondary": "Secundar",
+        "resend": "Retrimite codul",
+        "makePrimary": "Setează ca principal",
+        "confirmPassword": "Confirmă parola",
+        "verifyCode": "Cod de verificare",
+        "verify": "Verifică"
+      },
+      "status": {
+        "verified": "Verificat",
+        "unverified": "Neverificat"
+      },
+      "actions": {
+        "confirm": "Confirmă",
+        "cancel": "Anulează",
+        "remove": "Elimină"
+      },
+      "google": {
+        "profileAlt": "Profil Google",
+        "title": "Google",
+        "none": "Niciun cont Google conectat",
+        "passwordPlaceholder": "Confirmă parola",
+        "passwordAria": "Confirmă parola pentru contul Google",
+        "link": "Conectează Google",
+        "unlink": "Deconectează",
+        "copy": "Conectarea Google îți permite să te autentifici mai rapid. Nu postăm niciodată fără permisiune."
+      },
+      "payment": {
+        "title": "Metode de plată",
+        "addCard": "Adaugă card",
+        "saveCard": "Salvează cardul",
+        "empty": "Nu ai carduri salvate încă.",
+        "enterDetails": "Introdu detaliile cardului:",
+        "card": "Card",
+        "exp": "exp"
+      },
+      "session": {
+        "title": "Sesiune",
+        "copy": "Vei fi deconectat după o perioadă de inactivitate pentru a-ți păstra contul în siguranță.",
+        "logoutNow": "Deconectează-te acum",
+        "refresh": "Reîmprospătează sesiunea"
+      }
+    },
     "overview": {
       "title": "Prezentare",
       "quickLinks": "Acces rapid",
@@ -864,6 +921,16 @@
           "addBlock": "Adaugă bloc",
           "success": { "save": "Blocurile au fost salvate.", "rename": "URL-ul paginii a fost actualizat (redirecționare creată)." },
           "errors": { "load": "Nu am putut încărca blocurile.", "save": "Nu am putut salva blocurile.", "rename": "Nu s-a putut schimba URL-ul paginii." }
+        },
+        "redirects": {
+          "title": "Redirecționări",
+          "hint": "Create automat când schimbi URL-ul unei pagini. Redirecționările expirate indică către conținut lipsă.",
+          "search": "Caută redirecționări",
+          "empty": "Nu există redirecționări.",
+          "stale": "Redirecționare expirată: pagina țintă nu mai există.",
+          "deleteConfirm": "Ștergi această redirecționare?",
+          "success": { "deleted": "Redirecționare ștearsă." },
+          "errors": { "load": "Nu am putut încărca redirecționările.", "delete": "Nu am putut șterge redirecționarea." }
         },
         "success": { "save": "Conținut salvat.", "created": "Pagina a fost creată." },
         "errors": {

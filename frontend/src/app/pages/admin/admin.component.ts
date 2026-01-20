@@ -24,7 +24,8 @@ import {
   FeaturedCollection,
   ContentBlockVersionListItem,
   ContentBlockVersionRead,
-  ContentPageListItem
+  ContentPageListItem,
+  ContentRedirectRead
 } from '../../core/admin.service';
 import { AdminBlogComment, BlogService } from '../../core/blog.service';
 import { FxAdminService, FxAdminStatus } from '../../core/fx-admin.service';
@@ -946,6 +947,72 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="pageBlocksError[pageBlocksKey]">
                       {{ pageBlocksError[pageBlocksKey] }}
                     </span>
+                  </div>
+                </div>
+              </details>
+
+              <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.site.pages.redirects.title' | translate }}
+                </summary>
+                <div class="mt-3 grid gap-3">
+                  <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.site.pages.redirects.hint' | translate }}</p>
+
+                  <div class="flex flex-wrap gap-2 items-end">
+                    <app-input [label]="'adminUi.site.pages.redirects.search' | translate" [(value)]="redirectsQuery"></app-input>
+                    <app-button size="sm" variant="ghost" [label]="'adminUi.actions.search' | translate" (action)="loadContentRedirects(true)"></app-button>
+                  </div>
+
+                  <div *ngIf="redirectsError" class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+                    {{ redirectsError }}
+                  </div>
+
+                  <div *ngIf="redirectsLoading" class="text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'notifications.loading' | translate }}
+                  </div>
+
+                  <div *ngIf="!redirectsLoading && !redirectsError && redirects.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.site.pages.redirects.empty' | translate }}
+                  </div>
+
+                  <div *ngIf="!redirectsLoading && redirects.length" class="grid gap-2">
+                    <div
+                      *ngFor="let r of redirects"
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div class="min-w-0">
+                        <p class="text-sm font-medium text-slate-900 dark:text-slate-50 truncate">
+                          <span class="font-mono">{{ redirectKeyToUrl(r.from_key) }}</span>
+                          <span class="mx-2 text-slate-500 dark:text-slate-400">→</span>
+                          <span class="font-mono">{{ redirectKeyToUrl(r.to_key) }}</span>
+                        </p>
+                        <p *ngIf="!r.target_exists" class="text-xs text-rose-700 dark:text-rose-300">
+                          {{ 'adminUi.site.pages.redirects.stale' | translate }}
+                        </p>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400">{{ r.created_at | date: 'short' }}</p>
+                      </div>
+                      <app-button size="sm" variant="ghost" [label]="'adminUi.actions.delete' | translate" (action)="deleteContentRedirect(r.id)"></app-button>
+                    </div>
+                  </div>
+
+                  <div *ngIf="redirectsMeta.total_pages > 1" class="flex items-center gap-2">
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.actions.prev' | translate"
+                      [disabled]="redirectsMeta.page <= 1"
+                      (action)="setRedirectsPage(redirectsMeta.page - 1)"
+                    ></app-button>
+                    <span class="text-xs text-slate-600 dark:text-slate-300">
+                      {{ redirectsMeta.page }} / {{ redirectsMeta.total_pages }}
+                    </span>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.actions.next' | translate"
+                      [disabled]="redirectsMeta.page >= redirectsMeta.total_pages"
+                      (action)="setRedirectsPage(redirectsMeta.page + 1)"
+                    ></app-button>
                   </div>
                 </div>
               </details>
@@ -2951,6 +3018,11 @@ export class AdminComponent implements OnInit, OnDestroy {
   contentPages: ContentPageListItem[] = [];
   contentPagesLoading = false;
   contentPagesError: string | null = null;
+  redirects: ContentRedirectRead[] = [];
+  redirectsMeta = { total_items: 0, total_pages: 1, page: 1, limit: 25 };
+  redirectsLoading = false;
+  redirectsError: string | null = null;
+  redirectsQuery = '';
   newCustomPageTitle = '';
   newCustomPageStatus: 'draft' | 'published' = 'draft';
   creatingCustomPage = false;
@@ -3137,6 +3209,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       this.loadInfo();
       this.loadContentPages();
       this.loadPageBlocks(this.pageBlocksKey);
+      this.loadContentRedirects(true);
       this.loading.set(false);
       return;
     }
@@ -5069,11 +5142,72 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.pageBlocksKey = key;
         this.loadPageBlocks(key);
       },
-      error: () => {
+      error: (err) => {
         done();
-        this.toast.error(this.t('adminUi.site.pages.errors.create'));
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.toast.error(detail || this.t('adminUi.site.pages.errors.create'));
       }
     });
+  }
+
+  loadContentRedirects(reset: boolean = false): void {
+    if (reset) {
+      this.redirectsMeta = { ...this.redirectsMeta, page: 1 };
+    }
+    this.redirectsLoading = true;
+    this.redirectsError = null;
+    const q = (this.redirectsQuery || '').trim();
+    this.admin
+      .listContentRedirects({
+        q: q || undefined,
+        page: this.redirectsMeta.page,
+        limit: this.redirectsMeta.limit
+      })
+      .subscribe({
+        next: (res) => {
+          this.redirects = res?.items || [];
+          this.redirectsMeta = res?.meta || { total_items: 0, total_pages: 1, page: 1, limit: this.redirectsMeta.limit };
+          this.redirectsLoading = false;
+        },
+        error: () => {
+          this.redirectsLoading = false;
+          this.redirects = [];
+          this.redirectsMeta = { ...this.redirectsMeta, total_items: 0, total_pages: 1 };
+          this.redirectsError = this.t('adminUi.site.pages.redirects.errors.load');
+        }
+      });
+  }
+
+  setRedirectsPage(page: number): void {
+    const next = Math.max(1, Math.min(Number(page) || 1, this.redirectsMeta.total_pages || 1));
+    if (next === this.redirectsMeta.page) return;
+    this.redirectsMeta = { ...this.redirectsMeta, page: next };
+    this.loadContentRedirects();
+  }
+
+  deleteContentRedirect(id: string): void {
+    const value = (id || '').trim();
+    if (!value) return;
+    if (!window.confirm(this.t('adminUi.site.pages.redirects.deleteConfirm'))) return;
+    this.admin.deleteContentRedirect(value).subscribe({
+      next: () => {
+        this.toast.success(this.t('adminUi.site.pages.redirects.success.deleted'));
+        this.loadContentRedirects(true);
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.toast.error(detail || this.t('adminUi.site.pages.redirects.errors.delete'));
+      }
+    });
+  }
+
+  redirectKeyToUrl(key: string): string {
+    const value = (key || '').trim();
+    if (value.startsWith('page.')) {
+      const slug = value.split('.', 2)[1] || '';
+      return `/pages/${slug}`;
+    }
+    return value;
   }
 
   canRenamePageKey(key: string): boolean {

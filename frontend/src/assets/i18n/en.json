@@ -93,6 +93,63 @@
       "comments": "My comments",
       "privacy": "Privacy & data"
     },
+    "security": {
+      "subtitle": "Manage password, emails, and connected accounts.",
+      "password": {
+        "title": "Password",
+        "copy": "Change your password to keep your account secure.",
+        "action": "Change password"
+      },
+      "emails": {
+        "title": "Emails",
+        "copy": "Manage the emails you can use to sign in.",
+        "primaryHint": "To change your primary email, add and verify another email, then make it primary (requires password).",
+        "googleWarning": "Unlink Google before switching primary email.",
+        "addLabel": "Add email",
+        "addAction": "Add",
+        "primary": "Primary",
+        "secondary": "Secondary",
+        "resend": "Resend code",
+        "makePrimary": "Make primary",
+        "confirmPassword": "Confirm password",
+        "verifyCode": "Verify code",
+        "verify": "Verify"
+      },
+      "status": {
+        "verified": "Verified",
+        "unverified": "Unverified"
+      },
+      "actions": {
+        "confirm": "Confirm",
+        "cancel": "Cancel",
+        "remove": "Remove"
+      },
+      "google": {
+        "profileAlt": "Google profile",
+        "title": "Google",
+        "none": "No Google account linked",
+        "passwordPlaceholder": "Confirm password",
+        "passwordAria": "Confirm password for Google account",
+        "link": "Link Google",
+        "unlink": "Unlink",
+        "copy": "Linking Google lets you sign in faster. We never post without permission."
+      },
+      "payment": {
+        "title": "Payment methods",
+        "addCard": "Add card",
+        "saveCard": "Save card",
+        "empty": "No cards saved yet.",
+        "enterDetails": "Enter card details:",
+        "card": "Card",
+        "exp": "exp"
+      },
+      "session": {
+        "title": "Session",
+        "copy": "You will be logged out after inactivity to keep your account safe.",
+        "logoutNow": "Logout now",
+        "refresh": "Refresh session"
+      }
+    },
     "overview": {
       "title": "Overview",
       "quickLinks": "Quick links",
@@ -864,6 +921,16 @@
           "addBlock": "Add block",
           "success": { "save": "Blocks saved.", "rename": "Page URL updated (redirect created)." },
           "errors": { "load": "Could not load page blocks.", "save": "Could not save blocks.", "rename": "Could not change page URL." }
+        },
+        "redirects": {
+          "title": "Redirects",
+          "hint": "Created automatically when changing a page URL. Stale redirects point to missing content.",
+          "search": "Search redirects",
+          "empty": "No redirects found.",
+          "stale": "Stale redirect: target page no longer exists.",
+          "deleteConfirm": "Delete this redirect?",
+          "success": { "deleted": "Redirect deleted." },
+          "errors": { "load": "Could not load redirects.", "delete": "Could not delete redirect." }
         },
         "success": { "save": "Content saved.", "created": "Page created." },
         "errors": {

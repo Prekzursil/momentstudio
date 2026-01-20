@@ -253,6 +253,20 @@ export interface ContentPageRenameResponse {
   new_key: string;
 }
 
+export interface ContentRedirectRead {
+  id: string;
+  from_key: string;
+  to_key: string;
+  created_at: string;
+  updated_at: string;
+  target_exists: boolean;
+}
+
+export interface ContentRedirectListResponse {
+  items: ContentRedirectRead[];
+  meta: { total_items: number; total_pages: number; page: number; limit: number };
+}
+
 export interface ContentImageAssetRead {
   id: string;
   url: string;
@@ -542,5 +556,13 @@ export class AdminService {
 
   renameContentPage(slug: string, newSlug: string): Observable<ContentPageRenameResponse> {
     return this.api.post<ContentPageRenameResponse>(`/content/admin/pages/${encodeURIComponent(slug)}/rename`, { new_slug: newSlug });
+  }
+
+  listContentRedirects(params?: { q?: string; page?: number; limit?: number }): Observable<ContentRedirectListResponse> {
+    return this.api.get<ContentRedirectListResponse>('/content/admin/redirects', params as any);
+  }
+
+  deleteContentRedirect(id: string): Observable<void> {
+    return this.api.delete<void>(`/content/admin/redirects/${encodeURIComponent(id)}`);
   }
 }
