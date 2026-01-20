@@ -5,14 +5,24 @@ import { RouterLink } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 
 import { ButtonComponent } from '../../shared/button.component';
+import { SkeletonComponent } from '../../shared/skeleton.component';
 import { AccountComponent } from './account.component';
 
 @Component({
   selector: 'app-account-security',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, TranslateModule, ButtonComponent],
+  imports: [CommonModule, FormsModule, RouterLink, TranslateModule, ButtonComponent, SkeletonComponent],
   template: `
     <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+      <ng-container *ngIf="account.loading(); else securityBody">
+        <div class="grid gap-3">
+          <app-skeleton height="18px" width="220px"></app-skeleton>
+          <app-skeleton height="120px"></app-skeleton>
+          <app-skeleton height="120px"></app-skeleton>
+        </div>
+      </ng-container>
+
+      <ng-template #securityBody>
       <div class="grid gap-1">
         <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'account.sections.security' | translate }}</h2>
         <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'account.security.subtitle' | translate }}</p>
@@ -295,6 +305,7 @@ import { AccountComponent } from './account.component';
           </div>
         </div>
       </div>
+      </ng-template>
     </section>
   `
 })

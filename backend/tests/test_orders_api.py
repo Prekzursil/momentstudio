@@ -105,6 +105,121 @@ def test_order_create_requires_verified_email(test_app: Dict[str, object]) -> No
     assert res.json().get("detail") == "Email verification required"
 
 
+def test_list_my_orders_pagination_and_filters(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    token, user_id = create_user_token(SessionLocal, email="buyer-me@example.com")
+    _, other_user_id = create_user_token(SessionLocal, email="buyer-other@example.com")
+
+    async def seed_orders() -> list[UUID]:
+        async with SessionLocal() as session:
+            o1 = Order(
+                user_id=user_id,
+                status=OrderStatus.pending_payment,
+                reference_code="REF-AAA",
+                customer_email="buyer-me@example.com",
+                customer_name="Buyer",
+                total_amount=Decimal("10.00"),
+                payment_method="stripe",
+                currency="RON",
+                created_at=datetime(2026, 1, 5, tzinfo=timezone.utc),
+            )
+            o2 = Order(
+                user_id=user_id,
+                status=OrderStatus.paid,
+                reference_code="REF-BBB",
+                customer_email="buyer-me@example.com",
+                customer_name="Buyer",
+                total_amount=Decimal("20.00"),
+                payment_method="paypal",
+                currency="RON",
+                created_at=datetime(2026, 1, 10, tzinfo=timezone.utc),
+            )
+            o3 = Order(
+                user_id=user_id,
+                status=OrderStatus.pending_acceptance,
+                reference_code="XYZ",
+                customer_email="buyer-me@example.com",
+                customer_name="Buyer",
+                total_amount=Decimal("30.00"),
+                payment_method="cod",
+                currency="RON",
+                created_at=datetime(2026, 2, 1, tzinfo=timezone.utc),
+            )
+            other = Order(
+                user_id=other_user_id,
+                status=OrderStatus.paid,
+                reference_code="OTHER",
+                customer_email="buyer-other@example.com",
+                customer_name="Other",
+                total_amount=Decimal("40.00"),
+                payment_method="stripe",
+                currency="RON",
+            )
+            session.add_all([o1, o2, o3, other])
+            await session.commit()
+            for order in (o1, o2, o3):
+                await session.refresh(order)
+            return [o1.id, o2.id, o3.id]
+
+    order_ids = asyncio.run(seed_orders())
+
+    page1 = client.get("/api/v1/orders/me", params={"page": 1, "limit": 2}, headers=auth_headers(token))
+    assert page1.status_code == 200, page1.text
+    body = page1.json()
+    assert body["meta"]["total_items"] == 3
+    assert body["meta"]["total_pages"] == 2
+    assert body["meta"]["page"] == 1
+    assert body["meta"]["limit"] == 2
+    assert body["meta"]["pending_count"] == 2
+    assert len(body["items"]) == 2
+    assert body["items"][0]["id"] == str(order_ids[2])  # newest
+
+    page2 = client.get("/api/v1/orders/me", params={"page": 2, "limit": 2}, headers=auth_headers(token))
+    assert page2.status_code == 200, page2.text
+    body2 = page2.json()
+    assert body2["meta"]["total_items"] == 3
+    assert body2["meta"]["total_pages"] == 2
+    assert body2["meta"]["page"] == 2
+    assert len(body2["items"]) == 1
+    assert body2["items"][0]["id"] == str(order_ids[0])
+
+    status_filtered = client.get("/api/v1/orders/me", params={"status": "paid"}, headers=auth_headers(token))
+    assert status_filtered.status_code == 200, status_filtered.text
+    status_body = status_filtered.json()
+    assert status_body["meta"]["total_items"] == 1
+    assert status_body["meta"]["total_pages"] == 1
+    assert status_body["meta"]["pending_count"] == 2
+    assert len(status_body["items"]) == 1
+    assert status_body["items"][0]["reference_code"] == "REF-BBB"
+
+    q_filtered = client.get("/api/v1/orders/me", params={"q": "XYZ"}, headers=auth_headers(token))
+    assert q_filtered.status_code == 200, q_filtered.text
+    q_body = q_filtered.json()
+    assert q_body["meta"]["total_items"] == 1
+    assert len(q_body["items"]) == 1
+    assert q_body["items"][0]["reference_code"] == "XYZ"
+
+    date_filtered = client.get(
+        "/api/v1/orders/me",
+        params={"from": "2026-01-06", "to": "2026-01-31"},
+        headers=auth_headers(token),
+    )
+    assert date_filtered.status_code == 200, date_filtered.text
+    date_body = date_filtered.json()
+    assert date_body["meta"]["total_items"] == 1
+    assert len(date_body["items"]) == 1
+    assert date_body["items"][0]["reference_code"] == "REF-BBB"
+
+    invalid_date = client.get(
+        "/api/v1/orders/me",
+        params={"from": "2026-02-01", "to": "2026-01-01"},
+        headers=auth_headers(token),
+    )
+    assert invalid_date.status_code == 400, invalid_date.text
+
+
 def seed_cart_with_product(session_factory, user_id: UUID) -> UUID:
     async def seed():
         async with session_factory() as session:

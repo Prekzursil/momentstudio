@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 from typing import Sequence
 from uuid import UUID
@@ -192,6 +193,69 @@ async def get_orders_for_user(session: AsyncSession, user_id: UUID) -> Sequence[
         .order_by(Order.created_at.desc())
     )
     return result.scalars().all()
+
+
+async def search_orders_for_user(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    q: str | None = None,
+    status: OrderStatus | None = None,
+    from_dt: datetime | None = None,
+    to_dt: datetime | None = None,
+    page: int = 1,
+    limit: int = 20,
+) -> tuple[list[Order], int, int]:
+    cleaned_q = (q or "").strip()
+    page = max(1, int(page or 1))
+    limit = max(1, min(100, int(limit or 20)))
+    offset = (page - 1) * limit
+
+    filters: list[ColumnElement[bool]] = [Order.user_id == user_id]
+    if status:
+        filters.append(Order.status == status)
+    if cleaned_q:
+        pattern = f"%{cleaned_q}%"
+        filters.append(or_(Order.reference_code.ilike(pattern), cast(Order.id, String).ilike(pattern)))
+    if from_dt:
+        filters.append(Order.created_at >= from_dt)
+    if to_dt:
+        filters.append(Order.created_at <= to_dt)
+
+    total_items = (
+        await session.execute(
+            select(func.count()).select_from(Order).where(*filters),
+        )
+    ).scalar_one()
+
+    pending_count = (
+        await session.execute(
+            select(func.count())
+            .select_from(Order)
+            .where(
+                Order.user_id == user_id,
+                Order.status.in_([OrderStatus.pending_payment, OrderStatus.pending_acceptance]),
+            ),
+        )
+    ).scalar_one()
+
+    result = await session.execute(
+        select(Order)
+        .where(*filters)
+        .options(
+            selectinload(Order.items).selectinload(OrderItem.product),
+            selectinload(Order.shipping_method),
+            selectinload(Order.events),
+            selectinload(Order.user),
+            selectinload(Order.shipping_address),
+            selectinload(Order.billing_address),
+        )
+        .order_by(Order.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    orders = result.scalars().unique().all()
+    return list(orders), int(total_items), int(pending_count)
 
 
 async def get_order(session: AsyncSession, user_id: UUID, order_id: UUID) -> Order | None:

@@ -18,6 +18,7 @@ import {
   Address,
   AddressCreateRequest,
   Order,
+  OrderPaginationMeta,
   ReceiptShareToken
 } from '../../core/account.service';
 import { BlogMyComment, BlogService, PaginationMeta } from '../../core/blog.service';
@@ -87,10 +88,15 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   googleEmail = signal<string | null>(null);
   googlePicture = signal<string | null>(null);
   orders = signal<Order[]>([]);
+  ordersMeta = signal<OrderPaginationMeta | null>(null);
+  latestOrder = signal<Order | null>(null);
   ordersLoaded = signal<boolean>(false);
   ordersLoading = signal<boolean>(false);
   ordersError = signal<string | null>(null);
   orderFilter = '';
+  ordersQuery = '';
+  ordersFrom = '';
+  ordersTo = '';
   page = 1;
   pageSize = 5;
   totalPages = 1;
@@ -219,7 +225,6 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     private lang: LanguageService,
     private translate: TranslateService
   ) {
-    this.computeTotalPages();
     this.stripeThemeEffect = effect(() => {
       const mode = this.theme.mode()();
       if (this.card) {
@@ -392,8 +397,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   }
 
   pendingOrdersCount(): number {
-    if (!this.ordersLoaded()) return 0;
-    return this.orders().filter((o) => o.status === 'pending_payment' || o.status === 'pending_acceptance').length;
+    return this.ordersMeta()?.pending_count ?? 0;
   }
 
   loadCouponsCount(force: boolean = false): void {
@@ -479,21 +483,92 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     if (this.ordersLoading() && !force) return;
     if (this.ordersLoaded() && !force) return;
 
+    const q = this.ordersQuery.trim() || undefined;
+    const status = (this.orderFilter || '').trim() || undefined;
+    const from = (this.ordersFrom || '').trim() || undefined;
+    const to = (this.ordersTo || '').trim() || undefined;
+    const requestPage = this.page;
+    const isDefaultQuery = requestPage === 1 && !q && !status && !from && !to;
+
     this.ordersLoading.set(true);
     this.ordersError.set(null);
-    this.account.getOrders().subscribe({
-      next: (orders) => {
-        this.orders.set(orders);
-        this.ordersLoaded.set(true);
-        this.computeTotalPages();
-        this.page = Math.min(this.page, this.totalPages);
-      },
-      error: () => {
-        this.ordersError.set('account.orders.loadError');
-        this.ordersLoading.set(false);
-      },
-      complete: () => this.ordersLoading.set(false)
-    });
+    this.account
+      .getOrdersPage({
+        q,
+        status,
+        from,
+        to,
+        page: requestPage,
+        limit: this.pageSize
+      })
+      .subscribe({
+        next: (resp) => {
+          this.orders.set(resp.items);
+          this.ordersMeta.set(resp.meta);
+          this.ordersLoaded.set(true);
+          this.totalPages = Math.max(1, resp.meta.total_pages || 1);
+          this.page = Math.max(1, Math.min(requestPage, this.totalPages));
+          if (isDefaultQuery) {
+            this.latestOrder.set(resp.items[0] ?? null);
+          }
+        },
+        error: (err) => {
+          const detail = (err?.error?.detail || '').toString();
+          this.ordersError.set(detail === 'Invalid date range' ? 'account.orders.invalidDateRange' : 'account.orders.loadError');
+          this.ordersLoading.set(false);
+        },
+        complete: () => this.ordersLoading.set(false)
+      });
+  }
+
+  ordersFiltersActive(): boolean {
+    return Boolean(
+      (this.orderFilter || '').trim() ||
+        this.ordersQuery.trim() ||
+        (this.ordersFrom || '').trim() ||
+        (this.ordersTo || '').trim()
+    );
+  }
+
+  clearOrderFilters(): void {
+    this.orderFilter = '';
+    this.ordersQuery = '';
+    this.ordersFrom = '';
+    this.ordersTo = '';
+    this.applyOrderFilters();
+  }
+
+  filterOrders(): void {
+    this.applyOrderFilters();
+  }
+
+  applyOrderFilters(): void {
+    const from = (this.ordersFrom || '').trim();
+    const to = (this.ordersTo || '').trim();
+    if (from && to && from > to) {
+      this.ordersError.set('account.orders.invalidDateRange');
+      return;
+    }
+    this.page = 1;
+    this.loadOrders(true);
+  }
+
+  pagedOrders = () => {
+    return this.orders();
+  };
+
+  nextPage(): void {
+    if (this.page < this.totalPages) {
+      this.page += 1;
+      this.loadOrders(true);
+    }
+  }
+
+  prevPage(): void {
+    if (this.page > 1) {
+      this.page -= 1;
+      this.loadOrders(true);
+    }
   }
 
   loadAddresses(force: boolean = false): void {
@@ -516,30 +591,6 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  private filteredOrders() {
-    const f = this.orderFilter;
-    return this.orders().filter((o) => (f ? o.status === f : true));
-  }
-
-  pagedOrders = () => {
-    const filtered = this.filteredOrders();
-    this.computeTotalPages(filtered.length);
-    const start = (this.page - 1) * this.pageSize;
-    return filtered.slice(start, start + this.pageSize);
-  };
-
-  filterOrders(): void {
-    this.page = 1;
-  }
-
-  nextPage(): void {
-    if (this.page < this.totalPages) this.page += 1;
-  }
-
-  prevPage(): void {
-    if (this.page > 1) this.page -= 1;
-  }
-
   orderStatusChipClass(status: string): string {
     return orderStatusChipClass(status);
   }
@@ -548,6 +599,25 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     const trimmed = (trackingNumber || '').trim();
     if (!trimmed) return '';
     return `https://t.17track.net/en#nums=${encodeURIComponent(trimmed)}`;
+  }
+
+  paymentMethodLabel(order: Order): string {
+    const method = (order.payment_method ?? '').trim().toLowerCase();
+    const key =
+      method === 'stripe'
+        ? 'adminUi.orders.paymentStripe'
+        : method === 'paypal'
+          ? 'adminUi.orders.paymentPaypal'
+          : method === 'cod'
+            ? 'adminUi.orders.paymentCod'
+            : method === 'netopia'
+              ? 'adminUi.orders.paymentNetopia'
+              : '';
+    if (key) {
+      const translated = this.translate.instant(key);
+      if (translated !== key) return translated;
+    }
+    return method ? method.toUpperCase() : '—';
   }
 
   deliveryLabel(order: Order): string {
@@ -1376,11 +1446,6 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  private computeTotalPages(total?: number): void {
-    const count = total ?? this.filteredOrders().length;
-    this.totalPages = Math.max(1, Math.ceil(count / this.pageSize));
-  }
-
   private resetIdleTimer(): void {
     if (this.idleTimer) {
       clearTimeout(this.idleTimer);
@@ -1785,6 +1850,8 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private lastOrder(): Order | null {
+    const cached = this.latestOrder();
+    if (cached) return cached;
     const orders = this.orders();
     if (!orders.length) return null;
     return [...orders].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];

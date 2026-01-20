@@ -2,7 +2,7 @@ import csv
 import io
 import mimetypes
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from uuid import UUID
@@ -22,7 +22,16 @@ from app.models.cart import Cart
 from app.models.order import Order, OrderItem, OrderStatus, OrderEvent
 from app.schemas.cart import CartRead
 from app.schemas.cart import Totals
-from app.schemas.order import OrderRead, OrderCreate, OrderUpdate, ShippingMethodCreate, ShippingMethodRead, OrderEventRead
+from app.schemas.order import (
+    OrderCreate,
+    OrderEventRead,
+    OrderListResponse,
+    OrderPaginationMeta,
+    OrderRead,
+    OrderUpdate,
+    ShippingMethodCreate,
+    ShippingMethodRead,
+)
 from app.services import cart as cart_service
 from app.services import coupons_v2 as coupons_service
 from app.services import order as order_service
@@ -754,6 +763,42 @@ async def confirm_stripe_checkout(
 async def list_orders(current_user=Depends(require_complete_profile), session: AsyncSession = Depends(get_session)):
     orders = await order_service.get_orders_for_user(session, current_user.id)
     return list(orders)
+
+
+@router.get("/me", response_model=OrderListResponse)
+async def list_my_orders(
+    q: str | None = Query(default=None, max_length=200),
+    status: OrderStatus | None = Query(default=None),
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=10, ge=1, le=50),
+    current_user=Depends(require_complete_profile),
+    session: AsyncSession = Depends(get_session),
+) -> OrderListResponse:
+    if from_date and to_date and from_date > to_date:
+        raise HTTPException(status_code=400, detail="Invalid date range")
+    from_dt = datetime.combine(from_date, time.min, tzinfo=timezone.utc) if from_date else None
+    to_dt = datetime.combine(to_date, time.max, tzinfo=timezone.utc) if to_date else None
+    rows, total_items, pending_count = await order_service.search_orders_for_user(
+        session,
+        user_id=current_user.id,
+        q=q,
+        status=status,
+        from_dt=from_dt,
+        to_dt=to_dt,
+        page=page,
+        limit=limit,
+    )
+    total_pages = max(1, (int(total_items) + limit - 1) // limit)
+    meta = OrderPaginationMeta(
+        total_items=int(total_items),
+        total_pages=total_pages,
+        page=page,
+        limit=limit,
+        pending_count=int(pending_count),
+    )
+    return OrderListResponse(items=list(rows), meta=meta)
 
 
 @router.get("/admin", response_model=list[OrderRead])

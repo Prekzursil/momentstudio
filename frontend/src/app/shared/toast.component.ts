@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { NgForOf } from '@angular/common';
 
 export interface ToastMessage {
@@ -13,6 +13,8 @@ export interface ToastMessage {
   standalone: true,
   imports: [NgForOf],
   template: `
+    <div class="sr-only" aria-live="polite" aria-atomic="true">{{ livePolite }}</div>
+    <div class="sr-only" aria-live="assertive" aria-atomic="true">{{ liveAssertive }}</div>
     <div class="pointer-events-none fixed inset-x-0 top-4 z-50 flex flex-col items-center gap-3 px-4">
       <div
         *ngFor="let toast of messages"
@@ -28,6 +30,23 @@ export interface ToastMessage {
     </div>
   `
 })
-export class ToastComponent {
+export class ToastComponent implements OnChanges {
   @Input() messages: ToastMessage[] = [];
+  livePolite = '';
+  liveAssertive = '';
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (!('messages' in changes)) return;
+    const latest = this.messages[this.messages.length - 1];
+    if (!latest) return;
+    const text = [latest.title, latest.description].filter(Boolean).join('. ');
+    if (!text) return;
+    if (latest.tone === 'error') {
+      this.liveAssertive = text;
+      this.livePolite = '';
+      return;
+    }
+    this.livePolite = text;
+    this.liveAssertive = '';
+  }
 }

@@ -4,14 +4,23 @@ import { FormsModule } from '@angular/forms';
 import { TranslateModule } from '@ngx-translate/core';
 
 import { ButtonComponent } from '../../shared/button.component';
+import { SkeletonComponent } from '../../shared/skeleton.component';
 import { AccountComponent } from './account.component';
 
 @Component({
   selector: 'app-account-notifications',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule, ButtonComponent],
+  imports: [CommonModule, FormsModule, TranslateModule, ButtonComponent, SkeletonComponent],
   template: `
     <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+      <ng-container *ngIf="account.loading(); else notificationsBody">
+        <div class="grid gap-3">
+          <app-skeleton height="18px" width="220px"></app-skeleton>
+          <app-skeleton height="120px"></app-skeleton>
+        </div>
+      </ng-container>
+
+      <ng-template #notificationsBody>
       <div class="flex items-start justify-between gap-3">
         <div class="grid gap-1">
           <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'account.notifications.title' | translate }}</h2>
@@ -84,6 +93,7 @@ import { AccountComponent } from './account.component';
         }}</span>
         <span *ngIf="account.notificationsError" class="text-xs text-rose-700 dark:text-rose-300">{{ account.notificationsError | translate }}</span>
       </div>
+      </ng-template>
     </section>
   `
 })

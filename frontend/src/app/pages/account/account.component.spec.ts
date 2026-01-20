@@ -112,6 +112,7 @@ describe('AccountComponent', () => {
       'getProfile',
       'getAddresses',
       'getOrders',
+      'getOrdersPage',
       'getDeletionStatus',
       'requestAccountDeletion',
       'cancelAccountDeletion',
@@ -124,6 +125,12 @@ describe('AccountComponent', () => {
     account.getProfile.and.returnValue(of(profile as any));
     account.getAddresses.and.returnValue(of(addresses));
     account.getOrders.and.returnValue(of(orders));
+    account.getOrdersPage.and.returnValue(
+      of({
+        items: orders,
+        meta: { total_items: orders.length, total_pages: 1, page: 1, limit: 5, pending_count: 0 }
+      } as any)
+    );
     account.getDeletionStatus.and.returnValue(of({ requested_at: null, scheduled_for: null, deleted_at: null, cooldown_hours: 24 }));
     account.reorderOrder.and.returnValue(of({}));
     account.downloadReceipt.and.returnValue(of(new Blob(['pdf'], { type: 'application/pdf' })));

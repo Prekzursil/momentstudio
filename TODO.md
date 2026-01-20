@@ -458,11 +458,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Account UX: remember last visited tab and restore on `/account`.
 - [x] Account mobile: collapse sidebar into a dropdown or bottom nav.
 - [x] Account desktop: make sidebar sticky.
-- [ ] Account UX: add per-section skeleton loaders (avoid whole-page skeletons).
-- [ ] Account a11y: add an `aria-live` region for critical status updates/toasts.
-- [ ] Orders: migrate to server-side pagination (don’t fetch all orders at once).
-- [ ] Orders: add search by reference code + date-range filter.
-- [ ] Orders: surface payment method + payment state prominently on each order.
+- [x] Account UX: add per-section skeleton loaders (avoid whole-page skeletons).
+- [x] Account a11y: add an `aria-live` region for critical status updates/toasts.
+- [x] Orders: migrate to server-side pagination (don’t fetch all orders at once).
+- [x] Orders: add search by reference code + date-range filter.
+- [x] Orders: surface payment method + payment state prominently on each order.
 - [ ] Orders: show delivery tracking status (when available) alongside tracking number.
 - [ ] Orders: add “Request return” flow from eligible orders.
 - [ ] Orders: add item-level reorder (not only whole-order reorder).

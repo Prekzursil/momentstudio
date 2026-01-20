@@ -38,6 +38,47 @@ import { AccountComponent } from './account.component';
             <option value="refunded">{{ 'adminUi.orders.refunded' | translate }}</option>
           </select>
         </label>
+
+        <label class="flex items-center gap-2 min-w-[14rem]">
+          <span class="text-slate-600 dark:text-slate-300">{{ 'account.orders.searchLabel' | translate }}</span>
+          <input
+            class="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+            [(ngModel)]="account.ordersQuery"
+            (keyup.enter)="account.applyOrderFilters()"
+            [placeholder]="'account.orders.searchPlaceholder' | translate"
+            name="ordersQuery"
+            autocomplete="off"
+          />
+        </label>
+
+        <label class="flex items-center gap-2">
+          <span class="text-slate-600 dark:text-slate-300">{{ 'account.orders.fromLabel' | translate }}</span>
+          <input
+            class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            type="date"
+            [(ngModel)]="account.ordersFrom"
+            name="ordersFrom"
+          />
+        </label>
+
+        <label class="flex items-center gap-2">
+          <span class="text-slate-600 dark:text-slate-300">{{ 'account.orders.toLabel' | translate }}</span>
+          <input
+            class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            type="date"
+            [(ngModel)]="account.ordersTo"
+            name="ordersTo"
+          />
+        </label>
+
+        <app-button size="sm" variant="ghost" [label]="'account.orders.applyFilters' | translate" (action)="account.applyOrderFilters()"></app-button>
+        <app-button
+          size="sm"
+          variant="ghost"
+          [label]="'account.orders.clearFilters' | translate"
+          [disabled]="!account.ordersFiltersActive()"
+          (action)="account.clearOrderFilters()"
+        ></app-button>
       </div>
 
       <div *ngIf="account.ordersLoading() && !account.ordersLoaded()" class="grid gap-3">
@@ -81,6 +122,12 @@ import { AccountComponent } from './account.component';
                 <span class="font-semibold text-slate-900 dark:text-slate-50">Order #{{ order.reference_code || order.id }}</span>
                 <span class="text-xs rounded-full px-2 py-1" [ngClass]="account.orderStatusChipClass(order.status)">
                   {{ ('adminUi.orders.' + order.status) | translate }}
+                </span>
+                <span
+                  class="text-xs rounded-full px-2 py-1 bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  *ngIf="order.payment_method"
+                >
+                  {{ account.paymentMethodLabel(order) }}
                 </span>
               </div>
               <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -219,10 +266,22 @@ import { AccountComponent } from './account.component';
         </details>
 
         <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
-          <span>Page {{ account.page }} / {{ account.totalPages }}</span>
+          <span>{{ 'account.orders.pageLabel' | translate: { page: account.page, total: account.totalPages } }}</span>
           <div class="flex gap-2">
-            <app-button size="sm" variant="ghost" label="Prev" [disabled]="account.page === 1" (action)="account.prevPage()"></app-button>
-            <app-button size="sm" variant="ghost" label="Next" [disabled]="account.page === account.totalPages" (action)="account.nextPage()"></app-button>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'account.orders.prev' | translate"
+              [disabled]="account.page === 1"
+              (action)="account.prevPage()"
+            ></app-button>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'account.orders.next' | translate"
+              [disabled]="account.page === account.totalPages"
+              (action)="account.nextPage()"
+            ></app-button>
           </div>
         </div>
       </div>

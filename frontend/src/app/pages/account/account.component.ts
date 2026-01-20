@@ -34,21 +34,26 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
   ],
   template: `
     <app-container classes="py-10 grid gap-6">
-      <ng-container *ngIf="!loading(); else loadingTpl">
-        <div
-          *ngIf="error()"
-          class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-        >
-          <div class="flex items-start justify-between gap-3">
-            <span class="min-w-0">{{ error() | translate }}</span>
-            <app-button size="sm" variant="ghost" [label]="'shop.retry' | translate" (action)="retryAccountLoad()"></app-button>
-          </div>
+      <div
+        *ngIf="error()"
+        class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <span class="min-w-0">{{ error() | translate }}</span>
+          <app-button size="sm" variant="ghost" [label]="'shop.retry' | translate" (action)="retryAccountLoad()"></app-button>
         </div>
+      </div>
 
-        <div class="grid gap-6" *ngIf="!error()">
-          <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div class="min-w-0">
-              <p class="text-sm text-slate-500 dark:text-slate-400">{{ 'account.header.signedInAs' | translate }}</p>
+      <div class="grid gap-6" *ngIf="!error()">
+        <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div class="min-w-0">
+            <p class="text-sm text-slate-500 dark:text-slate-400">{{ 'account.header.signedInAs' | translate }}</p>
+
+            <ng-container *ngIf="loading(); else headerBody">
+              <app-skeleton height="28px" width="360px"></app-skeleton>
+            </ng-container>
+
+            <ng-template #headerBody>
               <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50 truncate">
                 {{ accountHeaderLabel() }}
               </h1>
@@ -78,14 +83,15 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
                 </form>
                 <p *ngIf="verificationStatus" class="text-xs text-amber-800 dark:text-amber-200">{{ verificationStatus }}</p>
               </div>
-            </div>
+            </ng-template>
+          </div>
 
-            <div class="flex flex-wrap items-center gap-2">
-              <app-button variant="ghost" [label]="'nav.signOut' | translate" (action)="signOut()"></app-button>
-            </div>
-          </header>
+          <div class="flex flex-wrap items-center gap-2">
+            <app-button variant="ghost" [label]="'nav.signOut' | translate" (action)="signOut()"></app-button>
+          </div>
+        </header>
 
-          <div class="grid gap-6">
+        <div class="grid gap-6">
             <div
               class="lg:hidden rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 grid gap-2"
               aria-label="Account section selector"
@@ -212,22 +218,13 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
               </a>
             </nav>
 
-            <main class="grid gap-4 min-w-0">
-              <router-outlet></router-outlet>
-            </main>
-            </div>
-          </div>
-        </div>
-      </ng-container>
-
-      <ng-template #loadingTpl>
-        <div class="grid gap-4">
-          <app-skeleton height="18px" width="160px"></app-skeleton>
-          <app-skeleton height="28px" width="360px"></app-skeleton>
-          <app-skeleton height="140px"></app-skeleton>
-        </div>
-      </ng-template>
-    </app-container>
+	            <main class="grid gap-4 min-w-0">
+	              <router-outlet></router-outlet>
+	            </main>
+	          </div>
+	        </div>
+	      </div>
+	    </app-container>
   `
 })
 export class AccountComponent extends AccountState {
