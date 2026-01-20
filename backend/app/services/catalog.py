@@ -99,14 +99,14 @@ async def _validate_category_parent_assignment(
     if parent_id not in parent_by_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Parent category not found")
     current: uuid.UUID | None = parent_id
-    hops = 0
+    seen: set[uuid.UUID] = set()
     while current is not None:
         if current == category_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category parent would create a cycle")
-        current = parent_by_id.get(current)
-        hops += 1
-        if hops > len(parent_by_id) + 1:
+        if current in seen:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid category hierarchy")
+        seen.add(current)
+        current = parent_by_id.get(current)
 
 
 def apply_category_translation(category: Category, lang: str | None) -> None:

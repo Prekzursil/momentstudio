@@ -586,8 +586,10 @@ export class ShopComponent implements OnInit, OnDestroy {
     }
 
     const sortByOrderThenName = (a: Category, b: Category) => {
-      const orderA = Number.isFinite(a.sort_order as any) ? Number(a.sort_order) : 0;
-      const orderB = Number.isFinite(b.sort_order as any) ? Number(b.sort_order) : 0;
+      const sortA = a.sort_order;
+      const sortB = b.sort_order;
+      const orderA = typeof sortA === 'number' && Number.isFinite(sortA) ? sortA : 0;
+      const orderB = typeof sortB === 'number' && Number.isFinite(sortB) ? sortB : 0;
       if (orderA !== orderB) return orderA - orderB;
       return (a.name ?? '').localeCompare(b.name ?? '');
     };

@@ -10,8 +10,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = "0077_home_hero_to_banner_blocks"
-down_revision = "0076_coupon_bulk_jobs_cancelled"
+revision: str = "0077"
+down_revision: str | None = "0076"
 branch_labels = None
 depends_on = None
 
@@ -200,4 +200,3 @@ def downgrade() -> None:
         return
     meta["blocks"] = next_blocks
     conn.execute(sa.update(content_blocks).where(content_blocks.c.id == row["id"]).values(meta=meta))
-
