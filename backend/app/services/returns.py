@@ -8,7 +8,7 @@ from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.order import Order, OrderItem
+from app.models.order import Order, OrderItem, OrderStatus
 from app.models.returns import ReturnRequest, ReturnRequestItem, ReturnRequestStatus
 from app.models.user import AdminAuditLog, User
 from app.schemas.returns import ReturnRequestCreate, ReturnRequestUpdate
@@ -132,6 +132,71 @@ async def create_return_request(
             data={"return_request_id": str(record.id), "order_id": str(order.id)},
         )
     )
+    await session.commit()
+    return await get_return_request(session, record.id) or record
+
+
+async def create_return_request_for_user(
+    session: AsyncSession,
+    *,
+    payload: ReturnRequestCreate,
+    user: User,
+) -> ReturnRequest:
+    order = await order_service.get_order(session, user.id, payload.order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    if OrderStatus(order.status) != OrderStatus.delivered:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Return request not eligible")
+
+    existing = int(
+        (
+            await session.execute(
+                select(func.count())
+                .select_from(ReturnRequest)
+                .where(
+                    ReturnRequest.order_id == order.id,
+                    ReturnRequest.user_id == user.id,
+                    ReturnRequest.status != ReturnRequestStatus.closed,
+                )
+            )
+        ).scalar_one()
+        or 0
+    )
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Return request already exists")
+
+    order_items_by_id = {item.id: item for item in order.items}
+    items: list[ReturnRequestItem] = []
+    requested_quantities: dict[UUID, int] = {}
+    for item_payload in payload.items:
+        if item_payload.quantity <= 0:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid quantity")
+        requested_quantities[item_payload.order_item_id] = requested_quantities.get(item_payload.order_item_id, 0) + int(
+            item_payload.quantity
+        )
+
+    for order_item_id, quantity in requested_quantities.items():
+        order_item = order_items_by_id.get(order_item_id)
+        if not order_item:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order item")
+        if quantity <= 0 or quantity > int(order_item.quantity):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid quantity")
+        items.append(ReturnRequestItem(order_item_id=order_item.id, quantity=quantity))
+
+    now = datetime.now(timezone.utc)
+    record = ReturnRequest(
+        order_id=order.id,
+        user_id=user.id,
+        status=ReturnRequestStatus.requested,
+        reason=payload.reason.strip(),
+        customer_message=(payload.customer_message.strip() if payload.customer_message else None),
+        created_by=user.id,
+        updated_by=user.id,
+        created_at=now,
+        updated_at=now,
+        items=items,
+    )
+    session.add(record)
     await session.commit()
     return await get_return_request(session, record.id) or record
 

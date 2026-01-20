@@ -69,6 +69,28 @@ export interface OrderListResponse {
   meta: OrderPaginationMeta;
 }
 
+export type ReturnRequestStatus = 'requested' | 'approved' | 'rejected' | 'received' | 'refunded' | 'closed';
+
+export interface ReturnRequestItemRead {
+  id: string;
+  order_item_id?: string | null;
+  quantity: number;
+  product_id?: string | null;
+  product_name?: string | null;
+}
+
+export interface ReturnRequestRead {
+  id: string;
+  order_id: string;
+  order_reference?: string | null;
+  status: ReturnRequestStatus;
+  reason: string;
+  customer_message?: string | null;
+  created_at: string;
+  updated_at: string;
+  items: ReturnRequestItemRead[];
+}
+
 export interface AddressCreateRequest {
   label?: string | null;
   line1: string;
@@ -154,6 +176,15 @@ export class AccountService {
         } satisfies OrderListResponse;
       })
     );
+  }
+
+  createReturnRequest(payload: {
+    order_id: string;
+    reason: string;
+    customer_message?: string | null;
+    items: Array<{ order_item_id: string; quantity: number }>;
+  }): Observable<ReturnRequestRead> {
+    return this.api.post<ReturnRequestRead>('/returns', payload as any);
   }
 
   downloadExport(): Observable<Blob> {

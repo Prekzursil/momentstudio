@@ -463,9 +463,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Orders: migrate to server-side pagination (don’t fetch all orders at once).
 - [x] Orders: add search by reference code + date-range filter.
 - [x] Orders: surface payment method + payment state prominently on each order.
-- [ ] Orders: show delivery tracking status (when available) alongside tracking number.
-- [ ] Orders: add “Request return” flow from eligible orders.
-- [ ] Orders: add item-level reorder (not only whole-order reorder).
+- [x] Orders: show delivery tracking status (when available) alongside tracking number.
+- [x] Orders: add “Request return” flow from eligible orders.
+- [x] Orders: add item-level reorder (not only whole-order reorder).
 - [ ] Orders: move receipt/invoice actions to the order header for quick access.
 - [ ] Orders: allow cancel request for eligible states (with confirmation + reason).
 - [ ] Orders: show “manual refund required” banner with next steps (when applicable).

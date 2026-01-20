@@ -128,6 +128,63 @@ async def _seed_order(session_factory) -> tuple[uuid.UUID, uuid.UUID]:
         return order.id, item.id
 
 
+async def _seed_order_for_user(session_factory, *, email: str, status: OrderStatus) -> tuple[uuid.UUID, uuid.UUID]:
+    async with session_factory() as session:
+        suffix = uuid.uuid4().hex[:8]
+        user = User(
+            email=email,
+            username=f"user_{suffix}",
+            hashed_password=security.hash_password("Password123"),
+            name=f"Customer {suffix}",
+            role=UserRole.customer,
+            email_verified=True,
+        )
+        session.add(user)
+
+        cat = Category(slug=f"cat-{suffix}", name="Cat", description="d", sort_order=1)
+        session.add(cat)
+        product = Product(
+            slug=f"p-{suffix}",
+            name="Product 1",
+            base_price=100,
+            currency="RON",
+            category=cat,
+            stock_quantity=10,
+            status=ProductStatus.published,
+        )
+        session.add(product)
+        await session.flush()
+
+        order = Order(
+            user_id=user.id,
+            status=status,
+            total_amount=100,
+            currency="RON",
+            tax_amount=0,
+            shipping_amount=0,
+            customer_email=user.email,
+            customer_name=user.name or user.email,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        session.add(order)
+        await session.flush()
+
+        item = OrderItem(
+            order_id=order.id,
+            product_id=product.id,
+            quantity=2,
+            shipped_quantity=0,
+            unit_price=100,
+            subtotal=200,
+            created_at=datetime.now(timezone.utc),
+        )
+        session.add(item)
+        await session.commit()
+
+        return order.id, item.id
+
+
 def test_admin_can_create_list_and_update_return_request(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]  # type: ignore[assignment]
@@ -185,6 +242,79 @@ def test_create_return_request_rejects_duplicate_order_items(test_app: Dict[str,
                 {"order_item_id": str(order_item_id), "quantity": 1},
                 {"order_item_id": str(order_item_id), "quantity": 2},
             ],
+        },
+    )
+    assert created.status_code == 400, created.text
+
+
+def test_customer_can_request_return_for_delivered_order(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]  # type: ignore[assignment]
+
+    email = f"cust-{uuid.uuid4().hex[:8]}@example.com"
+    order_id, order_item_id = asyncio.run(_seed_order_for_user(session_factory, email=email, status=OrderStatus.delivered))
+
+    common_headers = {"X-Maintenance-Bypass": settings.maintenance_bypass_token}
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={"email": email, "password": "Password123"},
+        headers=common_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    token = resp.json()["tokens"]["access_token"]
+    user_headers = {"Authorization": f"Bearer {token}", "X-Maintenance-Bypass": settings.maintenance_bypass_token}
+
+    created = client.post(
+        "/api/v1/returns",
+        headers=user_headers,
+        json={
+            "order_id": str(order_id),
+            "reason": "Not as expected",
+            "customer_message": "Too small",
+            "items": [{"order_item_id": str(order_item_id), "quantity": 1}],
+        },
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["order_id"] == str(order_id)
+    assert created.json()["status"] == "requested"
+    assert created.json()["items"][0]["order_item_id"] == str(order_item_id)
+
+    duplicate = client.post(
+        "/api/v1/returns",
+        headers=user_headers,
+        json={
+            "order_id": str(order_id),
+            "reason": "Second request",
+            "items": [{"order_item_id": str(order_item_id), "quantity": 1}],
+        },
+    )
+    assert duplicate.status_code == 409, duplicate.text
+
+
+def test_customer_return_request_rejects_non_delivered(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]  # type: ignore[assignment]
+
+    email = f"cust-{uuid.uuid4().hex[:8]}@example.com"
+    order_id, order_item_id = asyncio.run(_seed_order_for_user(session_factory, email=email, status=OrderStatus.paid))
+
+    common_headers = {"X-Maintenance-Bypass": settings.maintenance_bypass_token}
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={"email": email, "password": "Password123"},
+        headers=common_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    token = resp.json()["tokens"]["access_token"]
+    user_headers = {"Authorization": f"Bearer {token}", "X-Maintenance-Bypass": settings.maintenance_bypass_token}
+
+    created = client.post(
+        "/api/v1/returns",
+        headers=user_headers,
+        json={
+            "order_id": str(order_id),
+            "reason": "Too early",
+            "items": [{"order_item_id": str(order_item_id), "quantity": 1}],
         },
     )
     assert created.status_code == 400, created.text

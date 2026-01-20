@@ -283,6 +283,34 @@
       "empty": "Nu ai comenzi încă.",
       "loadError": "Nu am putut încărca comenzile tale.",
       "invalidDateRange": "Interval de date invalid.",
+      "trackingStatusLabel": "Status livrare",
+      "trackingStatus": {
+        "inTransit": "În tranzit",
+        "delivered": "Livrat"
+      },
+      "return": {
+        "open": "Solicită retur",
+        "requested": "Retur solicitat",
+        "title": "Retur",
+        "hint": "Selectează cantitățile și spune-ne de ce vrei să returnezi aceste produse.",
+        "cancel": "Anulează",
+        "reasonLabel": "Motiv",
+        "reasonPh": "Spune-ne de ce vrei să returnezi aceste produse…",
+        "messageLabel": "Mesaj (opțional)",
+        "messagePh": "Ce ar trebui să știm? (opțional)…",
+        "itemsLabel": "Produse",
+        "qtyLabel": "Cantitate de returnat",
+        "submit": "Trimite cererea",
+        "success": "Cererea de retur a fost trimisă.",
+        "errors": {
+          "notEligible": "Această comandă nu este încă eligibilă pentru retur.",
+          "alreadyExists": "Există deja o cerere de retur pentru această comandă.",
+          "reasonRequired": "Motivul este obligatoriu.",
+          "itemsRequired": "Selectează cel puțin un produs pentru retur.",
+          "invalidQuantity": "Cantitate selectată invalidă.",
+          "create": "Nu am putut trimite cererea de retur."
+        }
+      },
       "browse": "Explorează produsele",
       "reorder": "Recomandă din nou",
       "receiptPdf": "Chitanță (PDF)",

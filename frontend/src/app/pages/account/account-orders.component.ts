@@ -157,6 +157,10 @@ import { AccountComponent } from './account.component';
                   >
                   <span *ngIf="!order.tracking_number" class="text-slate-600 dark:text-slate-300">Not available</span>
                 </div>
+                <div *ngIf="account.trackingStatusLabel(order) as trackingStatus" class="flex flex-wrap items-center justify-between gap-2">
+                  <span class="text-slate-500 dark:text-slate-400">{{ 'account.orders.trackingStatusLabel' | translate }}</span>
+                  <span>{{ trackingStatus }}</span>
+                </div>
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <span class="text-slate-500 dark:text-slate-400">Shipping</span>
                   <span>{{ order.shipping_method?.name || '—' }}</span>
@@ -194,8 +198,17 @@ import { AccountComponent } from './account.component';
                       </p>
                       <p class="text-xs text-slate-500 dark:text-slate-400">Qty {{ item.quantity }}</p>
                     </div>
-                    <div class="text-right text-sm font-medium text-slate-900 dark:text-slate-50">
-                      {{ item.subtotal | localizedCurrency: order.currency || 'RON' }}
+                    <div class="text-right grid gap-2 justify-items-end">
+                      <div class="text-sm font-medium text-slate-900 dark:text-slate-50">
+                        {{ item.subtotal | localizedCurrency: order.currency || 'RON' }}
+                      </div>
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="'product.addToCart' | translate"
+                        [disabled]="account.reorderingOrderItemId === item.id || account.creatingReturn"
+                        (action)="account.reorderItem(order, item)"
+                      ></app-button>
                     </div>
                   </div>
                 </div>
@@ -235,6 +248,18 @@ import { AccountComponent } from './account.component';
                       (action)="account.reorder(order)"
                     ></app-button>
                     <app-button
+                      *ngIf="order.status === 'delivered'"
+                      size="sm"
+                      variant="ghost"
+                      [label]="
+                        account.hasReturnRequested(order)
+                          ? ('account.orders.return.requested' | translate)
+                          : ('account.orders.return.open' | translate)
+                      "
+                      [disabled]="account.hasReturnRequested(order) || account.creatingReturn"
+                      (action)="account.openReturnRequest(order)"
+                    ></app-button>
+                    <app-button
                       size="sm"
                       variant="ghost"
                       [label]="'account.orders.receiptPdf' | translate"
@@ -258,6 +283,91 @@ import { AccountComponent } from './account.component';
                   </div>
                   <div *ngIf="account.receiptShares()[order.id] as share" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
                     Share link expires: {{ share.expires_at | date: 'short' }}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                *ngIf="account.returnOrderId === order.id"
+                class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/40"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div class="grid gap-1">
+                    <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                      {{ 'account.orders.return.title' | translate }}
+                    </p>
+                    <p class="text-xs text-slate-600 dark:text-slate-300">
+                      {{ 'account.orders.return.hint' | translate }}
+                    </p>
+                  </div>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'account.orders.return.cancel' | translate"
+                    [disabled]="account.creatingReturn"
+                    (action)="account.closeReturnRequest()"
+                  ></app-button>
+                </div>
+
+                <div class="mt-3 grid gap-3">
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'account.orders.return.reasonLabel' | translate }}
+                    <textarea
+                      class="min-h-[90px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      [(ngModel)]="account.returnReason"
+                      [placeholder]="'account.orders.return.reasonPh' | translate"
+                    ></textarea>
+                  </label>
+
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'account.orders.return.messageLabel' | translate }}
+                    <textarea
+                      class="min-h-[90px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      [(ngModel)]="account.returnCustomerMessage"
+                      [placeholder]="'account.orders.return.messagePh' | translate"
+                    ></textarea>
+                  </label>
+
+                  <div class="grid gap-2">
+                    <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'account.orders.return.itemsLabel' | translate }}
+                    </div>
+                    <div class="grid gap-2">
+                      <div
+                        *ngFor="let item of order.items"
+                        class="grid grid-cols-[1fr_120px] gap-3 items-center rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
+                      >
+                        <div class="min-w-0">
+                          <div class="font-medium text-slate-900 dark:text-slate-50 truncate">{{ item.product?.name || item.product_id }}</div>
+                          <div class="text-xs text-slate-500 dark:text-slate-400">×{{ item.quantity }}</div>
+                        </div>
+                        <input
+                          class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          type="number"
+                          min="0"
+                          [max]="item.quantity"
+                          [(ngModel)]="account.returnQty[item.id]"
+                          [ngModelOptions]="{ standalone: true }"
+                          [attr.aria-label]="'account.orders.return.qtyLabel' | translate"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    *ngIf="account.returnCreateError"
+                    class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+                  >
+                    {{ account.returnCreateError }}
+                  </div>
+
+                  <div class="flex items-center justify-end gap-2">
+                    <app-button
+                      size="sm"
+                      [label]="'account.orders.return.submit' | translate"
+                      [disabled]="account.creatingReturn"
+                      (action)="account.submitReturnRequest(order)"
+                    ></app-button>
                   </div>
                 </div>
               </div>

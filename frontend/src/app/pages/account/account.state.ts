@@ -154,7 +154,15 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   profileLanguage: 'en' | 'ro' = 'en';
   profileThemePreference: ThemePreference = 'system';
   reorderingOrderId: string | null = null;
+  reorderingOrderItemId: string | null = null;
   downloadingReceiptId: string | null = null;
+  returnOrderId: string | null = null;
+  returnReason = '';
+  returnCustomerMessage = '';
+  returnQty: Record<string, number> = {};
+  creatingReturn = false;
+  returnCreateError: string | null = null;
+  private readonly returnRequestedOrderIds = new Set<string>();
 
   private forceProfileCompletion = false;
   private profileLoaded = false;
@@ -601,6 +609,14 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     return `https://t.17track.net/en#nums=${encodeURIComponent(trimmed)}`;
   }
 
+  trackingStatusLabel(order: Order): string | null {
+    if (!(order.tracking_number || '').trim()) return null;
+    const status = (order.status || '').trim().toLowerCase();
+    if (status === 'delivered') return this.t('account.orders.trackingStatus.delivered');
+    if (status === 'shipped') return this.t('account.orders.trackingStatus.inTransit');
+    return null;
+  }
+
   paymentMethodLabel(order: Order): string {
     const method = (order.payment_method ?? '').trim().toLowerCase();
     const key =
@@ -662,6 +678,119 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
       },
       complete: () => (this.reorderingOrderId = null)
     });
+  }
+
+  reorderItem(order: Order, item: Order['items'][number]): void {
+    if (this.reorderingOrderItemId) return;
+    this.reorderingOrderItemId = item.id;
+    this.api
+      .post('/cart/items', {
+        product_id: item.product_id,
+        variant_id: item.variant_id,
+        quantity: 1
+      })
+      .subscribe({
+        next: () => {
+          this.cart.loadFromBackend();
+          this.toast.success(this.t('account.orders.reorderSuccess'));
+        },
+        error: (err) => {
+          const message = err?.error?.detail || this.t('account.orders.reorderError');
+          this.toast.error(message);
+        },
+        complete: () => (this.reorderingOrderItemId = null)
+      });
+  }
+
+  hasReturnRequested(order: Order): boolean {
+    return this.returnRequestedOrderIds.has(order.id);
+  }
+
+  canRequestReturn(order: Order): boolean {
+    return (order.status || '').trim().toLowerCase() === 'delivered' && !this.hasReturnRequested(order);
+  }
+
+  openReturnRequest(order: Order): void {
+    if ((order.status || '').trim().toLowerCase() !== 'delivered') {
+      this.toast.error(this.t('account.orders.return.errors.notEligible'));
+      return;
+    }
+    if (this.returnOrderId === order.id) {
+      this.closeReturnRequest();
+      return;
+    }
+    this.returnOrderId = order.id;
+    this.returnReason = '';
+    this.returnCustomerMessage = '';
+    this.returnQty = Object.fromEntries((order.items ?? []).map((it) => [it.id, 0]));
+    this.returnCreateError = null;
+  }
+
+  closeReturnRequest(): void {
+    this.returnOrderId = null;
+    this.returnReason = '';
+    this.returnCustomerMessage = '';
+    this.returnQty = {};
+    this.returnCreateError = null;
+  }
+
+  submitReturnRequest(order: Order): void {
+    if (this.creatingReturn) return;
+    if (!this.returnOrderId || this.returnOrderId !== order.id) return;
+    if ((order.status || '').trim().toLowerCase() !== 'delivered') {
+      this.returnCreateError = this.t('account.orders.return.errors.notEligible');
+      return;
+    }
+
+    const reason = this.returnReason.trim();
+    if (!reason) {
+      this.returnCreateError = this.t('account.orders.return.errors.reasonRequired');
+      return;
+    }
+
+    const items: Array<{ order_item_id: string; quantity: number }> = [];
+    for (const it of order.items ?? []) {
+      const raw = Number(this.returnQty[it.id] ?? 0);
+      if (!Number.isFinite(raw) || raw <= 0) continue;
+      if (raw > it.quantity) {
+        this.returnCreateError = this.t('account.orders.return.errors.invalidQuantity');
+        return;
+      }
+      items.push({ order_item_id: it.id, quantity: Math.floor(raw) });
+    }
+    if (!items.length) {
+      this.returnCreateError = this.t('account.orders.return.errors.itemsRequired');
+      return;
+    }
+
+    this.creatingReturn = true;
+    this.returnCreateError = null;
+    this.account
+      .createReturnRequest({
+        order_id: order.id,
+        reason,
+        customer_message: this.returnCustomerMessage.trim() || null,
+        items
+      })
+      .subscribe({
+        next: () => {
+          this.returnRequestedOrderIds.add(order.id);
+          this.toast.success(this.t('account.orders.return.success'));
+          this.closeReturnRequest();
+        },
+        error: (err) => {
+          const detail = (err?.error?.detail || '').toString();
+          const key =
+            detail === 'Return request already exists'
+              ? 'account.orders.return.errors.alreadyExists'
+              : detail === 'Return request not eligible'
+                ? 'account.orders.return.errors.notEligible'
+                : 'account.orders.return.errors.create';
+          this.returnCreateError = this.t(key);
+          this.toast.error(this.returnCreateError);
+        },
+        complete: () => (this.creatingReturn = false)
+      });
   }
 
   downloadReceipt(order: Order): void {

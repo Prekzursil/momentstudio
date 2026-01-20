@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import require_admin
+from app.core.dependencies import require_admin, require_verified_email
 from app.db.session import get_session
 from app.models.returns import ReturnRequestStatus
 from app.models.user import User
@@ -21,6 +21,41 @@ from app.services import email as email_service
 from app.services import returns as returns_service
 
 router = APIRouter(prefix="/returns", tags=["returns"])
+
+
+def _serialize_return_request(record: object) -> ReturnRequestRead:
+    payload = ReturnRequestRead.model_validate(record).model_dump()
+    payload["order_reference"] = getattr(getattr(record, "order", None), "reference_code", None)
+    payload["customer_email"] = getattr(getattr(record, "order", None), "customer_email", None)
+    payload["customer_name"] = getattr(getattr(record, "order", None), "customer_name", None)
+    payload["items"] = [
+        {
+            "id": item.id,
+            "order_item_id": item.order_item_id,
+            "quantity": item.quantity,
+            "product_id": getattr(getattr(item.order_item, "product", None), "id", None) if getattr(item, "order_item", None) else None,
+            "product_name": getattr(getattr(item.order_item, "product", None), "name", None) if getattr(item, "order_item", None) else None,
+        }
+        for item in getattr(record, "items", []) or []
+    ]
+    return ReturnRequestRead(**payload)
+
+
+@router.post("", response_model=ReturnRequestRead, status_code=status.HTTP_201_CREATED)
+async def create_my_return_request(
+    payload: ReturnRequestCreate,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_verified_email),
+) -> ReturnRequestRead:
+    created = await returns_service.create_return_request_for_user(session, payload=payload, user=current_user)
+
+    to_email = getattr(created.order, "customer_email", None)
+    if to_email:
+        lang = created.user.preferred_language if getattr(created, "user", None) else None
+        background_tasks.add_task(email_service.send_return_request_created, to_email, created, lang=lang)
+
+    return _serialize_return_request(created)
 
 
 @router.get("/admin", response_model=ReturnRequestListResponse)
@@ -68,22 +103,7 @@ async def admin_get_return(
     record = await returns_service.get_return_request(session, return_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Return request not found")
-
-    payload = ReturnRequestRead.model_validate(record).model_dump()
-    payload["order_reference"] = getattr(record.order, "reference_code", None)
-    payload["customer_email"] = getattr(record.order, "customer_email", None)
-    payload["customer_name"] = getattr(record.order, "customer_name", None)
-    payload["items"] = [
-        {
-            "id": item.id,
-            "order_item_id": item.order_item_id,
-            "quantity": item.quantity,
-            "product_id": getattr(getattr(item.order_item, "product", None), "id", None) if getattr(item, "order_item", None) else None,
-            "product_name": getattr(getattr(item.order_item, "product", None), "name", None) if getattr(item, "order_item", None) else None,
-        }
-        for item in record.items
-    ]
-    return ReturnRequestRead(**payload)
+    return _serialize_return_request(record)
 
 
 @router.get("/admin/by-order/{order_id}", response_model=list[ReturnRequestRead])
@@ -98,21 +118,7 @@ async def admin_list_returns_for_order(
         detail = await returns_service.get_return_request(session, r.id)
         if not detail:
             continue
-        payload = ReturnRequestRead.model_validate(detail).model_dump()
-        payload["order_reference"] = getattr(detail.order, "reference_code", None)
-        payload["customer_email"] = getattr(detail.order, "customer_email", None)
-        payload["customer_name"] = getattr(detail.order, "customer_name", None)
-        payload["items"] = [
-            {
-                "id": item.id,
-                "order_item_id": item.order_item_id,
-                "quantity": item.quantity,
-                "product_id": getattr(getattr(item.order_item, "product", None), "id", None) if getattr(item, "order_item", None) else None,
-                "product_name": getattr(getattr(item.order_item, "product", None), "name", None) if getattr(item, "order_item", None) else None,
-            }
-            for item in detail.items
-        ]
-        out.append(ReturnRequestRead(**payload))
+        out.append(_serialize_return_request(detail))
     return out
 
 
@@ -161,4 +167,3 @@ async def admin_update_return(
         )
 
     return await admin_get_return(updated.id, session=session, _=admin)
-
