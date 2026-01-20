@@ -159,7 +159,7 @@ def test_sessions_list_and_revoke_others(test_app: Dict[str, object]) -> None:
     assert len(sessions) == 2
     assert sum(1 for s in sessions if s.get("is_current")) == 1
 
-    revoke = client.post("/api/v1/auth/me/sessions/revoke-others", headers=auth_headers(access_two))
+    revoke = client.post("/api/v1/auth/me/sessions/revoke-others", headers=auth_headers(access_two), json={"password": "supersecret"})
     assert revoke.status_code == 200, revoke.text
     assert revoke.json()["revoked"] == 1
 
@@ -331,6 +331,18 @@ def test_passkeys_register_list_and_login_flow(monkeypatch: pytest.MonkeyPatch, 
     body = login.json()
     assert body["tokens"]["access_token"]
 
+    deleted = client.request(
+        "DELETE",
+        f"/api/v1/auth/me/passkeys/{passkey_id}",
+        headers=auth_headers(access),
+        json={"password": "supersecret"},
+    )
+    assert deleted.status_code == 204, deleted.text
+
+    listed_after = client.get("/api/v1/auth/me/passkeys", headers=auth_headers(access))
+    assert listed_after.status_code == 200, listed_after.text
+    assert listed_after.json() == []
+
 
 def test_secondary_emails_flow(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
@@ -383,11 +395,27 @@ def test_secondary_emails_flow(monkeypatch: pytest.MonkeyPatch, test_app: Dict[s
     assert body["primary_email"] == "alt@example.com"
     assert any(e["email"] == "user@example.com" for e in body["secondary_emails"])
 
+    old_secondary = next((e for e in body["secondary_emails"] if e["email"] == "user@example.com"), None)
+    assert old_secondary and old_secondary.get("id")
+
     register_conflict = client.post(
         "/api/v1/auth/register",
         json=make_register_payload(email="user@example.com", username="dupuser", password="supersecret", name="User"),
     )
     assert register_conflict.status_code == 400
+
+    removed = client.request(
+        "DELETE",
+        f"/api/v1/auth/me/emails/{old_secondary['id']}",
+        headers=auth_headers(access),
+        json={"password": "supersecret"},
+    )
+    assert removed.status_code == 204, removed.text
+
+    emails_after = client.get("/api/v1/auth/me/emails", headers=auth_headers(access))
+    assert emails_after.status_code == 200, emails_after.text
+    after = emails_after.json()
+    assert all(e["email"] != "user@example.com" for e in after["secondary_emails"])
 
 def test_register_rejects_invalid_phone(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]

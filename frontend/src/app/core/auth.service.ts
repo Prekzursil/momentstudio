@@ -399,8 +399,8 @@ export class AuthService {
     return this.api.post<SecondaryEmail>('/auth/me/emails/verify/confirm', { token });
   }
 
-  deleteSecondaryEmail(secondaryEmailId: string): Observable<void> {
-    return this.api.delete<void>(`/auth/me/emails/${secondaryEmailId}`);
+  deleteSecondaryEmail(secondaryEmailId: string, password: string): Observable<void> {
+    return this.api.delete<void>(`/auth/me/emails/${secondaryEmailId}`, undefined, undefined, { password });
   }
 
   makeSecondaryEmailPrimary(secondaryEmailId: string, password: string): Observable<AuthUser> {
@@ -413,8 +413,8 @@ export class AuthService {
     return this.api.get<RefreshSessionInfo[]>('/auth/me/sessions');
   }
 
-  revokeOtherSessions(): Observable<RefreshSessionsRevokeResponse> {
-    return this.api.post<RefreshSessionsRevokeResponse>('/auth/me/sessions/revoke-others', {});
+  revokeOtherSessions(password: string): Observable<RefreshSessionsRevokeResponse> {
+    return this.api.post<RefreshSessionsRevokeResponse>('/auth/me/sessions/revoke-others', { password });
   }
 
   listSecurityEvents(limit: number = 30): Observable<UserSecurityEventInfo[]> {
@@ -457,8 +457,8 @@ export class AuthService {
     });
   }
 
-  deletePasskey(passkeyId: string): Observable<void> {
-    return this.api.delete<void>(`/auth/me/passkeys/${passkeyId}`);
+  deletePasskey(passkeyId: string, password: string): Observable<void> {
+    return this.api.delete<void>(`/auth/me/passkeys/${passkeyId}`, undefined, undefined, { password });
   }
 
   startPasskeyLogin(identifier: string | null, remember: boolean): Observable<PasskeyAuthenticationOptionsResponse> {

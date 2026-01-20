@@ -219,12 +219,17 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   makePrimaryPassword = '';
   makingPrimaryEmail = false;
   makePrimaryError: string | null = null;
+  removeSecondaryEmailId: string | null = null;
+  removeSecondaryEmailPassword = '';
+  removingSecondaryEmail = false;
 
   sessions = signal<RefreshSessionInfo[]>([]);
   sessionsLoaded = signal<boolean>(false);
   sessionsLoading = signal<boolean>(false);
   sessionsError = signal<string | null>(null);
   revokingOtherSessions = false;
+  revokeOtherSessionsConfirming = false;
+  revokeOtherSessionsPassword = '';
 
   securityEvents = signal<UserSecurityEventInfo[]>([]);
   securityEventsLoaded = signal<boolean>(false);
@@ -254,6 +259,8 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   passkeyRegisterPassword = '';
   passkeyRegisterName = '';
   registeringPasskey = false;
+  removePasskeyConfirmId: string | null = null;
+  removePasskeyPassword = '';
   removingPasskeyId: string | null = null;
 
   exportingData = false;
@@ -263,6 +270,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   deletionLoading = signal<boolean>(false);
   deletionError = signal<string | null>(null);
   deletionConfirmText = '';
+  deletionPassword = '';
   requestingDeletion = false;
   cancellingDeletion = false;
 
@@ -1746,12 +1754,20 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
 
   requestDeletion(): void {
     if (this.requestingDeletion || !this.auth.isAuthenticated()) return;
+    const password = this.deletionPassword.trim();
+    if (!password) {
+      const message = this.t('auth.currentPasswordRequired');
+      this.deletionError.set(message);
+      this.toast.error(message);
+      return;
+    }
     this.requestingDeletion = true;
     this.deletionError.set(null);
-    this.account.requestAccountDeletion(this.deletionConfirmText).subscribe({
+    this.account.requestAccountDeletion(this.deletionConfirmText, password).subscribe({
       next: (status) => {
         this.deletionStatus.set(status);
         this.deletionConfirmText = '';
+        this.deletionPassword = '';
         this.toast.success(this.t('account.privacy.deletion.scheduled'));
       },
       error: (err) => {
@@ -2210,15 +2226,39 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  removePasskey(passkeyId: string): void {
+  startRemovePasskey(passkeyId: string): void {
     if (!this.auth.isAuthenticated() || this.removingPasskeyId) return;
+    this.removePasskeyConfirmId = passkeyId;
+    this.removePasskeyPassword = '';
+    this.passkeysError.set(null);
+  }
+
+  cancelRemovePasskey(): void {
+    if (this.removingPasskeyId) return;
+    this.removePasskeyConfirmId = null;
+    this.removePasskeyPassword = '';
+  }
+
+  confirmRemovePasskey(): void {
+    if (!this.auth.isAuthenticated() || this.removingPasskeyId) return;
+    const passkeyId = this.removePasskeyConfirmId;
+    if (!passkeyId) return;
     if (!confirm(this.t('account.security.passkeys.removeConfirm'))) return;
+    const password = this.removePasskeyPassword.trim();
+    if (!password) {
+      const message = this.t('auth.currentPasswordRequired');
+      this.passkeysError.set(message);
+      this.toast.error(message);
+      return;
+    }
     this.removingPasskeyId = passkeyId;
     this.passkeysError.set(null);
-    this.auth.deletePasskey(passkeyId).subscribe({
+    this.auth.deletePasskey(passkeyId, password).subscribe({
       next: () => {
         this.toast.success(this.t('account.security.passkeys.removed'));
         this.passkeys.set(this.passkeys().filter((p) => p.id !== passkeyId));
+        this.removePasskeyConfirmId = null;
+        this.removePasskeyPassword = '';
         this.refreshSecurityEvents();
       },
       error: (err) => {
@@ -2381,12 +2421,33 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     return (this.sessions() ?? []).filter((s) => !s.is_current).length;
   }
 
-  revokeOtherSessions(): void {
+  startRevokeOtherSessions(): void {
     if (this.revokingOtherSessions || !this.auth.isAuthenticated()) return;
+    this.revokeOtherSessionsPassword = '';
+    this.revokeOtherSessionsConfirming = true;
+    this.sessionsError.set(null);
+  }
+
+  cancelRevokeOtherSessions(): void {
+    if (this.revokingOtherSessions) return;
+    this.revokeOtherSessionsPassword = '';
+    this.revokeOtherSessionsConfirming = false;
+  }
+
+  confirmRevokeOtherSessions(): void {
+    if (this.revokingOtherSessions || !this.auth.isAuthenticated()) return;
+    if (!this.revokeOtherSessionsConfirming) return;
     if (!confirm(this.t('account.security.devices.revokeConfirm'))) return;
+    const password = this.revokeOtherSessionsPassword.trim();
+    if (!password) {
+      const message = this.t('auth.currentPasswordRequired');
+      this.sessionsError.set(message);
+      this.toast.error(message);
+      return;
+    }
     this.revokingOtherSessions = true;
     this.sessionsError.set(null);
-    this.auth.revokeOtherSessions().subscribe({
+    this.auth.revokeOtherSessions(password).subscribe({
       next: (res) => {
         const revoked = res?.revoked ?? 0;
         if (revoked > 0) {
@@ -2403,6 +2464,8 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
       },
       complete: () => {
         this.revokingOtherSessions = false;
+        this.revokeOtherSessionsConfirming = false;
+        this.revokeOtherSessionsPassword = '';
       }
     });
   }
@@ -2415,6 +2478,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
 
   startSecondaryEmailVerification(secondaryEmailId: string): void {
     this.cancelMakePrimary();
+    this.cancelDeleteSecondaryEmail();
     this.secondaryVerificationEmailId = secondaryEmailId;
     this.secondaryVerificationToken = '';
     this.secondaryVerificationStatus = null;
@@ -2525,31 +2589,61 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  deleteSecondaryEmail(secondaryEmailId: string): void {
-    if (!confirm(this.t('account.security.emails.removeConfirm'))) return;
+  startDeleteSecondaryEmail(secondaryEmailId: string): void {
+    if (this.removingSecondaryEmail) return;
+    this.cancelMakePrimary();
+    this.cancelSecondaryEmailVerification();
+    this.removeSecondaryEmailId = secondaryEmailId;
+    this.removeSecondaryEmailPassword = '';
     this.secondaryEmailMessage = null;
     this.secondaryVerificationStatus = null;
-    this.auth.deleteSecondaryEmail(secondaryEmailId).subscribe({
+  }
+
+  cancelDeleteSecondaryEmail(): void {
+    if (this.removingSecondaryEmail) return;
+    this.removeSecondaryEmailId = null;
+    this.removeSecondaryEmailPassword = '';
+  }
+
+  confirmDeleteSecondaryEmail(): void {
+    if (this.removingSecondaryEmail) return;
+    const secondaryEmailId = this.removeSecondaryEmailId;
+    if (!secondaryEmailId) return;
+    if (!confirm(this.t('account.security.emails.removeConfirm'))) return;
+    const password = this.removeSecondaryEmailPassword.trim();
+    if (!password) {
+      const message = this.t('auth.currentPasswordRequired');
+      this.toast.error(message);
+      return;
+    }
+    this.removingSecondaryEmail = true;
+    this.secondaryEmailMessage = null;
+    this.secondaryVerificationStatus = null;
+    this.auth.deleteSecondaryEmail(secondaryEmailId, password).subscribe({
       next: () => {
         this.secondaryEmails.set(this.secondaryEmails().filter((e) => e.id !== secondaryEmailId));
-        if (this.makePrimarySecondaryEmailId === secondaryEmailId) {
-          this.cancelMakePrimary();
-        }
         if (this.secondaryVerificationEmailId === secondaryEmailId) {
           this.cancelSecondaryEmailVerification();
         }
         this.clearSecondaryEmailResendCooldown(secondaryEmailId);
+        this.removeSecondaryEmailId = null;
+        this.removeSecondaryEmailPassword = '';
         this.toast.success(this.t('account.security.emails.removed'));
       },
       error: (err) => {
         const message = err?.error?.detail || this.t('account.security.emails.removeError');
+        this.secondaryEmailMessage = message;
         this.toast.error(message);
+      },
+      complete: () => {
+        this.removingSecondaryEmail = false;
       }
     });
   }
 
   startMakePrimary(secondaryEmailId: string): void {
     this.cancelSecondaryEmailVerification();
+    this.cancelDeleteSecondaryEmail();
     this.makePrimarySecondaryEmailId = secondaryEmailId;
     this.makePrimaryPassword = '';
     this.makePrimaryError = null;

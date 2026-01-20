@@ -322,13 +322,55 @@ import { AccountComponent } from './account.component';
                   <span *ngIf="p.backed_up"> • {{ 'account.security.passkeys.backedUp' | translate }}</span>
                 </p>
               </div>
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'account.security.actions.remove' | translate"
-                [disabled]="account.removingPasskeyId === p.id"
-                (action)="account.removePasskey(p.id)"
-              ></app-button>
+              <ng-container *ngIf="account.removePasskeyConfirmId !== p.id; else passkeyRemoveConfirm">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'account.security.actions.remove' | translate"
+                  [disabled]="account.removingPasskeyId === p.id"
+                  (action)="account.startRemovePasskey(p.id)"
+                ></app-button>
+              </ng-container>
+
+              <ng-template #passkeyRemoveConfirm>
+                <div class="w-full grid gap-2 sm:grid-cols-[2fr_auto_auto] sm:items-end">
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'account.security.passkeys.passwordLabel' | translate }}
+                    <div class="relative">
+                      <input
+                        [attr.name]="'removePasskeyPassword-' + p.id"
+                        [type]="showRemovePasskeyPassword ? 'text' : 'password'"
+                        autocomplete="current-password"
+                        class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                        [disabled]="account.removingPasskeyId === p.id"
+                        [(ngModel)]="account.removePasskeyPassword"
+                      />
+                      <button
+                        type="button"
+                        class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
+                        (click)="showRemovePasskeyPassword = !showRemovePasskeyPassword"
+                        [attr.aria-label]="(showRemovePasskeyPassword ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+                      >
+                        {{ (showRemovePasskeyPassword ? 'auth.hide' : 'auth.show') | translate }}
+                      </button>
+                    </div>
+                  </label>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'account.security.actions.confirm' | translate"
+                    [disabled]="account.removingPasskeyId === p.id || !account.removePasskeyPassword.trim()"
+                    (action)="account.confirmRemovePasskey()"
+                  ></app-button>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'account.security.actions.cancel' | translate"
+                    [disabled]="account.removingPasskeyId === p.id"
+                    (action)="account.cancelRemovePasskey()"
+                  ></app-button>
+                </div>
+              </ng-template>
             </li>
           </ul>
 
@@ -386,6 +428,7 @@ import { AccountComponent } from './account.component';
             </p>
             <p *ngIf="account.googleEmail()" class="text-xs text-amber-800 dark:text-amber-200">
               {{ 'account.security.emails.googleWarning' | translate }}
+              <a href="#google-settings" class="underline underline-offset-2 ml-1">{{ 'account.security.emails.googleWarningLink' | translate }}</a>
             </p>
             <p *ngIf="account.emailCooldownSeconds() > 0" class="text-xs text-amber-800 dark:text-amber-200">
               {{ 'account.cooldowns.email' | translate: { time: account.formatCooldown(account.emailCooldownSeconds()) } }}
@@ -480,7 +523,48 @@ import { AccountComponent } from './account.component';
                   size="sm"
                   variant="ghost"
                   [label]="'account.security.actions.remove' | translate"
-                  (action)="account.deleteSecondaryEmail(e.id)"
+                  (action)="account.startDeleteSecondaryEmail(e.id)"
+                ></app-button>
+              </div>
+
+              <div
+                *ngIf="account.removeSecondaryEmailId === e.id"
+                class="w-full grid gap-2 sm:grid-cols-[2fr_auto_auto] sm:items-end"
+              >
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'account.security.emails.confirmPassword' | translate }}
+                  <div class="relative">
+                    <input
+                      [attr.name]="'removeSecondaryEmailPassword-' + e.id"
+                      [type]="showRemoveSecondaryEmailPassword ? 'text' : 'password'"
+                      autocomplete="current-password"
+                      class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      [disabled]="account.removingSecondaryEmail"
+                      [(ngModel)]="account.removeSecondaryEmailPassword"
+                    />
+                    <button
+                      type="button"
+                      class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
+                      (click)="showRemoveSecondaryEmailPassword = !showRemoveSecondaryEmailPassword"
+                      [attr.aria-label]="(showRemoveSecondaryEmailPassword ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+                    >
+                      {{ (showRemoveSecondaryEmailPassword ? 'auth.hide' : 'auth.show') | translate }}
+                    </button>
+                  </div>
+                </label>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'account.security.actions.confirm' | translate"
+                  [disabled]="account.removingSecondaryEmail || !account.removeSecondaryEmailPassword.trim()"
+                  (action)="account.confirmDeleteSecondaryEmail()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'account.security.actions.cancel' | translate"
+                  [disabled]="account.removingSecondaryEmail"
+                  (action)="account.cancelDeleteSecondaryEmail()"
                 ></app-button>
               </div>
 
@@ -573,7 +657,7 @@ import { AccountComponent } from './account.component';
           </ul>
         </div>
 
-        <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-2">
+        <div id="google-settings" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-2">
           <div class="flex flex-col sm:flex-row sm:items-center gap-3 text-sm">
             <img
               *ngIf="account.googlePicture()"
@@ -678,11 +762,53 @@ import { AccountComponent } from './account.component';
               <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'account.security.devices.copy' | translate }}</p>
             </div>
             <app-button
+              *ngIf="!account.revokeOtherSessionsConfirming"
               size="sm"
               variant="ghost"
               [label]="'account.security.devices.action' | translate"
               [disabled]="account.sessionsLoading() || account.revokingOtherSessions || account.otherSessionsCount() === 0"
-              (action)="account.revokeOtherSessions()"
+              (action)="account.startRevokeOtherSessions()"
+            ></app-button>
+          </div>
+
+          <div
+            *ngIf="account.revokeOtherSessionsConfirming"
+            class="w-full grid gap-2 sm:grid-cols-[2fr_auto_auto] sm:items-end"
+          >
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'auth.currentPassword' | translate }}
+              <div class="relative">
+                <input
+                  name="revokeOtherSessionsPassword"
+                  [type]="showRevokeOtherSessionsPassword ? 'text' : 'password'"
+                  autocomplete="current-password"
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  [disabled]="account.revokingOtherSessions"
+                  [(ngModel)]="account.revokeOtherSessionsPassword"
+                />
+                <button
+                  type="button"
+                  class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
+                  (click)="showRevokeOtherSessionsPassword = !showRevokeOtherSessionsPassword"
+                  [attr.aria-label]="(showRevokeOtherSessionsPassword ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+                >
+                  {{ (showRevokeOtherSessionsPassword ? 'auth.hide' : 'auth.show') | translate }}
+                </button>
+              </div>
+            </label>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'account.security.actions.confirm' | translate"
+              [disabled]="account.revokingOtherSessions || !account.revokeOtherSessionsPassword.trim()"
+              (action)="account.confirmRevokeOtherSessions()"
+            ></app-button>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'account.security.actions.cancel' | translate"
+              [disabled]="account.revokingOtherSessions"
+              (action)="account.cancelRevokeOtherSessions()"
             ></app-button>
           </div>
 
@@ -797,8 +923,11 @@ export class AccountSecurityComponent implements OnDestroy {
   showTwoFactorManagePassword = false;
   showTwoFactorSetupPassword = false;
   showPasskeyPassword = false;
+  showRemovePasskeyPassword = false;
   showMakePrimaryPassword = false;
+  showRemoveSecondaryEmailPassword = false;
   showGooglePassword = false;
+  showRevokeOtherSessionsPassword = false;
 
   @ViewChild('cardHost')
   private set cardHost(cardHost: ElementRef<HTMLDivElement> | undefined) {

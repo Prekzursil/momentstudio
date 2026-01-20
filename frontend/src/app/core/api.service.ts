@@ -47,10 +47,15 @@ export class ApiService {
   delete<T>(
     path: string,
     headers?: Record<string, string>,
-    params?: Record<string, string | number | boolean | string[] | number[] | undefined>
+    params?: Record<string, string | number | boolean | string[] | number[] | undefined>,
+    body?: unknown
   ): Observable<T> {
     const httpParams = this.buildParams(params);
-    return this.http.delete<T>(`${this.baseUrl}${path}`, { headers, params: httpParams });
+    const options: { headers?: Record<string, string>; params: HttpParams; body?: unknown } = { headers, params: httpParams };
+    if (body !== undefined) {
+      options.body = body;
+    }
+    return this.http.delete<T>(`${this.baseUrl}${path}`, options);
   }
 
   getBlob(path: string, params?: Record<string, string | number | boolean | string[] | number[] | undefined>, headers?: Record<string, string>): Observable<Blob> {

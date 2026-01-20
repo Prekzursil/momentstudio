@@ -198,8 +198,8 @@ export class AccountService {
     return this.api.get<AccountDeletionStatus>('/auth/me/delete/status');
   }
 
-  requestAccountDeletion(confirm: string): Observable<AccountDeletionStatus> {
-    return this.api.post<AccountDeletionStatus>('/auth/me/delete', { confirm });
+  requestAccountDeletion(confirm: string, password: string): Observable<AccountDeletionStatus> {
+    return this.api.post<AccountDeletionStatus>('/auth/me/delete', { confirm, password });
   }
 
   cancelAccountDeletion(): Observable<AccountDeletionStatus> {

@@ -259,6 +259,11 @@ class ProfileUpdate(BaseModel):
 
 class AccountDeletionRequest(BaseModel):
     confirm: str = Field(..., min_length=1, max_length=20, description='Type "DELETE" to confirm account deletion')
+    password: str = Field(min_length=1, max_length=128, description="Confirm password")
+
+
+class ConfirmPasswordRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
 
 
 class RegisterRequest(BaseModel):
@@ -732,10 +737,13 @@ async def passkey_register_verify(
 @router.delete("/me/passkeys/{passkey_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Remove a passkey")
 async def passkey_delete(
     passkey_id: UUID,
+    payload: ConfirmPasswordRequest,
     request: Request,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> None:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
     removed = await passkeys_service.delete_passkey(session, user_id=current_user.id, passkey_id=passkey_id)
     if not removed:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Passkey not found")
@@ -1259,9 +1267,12 @@ async def make_secondary_email_primary(
 )
 async def delete_secondary_email(
     secondary_email_id: UUID,
+    payload: ConfirmPasswordRequest,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> None:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
     await auth_service.delete_secondary_email(session, current_user, secondary_email_id)
 
 
@@ -1296,6 +1307,8 @@ async def request_account_deletion(
 ) -> AccountDeletionStatus:
     if payload.confirm.strip().upper() != "DELETE":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Type "DELETE" to confirm')
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
     now = datetime.now(timezone.utc)
     scheduled_for = current_user.deletion_scheduled_for
     if scheduled_for and scheduled_for.tzinfo is None:
@@ -1421,10 +1434,13 @@ async def list_my_sessions(
     description="Revokes all other active refresh sessions, keeping only the current device signed in.",
 )
 async def revoke_other_sessions(
+    payload: ConfirmPasswordRequest,
     request: Request,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> RefreshSessionsRevokeResponse:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
     candidate_jti = _extract_refresh_session_jti(request)
     current_jti = await _resolve_active_refresh_session_jti(session, current_user.id, candidate_jti)
     if not current_jti:
