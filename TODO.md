@@ -480,9 +480,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Wishlist: add “notify me when back in stock” for wishlist items.
 - [x] Coupons: show ineligible reasons + “you need X more subtotal” progress.
 - [x] Coupons: suggest best coupon for the current cart (without auto-applying).
-- [ ] Notifications: add template previews per notification type.
+- [x] Notifications: add template previews per notification type.
 - [x] Notifications: show last-updated timestamp per preference group.
-- [ ] Notifications: clarify transactional vs marketing preferences (copy + grouping).
+- [x] Notifications: clarify transactional vs marketing preferences (copy + grouping).
 - [ ] Security: list active sessions/devices + revoke others.
 - [ ] Security: show a recent security activity feed (logins/email changes/password changes).
 - [ ] Security: add 2FA (TOTP) + recovery codes.

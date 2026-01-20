@@ -135,7 +135,6 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   notificationsMessage: string | null = null;
   notificationsError: string | null = null;
   notifyMarketing = false;
-  showNotificationPreview = false;
   notificationLastUpdated: string | null = null;
   savingProfile = false;
   profileSaved = false;
@@ -1567,10 +1566,6 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         },
         complete: () => (this.savingNotifications = false)
       });
-  }
-
-  toggleNotificationPreview(): void {
-    this.showNotificationPreview = !this.showNotificationPreview;
   }
 
   private loadDeletionStatus(): void {
