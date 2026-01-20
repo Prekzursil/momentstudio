@@ -488,9 +488,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Security: add 2FA (TOTP) + recovery codes.
 - [x] Security: add passkeys (WebAuthn) for sign-in.
 - [x] Security: add password strength meter + show/hide toggles where missing.
-- [ ] Security: show cooldown timers (username/display name/email changes).
-- [ ] Emails: improve per-email verification state/actions UX (clearer status + inline actions).
-- [ ] Emails: add resend-verification cooldown countdown (anti-spam UX).
+- [x] Security: show cooldown timers (username/display name/email changes).
+- [x] Emails: improve per-email verification state/actions UX (clearer status + inline actions).
+- [x] Emails: add resend-verification cooldown countdown (anti-spam UX).
 - [ ] Emails: require re-auth for more sensitive actions (unlink Google/remove primary/etc).
 - [ ] Google linking: clarify “unlink required” restriction with better copy and UX.
 - [ ] Profile: separate “public identity” vs “private account info” sections.

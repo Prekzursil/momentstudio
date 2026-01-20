@@ -104,12 +104,19 @@
     "verification": {
       "sentStatus": "Email de verificare trimis. Introdu codul primit.",
       "sentToast": "Email de verificare trimis",
+      "resendIn": "Retrimite în {{seconds}}s",
       "sendError": "Nu am putut trimite emailul de verificare",
       "tokenRequired": "Introdu codul de verificare.",
       "verifiedStatus": "Email verificat",
       "verifiedToast": "Email verificat",
       "invalidTokenStatus": "Cod invalid sau expirat",
       "invalidTokenToast": "Cod invalid sau expirat"
+    },
+    "cooldowns": {
+      "username": "Numele de utilizator poate fi schimbat din nou în {{time}}.",
+      "displayName": "Numele afișat poate fi schimbat din nou în {{time}}.",
+      "email": "Emailul principal poate fi schimbat din nou în {{time}}.",
+      "loadError": "Nu am putut încărca informațiile despre limitări."
     },
     "profile": {
       "savedToast": "Profil salvat",
@@ -219,6 +226,7 @@
         "primary": "Principal",
         "secondary": "Secundar",
         "resend": "Retrimite codul",
+        "resendIn": "Retrimite în {{seconds}}s",
         "makePrimary": "Setează ca principal",
         "confirmPassword": "Confirmă parola",
         "verifyCode": "Cod de verificare",

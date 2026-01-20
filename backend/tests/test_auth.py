@@ -122,6 +122,25 @@ def test_register_and_login_flow(test_app: Dict[str, object]) -> None:
     assert refreshed["refresh_token"]
 
 
+def test_cooldowns_endpoint_returns_next_allowed_times(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    register_payload = make_register_payload(email="cooldowns@example.com", username="cooldowns", name="Cooldowns")
+    res = client.post("/api/v1/auth/register", json=register_payload)
+    assert res.status_code == 201, res.text
+    access = res.json()["tokens"]["access_token"]
+
+    cooldowns = client.get("/api/v1/auth/me/cooldowns", headers=auth_headers(access))
+    assert cooldowns.status_code == 200, cooldowns.text
+    body = cooldowns.json()
+    assert body["username"]["remaining_seconds"] > 0
+    assert body["username"]["next_allowed_at"]
+    assert body["display_name"]["remaining_seconds"] > 0
+    assert body["display_name"]["next_allowed_at"]
+    assert body["email"]["remaining_seconds"] == 0
+    assert body["email"]["next_allowed_at"] is None
+
+
 def test_sessions_list_and_revoke_others(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 

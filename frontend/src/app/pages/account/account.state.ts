@@ -14,12 +14,14 @@ import { appConfig } from '../../core/app-config';
 import {
   AuthService,
   AuthUser,
+  type CooldownInfo,
   PasskeyInfo,
   RefreshSessionInfo,
   SecondaryEmail,
   TwoFactorEnableResponse,
   TwoFactorSetupResponse,
   TwoFactorStatusResponse,
+  UserCooldownsResponse,
   UserAliasesResponse,
   UserSecurityEventInfo
 } from '../../core/auth.service';
@@ -82,6 +84,9 @@ type NotificationPrefsSnapshot = {
 
 @Directive()
 export class AccountState implements OnInit, AfterViewInit, OnDestroy {
+  private now = signal<number>(Date.now());
+  private nowInterval?: ReturnType<typeof setInterval>;
+
   emailVerified = signal<boolean>(false);
   couponsCount = signal<number>(0);
   couponsCountLoaded = signal<boolean>(false);
@@ -95,6 +100,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   placeholderAvatar = 'assets/placeholder/avatar-placeholder.svg';
   verificationToken = '';
   verificationStatus: string | null = null;
+  primaryVerificationResendUntil = signal<number | null>(null);
 
   profile = signal<AuthUser | null>(null);
   googleEmail = signal<string | null>(null);
@@ -204,6 +210,8 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   secondaryEmailToAdd = '';
   addingSecondaryEmail = false;
   secondaryEmailMessage: string | null = null;
+  secondaryEmailResendUntilById = signal<Record<string, number>>({});
+  secondaryVerificationEmailId: string | null = null;
   secondaryVerificationToken = '';
   secondaryVerificationStatus: string | null = null;
   verifyingSecondaryEmail = false;
@@ -269,6 +277,11 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   aliasesLoading = signal<boolean>(false);
   aliasesError = signal<string | null>(null);
 
+  cooldowns = signal<UserCooldownsResponse | null>(null);
+  cooldownsLoaded = signal<boolean>(false);
+  cooldownsLoading = signal<boolean>(false);
+  cooldownsError = signal<string | null>(null);
+
   constructor(
     private toast: ToastService,
     private auth: AuthService,
@@ -297,6 +310,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.nowInterval = setInterval(() => this.now.set(Date.now()), 1_000);
     this.forceProfileCompletion = this.route.snapshot.queryParamMap.get('complete') === '1';
     this.loadProfile();
     this.routerEventsSub = this.router.events
@@ -414,6 +428,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   private ensureLoadedForSection(section: AccountSection): void {
     switch (section) {
       case 'profile':
+        this.loadCooldowns();
         this.loadAliases();
         return;
       case 'orders':
@@ -430,6 +445,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
       case 'password':
         return;
       case 'security':
+        this.loadCooldowns();
         this.loadSecondaryEmails();
         this.loadPaymentMethods();
         this.loadSessions();
@@ -1174,10 +1190,18 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  primaryVerificationResendRemainingSeconds(): number {
+    const until = this.primaryVerificationResendUntil();
+    if (!until) return 0;
+    return Math.max(0, Math.ceil((until - this.now()) / 1_000));
+  }
+
   resendVerification(): void {
+    if (this.primaryVerificationResendRemainingSeconds() > 0) return;
     this.auth.requestEmailVerification().subscribe({
       next: () => {
         this.verificationStatus = this.t('account.verification.sentStatus');
+        this.primaryVerificationResendUntil.set(Date.now() + 60_000);
         this.toast.success(this.t('account.verification.sentToast'));
       },
       error: () => this.toast.error(this.t('account.verification.sendError'))
@@ -1480,6 +1504,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
           this.profileSaved = true;
           this.toast.success(this.t('account.profile.savedToast'));
           this.loadAliases(true);
+          this.loadCooldowns(true);
 
           if (this.forceProfileCompletion && computeMissingRequiredProfileFields(user).length === 0) {
             this.forceProfileCompletion = false;
@@ -1515,6 +1540,63 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
       },
       complete: () => this.aliasesLoading.set(false)
     });
+  }
+
+  loadCooldowns(force: boolean = false): void {
+    if (!this.auth.isAuthenticated()) return;
+    if (this.cooldownsLoading() && !force) return;
+    if (this.cooldownsLoaded() && !force) return;
+
+    this.cooldownsLoading.set(true);
+    this.cooldownsError.set(null);
+    this.auth.getCooldowns().subscribe({
+      next: (resp) => {
+        this.cooldowns.set(resp);
+        this.cooldownsLoaded.set(true);
+      },
+      error: () => {
+        this.cooldownsError.set(this.t('account.cooldowns.loadError'));
+        this.cooldownsLoading.set(false);
+      },
+      complete: () => this.cooldownsLoading.set(false)
+    });
+  }
+
+  usernameCooldownSeconds(): number {
+    return this.cooldownRemainingSeconds(this.cooldowns()?.username);
+  }
+
+  displayNameCooldownSeconds(): number {
+    return this.cooldownRemainingSeconds(this.cooldowns()?.display_name);
+  }
+
+  emailCooldownSeconds(): number {
+    return this.cooldownRemainingSeconds(this.cooldowns()?.email);
+  }
+
+  formatCooldown(seconds: number): string {
+    const remaining = Math.max(0, Math.floor(seconds));
+    if (!remaining) return '';
+
+    const days = Math.floor(remaining / 86_400);
+    const hours = Math.floor((remaining % 86_400) / 3_600);
+    const minutes = Math.floor((remaining % 3_600) / 60);
+    const secs = remaining % 60;
+
+    const parts: string[] = [];
+    if (days) parts.push(`${days}d`);
+    if (hours && parts.length < 2) parts.push(`${hours}h`);
+    if (!days && minutes && parts.length < 2) parts.push(`${minutes}m`);
+    if (!days && !hours && parts.length < 2) parts.push(`${secs}s`);
+    return parts.join(' ');
+  }
+
+  private cooldownRemainingSeconds(info: CooldownInfo | null | undefined): number {
+    const nextAllowedAt = info?.next_allowed_at ?? null;
+    if (!nextAllowedAt) return 0;
+    const nextMs = Date.parse(nextAllowedAt);
+    if (!Number.isFinite(nextMs)) return 0;
+    return Math.max(0, Math.ceil((nextMs - this.now()) / 1_000));
   }
 
   publicIdentityLabel(user?: AuthUser | null): string {
@@ -1772,6 +1854,9 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.nowInterval) {
+      clearInterval(this.nowInterval);
+    }
     if (this.idleTimer) {
       clearTimeout(this.idleTimer);
     }
@@ -2322,6 +2407,37 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  secondaryEmailResendRemainingSeconds(secondaryEmailId: string): number {
+    const until = this.secondaryEmailResendUntilById()[secondaryEmailId];
+    if (!until) return 0;
+    return Math.max(0, Math.ceil((until - this.now()) / 1_000));
+  }
+
+  startSecondaryEmailVerification(secondaryEmailId: string): void {
+    this.cancelMakePrimary();
+    this.secondaryVerificationEmailId = secondaryEmailId;
+    this.secondaryVerificationToken = '';
+    this.secondaryVerificationStatus = null;
+  }
+
+  cancelSecondaryEmailVerification(): void {
+    this.secondaryVerificationEmailId = null;
+    this.secondaryVerificationToken = '';
+    this.secondaryVerificationStatus = null;
+  }
+
+  private bumpSecondaryEmailResendCooldown(secondaryEmailId: string): void {
+    const current = this.secondaryEmailResendUntilById();
+    this.secondaryEmailResendUntilById.set({ ...current, [secondaryEmailId]: Date.now() + 60_000 });
+  }
+
+  private clearSecondaryEmailResendCooldown(secondaryEmailId: string): void {
+    const current = { ...this.secondaryEmailResendUntilById() };
+    if (!(secondaryEmailId in current)) return;
+    delete current[secondaryEmailId];
+    this.secondaryEmailResendUntilById.set(current);
+  }
+
   addSecondaryEmail(): void {
     if (this.addingSecondaryEmail) return;
     const email = this.secondaryEmailToAdd.trim();
@@ -2339,6 +2455,8 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.secondaryEmails.set([created, ...existing.filter((e) => e.id !== created.id)]);
         this.secondaryEmailToAdd = '';
         this.secondaryEmailMessage = this.t('account.security.emails.verificationSent');
+        this.bumpSecondaryEmailResendCooldown(created.id);
+        this.startSecondaryEmailVerification(created.id);
         this.toast.success(this.t('account.security.emails.added'));
       },
       error: (err) => {
@@ -2353,11 +2471,14 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   }
 
   resendSecondaryEmailVerification(secondaryEmailId: string): void {
+    if (this.secondaryEmailResendRemainingSeconds(secondaryEmailId) > 0) return;
     this.secondaryEmailMessage = null;
     this.secondaryVerificationStatus = null;
     this.auth.requestSecondaryEmailVerification(secondaryEmailId).subscribe({
       next: () => {
         this.secondaryEmailMessage = this.t('account.security.emails.verificationResent');
+        this.bumpSecondaryEmailResendCooldown(secondaryEmailId);
+        this.startSecondaryEmailVerification(secondaryEmailId);
         this.toast.success(this.t('account.security.emails.verificationEmailSent'));
       },
       error: (err) => {
@@ -2370,6 +2491,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
 
   confirmSecondaryEmailVerification(): void {
     if (this.verifyingSecondaryEmail) return;
+    if (!this.secondaryVerificationEmailId) return;
     const token = this.secondaryVerificationToken.trim();
     this.secondaryEmailMessage = null;
     this.secondaryVerificationStatus = null;
@@ -2387,7 +2509,9 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
           )
         );
         this.secondaryVerificationToken = '';
-        this.secondaryVerificationStatus = this.t('account.security.emails.verified');
+        this.secondaryVerificationEmailId = null;
+        this.secondaryEmailMessage = this.t('account.security.emails.verified');
+        this.clearSecondaryEmailResendCooldown(verified.id);
         this.toast.success(this.t('account.verification.verifiedToast'));
       },
       error: (err) => {
@@ -2411,6 +2535,10 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         if (this.makePrimarySecondaryEmailId === secondaryEmailId) {
           this.cancelMakePrimary();
         }
+        if (this.secondaryVerificationEmailId === secondaryEmailId) {
+          this.cancelSecondaryEmailVerification();
+        }
+        this.clearSecondaryEmailResendCooldown(secondaryEmailId);
         this.toast.success(this.t('account.security.emails.removed'));
       },
       error: (err) => {
@@ -2421,6 +2549,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   }
 
   startMakePrimary(secondaryEmailId: string): void {
+    this.cancelSecondaryEmailVerification();
     this.makePrimarySecondaryEmailId = secondaryEmailId;
     this.makePrimaryPassword = '';
     this.makePrimaryError = null;
@@ -2450,6 +2579,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.emailVerified.set(Boolean(user.email_verified));
         this.cancelMakePrimary();
         this.loadSecondaryEmails(true);
+        this.loadCooldowns(true);
         this.toast.success(this.t('account.security.emails.primaryUpdated'));
       },
       error: (err) => {

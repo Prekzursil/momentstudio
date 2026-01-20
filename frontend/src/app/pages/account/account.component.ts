@@ -66,7 +66,12 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
                   <app-button
                     size="sm"
                     variant="ghost"
-                    [label]="'auth.emailVerificationResend' | translate"
+                    [label]="
+                      primaryVerificationResendRemainingSeconds() > 0
+                        ? ('account.verification.resendIn' | translate: { seconds: primaryVerificationResendRemainingSeconds() })
+                        : ('auth.emailVerificationResend' | translate)
+                    "
+                    [disabled]="primaryVerificationResendRemainingSeconds() > 0"
                     (action)="resendVerification()"
                   ></app-button>
                 </div>

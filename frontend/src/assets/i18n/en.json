@@ -104,12 +104,19 @@
     "verification": {
       "sentStatus": "Verification email sent. Enter the token you received.",
       "sentToast": "Verification email sent",
+      "resendIn": "Resend in {{seconds}}s",
       "sendError": "Could not send verification email",
       "tokenRequired": "Enter a verification token.",
       "verifiedStatus": "Email verified",
       "verifiedToast": "Email verified",
       "invalidTokenStatus": "Invalid or expired token",
       "invalidTokenToast": "Invalid or expired token"
+    },
+    "cooldowns": {
+      "username": "Username can be changed again in {{time}}.",
+      "displayName": "Display name can be changed again in {{time}}.",
+      "email": "Primary email can be changed again in {{time}}.",
+      "loadError": "Could not load cooldown information."
     },
     "profile": {
       "savedToast": "Profile saved",
@@ -219,6 +226,7 @@
         "primary": "Primary",
         "secondary": "Secondary",
         "resend": "Resend code",
+        "resendIn": "Resend in {{seconds}}s",
         "makePrimary": "Make primary",
         "confirmPassword": "Confirm password",
         "verifyCode": "Verify code",

@@ -99,6 +99,9 @@ import { AccountComponent } from './account.component';
           <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
             Public: {{ account.publicIdentityLabel() }}
           </span>
+          <span *ngIf="account.displayNameCooldownSeconds() > 0" class="text-xs font-normal text-amber-800 dark:text-amber-200">
+            {{ 'account.cooldowns.displayName' | translate: { time: account.formatCooldown(account.displayNameCooldownSeconds()) } }}
+          </span>
         </label>
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           {{ 'auth.username' | translate }}
@@ -114,6 +117,9 @@ import { AccountComponent } from './account.component';
           />
           <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
             Use this to sign in and as a stable handle in public activity.
+          </span>
+          <span *ngIf="account.usernameCooldownSeconds() > 0" class="text-xs font-normal text-amber-800 dark:text-amber-200">
+            {{ 'account.cooldowns.username' | translate: { time: account.formatCooldown(account.usernameCooldownSeconds()) } }}
           </span>
         </label>
 

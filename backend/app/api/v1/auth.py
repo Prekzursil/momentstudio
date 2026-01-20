@@ -10,7 +10,7 @@ from jose import jwt
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, EmailStr, field_validator
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from webauthn.helpers import base64url_to_bytes
 
@@ -20,7 +20,15 @@ from app.core.dependencies import get_current_user, get_google_completion_user, 
 from app.core.rate_limit import limiter, per_identifier_limiter
 from app.core.security import decode_token
 from app.db.session import get_session
-from app.models.user import RefreshSession, User, UserSecondaryEmail, UserSecurityEvent
+from app.models.user import (
+    RefreshSession,
+    User,
+    UserDisplayNameHistory,
+    UserEmailHistory,
+    UserSecondaryEmail,
+    UserSecurityEvent,
+    UserUsernameHistory,
+)
 from app.schemas.auth import (
     AuthResponse,
     GoogleCallbackResponse,
@@ -370,6 +378,18 @@ class DisplayNameHistoryItem(BaseModel):
 class UserAliasesResponse(BaseModel):
     usernames: list[UsernameHistoryItem]
     display_names: list[DisplayNameHistoryItem]
+
+
+class CooldownInfo(BaseModel):
+    last_changed_at: datetime | None = None
+    next_allowed_at: datetime | None = None
+    remaining_seconds: int = 0
+
+
+class UserCooldownsResponse(BaseModel):
+    username: CooldownInfo
+    display_name: CooldownInfo
+    email: CooldownInfo
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=AuthResponse)
@@ -1030,6 +1050,66 @@ async def read_aliases(
         display_names=[
             DisplayNameHistoryItem(name=row.name, name_tag=row.name_tag, created_at=row.created_at) for row in display_names
         ],
+    )
+
+
+@router.get(
+    "/me/cooldowns",
+    response_model=UserCooldownsResponse,
+    summary="Get my profile/email change cooldowns",
+)
+async def read_cooldowns(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserCooldownsResponse:
+    now = datetime.now(timezone.utc)
+
+    def normalize_dt(value: datetime | None) -> datetime | None:
+        if not value:
+            return None
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+    def cooldown_info(*, last: datetime | None, cooldown: timedelta, enforce: bool) -> CooldownInfo:
+        last_dt = normalize_dt(last)
+        if not last_dt or not enforce:
+            return CooldownInfo(last_changed_at=last_dt, next_allowed_at=None, remaining_seconds=0)
+        next_dt = last_dt + cooldown
+        remaining = int(max(0, (next_dt - now).total_seconds()))
+        return CooldownInfo(
+            last_changed_at=last_dt,
+            next_allowed_at=next_dt if remaining > 0 else None,
+            remaining_seconds=remaining,
+        )
+
+    username_last = await session.scalar(
+        select(UserUsernameHistory.created_at)
+        .where(UserUsernameHistory.user_id == current_user.id)
+        .order_by(UserUsernameHistory.created_at.desc())
+        .limit(1)
+    )
+    display_last = await session.scalar(
+        select(UserDisplayNameHistory.created_at)
+        .where(UserDisplayNameHistory.user_id == current_user.id)
+        .order_by(UserDisplayNameHistory.created_at.desc())
+        .limit(1)
+    )
+
+    email_count = int(
+        await session.scalar(select(func.count()).select_from(UserEmailHistory).where(UserEmailHistory.user_id == current_user.id))
+        or 0
+    )
+    email_last = await session.scalar(
+        select(UserEmailHistory.created_at)
+        .where(UserEmailHistory.user_id == current_user.id)
+        .order_by(UserEmailHistory.created_at.desc())
+        .limit(1)
+    )
+
+    profile_complete = auth_service.is_profile_complete(current_user)
+    return UserCooldownsResponse(
+        username=cooldown_info(last=username_last, cooldown=auth_service.USERNAME_CHANGE_COOLDOWN, enforce=profile_complete),
+        display_name=cooldown_info(last=display_last, cooldown=auth_service.DISPLAY_NAME_CHANGE_COOLDOWN, enforce=profile_complete),
+        email=cooldown_info(last=email_last, cooldown=auth_service.EMAIL_CHANGE_COOLDOWN, enforce=email_count > 1),
     )
 
 

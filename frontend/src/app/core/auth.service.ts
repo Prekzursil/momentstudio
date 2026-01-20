@@ -142,6 +142,18 @@ export interface UserSecurityEventInfo {
   ip_address?: string | null;
 }
 
+export interface CooldownInfo {
+  last_changed_at?: string | null;
+  next_allowed_at?: string | null;
+  remaining_seconds: number;
+}
+
+export interface UserCooldownsResponse {
+  username: CooldownInfo;
+  display_name: CooldownInfo;
+  email: CooldownInfo;
+}
+
 type StorageMode = 'local' | 'session';
 
 @Injectable({ providedIn: 'root' })
@@ -357,6 +369,10 @@ export class AuthService {
 
   getAliases(): Observable<UserAliasesResponse> {
     return this.api.get<UserAliasesResponse>('/auth/me/aliases');
+  }
+
+  getCooldowns(): Observable<UserCooldownsResponse> {
+    return this.api.get<UserCooldownsResponse>('/auth/me/cooldowns');
   }
 
   requestEmailVerification(): Observable<{ detail: string }> {

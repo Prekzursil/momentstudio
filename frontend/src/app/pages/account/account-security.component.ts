@@ -387,6 +387,9 @@ import { AccountComponent } from './account.component';
             <p *ngIf="account.googleEmail()" class="text-xs text-amber-800 dark:text-amber-200">
               {{ 'account.security.emails.googleWarning' | translate }}
             </p>
+            <p *ngIf="account.emailCooldownSeconds() > 0" class="text-xs text-amber-800 dark:text-amber-200">
+              {{ 'account.cooldowns.email' | translate: { time: account.formatCooldown(account.emailCooldownSeconds()) } }}
+            </p>
           </div>
 
           <div class="grid gap-2 sm:grid-cols-[2fr_auto] sm:items-end">
@@ -447,8 +450,21 @@ import { AccountComponent } from './account.component';
                   *ngIf="!e.verified"
                   size="sm"
                   variant="ghost"
-                  [label]="'account.security.emails.resend' | translate"
+                  [label]="
+                    account.secondaryEmailResendRemainingSeconds(e.id) > 0
+                      ? ('account.security.emails.resendIn' | translate: { seconds: account.secondaryEmailResendRemainingSeconds(e.id) })
+                      : ('account.security.emails.resend' | translate)
+                  "
+                  [disabled]="account.secondaryEmailResendRemainingSeconds(e.id) > 0"
                   (action)="account.resendSecondaryEmailVerification(e.id)"
+                ></app-button>
+
+                <app-button
+                  *ngIf="!e.verified && account.secondaryVerificationEmailId !== e.id"
+                  size="sm"
+                  variant="ghost"
+                  [label]="'account.security.emails.verify' | translate"
+                  (action)="account.startSecondaryEmailVerification(e.id)"
                 ></app-button>
 
                 <app-button
@@ -456,7 +472,7 @@ import { AccountComponent } from './account.component';
                   size="sm"
                   variant="ghost"
                   [label]="'account.security.emails.makePrimary' | translate"
-                  [disabled]="!!account.googleEmail()"
+                  [disabled]="!!account.googleEmail() || account.emailCooldownSeconds() > 0"
                   (action)="account.startMakePrimary(e.id)"
                 ></app-button>
 
@@ -467,6 +483,45 @@ import { AccountComponent } from './account.component';
                   (action)="account.deleteSecondaryEmail(e.id)"
                 ></app-button>
               </div>
+
+              <form
+                *ngIf="!e.verified && account.secondaryVerificationEmailId === e.id"
+                class="w-full grid gap-2 sm:grid-cols-[2fr_auto_auto] sm:items-end"
+                (ngSubmit)="account.confirmSecondaryEmailVerification()"
+              >
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'account.security.emails.verifyCode' | translate }}
+                  <input
+                    [attr.name]="'secondaryVerificationToken-' + e.id"
+                    type="text"
+                    autocomplete="one-time-code"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                    [disabled]="account.verifyingSecondaryEmail"
+                    [(ngModel)]="account.secondaryVerificationToken"
+                  />
+                </label>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  type="submit"
+                  [label]="'account.security.actions.confirm' | translate"
+                  [disabled]="account.verifyingSecondaryEmail || !account.secondaryVerificationToken.trim()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'account.security.actions.cancel' | translate"
+                  [disabled]="account.verifyingSecondaryEmail"
+                  (action)="account.cancelSecondaryEmailVerification()"
+                ></app-button>
+              </form>
+
+              <p
+                *ngIf="!e.verified && account.secondaryVerificationEmailId === e.id && account.secondaryVerificationStatus"
+                class="w-full text-xs text-slate-600 dark:text-slate-300"
+              >
+                {{ account.secondaryVerificationStatus }}
+              </p>
 
               <div
                 *ngIf="account.makePrimarySecondaryEmailId === e.id"
@@ -516,30 +571,6 @@ import { AccountComponent } from './account.component';
               </p>
             </li>
           </ul>
-
-          <form class="grid gap-2 sm:grid-cols-[2fr_auto] sm:items-end" (ngSubmit)="account.confirmSecondaryEmailVerification()">
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              {{ 'account.security.emails.verifyCode' | translate }}
-              <input
-                name="secondaryVerificationToken"
-                type="text"
-                autocomplete="one-time-code"
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                [disabled]="account.verifyingSecondaryEmail"
-                [(ngModel)]="account.secondaryVerificationToken"
-              />
-            </label>
-            <app-button
-              size="sm"
-              variant="ghost"
-              type="submit"
-              [label]="'account.security.emails.verify' | translate"
-              [disabled]="account.verifyingSecondaryEmail || !account.secondaryVerificationToken.trim()"
-            ></app-button>
-          </form>
-          <p *ngIf="account.secondaryVerificationStatus" class="text-xs text-slate-600 dark:text-slate-300">
-            {{ account.secondaryVerificationStatus }}
-          </p>
         </div>
 
         <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-2">
