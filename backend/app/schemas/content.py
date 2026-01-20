@@ -85,6 +85,20 @@ class ContentPageRenameResponse(BaseModel):
     new_key: str
 
 
+class ContentRedirectRead(BaseModel):
+    id: UUID
+    from_key: str
+    to_key: str
+    created_at: datetime
+    updated_at: datetime
+    target_exists: bool = True
+
+
+class ContentRedirectListResponse(BaseModel):
+    items: list[ContentRedirectRead]
+    meta: PaginationMeta
+
+
 class ContentImageRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

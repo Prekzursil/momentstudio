@@ -139,3 +139,92 @@ def test_renaming_twice_flattens_redirect_chain(test_app: Dict[str, object]) -> 
 
     asyncio.run(verify_chain())
 
+
+def test_admin_create_page_rejects_reserved_slug(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]  # type: ignore[assignment]
+    asyncio.run(seed_page(session_factory, key="page.any", title="Any"))
+    headers = admin_headers(client, session_factory)
+
+    res = client.post(
+        "/api/v1/content/admin/page.cart",
+        json={"title": "Cart", "body_markdown": "Nope", "status": "draft", "meta": {"version": 2, "blocks": []}},
+        headers=headers,
+    )
+    assert res.status_code == 400, res.text
+    assert res.json()["detail"] == "Page slug is reserved"
+
+
+def test_admin_create_page_allows_locked_slug(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]  # type: ignore[assignment]
+    asyncio.run(seed_page(session_factory, key="page.any", title="Any"))
+    headers = admin_headers(client, session_factory)
+
+    res = client.post(
+        "/api/v1/content/admin/page.about",
+        json={"title": "About", "body_markdown": "Hello", "status": "draft", "meta": {"version": 2, "blocks": []}},
+        headers=headers,
+    )
+    assert res.status_code == 201, res.text
+    assert res.json()["key"] == "page.about"
+
+
+def test_admin_create_page_requires_canonical_slug(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]  # type: ignore[assignment]
+    asyncio.run(seed_page(session_factory, key="page.any", title="Any"))
+    headers = admin_headers(client, session_factory)
+
+    res = client.post(
+        "/api/v1/content/admin/page.About",
+        json={"title": "About", "body_markdown": "Hello", "status": "draft", "meta": {"version": 2, "blocks": []}},
+        headers=headers,
+    )
+    assert res.status_code == 400, res.text
+    assert res.json()["detail"] == "Invalid page slug"
+
+
+def test_admin_can_list_and_delete_redirects(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]  # type: ignore[assignment]
+
+    async def seed_redirects() -> None:
+        async with session_factory() as session:
+            await session.execute(delete(ContentRedirect))
+            await session.execute(delete(ContentBlock).where(ContentBlock.key.like("page.%")))
+            session.add(
+                ContentBlock(
+                    key="page.target",
+                    title="Target",
+                    body_markdown="Hello",
+                    status=ContentStatus.published,
+                    version=1,
+                    published_at=datetime.now(timezone.utc),
+                    meta={"version": 2, "blocks": []},
+                )
+            )
+            session.add(ContentRedirect(from_key="page.old", to_key="page.target"))
+            session.add(ContentRedirect(from_key="page.stale", to_key="page.missing"))
+            await session.commit()
+
+    asyncio.run(seed_redirects())
+    headers = admin_headers(client, session_factory)
+
+    listed = client.get("/api/v1/content/admin/redirects", headers=headers)
+    assert listed.status_code == 200, listed.text
+    body = listed.json()
+    by_from = {item["from_key"]: item for item in body["items"]}
+    assert by_from["page.old"]["to_key"] == "page.target"
+    assert by_from["page.old"]["target_exists"] is True
+    assert by_from["page.stale"]["to_key"] == "page.missing"
+    assert by_from["page.stale"]["target_exists"] is False
+
+    stale_id = by_from["page.stale"]["id"]
+    deleted = client.delete(f"/api/v1/content/admin/redirects/{stale_id}", headers=headers)
+    assert deleted.status_code == 204, deleted.text
+
+    listed2 = client.get("/api/v1/content/admin/redirects", headers=headers)
+    assert listed2.status_code == 200, listed2.text
+    keys = {item["from_key"] for item in listed2.json()["items"]}
+    assert "page.stale" not in keys

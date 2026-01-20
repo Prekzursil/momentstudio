@@ -1,11 +1,13 @@
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Query
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Query, Response
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.dependencies import get_session, require_admin
-from app.models.content import ContentBlock, ContentBlockVersion, ContentImage
+from app.models.content import ContentBlock, ContentBlockVersion, ContentImage, ContentRedirect
 from app.schemas.content import (
     ContentAuditRead,
     ContentBlockCreate,
@@ -16,6 +18,8 @@ from app.schemas.content import (
     ContentPageListItem,
     ContentPageRenameRequest,
     ContentPageRenameResponse,
+    ContentRedirectListResponse,
+    ContentRedirectRead,
     ContentBlockVersionListItem,
     ContentBlockVersionRead,
 )
@@ -68,6 +72,73 @@ async def admin_fetch_social_thumbnail(
     return SocialThumbnailResponse(thumbnail_url=thumbnail_url)
 
 
+@router.get("/admin/redirects", response_model=ContentRedirectListResponse)
+async def admin_list_redirects(
+    session: AsyncSession = Depends(get_session),
+    q: str | None = Query(default=None, description="Search from/to key"),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=25, ge=1, le=100),
+    _: str = Depends(require_admin),
+) -> ContentRedirectListResponse:
+    filters = []
+    if q:
+        needle = f"%{q.strip()}%"
+        filters.append(or_(ContentRedirect.from_key.ilike(needle), ContentRedirect.to_key.ilike(needle)))
+
+    total = await session.scalar(select(func.count()).select_from(ContentRedirect).where(*filters))
+    total_items = int(total or 0)
+    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
+    offset = (page - 1) * limit
+
+    result = await session.execute(
+        select(ContentRedirect)
+        .where(*filters)
+        .order_by(ContentRedirect.created_at.desc(), ContentRedirect.id.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    redirects = list(result.scalars().all())
+
+    to_keys = {r.to_key for r in redirects}
+    existing_targets: set[str] = set()
+    if to_keys:
+        existing_targets = set(
+            (await session.execute(select(ContentBlock.key).where(ContentBlock.key.in_(to_keys)))).scalars().all()
+        )
+
+    items: list[ContentRedirectRead] = []
+    for r in redirects:
+        items.append(
+            ContentRedirectRead(
+                id=r.id,
+                from_key=r.from_key,
+                to_key=r.to_key,
+                created_at=r.created_at,
+                updated_at=r.updated_at,
+                target_exists=r.to_key in existing_targets,
+            )
+        )
+
+    return ContentRedirectListResponse(
+        items=items,
+        meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
+    )
+
+
+@router.delete("/admin/redirects/{redirect_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_delete_redirect(
+    redirect_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> Response:
+    redirect = await session.scalar(select(ContentRedirect).where(ContentRedirect.id == redirect_id))
+    if not redirect:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Redirect not found")
+    await session.delete(redirect)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/admin/{key}", response_model=ContentBlockRead)
 async def admin_get_content(
     key: str,
@@ -99,6 +170,7 @@ async def admin_create_content(
     session: AsyncSession = Depends(get_session),
     admin=Depends(require_admin),
 ) -> ContentBlockRead:
+    content_service.validate_page_key_for_create(key)
     existing = await content_service.get_block_by_key(session, key)
     if existing:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Content key exists")

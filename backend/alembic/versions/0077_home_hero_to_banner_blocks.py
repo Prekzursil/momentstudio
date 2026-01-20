@@ -7,6 +7,7 @@ multiple banners/carousels.
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import UUID
 
 
 # revision identifiers, used by Alembic.
@@ -33,7 +34,7 @@ def upgrade() -> None:
 
     content_blocks = sa.table(
         "content_blocks",
-        sa.column("id", sa.String()),
+        sa.column("id", UUID(as_uuid=True)),
         sa.column("key", sa.String()),
         sa.column("title", sa.String()),
         sa.column("body_markdown", sa.Text()),
@@ -42,14 +43,14 @@ def upgrade() -> None:
     )
     translations = sa.table(
         "content_block_translations",
-        sa.column("content_block_id", sa.String()),
+        sa.column("content_block_id", UUID(as_uuid=True)),
         sa.column("lang", sa.String()),
         sa.column("title", sa.String()),
         sa.column("body_markdown", sa.Text()),
     )
     images = sa.table(
         "content_images",
-        sa.column("content_block_id", sa.String()),
+        sa.column("content_block_id", UUID(as_uuid=True)),
         sa.column("url", sa.String()),
         sa.column("sort_order", sa.Integer()),
         sa.column("created_at", sa.DateTime(timezone=True)),
@@ -182,7 +183,7 @@ def downgrade() -> None:
     conn = op.get_bind()
     content_blocks = sa.table(
         "content_blocks",
-        sa.column("id", sa.String()),
+        sa.column("id", UUID(as_uuid=True)),
         sa.column("key", sa.String()),
         sa.column("meta", sa.JSON()),
     )

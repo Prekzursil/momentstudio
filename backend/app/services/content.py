@@ -32,6 +32,7 @@ _RESERVED_PAGE_SLUGS = {
     "checkout",
     "contact",
     "error",
+    "faq",
     "home",
     "login",
     "pages",
@@ -40,6 +41,7 @@ _RESERVED_PAGE_SLUGS = {
     "receipt",
     "register",
     "shop",
+    "shipping",
     "tickets",
 }
 
@@ -70,6 +72,18 @@ def _validate_page_slug(value: str) -> str:
     if slug in _RESERVED_PAGE_SLUGS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug is reserved")
     return slug
+
+
+def validate_page_key_for_create(key: str) -> None:
+    value = (key or "").strip()
+    if not value.startswith("page."):
+        return
+    slug = value.split(".", 1)[1]
+    slug_norm = slugify_page_slug(slug)
+    if not slug_norm or f"page.{slug_norm}" != value:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid page slug")
+    if slug_norm in _RESERVED_PAGE_SLUGS and slug_norm not in _LOCKED_PAGE_SLUGS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug is reserved")
 
 
 async def resolve_redirect_key(session: AsyncSession, key: str, *, max_hops: int = 10) -> str:
@@ -229,6 +243,7 @@ async def upsert_block(
     lang = data.get("lang")
     published_at = _ensure_utc(data.get("published_at"))
     if not block:
+        validate_page_key_for_create(key)
         wants_published_at = None
         if data.get("status") == ContentStatus.published:
             wants_published_at = published_at or now
