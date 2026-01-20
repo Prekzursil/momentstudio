@@ -449,6 +449,57 @@ Below is a structured checklist you can turn into issues.
 - [x] Wishlist: investigate reports of add/remove not persisting and add e2e coverage for save/unsave flows.
 - [x] Account UX: unify email management UI in Security (single email section; reduce duplication; align Change password placement).
 - [x] Account UX: translate Security page strings (remove hard-coded English).
+### Account UX – Next Improvements (Backlog)
+- [x] Account UX: lazy-load per-section data (don’t fetch orders/addresses/comments on every Account route).
+- [x] Account UX: add “Retry” actions for section load failures (per card, not just global error).
+- [x] Account i18n: translate remaining hard-coded AccountState strings (toasts/prompts/labels).
+- [ ] Account UX: warn on unsaved changes (Profile/Addresses/Notifications).
+- [ ] Account nav: show badges (unread notifications, coupons count, pending orders).
+- [ ] Account UX: remember last visited tab and restore on `/account`.
+- [ ] Account mobile: collapse sidebar into a dropdown or bottom nav.
+- [ ] Account desktop: make sidebar sticky.
+- [ ] Account UX: add per-section skeleton loaders (avoid whole-page skeletons).
+- [ ] Account a11y: add an `aria-live` region for critical status updates/toasts.
+- [ ] Orders: migrate to server-side pagination (don’t fetch all orders at once).
+- [ ] Orders: add search by reference code + date-range filter.
+- [ ] Orders: surface payment method + payment state prominently on each order.
+- [ ] Orders: show delivery tracking status (when available) alongside tracking number.
+- [ ] Orders: add “Request return” flow from eligible orders.
+- [ ] Orders: add item-level reorder (not only whole-order reorder).
+- [ ] Orders: move receipt/invoice actions to the order header for quick access.
+- [ ] Orders: allow cancel request for eligible states (with confirmation + reason).
+- [ ] Orders: show “manual refund required” banner with next steps (when applicable).
+- [x] Receipts: show share expiry + revoke/copy states in Account orders UI.
+- [ ] Addresses: add country-specific validation hints (postal code, required fields).
+- [ ] Addresses: optional address autocomplete (feature-flag).
+- [x] Addresses: support “billing same as shipping” per address.
+- [ ] Addresses: add “Duplicate address” action.
+- [ ] Addresses: convert address label to a dropdown (Home/Work/Other) with custom fallback.
+- [ ] Wishlist: add bulk actions (remove selected / add selected to cart).
+- [ ] Wishlist: show stock + price-change chips since saved.
+- [ ] Wishlist: add “notify me when back in stock” for wishlist items.
+- [ ] Coupons: show ineligible reasons + “you need X more subtotal” progress.
+- [ ] Coupons: suggest best coupon for the current cart (without auto-applying).
+- [ ] Notifications: add template previews per notification type.
+- [x] Notifications: show last-updated timestamp per preference group.
+- [ ] Notifications: clarify transactional vs marketing preferences (copy + grouping).
+- [ ] Security: list active sessions/devices + revoke others.
+- [ ] Security: show a recent security activity feed (logins/email changes/password changes).
+- [ ] Security: add 2FA (TOTP) + recovery codes.
+- [ ] Security: add passkeys (WebAuthn) for sign-in.
+- [ ] Security: add password strength meter + show/hide toggles where missing.
+- [ ] Security: show cooldown timers (username/display name/email changes).
+- [ ] Emails: improve per-email verification state/actions UX (clearer status + inline actions).
+- [ ] Emails: add resend-verification cooldown countdown (anti-spam UX).
+- [ ] Emails: require re-auth for more sensitive actions (unlink Google/remove primary/etc).
+- [ ] Google linking: clarify “unlink required” restriction with better copy and UX.
+- [ ] Profile: separate “public identity” vs “private account info” sections.
+- [ ] Profile: improve phone input UX (formatting preview, validation hints).
+- [ ] Profile: add avatar crop/preview UI before upload.
+- [ ] Profile: add a public-profile preview card (how you appear in comments).
+- [ ] Privacy: show export progress + notify when ready (background job UX).
+- [ ] Privacy: show deletion cooldown progress + consequences checklist.
+- [ ] Support: show recent tickets inside Account (overview or dedicated section).
 
 ## Frontend - Admin Dashboard
 - [x] /admin layout with sidebar + guard.
