@@ -163,12 +163,34 @@ import { AccountComponent } from './account.component';
                 </button>
               </div>
               <span class="text-xs font-normal text-slate-500 dark:text-slate-400">Required to change your username.</span>
-            </label>
-          </div>
-        </div>
+	            </label>
+	          </div>
 
-        <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-3">
-          <div class="grid gap-1">
+	          <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+	            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">Public preview</p>
+	            <div class="mt-3 flex items-start gap-3">
+	              <img
+	                [src]="account.avatar || account.profile()?.avatar_url || account.placeholderAvatar"
+	                alt="avatar preview"
+	                class="h-10 w-10 rounded-full object-cover border border-slate-200 dark:border-slate-800"
+	              />
+	              <div class="min-w-0 flex-1">
+	                <div class="flex flex-wrap items-center gap-2">
+	                  <span class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+	                    {{ account.publicIdentityPreviewLabel() }}
+	                  </span>
+	                  <span class="text-xs text-slate-500 dark:text-slate-400">just now</span>
+	                </div>
+	                <p class="mt-1 text-sm text-slate-700 dark:text-slate-300">
+	                  Thanks for supporting my work!
+	                </p>
+	              </div>
+	            </div>
+	          </div>
+	        </div>
+	
+	        <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-3">
+	          <div class="grid gap-1">
             <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">Private account info</h3>
             <p class="text-xs text-slate-500 dark:text-slate-400">Used for orders, support, and legal requirements.</p>
           </div>

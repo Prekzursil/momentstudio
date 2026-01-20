@@ -496,7 +496,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Profile: separate “public identity” vs “private account info” sections.
 - [x] Profile: improve phone input UX (formatting preview, validation hints).
 - [x] Profile: add avatar crop/preview UI before upload.
-- [ ] Profile: add a public-profile preview card (how you appear in comments).
+- [x] Profile: add a public-profile preview card (how you appear in comments).
 - [ ] Privacy: show export progress + notify when ready (background job UX).
 - [ ] Privacy: show deletion cooldown progress + consequences checklist.
 - [ ] Support: show recent tickets inside Account (overview or dedicated section).

@@ -1638,6 +1638,20 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     return formatIdentity(u, '');
   }
 
+  publicIdentityPreviewLabel(): string {
+    const u = this.profile();
+    return formatIdentity(
+      {
+        name: this.profileName.trim() || u?.name,
+        username: this.profileUsername.trim() || u?.username,
+        name_tag: u?.name_tag,
+        email: u?.email,
+        id: u?.id
+      },
+      '...'
+    );
+  }
+
   accountHeaderLabel(user?: AuthUser | null): string {
     const u = user ?? this.profile();
     const username = (u?.username ?? '').trim();
