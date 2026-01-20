@@ -85,9 +85,36 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
             </div>
           </header>
 
-          <div class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+          <div class="grid gap-6">
+            <div
+              class="lg:hidden rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 grid gap-2"
+              aria-label="Account section selector"
+            >
+              <label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                {{ 'account.nav.sectionSelect' | translate }}
+              </label>
+              <select
+                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                [value]="navigationSection()"
+                (change)="navigateToSection($any($event.target).value)"
+              >
+                <option value="overview">{{ 'account.sections.overview' | translate }}</option>
+                <option value="profile">{{ 'nav.myProfile' | translate }}</option>
+                <option value="orders">{{ 'nav.myOrders' | translate }}</option>
+                <option value="addresses">{{ 'account.sections.addresses' | translate }}</option>
+                <option value="wishlist">{{ 'nav.myWishlist' | translate }}</option>
+                <option value="coupons">{{ 'nav.myCoupons' | translate }}</option>
+                <option value="notifications">{{ 'account.sections.notifications' | translate }}</option>
+                <option value="security">{{ 'account.sections.security' | translate }}</option>
+                <option value="comments">{{ 'account.sections.comments' | translate }}</option>
+                <option value="privacy">{{ 'account.sections.privacy' | translate }}</option>
+              </select>
+              <a routerLink="/tickets" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">{{ 'nav.helpCenter' | translate }}</a>
+            </div>
+
+            <div class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
             <nav
-              class="rounded-2xl border border-slate-200 bg-white p-3 grid gap-1 dark:border-slate-800 dark:bg-slate-900"
+              class="hidden lg:grid rounded-2xl border border-slate-200 bg-white p-3 gap-1 dark:border-slate-800 dark:bg-slate-900 lg:sticky lg:top-24 lg:self-start"
               aria-label="Account navigation"
             >
               <a
@@ -188,6 +215,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
             <main class="grid gap-4 min-w-0">
               <router-outlet></router-outlet>
             </main>
+            </div>
           </div>
         </div>
       </ng-container>

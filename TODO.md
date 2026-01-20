@@ -456,8 +456,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Account UX: warn on unsaved changes (Profile/Addresses/Notifications).
 - [x] Account nav: show badges (unread notifications, coupons count, pending orders).
 - [x] Account UX: remember last visited tab and restore on `/account`.
-- [ ] Account mobile: collapse sidebar into a dropdown or bottom nav.
-- [ ] Account desktop: make sidebar sticky.
+- [x] Account mobile: collapse sidebar into a dropdown or bottom nav.
+- [x] Account desktop: make sidebar sticky.
 - [ ] Account UX: add per-section skeleton loaders (avoid whole-page skeletons).
 - [ ] Account a11y: add an `aria-live` region for critical status updates/toasts.
 - [ ] Orders: migrate to server-side pagination (don’t fetch all orders at once).

@@ -84,6 +84,9 @@
     "header": {
       "signedInAs": "Conectat ca"
     },
+    "nav": {
+      "sectionSelect": "Secțiune"
+    },
     "sections": {
       "overview": "Prezentare",
       "profile": "Profil",

@@ -84,6 +84,9 @@
     "header": {
       "signedInAs": "Signed in as"
     },
+    "nav": {
+      "sectionSelect": "Section"
+    },
     "sections": {
       "overview": "Overview",
       "profile": "Profile",

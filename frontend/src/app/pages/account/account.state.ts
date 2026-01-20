@@ -335,6 +335,17 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  navigationSection(): AccountSection {
+    const section = this.activeSectionFromUrl(this.router.url);
+    return section === 'password' ? 'security' : section;
+  }
+
+  navigateToSection(raw: string): void {
+    const section = (raw || '').trim() as AccountSection;
+    if (!section || section === 'password') return;
+    void this.router.navigate([section === 'overview' ? 'overview' : section], { relativeTo: this.route });
+  }
+
   private ensureLoadedForSection(section: AccountSection): void {
     switch (section) {
       case 'profile':
