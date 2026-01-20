@@ -163,6 +163,11 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   creatingReturn = false;
   returnCreateError: string | null = null;
   private readonly returnRequestedOrderIds = new Set<string>();
+  cancelOrderId: string | null = null;
+  cancelReason = '';
+  requestingCancel = false;
+  cancelRequestError: string | null = null;
+  private readonly cancelRequestedOrderIds = new Set<string>();
 
   private forceProfileCompletion = false;
   private profileLoaded = false;
@@ -663,6 +668,28 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     return detail || null;
   }
 
+  private updateOrderInList(updated: Order): void {
+    this.orders.set(this.orders().map((o) => (o.id === updated.id ? updated : o)));
+    const latest = this.latestOrder();
+    if (latest?.id === updated.id) {
+      this.latestOrder.set(updated);
+    }
+  }
+
+  manualRefundRequired(order: Order): boolean {
+    const status = (order.status || '').trim().toLowerCase();
+    if (status !== 'cancelled') return false;
+    const method = (order.payment_method || '').trim().toLowerCase();
+    if (!['stripe', 'paypal'].includes(method)) return false;
+
+    const events = Array.isArray(order.events) ? order.events : [];
+    const captured = events.some((evt) => (evt?.event || '').trim().toLowerCase() === 'payment_captured');
+    if (!captured) return false;
+
+    const refunded = events.some((evt) => (evt?.event || '').trim().toLowerCase() === 'payment_refunded');
+    return !refunded;
+  }
+
   reorder(order: Order): void {
     if (this.reorderingOrderId) return;
     this.reorderingOrderId = order.id;
@@ -708,6 +735,82 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
 
   canRequestReturn(order: Order): boolean {
     return (order.status || '').trim().toLowerCase() === 'delivered' && !this.hasReturnRequested(order);
+  }
+
+  hasCancelRequested(order: Order): boolean {
+    if (this.cancelRequestedOrderIds.has(order.id)) return true;
+    const events = Array.isArray(order.events) ? order.events : [];
+    return events.some((evt) => (evt?.event || '').trim().toLowerCase() === 'cancel_requested');
+  }
+
+  canRequestCancel(order: Order): boolean {
+    const status = (order.status || '').trim().toLowerCase();
+    if (!['pending_payment', 'pending_acceptance', 'paid'].includes(status)) return false;
+    return !this.hasCancelRequested(order);
+  }
+
+  openCancelRequest(order: Order): void {
+    if (!this.canRequestCancel(order)) {
+      this.toast.error(this.t('account.orders.cancel.errors.notEligible'));
+      return;
+    }
+    if (this.cancelOrderId === order.id) {
+      this.closeCancelRequest();
+      return;
+    }
+    this.closeReturnRequest();
+    this.cancelOrderId = order.id;
+    this.cancelReason = '';
+    this.cancelRequestError = null;
+  }
+
+  closeCancelRequest(): void {
+    this.cancelOrderId = null;
+    this.cancelReason = '';
+    this.cancelRequestError = null;
+  }
+
+  submitCancelRequest(order: Order): void {
+    if (this.requestingCancel) return;
+    if (!this.cancelOrderId || this.cancelOrderId !== order.id) return;
+    if (!this.canRequestCancel(order)) {
+      this.cancelRequestError = this.t('account.orders.cancel.errors.notEligible');
+      return;
+    }
+
+    const reason = this.cancelReason.trim();
+    if (!reason) {
+      this.cancelRequestError = this.t('account.orders.cancel.errors.reasonRequired');
+      return;
+    }
+
+    const ref = order.reference_code || order.id;
+    if (!confirm(this.t('account.orders.cancel.confirm', { ref }))) return;
+
+    this.requestingCancel = true;
+    this.cancelRequestError = null;
+    this.account.requestOrderCancellation(order.id, reason).subscribe({
+      next: (updated) => {
+        this.cancelRequestedOrderIds.add(order.id);
+        this.updateOrderInList(updated);
+        this.toast.success(this.t('account.orders.cancel.success'));
+        this.closeCancelRequest();
+      },
+      error: (err) => {
+        const detail = (err?.error?.detail || '').toString();
+        const key =
+          detail === 'Cancel request already exists'
+            ? 'account.orders.cancel.errors.alreadyRequested'
+            : detail === 'Cancel request not eligible'
+              ? 'account.orders.cancel.errors.notEligible'
+              : detail === 'Cancel reason is required'
+                ? 'account.orders.cancel.errors.reasonRequired'
+                : 'account.orders.cancel.errors.create';
+        this.cancelRequestError = this.t(key);
+        this.toast.error(this.cancelRequestError);
+      },
+      complete: () => (this.requestingCancel = false)
+    });
   }
 
   openReturnRequest(order: Order): void {

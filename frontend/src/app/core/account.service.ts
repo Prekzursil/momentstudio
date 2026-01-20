@@ -34,6 +34,8 @@ export interface Order {
   status: string;
   cancel_reason?: string | null;
   payment_method?: string;
+  paypal_capture_id?: string | null;
+  stripe_payment_intent_id?: string | null;
   payment_retry_count?: number;
   total_amount: number;
   tax_amount?: number;
@@ -53,6 +55,7 @@ export interface Order {
   billing_address_id?: string | null;
   created_at: string;
   updated_at: string;
+  events?: Array<{ id: string; event: string; note?: string | null; created_at: string }>;
   items: OrderItem[];
 }
 
@@ -205,6 +208,12 @@ export class AccountService {
 
   reorderOrder(orderId: string): Observable<unknown> {
     return this.api.post(`/orders/${orderId}/reorder`, {});
+  }
+
+  requestOrderCancellation(orderId: string, reason: string): Observable<Order> {
+    return this.api
+      .post<any>(`/orders/${orderId}/cancel-request`, { reason })
+      .pipe(map((order) => this.normalizeOrder(order)));
   }
 
   downloadReceipt(orderId: string): Observable<Blob> {

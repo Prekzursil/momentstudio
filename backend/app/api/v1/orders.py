@@ -23,6 +23,7 @@ from app.models.order import Order, OrderItem, OrderStatus, OrderEvent
 from app.schemas.cart import CartRead
 from app.schemas.cart import Totals
 from app.schemas.order import (
+    OrderCancelRequest,
     OrderCreate,
     OrderEventRead,
     OrderListResponse,
@@ -1810,6 +1811,70 @@ async def revoke_receipt_share_token(
     receipt_url = f"{settings.frontend_origin.rstrip('/')}/receipt/{token}"
     receipt_pdf_url = f"{settings.frontend_origin.rstrip('/')}/api/v1/orders/receipt/{token}/pdf"
     return ReceiptShareTokenRead(token=token, receipt_url=receipt_url, receipt_pdf_url=receipt_pdf_url, expires_at=expires_at)
+
+
+@router.post("/{order_id}/cancel-request", response_model=OrderRead)
+async def request_order_cancellation(
+    order_id: UUID,
+    payload: OrderCancelRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(require_verified_email),
+) -> OrderRead:
+    order = await order_service.get_order(session, current_user.id, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    if OrderStatus(order.status) not in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancel request not eligible")
+
+    reason = (payload.reason or "").strip()
+    if not reason:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancel reason is required")
+
+    if any(getattr(evt, "event", None) == "cancel_requested" for evt in (order.events or [])):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cancel request already exists")
+
+    session.add(OrderEvent(order_id=order.id, event="cancel_requested", note=reason[:2000]))
+    await session.commit()
+    await session.refresh(order, attribute_names=["events"])
+
+    owner = await auth_service.get_owner_user(session)
+    if owner and owner.id:
+        await notification_service.create_notification(
+            session,
+            user_id=owner.id,
+            type="admin",
+            title="Cancel request" if (owner.preferred_language or "en") != "ro" else "Cerere anulare",
+            body=(
+                f"Order {order.reference_code or order.id} cancellation requested."
+                if (owner.preferred_language or "en") != "ro"
+                else f"Cerere de anulare pentru comanda {order.reference_code or order.id}."
+            ),
+            url=f"/admin/orders/{order.id}",
+        )
+
+    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+    if admin_to:
+        background_tasks.add_task(
+            email_service.send_order_cancel_request_notification,
+            admin_to,
+            order,
+            requested_by_email=getattr(current_user, "email", None),
+            reason=reason,
+            lang=owner.preferred_language if owner else None,
+        )
+
+    await notification_service.create_notification(
+        session,
+        user_id=current_user.id,
+        type="order",
+        title="Cancel requested" if (current_user.preferred_language or "en") != "ro" else "Anulare solicitată",
+        body=f"Reference {order.reference_code}" if order.reference_code else None,
+        url="/account",
+    )
+
+    return order
 
 
 @router.post("/{order_id}/reorder", response_model=CartRead)

@@ -134,15 +134,53 @@ import { AccountComponent } from './account.component';
                 {{ order.created_at | date: 'mediumDate' }} · {{ order.items.length }} item{{ order.items.length === 1 ? '' : 's' }}
               </p>
             </div>
-            <div class="text-right">
+            <div class="grid gap-2 justify-items-end text-right">
               <p class="font-semibold text-slate-900 dark:text-slate-50">
                 {{ order.total_amount | localizedCurrency: order.currency || 'RON' }}
               </p>
-              <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Updated {{ order.updated_at | date: 'mediumDate' }}</p>
+              <div
+                class="flex flex-wrap justify-end gap-2"
+                (click)="$event.preventDefault(); $event.stopPropagation()"
+              >
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'account.orders.receiptPdf' | translate"
+                  [disabled]="account.downloadingReceiptId === order.id"
+                  (action)="account.downloadReceipt(order)"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'account.orders.receiptShare' | translate"
+                  [disabled]="account.sharingReceiptId === order.id"
+                  (action)="account.shareReceipt(order)"
+                ></app-button>
+                <app-button
+                  *ngIf="account.receiptShares()[order.id]"
+                  size="sm"
+                  variant="ghost"
+                  [label]="'account.orders.receiptRevoke' | translate"
+                  [disabled]="account.revokingReceiptId === order.id"
+                  (action)="account.revokeReceiptShare(order)"
+                ></app-button>
+              </div>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Updated {{ order.updated_at | date: 'mediumDate' }}</p>
             </div>
           </summary>
 
           <div class="mt-3 grid gap-3">
+            <div
+              *ngIf="account.manualRefundRequired(order)"
+              class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+            >
+              <p class="font-semibold">{{ 'account.orders.refund.manualRequiredTitle' | translate }}</p>
+              <p class="mt-1 text-sm">{{ 'account.orders.refund.manualRequiredCopy' | translate }}</p>
+              <p class="mt-1 text-sm">{{ 'account.orders.refund.manualRequiredHint' | translate }}</p>
+              <a routerLink="/tickets" class="mt-2 inline-flex font-medium text-amber-900 underline dark:text-amber-100">{{
+                'account.orders.refund.contact' | translate
+              }}</a>
+            </div>
             <div class="mt-4 grid gap-4">
               <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
                 <div class="flex flex-wrap items-center justify-between gap-2">
@@ -260,29 +298,17 @@ import { AccountComponent } from './account.component';
                       (action)="account.openReturnRequest(order)"
                     ></app-button>
                     <app-button
-                      size="sm"
                       variant="ghost"
-                      [label]="'account.orders.receiptPdf' | translate"
-                      [disabled]="account.downloadingReceiptId === order.id"
-                      (action)="account.downloadReceipt(order)"
-                    ></app-button>
-                    <app-button
                       size="sm"
-                      variant="ghost"
-                      [label]="'account.orders.receiptShare' | translate"
-                      [disabled]="account.sharingReceiptId === order.id"
-                      (action)="account.shareReceipt(order)"
+                      [label]="
+                        account.hasCancelRequested(order)
+                          ? ('account.orders.cancel.requested' | translate)
+                          : ('account.orders.cancel.open' | translate)
+                      "
+                      [disabled]="account.hasCancelRequested(order) || account.requestingCancel"
+                      *ngIf="account.canRequestCancel(order) || account.hasCancelRequested(order)"
+                      (action)="account.openCancelRequest(order)"
                     ></app-button>
-                    <app-button
-                      size="sm"
-                      variant="ghost"
-                      [label]="'account.orders.receiptRevoke' | translate"
-                      [disabled]="account.revokingReceiptId === order.id"
-                      (action)="account.revokeReceiptShare(order)"
-                    ></app-button>
-                  </div>
-                  <div *ngIf="account.receiptShares()[order.id] as share" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                    Share link expires: {{ share.expires_at | date: 'short' }}
                   </div>
                 </div>
               </div>
@@ -367,6 +393,56 @@ import { AccountComponent } from './account.component';
                       [label]="'account.orders.return.submit' | translate"
                       [disabled]="account.creatingReturn"
                       (action)="account.submitReturnRequest(order)"
+                    ></app-button>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                *ngIf="account.cancelOrderId === order.id"
+                class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/40"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div class="grid gap-1">
+                    <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                      {{ 'account.orders.cancel.title' | translate }}
+                    </p>
+                    <p class="text-xs text-slate-600 dark:text-slate-300">
+                      {{ 'account.orders.cancel.hint' | translate }}
+                    </p>
+                  </div>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'account.orders.cancel.close' | translate"
+                    [disabled]="account.requestingCancel"
+                    (action)="account.closeCancelRequest()"
+                  ></app-button>
+                </div>
+
+                <div class="mt-3 grid gap-3">
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'account.orders.cancel.reasonLabel' | translate }}
+                    <textarea
+                      class="min-h-[90px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      [(ngModel)]="account.cancelReason"
+                      [placeholder]="'account.orders.cancel.reasonPh' | translate"
+                    ></textarea>
+                  </label>
+
+                  <div
+                    *ngIf="account.cancelRequestError"
+                    class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+                  >
+                    {{ account.cancelRequestError }}
+                  </div>
+
+                  <div class="flex items-center justify-end gap-2">
+                    <app-button
+                      size="sm"
+                      [label]="'account.orders.cancel.submit' | translate"
+                      [disabled]="account.requestingCancel"
+                      (action)="account.submitCancelRequest(order)"
                     ></app-button>
                   </div>
                 </div>

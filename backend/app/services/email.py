@@ -437,6 +437,61 @@ async def send_order_cancelled_update(to_email: str, order, *, lang: str | None 
     return await send_email(to_email, subject, text_body, html_body)
 
 
+async def send_order_cancel_request_notification(
+    to_email: str,
+    order,
+    *,
+    requested_by_email: str | None = None,
+    reason: str | None = None,
+    lang: str | None = None,
+) -> bool:
+    ref = getattr(order, "reference_code", None) or str(getattr(order, "id", ""))
+    admin_url = f"{settings.frontend_origin.rstrip('/')}/admin/orders/{getattr(order, 'id', '')}"
+    status_value = getattr(getattr(order, "status", None), "value", None) or str(getattr(order, "status", "") or "")
+
+    reason_clean = (reason or "").strip() or None
+    requested_by = (requested_by_email or "").strip() or None
+
+    def _lines(lng: str) -> list[str]:
+        lines = [
+            (
+                f"Cerere de anulare pentru comanda {ref}."
+                if lng == "ro"
+                else f"Cancellation request for order {ref}."
+            )
+        ]
+        if requested_by:
+            lines.append(("Solicitat de: " if lng == "ro" else "Requested by: ") + requested_by)
+        if reason_clean:
+            lines.append(("Motiv: " if lng == "ro" else "Reason: ") + reason_clean)
+        payment = _payment_method_label(getattr(order, "payment_method", None), lang=lng)
+        if payment:
+            lines.append(("Plată: " if lng == "ro" else "Payment: ") + payment)
+        if status_value:
+            lines.append(("Status: " if lng == "ro" else "Status: ") + status_value)
+        lines.append("")
+        lines.append(
+            f"Admin: {admin_url}" if lng == "ro" else f"Admin: {admin_url}"
+        )
+        return lines
+
+    subject = _bilingual_subject(
+        f"Cerere de anulare: {ref}",
+        f"Cancellation request: {ref}",
+        preferred_language=lang,
+    )
+    text_ro = "\n".join(_lines("ro"))
+    text_en = "\n".join(_lines("en"))
+    text_body, html_body = _bilingual_sections(
+        text_ro=text_ro,
+        text_en=text_en,
+        html_ro=_html_pre(text_ro),
+        html_en=_html_pre(text_en),
+        preferred_language=lang,
+    )
+    return await send_email(to_email, subject, text_body, html_body)
+
+
 async def send_order_refunded_update(to_email: str, order, *, lang: str | None = None) -> bool:
     ref = getattr(order, "reference_code", None) or str(getattr(order, "id", ""))
     account_url = f"{settings.frontend_origin.rstrip('/')}/account"

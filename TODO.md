@@ -466,9 +466,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Orders: show delivery tracking status (when available) alongside tracking number.
 - [x] Orders: add “Request return” flow from eligible orders.
 - [x] Orders: add item-level reorder (not only whole-order reorder).
-- [ ] Orders: move receipt/invoice actions to the order header for quick access.
-- [ ] Orders: allow cancel request for eligible states (with confirmation + reason).
-- [ ] Orders: show “manual refund required” banner with next steps (when applicable).
+- [x] Orders: move receipt/invoice actions to the order header for quick access.
+- [x] Orders: allow cancel request for eligible states (with confirmation + reason).
+- [x] Orders: show “manual refund required” banner with next steps (when applicable).
 - [x] Receipts: show share expiry + revoke/copy states in Account orders UI.
 - [ ] Addresses: add country-specific validation hints (postal code, required fields).
 - [ ] Addresses: optional address autocomplete (feature-flag).

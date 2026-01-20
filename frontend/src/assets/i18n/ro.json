@@ -311,6 +311,24 @@
           "create": "Nu am putut trimite cererea de retur."
         }
       },
+      "cancel": {
+        "open": "Solicită anulare",
+        "requested": "Anulare solicitată",
+        "title": "Anulare",
+        "hint": "Spune-ne de ce vrei să anulezi această comandă. O vom revizui cât mai curând.",
+        "close": "Închide",
+        "reasonLabel": "Motiv",
+        "reasonPh": "Spune-ne de ce vrei să anulezi…",
+        "submit": "Trimite cererea",
+        "confirm": "Soliciți anularea comenzii #{{ref}}?",
+        "success": "Cererea de anulare a fost trimisă.",
+        "errors": {
+          "notEligible": "Această comandă nu mai poate fi anulată.",
+          "reasonRequired": "Motivul este obligatoriu.",
+          "alreadyRequested": "Ai solicitat deja anularea pentru această comandă.",
+          "create": "Nu am putut trimite cererea de anulare."
+        }
+      },
       "browse": "Explorează produsele",
       "reorder": "Recomandă din nou",
       "receiptPdf": "Chitanță (PDF)",
@@ -326,6 +344,12 @@
       "receiptRevokeConfirm": "Revoci linkurile de chitanță partajate pentru această comandă?",
       "receiptRevoked": "Linkurile de chitanță au fost revocate",
       "receiptRevokeError": "Nu am putut revoca linkurile de chitanță.",
+      "refund": {
+        "manualRequiredTitle": "Rambursare în așteptare",
+        "manualRequiredCopy": "Comanda a fost anulată după confirmarea plății. Echipa noastră va procesa rambursarea manual.",
+        "manualRequiredHint": "Dacă ai întrebări, contactează suportul.",
+        "contact": "Contactează suportul"
+      },
       "delivery": {
         "home": "Livrare la domiciliu",
         "locker": "Ridicare de la locker"

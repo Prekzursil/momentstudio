@@ -109,6 +109,10 @@ class OrderUpdate(BaseModel):
     shipped_quantity: int | None = Field(default=None, ge=0)
 
 
+class OrderCancelRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=2000)
+
+
 class OrderEventRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -311,6 +311,24 @@
           "create": "Could not submit return request."
         }
       },
+      "cancel": {
+        "open": "Request cancellation",
+        "requested": "Cancellation requested",
+        "title": "Cancellation",
+        "hint": "Tell us why you want to cancel this order. We'll review it as soon as possible.",
+        "close": "Close",
+        "reasonLabel": "Reason",
+        "reasonPh": "Tell us why you want to cancel…",
+        "submit": "Send request",
+        "confirm": "Request cancellation for order #{{ref}}?",
+        "success": "Cancellation request sent.",
+        "errors": {
+          "notEligible": "This order can't be cancelled anymore.",
+          "reasonRequired": "Reason is required.",
+          "alreadyRequested": "You already requested cancellation for this order.",
+          "create": "Could not send cancellation request."
+        }
+      },
       "browse": "Browse products",
       "reorder": "Reorder",
       "reorderSuccess": "Added items to cart",
@@ -326,6 +344,12 @@
       "receiptRevokeConfirm": "Revoke previously shared receipt links for this order?",
       "receiptRevoked": "Receipt links revoked",
       "receiptRevokeError": "Could not revoke receipt links.",
+      "refund": {
+        "manualRequiredTitle": "Refund pending",
+        "manualRequiredCopy": "This order was cancelled after payment was captured. Our team will process a refund manually.",
+        "manualRequiredHint": "If you have questions, contact support.",
+        "contact": "Contact support"
+      },
       "delivery": {
         "home": "Home delivery",
         "locker": "Locker pickup"

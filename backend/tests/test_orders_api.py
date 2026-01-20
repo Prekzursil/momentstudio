@@ -220,6 +220,58 @@ def test_list_my_orders_pagination_and_filters(test_app: Dict[str, object]) -> N
     assert invalid_date.status_code == 400, invalid_date.text
 
 
+def test_order_cancel_request_flow(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    token, user_id = create_user_token(SessionLocal, email="buyer-cancelreq@example.com")
+
+    async def seed_order(status: OrderStatus) -> UUID:
+        async with SessionLocal() as session:
+            order = Order(
+                user_id=user_id,
+                status=status,
+                reference_code=f"CANCELREQ-{status.value}".upper(),
+                customer_email="buyer-cancelreq@example.com",
+                customer_name="Buyer Cancel",
+                total_amount=Decimal("10.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+                payment_method="cod",
+            )
+            session.add(order)
+            await session.commit()
+            await session.refresh(order)
+            return order.id
+
+    eligible_order_id = asyncio.run(seed_order(OrderStatus.pending_acceptance))
+    eligible_order_id_str = str(eligible_order_id)
+
+    first = client.post(
+        f"/api/v1/orders/{eligible_order_id_str}/cancel-request",
+        headers=auth_headers(token),
+        json={"reason": "Please cancel"},
+    )
+    assert first.status_code == 200, first.text
+    assert any(evt["event"] == "cancel_requested" for evt in first.json().get("events", []))
+
+    duplicate = client.post(
+        f"/api/v1/orders/{eligible_order_id_str}/cancel-request",
+        headers=auth_headers(token),
+        json={"reason": "Please cancel again"},
+    )
+    assert duplicate.status_code == 409, duplicate.text
+
+    ineligible_order_id = asyncio.run(seed_order(OrderStatus.shipped))
+    ineligible = client.post(
+        f"/api/v1/orders/{ineligible_order_id}/cancel-request",
+        headers=auth_headers(token),
+        json={"reason": "Too late"},
+    )
+    assert ineligible.status_code == 400, ineligible.text
+
+
 def seed_cart_with_product(session_factory, user_id: UUID) -> UUID:
     async def seed():
         async with session_factory() as session:
