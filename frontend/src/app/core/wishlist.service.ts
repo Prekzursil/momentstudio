@@ -19,8 +19,8 @@ export class WishlistService {
   private readonly snapshotSignal = signal<Record<string, WishlistSnapshotEntry>>({});
   readonly snapshots = this.snapshotSignal.asReadonly();
 
-  private loaded = false;
-  private loading = false;
+  private readonly loadedSignal = signal(false);
+  private readonly loadingSignal = signal(false);
   private authEffect?: EffectRef;
   private activeUserId: string | null = null;
 
@@ -41,37 +41,37 @@ export class WishlistService {
   }
 
   isLoaded(): boolean {
-    return this.loaded;
+    return this.loadedSignal();
   }
 
   ensureLoaded(): void {
-    if (this.loaded || this.loading) return;
+    if (this.loadedSignal() || this.loadingSignal()) return;
     if (!this.auth.isAuthenticated()) return;
-    this.loading = true;
+    this.loadingSignal.set(true);
     this.api.get<Product[]>('/wishlist').subscribe({
       next: (items) => {
         this.itemsSignal.set(items);
         this.ensureBaselines(items);
-        this.loaded = true;
-        this.loading = false;
+        this.loadedSignal.set(true);
+        this.loadingSignal.set(false);
       },
       error: () => {
         this.itemsSignal.set([]);
-        this.loaded = false;
-        this.loading = false;
+        this.loadedSignal.set(false);
+        this.loadingSignal.set(false);
       }
     });
   }
 
   refresh(): void {
-    this.loaded = false;
+    this.loadedSignal.set(false);
     this.ensureLoaded();
   }
 
   clear(): void {
     this.itemsSignal.set([]);
-    this.loaded = false;
-    this.loading = false;
+    this.loadedSignal.set(false);
+    this.loadingSignal.set(false);
   }
 
   isWishlisted(productId: string): boolean {
