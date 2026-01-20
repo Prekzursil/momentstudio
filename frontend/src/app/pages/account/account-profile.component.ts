@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule } from '@ngx-translate/core';
 
@@ -71,7 +71,7 @@ import { AccountComponent } from './account.component';
             <div class="flex flex-wrap items-center gap-3">
               <label class="text-sm text-indigo-600 font-medium cursor-pointer dark:text-indigo-300">
                 Upload avatar
-                <input type="file" class="hidden" accept="image/*" (change)="account.onAvatarChange($event)" />
+                <input type="file" class="hidden" accept="image/*" (change)="onAvatarFileChange($event)" />
               </label>
               <app-button
                 *ngIf="account.googlePicture() && (account.profile()?.avatar_url || '') !== (account.googlePicture() || '')"
@@ -237,7 +237,28 @@ import { AccountComponent } from './account.component';
                   [(ngModel)]="account.profilePhoneNational"
                 />
               </div>
-              <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{ 'auth.phoneHint' | translate }}</span>
+              <div class="grid gap-1">
+                <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{ 'auth.phoneHint' | translate }}</span>
+                <span
+                  *ngIf="account.phoneNationalPreview() as preview"
+                  class="text-xs font-normal text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'account.profile.phone.formattedPreview' | translate: { value: preview } }}
+                </span>
+                <ng-container *ngIf="account.phoneE164Preview() as e164; else phoneInvalid">
+                  <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+                    {{ 'account.profile.phone.e164Preview' | translate: { value: e164 } }}
+                  </span>
+                </ng-container>
+                <ng-template #phoneInvalid>
+                  <span
+                    *ngIf="account.profilePhoneNational.trim()"
+                    class="text-xs font-normal text-rose-700 dark:text-rose-300"
+                  >
+                    {{ 'validation.phoneInvalid' | translate }}
+                  </span>
+                </ng-template>
+              </div>
             </div>
 
             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -314,11 +335,75 @@ import { AccountComponent } from './account.component';
       </p>
       </ng-template>
     </section>
+
+    <ng-container *ngIf="avatarCropOpen">
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div
+          class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+        >
+          <div class="flex items-center justify-between gap-3">
+            <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">Crop avatar</h3>
+            <button
+              type="button"
+              class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+              (click)="cancelAvatarCrop()"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div class="mt-4 flex justify-center">
+            <div
+              class="relative h-64 w-64 overflow-hidden rounded-full border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950"
+            >
+              <img
+                *ngIf="avatarCropUrl"
+                [src]="avatarCropUrl"
+                alt="Avatar preview"
+                class="absolute left-1/2 top-1/2 max-w-none select-none"
+                [style.transform]="avatarCropTransform"
+              />
+            </div>
+          </div>
+
+          <label class="mt-4 grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            Zoom
+            <input
+              type="range"
+              min="1"
+              max="3"
+              step="0.01"
+              class="w-full"
+              [(ngModel)]="avatarCropZoom"
+              [disabled]="account.avatarBusy"
+            />
+          </label>
+
+          <p *ngIf="avatarCropError" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ avatarCropError }}</p>
+
+          <div class="mt-4 flex justify-end gap-2">
+            <app-button size="sm" variant="ghost" label="Cancel" [disabled]="account.avatarBusy" (action)="cancelAvatarCrop()"></app-button>
+            <app-button
+              size="sm"
+              label="Upload"
+              [disabled]="account.avatarBusy || !avatarCropReady"
+              (action)="confirmAvatarCrop()"
+            ></app-button>
+          </div>
+        </div>
+      </div>
+    </ng-container>
   `
 })
-export class AccountProfileComponent {
+export class AccountProfileComponent implements OnDestroy {
   protected readonly account = inject(AccountComponent);
   showUsernamePassword = false;
+  avatarCropOpen = false;
+  avatarCropUrl: string | null = null;
+  avatarCropZoom = 1;
+  avatarCropError: string | null = null;
+  private avatarImage: HTMLImageElement | null = null;
 
   hasUnsavedChanges(): boolean {
     return this.account.profileHasUnsavedChanges();
@@ -326,5 +411,94 @@ export class AccountProfileComponent {
 
   discardUnsavedChanges(): void {
     this.account.discardProfileChanges();
+  }
+
+  get avatarCropReady(): boolean {
+    return Boolean(this.avatarCropUrl && this.avatarImage && !this.avatarCropError);
+  }
+
+  get avatarCropTransform(): string {
+    const raw = Number(this.avatarCropZoom);
+    const zoom = Number.isFinite(raw) ? Math.max(1, Math.min(raw, 3)) : 1;
+    return `translate(-50%, -50%) scale(${zoom})`;
+  }
+
+  onAvatarFileChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] || null;
+    input.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return;
+
+    this.resetAvatarCrop();
+    const url = URL.createObjectURL(file);
+    this.avatarCropUrl = url;
+    this.avatarCropOpen = true;
+    this.avatarCropZoom = 1;
+    this.avatarCropError = null;
+    const img = new Image();
+    img.onload = () => {
+      this.avatarImage = img;
+    };
+    img.onerror = () => {
+      this.avatarCropError = 'Could not load image preview.';
+    };
+    img.src = url;
+  }
+
+  cancelAvatarCrop(): void {
+    if (this.account.avatarBusy) return;
+    this.resetAvatarCrop();
+  }
+
+  async confirmAvatarCrop(): Promise<void> {
+    if (this.account.avatarBusy) return;
+    if (!this.avatarImage) return;
+    const url = this.avatarCropUrl;
+    if (!url) return;
+
+    const raw = Number(this.avatarCropZoom);
+    const zoom = Number.isFinite(raw) ? Math.max(1, Math.min(raw, 3)) : 1;
+    const canvas = document.createElement('canvas');
+    const size = 512;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      this.resetAvatarCrop();
+      return;
+    }
+
+    const img = this.avatarImage;
+    const base = Math.min(img.naturalWidth, img.naturalHeight);
+    const crop = base / zoom;
+    const sx = (img.naturalWidth - crop) / 2;
+    const sy = (img.naturalHeight - crop) / 2;
+    ctx.drawImage(img, sx, sy, crop, crop, 0, 0, size, size);
+
+    const blob: Blob | null = await new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png', 0.92));
+    if (!blob) {
+      this.resetAvatarCrop();
+      return;
+    }
+
+    this.resetAvatarCrop();
+    const file = new File([blob], 'avatar.png', { type: blob.type });
+    this.account.uploadAvatar(file);
+  }
+
+  ngOnDestroy(): void {
+    this.resetAvatarCrop();
+  }
+
+  private resetAvatarCrop(): void {
+    this.avatarCropOpen = false;
+    this.avatarCropZoom = 1;
+    this.avatarImage = null;
+    this.avatarCropError = null;
+    if (this.avatarCropUrl) {
+      URL.revokeObjectURL(this.avatarCropUrl);
+      this.avatarCropUrl = null;
+    }
   }
 }

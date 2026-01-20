@@ -494,8 +494,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Emails: require re-auth for more sensitive actions (unlink Google/remove primary/etc).
 - [x] Google linking: clarify “unlink required” restriction with better copy and UX.
 - [x] Profile: separate “public identity” vs “private account info” sections.
-- [ ] Profile: improve phone input UX (formatting preview, validation hints).
-- [ ] Profile: add avatar crop/preview UI before upload.
+- [x] Profile: improve phone input UX (formatting preview, validation hints).
+- [x] Profile: add avatar crop/preview UI before upload.
 - [ ] Profile: add a public-profile preview card (how you appear in comments).
 - [ ] Privacy: show export progress + notify when ready (background job UX).
 - [ ] Privacy: show deletion cooldown progress + consequences checklist.

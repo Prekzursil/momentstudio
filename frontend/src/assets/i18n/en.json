@@ -138,6 +138,10 @@
       },
       "aliases": {
         "loadError": "Could not load your username/display name history."
+      },
+      "phone": {
+        "formattedPreview": "Preview: {{value}}",
+        "e164Preview": "Saved as: {{value}}"
       }
     },
     "privacy": {

@@ -44,7 +44,14 @@ import { WishlistService } from '../../core/wishlist.service';
 import { CouponsService, type CouponRead } from '../../core/coupons.service';
 import { orderStatusChipClass } from '../../shared/order-status';
 import { missingRequiredProfileFields as computeMissingRequiredProfileFields, type RequiredProfileField } from '../../shared/profile-requirements';
-import { buildE164, listPhoneCountries, splitE164, type PhoneCountryOption } from '../../shared/phone';
+  import {
+    buildE164,
+    formatInternationalPreview,
+    formatNationalAsYouType,
+    listPhoneCountries,
+    splitE164,
+    type PhoneCountryOption
+  } from '../../shared/phone';
 import { formatIdentity } from '../../shared/user-identity';
 import { isWebAuthnSupported, serializePublicKeyCredential, toPublicKeyCredentialCreationOptions } from '../../shared/webauthn';
 
@@ -1244,7 +1251,14 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   onAvatarChange(event: Event): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
+    input.value = '';
     if (!file) return;
+    this.uploadAvatar(file);
+  }
+
+  uploadAvatar(file: File): void {
+    if (this.avatarBusy) return;
+    this.avatarBusy = true;
     this.auth.uploadAvatar(file).subscribe({
       next: (user) => {
         this.profile.set(user);
@@ -1254,6 +1268,10 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
       error: (err) => {
         const message = err?.error?.detail || this.t('account.profile.avatar.uploadError');
         this.toast.error(message);
+        this.avatarBusy = false;
+      },
+      complete: () => {
+        this.avatarBusy = false;
       }
     });
   }
@@ -1357,6 +1375,14 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     const missing = computeMissingRequiredProfileFields(user);
     if (!missing.length) return false;
     return this.forceProfileCompletion || Boolean(user.google_sub);
+  }
+
+  phoneNationalPreview(): string {
+    return formatNationalAsYouType(this.profilePhoneCountry, this.profilePhoneNational);
+  }
+
+  phoneE164Preview(): string | null {
+    return formatInternationalPreview(this.profilePhoneCountry, this.profilePhoneNational);
   }
 
   usernameChanged(): boolean {

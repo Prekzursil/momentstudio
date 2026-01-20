@@ -138,6 +138,10 @@
       },
       "aliases": {
         "loadError": "Nu am putut încărca istoricul de username/nume afișat."
+      },
+      "phone": {
+        "formattedPreview": "Previzualizare: {{value}}",
+        "e164Preview": "Se salvează ca: {{value}}"
       }
     },
     "privacy": {
