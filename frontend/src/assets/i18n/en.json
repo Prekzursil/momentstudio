@@ -250,6 +250,19 @@
         "noneRevoked": "No other devices to sign out.",
         "revokeError": "Could not sign out other devices."
       },
+      "activity": {
+        "title": "Recent activity",
+        "copy": "Sign-ins and security changes for your account.",
+        "refresh": "Refresh",
+        "none": "No recent activity.",
+        "loadError": "Could not load security activity.",
+        "login_password": "Signed in with password",
+        "login_google": "Signed in with Google",
+        "email_changed": "Email changed",
+        "password_changed": "Password changed",
+        "password_reset": "Password reset",
+        "unknown": "Security event"
+      },
       "session": {
         "title": "Session",
         "copy": "You will be logged out after inactivity to keep your account safe.",

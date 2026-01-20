@@ -484,7 +484,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Notifications: show last-updated timestamp per preference group.
 - [x] Notifications: clarify transactional vs marketing preferences (copy + grouping).
 - [x] Security: list active sessions/devices + revoke others.
-- [ ] Security: show a recent security activity feed (logins/email changes/password changes).
+- [x] Security: show a recent security activity feed (logins/email changes/password changes).
 - [ ] Security: add 2FA (TOTP) + recovery codes.
 - [ ] Security: add passkeys (WebAuthn) for sign-in.
 - [ ] Security: add password strength meter + show/hide toggles where missing.

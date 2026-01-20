@@ -250,6 +250,19 @@
         "noneRevoked": "Nu există alte dispozitive de deconectat.",
         "revokeError": "Nu am putut deconecta celelalte dispozitive."
       },
+      "activity": {
+        "title": "Activitate recentă",
+        "copy": "Autentificări și modificări de securitate pentru contul tău.",
+        "refresh": "Reîmprospătează",
+        "none": "Nu există activitate recentă.",
+        "loadError": "Nu am putut încărca activitatea de securitate.",
+        "login_password": "Autentificat cu parolă",
+        "login_google": "Autentificat cu Google",
+        "email_changed": "Email schimbat",
+        "password_changed": "Parolă schimbată",
+        "password_reset": "Parolă resetată",
+        "unknown": "Eveniment de securitate"
+      },
       "session": {
         "title": "Sesiune",
         "copy": "Vei fi deconectat după o perioadă de inactivitate pentru a-ți păstra contul în siguranță.",

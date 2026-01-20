@@ -337,6 +337,52 @@ import { AccountComponent } from './account.component';
         </div>
 
         <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-3">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div class="grid gap-1">
+              <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'account.security.activity.title' | translate }}</h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'account.security.activity.copy' | translate }}</p>
+            </div>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'account.security.activity.refresh' | translate"
+              [disabled]="account.securityEventsLoading()"
+              (action)="account.refreshSecurityEvents()"
+            ></app-button>
+          </div>
+
+          <div *ngIf="account.securityEventsLoading()" class="text-sm text-slate-600 dark:text-slate-300">
+            {{ 'notifications.loading' | translate }}
+          </div>
+
+          <p *ngIf="account.securityEventsError()" class="text-xs text-rose-700 dark:text-rose-300">{{ account.securityEventsError() }}</p>
+
+          <p
+            *ngIf="!account.securityEventsLoading() && account.securityEvents().length === 0"
+            class="text-sm text-slate-700 dark:text-slate-200"
+          >
+            {{ 'account.security.activity.none' | translate }}
+          </p>
+
+          <ul *ngIf="!account.securityEventsLoading() && account.securityEvents().length" class="grid gap-2">
+            <li
+              *ngFor="let e of account.securityEvents()"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900 flex flex-col gap-1"
+            >
+              <p class="text-sm font-medium text-slate-900 dark:text-slate-50">
+                {{ ('account.security.activity.' + (e.event_type || 'unknown')) | translate }}
+              </p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                {{ e.created_at | date: 'medium' }}<span *ngIf="e.ip_address"> • IP {{ e.ip_address }}</span>
+              </p>
+              <p *ngIf="e.user_agent" class="text-xs text-slate-500 dark:text-slate-400 truncate">
+                {{ e.user_agent }}
+              </p>
+            </li>
+          </ul>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-3">
           <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'account.security.session.title' | translate }}</h3>
           <p class="text-sm text-slate-700 dark:text-slate-200">
             {{ 'account.security.session.copy' | translate }}

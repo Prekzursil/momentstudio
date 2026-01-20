@@ -11,7 +11,7 @@ import { filter, map, of, Subscription, switchMap } from 'rxjs';
 
 import { ApiService } from '../../core/api.service';
 import { appConfig } from '../../core/app-config';
-import { AuthService, AuthUser, RefreshSessionInfo, SecondaryEmail, UserAliasesResponse } from '../../core/auth.service';
+import { AuthService, AuthUser, RefreshSessionInfo, SecondaryEmail, UserAliasesResponse, UserSecurityEventInfo } from '../../core/auth.service';
 import {
   AccountDeletionStatus,
   AccountService,
@@ -206,6 +206,11 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   sessionsError = signal<string | null>(null);
   revokingOtherSessions = false;
 
+  securityEvents = signal<UserSecurityEventInfo[]>([]);
+  securityEventsLoaded = signal<boolean>(false);
+  securityEventsLoading = signal<boolean>(false);
+  securityEventsError = signal<string | null>(null);
+
   exportingData = false;
   exportError: string | null = null;
 
@@ -391,6 +396,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.loadSecondaryEmails();
         this.loadPaymentMethods();
         this.loadSessions();
+        this.loadSecurityEvents();
         return;
       case 'comments':
         if (!this.myCommentsMeta()) {
@@ -1944,6 +1950,30 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
       },
       complete: () => this.sessionsLoading.set(false)
     });
+  }
+
+  private loadSecurityEvents(force: boolean = false): void {
+    if (!this.auth.isAuthenticated()) return;
+    if (this.securityEventsLoading() && !force) return;
+    if (this.securityEventsLoaded() && !force) return;
+    this.securityEventsLoading.set(true);
+    this.securityEventsError.set(null);
+    this.auth.listSecurityEvents(30).subscribe({
+      next: (events) => {
+        this.securityEvents.set(events ?? []);
+        this.securityEventsLoaded.set(true);
+      },
+      error: () => {
+        this.securityEvents.set([]);
+        this.securityEventsError.set(this.t('account.security.activity.loadError'));
+        this.securityEventsLoading.set(false);
+      },
+      complete: () => this.securityEventsLoading.set(false)
+    });
+  }
+
+  refreshSecurityEvents(): void {
+    this.loadSecurityEvents(true);
   }
 
   otherSessionsCount(): number {

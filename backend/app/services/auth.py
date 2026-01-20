@@ -22,6 +22,7 @@ from app.models.user import (
     UserUsernameHistory,
     UserDisplayNameHistory,
     UserEmailHistory,
+    UserSecurityEvent,
     UserSecondaryEmail,
 )
 from app.schemas.user import UserCreate
@@ -810,6 +811,25 @@ async def issue_tokens_for_user(
     refresh = security.create_refresh_token(str(user.id), refresh_session.jti, refresh_session.expires_at)
     await session.commit()
     return {"access_token": access, "refresh_token": refresh}
+
+
+async def record_security_event(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    event_type: str,
+    *,
+    user_agent: str | None = None,
+    ip_address: str | None = None,
+) -> None:
+    session.add(
+        UserSecurityEvent(
+            user_id=user_id,
+            event_type=(event_type or "").strip()[:50] or "unknown",
+            user_agent=_truncate(user_agent, 255),
+            ip_address=_truncate(ip_address, 45),
+        )
+    )
+    await session.commit()
 
 
 async def _revoke_other_verification_tokens(session: AsyncSession, user_id: uuid.UUID) -> None:

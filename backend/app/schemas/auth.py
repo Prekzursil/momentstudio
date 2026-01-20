@@ -121,3 +121,11 @@ class RefreshSessionResponse(BaseModel):
 
 class RefreshSessionsRevokeResponse(BaseModel):
     revoked: int
+
+
+class UserSecurityEventResponse(BaseModel):
+    id: UUID
+    event_type: str
+    created_at: datetime
+    user_agent: str | None = None
+    ip_address: str | None = None

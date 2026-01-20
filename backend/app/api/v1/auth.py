@@ -19,13 +19,14 @@ from app.core.dependencies import get_current_user, get_google_completion_user, 
 from app.core.rate_limit import limiter, per_identifier_limiter
 from app.core.security import decode_token
 from app.db.session import get_session
-from app.models.user import RefreshSession, User, UserSecondaryEmail
+from app.models.user import RefreshSession, User, UserSecondaryEmail, UserSecurityEvent
 from app.schemas.auth import (
     AuthResponse,
     GoogleCallbackResponse,
     AccountDeletionStatus,
     RefreshSessionResponse,
     RefreshSessionsRevokeResponse,
+    UserSecurityEventResponse,
     EmailVerificationConfirm,
     SecondaryEmailConfirmRequest,
     SecondaryEmailCreateRequest,
@@ -371,6 +372,13 @@ async def register(
     )
     if response:
         set_refresh_cookie(response, tokens["refresh_token"], persistent=False)
+    await auth_service.record_security_event(
+        session,
+        user.id,
+        "login_password",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 
@@ -410,6 +418,13 @@ async def login(
     )
     if response:
         set_refresh_cookie(response, tokens["refresh_token"], persistent=persistent)
+    await auth_service.record_security_event(
+        session,
+        user.id,
+        "login_password",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 
@@ -543,6 +558,7 @@ async def logout(
 @router.post("/password/change", status_code=status.HTTP_200_OK)
 async def change_password(
     payload: ChangePasswordRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
@@ -553,6 +569,13 @@ async def change_password(
     session.add(current_user)
     await session.commit()
     background_tasks.add_task(email_service.send_password_changed, current_user.email, lang=current_user.preferred_language)
+    await auth_service.record_security_event(
+        session,
+        current_user.id,
+        "password_changed",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     return {"detail": "Password updated"}
 
 
@@ -631,6 +654,7 @@ async def update_username(
 )
 async def update_email(
     payload: EmailUpdateRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
@@ -643,6 +667,13 @@ async def update_email(
     background_tasks.add_task(email_service.send_email_changed, old_email, old_email=old_email, new_email=user.email, lang=user.preferred_language)
     background_tasks.add_task(email_service.send_email_changed, user.email, old_email=old_email, new_email=user.email, lang=user.preferred_language)
     background_tasks.add_task(email_service.send_verification_email, user.email, record.token, user.preferred_language)
+    await auth_service.record_security_event(
+        session,
+        user.id,
+        "email_changed",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     return UserResponse.model_validate(user)
 
 
@@ -720,12 +751,20 @@ async def confirm_secondary_email_verification(
 async def make_secondary_email_primary(
     secondary_email_id: UUID,
     payload: SecondaryEmailMakePrimaryRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> UserResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
     user = await auth_service.make_secondary_email_primary(session, current_user, secondary_email_id)
+    await auth_service.record_security_event(
+        session,
+        user.id,
+        "email_changed",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     return UserResponse.model_validate(user)
 
 
@@ -934,6 +973,43 @@ async def revoke_other_sessions(
     return RefreshSessionsRevokeResponse(revoked=len(to_revoke))
 
 
+@router.get(
+    "/me/security-events",
+    response_model=list[UserSecurityEventResponse],
+    summary="List my recent security activity",
+    description="Returns recent security-related events like logins and credential changes.",
+)
+async def list_security_events(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=30, ge=1, le=100),
+) -> list[UserSecurityEventResponse]:
+    rows = (
+        await session.execute(
+            select(UserSecurityEvent)
+            .where(UserSecurityEvent.user_id == current_user.id)
+            .order_by(UserSecurityEvent.created_at.desc())
+            .limit(limit)
+        )
+    ).scalars().all()
+
+    events: list[UserSecurityEventResponse] = []
+    for row in rows:
+        created_at = row.created_at
+        if created_at and created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        events.append(
+            UserSecurityEventResponse(
+                id=row.id,
+                event_type=row.event_type,
+                created_at=created_at,
+                user_agent=getattr(row, "user_agent", None),
+                ip_address=getattr(row, "ip_address", None),
+            )
+        )
+    return events
+
+
 @router.patch("/me", response_model=UserResponse)
 async def update_me(
     payload: ProfileUpdate,
@@ -1054,12 +1130,20 @@ async def request_password_reset(
 @router.post("/password-reset/confirm", status_code=status.HTTP_200_OK)
 async def confirm_password_reset(
     payload: PasswordResetConfirm,
+    request: Request,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(reset_confirm_rate_limit),
 ) -> dict[str, str]:
     user = await auth_service.confirm_reset_token(session, payload.token, payload.new_password)
     background_tasks.add_task(email_service.send_password_changed, user.email, lang=user.preferred_language)
+    await auth_service.record_security_event(
+        session,
+        user.id,
+        "password_reset",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     return {"status": "updated"}
 
 
@@ -1120,6 +1204,13 @@ async def google_callback(
             )
             if response:
                 set_refresh_cookie(response, tokens["refresh_token"], persistent=True)
+            await auth_service.record_security_event(
+                session,
+                existing_sub.id,
+                "login_google",
+                user_agent=request.headers.get("user-agent"),
+                ip_address=request.client.host if request.client else None,
+            )
             logger.info("google_login_existing", extra={"user_id": str(existing_sub.id)})
             return GoogleCallbackResponse(user=UserResponse.model_validate(existing_sub), tokens=TokenPair(**tokens))
 
@@ -1244,6 +1335,13 @@ async def google_complete_registration(
     )
     if response:
         set_refresh_cookie(response, tokens["refresh_token"], persistent=True)
+    await auth_service.record_security_event(
+        session,
+        user.id,
+        "login_google",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 

@@ -129,6 +129,43 @@ def test_sessions_list_and_revoke_others(test_app: Dict[str, object]) -> None:
     assert refresh_old.status_code == 401, refresh_old.text
 
 
+def test_security_events_include_logins_email_and_password_changes(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    res = client.post(
+        "/api/v1/auth/register",
+        json=make_register_payload(email="activity@example.com", username="activity", password="supersecret", name="Activity"),
+    )
+    assert res.status_code == 201, res.text
+    access = res.json()["tokens"]["access_token"]
+
+    first = client.get("/api/v1/auth/me/security-events", headers=auth_headers(access))
+    assert first.status_code == 200, first.text
+    first_types = {e["event_type"] for e in first.json()}
+    assert "login_password" in first_types
+
+    pw = client.post(
+        "/api/v1/auth/password/change",
+        headers=auth_headers(access),
+        json={"current_password": "supersecret", "new_password": "newsecret"},
+    )
+    assert pw.status_code == 200, pw.text
+
+    email = client.patch(
+        "/api/v1/auth/me/email",
+        headers=auth_headers(access),
+        json={"email": "activity2@example.com", "password": "newsecret"},
+    )
+    assert email.status_code == 200, email.text
+
+    events = client.get("/api/v1/auth/me/security-events", headers=auth_headers(access))
+    assert events.status_code == 200, events.text
+    event_types = {e["event_type"] for e in events.json()}
+    assert "login_password" in event_types
+    assert "password_changed" in event_types
+    assert "email_changed" in event_types
+
+
 def test_secondary_emails_flow(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 

@@ -91,6 +91,14 @@ export interface RefreshSessionsRevokeResponse {
   revoked: number;
 }
 
+export interface UserSecurityEventInfo {
+  id: string;
+  event_type: string;
+  created_at: string;
+  user_agent?: string | null;
+  ip_address?: string | null;
+}
+
 type StorageMode = 'local' | 'session';
 
 @Injectable({ providedIn: 'root' })
@@ -336,6 +344,10 @@ export class AuthService {
 
   revokeOtherSessions(): Observable<RefreshSessionsRevokeResponse> {
     return this.api.post<RefreshSessionsRevokeResponse>('/auth/me/sessions/revoke-others', {});
+  }
+
+  listSecurityEvents(limit: number = 30): Observable<UserSecurityEventInfo[]> {
+    return this.api.get<UserSecurityEventInfo[]>('/auth/me/security-events', { limit });
   }
 
   refresh(opts?: { silent?: boolean }): Observable<AuthTokens | null> {
