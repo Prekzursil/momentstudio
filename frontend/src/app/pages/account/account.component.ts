@@ -37,7 +37,10 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
           *ngIf="error()"
           class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
         >
-          {{ error() }}
+          <div class="flex items-start justify-between gap-3">
+            <span class="min-w-0">{{ error() | translate }}</span>
+            <app-button size="sm" variant="ghost" [label]="'shop.retry' | translate" (action)="retryAccountLoad()"></app-button>
+          </div>
         </div>
 
         <div class="grid gap-6" *ngIf="!error()">

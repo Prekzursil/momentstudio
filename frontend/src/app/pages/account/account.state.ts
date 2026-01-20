@@ -4,10 +4,10 @@
 // new routed subpages can share behavior without bundling the legacy template.
 
 import { AfterViewInit, Directive, ElementRef, effect, EffectRef, OnDestroy, OnInit, signal } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
 import { TranslateService } from '@ngx-translate/core';
 import type { Stripe, StripeCardElement, StripeCardElementChangeEvent, StripeElements } from '@stripe/stripe-js';
-import { forkJoin, map, of, switchMap } from 'rxjs';
+import { filter, map, of, Subscription, switchMap } from 'rxjs';
 
 import { ApiService } from '../../core/api.service';
 import { appConfig } from '../../core/app-config';
@@ -33,10 +33,26 @@ import { formatIdentity } from '../../shared/user-identity';
 
 import { type CountryCode } from 'libphonenumber-js';
 
+type AccountSection =
+  | 'overview'
+  | 'profile'
+  | 'orders'
+  | 'addresses'
+  | 'wishlist'
+  | 'coupons'
+  | 'notifications'
+  | 'security'
+  | 'comments'
+  | 'privacy'
+  | 'password';
+
 @Directive()
 export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   emailVerified = signal<boolean>(false);
   addresses = signal<Address[]>([]);
+  addressesLoaded = signal<boolean>(false);
+  addressesLoading = signal<boolean>(false);
+  addressesError = signal<string | null>(null);
   avatar: string | null = null;
   avatarBusy = false;
   placeholderAvatar = 'assets/placeholder/avatar-placeholder.svg';
@@ -47,14 +63,20 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   googleEmail = signal<string | null>(null);
   googlePicture = signal<string | null>(null);
   orders = signal<Order[]>([]);
+  ordersLoaded = signal<boolean>(false);
+  ordersLoading = signal<boolean>(false);
+  ordersError = signal<string | null>(null);
   orderFilter = '';
   page = 1;
   pageSize = 5;
   totalPages = 1;
-  loading = signal<boolean>(true);
+  loading = signal<boolean>(false);
   error = signal<string | null>(null);
 
   paymentMethods: any[] = [];
+  paymentMethodsLoaded = signal<boolean>(false);
+  paymentMethodsLoading = signal<boolean>(false);
+  paymentMethodsError = signal<string | null>(null);
   cardElementVisible = false;
   savingCard = false;
   cardReady = false;
@@ -105,12 +127,15 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   downloadingReceiptId: string | null = null;
 
   private forceProfileCompletion = false;
+  private profileLoaded = false;
+  private routerEventsSub?: Subscription;
 
   googlePassword = '';
   googleBusy = false;
   googleError: string | null = null;
 
   secondaryEmails = signal<SecondaryEmail[]>([]);
+  secondaryEmailsLoaded = signal<boolean>(false);
   secondaryEmailsLoading = signal<boolean>(false);
   secondaryEmailsError = signal<string | null>(null);
   secondaryEmailToAdd = '';
@@ -173,20 +198,18 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnInit(): void {
     this.forceProfileCompletion = this.route.snapshot.queryParamMap.get('complete') === '1';
-    this.wishlist.refresh();
-    this.loadData();
-    this.loadSecondaryEmails();
-    this.loadAliases();
-    this.loadDeletionStatus();
-    this.loadMyComments();
-    this.loadPaymentMethods();
+    this.loadProfile();
+    this.ensureLoadedForSection(this.activeSectionFromUrl(this.router.url));
+    this.routerEventsSub = this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+      .subscribe((e) => this.ensureLoadedForSection(this.activeSectionFromUrl(e.urlAfterRedirects)));
     this.resetIdleTimer();
     window.addEventListener('mousemove', this.handleUserActivity);
     window.addEventListener('keydown', this.handleUserActivity);
   }
 
   ngAfterViewInit(): void {
-    void this.setupStripe();
+    // Stripe Elements is initialized only when needed (e.g. when adding a payment method).
   }
 
   setCardHost(cardHost: ElementRef<HTMLDivElement> | undefined): void {
@@ -200,14 +223,71 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     this.mountCardElement();
   }
 
-  private loadData(): void {
+  retryAccountLoad(): void {
+    this.profileLoaded = false;
+    this.loadProfile();
+    this.ensureLoadedForSection(this.activeSectionFromUrl(this.router.url));
+  }
+
+  private activeSectionFromUrl(url: string): AccountSection {
+    const path = (url || '').split('?')[0].split('#')[0];
+    const segments = path.split('/').filter(Boolean);
+    const accountIndex = segments.indexOf('account');
+    if (accountIndex < 0) return 'overview';
+    const section = (segments[accountIndex + 1] ?? '').trim();
+    return (section || 'overview') as AccountSection;
+  }
+
+  private ensureLoadedForSection(section: AccountSection): void {
+    switch (section) {
+      case 'profile':
+        this.loadAliases();
+        return;
+      case 'orders':
+        this.loadOrders();
+        return;
+      case 'addresses':
+        this.loadAddresses();
+        return;
+      case 'wishlist':
+        this.wishlist.ensureLoaded();
+        return;
+      case 'coupons':
+      case 'notifications':
+      case 'password':
+        return;
+      case 'security':
+        this.loadSecondaryEmails();
+        this.loadPaymentMethods();
+        return;
+      case 'comments':
+        if (!this.myCommentsMeta()) {
+          this.loadMyComments();
+        }
+        return;
+      case 'privacy':
+        if (!this.deletionStatus()) {
+          this.loadDeletionStatus();
+        }
+        return;
+      case 'overview':
+      default:
+        this.loadOrders();
+        this.loadAddresses();
+        this.wishlist.ensureLoaded();
+        return;
+    }
+  }
+
+  private loadProfile(force: boolean = false): void {
+    if (!this.auth.isAuthenticated()) return;
+    if (this.loading() && !force) return;
+    if (this.profileLoaded && !force) return;
+
     this.loading.set(true);
-    forkJoin({
-      profile: this.account.getProfile(),
-      addresses: this.account.getAddresses(),
-      orders: this.account.getOrders()
-    }).subscribe({
-      next: ({ profile, addresses, orders }) => {
+    this.error.set(null);
+    this.account.getProfile().subscribe({
+      next: (profile) => {
         this.profile.set(profile);
         this.googleEmail.set(profile.google_email ?? null);
         this.googlePicture.set(profile.google_picture_url ?? null);
@@ -216,8 +296,6 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.notifyBlogCommentReplies = Boolean(profile?.notify_blog_comment_replies);
         this.notifyMarketing = Boolean(profile?.notify_marketing);
         this.notificationLastUpdated = profile.updated_at ?? null;
-        this.addresses.set(addresses);
-        this.orders.set(orders);
         this.avatar = profile.avatar_url ?? null;
         this.profileName = profile.name ?? '';
         this.profileUsername = (profile.username ?? '').trim();
@@ -231,12 +309,55 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.profilePhoneNational = phoneSplit.nationalNumber || '';
         this.profileLanguage = (profile.preferred_language === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
         this.profileThemePreference = (this.theme.preference()() ?? 'system') as ThemePreference;
-        this.computeTotalPages();
+        this.profileLoaded = true;
       },
       error: () => {
-        this.error.set('Unable to load account details right now.');
+        this.error.set('account.loadError');
+        this.loading.set(false);
       },
       complete: () => this.loading.set(false)
+    });
+  }
+
+  loadOrders(force: boolean = false): void {
+    if (!this.auth.isAuthenticated()) return;
+    if (this.ordersLoading() && !force) return;
+    if (this.ordersLoaded() && !force) return;
+
+    this.ordersLoading.set(true);
+    this.ordersError.set(null);
+    this.account.getOrders().subscribe({
+      next: (orders) => {
+        this.orders.set(orders);
+        this.ordersLoaded.set(true);
+        this.computeTotalPages();
+        this.page = Math.min(this.page, this.totalPages);
+      },
+      error: () => {
+        this.ordersError.set('account.orders.loadError');
+        this.ordersLoading.set(false);
+      },
+      complete: () => this.ordersLoading.set(false)
+    });
+  }
+
+  loadAddresses(force: boolean = false): void {
+    if (!this.auth.isAuthenticated()) return;
+    if (this.addressesLoading() && !force) return;
+    if (this.addressesLoaded() && !force) return;
+
+    this.addressesLoading.set(true);
+    this.addressesError.set(null);
+    this.account.getAddresses().subscribe({
+      next: (addresses) => {
+        this.addresses.set(addresses);
+        this.addressesLoaded.set(true);
+      },
+      error: () => {
+        this.addressesError.set('account.addresses.loadError');
+        this.addressesLoading.set(false);
+      },
+      complete: () => this.addressesLoading.set(false)
     });
   }
 
@@ -283,7 +404,12 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
           ? 'Fan Courier'
           : (order.courier ?? '').trim();
     const typeRaw = (order.delivery_type ?? '').trim().toLowerCase();
-    const deliveryType = typeRaw === 'home' ? 'Home delivery' : typeRaw === 'locker' ? 'Locker pickup' : (order.delivery_type ?? '').trim();
+    const deliveryType =
+      typeRaw === 'home'
+        ? this.t('account.orders.delivery.home')
+        : typeRaw === 'locker'
+          ? this.t('account.orders.delivery.locker')
+          : (order.delivery_type ?? '').trim();
     const parts = [courier, deliveryType].filter((p) => (p || '').trim());
     return parts.length ? parts.join(' · ') : '—';
   }
@@ -302,11 +428,11 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     this.account.reorderOrder(order.id).subscribe({
       next: () => {
         this.cart.loadFromBackend();
-        this.toast.success('Added items to cart');
+        this.toast.success(this.t('account.orders.reorderSuccess'));
         void this.router.navigateByUrl('/cart');
       },
       error: (err) => {
-        const message = err?.error?.detail || 'Could not reorder.';
+        const message = err?.error?.detail || this.t('account.orders.reorderError');
         this.toast.error(message);
       },
       complete: () => (this.reorderingOrderId = null)
@@ -330,7 +456,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         window.URL.revokeObjectURL(url);
       },
       error: (err) => {
-        const message = err?.error?.detail || 'Could not download receipt.';
+        const message = err?.error?.detail || this.t('account.orders.receiptDownloadError');
         this.toast.error(message);
       },
       complete: () => (this.downloadingReceiptId = null)
@@ -349,7 +475,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     const expiresAt = existing?.expires_at ? new Date(existing.expires_at) : null;
     if (existing?.receipt_url && expiresAt && expiresAt.getTime() > Date.now() + 30_000) {
       void this.copyToClipboard(existing.receipt_url).then((ok) => {
-        this.toast.success(ok ? 'Receipt link copied' : 'Receipt link ready');
+        this.toast.success(ok ? this.t('account.orders.receiptCopied') : this.t('account.orders.receiptReady'));
       });
       return;
     }
@@ -359,11 +485,11 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
       next: (token) => {
         this.receiptShares.set({ ...this.receiptShares(), [order.id]: token });
         void this.copyToClipboard(token.receipt_url).then((ok) => {
-          this.toast.success(ok ? 'Receipt link copied' : 'Receipt link generated');
+          this.toast.success(ok ? this.t('account.orders.receiptCopied') : this.t('account.orders.receiptGenerated'));
         });
       },
       error: (err) => {
-        const message = err?.error?.detail || 'Could not generate receipt link.';
+        const message = err?.error?.detail || this.t('account.orders.receiptGenerateError');
         this.toast.error(message);
       },
       complete: () => (this.sharingReceiptId = null)
@@ -371,7 +497,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   }
 
   revokeReceiptShare(order: Order): void {
-    if (!confirm('Revoke previously shared receipt links for this order?')) return;
+    if (!confirm(this.t('account.orders.receiptRevokeConfirm'))) return;
     if (this.revokingReceiptId) return;
     this.revokingReceiptId = order.id;
     this.account.revokeReceiptShare(order.id).subscribe({
@@ -379,10 +505,10 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         const nextShares = { ...this.receiptShares() };
         delete nextShares[order.id];
         this.receiptShares.set(nextShares);
-        this.toast.success('Receipt links revoked');
+        this.toast.success(this.t('account.orders.receiptRevoked'));
       },
       error: (err) => {
-        const message = err?.error?.detail || 'Could not revoke receipt links.';
+        const message = err?.error?.detail || this.t('account.orders.receiptRevokeError');
         this.toast.error(message);
       },
       complete: () => (this.revokingReceiptId = null)
@@ -409,7 +535,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
       region: existing?.region || '',
       postal_code: existing?.postal_code || '',
       country: existing?.country || 'US',
-      label: existing?.label || 'Home',
+      label: existing?.label || this.t('account.addresses.labels.home'),
       is_default_shipping: existing?.is_default_shipping,
       is_default_billing: existing?.is_default_billing
     };
@@ -424,20 +550,20 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     if (this.editingAddressId) {
       this.account.updateAddress(this.editingAddressId, payload).subscribe({
         next: (addr) => {
-          this.toast.success('Address updated');
+          this.toast.success(this.t('account.addresses.messages.updated'));
           this.upsertAddress(addr);
           this.closeAddressForm();
         },
-        error: (err) => this.toast.error(err?.error?.detail || 'Could not update address.')
+        error: (err) => this.toast.error(err?.error?.detail || this.t('account.addresses.errors.update'))
       });
     } else {
       this.account.createAddress(payload).subscribe({
         next: (addr) => {
-          this.toast.success('Address added');
+          this.toast.success(this.t('account.addresses.messages.added'));
           this.upsertAddress(addr);
           this.closeAddressForm();
         },
-        error: (err) => this.toast.error(err?.error?.detail || 'Could not add address.')
+        error: (err) => this.toast.error(err?.error?.detail || this.t('account.addresses.errors.add'))
       });
     }
   }
@@ -447,13 +573,14 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   }
 
   removeAddress(id: string): void {
-    if (!confirm('Remove this address?')) return;
+    if (!confirm(this.t('account.addresses.confirm.remove'))) return;
     this.account.deleteAddress(id).subscribe({
       next: () => {
-        this.toast.success('Address removed');
+        this.toast.success(this.t('account.addresses.messages.removed'));
         this.addresses.set(this.addresses().filter((a) => a.id !== id));
+        this.addressesLoaded.set(true);
       },
-      error: () => this.toast.error('Could not remove address.')
+      error: () => this.toast.error(this.t('account.addresses.errors.remove'))
     });
   }
 
@@ -461,9 +588,9 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     this.account.updateAddress(addr.id, { is_default_shipping: true }).subscribe({
       next: (updated) => {
         this.upsertAddress(updated);
-        this.toast.success('Default shipping updated');
+        this.toast.success(this.t('account.addresses.messages.defaultShippingUpdated'));
       },
-      error: (err) => this.toast.error(err?.error?.detail || 'Could not update default shipping.')
+      error: (err) => this.toast.error(err?.error?.detail || this.t('account.addresses.errors.defaultShipping'))
     });
   }
 
@@ -471,9 +598,9 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     this.account.updateAddress(addr.id, { is_default_billing: true }).subscribe({
       next: (updated) => {
         this.upsertAddress(updated);
-        this.toast.success('Default billing updated');
+        this.toast.success(this.t('account.addresses.messages.defaultBillingUpdated'));
       },
-      error: (err) => this.toast.error(err?.error?.detail || 'Could not update default billing.')
+      error: (err) => this.toast.error(err?.error?.detail || this.t('account.addresses.errors.defaultBilling'))
     });
   }
 
@@ -489,36 +616,39 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     }));
 
     this.addresses.set(normalized);
+    this.addressesLoaded.set(true);
   }
 
   addCard(): void {
     this.cardError = null;
     this.savingCard = false;
     this.cardElementVisible = true;
-    this.createSetupIntent();
-    this.mountCardElement();
+    void this.setupStripe().then(() => {
+      if (!this.stripe) return;
+      this.createSetupIntent();
+    });
   }
 
   resendVerification(): void {
     this.auth.requestEmailVerification().subscribe({
       next: () => {
-        this.verificationStatus = 'Verification email sent. Enter the token you received.';
-        this.toast.success('Verification email sent');
+        this.verificationStatus = this.t('account.verification.sentStatus');
+        this.toast.success(this.t('account.verification.sentToast'));
       },
-      error: () => this.toast.error('Could not send verification email')
+      error: () => this.toast.error(this.t('account.verification.sendError'))
     });
   }
 
   submitVerification(): void {
     if (!this.verificationToken) {
-      this.verificationStatus = 'Enter a verification token.';
+      this.verificationStatus = this.t('account.verification.tokenRequired');
       return;
     }
     this.auth.confirmEmailVerification(this.verificationToken).subscribe({
       next: (res) => {
         this.emailVerified.set(res.email_verified);
-        this.verificationStatus = 'Email verified';
-        this.toast.success('Email verified');
+        this.verificationStatus = this.t('account.verification.verifiedStatus');
+        this.toast.success(this.t('account.verification.verifiedToast'));
         this.verificationToken = '';
         this.auth.loadCurrentUser().subscribe({
           next: (user) => {
@@ -528,8 +658,8 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         });
       },
       error: () => {
-        this.verificationStatus = 'Invalid or expired token';
-        this.toast.error('Invalid or expired token');
+        this.verificationStatus = this.t('account.verification.invalidTokenStatus');
+        this.toast.error(this.t('account.verification.invalidTokenToast'));
       }
     });
   }
@@ -542,10 +672,10 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
       next: (user) => {
         this.profile.set(user);
         this.avatar = user.avatar_url ?? null;
-        this.toast.success('Avatar updated');
+        this.toast.success(this.t('account.profile.avatar.updated'));
       },
       error: (err) => {
-        const message = err?.error?.detail || 'Could not upload avatar.';
+        const message = err?.error?.detail || this.t('account.profile.avatar.uploadError');
         this.toast.error(message);
       }
     });
@@ -558,10 +688,10 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
       next: (user) => {
         this.profile.set(user);
         this.avatar = user.avatar_url ?? null;
-        this.toast.success('Avatar updated');
+        this.toast.success(this.t('account.profile.avatar.updated'));
       },
       error: (err) => {
-        const message = err?.error?.detail || 'Could not use Google photo.';
+        const message = err?.error?.detail || this.t('account.profile.avatar.googleError');
         this.toast.error(message);
       },
       complete: () => {
@@ -572,16 +702,16 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
 
   removeAvatar(): void {
     if (this.avatarBusy) return;
-    if (!confirm('Remove your avatar?')) return;
+    if (!confirm(this.t('account.profile.avatar.removeConfirm'))) return;
     this.avatarBusy = true;
     this.auth.removeAvatar().subscribe({
       next: (user) => {
         this.profile.set(user);
         this.avatar = user.avatar_url ?? null;
-        this.toast.success('Avatar removed');
+        this.toast.success(this.t('account.profile.avatar.removed'));
       },
       error: (err) => {
-        const message = err?.error?.detail || 'Could not remove avatar.';
+        const message = err?.error?.detail || this.t('account.profile.avatar.removeError');
         this.toast.error(message);
       },
       complete: () => {
@@ -594,20 +724,20 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     this.auth.refresh().subscribe({
       next: (tokens) => {
         if (tokens) {
-          this.toast.success('Session refreshed');
+          this.toast.success(this.t('account.security.session.refreshed'));
           this.resetIdleTimer();
         } else {
-          this.toast.error('Session expired. Please sign in again.');
+          this.toast.error(this.t('account.security.session.expired'));
         }
       },
-      error: () => this.toast.error('Could not refresh session.')
+      error: () => this.toast.error(this.t('account.security.session.refreshError'))
     });
   }
 
   signOut(): void {
     this.auth.logout().subscribe(() => {
       this.wishlist.clear();
-      this.toast.success('Signed out');
+      this.toast.success(this.t('account.signedOut'));
       void this.router.navigateByUrl('/');
     });
   }
@@ -693,37 +823,37 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     const usernameOk = /^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$/.test(username);
     if (this.profileCompletionRequired()) {
       if (!name) {
-        this.profileError = 'Display name is required.';
+        this.profileError = this.t('account.profile.errors.displayNameRequired');
         this.toast.error(this.profileError);
         this.savingProfile = false;
         return;
       }
       if (!username || !usernameOk) {
-        this.profileError = 'Enter a valid username.';
+        this.profileError = this.t('validation.usernameInvalid');
         this.toast.error(this.profileError);
         this.savingProfile = false;
         return;
       }
       if (!firstName) {
-        this.profileError = 'First name is required.';
+        this.profileError = this.t('account.profile.errors.firstNameRequired');
         this.toast.error(this.profileError);
         this.savingProfile = false;
         return;
       }
       if (!lastName) {
-        this.profileError = 'Last name is required.';
+        this.profileError = this.t('account.profile.errors.lastNameRequired');
         this.toast.error(this.profileError);
         this.savingProfile = false;
         return;
       }
       if (!dob) {
-        this.profileError = 'Date of birth is required.';
+        this.profileError = this.t('account.profile.errors.dobRequired');
         this.toast.error(this.profileError);
         this.savingProfile = false;
         return;
       }
       if (!phoneNational || !phone) {
-        this.profileError = 'Enter a valid phone number.';
+        this.profileError = this.t('validation.phoneInvalid');
         this.toast.error(this.profileError);
         this.savingProfile = false;
         return;
@@ -731,7 +861,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     }
 
     if (phoneNational && !phone) {
-      this.profileError = 'Enter a valid phone number.';
+      this.profileError = this.t('validation.phoneInvalid');
       this.toast.error(this.profileError);
       this.savingProfile = false;
       return;
@@ -739,7 +869,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     if (dob) {
       const parsed = new Date(`${dob}T00:00:00Z`);
       if (!Number.isNaN(parsed.valueOf()) && parsed.getTime() > Date.now()) {
-        this.profileError = 'Date of birth cannot be in the future.';
+        this.profileError = this.t('account.profile.errors.dobFuture');
         this.toast.error(this.profileError);
         this.savingProfile = false;
         return;
@@ -802,8 +932,8 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
           this.avatar = user.avatar_url ?? this.avatar;
           this.profileUsernamePassword = '';
           this.profileSaved = true;
-          this.toast.success('Profile saved');
-          this.loadAliases();
+          this.toast.success(this.t('account.profile.savedToast'));
+          this.loadAliases(true);
 
           if (this.forceProfileCompletion && computeMissingRequiredProfileFields(user).length === 0) {
             this.forceProfileCompletion = false;
@@ -817,7 +947,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
           }
         },
         error: (err) => {
-          const message = err?.error?.detail || 'Could not save profile.';
+          const message = err?.error?.detail || this.t('account.profile.errors.saveError');
           this.profileError = message;
           this.toast.error(message);
         },
@@ -825,13 +955,18 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
       });
   }
 
-  loadAliases(): void {
+  loadAliases(force: boolean = false): void {
     if (!this.auth.isAuthenticated()) return;
+    if (this.aliasesLoading() && !force) return;
+    if (this.aliases() && !force) return;
     this.aliasesLoading.set(true);
     this.aliasesError.set(null);
     this.auth.getAliases().subscribe({
       next: (resp) => this.aliases.set(resp),
-      error: () => this.aliasesError.set('Could not load your username/display name history.'),
+      error: () => {
+        this.aliasesError.set(this.t('account.profile.aliases.loadError'));
+        this.aliasesLoading.set(false);
+      },
       complete: () => this.aliasesLoading.set(false)
     });
   }
@@ -853,44 +988,60 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   }
 
   lastOrderLabel(): string {
+    if (this.ordersLoading() && !this.ordersLoaded()) return this.t('notifications.loading');
+    if (!this.ordersLoaded()) return '...';
     const order = this.lastOrder();
-    if (!order) return 'No orders yet';
-    return `#${order.reference_code || order.id} · ${order.status}`;
+    if (!order) return this.t('account.overview.noOrders');
+    const statusKey = `adminUi.orders.${order.status}`;
+    const statusTranslated = this.translate.instant(statusKey);
+    const status = statusTranslated !== statusKey ? statusTranslated : order.status;
+    return this.t('account.overview.lastOrderLabel', { ref: order.reference_code || order.id, status });
   }
 
   lastOrderSubcopy(): string {
+    if (this.ordersLoading() && !this.ordersLoaded()) return this.t('notifications.loading');
+    if (!this.ordersLoaded()) return '';
     const order = this.lastOrder();
-    if (!order) return 'Your recent orders will appear here.';
+    if (!order) return this.t('account.overview.noOrdersCopy');
     const when = order.created_at ? new Date(order.created_at).toLocaleDateString() : '';
     return `${this.formatMoney(order.total_amount, order.currency)}${when ? ` · ${when}` : ''}`;
   }
 
   defaultAddressLabel(): string {
+    if (this.addressesLoading() && !this.addressesLoaded()) return this.t('notifications.loading');
+    if (!this.addressesLoaded()) return '...';
     const addr = this.defaultShippingAddress();
-    if (!addr) return 'No addresses yet';
-    return addr.label || 'Default shipping';
+    if (!addr) return this.t('account.overview.noAddresses');
+    return addr.label || this.t('account.addresses.defaultShipping');
   }
 
   defaultAddressSubcopy(): string {
+    if (this.addressesLoading() && !this.addressesLoaded()) return this.t('notifications.loading');
+    if (!this.addressesLoaded()) return '';
     const addr = this.defaultShippingAddress();
-    if (!addr) return 'Add a shipping address for faster checkout.';
+    if (!addr) return this.t('account.overview.noAddressesCopy');
     const line = [addr.line1, addr.city].filter(Boolean).join(', ');
-    return line || 'Saved address';
+    return line || this.t('account.overview.savedAddressFallback');
   }
 
   wishlistCountLabel(): string {
+    if (!this.wishlist.isLoaded()) return this.t('notifications.loading');
     const count = this.wishlist.items().length;
-    return `${count} saved item${count === 1 ? '' : 's'}`;
+    if (count === 1) return this.t('account.overview.wishlistCountOne');
+    return this.t('account.overview.wishlistCountMany', { count });
   }
 
   notificationsLabel(): string {
+    if (!this.profile()) return this.t('notifications.loading');
     const enabled = [this.notifyBlogCommentReplies, this.notifyBlogComments, this.notifyMarketing].filter(Boolean).length;
-    return enabled ? `${enabled} enabled` : 'All off';
+    if (!enabled) return this.t('account.overview.notificationsAllOff');
+    return this.t('account.overview.notificationsEnabled', { count: enabled });
   }
 
   securityLabel(): string {
-    const verified = this.emailVerified() ? 'Email verified' : 'Email unverified';
-    const google = this.googleEmail() ? 'Google linked' : 'Google unlinked';
+    if (!this.profile()) return this.t('notifications.loading');
+    const verified = this.emailVerified() ? this.t('account.overview.security.emailVerified') : this.t('account.overview.security.emailUnverified');
+    const google = this.googleEmail() ? this.t('account.overview.security.googleLinked') : this.t('account.overview.security.googleUnlinked');
     return `${verified} · ${google}`;
   }
 
@@ -935,7 +1086,8 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.deletionStatus.set(status);
       },
       error: () => {
-        this.deletionError.set('Could not load deletion status.');
+        this.deletionError.set(this.t('account.privacy.deletion.loadError'));
+        this.deletionLoading.set(false);
       },
       complete: () => this.deletionLoading.set(false)
     });
@@ -954,10 +1106,10 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         a.download = `moment-studio-export-${date}.json`;
         a.click();
         window.URL.revokeObjectURL(url);
-        this.toast.success('Export downloaded');
+        this.toast.success(this.t('account.privacy.export.downloaded'));
       },
       error: (err) => {
-        const message = err?.error?.detail || 'Could not download export.';
+        const message = err?.error?.detail || this.t('account.privacy.export.downloadError');
         this.exportError = message;
         this.toast.error(message);
       },
@@ -975,10 +1127,10 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
       next: (status) => {
         this.deletionStatus.set(status);
         this.deletionConfirmText = '';
-        this.toast.success('Deletion scheduled');
+        this.toast.success(this.t('account.privacy.deletion.scheduled'));
       },
       error: (err) => {
-        const message = err?.error?.detail || 'Could not request account deletion.';
+        const message = err?.error?.detail || this.t('account.privacy.deletion.requestError');
         this.deletionError.set(message);
         this.toast.error(message);
       },
@@ -995,10 +1147,10 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     this.account.cancelAccountDeletion().subscribe({
       next: (status) => {
         this.deletionStatus.set(status);
-        this.toast.success('Deletion canceled');
+        this.toast.success(this.t('account.privacy.deletion.canceled'));
       },
       error: (err) => {
-        const message = err?.error?.detail || 'Could not cancel account deletion.';
+        const message = err?.error?.detail || this.t('account.privacy.deletion.cancelError');
         this.deletionError.set(message);
         this.toast.error(message);
       },
@@ -1020,7 +1172,8 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.myCommentsPage = res.meta.page;
       },
       error: () => {
-        this.myCommentsError.set('Could not load your comments.');
+        this.myCommentsError.set(this.t('account.comments.loadError'));
+        this.myCommentsLoading.set(false);
       },
       complete: () => this.myCommentsLoading.set(false)
     });
@@ -1075,7 +1228,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     }
     this.idleWarning.set(null);
     this.idleTimer = setTimeout(() => {
-      this.idleWarning.set('You have been logged out due to inactivity.');
+      this.idleWarning.set(this.t('account.security.session.idleLogout'));
       this.signOut();
     }, 30 * 60 * 1000); // 30 minutes
   }
@@ -1087,6 +1240,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     if (this.card) {
       this.card.destroy();
     }
+    this.routerEventsSub?.unsubscribe();
     this.stripeThemeEffect?.destroy();
     this.phoneCountriesEffect?.destroy();
     window.removeEventListener('mousemove', this.handleUserActivity);
@@ -1097,13 +1251,13 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     if (this.stripe) return;
     const publishableKey = this.getStripePublishableKey();
     if (!publishableKey) {
-      this.cardError = 'Stripe publishable key is not configured';
+      this.cardError = this.t('account.security.payment.stripeKeyMissing');
       return;
     }
     const { loadStripe } = await import('@stripe/stripe-js');
     this.stripe = await loadStripe(publishableKey);
     if (!this.stripe) {
-      this.cardError = 'Could not initialize Stripe.';
+      this.cardError = this.t('account.security.payment.stripeInitError');
       return;
     }
     this.elements = this.stripe.elements();
@@ -1146,8 +1300,9 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.clientSecret = res.client_secret;
       },
       error: () => {
-        this.cardError = 'Could not start card setup';
-        this.toast.error('Could not start card setup');
+        const msg = this.t('account.security.payment.setupIntentError');
+        this.cardError = msg;
+        this.toast.error(msg);
       }
     });
   }
@@ -1186,7 +1341,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
 
     if (!this.cardChangeListenerAttached) {
       this.card.on('change', (event: StripeCardElementChangeEvent) => {
-        this.cardError = event.error ? event.error.message ?? 'Card error' : null;
+        this.cardError = event.error ? event.error.message ?? this.t('account.security.payment.cardErrorFallback') : null;
       });
       this.cardChangeListenerAttached = true;
     }
@@ -1194,7 +1349,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
 
   async confirmCard(): Promise<void> {
     if (!this.stripe || !this.card || !this.clientSecret) {
-      this.cardError = 'Card form is not ready.';
+      this.cardError = this.t('account.security.payment.formNotReady');
       return;
     }
     this.savingCard = true;
@@ -1202,58 +1357,76 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
       payment_method: { card: this.card }
     });
     if (result.error) {
-      this.cardError = result.error.message ?? 'Could not save card';
+      this.cardError = result.error.message ?? this.t('account.security.payment.saveCardError');
       this.savingCard = false;
       return;
     }
     const pmId = result.setupIntent?.payment_method;
     if (!pmId) {
-      this.cardError = 'Payment method missing from setup intent.';
+      this.cardError = this.t('account.security.payment.missingPaymentMethod');
       this.savingCard = false;
       return;
     }
     this.api.post('/payment-methods/attach', { payment_method_id: pmId }).subscribe({
       next: () => {
-        this.toast.success('Card saved');
-        this.loadPaymentMethods();
+        this.toast.success(this.t('account.security.payment.saved'));
+        this.loadPaymentMethods(true);
         this.cardError = null;
         this.clientSecret = null;
         this.savingCard = false;
       },
       error: () => {
-        this.cardError = 'Could not attach payment method';
+        this.cardError = this.t('account.security.payment.attachError');
         this.savingCard = false;
       }
     });
   }
 
-  private loadPaymentMethods(): void {
+  private loadPaymentMethods(force: boolean = false): void {
+    if (!this.auth.isAuthenticated()) return;
+    if (this.paymentMethodsLoading() && !force) return;
+    if (this.paymentMethodsLoaded() && !force) return;
+    this.paymentMethodsLoading.set(true);
+    this.paymentMethodsError.set(null);
     this.api.get<any[]>('/payment-methods').subscribe({
-      next: (methods) => (this.paymentMethods = methods),
-      error: () => (this.paymentMethods = [])
+      next: (methods) => {
+        this.paymentMethods = methods;
+        this.paymentMethodsLoaded.set(true);
+      },
+      error: () => {
+        this.paymentMethods = [];
+        this.paymentMethodsError.set('account.security.payment.loadError');
+        this.paymentMethodsLoading.set(false);
+      },
+      complete: () => this.paymentMethodsLoading.set(false)
     });
   }
 
   removePaymentMethod(id: string): void {
-    if (!confirm('Remove this payment method?')) return;
+    if (!confirm(this.t('account.security.payment.removeConfirm'))) return;
     this.api.delete(`/payment-methods/${id}`).subscribe({
       next: () => {
-        this.toast.success('Payment method removed');
+        this.toast.success(this.t('account.security.payment.removed'));
         this.paymentMethods = this.paymentMethods.filter((pm) => pm.id !== id);
       },
-      error: () => this.toast.error('Could not remove payment method')
+      error: () => this.toast.error(this.t('account.security.payment.removeError'))
     });
   }
 
-  private loadSecondaryEmails(): void {
+  private loadSecondaryEmails(force: boolean = false): void {
+    if (!this.auth.isAuthenticated()) return;
+    if (this.secondaryEmailsLoading() && !force) return;
+    if (this.secondaryEmailsLoaded() && !force) return;
     this.secondaryEmailsLoading.set(true);
     this.secondaryEmailsError.set(null);
     this.auth.listEmails().subscribe({
       next: (res) => {
         this.secondaryEmails.set(res.secondary_emails ?? []);
+        this.secondaryEmailsLoaded.set(true);
       },
       error: () => {
-        this.secondaryEmailsError.set('Could not load secondary emails.');
+        this.secondaryEmailsError.set(this.t('account.security.emails.loadError'));
+        this.secondaryEmailsLoading.set(false);
       },
       complete: () => this.secondaryEmailsLoading.set(false)
     });
@@ -1265,7 +1438,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     this.secondaryEmailMessage = null;
     this.secondaryVerificationStatus = null;
     if (!email) {
-      this.secondaryEmailMessage = 'Enter an email address.';
+      this.secondaryEmailMessage = this.t('account.security.emails.enterEmail');
       this.toast.error(this.secondaryEmailMessage);
       return;
     }
@@ -1275,11 +1448,11 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         const existing = this.secondaryEmails();
         this.secondaryEmails.set([created, ...existing.filter((e) => e.id !== created.id)]);
         this.secondaryEmailToAdd = '';
-        this.secondaryEmailMessage = 'Verification code sent. Enter it below to verify.';
-        this.toast.success('Secondary email added');
+        this.secondaryEmailMessage = this.t('account.security.emails.verificationSent');
+        this.toast.success(this.t('account.security.emails.added'));
       },
       error: (err) => {
-        const message = err?.error?.detail || 'Could not add secondary email.';
+        const message = err?.error?.detail || this.t('account.security.emails.addError');
         this.secondaryEmailMessage = message;
         this.toast.error(message);
       },
@@ -1294,11 +1467,11 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     this.secondaryVerificationStatus = null;
     this.auth.requestSecondaryEmailVerification(secondaryEmailId).subscribe({
       next: () => {
-        this.secondaryEmailMessage = 'Verification code resent.';
-        this.toast.success('Verification email sent');
+        this.secondaryEmailMessage = this.t('account.security.emails.verificationResent');
+        this.toast.success(this.t('account.security.emails.verificationEmailSent'));
       },
       error: (err) => {
-        const message = err?.error?.detail || 'Could not resend verification email.';
+        const message = err?.error?.detail || this.t('account.security.emails.resendError');
         this.secondaryEmailMessage = message;
         this.toast.error(message);
       }
@@ -1311,7 +1484,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     this.secondaryEmailMessage = null;
     this.secondaryVerificationStatus = null;
     if (!token) {
-      this.secondaryVerificationStatus = 'Enter the verification code.';
+      this.secondaryVerificationStatus = this.t('account.security.emails.enterVerificationCode');
       this.toast.error(this.secondaryVerificationStatus);
       return;
     }
@@ -1324,11 +1497,11 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
           )
         );
         this.secondaryVerificationToken = '';
-        this.secondaryVerificationStatus = 'Secondary email verified.';
-        this.toast.success('Email verified');
+        this.secondaryVerificationStatus = this.t('account.security.emails.verified');
+        this.toast.success(this.t('account.verification.verifiedToast'));
       },
       error: (err) => {
-        const message = err?.error?.detail || 'Could not verify secondary email.';
+        const message = err?.error?.detail || this.t('account.security.emails.verifyError');
         this.secondaryVerificationStatus = message;
         this.toast.error(message);
       },
@@ -1339,7 +1512,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   }
 
   deleteSecondaryEmail(secondaryEmailId: string): void {
-    if (!confirm('Remove this secondary email?')) return;
+    if (!confirm(this.t('account.security.emails.removeConfirm'))) return;
     this.secondaryEmailMessage = null;
     this.secondaryVerificationStatus = null;
     this.auth.deleteSecondaryEmail(secondaryEmailId).subscribe({
@@ -1348,10 +1521,10 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         if (this.makePrimarySecondaryEmailId === secondaryEmailId) {
           this.cancelMakePrimary();
         }
-        this.toast.success('Secondary email removed');
+        this.toast.success(this.t('account.security.emails.removed'));
       },
       error: (err) => {
-        const message = err?.error?.detail || 'Could not remove secondary email.';
+        const message = err?.error?.detail || this.t('account.security.emails.removeError');
         this.toast.error(message);
       }
     });
@@ -1376,7 +1549,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     const password = this.makePrimaryPassword;
     this.makePrimaryError = null;
     if (!password) {
-      this.makePrimaryError = 'Confirm your password to switch primary email.';
+      this.makePrimaryError = this.t('account.security.emails.makePrimaryPasswordRequired');
       this.toast.error(this.makePrimaryError);
       return;
     }
@@ -1386,11 +1559,11 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.profile.set(user);
         this.emailVerified.set(Boolean(user.email_verified));
         this.cancelMakePrimary();
-        this.loadSecondaryEmails();
-        this.toast.success('Primary email updated');
+        this.loadSecondaryEmails(true);
+        this.toast.success(this.t('account.security.emails.primaryUpdated'));
       },
       error: (err) => {
-        const message = err?.error?.detail || 'Could not update primary email.';
+        const message = err?.error?.detail || this.t('account.security.emails.primaryUpdateError');
         this.makePrimaryError = message;
         this.toast.error(message);
       },
@@ -1404,7 +1577,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     const password = this.googlePassword.trim();
     this.googleError = null;
     if (!password) {
-      this.googleError = 'Enter your password to link Google.';
+      this.googleError = this.t('account.security.google.passwordRequiredLink');
       return;
     }
     this.googleBusy = true;
@@ -1416,7 +1589,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
       },
       error: (err) => {
         sessionStorage.removeItem('google_link_password');
-        const message = err?.error?.detail || 'Could not start Google link flow.';
+        const message = err?.error?.detail || this.t('account.security.google.startLinkError');
         this.googleError = message;
         this.toast.error(message);
         this.googleBusy = false;
@@ -1428,7 +1601,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     const password = this.googlePassword.trim();
     this.googleError = null;
     if (!password) {
-      this.googleError = 'Enter your password to unlink Google.';
+      this.googleError = this.t('account.security.google.passwordRequiredUnlink');
       return;
     }
     this.googleBusy = true;
@@ -1438,10 +1611,10 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.googlePicture.set(user.google_picture_url ?? null);
         this.profile.set(user);
         this.googlePassword = '';
-        this.toast.success('Google account disconnected');
+        this.toast.success(this.t('account.security.google.unlinked'));
       },
       error: (err) => {
-        const message = err?.error?.detail || 'Could not unlink Google account.';
+        const message = err?.error?.detail || this.t('account.security.google.unlinkError');
         this.googleError = message;
         this.toast.error(message);
       },
@@ -1469,5 +1642,9 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     } catch {
       return `${amount.toFixed(2)} ${currency || ''}`.trim();
     }
+  }
+
+  private t(key: string, params?: Record<string, unknown>): string {
+    return this.translate.instant(key, params);
   }
 }

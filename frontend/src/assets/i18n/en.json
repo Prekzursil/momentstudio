@@ -93,6 +93,56 @@
       "comments": "My comments",
       "privacy": "Privacy & data"
     },
+    "loadError": "Unable to load account details right now.",
+    "signedOut": "Signed out",
+    "verification": {
+      "sentStatus": "Verification email sent. Enter the token you received.",
+      "sentToast": "Verification email sent",
+      "sendError": "Could not send verification email",
+      "tokenRequired": "Enter a verification token.",
+      "verifiedStatus": "Email verified",
+      "verifiedToast": "Email verified",
+      "invalidTokenStatus": "Invalid or expired token",
+      "invalidTokenToast": "Invalid or expired token"
+    },
+    "profile": {
+      "savedToast": "Profile saved",
+      "errors": {
+        "displayNameRequired": "Display name is required.",
+        "firstNameRequired": "First name is required.",
+        "lastNameRequired": "Last name is required.",
+        "dobRequired": "Date of birth is required.",
+        "dobFuture": "Date of birth cannot be in the future.",
+        "saveError": "Could not save profile."
+      },
+      "avatar": {
+        "updated": "Avatar updated",
+        "uploadError": "Could not upload avatar.",
+        "googleError": "Could not use Google photo.",
+        "removeConfirm": "Remove your avatar?",
+        "removed": "Avatar removed",
+        "removeError": "Could not remove avatar."
+      },
+      "aliases": {
+        "loadError": "Could not load your username/display name history."
+      }
+    },
+    "privacy": {
+      "export": {
+        "downloaded": "Export downloaded",
+        "downloadError": "Could not download export."
+      },
+      "deletion": {
+        "loadError": "Could not load deletion status.",
+        "scheduled": "Deletion scheduled",
+        "requestError": "Could not request account deletion.",
+        "canceled": "Deletion canceled",
+        "cancelError": "Could not cancel account deletion."
+      }
+    },
+    "comments": {
+      "loadError": "Could not load your comments."
+    },
     "security": {
       "subtitle": "Manage password, emails, and connected accounts.",
       "password": {
@@ -113,7 +163,24 @@
         "makePrimary": "Make primary",
         "confirmPassword": "Confirm password",
         "verifyCode": "Verify code",
-        "verify": "Verify"
+        "verify": "Verify",
+        "loadError": "Could not load secondary emails.",
+        "enterEmail": "Enter an email address.",
+        "verificationSent": "Verification code sent. Enter it below to verify.",
+        "verificationResent": "Verification code resent.",
+        "verificationEmailSent": "Verification email sent",
+        "enterVerificationCode": "Enter the verification code.",
+        "verified": "Secondary email verified.",
+        "added": "Secondary email added",
+        "removed": "Secondary email removed",
+        "removeConfirm": "Remove this secondary email?",
+        "makePrimaryPasswordRequired": "Confirm your password to switch primary email.",
+        "primaryUpdated": "Primary email updated",
+        "addError": "Could not add secondary email.",
+        "resendError": "Could not resend verification email.",
+        "verifyError": "Could not verify secondary email.",
+        "removeError": "Could not remove secondary email.",
+        "primaryUpdateError": "Could not update primary email."
       },
       "status": {
         "verified": "Verified",
@@ -132,7 +199,12 @@
         "passwordAria": "Confirm password for Google account",
         "link": "Link Google",
         "unlink": "Unlink",
-        "copy": "Linking Google lets you sign in faster. We never post without permission."
+        "copy": "Linking Google lets you sign in faster. We never post without permission.",
+        "passwordRequiredLink": "Enter your password to link Google.",
+        "startLinkError": "Could not start Google link flow.",
+        "passwordRequiredUnlink": "Enter your password to unlink Google.",
+        "unlinked": "Google account disconnected",
+        "unlinkError": "Could not unlink Google account."
       },
       "payment": {
         "title": "Payment methods",
@@ -141,13 +213,30 @@
         "empty": "No cards saved yet.",
         "enterDetails": "Enter card details:",
         "card": "Card",
-        "exp": "exp"
+        "exp": "exp",
+        "loadError": "Could not load payment methods.",
+        "stripeKeyMissing": "Stripe publishable key is not configured",
+        "stripeInitError": "Could not initialize Stripe.",
+        "setupIntentError": "Could not start card setup",
+        "cardErrorFallback": "Card error",
+        "formNotReady": "Card form is not ready.",
+        "saveCardError": "Could not save card",
+        "missingPaymentMethod": "Payment method missing from setup intent.",
+        "saved": "Card saved",
+        "attachError": "Could not attach payment method",
+        "removeConfirm": "Remove this payment method?",
+        "removed": "Payment method removed",
+        "removeError": "Could not remove payment method"
       },
       "session": {
         "title": "Session",
         "copy": "You will be logged out after inactivity to keep your account safe.",
         "logoutNow": "Logout now",
-        "refresh": "Refresh session"
+        "refresh": "Refresh session",
+        "refreshed": "Session refreshed",
+        "expired": "Session expired. Please sign in again.",
+        "refreshError": "Could not refresh session.",
+        "idleLogout": "You have been logged out due to inactivity."
       }
     },
     "overview": {
@@ -155,17 +244,48 @@
       "quickLinks": "Quick links",
       "wishlistHint": "Saved items ready for later.",
       "notificationsHint": "Control email updates.",
-      "securityHint": "Password, Google link, verification."
+      "securityHint": "Password, Google link, verification.",
+      "noOrders": "No orders yet",
+      "noOrdersCopy": "Your recent orders will appear here.",
+      "lastOrderLabel": "#{{ref}} · {{status}}",
+      "noAddresses": "No addresses yet",
+      "noAddressesCopy": "Add a shipping address for faster checkout.",
+      "savedAddressFallback": "Saved address",
+      "wishlistCountOne": "1 saved item",
+      "wishlistCountMany": "{{count}} saved items",
+      "notificationsAllOff": "All off",
+      "notificationsEnabled": "{{count}} enabled",
+      "security": {
+        "emailVerified": "Email verified",
+        "emailUnverified": "Email unverified",
+        "googleLinked": "Google linked",
+        "googleUnlinked": "Google unlinked"
+      }
     },
     "orders": {
       "shopNew": "Shop new",
       "statusLabel": "Status",
       "empty": "No orders yet.",
+      "loadError": "Could not load your orders.",
       "browse": "Browse products",
       "reorder": "Reorder",
+      "reorderSuccess": "Added items to cart",
+      "reorderError": "Could not reorder.",
       "receiptPdf": "Receipt (PDF)",
       "receiptShare": "Share receipt",
-      "receiptRevoke": "Revoke share"
+      "receiptRevoke": "Revoke share",
+      "receiptDownloadError": "Could not download receipt.",
+      "receiptCopied": "Receipt link copied",
+      "receiptReady": "Receipt link ready",
+      "receiptGenerated": "Receipt link generated",
+      "receiptGenerateError": "Could not generate receipt link.",
+      "receiptRevokeConfirm": "Revoke previously shared receipt links for this order?",
+      "receiptRevoked": "Receipt links revoked",
+      "receiptRevokeError": "Could not revoke receipt links.",
+      "delivery": {
+        "home": "Home delivery",
+        "locker": "Locker pickup"
+      }
     },
     "wishlist": {
       "browse": "Browse products",
@@ -193,12 +313,33 @@
     "addresses": {
       "add": "Add address",
       "empty": "No addresses yet.",
+      "loadError": "Could not load your addresses.",
       "defaultShipping": "Default shipping",
       "defaultBilling": "Default billing",
       "makeDefaultShipping": "Make default shipping",
       "makeDefaultBilling": "Make default billing",
       "edit": "Edit",
-      "delete": "Delete"
+      "delete": "Delete",
+      "labels": {
+        "home": "Home"
+      },
+      "messages": {
+        "updated": "Address updated",
+        "added": "Address added",
+        "removed": "Address removed",
+        "defaultShippingUpdated": "Default shipping updated",
+        "defaultBillingUpdated": "Default billing updated"
+      },
+      "confirm": {
+        "remove": "Remove this address?"
+      },
+      "errors": {
+        "update": "Could not update address.",
+        "add": "Could not add address.",
+        "remove": "Could not remove address.",
+        "defaultShipping": "Could not update default shipping.",
+        "defaultBilling": "Could not update default billing."
+      }
     },
     "completeProfile": {
       "title": "Complete your profile",

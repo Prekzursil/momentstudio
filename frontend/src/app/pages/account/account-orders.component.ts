@@ -6,12 +6,13 @@ import { TranslateModule } from '@ngx-translate/core';
 
 import { ButtonComponent } from '../../shared/button.component';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
+import { SkeletonComponent } from '../../shared/skeleton.component';
 import { AccountComponent } from './account.component';
 
 @Component({
   selector: 'app-account-orders',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, TranslateModule, ButtonComponent, LocalizedCurrencyPipe],
+  imports: [CommonModule, FormsModule, RouterLink, TranslateModule, ButtonComponent, LocalizedCurrencyPipe, SkeletonComponent],
   template: `
     <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
       <div class="flex items-center justify-between">
@@ -39,15 +40,37 @@ import { AccountComponent } from './account.component';
         </label>
       </div>
 
+      <div *ngIf="account.ordersLoading() && !account.ordersLoaded()" class="grid gap-3">
+        <app-skeleton height="18px" width="240px"></app-skeleton>
+        <app-skeleton height="72px"></app-skeleton>
+        <app-skeleton height="72px"></app-skeleton>
+      </div>
+
       <div
-        *ngIf="account.pagedOrders().length === 0"
+        *ngIf="!account.ordersLoading() && account.ordersError()"
+        class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <span class="min-w-0">{{ account.ordersError() | translate }}</span>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'shop.retry' | translate"
+            [disabled]="account.ordersLoading()"
+            (action)="account.loadOrders(true)"
+          ></app-button>
+        </div>
+      </div>
+
+      <div
+        *ngIf="account.ordersLoaded() && !account.ordersLoading() && !account.ordersError() && account.pagedOrders().length === 0"
         class="border border-dashed border-slate-200 rounded-xl p-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300 grid gap-2"
       >
         <p>{{ 'account.orders.empty' | translate }}</p>
         <a routerLink="/shop" class="text-indigo-600 dark:text-indigo-300 font-medium">{{ 'account.orders.browse' | translate }}</a>
       </div>
 
-      <div *ngIf="account.pagedOrders().length" class="grid gap-3">
+      <div *ngIf="account.ordersLoaded() && account.pagedOrders().length" class="grid gap-3">
         <details
           *ngFor="let order of account.pagedOrders()"
           class="rounded-lg border border-slate-200 p-3 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200"

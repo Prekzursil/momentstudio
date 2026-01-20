@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 
 import { AccountComponent } from './account.component';
@@ -135,6 +135,7 @@ describe('AccountComponent', () => {
     ];
     wishlist = {
       items: () => wishlistItems,
+      isLoaded: jasmine.createSpy('isLoaded').and.returnValue(true),
       ensureLoaded: jasmine.createSpy('ensureLoaded'),
       isWishlisted: jasmine.createSpy('isWishlisted').and.returnValue(true),
       add: jasmine.createSpy('add').and.returnValue(of(wishlistItems[0])),
@@ -174,6 +175,23 @@ describe('AccountComponent', () => {
         { provide: CartStore, useValue: cart }
       ]
     });
+
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation(
+      'en',
+      {
+        account: {
+          overview: {
+            lastOrderLabel: '#{{ref}} · {{status}}',
+            wishlistCountOne: '1 saved item',
+            wishlistCountMany: '{{count}} saved items'
+          }
+        }
+      },
+      true
+    );
+    translate.setDefaultLang('en');
+    void translate.use('en');
   });
 
   it('computes overview summaries from last order and default shipping address', () => {
@@ -183,7 +201,7 @@ describe('AccountComponent', () => {
     fixture.detectChanges();
 
     expect(account.getProfile).toHaveBeenCalled();
-    expect(wishlist.refresh).toHaveBeenCalled();
+    expect(wishlist.ensureLoaded).toHaveBeenCalled();
 
     expect(cmp.lastOrderLabel()).toContain('#REF123');
     expect(cmp.lastOrderLabel()).toContain('shipped');

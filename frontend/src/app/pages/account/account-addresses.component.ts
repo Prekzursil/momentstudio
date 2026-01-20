@@ -4,22 +4,50 @@ import { TranslateModule } from '@ngx-translate/core';
 
 import { AddressFormComponent } from '../../shared/address-form.component';
 import { ButtonComponent } from '../../shared/button.component';
+import { SkeletonComponent } from '../../shared/skeleton.component';
 import { AccountComponent } from './account.component';
 
 @Component({
   selector: 'app-account-addresses',
   standalone: true,
-  imports: [CommonModule, TranslateModule, ButtonComponent, AddressFormComponent],
+  imports: [CommonModule, TranslateModule, ButtonComponent, AddressFormComponent, SkeletonComponent],
   template: `
     <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'account.sections.addresses' | translate }}</h2>
         <app-button size="sm" variant="ghost" [label]="'account.addresses.add' | translate" (action)="account.openAddressForm()"></app-button>
       </div>
+
+      <div *ngIf="account.addressesLoading() && !account.addressesLoaded()" class="grid gap-3">
+        <app-skeleton height="18px" width="220px"></app-skeleton>
+        <app-skeleton height="84px"></app-skeleton>
+      </div>
+
+      <div
+        *ngIf="!account.addressesLoading() && account.addressesError()"
+        class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <span class="min-w-0">{{ account.addressesError() | translate }}</span>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'shop.retry' | translate"
+            [disabled]="account.addressesLoading()"
+            (action)="account.loadAddresses(true)"
+          ></app-button>
+        </div>
+      </div>
+
       <div *ngIf="account.showAddressForm" class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
         <app-address-form [model]="account.addressModel" (save)="account.saveAddress($event)" (cancel)="account.closeAddressForm()"></app-address-form>
       </div>
-      <div *ngIf="account.addresses().length === 0 && !account.showAddressForm" class="text-sm text-slate-700 dark:text-slate-200">
+      <div
+        *ngIf="
+          account.addressesLoaded() && !account.addressesLoading() && !account.addressesError() && account.addresses().length === 0 && !account.showAddressForm
+        "
+        class="text-sm text-slate-700 dark:text-slate-200"
+      >
         {{ 'account.addresses.empty' | translate }}
       </div>
       <div
