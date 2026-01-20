@@ -357,7 +357,23 @@
     },
     "wishlist": {
       "browse": "Explorează produsele",
-      "empty": "Nu ai produse salvate încă."
+      "empty": "Nu ai produse salvate încă.",
+      "selectAll": "Selectează tot",
+      "selectedCount": "{{count}} selectate",
+      "addSelectedToCart": "Adaugă selectatele în coș",
+      "removeSelected": "Elimină selectatele",
+      "clearSelection": "Golește selecția",
+      "backInStock": "Înapoi în stoc",
+      "outOfStock": "Acum indisponibil",
+      "priceUp": "Preț +",
+      "priceDown": "Preț -",
+      "confirm": {
+        "removeSelected": "Elimini produsele selectate din lista de dorințe?"
+      },
+      "messages": {
+        "addedToCart": "Adăugat în coș",
+        "removedSelected": "Eliminat din lista de dorințe"
+      }
     },
     "coupons": {
       "coupon": "Cupon",

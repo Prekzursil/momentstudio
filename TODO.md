@@ -475,9 +475,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Addresses: support “billing same as shipping” per address.
 - [x] Addresses: add “Duplicate address” action.
 - [x] Addresses: convert address label to a dropdown (Home/Work/Other) with custom fallback.
-- [ ] Wishlist: add bulk actions (remove selected / add selected to cart).
-- [ ] Wishlist: show stock + price-change chips since saved.
-- [ ] Wishlist: add “notify me when back in stock” for wishlist items.
+- [x] Wishlist: add bulk actions (remove selected / add selected to cart).
+- [x] Wishlist: show stock + price-change chips since saved.
+- [x] Wishlist: add “notify me when back in stock” for wishlist items.
 - [ ] Coupons: show ineligible reasons + “you need X more subtotal” progress.
 - [ ] Coupons: suggest best coupon for the current cart (without auto-applying).
 - [ ] Notifications: add template previews per notification type.

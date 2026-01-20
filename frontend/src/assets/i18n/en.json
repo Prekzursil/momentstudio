@@ -357,7 +357,23 @@
     },
     "wishlist": {
       "browse": "Browse products",
-      "empty": "No saved items yet."
+      "empty": "No saved items yet.",
+      "selectAll": "Select all",
+      "selectedCount": "{{count}} selected",
+      "addSelectedToCart": "Add selected to cart",
+      "removeSelected": "Remove selected",
+      "clearSelection": "Clear",
+      "backInStock": "Back in stock",
+      "outOfStock": "Now out of stock",
+      "priceUp": "Price +",
+      "priceDown": "Price -",
+      "confirm": {
+        "removeSelected": "Remove selected items from your wishlist?"
+      },
+      "messages": {
+        "addedToCart": "Added to cart",
+        "removedSelected": "Removed from wishlist"
+      }
     },
     "coupons": {
       "coupon": "Coupon",
