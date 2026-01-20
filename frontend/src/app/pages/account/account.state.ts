@@ -110,12 +110,6 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   googleBusy = false;
   googleError: string | null = null;
 
-  emailChanging = false;
-  emailChangeEmail = '';
-  emailChangePassword = '';
-  emailChangeError: string | null = null;
-  emailChangeSuccess: string | null = null;
-
   secondaryEmails = signal<SecondaryEmail[]>([]);
   secondaryEmailsLoading = signal<boolean>(false);
   secondaryEmailsError = signal<string | null>(null);
@@ -1248,48 +1242,6 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.paymentMethods = this.paymentMethods.filter((pm) => pm.id !== id);
       },
       error: () => this.toast.error('Could not remove payment method')
-    });
-  }
-
-  updateEmail(): void {
-    if (this.emailChanging) return;
-    if (this.googleEmail()) {
-      this.emailChangeError = 'Unlink Google before changing your email.';
-      this.toast.error(this.emailChangeError);
-      return;
-    }
-    const email = this.emailChangeEmail.trim();
-    const password = this.emailChangePassword;
-    this.emailChangeError = null;
-    this.emailChangeSuccess = null;
-    if (!email) {
-      this.emailChangeError = 'Enter a new email.';
-      this.toast.error(this.emailChangeError);
-      return;
-    }
-    if (!password) {
-      this.emailChangeError = 'Confirm your password to change email.';
-      this.toast.error(this.emailChangeError);
-      return;
-    }
-    this.emailChanging = true;
-    this.auth.updateEmail(email, password).subscribe({
-      next: (user) => {
-        this.profile.set(user);
-        this.emailVerified.set(Boolean(user.email_verified));
-        this.emailChangeEmail = '';
-        this.emailChangePassword = '';
-        this.emailChangeSuccess = 'Email updated. Please verify your new email.';
-        this.toast.success('Email updated');
-      },
-      error: (err) => {
-        const message = err?.error?.detail || 'Could not change email.';
-        this.emailChangeError = message;
-        this.toast.error(message);
-      },
-      complete: () => {
-        this.emailChanging = false;
-      }
     });
   }
 
