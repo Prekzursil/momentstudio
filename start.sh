@@ -104,6 +104,57 @@ except Exception:
 PY
 }
 
+wait_for_backend_database() {
+  local max_wait_seconds="${DB_WAIT_SECONDS:-30}"
+  local connect_timeout="${DB_CONNECT_TIMEOUT_SECONDS:-2}"
+
+  (cd "${BACKEND_DIR}" && python - "${max_wait_seconds}" "${connect_timeout}" <<'PY'
+import asyncio
+import sys
+from urllib.parse import urlsplit
+
+import asyncpg
+
+from app.core.config import settings
+
+max_wait = int(sys.argv[1])
+connect_timeout = float(sys.argv[2])
+
+raw_url = settings.database_url
+url = raw_url
+if url.startswith("postgresql+asyncpg://"):
+    url = url.replace("postgresql+asyncpg://", "postgresql://", 1)
+
+parts = urlsplit(url)
+host = parts.hostname or "localhost"
+port = parts.port or 5432
+db = (parts.path or "").lstrip("/") or "postgres"
+
+async def main() -> None:
+    last_exc: Exception | None = None
+    for i in range(max_wait):
+        try:
+            conn = await asyncpg.connect(url, timeout=connect_timeout)
+        except Exception as exc:
+            last_exc = exc
+            if i == 0:
+                print(f"Waiting for Postgres at {host}:{port}/{db} (from DATABASE_URL)")
+            await asyncio.sleep(1)
+            continue
+        else:
+            await conn.close()
+            print("Postgres is reachable")
+            return
+    msg = f"Could not connect to Postgres at {host}:{port}/{db} after {max_wait}s"
+    if last_exc:
+        msg += f": {last_exc}"
+    raise SystemExit(msg)
+
+asyncio.run(main())
+PY
+  )
+}
+
 print_port_diagnostics() {
   local port="$1"
   if command -v lsof >/dev/null 2>&1; then
@@ -181,6 +232,23 @@ if [ "${START_BACKEND}" -eq 1 ]; then
   fi
 
   # Migrations
+  if ! run_step "Backend: wait for database" wait_for_backend_database; then
+    if [ "${AUTO_START_DB:-1}" != "0" ] && command -v docker >/dev/null 2>&1 && [ -f "${ROOT_DIR}/infra/docker-compose.yml" ]; then
+      echo ""
+      echo "Database is not reachable; attempting to start the Docker Compose Postgres service."
+      run_step "Backend: start Postgres via Docker Compose" docker compose -f infra/docker-compose.yml up -d db
+      export DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5433/adrianaart"
+      run_step "Backend: wait for database" wait_for_backend_database
+    else
+      echo ""
+      echo "Failed to connect to Postgres."
+      echo "Tip: ensure Postgres is running and DATABASE_URL points to it (backend/.env or env var)."
+      echo "If you're using Docker Compose for the DB, start it with:"
+      echo "  docker compose -f infra/docker-compose.yml up -d db"
+      exit 1
+    fi
+  fi
+
   run_step "Backend: apply migrations" true
   if ! (cd "${BACKEND_DIR}" && alembic upgrade head); then
     echo ""
