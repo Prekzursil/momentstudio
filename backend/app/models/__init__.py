@@ -8,6 +8,7 @@ from app.models.user import (
     UserDisplayNameHistory,
     AdminAuditLog,
 )  # noqa: F401
+from app.models.passkeys import UserPasskey  # noqa: F401
 from app.models.catalog import (
     Category,
     Product,
@@ -63,6 +64,7 @@ __all__ = [
     "UserUsernameHistory",
     "UserDisplayNameHistory",
     "AdminAuditLog",
+    "UserPasskey",
     "Category",
     "Product",
     "ProductImage",

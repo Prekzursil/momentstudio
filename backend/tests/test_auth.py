@@ -10,6 +10,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from webauthn.helpers import bytes_to_base64url
+
 from app.main import app
 from app.core.config import settings
 from app.db.base import Base
@@ -242,6 +244,73 @@ def test_two_factor_setup_and_login_flow(test_app: Dict[str, object]) -> None:
     assert status2.status_code == 200, status2.text
     assert status2.json()["enabled"] is True
     assert status2.json()["recovery_codes_remaining"] == len(recovery_codes) - 1
+
+
+def test_passkeys_register_list_and_login_flow(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    res = client.post(
+        "/api/v1/auth/register",
+        json=make_register_payload(email="passkeys@example.com", username="passkeys", password="supersecret", name="Passkeys"),
+    )
+    assert res.status_code == 201, res.text
+    access = res.json()["tokens"]["access_token"]
+
+    class DummyVerifiedRegistration:
+        credential_id = b"cred123"
+        credential_public_key = b"public_key"
+        sign_count = 0
+        aaguid = "test-aaguid"
+        credential_type = "public-key"
+        credential_device_type = "single_device"
+        credential_backed_up = False
+
+    class DummyVerifiedAuthentication:
+        new_sign_count = 1
+
+    def fake_verify_registration_response(**_kwargs):
+        return DummyVerifiedRegistration()
+
+    def fake_verify_authentication_response(**_kwargs):
+        return DummyVerifiedAuthentication()
+
+    monkeypatch.setattr("app.services.passkeys.verify_registration_response", fake_verify_registration_response)
+    monkeypatch.setattr("app.services.passkeys.verify_authentication_response", fake_verify_authentication_response)
+
+    opts = client.post("/api/v1/auth/me/passkeys/register/options", headers=auth_headers(access), json={"password": "supersecret"})
+    assert opts.status_code == 200, opts.text
+    registration_token = opts.json()["registration_token"]
+    assert registration_token
+
+    verify = client.post(
+        "/api/v1/auth/me/passkeys/register/verify",
+        headers=auth_headers(access),
+        json={"registration_token": registration_token, "credential": {"id": "ignored"}, "name": "Laptop"},
+    )
+    assert verify.status_code == 200, verify.text
+    passkey_id = verify.json()["id"]
+    assert passkey_id
+
+    listed = client.get("/api/v1/auth/me/passkeys", headers=auth_headers(access))
+    assert listed.status_code == 200, listed.text
+    keys = listed.json()
+    assert isinstance(keys, list)
+    assert len(keys) == 1
+    assert keys[0]["id"] == passkey_id
+
+    auth_opts = client.post("/api/v1/auth/passkeys/login/options", json={"identifier": "passkeys", "remember": True})
+    assert auth_opts.status_code == 200, auth_opts.text
+    authentication_token = auth_opts.json()["authentication_token"]
+    assert authentication_token
+
+    raw_id = bytes_to_base64url(DummyVerifiedRegistration.credential_id)
+    login = client.post(
+        "/api/v1/auth/passkeys/login/verify",
+        json={"authentication_token": authentication_token, "credential": {"rawId": raw_id, "id": raw_id}},
+    )
+    assert login.status_code == 200, login.text
+    body = login.json()
+    assert body["tokens"]["access_token"]
 
 
 def test_secondary_emails_flow(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:

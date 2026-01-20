@@ -6,7 +6,7 @@ const OWNER_PASSWORD = process.env.E2E_OWNER_PASSWORD || 'Password123';
 async function loginAsOwner(page: Page): Promise<void> {
   await page.goto('/login');
   await page.getByLabel('Email or username').fill(OWNER_IDENTIFIER);
-  await page.getByLabel('Password').fill(OWNER_PASSWORD);
+  await page.getByRole('textbox', { name: 'Password' }).fill(OWNER_PASSWORD);
   await page.getByRole('button', { name: 'Login' }).click();
   await expect(page).toHaveURL(/\/account(\/overview)?$/);
 }

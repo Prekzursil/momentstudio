@@ -267,6 +267,117 @@ import { AccountComponent } from './account.component';
         </div>
 
         <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-3">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div class="grid gap-1">
+              <p class="font-semibold text-slate-900 dark:text-slate-50">{{ 'account.security.passkeys.title' | translate }}</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'account.security.passkeys.copy' | translate }}</p>
+            </div>
+            <span
+              class="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+              [class.bg-emerald-100]="account.passkeys().length > 0"
+              [class.text-emerald-800]="account.passkeys().length > 0"
+              [class.dark:bg-emerald-900/40]="account.passkeys().length > 0"
+              [class.dark:text-emerald-200]="account.passkeys().length > 0"
+              [class.bg-slate-100]="account.passkeys().length === 0"
+              [class.text-slate-700]="account.passkeys().length === 0"
+              [class.dark:bg-slate-800]="account.passkeys().length === 0"
+              [class.dark:text-slate-200]="account.passkeys().length === 0"
+            >
+              {{
+                (account.passkeys().length > 0 ? 'account.security.passkeys.enabled' : 'account.security.passkeys.disabled') | translate
+              }}
+            </span>
+          </div>
+
+          <p *ngIf="!account.passkeysSupported()" class="text-sm text-slate-700 dark:text-slate-200">
+            {{ 'account.security.passkeys.notSupported' | translate }}
+          </p>
+
+          <div *ngIf="account.passkeysSupported() && account.passkeysLoading()" class="text-sm text-slate-600 dark:text-slate-300">
+            {{ 'notifications.loading' | translate }}
+          </div>
+
+          <p *ngIf="account.passkeysError()" class="text-xs text-rose-700 dark:text-rose-300">{{ account.passkeysError() }}</p>
+
+          <p
+            *ngIf="account.passkeysSupported() && !account.passkeysLoading() && account.passkeys().length === 0"
+            class="text-sm text-slate-700 dark:text-slate-200"
+          >
+            {{ 'account.security.passkeys.none' | translate }}
+          </p>
+
+          <ul *ngIf="account.passkeysSupported() && !account.passkeysLoading() && account.passkeys().length" class="grid gap-2">
+            <li
+              *ngFor="let p of account.passkeys()"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div class="min-w-0 grid gap-1">
+                <p class="text-sm font-medium text-slate-900 dark:text-slate-50 truncate">
+                  {{ p.name || ('account.security.passkeys.defaultName' | translate) }}
+                </p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'account.security.passkeys.created' | translate }}: {{ p.created_at | date: 'medium' }}
+                  <span *ngIf="p.last_used_at"> • {{ 'account.security.passkeys.lastUsed' | translate }}: {{ p.last_used_at | date: 'medium' }}</span>
+                  <span *ngIf="p.device_type"> • {{ p.device_type }}</span>
+                  <span *ngIf="p.backed_up"> • {{ 'account.security.passkeys.backedUp' | translate }}</span>
+                </p>
+              </div>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'account.security.actions.remove' | translate"
+                [disabled]="account.removingPasskeyId === p.id"
+                (action)="account.removePasskey(p.id)"
+              ></app-button>
+            </li>
+          </ul>
+
+          <div *ngIf="account.passkeysSupported()" class="grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'account.security.passkeys.nameLabel' | translate }}
+              <input
+                name="passkeyName"
+                type="text"
+                maxlength="120"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                [disabled]="account.registeringPasskey"
+                [(ngModel)]="account.passkeyRegisterName"
+              />
+            </label>
+
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'account.security.passkeys.passwordLabel' | translate }}
+              <div class="relative">
+                <input
+                  name="passkeyPassword"
+                  [type]="showPasskeyPassword ? 'text' : 'password'"
+                  autocomplete="current-password"
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  [disabled]="account.registeringPasskey"
+                  [(ngModel)]="account.passkeyRegisterPassword"
+                />
+                <button
+                  type="button"
+                  class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
+                  (click)="showPasskeyPassword = !showPasskeyPassword"
+                  [attr.aria-label]="(showPasskeyPassword ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+                >
+                  {{ (showPasskeyPassword ? 'auth.hide' : 'auth.show') | translate }}
+                </button>
+              </div>
+            </label>
+
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'account.security.passkeys.addAction' | translate"
+              [disabled]="account.registeringPasskey || !account.passkeyRegisterPassword.trim()"
+              (action)="account.registerPasskey()"
+            ></app-button>
+          </div>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-3">
           <div class="grid gap-1">
             <p class="font-semibold text-slate-900 dark:text-slate-50">{{ 'account.security.emails.title' | translate }}</p>
             <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'account.security.emails.copy' | translate }}</p>
@@ -654,6 +765,7 @@ export class AccountSecurityComponent implements OnDestroy {
   protected readonly account = inject(AccountComponent);
   showTwoFactorManagePassword = false;
   showTwoFactorSetupPassword = false;
+  showPasskeyPassword = false;
   showMakePrimaryPassword = false;
   showGooglePassword = false;
 

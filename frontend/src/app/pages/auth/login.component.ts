@@ -10,6 +10,7 @@ import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { appConfig } from '../../core/app-config';
+import { isWebAuthnSupported, serializePublicKeyCredential, toPublicKeyCredentialRequestOptions } from '../../shared/webauthn';
 
 @Component({
   selector: 'app-login',
@@ -42,10 +43,11 @@ import { appConfig } from '../../core/app-config';
             [(ngModel)]="identifier"
           />
         </label>
-        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-          {{ 'auth.password' | translate }}
+        <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+          <label for="login-password">{{ 'auth.password' | translate }}</label>
           <div class="relative">
             <input
+              id="login-password"
               name="password"
               [type]="showPassword ? 'text' : 'password'"
               class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
@@ -62,7 +64,7 @@ import { appConfig } from '../../core/app-config';
               {{ (showPassword ? 'auth.hide' : 'auth.show') | translate }}
             </button>
           </div>
-        </label>
+        </div>
         <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
           <input
             type="checkbox"
@@ -84,6 +86,13 @@ import { appConfig } from '../../core/app-config';
         <app-button [label]="'auth.login' | translate" type="submit"></app-button>
         <div class="border-t border-slate-200 pt-4 grid gap-2 dark:border-slate-800">
           <p class="text-sm text-slate-600 dark:text-slate-300 text-center">{{ 'auth.orContinue' | translate }}</p>
+          <app-button
+            *ngIf="passkeySupported"
+            variant="ghost"
+            [label]="'auth.passkeyContinue' | translate"
+            [disabled]="passkeyBusy"
+            (action)="startPasskey()"
+          ></app-button>
           <app-button variant="ghost" [label]="'auth.googleContinue' | translate" (action)="startGoogle()"></app-button>
         </div>
       </form>
@@ -101,10 +110,61 @@ export class LoginComponent {
   showPassword = false;
   captchaToken: string | null = null;
   loading = false;
+  passkeyBusy = false;
   captchaSiteKey = appConfig.captchaSiteKey || '';
   captchaEnabled = Boolean(this.captchaSiteKey);
+  passkeySupported = isWebAuthnSupported();
 
   constructor(private toast: ToastService, private auth: AuthService, private router: Router, private translate: TranslateService) {}
+
+  startPasskey(): void {
+    if (this.passkeyBusy) return;
+    if (!this.passkeySupported) {
+      this.toast.error(this.translate.instant('auth.passkeyNotSupported'));
+      return;
+    }
+    this.passkeyBusy = true;
+    this.auth.startPasskeyLogin(this.identifier, this.keepSignedIn).subscribe({
+      next: async (res) => {
+        try {
+          const publicKey = toPublicKeyCredentialRequestOptions(res.options);
+          const credential = (await navigator.credentials.get({ publicKey })) as PublicKeyCredential | null;
+          if (!credential) {
+            this.passkeyBusy = false;
+            return;
+          }
+          const payload = serializePublicKeyCredential(credential);
+          this.auth.completePasskeyLogin(res.authentication_token, payload, this.keepSignedIn).subscribe({
+            next: (authRes) => {
+              this.toast.success(this.translate.instant('auth.successLogin'), authRes?.user?.email);
+              void this.router.navigateByUrl('/account');
+            },
+            error: (err) => {
+              const message = err?.error?.detail || this.translate.instant('auth.passkeyError');
+              this.toast.error(message);
+            },
+            complete: () => {
+              this.passkeyBusy = false;
+            }
+          });
+        } catch (err: any) {
+          const name = err?.name || '';
+          if (name === 'NotAllowedError') {
+            this.toast.info(this.translate.instant('auth.passkeyCancelled'));
+          } else {
+            const message = err?.message || this.translate.instant('auth.passkeyError');
+            this.toast.error(message);
+          }
+          this.passkeyBusy = false;
+        }
+      },
+      error: (err) => {
+        const message = err?.error?.detail || this.translate.instant('auth.passkeyError');
+        this.toast.error(message);
+        this.passkeyBusy = false;
+      }
+    });
+  }
 
   startGoogle(): void {
     localStorage.setItem('google_flow', 'login');

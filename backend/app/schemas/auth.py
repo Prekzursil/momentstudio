@@ -1,4 +1,5 @@
 from datetime import datetime, date
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -83,6 +84,27 @@ class TwoFactorStatusResponse(BaseModel):
 
 class TwoFactorEnableResponse(BaseModel):
     recovery_codes: list[str]
+
+
+class PasskeyResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str | None = None
+    created_at: datetime
+    last_used_at: datetime | None = None
+    device_type: str | None = None
+    backed_up: bool = False
+
+
+class PasskeyRegistrationOptionsResponse(BaseModel):
+    registration_token: str
+    options: dict[str, Any]
+
+
+class PasskeyAuthenticationOptionsResponse(BaseModel):
+    authentication_token: str
+    options: dict[str, Any]
 
 
 class PasswordResetRequest(BaseModel):

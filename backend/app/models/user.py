@@ -1,12 +1,18 @@
+from __future__ import annotations
+
 import enum
 import uuid
 from datetime import datetime, date
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Date, DateTime, Enum, String, func, ForeignKey, Integer, UniqueConstraint, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.models.passkeys import UserPasskey
 
 
 class UserRole(str, enum.Enum):
@@ -81,6 +87,9 @@ class User(Base):
     )
     secondary_emails: Mapped[list["UserSecondaryEmail"]] = relationship(
         "UserSecondaryEmail", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
+    )
+    passkeys: Mapped[list["UserPasskey"]] = relationship(
+        "UserPasskey", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
     )
 
 

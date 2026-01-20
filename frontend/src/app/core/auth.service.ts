@@ -62,6 +62,25 @@ export interface TwoFactorEnableResponse {
   recovery_codes: string[];
 }
 
+export interface PasskeyInfo {
+  id: string;
+  name?: string | null;
+  created_at: string;
+  last_used_at?: string | null;
+  device_type?: string | null;
+  backed_up?: boolean;
+}
+
+export interface PasskeyRegistrationOptionsResponse {
+  registration_token: string;
+  options: any;
+}
+
+export interface PasskeyAuthenticationOptionsResponse {
+  authentication_token: string;
+  options: any;
+}
+
 export interface GoogleCallbackResponse {
   user: AuthUser;
   tokens?: AuthTokens | null;
@@ -404,6 +423,39 @@ export class AuthService {
 
   regenerateTwoFactorRecoveryCodes(password: string, code: string): Observable<TwoFactorEnableResponse> {
     return this.api.post<TwoFactorEnableResponse>('/auth/me/2fa/recovery-codes/regenerate', { password, code });
+  }
+
+  listPasskeys(): Observable<PasskeyInfo[]> {
+    return this.api.get<PasskeyInfo[]>('/auth/me/passkeys');
+  }
+
+  startPasskeyRegistration(password: string): Observable<PasskeyRegistrationOptionsResponse> {
+    return this.api.post<PasskeyRegistrationOptionsResponse>('/auth/me/passkeys/register/options', { password });
+  }
+
+  completePasskeyRegistration(registrationToken: string, credential: any, name?: string | null): Observable<PasskeyInfo> {
+    return this.api.post<PasskeyInfo>('/auth/me/passkeys/register/verify', {
+      registration_token: registrationToken,
+      credential,
+      name: name ?? null
+    });
+  }
+
+  deletePasskey(passkeyId: string): Observable<void> {
+    return this.api.delete<void>(`/auth/me/passkeys/${passkeyId}`);
+  }
+
+  startPasskeyLogin(identifier: string | null, remember: boolean): Observable<PasskeyAuthenticationOptionsResponse> {
+    return this.api.post<PasskeyAuthenticationOptionsResponse>('/auth/passkeys/login/options', {
+      identifier: (identifier ?? '').trim() || null,
+      remember
+    });
+  }
+
+  completePasskeyLogin(authenticationToken: string, credential: any, remember: boolean): Observable<AuthResponse> {
+    return this.api
+      .post<AuthResponse>('/auth/passkeys/login/verify', { authentication_token: authenticationToken, credential })
+      .pipe(tap((res) => this.persist(res, remember)));
   }
 
   refresh(opts?: { silent?: boolean }): Observable<AuthTokens | null> {

@@ -14,6 +14,7 @@ import { appConfig } from '../../core/app-config';
 import {
   AuthService,
   AuthUser,
+  PasskeyInfo,
   RefreshSessionInfo,
   SecondaryEmail,
   TwoFactorEnableResponse,
@@ -43,6 +44,7 @@ import { orderStatusChipClass } from '../../shared/order-status';
 import { missingRequiredProfileFields as computeMissingRequiredProfileFields, type RequiredProfileField } from '../../shared/profile-requirements';
 import { buildE164, listPhoneCountries, splitE164, type PhoneCountryOption } from '../../shared/phone';
 import { formatIdentity } from '../../shared/user-identity';
+import { isWebAuthnSupported, serializePublicKeyCredential, toPublicKeyCredentialCreationOptions } from '../../shared/webauthn';
 
 import { type CountryCode } from 'libphonenumber-js';
 
@@ -237,6 +239,15 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   disablingTwoFactor = false;
   regeneratingTwoFactorCodes = false;
 
+  passkeys = signal<PasskeyInfo[]>([]);
+  passkeysLoaded = signal<boolean>(false);
+  passkeysLoading = signal<boolean>(false);
+  passkeysError = signal<string | null>(null);
+  passkeyRegisterPassword = '';
+  passkeyRegisterName = '';
+  registeringPasskey = false;
+  removingPasskeyId: string | null = null;
+
   exportingData = false;
   exportError: string | null = null;
 
@@ -424,6 +435,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.loadSessions();
         this.loadSecurityEvents();
         this.loadTwoFactorStatus();
+        this.loadPasskeys();
         return;
       case 'comments':
         if (!this.myCommentsMeta()) {
@@ -2017,6 +2029,121 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.twoFactorLoading.set(false);
       },
       complete: () => this.twoFactorLoading.set(false)
+    });
+  }
+
+  passkeysSupported(): boolean {
+    return isWebAuthnSupported();
+  }
+
+  private loadPasskeys(force: boolean = false): void {
+    if (!this.auth.isAuthenticated()) return;
+    if (!this.passkeysSupported()) {
+      this.passkeys.set([]);
+      this.passkeysLoaded.set(true);
+      return;
+    }
+    if (this.passkeysLoading() && !force) return;
+    if (this.passkeysLoaded() && !force) return;
+    this.passkeysLoading.set(true);
+    this.passkeysError.set(null);
+    this.auth.listPasskeys().subscribe({
+      next: (passkeys) => {
+        this.passkeys.set(passkeys ?? []);
+        this.passkeysLoaded.set(true);
+      },
+      error: () => {
+        this.passkeys.set([]);
+        this.passkeysLoaded.set(true);
+        this.passkeysError.set(this.t('account.security.passkeys.loadError'));
+        this.passkeysLoading.set(false);
+      },
+      complete: () => this.passkeysLoading.set(false)
+    });
+  }
+
+  registerPasskey(): void {
+    if (!this.auth.isAuthenticated() || this.registeringPasskey) return;
+    if (!this.passkeysSupported()) {
+      this.toast.error(this.t('account.security.passkeys.notSupported'));
+      return;
+    }
+    const password = this.passkeyRegisterPassword.trim();
+    if (!password) {
+      this.toast.error(this.t('auth.completeForm'));
+      return;
+    }
+
+    this.registeringPasskey = true;
+    this.passkeysError.set(null);
+
+    this.auth.startPasskeyRegistration(password).subscribe({
+      next: async (res) => {
+        try {
+          const publicKey = toPublicKeyCredentialCreationOptions(res.options);
+          const credential = (await navigator.credentials.create({ publicKey })) as PublicKeyCredential | null;
+          if (!credential) {
+            this.registeringPasskey = false;
+            return;
+          }
+          const payload = serializePublicKeyCredential(credential);
+          const name = this.passkeyRegisterName.trim() || null;
+          this.auth.completePasskeyRegistration(res.registration_token, payload, name).subscribe({
+            next: () => {
+              this.toast.success(this.t('account.security.passkeys.added'));
+              this.passkeyRegisterPassword = '';
+              this.passkeyRegisterName = '';
+              this.loadPasskeys(true);
+              this.refreshSecurityEvents();
+            },
+            error: (err) => {
+              const message = err?.error?.detail || this.t('account.security.passkeys.addError');
+              this.passkeysError.set(message);
+              this.toast.error(message);
+            },
+            complete: () => {
+              this.registeringPasskey = false;
+            }
+          });
+        } catch (err: any) {
+          const name = err?.name || '';
+          if (name === 'NotAllowedError') {
+            this.toast.info(this.t('account.security.passkeys.cancelled'));
+          } else {
+            const message = err?.message || this.t('account.security.passkeys.addError');
+            this.toast.error(message);
+          }
+          this.registeringPasskey = false;
+        }
+      },
+      error: (err) => {
+        const message = err?.error?.detail || this.t('account.security.passkeys.addError');
+        this.passkeysError.set(message);
+        this.toast.error(message);
+        this.registeringPasskey = false;
+      }
+    });
+  }
+
+  removePasskey(passkeyId: string): void {
+    if (!this.auth.isAuthenticated() || this.removingPasskeyId) return;
+    if (!confirm(this.t('account.security.passkeys.removeConfirm'))) return;
+    this.removingPasskeyId = passkeyId;
+    this.passkeysError.set(null);
+    this.auth.deletePasskey(passkeyId).subscribe({
+      next: () => {
+        this.toast.success(this.t('account.security.passkeys.removed'));
+        this.passkeys.set(this.passkeys().filter((p) => p.id !== passkeyId));
+        this.refreshSecurityEvents();
+      },
+      error: (err) => {
+        const message = err?.error?.detail || this.t('account.security.passkeys.removeError');
+        this.passkeysError.set(message);
+        this.toast.error(message);
+      },
+      complete: () => {
+        this.removingPasskeyId = null;
+      }
     });
   }
 

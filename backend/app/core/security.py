@@ -65,6 +65,27 @@ def create_two_factor_token(subject: str, *, remember: bool, method: str) -> str
     )
 
 
+def create_webauthn_token(
+    *,
+    purpose: str,
+    challenge: str,
+    user_id: str | None = None,
+    remember: bool | None = None,
+) -> str:
+    claims: dict[str, Any] = {"purpose": str(purpose), "challenge": str(challenge)}
+    if user_id:
+        claims["uid"] = str(user_id)
+    if remember is not None:
+        claims["remember"] = bool(remember)
+    subject = str(user_id) if user_id else "anon"
+    return _create_token_with_claims(
+        subject,
+        "webauthn",
+        timedelta(minutes=settings.webauthn_challenge_exp_minutes),
+        extra_claims=claims,
+    )
+
+
 def decode_token(token: str) -> Optional[dict[str, Any]]:
     try:
         return jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])

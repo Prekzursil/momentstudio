@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, EmailStr, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from webauthn.helpers import base64url_to_bytes
 
 from app.core import security
 from app.core.config import settings
@@ -31,6 +32,9 @@ from app.schemas.auth import (
     TwoFactorEnableResponse,
     TwoFactorSetupResponse,
     TwoFactorStatusResponse,
+    PasskeyAuthenticationOptionsResponse,
+    PasskeyRegistrationOptionsResponse,
+    PasskeyResponse,
     EmailVerificationConfirm,
     SecondaryEmailConfirmRequest,
     SecondaryEmailCreateRequest,
@@ -47,6 +51,7 @@ from app.schemas.user import UserCreate
 from app.services import auth as auth_service
 from app.services import captcha as captcha_service
 from app.services import email as email_service
+from app.services import passkeys as passkeys_service
 from app.services import self_service
 from app.services import storage
 from app.core import metrics
@@ -321,6 +326,26 @@ class TwoFactorDisableRequest(BaseModel):
     code: str = Field(min_length=1, max_length=32)
 
 
+class PasskeyLoginOptionsRequest(BaseModel):
+    identifier: str | None = None
+    remember: bool = False
+
+
+class PasskeyLoginVerifyRequest(BaseModel):
+    authentication_token: str = Field(min_length=1)
+    credential: dict
+
+
+class PasskeyRegistrationOptionsRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+
+
+class PasskeyRegistrationVerifyRequest(BaseModel):
+    registration_token: str = Field(min_length=1)
+    credential: dict
+    name: str | None = Field(default=None, max_length=120)
+
+
 class UsernameUpdateRequest(BaseModel):
     username: str = Field(min_length=3, max_length=30, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$")
     password: str = Field(min_length=1, max_length=128)
@@ -508,6 +533,200 @@ async def login_two_factor(
     )
 
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
+
+
+@router.post(
+    "/passkeys/login/options",
+    response_model=PasskeyAuthenticationOptionsResponse,
+    summary="Get WebAuthn options for passkey login",
+)
+async def passkey_login_options(
+    payload: PasskeyLoginOptionsRequest,
+    session: AsyncSession = Depends(get_session),
+    _: None = Depends(login_rate_limit),
+) -> PasskeyAuthenticationOptionsResponse:
+    identifier = (payload.identifier or "").strip()
+    user: User | None = None
+    if identifier:
+        if "@" in identifier:
+            user = await auth_service.get_user_by_login_email(session, identifier)
+        else:
+            user = await auth_service.get_user_by_username(session, identifier)
+
+    options, _ = await passkeys_service.generate_authentication_options_for_user(session, user)
+    challenge = str(options.get("challenge") or "").strip()
+    if not challenge:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate passkey challenge")
+
+    token = security.create_webauthn_token(
+        purpose="login",
+        challenge=challenge,
+        user_id=str(user.id) if user else None,
+        remember=bool(payload.remember),
+    )
+    return PasskeyAuthenticationOptionsResponse(authentication_token=token, options=options)
+
+
+@router.post(
+    "/passkeys/login/verify",
+    response_model=AuthResponse,
+    summary="Verify a passkey assertion and start a session",
+)
+async def passkey_login_verify(
+    payload: PasskeyLoginVerifyRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    _: None = Depends(login_rate_limit),
+    response: Response = None,
+) -> AuthResponse:
+    token_payload = security.decode_token(payload.authentication_token)
+    if not token_payload or token_payload.get("type") != "webauthn" or token_payload.get("purpose") != "login":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    challenge_b64 = str(token_payload.get("challenge") or "").strip()
+    if not challenge_b64:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    try:
+        expected_challenge = base64url_to_bytes(challenge_b64)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token") from exc
+
+    remember = bool(token_payload.get("remember"))
+    token_user_id = str(token_payload.get("uid") or "").strip() or None
+
+    user, _passkey = await passkeys_service.verify_passkey_authentication(
+        session,
+        credential=payload.credential,
+        expected_challenge=expected_challenge,
+        user_id=token_user_id,
+    )
+
+    if getattr(user, "google_sub", None) and not auth_service.is_profile_complete(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Complete your Google sign-in registration before using passkey login.",
+        )
+    if getattr(user, "deleted_at", None) is not None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
+        await self_service.execute_account_deletion(session, user)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+
+    metrics.record_login_success()
+    tokens = await auth_service.issue_tokens_for_user(
+        session,
+        user,
+        persistent=remember,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    if response:
+        set_refresh_cookie(response, tokens["refresh_token"], persistent=remember)
+
+    await auth_service.record_security_event(
+        session,
+        user.id,
+        "login_passkey",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
+
+
+@router.get("/me/passkeys", response_model=list[PasskeyResponse], summary="List my passkeys")
+async def list_my_passkeys(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[PasskeyResponse]:
+    passkeys = await passkeys_service.list_passkeys(session, current_user.id)
+    return [PasskeyResponse.model_validate(p) for p in passkeys]
+
+
+@router.post(
+    "/me/passkeys/register/options",
+    response_model=PasskeyRegistrationOptionsResponse,
+    summary="Start passkey registration (generates WebAuthn options)",
+)
+async def passkey_register_options(
+    payload: PasskeyRegistrationOptionsRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> PasskeyRegistrationOptionsResponse:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+
+    options, _ = await passkeys_service.generate_registration_options_for_user(session, current_user)
+    challenge = str(options.get("challenge") or "").strip()
+    if not challenge:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate passkey challenge")
+
+    token = security.create_webauthn_token(
+        purpose="register",
+        challenge=challenge,
+        user_id=str(current_user.id),
+    )
+    return PasskeyRegistrationOptionsResponse(registration_token=token, options=options)
+
+
+@router.post(
+    "/me/passkeys/register/verify",
+    response_model=PasskeyResponse,
+    summary="Finalize passkey registration",
+)
+async def passkey_register_verify(
+    payload: PasskeyRegistrationVerifyRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> PasskeyResponse:
+    token_payload = security.decode_token(payload.registration_token)
+    if not token_payload or token_payload.get("type") != "webauthn" or token_payload.get("purpose") != "register":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    token_user_id = str(token_payload.get("uid") or "").strip()
+    if token_user_id != str(current_user.id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    challenge_b64 = str(token_payload.get("challenge") or "").strip()
+    if not challenge_b64:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    try:
+        expected_challenge = base64url_to_bytes(challenge_b64)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token") from exc
+
+    passkey = await passkeys_service.register_passkey(
+        session,
+        user=current_user,
+        credential=payload.credential,
+        expected_challenge=expected_challenge,
+        name=payload.name,
+    )
+    await auth_service.record_security_event(
+        session,
+        current_user.id,
+        "passkey_added",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    return PasskeyResponse.model_validate(passkey)
+
+
+@router.delete("/me/passkeys/{passkey_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Remove a passkey")
+async def passkey_delete(
+    passkey_id: UUID,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    removed = await passkeys_service.delete_passkey(session, user_id=current_user.id, passkey_id=passkey_id)
+    if not removed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Passkey not found")
+    await auth_service.record_security_event(
+        session,
+        current_user.id,
+        "passkey_removed",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    return None
 
 
 @router.post("/refresh", response_model=TokenPair)

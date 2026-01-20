@@ -282,6 +282,7 @@ BACKEND_PID=""
 echo ""
 echo "Starting backend on http://${UVICORN_HOST}:${BACKEND_PORT}"
 if [ "${START_BACKEND}" -eq 1 ]; then
+  export FRONTEND_ORIGIN="${FRONTEND_ORIGIN:-http://localhost:${FRONTEND_PORT}}"
   (cd "${BACKEND_DIR}" && exec uvicorn app.main:app --host "${UVICORN_HOST}" --port "${BACKEND_PORT}" --reload) &
   BACKEND_PID=$!
 else

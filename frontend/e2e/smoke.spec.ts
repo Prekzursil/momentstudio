@@ -55,7 +55,7 @@ test('guest checkout prompts for email verification', async ({ page }) => {
 test('owner can sign in and reach admin dashboard', async ({ page }) => {
   await page.goto('/login');
   await page.getByLabel('Email or username').fill(OWNER_IDENTIFIER);
-  await page.getByLabel('Password').fill(OWNER_PASSWORD);
+  await page.getByRole('textbox', { name: 'Password' }).fill(OWNER_PASSWORD);
   await page.getByRole('button', { name: 'Login' }).click();
 
   await expect(page).toHaveURL(/\/account(\/overview)?$/);
