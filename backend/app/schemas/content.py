@@ -74,6 +74,17 @@ class ContentPageListItem(BaseModel):
     published_at: datetime | None = None
 
 
+class ContentPageRenameRequest(BaseModel):
+    new_slug: str = Field(min_length=1, max_length=120)
+
+
+class ContentPageRenameResponse(BaseModel):
+    old_slug: str
+    new_slug: str
+    old_key: str
+    new_key: str
+
+
 class ContentImageRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

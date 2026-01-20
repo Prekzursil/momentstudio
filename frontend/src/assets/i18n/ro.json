@@ -615,6 +615,7 @@
       "cancel": "Anulează",
       "retry": "Reîncearcă",
       "edit": "Editează",
+      "changeUrl": "Schimbă URL-ul",
       "refresh": "Reîncarcă",
       "search": "Caută",
       "copy": "Copiază",
@@ -858,9 +859,11 @@
           "status": "Stare",
           "createPage": "Creează pagină",
           "page": "Pagină",
+          "changeUrlPrompt": "Noul URL (slug) pentru această pagină",
+          "changeUrlConfirm": "Schimbi URL-ul din /pages/{{old}} în /pages/{{next}}? Linkurile existente vor redirecționa.",
           "addBlock": "Adaugă bloc",
-          "success": { "save": "Blocurile au fost salvate." },
-          "errors": { "load": "Nu am putut încărca blocurile.", "save": "Nu am putut salva blocurile." }
+          "success": { "save": "Blocurile au fost salvate.", "rename": "URL-ul paginii a fost actualizat (redirecționare creată)." },
+          "errors": { "load": "Nu am putut încărca blocurile.", "save": "Nu am putut salva blocurile.", "rename": "Nu s-a putut schimba URL-ul paginii." }
         },
         "success": { "save": "Conținut salvat.", "created": "Pagina a fost creată." },
         "errors": {

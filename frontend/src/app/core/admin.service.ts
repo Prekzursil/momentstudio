@@ -246,6 +246,13 @@ export interface ContentPageListItem {
   published_at?: string | null;
 }
 
+export interface ContentPageRenameResponse {
+  old_slug: string;
+  new_slug: string;
+  old_key: string;
+  new_key: string;
+}
+
 export interface ContentImageAssetRead {
   id: string;
   url: string;
@@ -531,5 +538,9 @@ export class AdminService {
 
   listContentPages(): Observable<ContentPageListItem[]> {
     return this.api.get<ContentPageListItem[]>('/content/admin/pages/list');
+  }
+
+  renameContentPage(slug: string, newSlug: string): Observable<ContentPageRenameResponse> {
+    return this.api.post<ContentPageRenameResponse>(`/content/admin/pages/${encodeURIComponent(slug)}/rename`, { new_slug: newSlug });
   }
 }

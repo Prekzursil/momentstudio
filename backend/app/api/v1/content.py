@@ -14,6 +14,8 @@ from app.schemas.content import (
     ContentImageAssetListResponse,
     ContentImageAssetRead,
     ContentPageListItem,
+    ContentPageRenameRequest,
+    ContentPageRenameResponse,
     ContentBlockVersionListItem,
     ContentBlockVersionRead,
 )
@@ -30,8 +32,11 @@ async def get_static_page(
     session: AsyncSession = Depends(get_session),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
 ) -> ContentBlockRead:
-    key = f"page.{slug}"
-    block = await content_service.get_published_by_key(session, key, lang=lang)
+    slug_value = content_service.slugify_page_slug(slug)
+    if not slug_value:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+    key = f"page.{slug_value}"
+    block = await content_service.get_published_by_key_following_redirects(session, key, lang=lang)
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
     return block
@@ -43,7 +48,7 @@ async def get_content(
     session: AsyncSession = Depends(get_session),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
 ) -> ContentBlockRead:
-    block = await content_service.get_published_by_key(session, key, lang=lang)
+    block = await content_service.get_published_by_key_following_redirects(session, key, lang=lang)
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
     return block
@@ -197,6 +202,22 @@ async def admin_list_pages(
             )
         )
     return items
+
+
+@router.post("/admin/pages/{slug}/rename", response_model=ContentPageRenameResponse)
+async def admin_rename_page(
+    slug: str,
+    payload: ContentPageRenameRequest,
+    session: AsyncSession = Depends(get_session),
+    admin=Depends(require_admin),
+) -> ContentPageRenameResponse:
+    old_slug, new_slug, old_key, new_key = await content_service.rename_page_slug(
+        session,
+        old_slug=slug,
+        new_slug=payload.new_slug,
+        actor_id=admin.id,
+    )
+    return ContentPageRenameResponse(old_slug=old_slug, new_slug=new_slug, old_key=old_key, new_key=new_key)
 
 
 @router.get("/admin/{key}/preview", response_model=ContentBlockRead)

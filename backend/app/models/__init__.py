@@ -36,7 +36,15 @@ from app.models.coupons_v2 import (  # noqa: F401
 )
 from app.models.address import Address  # noqa: F401
 from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod, OrderEvent  # noqa: F401
-from app.models.content import ContentBlock, ContentBlockVersion, ContentStatus, ContentImage, ContentAuditLog, ContentBlockTranslation  # noqa: F401
+from app.models.content import (  # noqa: F401
+    ContentBlock,
+    ContentBlockVersion,
+    ContentStatus,
+    ContentImage,
+    ContentAuditLog,
+    ContentBlockTranslation,
+    ContentRedirect,
+)
 from app.models.wishlist import WishlistItem  # noqa: F401
 from app.models.webhook import StripeWebhookEvent  # noqa: F401
 from app.models.blog import BlogComment, BlogCommentFlag  # noqa: F401
@@ -88,6 +96,7 @@ __all__ = [
     "ContentImage",
     "ContentAuditLog",
     "ContentBlockTranslation",
+    "ContentRedirect",
     "WishlistItem",
     "StripeWebhookEvent",
     "BlogComment",

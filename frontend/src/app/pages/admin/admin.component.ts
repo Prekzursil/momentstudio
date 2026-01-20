@@ -527,7 +527,14 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                       </select>
                     </label>
 
-                    <div class="flex items-end gap-2">
+                    <div class="flex flex-wrap items-end gap-2">
+                      <app-button
+                        *ngIf="canRenamePageKey(pageBlocksKey)"
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.actions.changeUrl' | translate"
+                        (action)="renameCustomPageUrl()"
+                      ></app-button>
                       <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                         {{ 'adminUi.site.pages.builder.addBlock' | translate }}
                         <select
@@ -5069,6 +5076,49 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
+  canRenamePageKey(key: string): boolean {
+    const value = (key || '').trim();
+    if (!value.startsWith('page.')) return false;
+    if (value === 'page.about' || value === 'page.contact' || value === 'page.faq' || value === 'page.shipping') return false;
+    return true;
+  }
+
+  renameCustomPageUrl(): void {
+    const pageKey = this.pageBlocksKey;
+    if (!this.canRenamePageKey(pageKey)) return;
+    const oldSlug = pageKey.split('.', 2)[1] || '';
+    const entered = window.prompt(this.t('adminUi.site.pages.builder.changeUrlPrompt'), oldSlug);
+    if (entered === null) return;
+    const nextSlug = this.slugifyPageSlug(entered);
+    if (!nextSlug || nextSlug === oldSlug) {
+      this.toast.error(this.t('adminUi.site.pages.builder.errors.rename'));
+      return;
+    }
+    if (this.isReservedPageSlug(nextSlug)) {
+      this.toast.error(this.t('adminUi.site.pages.errors.reservedTitle'), this.t('adminUi.site.pages.errors.reservedCopy'));
+      return;
+    }
+    if (
+      !window.confirm(
+        this.t('adminUi.site.pages.builder.changeUrlConfirm', { old: oldSlug, next: nextSlug })
+      )
+    ) {
+      return;
+    }
+    this.admin.renameContentPage(oldSlug, nextSlug).subscribe({
+      next: (res) => {
+        this.toast.success(this.t('adminUi.site.pages.builder.success.rename'));
+        this.pageBlocksKey = res.new_key as PageBuilderKey;
+        this.loadContentPages();
+        this.loadPageBlocks(this.pageBlocksKey);
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.toast.error(detail || this.t('adminUi.site.pages.builder.errors.rename'));
+      }
+    });
+  }
+
   private isReservedPageSlug(slug: string): boolean {
     const value = (slug || '').trim().toLowerCase();
     if (!value) return true;
@@ -5081,6 +5131,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       'checkout',
       'contact',
       'error',
+      'home',
       'login',
       'register',
       'receipt',

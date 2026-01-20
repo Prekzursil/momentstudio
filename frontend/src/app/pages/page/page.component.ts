@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
 import { Subscription } from 'rxjs';
 import { ApiService } from '../../core/api.service';
@@ -19,6 +19,7 @@ interface ContentImage {
 }
 
 interface ContentBlock {
+  key: string;
   title: string;
   body_markdown: string;
   meta?: Record<string, unknown> | null;
@@ -157,10 +158,12 @@ export class CmsPageComponent implements OnInit, OnDestroy {
   private langSub?: Subscription;
   private slugSub?: Subscription;
   private slug = '';
+  private suppressNextLoad = false;
 
   constructor(
     private api: ApiService,
     private route: ActivatedRoute,
+    private router: Router,
     private translate: TranslateService,
     private title: Title,
     private meta: Meta,
@@ -170,6 +173,10 @@ export class CmsPageComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.slugSub = this.route.paramMap.subscribe((params) => {
       this.slug = params.get('slug') || '';
+      if (this.suppressNextLoad) {
+        this.suppressNextLoad = false;
+        return;
+      }
       this.load();
     });
     this.langSub = this.translate.onLangChange.subscribe(() => this.load());
@@ -195,11 +202,16 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     this.api.get<ContentBlock>(`/content/pages/${encodeURIComponent(slug)}`, { lang }).subscribe({
       next: (block) => {
+        const canonicalSlug = this.slugFromKey(block.key);
         this.block.set(block);
         this.bodyHtml.set(this.markdown.render(block.body_markdown));
         this.pageBlocks.set(parsePageBlocks(block.meta, lang, (md) => this.markdown.render(md)));
         this.loading.set(false);
         this.hasError.set(false);
+        if (canonicalSlug && canonicalSlug !== slug) {
+          this.suppressNextLoad = true;
+          void this.router.navigate(['/pages', canonicalSlug], { replaceUrl: true, queryParamsHandling: 'preserve' });
+        }
         const metaBody = this.pageBlocks().length ? pageBlocksToPlainText(this.pageBlocks()) : block.body_markdown;
         this.crumbs.set([
           { label: 'nav.home', url: '/' },
@@ -222,6 +234,11 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     });
   }
 
+  private slugFromKey(key: string): string {
+    const raw = (key || '').trim();
+    return raw.startsWith('page.') ? raw.slice('page.'.length) : '';
+  }
+
   private setMetaTags(title: string, body: string): void {
     const pageTitle = title ? `${title} | momentstudio` : 'Page | momentstudio';
     const description = (body || '').replace(/\s+/g, ' ').trim().slice(0, 160);
@@ -233,4 +250,3 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     this.meta.updateTag({ name: 'og:title', content: pageTitle });
   }
 }
-

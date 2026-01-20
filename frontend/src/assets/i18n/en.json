@@ -615,6 +615,7 @@
       "cancel": "Cancel",
       "retry": "Retry",
       "edit": "Edit",
+      "changeUrl": "Change URL",
       "refresh": "Refresh",
       "search": "Search",
       "copy": "Copy",
@@ -858,9 +859,11 @@
           "status": "Status",
           "createPage": "Create page",
           "page": "Page",
+          "changeUrlPrompt": "New URL (slug) for this page",
+          "changeUrlConfirm": "Change URL from /pages/{{old}} to /pages/{{next}}? Existing links will redirect.",
           "addBlock": "Add block",
-          "success": { "save": "Blocks saved." },
-          "errors": { "load": "Could not load page blocks.", "save": "Could not save blocks." }
+          "success": { "save": "Blocks saved.", "rename": "Page URL updated (redirect created)." },
+          "errors": { "load": "Could not load page blocks.", "save": "Could not save blocks.", "rename": "Could not change page URL." }
         },
         "success": { "save": "Content saved.", "created": "Page created." },
         "errors": {
