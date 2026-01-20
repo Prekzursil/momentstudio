@@ -41,6 +41,7 @@ class UserResponse(BaseModel):
     notify_blog_comments: bool = False
     notify_blog_comment_replies: bool = False
     notify_marketing: bool = False
+    two_factor_enabled: bool = False
     google_sub: str | None = None
     google_email: str | None = None
     google_picture_url: str | None = None
@@ -59,6 +60,29 @@ class GoogleCallbackResponse(BaseModel):
     tokens: TokenPair | None = None
     requires_completion: bool = False
     completion_token: str | None = None
+    requires_two_factor: bool = False
+    two_factor_token: str | None = None
+
+
+class TwoFactorChallengeResponse(BaseModel):
+    user: UserResponse
+    requires_two_factor: bool = True
+    two_factor_token: str
+
+
+class TwoFactorSetupResponse(BaseModel):
+    secret: str
+    otpauth_url: str
+
+
+class TwoFactorStatusResponse(BaseModel):
+    enabled: bool
+    confirmed_at: datetime | None = None
+    recovery_codes_remaining: int = 0
+
+
+class TwoFactorEnableResponse(BaseModel):
+    recovery_codes: list[str]
 
 
 class PasswordResetRequest(BaseModel):

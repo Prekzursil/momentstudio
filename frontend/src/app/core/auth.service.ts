@@ -26,6 +26,7 @@ export interface AuthUser {
   notify_blog_comments?: boolean;
   notify_blog_comment_replies?: boolean;
   notify_marketing?: boolean;
+  two_factor_enabled?: boolean;
   google_sub?: string | null;
   google_email?: string | null;
   google_picture_url?: string | null;
@@ -40,11 +41,34 @@ export interface AuthResponse {
   tokens: AuthTokens;
 }
 
+export interface TwoFactorChallengeResponse {
+  user: AuthUser;
+  requires_two_factor: boolean;
+  two_factor_token: string;
+}
+
+export interface TwoFactorStatusResponse {
+  enabled: boolean;
+  confirmed_at?: string | null;
+  recovery_codes_remaining?: number;
+}
+
+export interface TwoFactorSetupResponse {
+  secret: string;
+  otpauth_url: string;
+}
+
+export interface TwoFactorEnableResponse {
+  recovery_codes: string[];
+}
+
 export interface GoogleCallbackResponse {
   user: AuthUser;
   tokens?: AuthTokens | null;
   requires_completion?: boolean;
   completion_token?: string | null;
+  requires_two_factor?: boolean;
+  two_factor_token?: string | null;
 }
 
 export interface UsernameHistoryItem {
@@ -143,15 +167,21 @@ export class AuthService {
     password: string,
     captchaToken?: string,
     opts?: { remember?: boolean }
-  ): Observable<AuthResponse> {
+  ): Observable<AuthResponse | TwoFactorChallengeResponse> {
     return this.api
-      .post<AuthResponse>('/auth/login', {
+      .post<AuthResponse | TwoFactorChallengeResponse>('/auth/login', {
         identifier,
         password,
         captcha_token: captchaToken ?? null,
         remember: opts?.remember ?? false
       })
-      .pipe(tap((res) => this.persist(res, opts?.remember ?? false)));
+      .pipe(
+        tap((res) => {
+          if (this.isAuthResponse(res)) {
+            this.persist(res, opts?.remember ?? false);
+          }
+        })
+      );
   }
 
   register(payload: {
@@ -191,6 +221,12 @@ export class AuthService {
         }
       })
     );
+  }
+
+  completeTwoFactorLogin(twoFactorToken: string, code: string, remember: boolean): Observable<AuthResponse> {
+    return this.api
+      .post<AuthResponse>('/auth/login/2fa', { two_factor_token: twoFactorToken, code })
+      .pipe(tap((res) => this.persist(res, remember)));
   }
 
   completeGoogleRegistration(
@@ -350,6 +386,26 @@ export class AuthService {
     return this.api.get<UserSecurityEventInfo[]>('/auth/me/security-events', { limit });
   }
 
+  getTwoFactorStatus(): Observable<TwoFactorStatusResponse> {
+    return this.api.get<TwoFactorStatusResponse>('/auth/me/2fa');
+  }
+
+  startTwoFactorSetup(password: string): Observable<TwoFactorSetupResponse> {
+    return this.api.post<TwoFactorSetupResponse>('/auth/me/2fa/setup', { password });
+  }
+
+  enableTwoFactor(code: string): Observable<TwoFactorEnableResponse> {
+    return this.api.post<TwoFactorEnableResponse>('/auth/me/2fa/enable', { code });
+  }
+
+  disableTwoFactor(password: string, code: string): Observable<TwoFactorStatusResponse> {
+    return this.api.post<TwoFactorStatusResponse>('/auth/me/2fa/disable', { password, code });
+  }
+
+  regenerateTwoFactorRecoveryCodes(password: string, code: string): Observable<TwoFactorEnableResponse> {
+    return this.api.post<TwoFactorEnableResponse>('/auth/me/2fa/recovery-codes/regenerate', { password, code });
+  }
+
   refresh(opts?: { silent?: boolean }): Observable<AuthTokens | null> {
     const silent = opts?.silent ?? false;
     const headers = silent ? { 'X-Silent': '1' } : undefined;
@@ -499,6 +555,10 @@ export class AuthService {
     // persisted tokens/user state to avoid stale \"logged in\" UI after reloads.
     this.clearStorage();
     this.storageMode = remember ? 'local' : 'session';
+  }
+
+  private isAuthResponse(res: AuthResponse | TwoFactorChallengeResponse): res is AuthResponse {
+    return Boolean((res as AuthResponse | null)?.tokens?.access_token && (res as AuthResponse | null)?.tokens?.refresh_token);
   }
 
   setTokens(tokens: AuthTokens | null): void {

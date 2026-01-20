@@ -73,6 +73,16 @@ export class GoogleCallbackComponent implements OnInit {
           void this.router.navigate(['/register'], { queryParams: { complete: 1 } });
           return;
         }
+        if (res.requires_two_factor && res.two_factor_token) {
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.setItem('two_factor_token', res.two_factor_token);
+            sessionStorage.setItem('two_factor_user', JSON.stringify(res.user ?? null));
+            sessionStorage.setItem('two_factor_remember', JSON.stringify(true));
+          }
+          this.toast.info(this.translate.instant('auth.twoFactorRequired'));
+          void this.router.navigateByUrl('/login/2fa');
+          return;
+        }
         this.toast.success(this.translate.instant('auth.googleLoginSuccess'), res.user.email);
         void this.router.navigateByUrl('/account');
       },

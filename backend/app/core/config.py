@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     refresh_token_exp_days: int = 7
     refresh_token_rotation: bool = True
     refresh_token_rotation_grace_seconds: int = 60
+    two_factor_challenge_exp_minutes: int = 10
+    two_factor_totp_period_seconds: int = 30
+    two_factor_totp_window: int = 1
+    two_factor_totp_digits: int = 6
+    two_factor_recovery_codes_count: int = 10
     account_deletion_cooldown_hours: int = 24
     secure_cookies: bool = False
     cookie_samesite: str = "lax"

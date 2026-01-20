@@ -26,17 +26,43 @@ def _create_token(subject: str, token_type: str, expires_delta: timedelta, jti: 
     return jwt.encode(to_encode, settings.secret_key, algorithm=settings.jwt_algorithm)
 
 
+def _create_token_with_claims(
+    subject: str,
+    token_type: str,
+    expires_delta: timedelta,
+    *,
+    jti: str | None = None,
+    extra_claims: dict[str, Any] | None = None,
+) -> str:
+    expire = datetime.now(timezone.utc) + expires_delta
+    to_encode: dict[str, Any] = {"sub": subject, "type": token_type, "exp": expire}
+    if jti:
+        to_encode["jti"] = jti
+    if extra_claims:
+        to_encode.update(extra_claims)
+    return jwt.encode(to_encode, settings.secret_key, algorithm=settings.jwt_algorithm)
+
+
 def create_access_token(subject: str, jti: str | None = None) -> str:
-    return _create_token(subject, "access", timedelta(minutes=settings.access_token_exp_minutes), jti=jti)
+    return _create_token_with_claims(subject, "access", timedelta(minutes=settings.access_token_exp_minutes), jti=jti)
 
 
 def create_refresh_token(subject: str, jti: str, expires_at: datetime | None = None) -> str:
     delta = expires_at - datetime.now(timezone.utc) if expires_at else timedelta(days=settings.refresh_token_exp_days)
-    return _create_token(subject, "refresh", delta, jti=jti)
+    return _create_token_with_claims(subject, "refresh", delta, jti=jti)
 
 
 def create_google_completion_token(subject: str) -> str:
-    return _create_token(subject, "google_completion", timedelta(minutes=settings.google_completion_token_exp_minutes))
+    return _create_token_with_claims(subject, "google_completion", timedelta(minutes=settings.google_completion_token_exp_minutes))
+
+
+def create_two_factor_token(subject: str, *, remember: bool, method: str) -> str:
+    return _create_token_with_claims(
+        subject,
+        "two_factor",
+        timedelta(minutes=settings.two_factor_challenge_exp_minutes),
+        extra_claims={"remember": bool(remember), "method": str(method)},
+    )
 
 
 def decode_token(token: str) -> Optional[dict[str, Any]]:

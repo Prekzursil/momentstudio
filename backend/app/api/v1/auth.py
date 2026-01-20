@@ -27,6 +27,10 @@ from app.schemas.auth import (
     RefreshSessionResponse,
     RefreshSessionsRevokeResponse,
     UserSecurityEventResponse,
+    TwoFactorChallengeResponse,
+    TwoFactorEnableResponse,
+    TwoFactorSetupResponse,
+    TwoFactorStatusResponse,
     EmailVerificationConfirm,
     SecondaryEmailConfirmRequest,
     SecondaryEmailCreateRequest,
@@ -54,6 +58,7 @@ register_rate_limit = per_identifier_limiter(
     lambda r: r.client.host if r.client else "anon", settings.auth_rate_limit_register, 60
 )
 login_rate_limit = limiter("auth:login", settings.auth_rate_limit_login, 60)
+two_factor_rate_limit = limiter("auth:2fa", settings.auth_rate_limit_login, 60)
 refresh_rate_limit = limiter("auth:refresh", settings.auth_rate_limit_refresh, 60)
 reset_request_rate_limit = limiter("auth:reset_request", settings.auth_rate_limit_reset_request, 60)
 reset_confirm_rate_limit = limiter("auth:reset_confirm", settings.auth_rate_limit_reset_confirm, 60)
@@ -298,6 +303,24 @@ class LoginRequest(BaseModel):
     remember: bool = False
 
 
+class TwoFactorLoginRequest(BaseModel):
+    two_factor_token: str = Field(min_length=1)
+    code: str = Field(min_length=1, max_length=32)
+
+
+class TwoFactorSetupRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+
+
+class TwoFactorEnableRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=32)
+
+
+class TwoFactorDisableRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+    code: str = Field(min_length=1, max_length=32)
+
+
 class UsernameUpdateRequest(BaseModel):
     username: str = Field(min_length=3, max_length=30, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$")
     password: str = Field(min_length=1, max_length=128)
@@ -384,7 +407,7 @@ async def register(
 
 @router.post(
     "/login",
-    response_model=AuthResponse,
+    response_model=AuthResponse | TwoFactorChallengeResponse,
     summary="Login with email or username",
     description=(
         "Accepts an `identifier` field (email or username). For backward compatibility, an `email` field is also "
@@ -397,7 +420,7 @@ async def login(
     session: AsyncSession = Depends(get_session),
     _: None = Depends(login_rate_limit),
     response: Response = None,
-) -> AuthResponse:
+) -> AuthResponse | TwoFactorChallengeResponse:
     await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
     identifier = (payload.identifier or payload.email or "").strip()
     if not identifier:
@@ -409,6 +432,9 @@ async def login(
         raise
     metrics.record_login_success()
     persistent = bool(payload.remember)
+    if bool(getattr(user, "two_factor_enabled", False)):
+        token = security.create_two_factor_token(str(user.id), remember=persistent, method="password")
+        return TwoFactorChallengeResponse(user=UserResponse.model_validate(user), two_factor_token=token)
     tokens = await auth_service.issue_tokens_for_user(
         session,
         user,
@@ -425,6 +451,62 @@ async def login(
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
     )
+    return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
+
+
+@router.post("/login/2fa", response_model=AuthResponse, summary="Complete login with two-factor code")
+async def login_two_factor(
+    payload: TwoFactorLoginRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    _: None = Depends(two_factor_rate_limit),
+    response: Response = None,
+) -> AuthResponse:
+    token_payload = security.decode_token(payload.two_factor_token)
+    if not token_payload or token_payload.get("type") != "two_factor":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor token")
+
+    sub = token_payload.get("sub")
+    try:
+        user_id = UUID(str(sub))
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor token")
+    remember = bool(token_payload.get("remember"))
+    method = str(token_payload.get("method") or "password").strip() or "password"
+
+    user = await session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor token")
+    if getattr(user, "deleted_at", None) is not None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
+        await self_service.execute_account_deletion(session, user)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+
+    if not bool(getattr(user, "two_factor_enabled", False)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Two-factor is not enabled")
+    if not await auth_service.verify_two_factor_code(session, user, payload.code):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor code")
+
+    tokens = await auth_service.issue_tokens_for_user(
+        session,
+        user,
+        persistent=remember,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    if response:
+        set_refresh_cookie(response, tokens["refresh_token"], persistent=remember)
+
+    event_type = "login_google" if method == "google" else "login_password"
+    await auth_service.record_security_event(
+        session,
+        user.id,
+        event_type,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 
@@ -607,6 +689,109 @@ async def confirm_email_verification(
 @router.get("/me", response_model=UserResponse)
 async def read_me(current_user: User = Depends(get_current_user)) -> UserResponse:
     return UserResponse.model_validate(current_user)
+
+
+@router.get("/me/2fa", response_model=TwoFactorStatusResponse, summary="Get my two-factor status")
+async def two_factor_status(current_user: User = Depends(get_current_user)) -> TwoFactorStatusResponse:
+    confirmed_at = getattr(current_user, "two_factor_confirmed_at", None)
+    if confirmed_at and confirmed_at.tzinfo is None:
+        confirmed_at = confirmed_at.replace(tzinfo=timezone.utc)
+    codes = list(getattr(current_user, "two_factor_recovery_codes", None) or [])
+    return TwoFactorStatusResponse(
+        enabled=bool(getattr(current_user, "two_factor_enabled", False)),
+        confirmed_at=confirmed_at,
+        recovery_codes_remaining=len(codes),
+    )
+
+
+@router.post("/me/2fa/setup", response_model=TwoFactorSetupResponse, summary="Start two-factor setup")
+async def two_factor_setup(
+    payload: TwoFactorSetupRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> TwoFactorSetupResponse:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+    secret, otpauth_url = await auth_service.start_two_factor_setup(session, current_user)
+    await auth_service.record_security_event(
+        session,
+        current_user.id,
+        "two_factor_setup_started",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    return TwoFactorSetupResponse(secret=secret, otpauth_url=otpauth_url)
+
+
+@router.post("/me/2fa/enable", response_model=TwoFactorEnableResponse, summary="Enable two-factor authentication")
+async def two_factor_enable(
+    payload: TwoFactorEnableRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> TwoFactorEnableResponse:
+    codes = await auth_service.enable_two_factor(session, current_user, payload.code)
+    await auth_service.record_security_event(
+        session,
+        current_user.id,
+        "two_factor_enabled",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    return TwoFactorEnableResponse(recovery_codes=codes)
+
+
+@router.post("/me/2fa/disable", response_model=TwoFactorStatusResponse, summary="Disable two-factor authentication")
+async def two_factor_disable(
+    payload: TwoFactorDisableRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> TwoFactorStatusResponse:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+    if not bool(getattr(current_user, "two_factor_enabled", False)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Two-factor is not enabled")
+    if not await auth_service.verify_two_factor_code(session, current_user, payload.code):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor code")
+    await auth_service.disable_two_factor(session, current_user)
+    await auth_service.record_security_event(
+        session,
+        current_user.id,
+        "two_factor_disabled",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    return TwoFactorStatusResponse(enabled=False, confirmed_at=None, recovery_codes_remaining=0)
+
+
+@router.post(
+    "/me/2fa/recovery-codes/regenerate",
+    response_model=TwoFactorEnableResponse,
+    summary="Regenerate two-factor recovery codes",
+)
+async def two_factor_regenerate_codes(
+    payload: TwoFactorDisableRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> TwoFactorEnableResponse:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+    if not bool(getattr(current_user, "two_factor_enabled", False)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Two-factor is not enabled")
+    if not await auth_service.verify_two_factor_code(session, current_user, payload.code):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor code")
+    codes = await auth_service.regenerate_recovery_codes(session, current_user)
+    await auth_service.record_security_event(
+        session,
+        current_user.id,
+        "two_factor_recovery_regenerated",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    return TwoFactorEnableResponse(recovery_codes=codes)
 
 
 @router.get(
@@ -1196,6 +1381,13 @@ async def google_callback(
         if getattr(existing_sub, "deleted_at", None) is not None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
         if auth_service.is_profile_complete(existing_sub):
+            if bool(getattr(existing_sub, "two_factor_enabled", False)):
+                token = security.create_two_factor_token(str(existing_sub.id), remember=True, method="google")
+                return GoogleCallbackResponse(
+                    user=UserResponse.model_validate(existing_sub),
+                    requires_two_factor=True,
+                    two_factor_token=token,
+                )
             tokens = await auth_service.issue_tokens_for_user(
                 session,
                 existing_sub,

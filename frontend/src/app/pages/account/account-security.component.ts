@@ -43,6 +43,210 @@ import { AccountComponent } from './account.component';
         </div>
 
         <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-3">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div class="grid gap-1">
+              <p class="font-semibold text-slate-900 dark:text-slate-50">{{ 'account.security.twoFactor.title' | translate }}</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'account.security.twoFactor.copy' | translate }}</p>
+            </div>
+            <span
+              class="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+              [class.bg-emerald-100]="account.twoFactorStatus()?.enabled"
+              [class.text-emerald-800]="account.twoFactorStatus()?.enabled"
+              [class.dark:bg-emerald-900/40]="account.twoFactorStatus()?.enabled"
+              [class.dark:text-emerald-200]="account.twoFactorStatus()?.enabled"
+              [class.bg-slate-100]="!account.twoFactorStatus()?.enabled"
+              [class.text-slate-700]="!account.twoFactorStatus()?.enabled"
+              [class.dark:bg-slate-800]="!account.twoFactorStatus()?.enabled"
+              [class.dark:text-slate-200]="!account.twoFactorStatus()?.enabled"
+            >
+              {{
+                (account.twoFactorStatus()?.enabled ? 'account.security.twoFactor.enabled' : 'account.security.twoFactor.disabled') | translate
+              }}
+            </span>
+          </div>
+
+          <div *ngIf="account.twoFactorLoading()" class="text-sm text-slate-600 dark:text-slate-300">
+            {{ 'notifications.loading' | translate }}
+          </div>
+
+          <p *ngIf="account.twoFactorError()" class="text-xs text-rose-700 dark:text-rose-300">{{ account.twoFactorError() }}</p>
+
+          <ng-container *ngIf="account.twoFactorStatus()?.enabled; else twoFactorSetup">
+            <p class="text-sm text-slate-700 dark:text-slate-200">
+              {{
+                'account.security.twoFactor.recoveryRemaining'
+                  | translate: { count: account.twoFactorStatus()?.recovery_codes_remaining || 0 }
+              }}
+            </p>
+
+            <div
+              *ngIf="account.twoFactorRecoveryCodes?.length"
+              class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30 grid gap-2"
+            >
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'account.security.twoFactor.recoveryTitle' | translate }}</p>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'account.security.twoFactor.copyCodes' | translate"
+                  (action)="account.copyTwoFactorRecoveryCodes()"
+                ></app-button>
+              </div>
+              <p class="text-xs text-slate-600 dark:text-slate-300">{{ 'account.security.twoFactor.recoveryCopy' | translate }}</p>
+              <div class="grid gap-1 sm:grid-cols-2">
+                <code
+                  *ngFor="let code of account.twoFactorRecoveryCodes"
+                  class="rounded-md bg-white px-2 py-1 text-xs text-slate-800 dark:bg-slate-900 dark:text-slate-200 border border-slate-200 dark:border-slate-800"
+                  >{{ code }}</code
+                >
+              </div>
+            </div>
+
+            <div class="grid gap-2 sm:grid-cols-[2fr_2fr_auto_auto] sm:items-end">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'account.security.twoFactor.managePasswordLabel' | translate }}
+                <input
+                  name="twoFactorManagePassword"
+                  type="password"
+                  autocomplete="current-password"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  [disabled]="account.regeneratingTwoFactorCodes || account.disablingTwoFactor"
+                  [(ngModel)]="account.twoFactorManagePassword"
+                />
+              </label>
+
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'account.security.twoFactor.manageCodeLabel' | translate }}
+                <input
+                  name="twoFactorManageCode"
+                  type="text"
+                  autocomplete="one-time-code"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  [disabled]="account.regeneratingTwoFactorCodes || account.disablingTwoFactor"
+                  [(ngModel)]="account.twoFactorManageCode"
+                />
+              </label>
+
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'account.security.twoFactor.regenerateAction' | translate"
+                [disabled]="
+                  account.regeneratingTwoFactorCodes ||
+                  account.disablingTwoFactor ||
+                  !account.twoFactorManagePassword.trim() ||
+                  !account.twoFactorManageCode.trim()
+                "
+                (action)="account.regenerateTwoFactorRecoveryCodes()"
+              ></app-button>
+
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'account.security.twoFactor.disableAction' | translate"
+                [disabled]="
+                  account.regeneratingTwoFactorCodes ||
+                  account.disablingTwoFactor ||
+                  !account.twoFactorManagePassword.trim() ||
+                  !account.twoFactorManageCode.trim()
+                "
+                (action)="account.disableTwoFactor()"
+              ></app-button>
+            </div>
+          </ng-container>
+
+          <ng-template #twoFactorSetup>
+            <ng-container *ngIf="account.twoFactorSetupSecret && account.twoFactorSetupUrl; else twoFactorStart">
+              <p class="text-sm text-slate-700 dark:text-slate-200">{{ 'account.security.twoFactor.setupHint' | translate }}</p>
+
+              <div class="grid gap-2">
+                <div class="grid gap-2 sm:grid-cols-[2fr_auto] sm:items-end">
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'account.security.twoFactor.secretLabel' | translate }}
+                    <input
+                      type="text"
+                      name="twoFactorSecret"
+                      [value]="account.twoFactorSetupSecret"
+                      readonly
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                    />
+                  </label>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'account.security.twoFactor.copySecret' | translate"
+                    (action)="account.copyTwoFactorSecret()"
+                  ></app-button>
+                </div>
+
+                <div class="grid gap-2 sm:grid-cols-[2fr_auto] sm:items-end">
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'account.security.twoFactor.setupUrlLabel' | translate }}
+                    <input
+                      type="text"
+                      name="twoFactorSetupUrl"
+                      [value]="account.twoFactorSetupUrl"
+                      readonly
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                    />
+                  </label>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'account.security.twoFactor.copyUrl' | translate"
+                    (action)="account.copyTwoFactorSetupUrl()"
+                  ></app-button>
+                </div>
+              </div>
+
+              <div class="grid gap-2 sm:grid-cols-[2fr_auto] sm:items-end">
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'account.security.twoFactor.codeLabel' | translate }}
+                  <input
+                    name="twoFactorEnableCode"
+                    type="text"
+                    autocomplete="one-time-code"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                    [disabled]="account.enablingTwoFactor"
+                    [(ngModel)]="account.twoFactorEnableCode"
+                  />
+                </label>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'account.security.twoFactor.enableAction' | translate"
+                  [disabled]="account.enablingTwoFactor || !account.twoFactorEnableCode.trim()"
+                  (action)="account.enableTwoFactor()"
+                ></app-button>
+              </div>
+            </ng-container>
+
+            <ng-template #twoFactorStart>
+              <div class="grid gap-2 sm:grid-cols-[2fr_auto] sm:items-end">
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'account.security.twoFactor.setupPasswordLabel' | translate }}
+                  <input
+                    name="twoFactorSetupPassword"
+                    type="password"
+                    autocomplete="current-password"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                    [disabled]="account.startingTwoFactor"
+                    [(ngModel)]="account.twoFactorSetupPassword"
+                  />
+                </label>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'account.security.twoFactor.setupAction' | translate"
+                  [disabled]="account.startingTwoFactor || !account.twoFactorSetupPassword.trim()"
+                  (action)="account.startTwoFactorSetup()"
+                ></app-button>
+              </div>
+            </ng-template>
+          </ng-template>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-3">
           <div class="grid gap-1">
             <p class="font-semibold text-slate-900 dark:text-slate-50">{{ 'account.security.emails.title' | translate }}</p>
             <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'account.security.emails.copy' | translate }}</p>

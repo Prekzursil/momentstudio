@@ -78,6 +78,11 @@ export const routes: Routes = [
   },
   { path: 'login', loadComponent: () => import('./pages/auth/login.component').then((m) => m.LoginComponent), title: 'Login | momentstudio' },
   {
+    path: 'login/2fa',
+    loadComponent: () => import('./pages/auth/two-factor.component').then((m) => m.TwoFactorComponent),
+    title: 'Two-factor | momentstudio'
+  },
+  {
     path: 'register',
     loadComponent: () => import('./pages/auth/register.component').then((m) => m.RegisterComponent),
     title: 'Register | momentstudio'

@@ -122,7 +122,18 @@ export class LoginComponent {
       .login(this.identifier, this.password, this.captchaToken ?? undefined, { remember: this.keepSignedIn })
       .subscribe({
       next: (res) => {
-        this.toast.success(this.translate.instant('auth.successLogin'), res.user.email);
+        const anyRes = res as any;
+        if (anyRes?.requires_two_factor && anyRes?.two_factor_token) {
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.setItem('two_factor_token', anyRes.two_factor_token);
+            sessionStorage.setItem('two_factor_user', JSON.stringify(anyRes.user ?? null));
+            sessionStorage.setItem('two_factor_remember', JSON.stringify(this.keepSignedIn));
+          }
+          this.toast.info(this.translate.instant('auth.twoFactorRequired'));
+          void this.router.navigateByUrl('/login/2fa');
+          return;
+        }
+        this.toast.success(this.translate.instant('auth.successLogin'), anyRes?.user?.email);
         void this.router.navigateByUrl('/account');
       },
       error: (err) => {

@@ -1,5 +1,8 @@
+import base64
 import asyncio
 from datetime import datetime, timedelta, timezone
+import hashlib
+import hmac
 from typing import Callable, Dict
 
 import pytest
@@ -8,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.main import app
+from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_session
 from app.models.user import User, UserRole, UserDisplayNameHistory, UserUsernameHistory
@@ -64,6 +68,25 @@ def make_register_payload(
     if middle_name is not None:
         payload["middle_name"] = middle_name
     return payload
+
+
+def _totp_code(secret: str, *, now: datetime | None = None) -> str:
+    now_dt = now or datetime.now(timezone.utc)
+    period = int(getattr(settings, "two_factor_totp_period_seconds", 30) or 30)
+    digits = int(getattr(settings, "two_factor_totp_digits", 6) or 6)
+    counter = int(now_dt.timestamp()) // period
+
+    clean = (secret or "").strip().upper().replace(" ", "")
+    padding = "=" * ((8 - len(clean) % 8) % 8)
+    key = base64.b32decode(clean + padding, casefold=True)
+
+    msg = counter.to_bytes(8, "big")
+    digest = hmac.new(key, msg, hashlib.sha1).digest()
+    offset = digest[-1] & 0x0F
+    chunk = digest[offset : offset + 4]
+    value = int.from_bytes(chunk, "big") & 0x7FFFFFFF
+    code = value % (10 ** digits)
+    return f"{code:0{digits}d}"
 
 
 def test_register_and_login_flow(test_app: Dict[str, object]) -> None:
@@ -164,6 +187,61 @@ def test_security_events_include_logins_email_and_password_changes(test_app: Dic
     assert "login_password" in event_types
     assert "password_changed" in event_types
     assert "email_changed" in event_types
+
+
+def test_two_factor_setup_and_login_flow(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    res = client.post(
+        "/api/v1/auth/register",
+        json=make_register_payload(email="2fa@example.com", username="twofactor", password="supersecret", name="2FA"),
+    )
+    assert res.status_code == 201, res.text
+    access = res.json()["tokens"]["access_token"]
+
+    setup = client.post("/api/v1/auth/me/2fa/setup", headers=auth_headers(access), json={"password": "supersecret"})
+    assert setup.status_code == 200, setup.text
+    secret = setup.json()["secret"]
+
+    enable = client.post(
+        "/api/v1/auth/me/2fa/enable",
+        headers=auth_headers(access),
+        json={"code": _totp_code(secret)},
+    )
+    assert enable.status_code == 200, enable.text
+    recovery_codes = enable.json()["recovery_codes"]
+    assert isinstance(recovery_codes, list)
+    assert len(recovery_codes) >= 5
+
+    status = client.get("/api/v1/auth/me/2fa", headers=auth_headers(access))
+    assert status.status_code == 200, status.text
+    assert status.json()["enabled"] is True
+    assert status.json()["recovery_codes_remaining"] == len(recovery_codes)
+
+    login = client.post("/api/v1/auth/login", json={"identifier": "2fa@example.com", "password": "supersecret"})
+    assert login.status_code == 200, login.text
+    body = login.json()
+    assert body.get("requires_two_factor") is True
+    assert body.get("two_factor_token")
+    assert body.get("tokens") is None
+
+    two_factor_token = body["two_factor_token"]
+    login2 = client.post("/api/v1/auth/login/2fa", json={"two_factor_token": two_factor_token, "code": _totp_code(secret)})
+    assert login2.status_code == 200, login2.text
+    assert login2.json()["tokens"]["access_token"]
+
+    # Recovery codes should work and be consumed.
+    recovery_code = recovery_codes[0]
+    login = client.post("/api/v1/auth/login", json={"identifier": "2fa@example.com", "password": "supersecret"})
+    token3 = login.json()["two_factor_token"]
+    login3 = client.post("/api/v1/auth/login/2fa", json={"two_factor_token": token3, "code": recovery_code})
+    assert login3.status_code == 200, login3.text
+    access2 = login3.json()["tokens"]["access_token"]
+
+    status2 = client.get("/api/v1/auth/me/2fa", headers=auth_headers(access2))
+    assert status2.status_code == 200, status2.text
+    assert status2.json()["enabled"] is True
+    assert status2.json()["recovery_codes_remaining"] == len(recovery_codes) - 1
 
 
 def test_secondary_emails_flow(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:

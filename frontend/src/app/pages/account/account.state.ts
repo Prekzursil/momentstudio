@@ -11,7 +11,17 @@ import { filter, map, of, Subscription, switchMap } from 'rxjs';
 
 import { ApiService } from '../../core/api.service';
 import { appConfig } from '../../core/app-config';
-import { AuthService, AuthUser, RefreshSessionInfo, SecondaryEmail, UserAliasesResponse, UserSecurityEventInfo } from '../../core/auth.service';
+import {
+  AuthService,
+  AuthUser,
+  RefreshSessionInfo,
+  SecondaryEmail,
+  TwoFactorEnableResponse,
+  TwoFactorSetupResponse,
+  TwoFactorStatusResponse,
+  UserAliasesResponse,
+  UserSecurityEventInfo
+} from '../../core/auth.service';
 import {
   AccountDeletionStatus,
   AccountService,
@@ -211,6 +221,22 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   securityEventsLoading = signal<boolean>(false);
   securityEventsError = signal<string | null>(null);
 
+  twoFactorStatus = signal<TwoFactorStatusResponse | null>(null);
+  twoFactorLoaded = signal<boolean>(false);
+  twoFactorLoading = signal<boolean>(false);
+  twoFactorError = signal<string | null>(null);
+  twoFactorSetupPassword = '';
+  twoFactorSetupSecret: string | null = null;
+  twoFactorSetupUrl: string | null = null;
+  twoFactorEnableCode = '';
+  twoFactorRecoveryCodes: string[] | null = null;
+  twoFactorManagePassword = '';
+  twoFactorManageCode = '';
+  startingTwoFactor = false;
+  enablingTwoFactor = false;
+  disablingTwoFactor = false;
+  regeneratingTwoFactorCodes = false;
+
   exportingData = false;
   exportError: string | null = null;
 
@@ -397,6 +423,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.loadPaymentMethods();
         this.loadSessions();
         this.loadSecurityEvents();
+        this.loadTwoFactorStatus();
         return;
       case 'comments':
         if (!this.myCommentsMeta()) {
@@ -1969,6 +1996,168 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.securityEventsLoading.set(false);
       },
       complete: () => this.securityEventsLoading.set(false)
+    });
+  }
+
+  private loadTwoFactorStatus(force: boolean = false): void {
+    if (!this.auth.isAuthenticated()) return;
+    if (this.twoFactorLoading() && !force) return;
+    if (this.twoFactorLoaded() && !force) return;
+    this.twoFactorLoading.set(true);
+    this.twoFactorError.set(null);
+    this.auth.getTwoFactorStatus().subscribe({
+      next: (status) => {
+        this.twoFactorStatus.set(status);
+        this.twoFactorLoaded.set(true);
+      },
+      error: () => {
+        this.twoFactorStatus.set(null);
+        this.twoFactorLoaded.set(true);
+        this.twoFactorError.set(this.t('account.security.twoFactor.loadError'));
+        this.twoFactorLoading.set(false);
+      },
+      complete: () => this.twoFactorLoading.set(false)
+    });
+  }
+
+  startTwoFactorSetup(): void {
+    if (!this.auth.isAuthenticated() || this.startingTwoFactor) return;
+    const password = this.twoFactorSetupPassword.trim();
+    if (!password) {
+      this.toast.error(this.t('auth.completeForm'));
+      return;
+    }
+    this.startingTwoFactor = true;
+    this.twoFactorError.set(null);
+    this.twoFactorRecoveryCodes = null;
+    this.auth.startTwoFactorSetup(password).subscribe({
+      next: (res: TwoFactorSetupResponse) => {
+        this.twoFactorSetupSecret = res.secret;
+        this.twoFactorSetupUrl = res.otpauth_url;
+        this.twoFactorSetupPassword = '';
+        this.twoFactorEnableCode = '';
+        this.toast.info(this.t('account.security.activity.two_factor_setup_started'));
+      },
+      error: (err) => {
+        const message = err?.error?.detail || this.t('account.security.twoFactor.startError');
+        this.twoFactorError.set(message);
+        this.toast.error(message);
+      },
+      complete: () => {
+        this.startingTwoFactor = false;
+      }
+    });
+  }
+
+  enableTwoFactor(): void {
+    if (!this.auth.isAuthenticated() || this.enablingTwoFactor) return;
+    const code = this.twoFactorEnableCode.trim();
+    if (!code) {
+      this.toast.error(this.t('auth.completeForm'));
+      return;
+    }
+    this.enablingTwoFactor = true;
+    this.twoFactorError.set(null);
+    this.auth.enableTwoFactor(code).subscribe({
+      next: (res: TwoFactorEnableResponse) => {
+        this.twoFactorRecoveryCodes = res.recovery_codes ?? [];
+        this.twoFactorSetupSecret = null;
+        this.twoFactorSetupUrl = null;
+        this.twoFactorEnableCode = '';
+        this.toast.success(this.t('account.security.activity.two_factor_enabled'));
+        this.loadTwoFactorStatus(true);
+        this.auth.loadCurrentUser().subscribe({ error: () => void 0 });
+        this.refreshSecurityEvents();
+      },
+      error: (err) => {
+        const message = err?.error?.detail || this.t('account.security.twoFactor.enableError');
+        this.twoFactorError.set(message);
+        this.toast.error(message);
+      },
+      complete: () => {
+        this.enablingTwoFactor = false;
+      }
+    });
+  }
+
+  async copyTwoFactorSecret(): Promise<void> {
+    if (!this.twoFactorSetupSecret) return;
+    const ok = await this.copyToClipboard(this.twoFactorSetupSecret);
+    this.toast.success(ok ? this.t('account.security.twoFactor.copied') : this.t('account.security.twoFactor.copySecret'));
+  }
+
+  async copyTwoFactorSetupUrl(): Promise<void> {
+    if (!this.twoFactorSetupUrl) return;
+    const ok = await this.copyToClipboard(this.twoFactorSetupUrl);
+    this.toast.success(ok ? this.t('account.security.twoFactor.copied') : this.t('account.security.twoFactor.copyUrl'));
+  }
+
+  async copyTwoFactorRecoveryCodes(): Promise<void> {
+    if (!this.twoFactorRecoveryCodes?.length) return;
+    const ok = await this.copyToClipboard(this.twoFactorRecoveryCodes.join('\n'));
+    this.toast.success(ok ? this.t('account.security.twoFactor.copied') : this.t('account.security.twoFactor.copyCodes'));
+  }
+
+  regenerateTwoFactorRecoveryCodes(): void {
+    if (!this.auth.isAuthenticated() || this.regeneratingTwoFactorCodes) return;
+    if (!confirm(this.t('account.security.twoFactor.regenerateConfirm'))) return;
+    const password = this.twoFactorManagePassword.trim();
+    const code = this.twoFactorManageCode.trim();
+    if (!password || !code) {
+      this.toast.error(this.t('auth.completeForm'));
+      return;
+    }
+    this.regeneratingTwoFactorCodes = true;
+    this.twoFactorError.set(null);
+    this.auth.regenerateTwoFactorRecoveryCodes(password, code).subscribe({
+      next: (res: TwoFactorEnableResponse) => {
+        this.twoFactorRecoveryCodes = res.recovery_codes ?? [];
+        this.twoFactorManageCode = '';
+        this.toast.success(this.t('account.security.activity.two_factor_recovery_regenerated'));
+        this.loadTwoFactorStatus(true);
+        this.refreshSecurityEvents();
+      },
+      error: (err) => {
+        const message = err?.error?.detail || this.t('account.security.twoFactor.regenerateError');
+        this.twoFactorError.set(message);
+        this.toast.error(message);
+      },
+      complete: () => {
+        this.regeneratingTwoFactorCodes = false;
+      }
+    });
+  }
+
+  disableTwoFactor(): void {
+    if (!this.auth.isAuthenticated() || this.disablingTwoFactor) return;
+    if (!confirm(this.t('account.security.twoFactor.disableConfirm'))) return;
+    const password = this.twoFactorManagePassword.trim();
+    const code = this.twoFactorManageCode.trim();
+    if (!password || !code) {
+      this.toast.error(this.t('auth.completeForm'));
+      return;
+    }
+    this.disablingTwoFactor = true;
+    this.twoFactorError.set(null);
+    this.auth.disableTwoFactor(password, code).subscribe({
+      next: (status) => {
+        this.twoFactorStatus.set(status);
+        this.twoFactorLoaded.set(true);
+        this.twoFactorRecoveryCodes = null;
+        this.twoFactorManageCode = '';
+        this.twoFactorManagePassword = '';
+        this.toast.success(this.t('account.security.activity.two_factor_disabled'));
+        this.auth.loadCurrentUser().subscribe({ error: () => void 0 });
+        this.refreshSecurityEvents();
+      },
+      error: (err) => {
+        const message = err?.error?.detail || this.t('account.security.twoFactor.disableError');
+        this.twoFactorError.set(message);
+        this.toast.error(message);
+      },
+      complete: () => {
+        this.disablingTwoFactor = false;
+      }
     });
   }
 
