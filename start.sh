@@ -15,6 +15,25 @@ UVICORN_HOST="${UVICORN_HOST:-127.0.0.1}"
 UVICORN_PORT="${UVICORN_PORT:-8000}"
 FRONTEND_PORT="${FRONTEND_PORT:-4200}"
 
+sha256_file() {
+  local file="$1"
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "${file}" | awk '{print $1}'
+    return 0
+  fi
+  python3 - "${file}" <<'PY'
+import hashlib
+import sys
+
+path = sys.argv[1]
+h = hashlib.sha256()
+with open(path, "rb") as f:
+    for chunk in iter(lambda: f.read(1024 * 1024), b""):
+        h.update(chunk)
+print(h.hexdigest())
+PY
+}
+
 port_is_free() {
   python3 - "$1" <<'PY'
 import errno
@@ -96,6 +115,14 @@ print_port_diagnostics() {
   fi
 }
 
+run_step() {
+  local title="$1"
+  shift
+  echo ""
+  echo "==> ${title}"
+  "$@"
+}
+
 START_BACKEND=1
 BACKEND_PORT="${UVICORN_PORT}"
 FRONTEND_PORT_BASE="${FRONTEND_PORT}"
@@ -127,17 +154,34 @@ if ! port_is_free "${FRONTEND_PORT}"; then
 fi
 
 if [ "${START_BACKEND}" -eq 1 ]; then
+  run_step "Backend: set up Python environment" true
+
   # Python env + deps
   if [ ! -d "${VENV_DIR}" ]; then
     python3 -m venv "${VENV_DIR}"
   fi
   # shellcheck disable=SC1091
   source "${VENV_DIR}/bin/activate"
-  python -m pip install --upgrade pip
-  pip install -r "${BACKEND_DIR}/requirements.txt"
+
+  REQUIREMENTS_FILE="${BACKEND_DIR}/requirements.txt"
+  REQUIREMENTS_HASH_FILE="${VENV_DIR}/.requirements.sha256"
+  REQUIREMENTS_HASH="$(sha256_file "${REQUIREMENTS_FILE}")"
+  PREV_REQUIREMENTS_HASH=""
+  if [ -f "${REQUIREMENTS_HASH_FILE}" ]; then
+    PREV_REQUIREMENTS_HASH="$(cat "${REQUIREMENTS_HASH_FILE}" 2>/dev/null || true)"
+  fi
+
+  if [ "${REQUIREMENTS_HASH}" != "${PREV_REQUIREMENTS_HASH}" ] || [ "${FORCE_PIP_INSTALL:-0}" = "1" ]; then
+    run_step "Backend: ensure pip is up-to-date" python -m pip install --disable-pip-version-check --progress-bar off --upgrade pip
+    run_step "Backend: install Python dependencies (first run can take a few minutes)" \
+      python -m pip install --disable-pip-version-check --progress-bar off --no-input -r "${REQUIREMENTS_FILE}"
+    echo "${REQUIREMENTS_HASH}" >"${REQUIREMENTS_HASH_FILE}"
+  else
+    echo "Backend: Python dependencies are already installed (set FORCE_PIP_INSTALL=1 to reinstall)."
+  fi
 
   # Migrations
-  echo "Applying backend migrations"
+  run_step "Backend: apply migrations" true
   if ! (cd "${BACKEND_DIR}" && alembic upgrade head); then
     echo ""
     echo "Failed to apply backend migrations."
@@ -152,7 +196,7 @@ fi
 
 # Node deps
 if [ ! -d "${FRONTEND_DIR}/node_modules" ]; then
-  (cd "${FRONTEND_DIR}" && npm ci)
+  run_step "Frontend: install Node dependencies" bash -lc "cd \"${FRONTEND_DIR}\" && npm ci"
 fi
 
 cleanup() {
@@ -167,6 +211,7 @@ cleanup() {
 PROXY_CONF=""
 BACKEND_PID=""
 
+echo ""
 echo "Starting backend on http://${UVICORN_HOST}:${BACKEND_PORT}"
 if [ "${START_BACKEND}" -eq 1 ]; then
   (cd "${BACKEND_DIR}" && exec uvicorn app.main:app --host "${UVICORN_HOST}" --port "${BACKEND_PORT}" --reload) &
@@ -179,6 +224,7 @@ trap cleanup EXIT
 trap 'cleanup; exit 130' INT
 trap 'cleanup; exit 143' TERM
 
+echo ""
 echo "Starting frontend dev server on http://localhost:${FRONTEND_PORT}"
 PROXY_CONF="$(mktemp "${TMPDIR:-/tmp}/adrianaart-proxy.XXXXXX.json")"
 cat >"${PROXY_CONF}" <<EOF
