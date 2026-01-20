@@ -191,6 +191,8 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS: add dynamic pages under `/pages/:slug` (content keys `page.<slug>`).
 - [x] CMS: add banner + carousel blocks (shared slide schema) and migrate legacy homepage hero to a banner block.
 - [x] CMS: allow changing page URLs with redirects (advanced).
+- [ ] CMS: redirects – add admin UI to list/manage redirects (view/delete stale entries).
+- [ ] CMS: pages – enforce reserved slug validation server-side on page creation (not just frontend).
 
 ## Backend - Email & Notifications
 - [x] Email settings (SMTP).
@@ -446,6 +448,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Auth UX: ensure header/profile dropdown always reflects server auth state after restart (clear stale UI on 401/refresh failure) and sign-out works consistently in all menus.
 - [x] Wishlist: investigate reports of add/remove not persisting and add e2e coverage for save/unsave flows.
 - [x] Account UX: unify email management UI in Security (single email section; reduce duplication; align Change password placement).
+- [ ] Account UX: translate Security page strings (remove hard-coded English).
 
 ## Frontend - Admin Dashboard
 - [x] /admin layout with sidebar + guard.
