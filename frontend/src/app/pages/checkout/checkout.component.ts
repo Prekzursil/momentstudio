@@ -578,6 +578,30 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
 
 	                    <ng-container *ngIf="!couponEligibilityLoading && !couponEligibilityError && couponEligibility">
 	                      <div *ngIf="couponEligibility.eligible.length" class="grid gap-2">
+                          <div
+                            *ngIf="suggestedCouponOffer && !appliedCouponOffer"
+                            class="grid gap-2 rounded-xl border border-indigo-200 bg-indigo-50/60 p-3 dark:border-indigo-900/40 dark:bg-indigo-950/30"
+                          >
+                            <p class="text-xs font-semibold text-indigo-900 dark:text-indigo-100">
+                              {{ 'checkout.bestCouponTitle' | translate }}
+                            </p>
+                            <div class="flex items-start justify-between gap-3">
+                              <div class="min-w-0">
+                                <p class="text-sm font-medium text-slate-900 dark:text-slate-50">
+                                  {{ suggestedCouponOffer.coupon.promotion?.name || suggestedCouponOffer.coupon.code }}
+                                </p>
+                                <p class="text-xs text-slate-700 dark:text-slate-200">
+                                  {{ describeCouponOffer(suggestedCouponOffer) }}
+                                </p>
+                              </div>
+                              <app-button
+                                size="sm"
+                                variant="ghost"
+                                [label]="'checkout.apply' | translate"
+                                (action)="applyCouponOffer(suggestedCouponOffer)"
+                              ></app-button>
+                            </div>
+                          </div>
 	                        <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">
 	                          {{ 'checkout.availableCoupons' | translate }}
 	                        </p>
@@ -623,6 +647,21 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
 	                              <p *ngIf="offer.reasons?.length" class="text-xs text-amber-700 dark:text-amber-300 pt-1">
 	                                {{ describeCouponReasons(offer.reasons) }}
 	                              </p>
+                                  <ng-container *ngIf="minSubtotalShortfall(offer) as minInfo">
+                                    <p class="text-xs text-slate-600 dark:text-slate-300 pt-1">
+                                      {{
+                                        'checkout.couponMinSubtotalRemaining'
+                                          | translate
+                                            : { amount: minInfo.remaining.toFixed(2), min: minInfo.min.toFixed(2) }
+                                      }}
+                                    </p>
+                                    <div class="mt-1 h-2 w-full rounded-full bg-slate-200 dark:bg-slate-800">
+                                      <div
+                                        class="h-2 rounded-full bg-indigo-600"
+                                        [style.width.%]="minInfo.progress * 100"
+                                      ></div>
+                                    </div>
+                                  </ng-container>
 	                            </div>
 	                            <span class="font-mono text-xs text-slate-500 dark:text-slate-400">{{ offer.coupon.code }}</span>
 	                          </div>
@@ -790,6 +829,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   couponEligibilityLoading = false;
   couponEligibilityError = '';
   appliedCouponOffer: CouponOffer | null = null;
+  suggestedCouponOffer: CouponOffer | null = null;
   private pendingPromoCode: string | null = null;
   countries: PhoneCountryOption[] = [];
   readonly roCounties = RO_COUNTIES;
@@ -980,6 +1020,34 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     return labels.join(' • ');
   }
 
+  minSubtotalShortfall(offer: CouponOffer | null): { min: number; remaining: number; progress: number } | null {
+    if (!offer?.reasons?.includes('min_subtotal_not_met')) return null;
+    const promo = offer.coupon?.promotion;
+    if (!promo?.min_subtotal) return null;
+    const min = parseMoney(promo.min_subtotal);
+    if (!Number.isFinite(min) || min <= 0) return null;
+    const current = this.quoteSubtotal();
+    const remaining = Math.max(0, min - current);
+    if (remaining <= 0) return null;
+    const progress = Math.max(0, Math.min(1, current / min));
+    return { min, remaining, progress };
+  }
+
+  private pickBestCouponOffer(offers: CouponOffer[]): CouponOffer | null {
+    let best: CouponOffer | null = null;
+    let bestSavings = 0;
+    for (const offer of offers ?? []) {
+      if (!offer?.eligible) continue;
+      const savings = this.couponOfferSavings(offer);
+      if (!Number.isFinite(savings) || savings <= 0) continue;
+      if (!best || savings > bestSavings) {
+        best = offer;
+        bestSavings = savings;
+      }
+    }
+    return best;
+  }
+
 	  private couponShippingDiscount(): number {
 	    const offer = this.appliedCouponOffer;
 	    if (!offer || !offer.eligible) return 0;
@@ -1055,6 +1123,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 	      this.couponEligibility = null;
       this.couponEligibilityError = '';
       this.couponEligibilityLoading = false;
+      this.suggestedCouponOffer = null;
       return;
     }
 
@@ -1064,6 +1133,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.couponEligibility = res ?? { eligible: [], ineligible: [] };
         this.couponEligibilityLoading = false;
+        this.suggestedCouponOffer = this.pickBestCouponOffer(this.couponEligibility.eligible ?? []);
 
         const current = (this.promo || '').trim().toUpperCase();
         if (!current) {
@@ -1119,7 +1189,16 @@ export class CheckoutComponent implements OnInit, OnDestroy {
             this.promoStatus = 'warn';
             this.promoValid = false;
             const reasons = this.describeCouponReasons(offer.reasons ?? []);
-            this.promoMessage = `${this.translate.instant('checkout.couponNotEligible')}: ${reasons}`;
+            const minInfo = this.minSubtotalShortfall(offer);
+            if (minInfo) {
+              const extra = this.translate.instant('checkout.couponMinSubtotalRemaining', {
+                amount: minInfo.remaining.toFixed(2),
+                min: minInfo.min.toFixed(2)
+              });
+              this.promoMessage = `${this.translate.instant('checkout.couponNotEligible')}: ${reasons}. ${extra}`;
+            } else {
+              this.promoMessage = `${this.translate.instant('checkout.couponNotEligible')}: ${reasons}`;
+            }
             this.refreshQuote(null);
             return;
           }

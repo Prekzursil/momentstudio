@@ -738,7 +738,9 @@
     "couponsLoadError": "Nu am putut încărca cupoanele.",
     "availableCoupons": "Cupoane disponibile",
     "unavailableCoupons": "Cupoane indisponibile",
+    "bestCouponTitle": "Cel mai bun cupon pentru acest coș",
     "couponNotEligible": "Cupon neeligibil",
+    "couponMinSubtotalRemaining": "Adaugă încă {{amount}} RON pentru a ajunge la subtotalul minim de {{min}} RON.",
     "couponReasons": {
       "inactive": "Inactiv",
       "not_started": "Nu a început încă",

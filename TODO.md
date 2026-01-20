@@ -478,8 +478,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Wishlist: add bulk actions (remove selected / add selected to cart).
 - [x] Wishlist: show stock + price-change chips since saved.
 - [x] Wishlist: add “notify me when back in stock” for wishlist items.
-- [ ] Coupons: show ineligible reasons + “you need X more subtotal” progress.
-- [ ] Coupons: suggest best coupon for the current cart (without auto-applying).
+- [x] Coupons: show ineligible reasons + “you need X more subtotal” progress.
+- [x] Coupons: suggest best coupon for the current cart (without auto-applying).
 - [ ] Notifications: add template previews per notification type.
 - [x] Notifications: show last-updated timestamp per preference group.
 - [ ] Notifications: clarify transactional vs marketing preferences (copy + grouping).

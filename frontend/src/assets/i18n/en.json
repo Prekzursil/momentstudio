@@ -738,7 +738,9 @@
     "couponsLoadError": "Could not load coupons.",
     "availableCoupons": "Available coupons",
     "unavailableCoupons": "Unavailable coupons",
+    "bestCouponTitle": "Best coupon for this cart",
     "couponNotEligible": "Coupon not eligible",
+    "couponMinSubtotalRemaining": "Add {{amount}} RON more to reach the {{min}} RON minimum subtotal.",
     "couponReasons": {
       "inactive": "Inactive",
       "not_started": "Not started yet",
