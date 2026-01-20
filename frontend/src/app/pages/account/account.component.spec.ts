@@ -15,6 +15,8 @@ import { WishlistService } from '../../core/wishlist.service';
 import { ThemeService } from '../../core/theme.service';
 import { LanguageService } from '../../core/language.service';
 import { CartStore } from '../../core/cart.store';
+import { CouponsService } from '../../core/coupons.service';
+import { NotificationsService } from '../../core/notifications.service';
 
 describe('AccountComponent', () => {
   let toast: jasmine.SpyObj<ToastService>;
@@ -23,6 +25,8 @@ describe('AccountComponent', () => {
   let blog: jasmine.SpyObj<BlogService>;
   let api: jasmine.SpyObj<ApiService>;
   let wishlist: any;
+  let coupons: jasmine.SpyObj<CouponsService>;
+  let notifications: any;
   let theme: any;
   let lang: any;
   let cart: jasmine.SpyObj<CartStore>;
@@ -85,6 +89,7 @@ describe('AccountComponent', () => {
   ];
 
   beforeEach(() => {
+    localStorage.removeItem('account.lastSection');
     toast = jasmine.createSpyObj<ToastService>('ToastService', ['success', 'error', 'info']);
     auth = jasmine.createSpyObj<AuthService>('AuthService', [
       'isAuthenticated',
@@ -146,6 +151,14 @@ describe('AccountComponent', () => {
       clear: jasmine.createSpy('clear')
     };
 
+    coupons = jasmine.createSpyObj<CouponsService>('CouponsService', ['myCoupons', 'eligibility', 'validate']);
+    coupons.myCoupons.and.returnValue(of([] as any));
+
+    notifications = {
+      unreadCount: () => 0,
+      refreshUnreadCount: jasmine.createSpy('refreshUnreadCount')
+    };
+
     const modeSig = signal<'light' | 'dark'>('light');
     const prefSig = signal<'light' | 'dark' | 'system'>('system');
     theme = {
@@ -170,6 +183,8 @@ describe('AccountComponent', () => {
         { provide: BlogService, useValue: blog },
         { provide: ApiService, useValue: api },
         { provide: WishlistService, useValue: wishlist },
+        { provide: CouponsService, useValue: coupons },
+        { provide: NotificationsService, useValue: notifications },
         { provide: ThemeService, useValue: theme },
         { provide: LanguageService, useValue: lang },
         { provide: CartStore, useValue: cart }

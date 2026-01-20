@@ -453,9 +453,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Account UX: lazy-load per-section data (don’t fetch orders/addresses/comments on every Account route).
 - [x] Account UX: add “Retry” actions for section load failures (per card, not just global error).
 - [x] Account i18n: translate remaining hard-coded AccountState strings (toasts/prompts/labels).
-- [ ] Account UX: warn on unsaved changes (Profile/Addresses/Notifications).
-- [ ] Account nav: show badges (unread notifications, coupons count, pending orders).
-- [ ] Account UX: remember last visited tab and restore on `/account`.
+- [x] Account UX: warn on unsaved changes (Profile/Addresses/Notifications).
+- [x] Account nav: show badges (unread notifications, coupons count, pending orders).
+- [x] Account UX: remember last visited tab and restore on `/account`.
 - [ ] Account mobile: collapse sidebar into a dropdown or bottom nav.
 - [ ] Account desktop: make sidebar sticky.
 - [ ] Account UX: add per-section skeleton loaders (avoid whole-page skeletons).

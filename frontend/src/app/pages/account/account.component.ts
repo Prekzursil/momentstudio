@@ -9,7 +9,9 @@ import { AuthService } from '../../core/auth.service';
 import { BlogService } from '../../core/blog.service';
 import { CartStore } from '../../core/cart.store';
 import { LanguageService } from '../../core/language.service';
+import { NotificationsService } from '../../core/notifications.service';
 import { AccountService } from '../../core/account.service';
+import { CouponsService } from '../../core/coupons.service';
 import { ThemeService } from '../../core/theme.service';
 import { ToastService } from '../../core/toast.service';
 import { WishlistService } from '../../core/wishlist.service';
@@ -89,72 +91,98 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
               aria-label="Account navigation"
             >
               <a
-                routerLink="/account"
+                routerLink="/account/overview"
                 [routerLinkActiveOptions]="{ exact: true }"
                 routerLinkActive="bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-50"
-                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition"
-                >{{ 'account.sections.overview' | translate }}</a
+                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition flex items-center justify-between gap-2"
               >
+                <span>{{ 'account.sections.overview' | translate }}</span>
+              </a>
               <a
                 routerLink="/account/profile"
                 routerLinkActive="bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-50"
-                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition"
-                >{{ 'nav.myProfile' | translate }}</a
+                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition flex items-center justify-between gap-2"
               >
+                <span>{{ 'nav.myProfile' | translate }}</span>
+              </a>
               <a
                 routerLink="/account/orders"
                 routerLinkActive="bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-50"
-                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition"
-                >{{ 'nav.myOrders' | translate }}</a
+                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition flex items-center justify-between gap-2"
               >
+                <span>{{ 'nav.myOrders' | translate }}</span>
+                <span
+                  *ngIf="pendingOrdersCount() > 0"
+                  class="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white dark:bg-amber-400 dark:text-slate-900"
+                  >{{ pendingOrdersCount() }}</span
+                >
+              </a>
               <a
                 routerLink="/account/addresses"
                 routerLinkActive="bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-50"
-                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition"
-                >{{ 'account.sections.addresses' | translate }}</a
+                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition flex items-center justify-between gap-2"
               >
+                <span>{{ 'account.sections.addresses' | translate }}</span>
+              </a>
               <a
                 routerLink="/account/wishlist"
                 routerLinkActive="bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-50"
-                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition"
-                >{{ 'nav.myWishlist' | translate }}</a
+                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition flex items-center justify-between gap-2"
               >
+                <span>{{ 'nav.myWishlist' | translate }}</span>
+              </a>
               <a
                 routerLink="/account/coupons"
                 routerLinkActive="bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-50"
-                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition"
-                >{{ 'nav.myCoupons' | translate }}</a
+                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition flex items-center justify-between gap-2"
               >
+                <span>{{ 'nav.myCoupons' | translate }}</span>
+                <span
+                  *ngIf="couponsCountLoaded() && couponsCount() > 0"
+                  class="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-indigo-600 px-2 py-0.5 text-xs font-semibold text-white dark:bg-indigo-500"
+                  >{{ couponsCount() }}</span
+                >
+              </a>
               <a
                 routerLink="/account/notifications"
                 routerLinkActive="bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-50"
-                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition"
-                >{{ 'account.sections.notifications' | translate }}</a
+                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition flex items-center justify-between gap-2"
               >
+                <span>{{ 'account.sections.notifications' | translate }}</span>
+                <span
+                  *ngIf="unreadNotificationsCount() > 0"
+                  class="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-indigo-600 px-2 py-0.5 text-xs font-semibold text-white dark:bg-indigo-500"
+                  >{{ unreadNotificationsCount() }}</span
+                >
+              </a>
               <a
                 routerLink="/account/security"
                 routerLinkActive="bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-50"
-                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition"
-                >{{ 'account.sections.security' | translate }}</a
+                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition flex items-center justify-between gap-2"
               >
+                <span>{{ 'account.sections.security' | translate }}</span>
+              </a>
               <a
                 routerLink="/account/comments"
                 routerLinkActive="bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-50"
-                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition"
-                >{{ 'account.sections.comments' | translate }}</a
+                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition flex items-center justify-between gap-2"
               >
+                <span>{{ 'account.sections.comments' | translate }}</span>
+              </a>
               <a
                 routerLink="/account/privacy"
                 routerLinkActive="bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-50"
-                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition"
-                >{{ 'account.sections.privacy' | translate }}</a
+                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition flex items-center justify-between gap-2"
               >
+                <span>{{ 'account.sections.privacy' | translate }}</span>
+              </a>
               <a
                 routerLink="/tickets"
                 routerLinkActive="bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-50"
-                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition"
-                >{{ 'nav.helpCenter' | translate }}</a
+                class="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition flex items-center justify-between gap-2"
               >
+                <span>{{ 'nav.helpCenter' | translate }}</span>
+              </a>
             </nav>
 
             <main class="grid gap-4 min-w-0">
@@ -185,10 +213,12 @@ export class AccountComponent extends AccountState {
     route: ActivatedRoute,
     api: ApiService,
     wishlist: WishlistService,
+    notifications: NotificationsService,
+    coupons: CouponsService,
     theme: ThemeService,
     lang: LanguageService,
     translate: TranslateService
   ) {
-    super(toast, auth, account, blog, cart, router, route, api, wishlist, theme, lang, translate);
+    super(toast, auth, account, blog, cart, router, route, api, wishlist, notifications, coupons, theme, lang, translate);
   }
 }

@@ -8,6 +8,7 @@ import { BlogListComponent } from './pages/blog/blog-list.component';
 import { BlogPostComponent } from './pages/blog/blog-post.component';
 import { ContactComponent } from './pages/contact/contact.component';
 import { adminGuard, authGuard } from './core/auth.guard';
+import { unsavedChangesGuard } from './core/unsaved-changes.guard';
 import { shopCategoriesResolver } from './core/shop.resolver';
 
 export const routes: Routes = [
@@ -102,14 +103,27 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/account/account.component').then((m) => m.AccountComponent),
     children: [
       { path: '', loadComponent: () => import('./pages/account/account-overview.component').then((m) => m.AccountOverviewComponent) },
-      { path: 'profile', loadComponent: () => import('./pages/account/account-profile.component').then((m) => m.AccountProfileComponent) },
+      {
+        path: 'overview',
+        loadComponent: () => import('./pages/account/account-overview.component').then((m) => m.AccountOverviewComponent)
+      },
+      {
+        path: 'profile',
+        loadComponent: () => import('./pages/account/account-profile.component').then((m) => m.AccountProfileComponent),
+        canDeactivate: [unsavedChangesGuard]
+      },
       { path: 'orders', loadComponent: () => import('./pages/account/account-orders.component').then((m) => m.AccountOrdersComponent) },
-      { path: 'addresses', loadComponent: () => import('./pages/account/account-addresses.component').then((m) => m.AccountAddressesComponent) },
+      {
+        path: 'addresses',
+        loadComponent: () => import('./pages/account/account-addresses.component').then((m) => m.AccountAddressesComponent),
+        canDeactivate: [unsavedChangesGuard]
+      },
       { path: 'wishlist', loadComponent: () => import('./pages/account/account-wishlist.component').then((m) => m.AccountWishlistComponent) },
       { path: 'coupons', loadComponent: () => import('./pages/account/account-coupons.component').then((m) => m.AccountCouponsComponent) },
       {
         path: 'notifications',
-        loadComponent: () => import('./pages/account/account-notifications.component').then((m) => m.AccountNotificationsComponent)
+        loadComponent: () => import('./pages/account/account-notifications.component').then((m) => m.AccountNotificationsComponent),
+        canDeactivate: [unsavedChangesGuard]
       },
       { path: 'security', loadComponent: () => import('./pages/account/account-security.component').then((m) => m.AccountSecurityComponent) },
       { path: 'comments', loadComponent: () => import('./pages/account/account-comments.component').then((m) => m.AccountCommentsComponent) },

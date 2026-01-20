@@ -89,5 +89,12 @@ import { AccountComponent } from './account.component';
 })
 export class AccountNotificationsComponent {
   protected readonly account = inject(AccountComponent);
-}
 
+  hasUnsavedChanges(): boolean {
+    return this.account.notificationsHasUnsavedChanges();
+  }
+
+  discardUnsavedChanges(): void {
+    this.account.discardNotificationChanges();
+  }
+}

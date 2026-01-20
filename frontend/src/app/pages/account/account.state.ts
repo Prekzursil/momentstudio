@@ -23,9 +23,11 @@ import {
 import { BlogMyComment, BlogService, PaginationMeta } from '../../core/blog.service';
 import { CartStore } from '../../core/cart.store';
 import { LanguageService } from '../../core/language.service';
+import { NotificationsService } from '../../core/notifications.service';
 import { ThemeMode, ThemePreference, ThemeService } from '../../core/theme.service';
 import { ToastService } from '../../core/toast.service';
 import { WishlistService } from '../../core/wishlist.service';
+import { CouponsService, type CouponRead } from '../../core/coupons.service';
 import { orderStatusChipClass } from '../../shared/order-status';
 import { missingRequiredProfileFields as computeMissingRequiredProfileFields, type RequiredProfileField } from '../../shared/profile-requirements';
 import { buildE164, listPhoneCountries, splitE164, type PhoneCountryOption } from '../../shared/phone';
@@ -46,9 +48,31 @@ type AccountSection =
   | 'privacy'
   | 'password';
 
+type ProfileFormSnapshot = {
+  name: string;
+  username: string;
+  firstName: string;
+  middleName: string;
+  lastName: string;
+  dateOfBirth: string;
+  phoneCountry: CountryCode;
+  phoneNational: string;
+  preferredLanguage: 'en' | 'ro';
+  themePreference: ThemePreference;
+};
+
+type NotificationPrefsSnapshot = {
+  notifyBlogComments: boolean;
+  notifyBlogCommentReplies: boolean;
+  notifyMarketing: boolean;
+};
+
 @Directive()
 export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   emailVerified = signal<boolean>(false);
+  couponsCount = signal<number>(0);
+  couponsCountLoaded = signal<boolean>(false);
+  couponsCountLoading = signal<boolean>(false);
   addresses = signal<Address[]>([]);
   addressesLoaded = signal<boolean>(false);
   addressesLoading = signal<boolean>(false);
@@ -129,6 +153,15 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   private forceProfileCompletion = false;
   private profileLoaded = false;
   private routerEventsSub?: Subscription;
+  private profileBaseline: ProfileFormSnapshot | null = null;
+  private notificationsBaseline: NotificationPrefsSnapshot | null = null;
+  private addressFormBaseline: AddressCreateRequest | null = null;
+  private readonly lastSectionStorageKey = 'account.lastSection';
+  private readonly handleBeforeUnload = (event: BeforeUnloadEvent) => {
+    if (!this.hasUnsavedChanges()) return;
+    event.preventDefault();
+    event.returnValue = '';
+  };
 
   googlePassword = '';
   googleBusy = false;
@@ -180,6 +213,8 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     private route: ActivatedRoute,
     private api: ApiService,
     public wishlist: WishlistService,
+    private notificationsService: NotificationsService,
+    private couponsService: CouponsService,
     private theme: ThemeService,
     private lang: LanguageService,
     private translate: TranslateService
@@ -199,13 +234,35 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit(): void {
     this.forceProfileCompletion = this.route.snapshot.queryParamMap.get('complete') === '1';
     this.loadProfile();
-    this.ensureLoadedForSection(this.activeSectionFromUrl(this.router.url));
     this.routerEventsSub = this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
-      .subscribe((e) => this.ensureLoadedForSection(this.activeSectionFromUrl(e.urlAfterRedirects)));
+      .subscribe((e) => {
+        const section = this.activeSectionFromUrl(e.urlAfterRedirects);
+        this.rememberLastVisitedSection(section);
+        this.ensureLoadedForSection(section);
+      });
+    this.notificationsService.refreshUnreadCount();
+    this.loadCouponsCount();
+
+    const initialUrl = this.router.url;
+    if (this.isAccountRootUrl(initialUrl)) {
+      const remembered = this.forceProfileCompletion ? 'profile' : this.lastVisitedSection();
+      const target = remembered === 'password' ? 'overview' : remembered;
+      void this.router.navigate([target === 'overview' ? 'overview' : target], {
+        relativeTo: this.route,
+        queryParamsHandling: 'preserve',
+        replaceUrl: true
+      });
+    } else {
+      const initialSection = this.activeSectionFromUrl(initialUrl);
+      this.rememberLastVisitedSection(initialSection);
+      this.ensureLoadedForSection(initialSection);
+    }
+
     this.resetIdleTimer();
     window.addEventListener('mousemove', this.handleUserActivity);
     window.addEventListener('keydown', this.handleUserActivity);
+    window.addEventListener('beforeunload', this.handleBeforeUnload);
   }
 
   ngAfterViewInit(): void {
@@ -236,6 +293,46 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     if (accountIndex < 0) return 'overview';
     const section = (segments[accountIndex + 1] ?? '').trim();
     return (section || 'overview') as AccountSection;
+  }
+
+  private isAccountRootUrl(url: string): boolean {
+    const path = (url || '').split('?')[0].split('#')[0];
+    const segments = path.split('/').filter(Boolean);
+    const accountIndex = segments.indexOf('account');
+    if (accountIndex < 0) return false;
+    return accountIndex === segments.length - 1;
+  }
+
+  private lastVisitedSection(): AccountSection {
+    try {
+      const value = (localStorage.getItem(this.lastSectionStorageKey) ?? '').trim();
+      const normalized = value as AccountSection;
+      const allowed: AccountSection[] = [
+        'overview',
+        'profile',
+        'orders',
+        'addresses',
+        'wishlist',
+        'coupons',
+        'notifications',
+        'security',
+        'comments',
+        'privacy'
+      ];
+      if (allowed.includes(normalized)) return normalized;
+    } catch {
+      // Ignore storage issues.
+    }
+    return 'overview';
+  }
+
+  private rememberLastVisitedSection(section: AccountSection): void {
+    if (section === 'password') return;
+    try {
+      localStorage.setItem(this.lastSectionStorageKey, section);
+    } catch {
+      // Ignore storage issues.
+    }
   }
 
   private ensureLoadedForSection(section: AccountSection): void {
@@ -279,6 +376,50 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  unreadNotificationsCount(): number {
+    return this.notificationsService.unreadCount();
+  }
+
+  pendingOrdersCount(): number {
+    if (!this.ordersLoaded()) return 0;
+    return this.orders().filter((o) => o.status === 'pending_payment' || o.status === 'pending_acceptance').length;
+  }
+
+  loadCouponsCount(force: boolean = false): void {
+    if (!this.auth.isAuthenticated()) return;
+    if (this.couponsCountLoading() && !force) return;
+    if (this.couponsCountLoaded() && !force) return;
+
+    this.couponsCountLoading.set(true);
+    this.couponsService.myCoupons().subscribe({
+      next: (coupons) => {
+        this.couponsCount.set(this.countAvailableCoupons(coupons ?? []));
+        this.couponsCountLoaded.set(true);
+      },
+      error: () => {
+        this.couponsCount.set(0);
+        this.couponsCountLoaded.set(true);
+        this.couponsCountLoading.set(false);
+      },
+      complete: () => this.couponsCountLoading.set(false)
+    });
+  }
+
+  private countAvailableCoupons(coupons: CouponRead[]): number {
+    const now = Date.now();
+    return (coupons ?? []).filter((coupon) => {
+      if (!coupon?.is_active) return false;
+      const promoActive = coupon.promotion ? coupon.promotion.is_active !== false : true;
+      if (!promoActive) return false;
+
+      const startsAt = coupon.starts_at ? Date.parse(coupon.starts_at) : NaN;
+      if (Number.isFinite(startsAt) && startsAt > now) return false;
+      const endsAt = coupon.ends_at ? Date.parse(coupon.ends_at) : NaN;
+      if (Number.isFinite(endsAt) && endsAt < now) return false;
+      return true;
+    }).length;
+  }
+
   private loadProfile(force: boolean = false): void {
     if (!this.auth.isAuthenticated()) return;
     if (this.loading() && !force) return;
@@ -309,6 +450,9 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.profilePhoneNational = phoneSplit.nationalNumber || '';
         this.profileLanguage = (profile.preferred_language === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
         this.profileThemePreference = (this.theme.preference()() ?? 'system') as ThemePreference;
+        this.profileUsernamePassword = '';
+        this.profileBaseline = this.captureProfileSnapshot();
+        this.notificationsBaseline = this.captureNotificationSnapshot();
         this.profileLoaded = true;
       },
       error: () => {
@@ -539,11 +683,13 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
       is_default_shipping: existing?.is_default_shipping,
       is_default_billing: existing?.is_default_billing
     };
+    this.addressFormBaseline = { ...this.addressModel };
   }
 
   closeAddressForm(): void {
     this.showAddressForm = false;
     this.editingAddressId = null;
+    this.addressFormBaseline = null;
   }
 
   saveAddress(payload: AddressCreateRequest): void {
@@ -931,6 +1077,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
           this.profileLanguage = (user.preferred_language === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
           this.avatar = user.avatar_url ?? this.avatar;
           this.profileUsernamePassword = '';
+          this.profileBaseline = this.captureProfileSnapshot();
           this.profileSaved = true;
           this.toast.success(this.t('account.profile.savedToast'));
           this.loadAliases(true);
@@ -1063,6 +1210,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
           this.notifyBlogCommentReplies = Boolean(user?.notify_blog_comment_replies);
           this.notifyMarketing = Boolean(user?.notify_marketing);
           this.notificationLastUpdated = user.updated_at ?? null;
+          this.notificationsBaseline = this.captureNotificationSnapshot();
           this.notificationsMessage = 'account.notifications.saved';
         },
         error: () => {
@@ -1245,6 +1393,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     this.phoneCountriesEffect?.destroy();
     window.removeEventListener('mousemove', this.handleUserActivity);
     window.removeEventListener('keydown', this.handleUserActivity);
+    window.removeEventListener('beforeunload', this.handleBeforeUnload);
   }
 
   private async setupStripe(): Promise<void> {
@@ -1642,6 +1791,139 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     } catch {
       return `${amount.toFixed(2)} ${currency || ''}`.trim();
     }
+  }
+
+  discardProfileChanges(): void {
+    const baseline = this.profileBaseline;
+    if (!baseline) return;
+    this.profileName = baseline.name;
+    this.profileUsername = baseline.username;
+    this.profileFirstName = baseline.firstName;
+    this.profileMiddleName = baseline.middleName;
+    this.profileLastName = baseline.lastName;
+    this.profileDateOfBirth = baseline.dateOfBirth;
+    this.profilePhoneCountry = baseline.phoneCountry;
+    this.profilePhoneNational = baseline.phoneNational;
+    this.profileLanguage = baseline.preferredLanguage;
+    this.profileThemePreference = baseline.themePreference;
+    this.profileUsernamePassword = '';
+    this.profileError = null;
+    this.profileSaved = false;
+  }
+
+  discardNotificationChanges(): void {
+    const baseline = this.notificationsBaseline;
+    if (!baseline) return;
+    this.notifyBlogComments = baseline.notifyBlogComments;
+    this.notifyBlogCommentReplies = baseline.notifyBlogCommentReplies;
+    this.notifyMarketing = baseline.notifyMarketing;
+    this.notificationsMessage = null;
+    this.notificationsError = null;
+  }
+
+  discardAddressChanges(): void {
+    if (!this.showAddressForm) return;
+    this.closeAddressForm();
+  }
+
+  profileHasUnsavedChanges(): boolean {
+    if (!this.profileBaseline) return false;
+    if (this.profileUsernamePassword.trim()) return true;
+    const current = this.captureProfileSnapshot();
+    return !this.sameProfileSnapshot(this.profileBaseline, current);
+  }
+
+  notificationsHasUnsavedChanges(): boolean {
+    if (!this.notificationsBaseline) return false;
+    const current = this.captureNotificationSnapshot();
+    return !this.sameNotificationSnapshot(this.notificationsBaseline, current);
+  }
+
+  addressesHasUnsavedChanges(): boolean {
+    if (!this.showAddressForm) return false;
+    const baseline = this.addressFormBaseline;
+    if (!baseline) return true;
+    return !this.sameAddressSnapshot(baseline, this.addressModel);
+  }
+
+  private hasUnsavedChanges(): boolean {
+    return this.profileHasUnsavedChanges() || this.addressesHasUnsavedChanges() || this.notificationsHasUnsavedChanges();
+  }
+
+  private captureProfileSnapshot(): ProfileFormSnapshot {
+    return {
+      name: this.profileName.trim(),
+      username: this.profileUsername.trim(),
+      firstName: this.profileFirstName.trim(),
+      middleName: this.profileMiddleName.trim(),
+      lastName: this.profileLastName.trim(),
+      dateOfBirth: this.profileDateOfBirth.trim(),
+      phoneCountry: this.profilePhoneCountry,
+      phoneNational: this.profilePhoneNational.trim(),
+      preferredLanguage: this.profileLanguage,
+      themePreference: this.profileThemePreference
+    };
+  }
+
+  private sameProfileSnapshot(a: ProfileFormSnapshot, b: ProfileFormSnapshot): boolean {
+    return (
+      a.name === b.name &&
+      a.username === b.username &&
+      a.firstName === b.firstName &&
+      a.middleName === b.middleName &&
+      a.lastName === b.lastName &&
+      a.dateOfBirth === b.dateOfBirth &&
+      a.phoneCountry === b.phoneCountry &&
+      a.phoneNational === b.phoneNational &&
+      a.preferredLanguage === b.preferredLanguage &&
+      a.themePreference === b.themePreference
+    );
+  }
+
+  private captureNotificationSnapshot(): NotificationPrefsSnapshot {
+    return {
+      notifyBlogComments: Boolean(this.notifyBlogComments),
+      notifyBlogCommentReplies: Boolean(this.notifyBlogCommentReplies),
+      notifyMarketing: Boolean(this.notifyMarketing)
+    };
+  }
+
+  private sameNotificationSnapshot(a: NotificationPrefsSnapshot, b: NotificationPrefsSnapshot): boolean {
+    return (
+      a.notifyBlogComments === b.notifyBlogComments &&
+      a.notifyBlogCommentReplies === b.notifyBlogCommentReplies &&
+      a.notifyMarketing === b.notifyMarketing
+    );
+  }
+
+  private normalizeAddressSnapshot(model: AddressCreateRequest): AddressCreateRequest {
+    return {
+      label: (model.label ?? '').trim(),
+      line1: (model.line1 ?? '').trim(),
+      line2: (model.line2 ?? '').trim(),
+      city: (model.city ?? '').trim(),
+      region: (model.region ?? '').trim(),
+      postal_code: (model.postal_code ?? '').trim(),
+      country: (model.country ?? '').trim(),
+      is_default_shipping: Boolean(model.is_default_shipping),
+      is_default_billing: Boolean(model.is_default_billing)
+    };
+  }
+
+  private sameAddressSnapshot(a: AddressCreateRequest, b: AddressCreateRequest): boolean {
+    const an = this.normalizeAddressSnapshot(a);
+    const bn = this.normalizeAddressSnapshot(b);
+    return (
+      an.label === bn.label &&
+      an.line1 === bn.line1 &&
+      an.line2 === bn.line2 &&
+      an.city === bn.city &&
+      an.region === bn.region &&
+      an.postal_code === bn.postal_code &&
+      an.country === bn.country &&
+      Boolean(an.is_default_shipping) === Boolean(bn.is_default_shipping) &&
+      Boolean(an.is_default_billing) === Boolean(bn.is_default_billing)
+    );
   }
 
   private t(key: string, params?: Record<string, unknown>): string {

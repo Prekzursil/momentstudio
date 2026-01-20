@@ -95,6 +95,9 @@
     },
     "loadError": "Nu am putut încărca detaliile contului chiar acum.",
     "signedOut": "Te-ai deconectat",
+    "unsaved": {
+      "confirmDiscard": "Ai modificări nesalvate. Le arunci și părăsești pagina?"
+    },
     "verification": {
       "sentStatus": "Email de verificare trimis. Introdu codul primit.",
       "sentToast": "Email de verificare trimis",

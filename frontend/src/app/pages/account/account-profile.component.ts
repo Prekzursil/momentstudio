@@ -260,4 +260,12 @@ import { AccountComponent } from './account.component';
 })
 export class AccountProfileComponent {
   protected readonly account = inject(AccountComponent);
+
+  hasUnsavedChanges(): boolean {
+    return this.account.profileHasUnsavedChanges();
+  }
+
+  discardUnsavedChanges(): void {
+    this.account.discardProfileChanges();
+  }
 }

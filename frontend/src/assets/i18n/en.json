@@ -95,6 +95,9 @@
     },
     "loadError": "Unable to load account details right now.",
     "signedOut": "Signed out",
+    "unsaved": {
+      "confirmDiscard": "You have unsaved changes. Discard them and leave?"
+    },
     "verification": {
       "sentStatus": "Verification email sent. Enter the token you received.",
       "sentToast": "Verification email sent",

@@ -94,4 +94,12 @@ import { AccountComponent } from './account.component';
 })
 export class AccountAddressesComponent {
   protected readonly account = inject(AccountComponent);
+
+  hasUnsavedChanges(): boolean {
+    return this.account.addressesHasUnsavedChanges();
+  }
+
+  discardUnsavedChanges(): void {
+    this.account.discardAddressChanges();
+  }
 }
