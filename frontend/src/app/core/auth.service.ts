@@ -77,6 +77,20 @@ export interface UserEmailsResponse {
   secondary_emails: SecondaryEmail[];
 }
 
+export interface RefreshSessionInfo {
+  id: string;
+  created_at: string;
+  expires_at: string;
+  persistent: boolean;
+  is_current: boolean;
+  user_agent?: string | null;
+  ip_address?: string | null;
+}
+
+export interface RefreshSessionsRevokeResponse {
+  revoked: number;
+}
+
 type StorageMode = 'local' | 'session';
 
 @Injectable({ providedIn: 'root' })
@@ -314,6 +328,14 @@ export class AuthService {
     return this.api
       .post<AuthUser>(`/auth/me/emails/${secondaryEmailId}/make-primary`, { password })
       .pipe(tap((user) => this.setUser(user)));
+  }
+
+  listSessions(): Observable<RefreshSessionInfo[]> {
+    return this.api.get<RefreshSessionInfo[]>('/auth/me/sessions');
+  }
+
+  revokeOtherSessions(): Observable<RefreshSessionsRevokeResponse> {
+    return this.api.post<RefreshSessionsRevokeResponse>('/auth/me/sessions/revoke-others', {});
   }
 
   refresh(opts?: { silent?: boolean }): Observable<AuthTokens | null> {

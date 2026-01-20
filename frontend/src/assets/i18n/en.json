@@ -234,6 +234,22 @@
         "removed": "Payment method removed",
         "removeError": "Could not remove payment method"
       },
+      "devices": {
+        "title": "Devices",
+        "copy": "Review where you're signed in. If something looks unfamiliar, sign out of other devices.",
+        "action": "Sign out other devices",
+        "current": "This device",
+        "unknownDevice": "Unknown device",
+        "created": "Signed in",
+        "expires": "Expires",
+        "persistent": "Remembered",
+        "none": "No active sessions found.",
+        "loadError": "Could not load active sessions.",
+        "revokeConfirm": "Sign out of other devices?",
+        "revoked": "Signed out of {{count}} other device(s).",
+        "noneRevoked": "No other devices to sign out.",
+        "revokeError": "Could not sign out other devices."
+      },
       "session": {
         "title": "Session",
         "copy": "You will be logged out after inactivity to keep your account safe.",

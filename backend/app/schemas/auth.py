@@ -107,3 +107,17 @@ class AccountDeletionStatus(BaseModel):
     scheduled_for: datetime | None = None
     deleted_at: datetime | None = None
     cooldown_hours: int
+
+
+class RefreshSessionResponse(BaseModel):
+    id: UUID
+    created_at: datetime
+    expires_at: datetime
+    persistent: bool
+    is_current: bool = False
+    user_agent: str | None = None
+    ip_address: str | None = None
+
+
+class RefreshSessionsRevokeResponse(BaseModel):
+    revoked: int

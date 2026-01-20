@@ -97,6 +97,38 @@ def test_register_and_login_flow(test_app: Dict[str, object]) -> None:
     assert refreshed["refresh_token"]
 
 
+def test_sessions_list_and_revoke_others(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    register_payload = make_register_payload(email="sess@example.com", username="sess1", name="Sess")
+    res = client.post("/api/v1/auth/register", json=register_payload)
+    assert res.status_code == 201, res.text
+    refresh_one = res.json()["tokens"]["refresh_token"]
+
+    login_two = client.post("/api/v1/auth/login", json={"identifier": "sess@example.com", "password": "supersecret"})
+    assert login_two.status_code == 200, login_two.text
+    access_two = login_two.json()["tokens"]["access_token"]
+
+    sessions_res = client.get("/api/v1/auth/me/sessions", headers=auth_headers(access_two))
+    assert sessions_res.status_code == 200, sessions_res.text
+    sessions = sessions_res.json()
+    assert len(sessions) == 2
+    assert sum(1 for s in sessions if s.get("is_current")) == 1
+
+    revoke = client.post("/api/v1/auth/me/sessions/revoke-others", headers=auth_headers(access_two))
+    assert revoke.status_code == 200, revoke.text
+    assert revoke.json()["revoked"] == 1
+
+    sessions_after = client.get("/api/v1/auth/me/sessions", headers=auth_headers(access_two))
+    assert sessions_after.status_code == 200, sessions_after.text
+    after = sessions_after.json()
+    assert len(after) == 1
+    assert after[0]["is_current"] is True
+
+    refresh_old = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_one})
+    assert refresh_old.status_code == 401, refresh_old.text
+
+
 def test_secondary_emails_flow(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 

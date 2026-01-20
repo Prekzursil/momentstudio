@@ -764,17 +764,48 @@ async def confirm_reset_token(session: AsyncSession, token: str, new_password: s
     return user
 
 
-async def create_refresh_session(session: AsyncSession, user_id: uuid.UUID, *, persistent: bool = True) -> RefreshSession:
+def _truncate(value: str | None, max_len: int) -> str | None:
+    clean = (value or "").strip()
+    if not clean:
+        return None
+    return clean[:max_len]
+
+
+async def create_refresh_session(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    persistent: bool = True,
+    user_agent: str | None = None,
+    ip_address: str | None = None,
+) -> RefreshSession:
     jti = secrets.token_hex(16)
     expires_at = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_exp_days)
-    refresh_session = RefreshSession(user_id=user_id, jti=jti, expires_at=expires_at, persistent=persistent, revoked=False)
+    refresh_session = RefreshSession(
+        user_id=user_id,
+        jti=jti,
+        expires_at=expires_at,
+        persistent=persistent,
+        revoked=False,
+        user_agent=_truncate(user_agent, 255),
+        ip_address=_truncate(ip_address, 45),
+    )
     session.add(refresh_session)
     await session.flush()
     return refresh_session
 
 
-async def issue_tokens_for_user(session: AsyncSession, user: User, *, persistent: bool = True) -> dict[str, str]:
-    refresh_session = await create_refresh_session(session, user.id, persistent=persistent)
+async def issue_tokens_for_user(
+    session: AsyncSession,
+    user: User,
+    *,
+    persistent: bool = True,
+    user_agent: str | None = None,
+    ip_address: str | None = None,
+) -> dict[str, str]:
+    refresh_session = await create_refresh_session(
+        session, user.id, persistent=persistent, user_agent=user_agent, ip_address=ip_address
+    )
     access = security.create_access_token(str(user.id), refresh_session.jti)
     refresh = security.create_refresh_token(str(user.id), refresh_session.jti, refresh_session.expires_at)
     await session.commit()

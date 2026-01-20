@@ -24,6 +24,8 @@ from app.schemas.auth import (
     AuthResponse,
     GoogleCallbackResponse,
     AccountDeletionStatus,
+    RefreshSessionResponse,
+    RefreshSessionsRevokeResponse,
     EmailVerificationConfirm,
     SecondaryEmailConfirmRequest,
     SecondaryEmailCreateRequest,
@@ -99,6 +101,75 @@ def clear_refresh_cookie(response: Response) -> None:
         secure=settings.secure_cookies,
         samesite=settings.cookie_samesite.lower(),
     )
+
+
+def _extract_bearer_token(request: Request) -> str | None:
+    raw = (request.headers.get("authorization") or "").strip()
+    if not raw:
+        return None
+    parts = raw.split(" ", 1)
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        return None
+    token = parts[1].strip()
+    return token or None
+
+
+def _extract_refresh_session_jti(request: Request) -> str | None:
+    refresh_token = (request.cookies.get("refresh_token") or "").strip()
+    if refresh_token:
+        payload = security.decode_token(refresh_token)
+        if payload and payload.get("type") == "refresh":
+            jti = str(payload.get("jti") or "").strip()
+            if jti:
+                return jti
+
+    access_token = _extract_bearer_token(request)
+    if access_token:
+        payload = security.decode_token(access_token)
+        if payload and payload.get("type") == "access":
+            jti = str(payload.get("jti") or "").strip()
+            if jti:
+                return jti
+
+    return None
+
+
+async def _resolve_active_refresh_session_jti(
+    session: AsyncSession,
+    user_id: UUID,
+    candidate_jti: str | None,
+) -> str | None:
+    if not candidate_jti:
+        return None
+    stored = (await session.execute(select(RefreshSession).where(RefreshSession.jti == candidate_jti))).scalar_one_or_none()
+    if not stored or stored.user_id != user_id:
+        return None
+
+    now = datetime.now(timezone.utc)
+    expires_at = stored.expires_at
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if not expires_at or expires_at < now:
+        return None
+
+    if not stored.revoked:
+        return stored.jti
+
+    replacement_jti = (getattr(stored, "replaced_by_jti", None) or "").strip()
+    if not replacement_jti:
+        return None
+
+    replacement = (
+        await session.execute(select(RefreshSession).where(RefreshSession.jti == replacement_jti))
+    ).scalar_one_or_none()
+    if not replacement or replacement.user_id != user_id or replacement.revoked:
+        return None
+    replacement_expires_at = replacement.expires_at
+    if replacement_expires_at and replacement_expires_at.tzinfo is None:
+        replacement_expires_at = replacement_expires_at.replace(tzinfo=timezone.utc)
+    if not replacement_expires_at or replacement_expires_at < now:
+        return None
+    return replacement.jti
 
 
 class ChangePasswordRequest(BaseModel):
@@ -291,7 +362,13 @@ async def register(
         first_name=user.first_name,
         lang=user.preferred_language,
     )
-    tokens = await auth_service.issue_tokens_for_user(session, user, persistent=False)
+    tokens = await auth_service.issue_tokens_for_user(
+        session,
+        user,
+        persistent=False,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     if response:
         set_refresh_cookie(response, tokens["refresh_token"], persistent=False)
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
@@ -324,7 +401,13 @@ async def login(
         raise
     metrics.record_login_success()
     persistent = bool(payload.remember)
-    tokens = await auth_service.issue_tokens_for_user(session, user, persistent=persistent)
+    tokens = await auth_service.issue_tokens_for_user(
+        session,
+        user,
+        persistent=persistent,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     if response:
         set_refresh_cookie(response, tokens["refresh_token"], persistent=persistent)
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
@@ -418,7 +501,13 @@ async def refresh_tokens(
         return TokenPair(access_token=access, refresh_token=refresh)
 
     # Rotate the token by revoking the current refresh session and issuing a replacement.
-    replacement_session = await auth_service.create_refresh_session(session, user.id, persistent=persistent)
+    replacement_session = await auth_service.create_refresh_session(
+        session,
+        user.id,
+        persistent=persistent,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     stored.revoked = True
     stored.revoked_reason = "rotated"
     stored.rotated_at = now
@@ -755,6 +844,96 @@ async def update_notification_preferences(
     return UserResponse.model_validate(current_user)
 
 
+@router.get(
+    "/me/sessions",
+    response_model=list[RefreshSessionResponse],
+    summary="List my active sessions",
+    description="Returns active refresh sessions for the current account so you can revoke other devices.",
+)
+async def list_my_sessions(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[RefreshSessionResponse]:
+    candidate_jti = _extract_refresh_session_jti(request)
+    current_jti = await _resolve_active_refresh_session_jti(session, current_user.id, candidate_jti)
+
+    rows = (
+        await session.execute(
+            select(RefreshSession).where(RefreshSession.user_id == current_user.id, RefreshSession.revoked.is_(False))
+        )
+    ).scalars().all()
+
+    now = datetime.now(timezone.utc)
+    sessions: list[RefreshSessionResponse] = []
+    for row in rows:
+        expires_at = row.expires_at
+        if expires_at and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if not expires_at or expires_at < now:
+            continue
+        created_at = row.created_at
+        if created_at and created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        sessions.append(
+            RefreshSessionResponse(
+                id=row.id,
+                created_at=created_at,
+                expires_at=expires_at,
+                persistent=bool(getattr(row, "persistent", True)),
+                is_current=bool(current_jti and row.jti == current_jti),
+                user_agent=getattr(row, "user_agent", None),
+                ip_address=getattr(row, "ip_address", None),
+            )
+        )
+
+    sessions.sort(key=lambda entry: (entry.is_current, entry.created_at), reverse=True)
+    return sessions
+
+
+@router.post(
+    "/me/sessions/revoke-others",
+    response_model=RefreshSessionsRevokeResponse,
+    summary="Revoke other active sessions",
+    description="Revokes all other active refresh sessions, keeping only the current device signed in.",
+)
+async def revoke_other_sessions(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> RefreshSessionsRevokeResponse:
+    candidate_jti = _extract_refresh_session_jti(request)
+    current_jti = await _resolve_active_refresh_session_jti(session, current_user.id, candidate_jti)
+    if not current_jti:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not identify current session")
+
+    rows = (
+        await session.execute(
+            select(RefreshSession).where(RefreshSession.user_id == current_user.id, RefreshSession.revoked.is_(False))
+        )
+    ).scalars().all()
+
+    now = datetime.now(timezone.utc)
+    to_revoke: list[RefreshSession] = []
+    for row in rows:
+        if row.jti == current_jti:
+            continue
+        expires_at = row.expires_at
+        if expires_at and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if not expires_at or expires_at < now:
+            continue
+        row.revoked = True
+        row.revoked_reason = "revoke_others"
+        to_revoke.append(row)
+
+    if to_revoke:
+        session.add_all(to_revoke)
+        await session.commit()
+
+    return RefreshSessionsRevokeResponse(revoked=len(to_revoke))
+
+
 @router.patch("/me", response_model=UserResponse)
 async def update_me(
     payload: ProfileUpdate,
@@ -905,6 +1084,7 @@ async def google_start(_: None = Depends(google_rate_limit)) -> dict:
 @router.post("/google/callback", response_model=GoogleCallbackResponse)
 async def google_callback(
     payload: GoogleCallback,
+    request: Request,
     session: AsyncSession = Depends(get_session),
     response: Response = None,
     _: None = Depends(google_rate_limit),
@@ -932,7 +1112,12 @@ async def google_callback(
         if getattr(existing_sub, "deleted_at", None) is not None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
         if auth_service.is_profile_complete(existing_sub):
-            tokens = await auth_service.issue_tokens_for_user(session, existing_sub)
+            tokens = await auth_service.issue_tokens_for_user(
+                session,
+                existing_sub,
+                user_agent=request.headers.get("user-agent"),
+                ip_address=request.client.host if request.client else None,
+            )
             if response:
                 set_refresh_cookie(response, tokens["refresh_token"], persistent=True)
             logger.info("google_login_existing", extra={"user_id": str(existing_sub.id)})
@@ -1023,6 +1208,7 @@ class GoogleCompleteRequest(BaseModel):
 @router.post("/google/complete", response_model=AuthResponse)
 async def google_complete_registration(
     payload: GoogleCompleteRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_google_completion_user),
     session: AsyncSession = Depends(get_session),
@@ -1050,7 +1236,12 @@ async def google_complete_registration(
     if not user.email_verified:
         record = await auth_service.create_email_verification(session, user)
         background_tasks.add_task(email_service.send_verification_email, user.email, record.token, user.preferred_language)
-    tokens = await auth_service.issue_tokens_for_user(session, user)
+    tokens = await auth_service.issue_tokens_for_user(
+        session,
+        user,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     if response:
         set_refresh_cookie(response, tokens["refresh_token"], persistent=True)
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))

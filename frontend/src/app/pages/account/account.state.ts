@@ -11,7 +11,7 @@ import { filter, map, of, Subscription, switchMap } from 'rxjs';
 
 import { ApiService } from '../../core/api.service';
 import { appConfig } from '../../core/app-config';
-import { AuthService, AuthUser, SecondaryEmail, UserAliasesResponse } from '../../core/auth.service';
+import { AuthService, AuthUser, RefreshSessionInfo, SecondaryEmail, UserAliasesResponse } from '../../core/auth.service';
 import {
   AccountDeletionStatus,
   AccountService,
@@ -200,6 +200,12 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   makingPrimaryEmail = false;
   makePrimaryError: string | null = null;
 
+  sessions = signal<RefreshSessionInfo[]>([]);
+  sessionsLoaded = signal<boolean>(false);
+  sessionsLoading = signal<boolean>(false);
+  sessionsError = signal<string | null>(null);
+  revokingOtherSessions = false;
+
   exportingData = false;
   exportError: string | null = null;
 
@@ -384,6 +390,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
       case 'security':
         this.loadSecondaryEmails();
         this.loadPaymentMethods();
+        this.loadSessions();
         return;
       case 'comments':
         if (!this.myCommentsMeta()) {
@@ -1916,6 +1923,56 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.secondaryEmailsLoading.set(false);
       },
       complete: () => this.secondaryEmailsLoading.set(false)
+    });
+  }
+
+  private loadSessions(force: boolean = false): void {
+    if (!this.auth.isAuthenticated()) return;
+    if (this.sessionsLoading() && !force) return;
+    if (this.sessionsLoaded() && !force) return;
+    this.sessionsLoading.set(true);
+    this.sessionsError.set(null);
+    this.auth.listSessions().subscribe({
+      next: (sessions) => {
+        this.sessions.set(sessions ?? []);
+        this.sessionsLoaded.set(true);
+      },
+      error: () => {
+        this.sessions.set([]);
+        this.sessionsError.set(this.t('account.security.devices.loadError'));
+        this.sessionsLoading.set(false);
+      },
+      complete: () => this.sessionsLoading.set(false)
+    });
+  }
+
+  otherSessionsCount(): number {
+    return (this.sessions() ?? []).filter((s) => !s.is_current).length;
+  }
+
+  revokeOtherSessions(): void {
+    if (this.revokingOtherSessions || !this.auth.isAuthenticated()) return;
+    if (!confirm(this.t('account.security.devices.revokeConfirm'))) return;
+    this.revokingOtherSessions = true;
+    this.sessionsError.set(null);
+    this.auth.revokeOtherSessions().subscribe({
+      next: (res) => {
+        const revoked = res?.revoked ?? 0;
+        if (revoked > 0) {
+          this.toast.success(this.t('account.security.devices.revoked', { count: revoked }));
+        } else {
+          this.toast.success(this.t('account.security.devices.noneRevoked'));
+        }
+        this.loadSessions(true);
+      },
+      error: (err) => {
+        const message = err?.error?.detail || this.t('account.security.devices.revokeError');
+        this.sessionsError.set(message);
+        this.toast.error(message);
+      },
+      complete: () => {
+        this.revokingOtherSessions = false;
+      }
     });
   }
 

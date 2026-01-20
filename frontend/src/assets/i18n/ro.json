@@ -234,6 +234,22 @@
         "removed": "Metodă de plată eliminată",
         "removeError": "Nu am putut elimina metoda de plată"
       },
+      "devices": {
+        "title": "Dispozitive",
+        "copy": "Vezi unde ești autentificat. Dacă ceva pare necunoscut, deconectează celelalte dispozitive.",
+        "action": "Deconectează celelalte dispozitive",
+        "current": "Acest dispozitiv",
+        "unknownDevice": "Dispozitiv necunoscut",
+        "created": "Autentificat",
+        "expires": "Expiră",
+        "persistent": "Memorat",
+        "none": "Nu există sesiuni active.",
+        "loadError": "Nu am putut încărca sesiunile active.",
+        "revokeConfirm": "Deconectezi celelalte dispozitive?",
+        "revoked": "Ai deconectat {{count}} alt(e) dispozitiv(e).",
+        "noneRevoked": "Nu există alte dispozitive de deconectat.",
+        "revokeError": "Nu am putut deconecta celelalte dispozitive."
+      },
       "session": {
         "title": "Sesiune",
         "copy": "Vei fi deconectat după o perioadă de inactivitate pentru a-ți păstra contul în siguranță.",

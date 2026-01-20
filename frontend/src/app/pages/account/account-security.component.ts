@@ -286,6 +286,57 @@ import { AccountComponent } from './account.component';
         </div>
 
         <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-3">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div class="grid gap-1">
+              <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'account.security.devices.title' | translate }}</h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'account.security.devices.copy' | translate }}</p>
+            </div>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'account.security.devices.action' | translate"
+              [disabled]="account.sessionsLoading() || account.revokingOtherSessions || account.otherSessionsCount() === 0"
+              (action)="account.revokeOtherSessions()"
+            ></app-button>
+          </div>
+
+          <div *ngIf="account.sessionsLoading()" class="text-sm text-slate-600 dark:text-slate-300">
+            {{ 'notifications.loading' | translate }}
+          </div>
+
+          <p *ngIf="account.sessionsError()" class="text-xs text-rose-700 dark:text-rose-300">{{ account.sessionsError() }}</p>
+
+          <p *ngIf="!account.sessionsLoading() && account.sessions().length === 0" class="text-sm text-slate-700 dark:text-slate-200">
+            {{ 'account.security.devices.none' | translate }}
+          </p>
+
+          <ul *ngIf="!account.sessionsLoading() && account.sessions().length" class="grid gap-2">
+            <li
+              *ngFor="let s of account.sessions()"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900 flex flex-col gap-1"
+            >
+              <div class="flex flex-wrap items-center gap-2">
+                <p class="text-sm font-medium text-slate-900 dark:text-slate-50 truncate max-w-full">
+                  {{ (s.user_agent || ('account.security.devices.unknownDevice' | translate)) | slice: 0: 90 }}
+                </p>
+                <span
+                  *ngIf="s.is_current"
+                  class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
+                >
+                  {{ 'account.security.devices.current' | translate }}
+                </span>
+              </div>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'account.security.devices.created' | translate }}: {{ s.created_at | date: 'medium' }} •
+                {{ 'account.security.devices.expires' | translate }}: {{ s.expires_at | date: 'medium' }}
+                <span *ngIf="s.ip_address"> • IP {{ s.ip_address }}</span>
+                <span *ngIf="s.persistent"> • {{ 'account.security.devices.persistent' | translate }}</span>
+              </p>
+            </li>
+          </ul>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-3">
           <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'account.security.session.title' | translate }}</h3>
           <p class="text-sm text-slate-700 dark:text-slate-200">
             {{ 'account.security.session.copy' | translate }}
