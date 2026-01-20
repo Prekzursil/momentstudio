@@ -55,7 +55,14 @@ import { AccountComponent } from './account.component';
         class="rounded-lg border border-slate-200 p-3 grid gap-1 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200"
       >
         <div class="flex items-center justify-between">
-          <span class="font-semibold text-slate-900 dark:text-slate-50">{{ addr.label || 'Address' }}</span>
+          <span class="font-semibold text-slate-900 dark:text-slate-50">
+            <ng-container [ngSwitch]="addr.label">
+              <ng-container *ngSwitchCase="'home'">{{ 'account.addresses.labels.home' | translate }}</ng-container>
+              <ng-container *ngSwitchCase="'work'">{{ 'account.addresses.labels.work' | translate }}</ng-container>
+              <ng-container *ngSwitchCase="'other'">{{ 'account.addresses.labels.other' | translate }}</ng-container>
+              <ng-container *ngSwitchDefault>{{ addr.label || ('account.addresses.labels.address' | translate) }}</ng-container>
+            </ng-container>
+          </span>
           <div class="flex items-center gap-2 text-xs">
             <span *ngIf="addr.is_default_shipping" class="rounded-full bg-slate-100 px-2 py-0.5 dark:bg-slate-800">{{
               'account.addresses.defaultShipping' | translate
@@ -80,6 +87,12 @@ import { AccountComponent } from './account.component';
               (action)="account.setDefaultBilling(addr)"
             ></app-button>
             <app-button size="sm" variant="ghost" [label]="'account.addresses.edit' | translate" (action)="account.editAddress(addr)"></app-button>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'account.addresses.duplicate' | translate"
+              (action)="account.duplicateAddress(addr)"
+            ></app-button>
             <app-button size="sm" variant="ghost" [label]="'account.addresses.delete' | translate" (action)="account.removeAddress(addr.id)"></app-button>
           </div>
         </div>

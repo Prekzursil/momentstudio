@@ -387,9 +387,14 @@
       "makeDefaultShipping": "Make default shipping",
       "makeDefaultBilling": "Make default billing",
       "edit": "Edit",
+      "duplicate": "Duplicate",
       "delete": "Delete",
       "labels": {
-        "home": "Home"
+        "address": "Address",
+        "home": "Home",
+        "work": "Work",
+        "other": "Other",
+        "custom": "Custom"
       },
       "messages": {
         "updated": "Address updated",
@@ -824,6 +829,7 @@
   "validation": {
     "required": "This field is required.",
     "invalidEmail": "Enter a valid email address.",
+    "invalidPostal": "Enter a valid postal code.",
     "usernameInvalid": "Username must be 3–30 characters and may include letters, numbers, '.', '_', '-'.",
     "passwordMin": "Password must be at least 6 characters.",
     "passwordMismatch": "Passwords do not match.",
@@ -831,11 +837,18 @@
   },
   "addressForm": {
     "label": "Label",
+    "customLabelPlaceholder": "Custom label",
     "line1": "Address line 1",
     "line2": "Address line 2",
     "defaultShipping": "Set as default shipping",
     "defaultBilling": "Set as default billing",
     "useAsBillingToo": "Use as billing too",
+    "postalHint": "Example: {{example}}",
+    "autocomplete": {
+      "label": "Search address (optional)",
+      "placeholder": "Start typing your address…",
+      "poweredBy": "Suggestions from OpenStreetMap"
+    },
     "cancel": "Cancel",
     "save": "Save"
   },

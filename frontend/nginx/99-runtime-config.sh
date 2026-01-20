@@ -21,6 +21,7 @@ APP_VERSION="${APP_VERSION:-}"
 STRIPE_PUBLISHABLE_KEY="${STRIPE_PUBLISHABLE_KEY:-}"
 PAYPAL_ENABLED="${PAYPAL_ENABLED:-}"
 NETOPIA_ENABLED="${NETOPIA_ENABLED:-}"
+ADDRESS_AUTOCOMPLETE_ENABLED="${ADDRESS_AUTOCOMPLETE_ENABLED:-}"
 SENTRY_DSN="${SENTRY_DSN:-}"
 CAPTCHA_SITE_KEY="${CAPTCHA_SITE_KEY:-}"
 
@@ -35,6 +36,7 @@ window.__APP_CONFIG__ = {
   "stripePublishableKey": "$(escape "$STRIPE_PUBLISHABLE_KEY")",
   "paypalEnabled": $(truthy "$PAYPAL_ENABLED"),
   "netopiaEnabled": $(truthy "$NETOPIA_ENABLED"),
+  "addressAutocompleteEnabled": $(truthy "$ADDRESS_AUTOCOMPLETE_ENABLED"),
   "sentryDsn": "$(escape "$SENTRY_DSN")",
   "captchaSiteKey": "$(escape "$CAPTCHA_SITE_KEY")"
 };

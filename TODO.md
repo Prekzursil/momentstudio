@@ -470,11 +470,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Orders: allow cancel request for eligible states (with confirmation + reason).
 - [x] Orders: show “manual refund required” banner with next steps (when applicable).
 - [x] Receipts: show share expiry + revoke/copy states in Account orders UI.
-- [ ] Addresses: add country-specific validation hints (postal code, required fields).
-- [ ] Addresses: optional address autocomplete (feature-flag).
+- [x] Addresses: add country-specific validation hints (postal code, required fields).
+- [x] Addresses: optional address autocomplete (feature-flag).
 - [x] Addresses: support “billing same as shipping” per address.
-- [ ] Addresses: add “Duplicate address” action.
-- [ ] Addresses: convert address label to a dropdown (Home/Work/Other) with custom fallback.
+- [x] Addresses: add “Duplicate address” action.
+- [x] Addresses: convert address label to a dropdown (Home/Work/Other) with custom fallback.
 - [ ] Wishlist: add bulk actions (remove selected / add selected to cart).
 - [ ] Wishlist: show stock + price-change chips since saved.
 - [ ] Wishlist: add “notify me when back in stock” for wishlist items.

@@ -985,6 +985,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   openAddressForm(existing?: Address): void {
     this.showAddressForm = true;
     this.editingAddressId = existing?.id ?? null;
+    const label = existing ? this.normalizeAddressLabel(existing.label) : 'home';
     this.addressModel = {
       line1: existing?.line1 || '',
       line2: existing?.line2 || '',
@@ -992,9 +993,27 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
       region: existing?.region || '',
       postal_code: existing?.postal_code || '',
       country: existing?.country || 'US',
-      label: existing?.label || this.t('account.addresses.labels.home'),
+      label,
       is_default_shipping: existing?.is_default_shipping,
       is_default_billing: existing?.is_default_billing
+    };
+    this.addressFormBaseline = { ...this.addressModel };
+  }
+
+  duplicateAddress(existing: Address): void {
+    this.showAddressForm = true;
+    this.editingAddressId = null;
+    const label = this.normalizeAddressLabel(existing?.label);
+    this.addressModel = {
+      line1: existing?.line1 || '',
+      line2: existing?.line2 || '',
+      city: existing?.city || '',
+      region: existing?.region || '',
+      postal_code: existing?.postal_code || '',
+      country: existing?.country || 'US',
+      label,
+      is_default_shipping: false,
+      is_default_billing: false
     };
     this.addressFormBaseline = { ...this.addressModel };
   }
@@ -1076,6 +1095,22 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
 
     this.addresses.set(normalized);
     this.addressesLoaded.set(true);
+  }
+
+  private normalizeAddressLabel(label: string | null | undefined): string {
+    const raw = String(label ?? '').trim();
+    if (!raw) return 'home';
+    const normalized = raw.toLowerCase();
+    if (['home', 'work', 'other'].includes(normalized)) return normalized;
+
+    const homeKeys = new Set(['home', 'acasa', 'acasă', this.t('account.addresses.labels.home').toLowerCase()]);
+    const workKeys = new Set(['work', 'serviciu', this.t('account.addresses.labels.work').toLowerCase()]);
+    const otherKeys = new Set(['other', 'altul', 'altele', this.t('account.addresses.labels.other').toLowerCase()]);
+
+    if (homeKeys.has(normalized)) return 'home';
+    if (workKeys.has(normalized)) return 'work';
+    if (otherKeys.has(normalized)) return 'other';
+    return raw;
   }
 
   addCard(): void {

@@ -387,9 +387,14 @@
       "makeDefaultShipping": "Setează ca livrare implicită",
       "makeDefaultBilling": "Setează ca facturare implicită",
       "edit": "Editează",
+      "duplicate": "Duplică",
       "delete": "Șterge",
       "labels": {
-        "home": "Acasă"
+        "address": "Adresă",
+        "home": "Acasă",
+        "work": "Serviciu",
+        "other": "Altul",
+        "custom": "Personalizat"
       },
       "messages": {
         "updated": "Adresă actualizată",
@@ -824,6 +829,7 @@
   "validation": {
     "required": "Acest câmp este obligatoriu.",
     "invalidEmail": "Introdu o adresă de email validă.",
+    "invalidPostal": "Introdu un cod poștal valid.",
     "usernameInvalid": "Utilizatorul trebuie să aibă 3–30 caractere și poate conține litere, cifre, '.', '_', '-'.",
     "passwordMin": "Parola trebuie să aibă cel puțin 6 caractere.",
     "passwordMismatch": "Parolele nu coincid.",
@@ -831,11 +837,18 @@
   },
   "addressForm": {
     "label": "Etichetă",
+    "customLabelPlaceholder": "Etichetă personalizată",
     "line1": "Adresă (linia 1)",
     "line2": "Adresă (linia 2)",
     "defaultShipping": "Setează ca livrare implicită",
     "defaultBilling": "Setează ca facturare implicită",
     "useAsBillingToo": "Folosește și ca facturare",
+    "postalHint": "Exemplu: {{example}}",
+    "autocomplete": {
+      "label": "Caută adresa (opțional)",
+      "placeholder": "Începe să tastezi adresa…",
+      "poweredBy": "Sugestii de la OpenStreetMap"
+    },
     "cancel": "Anulează",
     "save": "Salvează"
   },
