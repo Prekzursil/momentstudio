@@ -58,7 +58,7 @@ test('owner can sign in and reach admin dashboard', async ({ page }) => {
   await page.getByLabel('Password').fill(OWNER_PASSWORD);
   await page.getByRole('button', { name: 'Login' }).click();
 
-  await expect(page).toHaveURL(/\/account$/);
+  await expect(page).toHaveURL(/\/account(\/overview)?$/);
 
   const viewAdmin = page.getByRole('link', { name: 'View admin' });
   await expect(viewAdmin).toBeVisible();

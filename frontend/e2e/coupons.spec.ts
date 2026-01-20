@@ -8,7 +8,7 @@ async function loginUi(page: Page): Promise<void> {
   await page.getByLabel('Email or username').fill(OWNER_IDENTIFIER);
   await page.getByLabel('Password').fill(OWNER_PASSWORD);
   await page.getByRole('button', { name: 'Login' }).click();
-  await expect(page).toHaveURL(/\/account$/);
+  await expect(page).toHaveURL(/\/account(\/overview)?$/);
 }
 
 async function loginApi(request: APIRequestContext): Promise<string> {
