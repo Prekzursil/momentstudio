@@ -307,29 +307,59 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
                   <span *ngIf="step2Complete()" class="text-xs font-semibold text-emerald-700 dark:text-emerald-300">✓</span>
                 </div>
                 <div class="grid sm:grid-cols-2 gap-3">
-                <label class="text-sm grid gap-1">
-                  {{ 'checkout.name' | translate }}
-                  <input
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                    name="name"
-                    autocomplete="name"
-                    [(ngModel)]="address.name"
-                    required
-                  />
-                </label>
-                <label class="text-sm grid gap-1">
-                  {{ 'checkout.email' | translate }}
-                  <input
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                    name="email"
-                    autocomplete="email"
-                    [(ngModel)]="address.email"
-                    type="email"
-                    required
-                    (ngModelChange)="onEmailChanged()"
-                  />
-                  <div *ngIf="!auth.isAuthenticated()" class="flex flex-wrap items-center gap-2">
-                    <app-button
+	                <label class="text-sm grid gap-1">
+	                  {{ 'checkout.name' | translate }}
+	                  <input
+	                    class="rounded-lg border bg-white px-3 py-2 text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                    [ngClass]="
+	                      nameCtrl.invalid && (nameCtrl.touched || checkoutForm.submitted)
+	                        ? 'border-rose-300 ring-2 ring-rose-200 dark:border-rose-900/40 dark:ring-rose-900/30'
+	                        : 'border-slate-200 dark:border-slate-700'
+	                    "
+	                    [attr.aria-invalid]="nameCtrl.invalid && (nameCtrl.touched || checkoutForm.submitted) ? 'true' : null"
+	                    aria-describedby="checkout-name-error"
+	                    name="name"
+	                    autocomplete="name"
+	                    [(ngModel)]="address.name"
+	                    #nameCtrl="ngModel"
+	                    required
+	                  />
+	                  <span
+	                    *ngIf="nameCtrl.invalid && (nameCtrl.touched || checkoutForm.submitted)"
+	                    id="checkout-name-error"
+	                    class="text-xs font-normal text-rose-700 dark:text-rose-300"
+	                  >
+	                    {{ 'validation.required' | translate }}
+	                  </span>
+	                </label>
+	                <label class="text-sm grid gap-1">
+	                  {{ 'checkout.email' | translate }}
+	                  <input
+	                    class="rounded-lg border bg-white px-3 py-2 text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                    [ngClass]="
+	                      emailCtrl.invalid && (emailCtrl.touched || checkoutForm.submitted)
+	                        ? 'border-rose-300 ring-2 ring-rose-200 dark:border-rose-900/40 dark:ring-rose-900/30'
+	                        : 'border-slate-200 dark:border-slate-700'
+	                    "
+	                    [attr.aria-invalid]="emailCtrl.invalid && (emailCtrl.touched || checkoutForm.submitted) ? 'true' : null"
+	                    aria-describedby="checkout-email-error"
+	                    name="email"
+	                    autocomplete="email"
+	                    [(ngModel)]="address.email"
+	                    #emailCtrl="ngModel"
+	                    type="email"
+	                    required
+	                    (ngModelChange)="onEmailChanged()"
+	                  />
+	                  <span
+	                    *ngIf="emailCtrl.invalid && (emailCtrl.touched || checkoutForm.submitted)"
+	                    id="checkout-email-error"
+	                    class="text-xs font-normal text-rose-700 dark:text-rose-300"
+	                  >
+	                    {{ emailCtrl.errors?.['email'] ? ('validation.invalidEmail' | translate) : ('validation.required' | translate) }}
+	                  </span>
+	                  <div *ngIf="!auth.isAuthenticated()" class="flex flex-wrap items-center gap-2">
+	                    <app-button
                       size="sm"
                       variant="ghost"
                       [label]="
@@ -402,65 +432,144 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
                       </button>
 	                  </label>
 	                </ng-container>
-                <label class="text-sm grid gap-1 sm:col-span-2">
-                  {{ 'checkout.line1' | translate }}
-                  <input
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                    name="line1"
-                    autocomplete="shipping address-line1"
-                    [(ngModel)]="address.line1"
-                    required
-                  />
-                </label>
-                <div class="grid gap-3 sm:grid-cols-3 sm:col-span-2">
-                  <label class="text-sm grid gap-1">
-                    {{ 'checkout.city' | translate }}
-                    <input
-                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                      name="city"
-                      autocomplete="shipping address-level2"
-                      [(ngModel)]="address.city"
-                      [attr.list]="address.country === 'RO' ? 'roCities' : null"
-                      required
-                    />
-                  </label>
-                  <label class="text-sm grid gap-1">
-                    {{ 'checkout.region' | translate }}
-                    <input
-                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                      name="region"
-                      autocomplete="shipping address-level1"
-                      [(ngModel)]="address.region"
-                      [attr.list]="address.country === 'RO' ? 'roCounties' : null"
-                      [required]="address.country === 'RO'"
-                    />
-                  </label>
-                  <label class="text-sm grid gap-1">
-                    {{ 'checkout.postal' | translate }}
-                    <input
-                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                      name="postal"
-                      autocomplete="shipping postal-code"
-                      [(ngModel)]="address.postal"
-                      required
-                    />
-                  </label>
-                </div>
-                <label class="text-sm grid gap-1 sm:col-span-2">
-                  {{ 'checkout.country' | translate }}
-                  <input
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                    name="countryInput"
-                    autocomplete="shipping country"
-                    [attr.list]="'countryOptions'"
-                    [(ngModel)]="shippingCountryInput"
-                    (ngModelChange)="shippingCountryError = ''"
-                    (blur)="normalizeShippingCountry()"
-                    required
-                  />
-                  <p *ngIf="shippingCountryError" class="text-xs text-amber-700 dark:text-amber-300">{{ shippingCountryError }}</p>
-                </label>
-              </div>
+	                <label class="text-sm grid gap-1 sm:col-span-2">
+	                  {{ 'checkout.line1' | translate }}
+	                  <input
+	                    class="rounded-lg border bg-white px-3 py-2 text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                    [ngClass]="
+	                      line1Ctrl.invalid && (line1Ctrl.touched || checkoutForm.submitted)
+	                        ? 'border-rose-300 ring-2 ring-rose-200 dark:border-rose-900/40 dark:ring-rose-900/30'
+	                        : 'border-slate-200 dark:border-slate-700'
+	                    "
+	                    [attr.aria-invalid]="line1Ctrl.invalid && (line1Ctrl.touched || checkoutForm.submitted) ? 'true' : null"
+	                    aria-describedby="checkout-shipping-line1-error"
+	                    name="line1"
+	                    autocomplete="shipping address-line1"
+	                    [(ngModel)]="address.line1"
+	                    #line1Ctrl="ngModel"
+	                    required
+	                  />
+	                  <span
+	                    *ngIf="line1Ctrl.invalid && (line1Ctrl.touched || checkoutForm.submitted)"
+	                    id="checkout-shipping-line1-error"
+	                    class="text-xs font-normal text-rose-700 dark:text-rose-300"
+	                  >
+	                    {{ 'validation.required' | translate }}
+	                  </span>
+	                </label>
+	                <div class="grid gap-3 sm:grid-cols-3 sm:col-span-2">
+	                  <label class="text-sm grid gap-1">
+	                    {{ 'checkout.city' | translate }}
+	                    <input
+	                      class="rounded-lg border bg-white px-3 py-2 text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                      [ngClass]="
+	                        cityCtrl.invalid && (cityCtrl.touched || checkoutForm.submitted)
+	                          ? 'border-rose-300 ring-2 ring-rose-200 dark:border-rose-900/40 dark:ring-rose-900/30'
+	                          : 'border-slate-200 dark:border-slate-700'
+	                      "
+	                      [attr.aria-invalid]="cityCtrl.invalid && (cityCtrl.touched || checkoutForm.submitted) ? 'true' : null"
+	                      aria-describedby="checkout-shipping-city-error"
+	                      name="city"
+	                      autocomplete="shipping address-level2"
+	                      [(ngModel)]="address.city"
+	                      #cityCtrl="ngModel"
+	                      [attr.list]="address.country === 'RO' ? 'roCities' : null"
+	                      required
+	                    />
+	                    <span
+	                      *ngIf="cityCtrl.invalid && (cityCtrl.touched || checkoutForm.submitted)"
+	                      id="checkout-shipping-city-error"
+	                      class="text-xs font-normal text-rose-700 dark:text-rose-300"
+	                    >
+	                      {{ 'validation.required' | translate }}
+	                    </span>
+	                  </label>
+	                  <label class="text-sm grid gap-1">
+	                    {{ 'checkout.region' | translate }}
+	                    <input
+	                      class="rounded-lg border bg-white px-3 py-2 text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                      [ngClass]="
+	                        regionCtrl.invalid && (regionCtrl.touched || checkoutForm.submitted)
+	                          ? 'border-rose-300 ring-2 ring-rose-200 dark:border-rose-900/40 dark:ring-rose-900/30'
+	                          : 'border-slate-200 dark:border-slate-700'
+	                      "
+	                      [attr.aria-invalid]="regionCtrl.invalid && (regionCtrl.touched || checkoutForm.submitted) ? 'true' : null"
+	                      aria-describedby="checkout-shipping-region-error"
+	                      name="region"
+	                      autocomplete="shipping address-level1"
+	                      [(ngModel)]="address.region"
+	                      #regionCtrl="ngModel"
+	                      [attr.list]="address.country === 'RO' ? 'roCounties' : null"
+	                      [required]="address.country === 'RO'"
+	                    />
+	                    <span
+	                      *ngIf="regionCtrl.invalid && (regionCtrl.touched || checkoutForm.submitted)"
+	                      id="checkout-shipping-region-error"
+	                      class="text-xs font-normal text-rose-700 dark:text-rose-300"
+	                    >
+	                      {{ 'validation.required' | translate }}
+	                    </span>
+	                  </label>
+	                  <label class="text-sm grid gap-1">
+	                    {{ 'checkout.postal' | translate }}
+	                    <input
+	                      class="rounded-lg border bg-white px-3 py-2 text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                      [ngClass]="
+	                        postalCtrl.invalid && (postalCtrl.touched || checkoutForm.submitted)
+	                          ? 'border-rose-300 ring-2 ring-rose-200 dark:border-rose-900/40 dark:ring-rose-900/30'
+	                          : 'border-slate-200 dark:border-slate-700'
+	                      "
+	                      [attr.aria-invalid]="postalCtrl.invalid && (postalCtrl.touched || checkoutForm.submitted) ? 'true' : null"
+	                      aria-describedby="checkout-shipping-postal-error"
+	                      name="postal"
+	                      autocomplete="shipping postal-code"
+	                      [(ngModel)]="address.postal"
+	                      #postalCtrl="ngModel"
+	                      required
+	                    />
+	                    <span
+	                      *ngIf="postalCtrl.invalid && (postalCtrl.touched || checkoutForm.submitted)"
+	                      id="checkout-shipping-postal-error"
+	                      class="text-xs font-normal text-rose-700 dark:text-rose-300"
+	                    >
+	                      {{ 'validation.required' | translate }}
+	                    </span>
+	                  </label>
+	                </div>
+	                <label class="text-sm grid gap-1 sm:col-span-2">
+	                  {{ 'checkout.country' | translate }}
+	                  <input
+	                    class="rounded-lg border bg-white px-3 py-2 text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                    [ngClass]="
+	                      shippingCountryError || (shippingCountryCtrl.invalid && (shippingCountryCtrl.touched || checkoutForm.submitted))
+	                        ? 'border-rose-300 ring-2 ring-rose-200 dark:border-rose-900/40 dark:ring-rose-900/30'
+	                        : 'border-slate-200 dark:border-slate-700'
+	                    "
+	                    [attr.aria-invalid]="
+	                      shippingCountryError || (shippingCountryCtrl.invalid && (shippingCountryCtrl.touched || checkoutForm.submitted)) ? 'true' : null
+	                    "
+	                    aria-describedby="checkout-shipping-country-required checkout-shipping-country-invalid"
+	                    name="countryInput"
+	                    #shippingCountryCtrl="ngModel"
+	                    autocomplete="shipping country"
+	                    [attr.list]="'countryOptions'"
+	                    [(ngModel)]="shippingCountryInput"
+	                    (ngModelChange)="shippingCountryError = ''"
+	                    (blur)="normalizeShippingCountry()"
+	                    required
+	                  />
+	                  <span
+	                    *ngIf="shippingCountryCtrl.invalid && (shippingCountryCtrl.touched || checkoutForm.submitted)"
+	                    id="checkout-shipping-country-required"
+	                    class="text-xs font-normal text-rose-700 dark:text-rose-300"
+	                  >
+	                    {{ 'validation.required' | translate }}
+	                  </span>
+	                  <span *ngIf="shippingCountryError" id="checkout-shipping-country-invalid" class="text-xs font-normal text-rose-700 dark:text-rose-300">{{
+	                    shippingCountryError
+	                  }}</span>
+	                </label>
+	              </div>
 
               <div class="grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
                 <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">
@@ -518,22 +627,32 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
                 </div>
               </div>
 
-              <div class="grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                  <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">
-                    {{ 'checkout.billingTitle' | translate }}
-                  </p>
-	                  <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-	                    <input
-	                      type="checkbox"
-	                      [(ngModel)]="billingSameAsShipping"
-	                      name="billingSameAsShipping"
-	                      (ngModelChange)="onBillingSameAsShippingChanged()"
-	                    />
-	                    {{ 'checkout.billingSameAsShipping' | translate }}
-	                  </label>
-	                </div>
-                <div *ngIf="!billingSameAsShipping" class="grid sm:grid-cols-2 gap-3">
+	              <div class="grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
+	                <div class="flex flex-wrap items-center justify-between gap-3">
+	                  <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">
+	                    {{ 'checkout.billingTitle' | translate }}
+	                  </p>
+	                  <div class="flex flex-wrap items-center gap-3">
+	                    <button
+	                      *ngIf="!billingSameAsShipping"
+	                      type="button"
+	                      class="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
+	                      (click)="copyShippingToBilling()"
+	                    >
+	                      {{ 'checkout.copyFromShipping' | translate }}
+	                    </button>
+		                  <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+		                    <input
+		                      type="checkbox"
+		                      [(ngModel)]="billingSameAsShipping"
+		                      name="billingSameAsShipping"
+		                      (ngModelChange)="onBillingSameAsShippingChanged()"
+		                    />
+		                    {{ 'checkout.billingSameAsShipping' | translate }}
+		                  </label>
+	                  </div>
+		                </div>
+	                <div *ngIf="!billingSameAsShipping" class="grid sm:grid-cols-2 gap-3">
                   <ng-container *ngIf="auth.isAuthenticated()">
 	                    <label *ngIf="savedAddresses.length" class="text-sm grid gap-1 sm:col-span-2">
 	                      {{ 'checkout.savedBillingAddress' | translate }}
@@ -556,66 +675,145 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
                         </button>
 	                    </label>
 	                  </ng-container>
-                  <label class="text-sm grid gap-1 sm:col-span-2">
-                    {{ 'checkout.line1' | translate }}
-                    <input
-                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                      name="billingLine1"
-                      autocomplete="billing address-line1"
-                      [(ngModel)]="billing.line1"
-                      required
-                    />
-                  </label>
-                  <div class="grid gap-3 sm:grid-cols-3 sm:col-span-2">
-                    <label class="text-sm grid gap-1">
-                      {{ 'checkout.city' | translate }}
-                      <input
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                        name="billingCity"
-                        autocomplete="billing address-level2"
-                        [(ngModel)]="billing.city"
-                        [attr.list]="billing.country === 'RO' ? 'roCities' : null"
-                        required
-                      />
-                    </label>
-                    <label class="text-sm grid gap-1">
-                      {{ 'checkout.region' | translate }}
-                      <input
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                        name="billingRegion"
-                        autocomplete="billing address-level1"
-                        [(ngModel)]="billing.region"
-                        [attr.list]="billing.country === 'RO' ? 'roCounties' : null"
-                        [required]="billing.country === 'RO'"
-                      />
-                    </label>
-                    <label class="text-sm grid gap-1">
-                      {{ 'checkout.postal' | translate }}
-                      <input
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                        name="billingPostal"
-                        autocomplete="billing postal-code"
-                        [(ngModel)]="billing.postal"
-                        required
-                      />
-                    </label>
-                  </div>
-                  <label class="text-sm grid gap-1 sm:col-span-2">
-                    {{ 'checkout.country' | translate }}
-                    <input
-                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                      name="billingCountryInput"
-                      autocomplete="billing country"
-                      [attr.list]="'countryOptions'"
-                      [(ngModel)]="billingCountryInput"
-                      (ngModelChange)="billingCountryError = ''"
-                      (blur)="normalizeBillingCountry()"
-                      required
-                    />
-                    <p *ngIf="billingCountryError" class="text-xs text-amber-700 dark:text-amber-300">{{ billingCountryError }}</p>
-                  </label>
-                </div>
-              </div>
+	                  <label class="text-sm grid gap-1 sm:col-span-2">
+	                    {{ 'checkout.line1' | translate }}
+	                    <input
+	                      class="rounded-lg border bg-white px-3 py-2 text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                      [ngClass]="
+	                        billingLine1Ctrl.invalid && (billingLine1Ctrl.touched || checkoutForm.submitted)
+	                          ? 'border-rose-300 ring-2 ring-rose-200 dark:border-rose-900/40 dark:ring-rose-900/30'
+	                          : 'border-slate-200 dark:border-slate-700'
+	                      "
+	                      [attr.aria-invalid]="billingLine1Ctrl.invalid && (billingLine1Ctrl.touched || checkoutForm.submitted) ? 'true' : null"
+	                      aria-describedby="checkout-billing-line1-error"
+	                      name="billingLine1"
+	                      autocomplete="billing address-line1"
+	                      [(ngModel)]="billing.line1"
+	                      #billingLine1Ctrl="ngModel"
+	                      required
+	                    />
+	                    <span
+	                      *ngIf="billingLine1Ctrl.invalid && (billingLine1Ctrl.touched || checkoutForm.submitted)"
+	                      id="checkout-billing-line1-error"
+	                      class="text-xs font-normal text-rose-700 dark:text-rose-300"
+	                    >
+	                      {{ 'validation.required' | translate }}
+	                    </span>
+	                  </label>
+	                  <div class="grid gap-3 sm:grid-cols-3 sm:col-span-2">
+	                    <label class="text-sm grid gap-1">
+	                      {{ 'checkout.city' | translate }}
+	                      <input
+	                        class="rounded-lg border bg-white px-3 py-2 text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                        [ngClass]="
+	                          billingCityCtrl.invalid && (billingCityCtrl.touched || checkoutForm.submitted)
+	                            ? 'border-rose-300 ring-2 ring-rose-200 dark:border-rose-900/40 dark:ring-rose-900/30'
+	                            : 'border-slate-200 dark:border-slate-700'
+	                        "
+	                        [attr.aria-invalid]="billingCityCtrl.invalid && (billingCityCtrl.touched || checkoutForm.submitted) ? 'true' : null"
+	                        aria-describedby="checkout-billing-city-error"
+	                        name="billingCity"
+	                        autocomplete="billing address-level2"
+	                        [(ngModel)]="billing.city"
+	                        #billingCityCtrl="ngModel"
+	                        [attr.list]="billing.country === 'RO' ? 'roCities' : null"
+	                        required
+	                      />
+	                      <span
+	                        *ngIf="billingCityCtrl.invalid && (billingCityCtrl.touched || checkoutForm.submitted)"
+	                        id="checkout-billing-city-error"
+	                        class="text-xs font-normal text-rose-700 dark:text-rose-300"
+	                      >
+	                        {{ 'validation.required' | translate }}
+	                      </span>
+	                    </label>
+	                    <label class="text-sm grid gap-1">
+	                      {{ 'checkout.region' | translate }}
+	                      <input
+	                        class="rounded-lg border bg-white px-3 py-2 text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                        [ngClass]="
+	                          billingRegionCtrl.invalid && (billingRegionCtrl.touched || checkoutForm.submitted)
+	                            ? 'border-rose-300 ring-2 ring-rose-200 dark:border-rose-900/40 dark:ring-rose-900/30'
+	                            : 'border-slate-200 dark:border-slate-700'
+	                        "
+	                        [attr.aria-invalid]="billingRegionCtrl.invalid && (billingRegionCtrl.touched || checkoutForm.submitted) ? 'true' : null"
+	                        aria-describedby="checkout-billing-region-error"
+	                        name="billingRegion"
+	                        autocomplete="billing address-level1"
+	                        [(ngModel)]="billing.region"
+	                        #billingRegionCtrl="ngModel"
+	                        [attr.list]="billing.country === 'RO' ? 'roCounties' : null"
+	                        [required]="billing.country === 'RO'"
+	                      />
+	                      <span
+	                        *ngIf="billingRegionCtrl.invalid && (billingRegionCtrl.touched || checkoutForm.submitted)"
+	                        id="checkout-billing-region-error"
+	                        class="text-xs font-normal text-rose-700 dark:text-rose-300"
+	                      >
+	                        {{ 'validation.required' | translate }}
+	                      </span>
+	                    </label>
+	                    <label class="text-sm grid gap-1">
+	                      {{ 'checkout.postal' | translate }}
+	                      <input
+	                        class="rounded-lg border bg-white px-3 py-2 text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                        [ngClass]="
+	                          billingPostalCtrl.invalid && (billingPostalCtrl.touched || checkoutForm.submitted)
+	                            ? 'border-rose-300 ring-2 ring-rose-200 dark:border-rose-900/40 dark:ring-rose-900/30'
+	                            : 'border-slate-200 dark:border-slate-700'
+	                        "
+	                        [attr.aria-invalid]="billingPostalCtrl.invalid && (billingPostalCtrl.touched || checkoutForm.submitted) ? 'true' : null"
+	                        aria-describedby="checkout-billing-postal-error"
+	                        name="billingPostal"
+	                        autocomplete="billing postal-code"
+	                        [(ngModel)]="billing.postal"
+	                        #billingPostalCtrl="ngModel"
+	                        required
+	                      />
+	                      <span
+	                        *ngIf="billingPostalCtrl.invalid && (billingPostalCtrl.touched || checkoutForm.submitted)"
+	                        id="checkout-billing-postal-error"
+	                        class="text-xs font-normal text-rose-700 dark:text-rose-300"
+	                      >
+	                        {{ 'validation.required' | translate }}
+	                      </span>
+	                    </label>
+	                  </div>
+	                  <label class="text-sm grid gap-1 sm:col-span-2">
+	                    {{ 'checkout.country' | translate }}
+	                    <input
+	                      class="rounded-lg border bg-white px-3 py-2 text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                      [ngClass]="
+	                        billingCountryError || (billingCountryCtrl.invalid && (billingCountryCtrl.touched || checkoutForm.submitted))
+	                          ? 'border-rose-300 ring-2 ring-rose-200 dark:border-rose-900/40 dark:ring-rose-900/30'
+	                          : 'border-slate-200 dark:border-slate-700'
+	                      "
+	                      [attr.aria-invalid]="
+	                        billingCountryError || (billingCountryCtrl.invalid && (billingCountryCtrl.touched || checkoutForm.submitted)) ? 'true' : null
+	                      "
+	                      aria-describedby="checkout-billing-country-required checkout-billing-country-invalid"
+	                      name="billingCountryInput"
+	                      #billingCountryCtrl="ngModel"
+	                      autocomplete="billing country"
+	                      [attr.list]="'countryOptions'"
+	                      [(ngModel)]="billingCountryInput"
+	                      (ngModelChange)="billingCountryError = ''"
+	                      (blur)="normalizeBillingCountry()"
+	                      required
+	                    />
+	                    <span
+	                      *ngIf="billingCountryCtrl.invalid && (billingCountryCtrl.touched || checkoutForm.submitted)"
+	                      id="checkout-billing-country-required"
+	                      class="text-xs font-normal text-rose-700 dark:text-rose-300"
+	                    >
+	                      {{ 'validation.required' | translate }}
+	                    </span>
+	                    <span *ngIf="billingCountryError" id="checkout-billing-country-invalid" class="text-xs font-normal text-rose-700 dark:text-rose-300">{{
+	                      billingCountryError
+	                    }}</span>
+	                  </label>
+	                </div>
+	              </div>
               <datalist id="roCities">
                 <option *ngFor="let c of roCities" [value]="c"></option>
               </datalist>
@@ -625,19 +823,29 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
               <datalist id="countryOptions">
                 <option *ngFor="let c of countries" [value]="formatCountryOption(c)"></option>
               </datalist>
-	              <label class="flex items-center gap-2 text-sm">
-	                <input
-	                  type="checkbox"
-	                  [(ngModel)]="saveAddress"
-	                  name="saveAddress"
-	                  [disabled]="!auth.isAuthenticated() && guestCreateAccount"
-	                />
-	                {{ 'checkout.saveAddress' | translate }}
-	              </label>
-	              <p
-	                *ngIf="!auth.isAuthenticated() && guestCreateAccount"
-	                class="text-xs text-slate-500 dark:text-slate-400"
-	              >
+		              <label class="flex items-center gap-2 text-sm">
+		                <input
+		                  type="checkbox"
+		                  [(ngModel)]="saveAddress"
+		                  name="saveAddress"
+		                  [disabled]="!auth.isAuthenticated() && guestCreateAccount"
+		                />
+		                {{ 'checkout.saveAddress' | translate }}
+		              </label>
+		              <div *ngIf="auth.isAuthenticated() && saveAddress" class="grid gap-1 pl-6">
+		                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+		                  <input type="checkbox" [(ngModel)]="saveDefaultShipping" name="saveDefaultShipping" />
+		                  {{ 'addressForm.defaultShipping' | translate }}
+		                </label>
+		                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+		                  <input type="checkbox" [(ngModel)]="saveDefaultBilling" name="saveDefaultBilling" />
+		                  {{ 'addressForm.defaultBilling' | translate }}
+		                </label>
+		              </div>
+		              <p
+		                *ngIf="!auth.isAuthenticated() && guestCreateAccount"
+		                class="text-xs text-slate-500 dark:text-slate-400"
+		              >
 	                {{ 'checkout.saveAddressRequiredForAccount' | translate }}
 	              </p>
               <p *ngIf="addressError" class="text-sm text-amber-700 dark:text-amber-300">{{ addressError }}</p>
@@ -1099,6 +1307,8 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   pricesRefreshed = false;
   syncQueued = false;
   saveAddress = true;
+  saveDefaultShipping = true;
+  saveDefaultBilling = true;
   guestCreateAccount = false;
   guestUsername = '';
   guestPassword = '';
@@ -1227,21 +1437,58 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 
   step2Complete(): boolean {
     if (!this.address.name.trim()) return false;
-    if (!this.address.email.trim()) return false;
+    const email = (this.address.email || '').trim();
+    if (!email) return false;
+    if (!this.isValidEmail(email)) return false;
     if (!this.address.line1.trim()) return false;
     if (!this.address.city.trim()) return false;
     if (!this.address.postal.trim()) return false;
-    if (!this.address.country.trim()) return false;
-    if (this.auth.isAuthenticated()) {
-      return this.emailVerified();
+
+    const shippingCode = this.resolveCountryCode(this.shippingCountryInput);
+    if (!shippingCode) return false;
+    if (shippingCode === 'RO' && !(this.address.region || '').trim()) return false;
+    if (this.shippingCountryError) return false;
+
+    if (this.deliveryType === 'locker' && !this.locker) return false;
+
+    if (!this.billingSameAsShipping) {
+      if (!this.billing.line1.trim()) return false;
+      if (!this.billing.city.trim()) return false;
+      if (!this.billing.postal.trim()) return false;
+      const billingCode = this.resolveCountryCode(this.billingCountryInput);
+      if (!billingCode) return false;
+      if (billingCode === 'RO' && !(this.billing.region || '').trim()) return false;
+      if (this.billingCountryError) return false;
     }
+
+    if (this.auth.isAuthenticated()) return this.emailVerified();
     return this.guestEmailVerified;
   }
 
   step3Complete(): boolean {
-    if (this.deliveryType === 'locker') {
-      return !!this.locker;
-    }
+    return this.step2Complete();
+  }
+
+  copyShippingToBilling(): void {
+    if (this.billingSameAsShipping) return;
+    this.selectedBillingAddressId = '';
+    this.billing.line1 = this.address.line1;
+    this.billing.line2 = this.address.line2;
+    this.billing.city = this.address.city;
+    this.billing.region = this.address.region;
+    this.billing.postal = this.address.postal;
+    this.billing.country = this.address.country;
+    this.billingCountryInput = this.shippingCountryInput;
+    this.billingCountryError = '';
+  }
+
+  private isValidEmail(email: string): boolean {
+    const value = (email || '').trim();
+    if (!value || value.length > 255) return false;
+    const at = value.indexOf('@');
+    if (at <= 0 || at === value.length - 1) return false;
+    const domain = value.slice(at + 1);
+    if (!domain.includes('.')) return false;
     return true;
   }
 
@@ -2337,6 +2584,10 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       locker_lat: this.deliveryType === 'locker' ? this.locker?.lat ?? null : null,
       locker_lng: this.deliveryType === 'locker' ? this.locker?.lng ?? null : null,
     };
+    if (this.saveAddress) {
+      body['default_shipping'] = this.saveDefaultShipping;
+      body['default_billing'] = this.saveDefaultBilling;
+    }
     if (!this.billingSameAsShipping) {
       body['billing_line1'] = this.billing.line1;
       body['billing_line2'] = this.billing.line2 || null;

@@ -122,3 +122,5 @@ class CheckoutRequest(BaseModel):
     shipping_method_id: UUID | None = None
     promo_code: str | None = None
     save_address: bool = True
+    default_shipping: bool | None = None
+    default_billing: bool | None = None

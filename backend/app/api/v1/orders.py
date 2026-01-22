@@ -355,6 +355,12 @@ async def checkout(
     billing_same_as_shipping = not has_billing
 
     address_user_id = current_user.id if payload.save_address else None
+    default_shipping = bool(
+        payload.save_address and (payload.default_shipping if payload.default_shipping is not None else True)
+    )
+    default_billing = bool(
+        payload.save_address and (payload.default_billing if payload.default_billing is not None else True)
+    )
 
     shipping_addr = await address_service.create_address(
         session,
@@ -367,8 +373,8 @@ async def checkout(
             region=payload.region,
             postal_code=payload.postal_code,
             country=payload.country,
-            is_default_shipping=payload.save_address,
-            is_default_billing=bool(payload.save_address and billing_same_as_shipping),
+            is_default_shipping=default_shipping,
+            is_default_billing=bool(default_billing and billing_same_as_shipping),
         ),
     )
 
@@ -393,7 +399,7 @@ async def checkout(
                 postal_code=payload.billing_postal_code,
                 country=payload.billing_country,
                 is_default_shipping=False,
-                is_default_billing=payload.save_address,
+                is_default_billing=default_billing,
             ),
         )
 

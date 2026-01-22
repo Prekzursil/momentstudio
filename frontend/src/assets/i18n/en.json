@@ -1029,6 +1029,7 @@
     },
     "billingTitle": "Billing address",
     "billingSameAsShipping": "Same as shipping",
+    "copyFromShipping": "Copy from shipping",
     "step3": "Promo code",
     "promoPlaceholder": "Enter code",
     "apply": "Apply",

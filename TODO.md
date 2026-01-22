@@ -442,9 +442,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Checkout: improve Stripe return/cancel screens (clear status, retry CTA, support link).
 - [x] Checkout: improve PayPal return/cancel screens (clear status, retry CTA, support link).
 - [x] Checkout: show loader when payment method is “not ready” instead of a hard error.
-- [ ] Checkout: show inline field validation (per field) with `aria-describedby` and consistent styling.
-- [ ] Checkout: add “Copy from shipping” button for billing address when not “same as shipping”.
-- [ ] Checkout: add “Save as default shipping/billing” toggles when saving address (signed-in).
+- [x] Checkout: show inline field validation (per field) with `aria-describedby` and consistent styling.
+- [x] Checkout: add “Copy from shipping” button for billing address when not “same as shipping”.
+- [x] Checkout: add “Save as default shipping/billing” toggles when saving address (signed-in).
 - [ ] Checkout: expose courier price/ETA differences more clearly (radio cards).
 - [ ] Checkout: add phone field to shipping address if courier requires it (configurable).
 - [ ] Checkout: add optional invoice details (company name, VAT ID) under billing.
