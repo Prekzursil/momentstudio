@@ -22,6 +22,7 @@ import { RO_CITIES, RO_COUNTIES } from '../../shared/ro-geo';
 import { ModalComponent } from '../../shared/modal.component';
 import { parseMoney } from '../../shared/money';
 import { CheckoutPrefsService } from '../../core/checkout-prefs.service';
+import { ImgFallbackDirective } from '../../shared/img-fallback.directive';
 
 type CheckoutShippingAddress = {
   name: string;
@@ -88,6 +89,7 @@ type CheckoutSuccessSummary = {
 const CHECKOUT_SUCCESS_KEY = 'checkout_last_order';
 const CHECKOUT_PAYPAL_PENDING_KEY = 'checkout_paypal_pending';
 const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
+const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
 
 @Component({
   selector: 'app-checkout',
@@ -103,7 +105,8 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
 	    TranslateModule,
 	    LockerPickerComponent,
 	    ModalComponent,
-	    AddressFormComponent
+	    AddressFormComponent,
+	    ImgFallbackDirective
 	  ],
   template: `
       <app-container classes="py-10 grid gap-6">
@@ -651,26 +654,42 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
 	                    />
 	                    <app-button size="sm" [label]="'checkout.apply' | translate" (action)="applyPromo()"></app-button>
 	                  </div>
-	                  <p
-	                    class="text-sm"
-	                    [ngClass]="
-	                      promoStatus === 'success'
-	                        ? 'text-emerald-700 dark:text-emerald-300'
-	                        : promoStatus === 'warn'
-	                          ? 'text-amber-700 dark:text-amber-300'
-	                          : 'text-slate-700 dark:text-slate-300'
-	                    "
-	                    *ngIf="promoMessage"
-	                  >
-	                    {{ promoMessage }}
-	                  </p>
+		                  <p
+		                    class="text-sm"
+		                    [ngClass]="
+		                      promoStatus === 'success'
+		                        ? 'text-emerald-700 dark:text-emerald-300'
+		                        : promoStatus === 'warn'
+		                          ? 'text-amber-700 dark:text-amber-300'
+		                          : 'text-slate-700 dark:text-slate-300'
+		                    "
+		                    *ngIf="promoMessage"
+		                  >
+		                    {{ promoMessage }}
+		                  </p>
 
-	                  <div class="grid gap-2 pt-2">
-	                    <p *ngIf="couponEligibilityLoading" class="text-xs text-slate-500 dark:text-slate-400">
-	                      {{ 'checkout.couponsLoading' | translate }}
-	                    </p>
-	                    <p *ngIf="couponEligibilityError" class="text-xs text-amber-700 dark:text-amber-300">
-	                      {{ couponEligibilityError }}
+		                  <div class="grid gap-2 pt-2">
+		                    <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200">
+		                      <p class="font-semibold text-slate-800 dark:text-slate-100">{{ 'checkout.couponRulesTitle' | translate }}</p>
+		                      <ul class="list-disc pl-5 text-slate-600 dark:text-slate-300">
+		                        <li>{{ 'checkout.couponRulesSubtotal' | translate }}</li>
+		                        <li>{{ 'checkout.couponRulesOneCoupon' | translate }}</li>
+		                        <li>{{ 'checkout.couponRulesSaleItems' | translate }}</li>
+		                      </ul>
+		                      <label class="flex items-center gap-2 pt-1">
+		                        <input
+		                          type="checkbox"
+		                          [checked]="autoApplyBestCoupon"
+		                          (change)="setAutoApplyBestCouponPreference($any($event.target).checked)"
+		                        />
+		                        <span>{{ 'checkout.autoApplyBestCoupon' | translate }}</span>
+		                      </label>
+		                    </div>
+		                    <p *ngIf="couponEligibilityLoading" class="text-xs text-slate-500 dark:text-slate-400">
+		                      {{ 'checkout.couponsLoading' | translate }}
+		                    </p>
+		                    <p *ngIf="couponEligibilityError" class="text-xs text-amber-700 dark:text-amber-300">
+		                      {{ couponEligibilityError }}
 	                    </p>
 
 	                    <ng-container *ngIf="!couponEligibilityLoading && !couponEligibilityError && couponEligibility">
@@ -682,19 +701,35 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                             <p class="text-xs font-semibold text-indigo-900 dark:text-indigo-100">
                               {{ 'checkout.bestCouponTitle' | translate }}
                             </p>
-                            <div class="flex items-start justify-between gap-3">
-                              <div class="min-w-0">
-                                <p class="text-sm font-medium text-slate-900 dark:text-slate-50">
-                                  {{ suggestedCouponOffer.coupon.promotion?.name || suggestedCouponOffer.coupon.code }}
-                                </p>
-                                <p class="text-xs text-slate-700 dark:text-slate-200">
-                                  {{ describeCouponOffer(suggestedCouponOffer) }}
-                                </p>
-                              </div>
-                              <app-button
-                                size="sm"
-                                variant="ghost"
-                                [label]="'checkout.apply' | translate"
+		                            <div class="flex items-start justify-between gap-3">
+		                              <div class="min-w-0">
+		                                <p class="text-sm font-medium text-slate-900 dark:text-slate-50">
+		                                  {{ suggestedCouponOffer.coupon.promotion?.name || suggestedCouponOffer.coupon.code }}
+		                                </p>
+		                                <p class="text-xs text-slate-700 dark:text-slate-200">
+		                                  {{ describeCouponOffer(suggestedCouponOffer) }}
+		                                </p>
+		                                <div *ngIf="suggestedCouponOffer.coupon.promotion as promo" class="pt-1 flex flex-wrap gap-1">
+		                                  <span
+		                                    class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium"
+		                                    [ngClass]="
+		                                      promo.allow_on_sale_items
+		                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200'
+		                                        : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200'
+		                                    "
+		                                  >
+		                                    {{
+		                                      (promo.allow_on_sale_items
+		                                        ? 'checkout.couponStacksWithSales'
+		                                        : 'checkout.couponExcludesSaleItems') | translate
+		                                    }}
+		                                  </span>
+		                                </div>
+		                              </div>
+		                              <app-button
+		                                size="sm"
+		                                variant="ghost"
+		                                [label]="'checkout.apply' | translate"
                                 (action)="applyCouponOffer(suggestedCouponOffer)"
                               ></app-button>
                             </div>
@@ -707,17 +742,33 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
 	                            *ngFor="let offer of couponEligibility.eligible"
 	                            class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-950/30"
 	                          >
-	                            <div class="min-w-0">
-	                              <p class="text-sm font-medium text-slate-900 dark:text-slate-50">
-	                                {{ offer.coupon.promotion?.name || offer.coupon.code }}
-	                              </p>
-	                              <p class="text-xs text-slate-600 dark:text-slate-300">
-	                                {{ describeCouponOffer(offer) }}
-	                              </p>
-	                            </div>
-	                            <app-button
-	                              size="sm"
-	                              variant="ghost"
+		                            <div class="min-w-0">
+		                              <p class="text-sm font-medium text-slate-900 dark:text-slate-50">
+		                                {{ offer.coupon.promotion?.name || offer.coupon.code }}
+		                              </p>
+		                              <p class="text-xs text-slate-600 dark:text-slate-300">
+		                                {{ describeCouponOffer(offer) }}
+		                              </p>
+		                              <div *ngIf="offer.coupon.promotion as promo" class="pt-1 flex flex-wrap gap-1">
+		                                <span
+		                                  class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium"
+		                                  [ngClass]="
+		                                    promo.allow_on_sale_items
+		                                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200'
+		                                      : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200'
+		                                  "
+		                                >
+		                                  {{
+		                                    (promo.allow_on_sale_items
+		                                      ? 'checkout.couponStacksWithSales'
+		                                      : 'checkout.couponExcludesSaleItems') | translate
+		                                  }}
+		                                </span>
+		                              </div>
+		                            </div>
+		                            <app-button
+		                              size="sm"
+		                              variant="ghost"
 	                              [label]="'checkout.apply' | translate"
 	                              (action)="applyCouponOffer(offer)"
 	                            ></app-button>
@@ -734,17 +785,33 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
 	                            *ngFor="let offer of couponEligibility.ineligible"
 	                            class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
 	                          >
-	                            <div class="min-w-0">
-	                              <p class="text-sm font-medium text-slate-900 dark:text-slate-50">
-	                                {{ offer.coupon.promotion?.name || offer.coupon.code }}
-	                              </p>
-	                              <p class="text-xs text-slate-600 dark:text-slate-300">
-	                                {{ describeCouponOffer(offer) }}
-	                              </p>
-	                              <p *ngIf="offer.reasons?.length" class="text-xs text-amber-700 dark:text-amber-300 pt-1">
-	                                {{ describeCouponReasons(offer.reasons) }}
-	                              </p>
-                                  <ng-container *ngIf="minSubtotalShortfall(offer) as minInfo">
+		                            <div class="min-w-0">
+		                              <p class="text-sm font-medium text-slate-900 dark:text-slate-50">
+		                                {{ offer.coupon.promotion?.name || offer.coupon.code }}
+		                              </p>
+		                              <p class="text-xs text-slate-600 dark:text-slate-300">
+		                                {{ describeCouponOffer(offer) }}
+		                              </p>
+		                              <div *ngIf="offer.coupon.promotion as promo" class="pt-1 flex flex-wrap gap-1">
+		                                <span
+		                                  class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium"
+		                                  [ngClass]="
+		                                    promo.allow_on_sale_items
+		                                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200'
+		                                      : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200'
+		                                  "
+		                                >
+		                                  {{
+		                                    (promo.allow_on_sale_items
+		                                      ? 'checkout.couponStacksWithSales'
+		                                      : 'checkout.couponExcludesSaleItems') | translate
+		                                  }}
+		                                </span>
+		                              </div>
+		                              <p *ngIf="offer.reasons?.length" class="text-xs text-amber-700 dark:text-amber-300 pt-1">
+		                                {{ describeCouponReasons(offer.reasons) }}
+		                              </p>
+	                                  <ng-container *ngIf="minSubtotalShortfall(offer) as minInfo">
                                     <p class="text-xs text-slate-600 dark:text-slate-300 pt-1">
                                       {{
                                         'checkout.couponMinSubtotalRemaining'
@@ -880,17 +947,36 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
           </form>
         </section>
 
-        <aside class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
-          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'checkout.summary' | translate }}</h2>
-          <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
-            <div *ngFor="let item of items()">
-              <div class="flex justify-between">
-                <span>{{ item.name }} × {{ item.quantity }}</span>
-                <span>{{ item.price * item.quantity | localizedCurrency : item.currency }}</span>
-              </div>
-              <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'cart.inStock' | translate : { count: item.stock } }}</p>
-            </div>
-          </div>
+	        <aside class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+	          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'checkout.summary' | translate }}</h2>
+	          <div class="grid gap-3 text-sm text-slate-700 dark:text-slate-200">
+	            <div *ngFor="let item of items()" class="flex gap-3">
+	              <a class="shrink-0" [routerLink]="['/products', item.slug]">
+	                <img
+	                  class="h-12 w-12 rounded-xl object-cover border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+	                  [src]="item.image || 'assets/placeholder/product-placeholder.svg'"
+	                  [alt]="item.name"
+	                  [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
+	                />
+	              </a>
+	              <div class="min-w-0 flex-1">
+	                <div class="flex items-start justify-between gap-3">
+	                  <div class="min-w-0">
+	                    <a class="font-medium text-slate-900 hover:underline dark:text-slate-50" [routerLink]="['/products', item.slug]">
+	                      {{ item.name }}
+	                    </a>
+	                    <p class="text-xs text-slate-500 dark:text-slate-400">
+	                      {{ item.quantity }} × {{ item.price | localizedCurrency : item.currency }}
+	                    </p>
+	                  </div>
+	                  <span class="font-medium text-slate-900 dark:text-slate-50">
+	                    {{ item.price * item.quantity | localizedCurrency : item.currency }}
+	                  </span>
+	                </div>
+	                <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'cart.inStock' | translate : { count: item.stock } }}</p>
+	              </div>
+	            </div>
+	          </div>
           <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
             <span>{{ 'checkout.subtotal' | translate }}</span>
             <span>{{ quoteSubtotal() | localizedCurrency : currency }}</span>
@@ -910,10 +996,10 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
             <span>{{ 'checkout.shipping' | translate }}</span>
             <span>{{ quoteShipping() | localizedCurrency : currency }}</span>
           </div>
-          <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200" *ngIf="quotePromoSavings() > 0">
-            <span>{{ 'checkout.promo' | translate }}</span>
-            <span class="text-emerald-700 dark:text-emerald-300">-{{ quotePromoSavings() | localizedCurrency : currency }}</span>
-          </div>
+	          <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200" *ngIf="quotePromoSavings() > 0">
+	            <span>{{ 'checkout.discount' | translate }}</span>
+	            <span class="text-emerald-700 dark:text-emerald-300">{{ -quotePromoSavings() | localizedCurrency : currency }}</span>
+	          </div>
           <div class="border-t border-slate-200 pt-3 flex items-center justify-between text-base font-semibold text-slate-900 dark:border-slate-800 dark:text-slate-50">
             <span>{{ 'checkout.estimatedTotal' | translate }}</span>
             <span>{{ quoteTotal() | localizedCurrency : currency }}</span>
@@ -955,6 +1041,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   couponEligibilityError = '';
   appliedCouponOffer: CouponOffer | null = null;
   suggestedCouponOffer: CouponOffer | null = null;
+  autoApplyBestCoupon = false;
   private pendingPromoCode: string | null = null;
   countries: PhoneCountryOption[] = [];
   readonly roCounties = RO_COUNTIES;
@@ -1486,6 +1573,46 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     return Math.max(0, discount + this.couponShippingDiscount());
   }
 
+  setAutoApplyBestCouponPreference(enabled: boolean): void {
+    this.autoApplyBestCoupon = enabled;
+    this.persistAutoApplyBestCouponPreference(enabled);
+    if (enabled) {
+      this.maybeAutoApplyBestCoupon();
+    }
+  }
+
+  private loadAutoApplyBestCouponPreference(): boolean {
+    if (typeof localStorage === 'undefined') return false;
+    try {
+      const raw = localStorage.getItem(CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw) as unknown;
+      return parsed === true;
+    } catch {
+      return false;
+    }
+  }
+
+  private persistAutoApplyBestCouponPreference(enabled: boolean): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem(CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY, JSON.stringify(Boolean(enabled)));
+    } catch {
+      // ignore
+    }
+  }
+
+  private maybeAutoApplyBestCoupon(): void {
+    if (!this.autoApplyBestCoupon) return;
+    if (!this.auth.isAuthenticated()) return;
+    if (this.pendingPromoCode) return;
+    if (this.cartSyncPending()) return;
+    if ((this.promo || '').trim()) return;
+    if (!this.suggestedCouponOffer) return;
+    if (this.appliedCouponOffer) return;
+    this.applyCouponOffer(this.suggestedCouponOffer);
+  }
+
   applyCouponOffer(offer: CouponOffer): void {
     this.promo = offer.coupon.code;
     this.appliedCouponOffer = offer;
@@ -1631,9 +1758,9 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 	    this.applyPendingPromoCode();
 	  }
 
-	  private loadCouponsEligibility(): void {
-	    if (!this.auth.isAuthenticated()) {
-	      this.couponEligibility = null;
+  private loadCouponsEligibility(): void {
+    if (!this.auth.isAuthenticated()) {
+      this.couponEligibility = null;
       this.couponEligibilityError = '';
       this.couponEligibilityLoading = false;
       this.suggestedCouponOffer = null;
@@ -1651,11 +1778,13 @@ export class CheckoutComponent implements OnInit, OnDestroy {
         const current = (this.promo || '').trim().toUpperCase();
         if (!current) {
           this.appliedCouponOffer = null;
-          return;
+        } else {
+          const offers = [...(this.couponEligibility.eligible ?? []), ...(this.couponEligibility.ineligible ?? [])];
+          const match = offers.find((offer) => offer.coupon?.code?.toUpperCase() === current) ?? null;
+          this.appliedCouponOffer = match;
         }
-        const offers = [...(this.couponEligibility.eligible ?? []), ...(this.couponEligibility.ineligible ?? [])];
-        const match = offers.find((offer) => offer.coupon?.code?.toUpperCase() === current) ?? null;
-        this.appliedCouponOffer = match;
+
+        this.maybeAutoApplyBestCoupon();
       },
       error: (err) => {
         this.couponEligibilityLoading = false;
@@ -1953,6 +2082,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.autoApplyBestCoupon = this.loadAutoApplyBestCouponPreference();
     this.route.queryParamMap.subscribe((params) => {
       const promo = (params.get('promo') || '').trim();
       if (!promo) return;

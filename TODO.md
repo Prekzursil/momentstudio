@@ -432,11 +432,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Checkout: preselect default saved shipping/billing addresses and allow quick switch.
 - [x] Checkout: allow editing a selected saved address inline (opens modal) and re-apply it.
 - [x] Checkout: improve guest email verification UX (clearer errors, resend cooldown, avoid masking specific errors).
-- [ ] Checkout: show eligible + ineligible coupons with reasons and estimated savings.
-- [ ] Checkout: optionally auto-apply the best eligible coupon (toggleable).
-- [ ] Checkout: clearly show stacking rules (sale price + coupon) and why some coupons can’t be applied.
-- [ ] Checkout: order summary breakdown (subtotal, discount, shipping, VAT) with consistent formatting.
-- [ ] Checkout: include item thumbnails + per-line totals in the order summary.
+- [x] Checkout: show eligible + ineligible coupons with reasons and estimated savings.
+- [x] Checkout: optionally auto-apply the best eligible coupon (toggleable).
+- [x] Checkout: clearly show stacking rules (sale price + coupon) and why some coupons can’t be applied.
+- [x] Checkout: order summary breakdown (subtotal, discount, shipping, VAT) with consistent formatting.
+- [x] Checkout: include item thumbnails + per-line totals in the order summary.
 - [ ] Checkout: ensure guest “create account” preserves saved address + preferences on submit.
 - [ ] Checkout: add helper copy and links per payment method (Stripe/PayPal/COD/Netopia).
 - [ ] Checkout: improve Stripe return/cancel screens (clear status, retry CTA, support link).

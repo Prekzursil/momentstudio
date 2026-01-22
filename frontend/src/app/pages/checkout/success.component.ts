@@ -101,10 +101,10 @@ const CHECKOUT_SUCCESS_KEY = 'checkout_last_order';
             <span>{{ 'checkout.shipping' | translate }}</span>
             <span>{{ summary.totals.shipping | localizedCurrency : summary.totals.currency }}</span>
           </div>
-          <div class="flex items-center justify-between" *ngIf="summary.totals.discount > 0">
-            <span>{{ 'checkout.promo' | translate }}</span>
-            <span class="text-emerald-700 dark:text-emerald-300">-{{ summary.totals.discount | localizedCurrency : summary.totals.currency }}</span>
-          </div>
+	          <div class="flex items-center justify-between" *ngIf="summary.totals.discount > 0">
+	            <span>{{ 'checkout.discount' | translate }}</span>
+	            <span class="text-emerald-700 dark:text-emerald-300">{{ -summary.totals.discount | localizedCurrency : summary.totals.currency }}</span>
+	          </div>
           <div class="flex items-center justify-between text-base font-semibold text-slate-900 pt-1 dark:text-slate-50">
             <span>{{ 'checkout.estimatedTotal' | translate }}</span>
             <span>{{ summary.totals.total | localizedCurrency : summary.totals.currency }}</span>

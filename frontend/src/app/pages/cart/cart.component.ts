@@ -220,13 +220,13 @@ const SAVED_FOR_LATER_KEY = 'cart_saved_for_later';
               <span>{{ 'cart.shipping' | translate }}</span>
               <span>{{ quoteShipping() | localizedCurrency : currency }}</span>
             </div>
-            <div
-              class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200"
-              *ngIf="promoStatus === 'success' && quotePromoSavings() > 0"
-            >
-              <span>{{ 'checkout.promo' | translate }}</span>
-              <span class="text-emerald-700 dark:text-emerald-300">-{{ quotePromoSavings() | localizedCurrency : currency }}</span>
-            </div>
+	            <div
+	              class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200"
+	              *ngIf="promoStatus === 'success' && quotePromoSavings() > 0"
+	            >
+	              <span>{{ 'checkout.discount' | translate }}</span>
+	              <span class="text-emerald-700 dark:text-emerald-300">{{ -quotePromoSavings() | localizedCurrency : currency }}</span>
+	            </div>
 	            <div class="border-t border-slate-200 pt-3 flex items-center justify-between text-base font-semibold text-slate-900 dark:border-slate-800 dark:text-slate-50">
 	              <span>{{ 'cart.estimatedTotal' | translate }}</span>
 	              <span>{{ quoteTotal() | localizedCurrency : currency }}</span>
