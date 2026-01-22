@@ -268,35 +268,62 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
                       required
                     />
                   </label>
-                  <div class="grid gap-1 text-sm sm:col-span-2">
-                    <span class="font-medium text-slate-700 dark:text-slate-200">{{ 'auth.phone' | translate }}</span>
-                    <div class="grid grid-cols-[auto_1fr] gap-2">
-                      <select
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        name="guestPhoneCountry"
-                        [(ngModel)]="guestPhoneCountry"
-                        (ngModelChange)="onGuestPhoneChanged()"
-                        required
-                      >
-                        <option *ngFor="let c of phoneCountries" [value]="c.code">{{ c.flag }} {{ c.dial }} {{ c.name }}</option>
-                      </select>
-                      <input
-                        type="tel"
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                        name="guestPhoneNational"
-                        [(ngModel)]="guestPhoneNational"
-                        (ngModelChange)="onGuestPhoneChanged()"
-                        autocomplete="tel-national"
-                        required
-                        pattern="^[0-9]{6,14}$"
-                      />
-                    </div>
-                    <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'auth.phoneHint' | translate }}</span>
-                    <span *ngIf="guestPhoneNational && !guestPhoneE164()" class="text-xs text-amber-700 dark:text-amber-300">
-                      {{ 'validation.phoneInvalid' | translate }}
-                    </span>
-                  </div>
-                </div>
+	                  <div class="grid gap-1 text-sm sm:col-span-2">
+	                    <span class="font-medium text-slate-700 dark:text-slate-200">{{ 'auth.phone' | translate }}</span>
+	                    <div class="grid grid-cols-[auto_1fr] gap-2">
+	                      <select
+	                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                        name="guestPhoneCountry"
+	                        [(ngModel)]="guestPhoneCountry"
+	                        (ngModelChange)="onGuestPhoneChanged()"
+	                        required
+	                      >
+	                        <option *ngFor="let c of phoneCountries" [value]="c.code">{{ c.flag }} {{ c.dial }} {{ c.name }}</option>
+	                      </select>
+	                      <input
+	                        #guestPhoneCtrl="ngModel"
+	                        type="tel"
+	                        class="rounded-lg border bg-white px-3 py-2 text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                        [ngClass]="
+	                          (guestPhoneCtrl.invalid && (guestPhoneCtrl.touched || checkoutForm.submitted)) || (guestPhoneNational && !guestPhoneE164())
+	                            ? 'border-rose-300 ring-2 ring-rose-200 dark:border-rose-900/40 dark:ring-rose-900/30'
+	                            : 'border-slate-200 dark:border-slate-700'
+	                        "
+	                        [attr.aria-invalid]="
+	                          (guestPhoneCtrl.invalid && (guestPhoneCtrl.touched || checkoutForm.submitted)) || (guestPhoneNational && !guestPhoneE164())
+	                            ? 'true'
+	                            : null
+	                        "
+	                        aria-describedby="checkout-guest-phone-required checkout-guest-phone-invalid"
+	                        name="guestPhoneNational"
+	                        [(ngModel)]="guestPhoneNational"
+	                        (ngModelChange)="onGuestPhoneChanged()"
+	                        autocomplete="tel-national"
+	                        inputmode="numeric"
+	                        required
+	                        pattern="^[0-9]{6,14}$"
+	                      />
+	                    </div>
+	                    <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'auth.phoneHint' | translate }}</span>
+	                    <span
+	                      *ngIf="guestPhoneCtrl.invalid && guestPhoneCtrl.errors?.['required'] && (guestPhoneCtrl.touched || checkoutForm.submitted)"
+	                      id="checkout-guest-phone-required"
+	                      class="text-xs font-normal text-rose-700 dark:text-rose-300"
+	                    >
+	                      {{ 'validation.required' | translate }}
+	                    </span>
+	                    <span
+	                      *ngIf="
+	                        ((guestPhoneCtrl.invalid && !guestPhoneCtrl.errors?.['required']) && (guestPhoneCtrl.touched || checkoutForm.submitted)) ||
+	                        (guestPhoneNational && !guestPhoneE164())
+	                      "
+	                      id="checkout-guest-phone-invalid"
+	                      class="text-xs font-normal text-rose-700 dark:text-rose-300"
+	                    >
+	                      {{ 'validation.phoneInvalid' | translate }}
+	                    </span>
+	                  </div>
+	                </div>
                 <div class="flex justify-end">
                   <app-button
                     size="sm"
@@ -2536,7 +2563,7 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
 	      if (!this.guestPhoneE164()) {
 	        this.errorMessage = this.translate.instant('validation.phoneInvalid');
           this.announceAssertive(this.errorMessage);
-          this.focusGlobalError();
+          this.focusFirstInvalidField();
 	        return;
 	      }
 	    }
