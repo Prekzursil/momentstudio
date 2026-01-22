@@ -1081,6 +1081,7 @@ export class AccountState implements OnInit, OnDestroy {
       region: existing?.region || '',
       postal_code: existing?.postal_code || '',
       country: existing?.country || 'US',
+      phone: existing?.phone || null,
       label,
       is_default_shipping: existing?.is_default_shipping,
       is_default_billing: existing?.is_default_billing
@@ -1099,6 +1100,7 @@ export class AccountState implements OnInit, OnDestroy {
       region: existing?.region || '',
       postal_code: existing?.postal_code || '',
       country: existing?.country || 'US',
+      phone: existing?.phone || null,
       label,
       is_default_shipping: false,
       is_default_billing: false
@@ -2926,6 +2928,7 @@ export class AccountState implements OnInit, OnDestroy {
   }
 
   private normalizeAddressSnapshot(model: AddressCreateRequest): AddressCreateRequest {
+    const phoneRaw = typeof model.phone === 'string' ? model.phone.trim() : '';
     return {
       label: (model.label ?? '').trim(),
       line1: (model.line1 ?? '').trim(),
@@ -2934,6 +2937,7 @@ export class AccountState implements OnInit, OnDestroy {
       region: (model.region ?? '').trim(),
       postal_code: (model.postal_code ?? '').trim(),
       country: (model.country ?? '').trim(),
+      phone: phoneRaw || null,
       is_default_shipping: Boolean(model.is_default_shipping),
       is_default_billing: Boolean(model.is_default_billing)
     };
@@ -2950,6 +2954,7 @@ export class AccountState implements OnInit, OnDestroy {
       an.region === bn.region &&
       an.postal_code === bn.postal_code &&
       an.country === bn.country &&
+      (an.phone || '') === (bn.phone || '') &&
       Boolean(an.is_default_shipping) === Boolean(bn.is_default_shipping) &&
       Boolean(an.is_default_billing) === Boolean(bn.is_default_billing)
     );

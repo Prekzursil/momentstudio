@@ -7,6 +7,7 @@ import { parseMoney } from '../shared/money';
 export interface Address {
   id: string;
   label?: string | null;
+  phone?: string | null;
   line1: string;
   line2?: string | null;
   city: string;
@@ -34,6 +35,8 @@ export interface Order {
   status: string;
   cancel_reason?: string | null;
   payment_method?: string;
+  invoice_company?: string | null;
+  invoice_vat_id?: string | null;
   paypal_capture_id?: string | null;
   stripe_payment_intent_id?: string | null;
   payment_retry_count?: number;
@@ -96,6 +99,7 @@ export interface ReturnRequestRead {
 
 export interface AddressCreateRequest {
   label?: string | null;
+  phone?: string | null;
   line1: string;
   line2?: string | null;
   city: string;

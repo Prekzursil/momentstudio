@@ -110,9 +110,13 @@ def build_order_receipt(order, items: Sequence | None = None, *, redacted: bool 
     status_value = getattr(status_raw, "value", status_raw) or ""
     customer_email = (getattr(order, "customer_email", None) or "").strip() or None
     customer_name = (getattr(order, "customer_name", None) or "").strip() or None
+    invoice_company = (getattr(order, "invoice_company", None) or "").strip() or None
+    invoice_vat_id = (getattr(order, "invoice_vat_id", None) or "").strip() or None
     if redacted:
         customer_email = _mask_email(customer_email or "")
         customer_name = _mask_text(customer_name or "") if customer_name else None
+        invoice_company = None
+        invoice_vat_id = None
 
     return ReceiptRead(
         order_id=getattr(order, "id"),
@@ -128,6 +132,8 @@ def build_order_receipt(order, items: Sequence | None = None, *, redacted: bool 
         tracking_number=getattr(order, "tracking_number", None),
         customer_email=customer_email,
         customer_name=customer_name,
+        invoice_company=invoice_company,
+        invoice_vat_id=invoice_vat_id,
         pii_redacted=redacted,
         shipping_amount=_as_decimal(getattr(order, "shipping_amount", None)),
         tax_amount=_as_decimal(getattr(order, "tax_amount", None)),
@@ -276,6 +282,14 @@ def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None, *,
         )
         story.append(addr_table)
         story.append(Spacer(1, 10))
+
+    if receipt.invoice_company or receipt.invoice_vat_id:
+        story.append(Paragraph("Invoice / Factură", h2))
+        if receipt.invoice_company:
+            story.append(Paragraph(f"Company / Firmă: {xml_escape(receipt.invoice_company)}", base_style))
+        if receipt.invoice_vat_id:
+            story.append(Paragraph(f"VAT ID / CUI: {xml_escape(receipt.invoice_vat_id)}", base_style))
+        story.append(Spacer(1, 8))
 
     # Payment / delivery info
     info_lines: list[str] = []
@@ -548,6 +562,22 @@ def render_order_receipt_pdf_raster(order, items: Sequence | None = None, *, red
                 draw.text((x0 + 18, ay), line, fill=fg, font=small_font)
                 ay += 22
         y += box_h + 22
+
+    invoice_company = (getattr(order, "invoice_company", None) or "").strip()
+    invoice_vat_id = (getattr(order, "invoice_vat_id", None) or "").strip()
+    if redacted:
+        invoice_company = ""
+        invoice_vat_id = ""
+    if invoice_company or invoice_vat_id:
+        draw.text((margin, y), "Invoice / Factură", fill=fg, font=h_font)
+        y += 26
+        if invoice_company:
+            draw.text((margin, y), f"Company / Firmă: {invoice_company}", fill=fg, font=small_font)
+            y += 22
+        if invoice_vat_id:
+            draw.text((margin, y), f"VAT ID / CUI: {invoice_vat_id}", fill=fg, font=small_font)
+            y += 22
+        y += 10
 
     draw.text((margin, y), "Items / Produse", fill=fg, font=h_font)
     y += 26

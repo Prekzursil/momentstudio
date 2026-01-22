@@ -1749,6 +1749,7 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
     this.editSavedAddressId = addr.id;
     this.editSavedAddressModel = {
       label: addr.label ?? null,
+      phone: addr.phone ?? null,
       line1: addr.line1 || '',
       line2: addr.line2 ?? null,
       city: addr.city || '',
@@ -1807,6 +1808,12 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
     this.address.postal = addr.postal_code || '';
     this.address.country = (addr.country || '').trim().toUpperCase();
     this.shippingCountryInput = this.countryInputFromCode(this.address.country);
+    const savedPhone = (addr.phone || '').trim();
+    if (savedPhone) {
+      const split = splitE164(savedPhone);
+      if (split.country) this.shippingPhoneCountry = split.country;
+      this.shippingPhoneNational = split.nationalNumber;
+    }
     if (this.billingSameAsShipping) {
       this.billing.line1 = this.address.line1;
       this.billing.line2 = this.address.line2;

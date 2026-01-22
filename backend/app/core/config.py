@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     paypal_client_secret_live: str | None = None
     paypal_webhook_id_live: str | None = None
     netopia_enabled: bool = False
+    netopia_pos_signature: str | None = None
+    netopia_public_key_pem: str | None = None
+    netopia_public_key_path: str | None = None
+    netopia_jwt_alg: str = "RS512"
     jwt_algorithm: str = "HS256"
     access_token_exp_minutes: int = 30
     refresh_token_exp_days: int = 7

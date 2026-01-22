@@ -354,6 +354,22 @@ type OrderAction =
 	                <ng-template #noBilling>
 	                  <div class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.orders.noAddress' | translate }}</div>
 	                </ng-template>
+
+                  <div class="mt-3 border-t border-slate-200 pt-3 text-sm text-slate-700 dark:border-slate-800 dark:text-slate-200">
+                    <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.orders.invoiceTitle' | translate }}
+                    </div>
+                    <div class="mt-2 grid gap-1">
+                      <div>
+                        <span class="text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.invoiceCompany' | translate }}:</span>
+                        <span class="ml-1">{{ order()!.invoice_company || '—' }}</span>
+                      </div>
+                      <div>
+                        <span class="text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.invoiceVatId' | translate }}:</span>
+                        <span class="ml-1">{{ order()!.invoice_vat_id || '—' }}</span>
+                      </div>
+                    </div>
+                  </div>
 	              </div>
 	            </div>
 	          </section>

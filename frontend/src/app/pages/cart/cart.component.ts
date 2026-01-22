@@ -126,16 +126,17 @@ const SAVED_FOR_LATER_KEY = 'cart_saved_for_later';
 	                    >
 	                      {{ 'cart.moveToWishlist' | translate }}
 	                    </button>
-	                    <button
-	                      type="button"
-	                      class="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
-	                      [disabled]="savingForLater[item.id]"
-	                      (click)="remove(item.id)"
-	                    >
-	                      {{ 'cart.remove' | translate }}
-	                    </button>
-	                  </div>
-	                </div>
+		                    <button
+		                      type="button"
+		                      class="rounded text-sm text-slate-500 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:text-slate-400 dark:hover:text-slate-50"
+		                      [disabled]="savingForLater[item.id]"
+		                      (click)="remove(item.id)"
+		                      [attr.aria-label]="'cart.removeItem' | translate : { name: item.name }"
+		                    >
+		                      {{ 'cart.remove' | translate }}
+		                    </button>
+		                  </div>
+		                </div>
                 <div class="flex items-center gap-3 text-sm">
                   <div class="flex items-center gap-2">
                     <span class="text-slate-700 dark:text-slate-200">{{ 'cart.qty' | translate }}</span>
@@ -144,32 +145,33 @@ const SAVED_FOR_LATER_KEY = 'cart_saved_for_later';
                       [class.border-amber-300]="isMaxQuantity(item)"
                       [class.dark:border-amber-700]="isMaxQuantity(item)"
                     >
-                      <button
-                        type="button"
-                        class="px-2 py-1 text-slate-700 hover:text-slate-900 disabled:opacity-50 dark:text-slate-200 dark:hover:text-slate-50"
-                        [attr.aria-label]="'cart.decreaseQty' | translate"
-                        [disabled]="item.quantity <= 1"
-                        (click)="stepQuantity(item, -1)"
-                      >
-                        −
-                      </button>
-                      <input
-                        type="number"
-                        class="w-16 bg-transparent px-2 py-1 text-center text-slate-900 outline-none dark:text-slate-100"
-                        [value]="item.quantity"
-                        (change)="onQuantityChange(item.id, $any($event.target).value)"
-                        min="1"
-                        [max]="item.stock"
-                      />
-                      <button
-                        type="button"
-                        class="px-2 py-1 text-slate-700 hover:text-slate-900 disabled:opacity-50 dark:text-slate-200 dark:hover:text-slate-50"
-                        [attr.aria-label]="'cart.increaseQty' | translate"
-                        [disabled]="item.stock > 0 && item.quantity >= item.stock"
-                        (click)="stepQuantity(item, 1)"
-                      >
-                        +
-                      </button>
+	                      <button
+	                        type="button"
+	                        class="rounded px-2 py-1 text-slate-700 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-50 dark:text-slate-200 dark:hover:text-slate-50"
+	                        [attr.aria-label]="'cart.decreaseQtyItem' | translate : { name: item.name }"
+	                        [disabled]="item.quantity <= 1"
+	                        (click)="stepQuantity(item, -1)"
+	                      >
+	                        −
+	                      </button>
+	                      <input
+	                        type="number"
+	                        class="w-16 bg-transparent px-2 py-1 text-center text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:text-slate-100"
+	                        [value]="item.quantity"
+	                        [attr.aria-label]="'cart.quantityForItem' | translate : { name: item.name }"
+	                        (change)="onQuantityChange(item.id, $any($event.target).value)"
+	                        min="1"
+	                        [max]="item.stock"
+	                      />
+	                      <button
+	                        type="button"
+	                        class="rounded px-2 py-1 text-slate-700 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-50 dark:text-slate-200 dark:hover:text-slate-50"
+	                        [attr.aria-label]="'cart.increaseQtyItem' | translate : { name: item.name }"
+	                        [disabled]="item.stock > 0 && item.quantity >= item.stock"
+	                        (click)="stepQuantity(item, 1)"
+	                      >
+	                        +
+	                      </button>
                     </div>
                   </div>
                   <span class="text-slate-600 dark:text-slate-300">

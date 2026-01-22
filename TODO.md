@@ -160,7 +160,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Payments: add PayPal webhooks to capture/settle orders even if the buyer never returns to the site.
 - [x] Payments: itemize Stripe Checkout line items (products + shipping + discount) instead of a single aggregated line.
 - [x] Payments: map internal promo codes to reusable Stripe coupons/promotion codes (avoid per-checkout coupon creation).
-- [ ] Payments: implement Netopia callback/webhook settlement + signature verification once enabled.
+- [x] Payments: implement Netopia callback/webhook settlement + signature verification once enabled.
 - [x] Money: migrate monetary fields to Decimal end-to-end (models + schemas + calculations), eliminating float casts.
 - [x] Tax: make tax/VAT strategy configurable (rate, exemptions) instead of hard-coded `0.1`.
 - [x] Receipts: add Share/Revoke actions in Account + Admin UI (copy link, show expiry, revoke token).
@@ -451,9 +451,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Payments UX: hide/disable payment methods that are not available for current cart/currency/country.
 - [x] Payments UX: remember last-used payment method and default to it on next checkout.
 - [x] Payments UX: prevent double-submits and show progress on “Place order” (incl. network retries).
-- [ ] Checkout: allow saving/editing phone on saved addresses and prefill it in checkout.
-- [ ] Receipts/Admin: show invoice details (company/VAT) on order detail + receipt PDF (redact in share links).
-- [ ] A11y: add aria-labels for cart remove/quantity controls and ensure full keyboard support.
+- [x] Checkout: allow saving/editing phone on saved addresses and prefill it in checkout.
+- [x] Receipts/Admin: show invoice details (company/VAT) on order detail + receipt PDF (redact in share links).
+- [x] A11y: add aria-labels for cart remove/quantity controls and ensure full keyboard support.
 - [ ] A11y: announce validation errors via `aria-live` on checkout and move focus to first error.
 - [ ] A11y: ensure focus management when steps change or modals open/close.
 - [ ] Performance: split the monolithic `CheckoutComponent` into smaller components (shipping/promo/payment).

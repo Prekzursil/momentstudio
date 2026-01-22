@@ -5,7 +5,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AddressCreateRequest } from '../core/account.service';
 import { appConfig } from '../core/app-config';
 import { ButtonComponent } from './button.component';
-import { listPhoneCountries, PhoneCountryOption } from './phone';
+import { buildE164, listPhoneCountries, PhoneCountryOption, splitE164 } from './phone';
 import { RO_CITIES, RO_COUNTIES } from './ro-geo';
 
 @Component({
@@ -67,6 +67,48 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
             maxlength="50"
           />
         </div>
+      </div>
+
+      <div class="grid gap-1 text-sm">
+        <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'auth.phone' | translate }}</label>
+        <div class="grid grid-cols-[auto_1fr] gap-2">
+          <select
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            name="phoneCountry"
+            [(ngModel)]="phoneCountry"
+            (ngModelChange)="onPhoneChanged()"
+          >
+            <option *ngFor="let c of countries" [value]="c.code">{{ c.flag }} {{ c.dial }} {{ c.name }}</option>
+          </select>
+          <input
+            #phoneCtrl="ngModel"
+            type="tel"
+            class="rounded-lg border bg-white px-3 py-2 text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+            [ngClass]="
+              (phoneCtrl.invalid && (phoneCtrl.touched || addrForm.submitted)) || (phoneNational && !phoneE164())
+                ? 'border-rose-300 ring-2 ring-rose-200 dark:border-rose-900/40 dark:ring-rose-900/30'
+                : 'border-slate-200 dark:border-slate-700'
+            "
+            [attr.aria-invalid]="
+              (phoneCtrl.invalid && (phoneCtrl.touched || addrForm.submitted)) || (phoneNational && !phoneE164()) ? 'true' : null
+            "
+            aria-describedby="address-phone-invalid"
+            name="phoneNational"
+            [(ngModel)]="phoneNational"
+            (ngModelChange)="onPhoneChanged()"
+            autocomplete="tel-national"
+            inputmode="numeric"
+            pattern="^[0-9]{6,14}$"
+          />
+        </div>
+        <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'auth.phoneHint' | translate }}</span>
+        <span
+          *ngIf="phoneNational && !phoneE164()"
+          id="address-phone-invalid"
+          class="text-xs font-normal text-rose-700 dark:text-rose-300"
+        >
+          {{ 'validation.phoneInvalid' | translate }}
+        </span>
       </div>
       <div class="grid gap-1 text-sm">
         <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'addressForm.line1' | translate }} <span class="text-rose-600">*</span></label>
@@ -219,6 +261,8 @@ export class AddressFormComponent implements OnChanges, OnDestroy {
   private autocompleteAbort: AbortController | null = null;
   labelPreset: 'home' | 'work' | 'other' | 'custom' = 'home';
   labelCustom = '';
+  phoneCountry = 'RO';
+  phoneNational = '';
   @Output() save = new EventEmitter<AddressCreateRequest>();
   @Output() cancel = new EventEmitter<void>();
 
@@ -229,6 +273,7 @@ export class AddressFormComponent implements OnChanges, OnDestroy {
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['model']) {
       this.syncLabelState();
+      this.syncPhoneState();
     }
   }
 
@@ -239,6 +284,20 @@ export class AddressFormComponent implements OnChanges, OnDestroy {
     }
     this.autocompleteAbort?.abort();
     this.autocompleteAbort = null;
+  }
+
+  phoneE164(): string | null {
+    const country = (this.phoneCountry || 'RO') as any;
+    return buildE164(country, this.phoneNational);
+  }
+
+  onPhoneChanged(): void {
+    const digits = (this.phoneNational || '').trim();
+    if (!digits) {
+      this.model.phone = null;
+      return;
+    }
+    this.model.phone = this.phoneE164();
   }
 
   get postalExample(): string {
@@ -252,6 +311,18 @@ export class AddressFormComponent implements OnChanges, OnDestroy {
         DE: '12345'
       }[country] || '12345'
     );
+  }
+
+  private syncPhoneState(): void {
+    const raw = typeof this.model?.phone === 'string' ? this.model.phone.trim() : '';
+    if (!raw) {
+      this.phoneCountry = 'RO';
+      this.phoneNational = '';
+      return;
+    }
+    const split = splitE164(raw);
+    if (split.country) this.phoneCountry = split.country;
+    this.phoneNational = split.nationalNumber || '';
   }
 
   get postalPattern(): string | null {
@@ -398,7 +469,7 @@ export class AddressFormComponent implements OnChanges, OnDestroy {
   }
 
   submit(form: NgForm): void {
-    if (form.valid) {
+    if (form.valid && !(this.phoneNational && !this.phoneE164())) {
       this.save.emit(this.model);
     }
   }
