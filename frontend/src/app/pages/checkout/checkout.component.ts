@@ -156,11 +156,16 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
 	                <div class="flex items-center justify-between gap-3">
 	                  <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step1' | translate }}</p>
 	                  <span *ngIf="step1Complete()" class="text-xs font-semibold text-emerald-700 dark:text-emerald-300">✓</span>
-	                </div>
-	                <label class="flex items-center gap-2 text-sm">
-	                  <input type="checkbox" [(ngModel)]="guestCreateAccount" name="guestCreateAccount" />
-	                  {{ 'checkout.createAccount' | translate }}
-	                </label>
+		                </div>
+		                <label class="flex items-center gap-2 text-sm">
+		                  <input
+		                    type="checkbox"
+		                    [(ngModel)]="guestCreateAccount"
+		                    name="guestCreateAccount"
+		                    (ngModelChange)="onGuestCreateAccountChanged($event)"
+		                  />
+		                  {{ 'checkout.createAccount' | translate }}
+		                </label>
                 <div *ngIf="guestCreateAccount" class="grid sm:grid-cols-2 gap-3">
                   <label class="text-sm grid gap-1">
                     {{ 'auth.username' | translate }}
@@ -620,10 +625,21 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
               <datalist id="countryOptions">
                 <option *ngFor="let c of countries" [value]="formatCountryOption(c)"></option>
               </datalist>
-              <label class="flex items-center gap-2 text-sm">
-                <input type="checkbox" [(ngModel)]="saveAddress" name="saveAddress" />
-                {{ 'checkout.saveAddress' | translate }}
-              </label>
+	              <label class="flex items-center gap-2 text-sm">
+	                <input
+	                  type="checkbox"
+	                  [(ngModel)]="saveAddress"
+	                  name="saveAddress"
+	                  [disabled]="!auth.isAuthenticated() && guestCreateAccount"
+	                />
+	                {{ 'checkout.saveAddress' | translate }}
+	              </label>
+	              <p
+	                *ngIf="!auth.isAuthenticated() && guestCreateAccount"
+	                class="text-xs text-slate-500 dark:text-slate-400"
+	              >
+	                {{ 'checkout.saveAddressRequiredForAccount' | translate }}
+	              </p>
               <p *ngIf="addressError" class="text-sm text-amber-700 dark:text-amber-300">{{ addressError }}</p>
               <div class="flex justify-end">
                 <app-button
@@ -925,20 +941,32 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
                   <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#635BFF] text-xs font-bold text-white">S</span>
                   <span>{{ 'checkout.paymentStripe' | translate }}</span>
                 </button>
-              </div>
-              <p class="text-xs text-slate-600 dark:text-slate-300" *ngIf="paymentMethod === 'cod'">
-                {{ 'checkout.paymentCashHint' | translate }}
-              </p>
-              <p class="text-xs text-slate-600 dark:text-slate-300" *ngIf="paymentMethod === 'netopia'">
-                {{ netopiaEnabled ? ('checkout.paymentNetopiaHint' | translate) : ('checkout.paymentNetopiaDisabled' | translate) }}
-              </p>
-              <p class="text-xs text-slate-600 dark:text-slate-300" *ngIf="paymentMethod === 'paypal'">
-                {{ 'checkout.paymentPayPalHint' | translate }}
-              </p>
-              <p class="text-xs text-slate-600 dark:text-slate-300" *ngIf="paymentMethod === 'stripe'">
-                {{ 'checkout.paymentStripeHint' | translate }}
-              </p>
-            </div>
+	              </div>
+	              <p class="text-xs text-slate-600 dark:text-slate-300" *ngIf="paymentMethod === 'cod'">
+	                <span>{{ 'checkout.paymentCashHint' | translate }}</span>
+	                <a class="ml-1 underline text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200" routerLink="/contact">
+	                  {{ 'checkout.paymentHelpLink' | translate }}
+	                </a>
+	              </p>
+	              <p class="text-xs text-slate-600 dark:text-slate-300" *ngIf="paymentMethod === 'netopia'">
+	                <span>{{ netopiaEnabled ? ('checkout.paymentNetopiaHint' | translate) : ('checkout.paymentNetopiaDisabled' | translate) }}</span>
+	                <a class="ml-1 underline text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200" routerLink="/contact">
+	                  {{ 'checkout.paymentHelpLink' | translate }}
+	                </a>
+	              </p>
+	              <p class="text-xs text-slate-600 dark:text-slate-300" *ngIf="paymentMethod === 'paypal'">
+	                <span>{{ 'checkout.paymentPayPalHint' | translate }}</span>
+	                <a class="ml-1 underline text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200" routerLink="/contact">
+	                  {{ 'checkout.paymentHelpLink' | translate }}
+	                </a>
+	              </p>
+	              <p class="text-xs text-slate-600 dark:text-slate-300" *ngIf="paymentMethod === 'stripe'">
+	                <span>{{ 'checkout.paymentStripeHint' | translate }}</span>
+	                <a class="ml-1 underline text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200" routerLink="/contact">
+	                  {{ 'checkout.paymentHelpLink' | translate }}
+	                </a>
+	              </p>
+	            </div>
 
             <div class="flex gap-3">
               <app-button [label]="'checkout.placeOrder' | translate" type="submit" [disabled]="placing || cartSyncPending()"></app-button>
@@ -1527,6 +1555,11 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       this.lastGuestEmailRequested = null;
       this.clearGuestResendCooldown();
     }
+  }
+
+  onGuestCreateAccountChanged(enabled: boolean): void {
+    if (!enabled) return;
+    this.saveAddress = true;
   }
 
   toggleGuestPassword(): void {

@@ -437,8 +437,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Checkout: clearly show stacking rules (sale price + coupon) and why some coupons can’t be applied.
 - [x] Checkout: order summary breakdown (subtotal, discount, shipping, VAT) with consistent formatting.
 - [x] Checkout: include item thumbnails + per-line totals in the order summary.
-- [ ] Checkout: ensure guest “create account” preserves saved address + preferences on submit.
-- [ ] Checkout: add helper copy and links per payment method (Stripe/PayPal/COD/Netopia).
+- [x] Checkout: ensure guest “create account” preserves saved address + preferences on submit.
+- [x] Checkout: add helper copy and links per payment method (Stripe/PayPal/COD/Netopia).
 - [ ] Checkout: improve Stripe return/cancel screens (clear status, retry CTA, support link).
 - [ ] Checkout: improve PayPal return/cancel screens (clear status, retry CTA, support link).
 - [ ] Checkout: show loader when payment method is “not ready” instead of a hard error.
