@@ -960,15 +960,19 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
 	                  {{ 'checkout.paymentHelpLink' | translate }}
 	                </a>
 	              </p>
-	              <p class="text-xs text-slate-600 dark:text-slate-300" *ngIf="paymentMethod === 'stripe'">
-	                <span>{{ 'checkout.paymentStripeHint' | translate }}</span>
-	                <a class="ml-1 underline text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200" routerLink="/contact">
-	                  {{ 'checkout.paymentHelpLink' | translate }}
-	                </a>
-	              </p>
-	            </div>
+		              <p class="text-xs text-slate-600 dark:text-slate-300" *ngIf="paymentMethod === 'stripe'">
+		                <span>{{ 'checkout.paymentStripeHint' | translate }}</span>
+		                <a class="ml-1 underline text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200" routerLink="/contact">
+		                  {{ 'checkout.paymentHelpLink' | translate }}
+		                </a>
+		              </p>
+		              <div *ngIf="paymentNotReady" class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+		                <span class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-indigo-600 dark:border-slate-700 dark:border-t-indigo-300"></span>
+		                <span>{{ 'checkout.paymentNotReady' | translate }}</span>
+		              </div>
+		            </div>
 
-            <div class="flex gap-3">
+	            <div class="flex gap-3">
               <app-button [label]="'checkout.placeOrder' | translate" type="submit" [disabled]="placing || cartSyncPending()"></app-button>
               <app-button variant="ghost" [label]="'checkout.backToCart' | translate" routerLink="/cart"></app-button>
             </div>
@@ -1145,12 +1149,14 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     country: ''
   };
 
-  syncing = false;
-  placing = false;
-  paymentMethod: CheckoutPaymentMethod = 'cod';
-  paypalEnabled = Boolean(appConfig.paypalEnabled);
-  netopiaEnabled = Boolean(appConfig.netopiaEnabled);
-  private syncDebounceHandle: ReturnType<typeof setTimeout> | null = null;
+	  syncing = false;
+	  placing = false;
+	  paymentNotReady = false;
+	  private paymentNotReadyTimer: ReturnType<typeof setTimeout> | null = null;
+	  paymentMethod: CheckoutPaymentMethod = 'cod';
+	  paypalEnabled = Boolean(appConfig.paypalEnabled);
+	  netopiaEnabled = Boolean(appConfig.netopiaEnabled);
+	  private syncDebounceHandle: ReturnType<typeof setTimeout> | null = null;
   private queuedSyncItems: CartItem[] | null = null;
   private checkoutRedirectedToCart = false;
 
@@ -1956,16 +1962,18 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 	      this.queueCartSync(this.items(), { immediate: true });
 	      return;
 	    }
-	    this.errorMessage = '';
-	    this.syncNotice = '';
-	    if (this.paymentMethod === 'paypal' && !this.paypalEnabled) {
-	      this.errorMessage = this.translate.instant('checkout.paymentNotReady');
+		    this.errorMessage = '';
+		    this.syncNotice = '';
+		    if (this.paymentMethod === 'paypal' && !this.paypalEnabled) {
+		      this.showPaymentNotReady();
+		      this.scrollToStep('checkout-step-4');
+		      return;
+		    }
+	    if (this.paymentMethod === 'netopia' && !this.netopiaEnabled) {
+	      this.showPaymentNotReady();
+	      this.scrollToStep('checkout-step-4');
 	      return;
 	    }
-    if (this.paymentMethod === 'netopia' && !this.netopiaEnabled) {
-      this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-      return;
-    }
     this.placing = true;
     if (this.auth.isAuthenticated()) {
       this.submitCheckout();
@@ -2137,37 +2145,54 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     this.loadGuestEmailVerificationStatus();
   }
 
-  ngOnDestroy(): void {
-    if (this.syncDebounceHandle) {
-      clearTimeout(this.syncDebounceHandle);
-      this.syncDebounceHandle = null;
-    }
-    if (this.guestResendTimer) {
-      clearInterval(this.guestResendTimer);
-      this.guestResendTimer = null;
-    }
-  }
+	  ngOnDestroy(): void {
+	    if (this.syncDebounceHandle) {
+	      clearTimeout(this.syncDebounceHandle);
+	      this.syncDebounceHandle = null;
+	    }
+	    if (this.guestResendTimer) {
+	      clearInterval(this.guestResendTimer);
+	      this.guestResendTimer = null;
+	    }
+	    if (this.paymentNotReadyTimer) {
+	      clearTimeout(this.paymentNotReadyTimer);
+	      this.paymentNotReadyTimer = null;
+	    }
+	  }
 
-  setPaymentMethod(method: CheckoutPaymentMethod): void {
-    if (method === 'paypal' && !this.paypalEnabled) {
-      this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-      return;
-    }
-    if (method === 'netopia' && !this.netopiaEnabled) {
-      this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-      return;
-    }
-    this.paymentMethod = method;
-    this.errorMessage = '';
-  }
+	  setPaymentMethod(method: CheckoutPaymentMethod): void {
+	    if (method === 'paypal' && !this.paypalEnabled) {
+	      this.showPaymentNotReady();
+	      return;
+	    }
+	    if (method === 'netopia' && !this.netopiaEnabled) {
+	      this.showPaymentNotReady();
+	      return;
+	    }
+	    this.paymentMethod = method;
+	    this.errorMessage = '';
+	    this.paymentNotReady = false;
+	  }
 
-  private defaultPaymentMethod(): CheckoutPaymentMethod {
-    return 'cod';
-  }
+	  private defaultPaymentMethod(): CheckoutPaymentMethod {
+	    return 'cod';
+	  }
 
-  private syncBackendCart(items: CartItem[]): void {
-    this.syncing = true;
-    this.pricesRefreshed = false;
+	  private showPaymentNotReady(): void {
+	    this.errorMessage = '';
+	    this.paymentNotReady = true;
+	    if (this.paymentNotReadyTimer) {
+	      clearTimeout(this.paymentNotReadyTimer);
+	    }
+	    this.paymentNotReadyTimer = setTimeout(() => {
+	      this.paymentNotReady = false;
+	      this.paymentNotReadyTimer = null;
+	    }, 6_000);
+	  }
+
+	  private syncBackendCart(items: CartItem[]): void {
+	    this.syncing = true;
+	    this.pricesRefreshed = false;
     this.cartApi
       .sync(
         items.map((i) => ({

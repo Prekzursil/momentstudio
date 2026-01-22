@@ -439,9 +439,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Checkout: include item thumbnails + per-line totals in the order summary.
 - [x] Checkout: ensure guest “create account” preserves saved address + preferences on submit.
 - [x] Checkout: add helper copy and links per payment method (Stripe/PayPal/COD/Netopia).
-- [ ] Checkout: improve Stripe return/cancel screens (clear status, retry CTA, support link).
-- [ ] Checkout: improve PayPal return/cancel screens (clear status, retry CTA, support link).
-- [ ] Checkout: show loader when payment method is “not ready” instead of a hard error.
+- [x] Checkout: improve Stripe return/cancel screens (clear status, retry CTA, support link).
+- [x] Checkout: improve PayPal return/cancel screens (clear status, retry CTA, support link).
+- [x] Checkout: show loader when payment method is “not ready” instead of a hard error.
 - [ ] Checkout: show inline field validation (per field) with `aria-describedby` and consistent styling.
 - [ ] Checkout: add “Copy from shipping” button for billing address when not “same as shipping”.
 - [ ] Checkout: add “Save as default shipping/billing” toggles when saving address (signed-in).

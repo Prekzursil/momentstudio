@@ -19,17 +19,18 @@ const CHECKOUT_PAYPAL_PENDING_KEY = 'checkout_paypal_pending';
         class="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
       >
         <p class="text-sm font-semibold tracking-[0.2em] uppercase">{{ 'checkout.paypalReturnTitle' | translate }}</p>
-        <h1 class="mt-3 text-xl font-semibold text-amber-900 dark:text-amber-100">
-          {{ 'checkout.paypalCancelled' | translate }}
-        </h1>
-        <p class="mt-2 text-sm text-amber-800 dark:text-amber-200">{{ 'checkout.paypalCancelledCopy' | translate }}</p>
-        <div class="mt-5 flex flex-wrap gap-3">
-          <app-button routerLink="/checkout" [label]="'checkout.backToCheckout' | translate"></app-button>
-          <app-button routerLink="/cart" variant="ghost" [label]="'checkout.backToCart' | translate"></app-button>
-        </div>
-      </div>
-    </app-container>
-  `
+	        <h1 class="mt-3 text-xl font-semibold text-amber-900 dark:text-amber-100">
+	          {{ 'checkout.paypalCancelled' | translate }}
+	        </h1>
+	        <p class="mt-2 text-sm text-amber-800 dark:text-amber-200">{{ 'checkout.paypalCancelledCopy' | translate }}</p>
+	        <div class="mt-5 flex flex-wrap gap-3">
+	          <app-button routerLink="/checkout" [label]="'checkout.backToCheckout' | translate"></app-button>
+	          <app-button routerLink="/cart" variant="ghost" [label]="'checkout.backToCart' | translate"></app-button>
+	          <app-button routerLink="/contact" variant="ghost" [label]="'nav.contact' | translate"></app-button>
+	        </div>
+	      </div>
+	    </app-container>
+	  `
 })
 export class PayPalCancelComponent {
   crumbs = [
