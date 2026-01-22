@@ -9,15 +9,17 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { CartStore, CartItem } from '../../core/cart.store';
 import { CartApi, CartResponse } from '../../core/cart.api';
 import { ApiService } from '../../core/api.service';
-import { AccountService, Address } from '../../core/account.service';
+import { AccountService, Address, AddressCreateRequest } from '../../core/account.service';
 import { CouponsService, type CouponEligibilityResponse, type CouponOffer } from '../../core/coupons.service';
 import { appConfig } from '../../core/app-config';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthService } from '../../core/auth.service';
 import { buildE164, listPhoneCountries, PhoneCountryOption } from '../../shared/phone';
 import { LockerPickerComponent } from '../../shared/locker-picker.component';
+import { AddressFormComponent } from '../../shared/address-form.component';
 import { LockerProvider, LockerRead } from '../../core/shipping.service';
 import { RO_CITIES, RO_COUNTIES } from '../../shared/ro-geo';
+import { ModalComponent } from '../../shared/modal.component';
 import { parseMoney } from '../../shared/money';
 import { CheckoutPrefsService } from '../../core/checkout-prefs.service';
 
@@ -90,27 +92,38 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
 @Component({
   selector: 'app-checkout',
   standalone: true,
-  imports: [
-    CommonModule,
-    FormsModule,
-    RouterLink,
-    ContainerComponent,
-    ButtonComponent,
-    BreadcrumbComponent,
-    LocalizedCurrencyPipe,
-    TranslateModule,
-    LockerPickerComponent
-  ],
+	  imports: [
+	    CommonModule,
+	    FormsModule,
+	    RouterLink,
+	    ContainerComponent,
+	    ButtonComponent,
+	    BreadcrumbComponent,
+	    LocalizedCurrencyPipe,
+	    TranslateModule,
+	    LockerPickerComponent,
+	    ModalComponent,
+	    AddressFormComponent
+	  ],
   template: `
       <app-container classes="py-10 grid gap-6">
         <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-        <div class="grid lg:grid-cols-[2fr_1fr] gap-6 items-start">
-          <section class="grid gap-4">
-            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'checkout.title' | translate }}</h1>
-            <div
-              *ngIf="errorMessage"
-            class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex items-start justify-between gap-3 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
-            >
+	        <div class="grid lg:grid-cols-[2fr_1fr] gap-6 items-start">
+	          <section class="grid gap-4">
+	            <div class="flex items-center justify-between gap-3">
+	              <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'checkout.title' | translate }}</h1>
+	              <span *ngIf="cartSyncPending()" class="text-xs text-slate-500 dark:text-slate-400">{{ 'checkout.syncing' | translate }}</span>
+	            </div>
+	            <div
+	              *ngIf="syncNotice"
+	              class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+	            >
+	              {{ syncNotice }}
+	            </div>
+	            <div
+	              *ngIf="errorMessage"
+	            class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex items-start justify-between gap-3 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+	            >
               <span>{{ errorMessage }}</span>
               <app-button size="sm" variant="ghost" [label]="'checkout.retry' | translate" (action)="retryValidation()"></app-button>
             </div>
@@ -131,16 +144,20 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
               <span>{{ 'auth.emailVerificationNeeded' | translate }}</span>
               <app-button size="sm" variant="ghost" [label]="'auth.emailVerificationConfirm' | translate" routerLink="/account"></app-button>
             </div>
-            <form #checkoutForm="ngForm" class="grid gap-4" (ngSubmit)="placeOrder(checkoutForm)">
-              <div
-                *ngIf="!auth.isAuthenticated()"
-                class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-              >
-                <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step1' | translate }}</p>
-                <label class="flex items-center gap-2 text-sm">
-                  <input type="checkbox" [(ngModel)]="guestCreateAccount" name="guestCreateAccount" />
-                  {{ 'checkout.createAccount' | translate }}
-                </label>
+	            <form #checkoutForm="ngForm" class="grid gap-4" (ngSubmit)="placeOrder(checkoutForm)">
+	              <div
+	                *ngIf="!auth.isAuthenticated()"
+	                id="checkout-step-1"
+	                class="scroll-mt-24 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+	              >
+	                <div class="flex items-center justify-between gap-3">
+	                  <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step1' | translate }}</p>
+	                  <span *ngIf="step1Complete()" class="text-xs font-semibold text-emerald-700 dark:text-emerald-300">✓</span>
+	                </div>
+	                <label class="flex items-center gap-2 text-sm">
+	                  <input type="checkbox" [(ngModel)]="guestCreateAccount" name="guestCreateAccount" />
+	                  {{ 'checkout.createAccount' | translate }}
+	                </label>
                 <div *ngIf="guestCreateAccount" class="grid sm:grid-cols-2 gap-3">
                   <label class="text-sm grid gap-1">
                     {{ 'auth.username' | translate }}
@@ -263,9 +280,24 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                     </span>
                   </div>
                 </div>
+                <div class="flex justify-end">
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'checkout.continue' | translate"
+                    [disabled]="!step1Complete()"
+                    (action)="scrollToStep('checkout-step-2')"
+                  ></app-button>
+                </div>
               </div>
-              <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step2' | translate }}</p>
+              <div
+                id="checkout-step-2"
+                class="scroll-mt-24 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step2' | translate }}</p>
+                  <span *ngIf="step2Complete()" class="text-xs font-semibold text-emerald-700 dark:text-emerald-300">✓</span>
+                </div>
                 <div class="grid sm:grid-cols-2 gap-3">
                 <label class="text-sm grid gap-1">
                   {{ 'checkout.name' | translate }}
@@ -300,9 +332,12 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                             : ('checkout.emailVerifySend' | translate)
                       "
                       (action)="requestGuestEmailVerification()"
-                      [disabled]="guestSendingCode || !address.email || guestEmailVerified"
+                      [disabled]="guestSendingCode || guestResendSecondsLeft > 0 || !address.email || guestEmailVerified"
                     ></app-button>
                     <span *ngIf="guestEmailVerified" class="text-xs font-medium text-emerald-700 dark:text-emerald-300">✓</span>
+                    <span *ngIf="!guestEmailVerified && guestResendSecondsLeft > 0" class="text-xs text-slate-500 dark:text-slate-400">
+                      {{ 'checkout.emailVerifyResendIn' | translate : { seconds: guestResendSecondsLeft } }}
+                    </span>
                   </div>
                   <div *ngIf="!auth.isAuthenticated() && guestVerificationSent && !guestEmailVerified" class="grid gap-2">
                     <div class="grid grid-cols-[1fr_auto] gap-2 items-center">
@@ -338,19 +373,27 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                     {{ 'notifications.loading' | translate }}
                   </div>
                   <p *ngIf="savedAddressesError" class="sm:col-span-2 text-xs text-rose-700 dark:text-rose-300">{{ savedAddressesError }}</p>
-                  <label *ngIf="savedAddresses.length" class="text-sm grid gap-1 sm:col-span-2">
-                    {{ 'checkout.savedShippingAddress' | translate }}
-                    <select
-                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                      name="savedShippingAddress"
-                      [(ngModel)]="selectedShippingAddressId"
-                      (ngModelChange)="applySelectedShippingAddress()"
-                    >
-                      <option value="">{{ 'checkout.savedAddressSelect' | translate }}</option>
-                      <option *ngFor="let a of savedAddresses" [value]="a.id">{{ formatSavedAddress(a) }}</option>
-                    </select>
-                  </label>
-                </ng-container>
+	                  <label *ngIf="savedAddresses.length" class="text-sm grid gap-1 sm:col-span-2">
+	                    {{ 'checkout.savedShippingAddress' | translate }}
+	                    <select
+	                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                      name="savedShippingAddress"
+	                      [(ngModel)]="selectedShippingAddressId"
+	                      (ngModelChange)="applySelectedShippingAddress()"
+	                    >
+	                      <option value="">{{ 'checkout.savedAddressSelect' | translate }}</option>
+	                      <option *ngFor="let a of savedAddresses" [value]="a.id">{{ formatSavedAddress(a) }}</option>
+	                    </select>
+                      <button
+                        type="button"
+                        class="text-left text-xs text-indigo-600 hover:text-indigo-700 disabled:opacity-50 dark:text-indigo-300 dark:hover:text-indigo-200"
+                        [disabled]="!selectedShippingAddressId"
+                        (click)="openEditSavedAddress('shipping')"
+                      >
+                        {{ 'account.addresses.edit' | translate }}
+                      </button>
+	                  </label>
+	                </ng-container>
                 <label class="text-sm grid gap-1 sm:col-span-2">
                   {{ 'checkout.line1' | translate }}
                   <input
@@ -472,26 +515,39 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                   <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">
                     {{ 'checkout.billingTitle' | translate }}
                   </p>
-                  <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                    <input type="checkbox" [(ngModel)]="billingSameAsShipping" name="billingSameAsShipping" />
-                    {{ 'checkout.billingSameAsShipping' | translate }}
-                  </label>
-                </div>
+	                  <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+	                    <input
+	                      type="checkbox"
+	                      [(ngModel)]="billingSameAsShipping"
+	                      name="billingSameAsShipping"
+	                      (ngModelChange)="onBillingSameAsShippingChanged()"
+	                    />
+	                    {{ 'checkout.billingSameAsShipping' | translate }}
+	                  </label>
+	                </div>
                 <div *ngIf="!billingSameAsShipping" class="grid sm:grid-cols-2 gap-3">
                   <ng-container *ngIf="auth.isAuthenticated()">
-                    <label *ngIf="savedAddresses.length" class="text-sm grid gap-1 sm:col-span-2">
-                      {{ 'checkout.savedBillingAddress' | translate }}
-                      <select
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        name="savedBillingAddress"
-                        [(ngModel)]="selectedBillingAddressId"
-                        (ngModelChange)="applySelectedBillingAddress()"
-                      >
-                        <option value="">{{ 'checkout.savedAddressSelect' | translate }}</option>
-                        <option *ngFor="let a of savedAddresses" [value]="a.id">{{ formatSavedAddress(a) }}</option>
-                      </select>
-                    </label>
-                  </ng-container>
+	                    <label *ngIf="savedAddresses.length" class="text-sm grid gap-1 sm:col-span-2">
+	                      {{ 'checkout.savedBillingAddress' | translate }}
+	                      <select
+	                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                        name="savedBillingAddress"
+	                        [(ngModel)]="selectedBillingAddressId"
+	                        (ngModelChange)="applySelectedBillingAddress()"
+	                      >
+	                        <option value="">{{ 'checkout.savedAddressSelect' | translate }}</option>
+	                        <option *ngFor="let a of savedAddresses" [value]="a.id">{{ formatSavedAddress(a) }}</option>
+	                      </select>
+                        <button
+                          type="button"
+                          class="text-left text-xs text-indigo-600 hover:text-indigo-700 disabled:opacity-50 dark:text-indigo-300 dark:hover:text-indigo-200"
+                          [disabled]="!selectedBillingAddressId"
+                          (click)="openEditSavedAddress('billing')"
+                        >
+                          {{ 'account.addresses.edit' | translate }}
+                        </button>
+	                    </label>
+	                  </ng-container>
                   <label class="text-sm grid gap-1 sm:col-span-2">
                     {{ 'checkout.line1' | translate }}
                     <input
@@ -565,11 +621,26 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                 <input type="checkbox" [(ngModel)]="saveAddress" name="saveAddress" />
                 {{ 'checkout.saveAddress' | translate }}
               </label>
-                <p *ngIf="addressError" class="text-sm text-amber-700 dark:text-amber-300">{{ addressError }}</p>
+              <p *ngIf="addressError" class="text-sm text-amber-700 dark:text-amber-300">{{ addressError }}</p>
+              <div class="flex justify-end">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'checkout.continue' | translate"
+                  [disabled]="!step2Complete()"
+                  (action)="scrollToStep('checkout-step-3')"
+                ></app-button>
+              </div>
               </div>
 
-	              <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-	                <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step3' | translate }}</p>
+	              <div
+	                id="checkout-step-3"
+	                class="scroll-mt-24 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+	              >
+	                <div class="flex items-center justify-between gap-3">
+	                  <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step3' | translate }}</p>
+	                  <span *ngIf="step3Complete()" class="text-xs font-semibold text-emerald-700 dark:text-emerald-300">✓</span>
+	                </div>
 	                <ng-container *ngIf="auth.isAuthenticated(); else guestCoupons">
 	                  <div class="flex gap-3">
 	                    <input
@@ -705,12 +776,24 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
 	                      <app-button size="sm" variant="ghost" [label]="'nav.register' | translate" routerLink="/register"></app-button>
 	                    </div>
 	                  </div>
-	                </ng-template>
-	            </div>
-
-	            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-	              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step4' | translate }}</p>
-              <div class="flex flex-wrap gap-3">
+		                </ng-template>
+                    <div class="flex justify-end">
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="'checkout.continue' | translate"
+                        [disabled]="!step3Complete()"
+                        (action)="scrollToStep('checkout-step-4')"
+                      ></app-button>
+                    </div>
+		            </div>
+	
+		            <div
+		              id="checkout-step-4"
+		              class="scroll-mt-24 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+		            >
+		              <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step4' | translate }}</p>
+	              <div class="flex flex-wrap gap-3">
                 <button
                   type="button"
                   class="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
@@ -791,7 +874,7 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
             </div>
 
             <div class="flex gap-3">
-              <app-button [label]="'checkout.placeOrder' | translate" type="submit"></app-button>
+              <app-button [label]="'checkout.placeOrder' | translate" type="submit" [disabled]="placing || cartSyncPending()"></app-button>
               <app-button variant="ghost" [label]="'checkout.backToCart' | translate" routerLink="/cart"></app-button>
             </div>
           </form>
@@ -805,7 +888,7 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                 <span>{{ item.name }} × {{ item.quantity }}</span>
                 <span>{{ item.price * item.quantity | localizedCurrency : item.currency }}</span>
               </div>
-              <p class="text-xs text-slate-500 dark:text-slate-400">Stock: {{ item.stock }}</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'cart.inStock' | translate : { count: item.stock } }}</p>
             </div>
           </div>
           <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
@@ -837,6 +920,22 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
           </div>
           </aside>
         </div>
+
+        <app-modal
+          [open]="editSavedAddressOpen"
+          [title]="editSavedAddressTitle()"
+          [showActions]="false"
+          [closeLabel]="'addressForm.cancel' | translate"
+          (closed)="closeEditSavedAddress()"
+        >
+          <p *ngIf="editSavedAddressError" class="text-sm text-rose-700 dark:text-rose-300">{{ editSavedAddressError }}</p>
+          <app-address-form
+            *ngIf="editSavedAddressModel"
+            [model]="editSavedAddressModel"
+            (cancel)="closeEditSavedAddress()"
+            (save)="saveEditedSavedAddress($event)"
+          ></app-address-form>
+        </app-modal>
       </app-container>
     `
 })
@@ -869,9 +968,17 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   savedAddressesError = '';
   selectedShippingAddressId = '';
   selectedBillingAddressId = '';
+  editSavedAddressOpen = false;
+  editSavedAddressTarget: 'shipping' | 'billing' = 'shipping';
+  editSavedAddressId = '';
+  editSavedAddressModel: AddressCreateRequest | null = null;
+  editSavedAddressError = '';
+  private editSavedAddressSaving = false;
   addressError = '';
   errorMessage = '';
+  syncNotice = '';
   pricesRefreshed = false;
+  syncQueued = false;
   saveAddress = true;
   guestCreateAccount = false;
   guestUsername = '';
@@ -892,6 +999,9 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   guestSendingCode = false;
   guestConfirmingCode = false;
   guestEmailError = '';
+  guestResendSecondsLeft = 0;
+  private guestResendCooldownUntil = 0;
+  private guestResendTimer: ReturnType<typeof setInterval> | null = null;
   private lastGuestEmailRequested: string | null = null;
   private lastGuestEmailVerified: string | null = null;
   courier: LockerProvider = 'sameday';
@@ -925,6 +1035,9 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   paymentMethod: CheckoutPaymentMethod = 'cod';
   paypalEnabled = Boolean(appConfig.paypalEnabled);
   netopiaEnabled = Boolean(appConfig.netopiaEnabled);
+  private syncDebounceHandle: ReturnType<typeof setTimeout> | null = null;
+  private queuedSyncItems: CartItem[] | null = null;
+  private checkoutRedirectedToCart = false;
 
   constructor(
     private cart: CartStore,
@@ -965,6 +1078,51 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   items = this.cart.items;
   subtotal = this.cart.subtotal;
   currency = 'RON';
+
+  cartSyncPending(): boolean {
+    return this.syncing || this.syncQueued;
+  }
+
+  scrollToStep(id: string): void {
+    try {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch {
+      // ignore
+    }
+  }
+
+  step1Complete(): boolean {
+    if (this.auth.isAuthenticated()) return true;
+    if (!this.guestCreateAccount) return true;
+    const username = this.guestUsername.trim();
+    if (!username || !/^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$/.test(username)) return false;
+    if (this.guestPassword.length < 6) return false;
+    if (this.guestPassword !== this.guestPasswordConfirm) return false;
+    if (!this.guestFirstName.trim() || !this.guestLastName.trim()) return false;
+    if (!this.guestDob) return false;
+    if (!this.guestPhoneE164()) return false;
+    return true;
+  }
+
+  step2Complete(): boolean {
+    if (!this.address.name.trim()) return false;
+    if (!this.address.email.trim()) return false;
+    if (!this.address.line1.trim()) return false;
+    if (!this.address.city.trim()) return false;
+    if (!this.address.postal.trim()) return false;
+    if (!this.address.country.trim()) return false;
+    if (this.auth.isAuthenticated()) {
+      return this.emailVerified();
+    }
+    return this.guestEmailVerified;
+  }
+
+  step3Complete(): boolean {
+    if (this.deliveryType === 'locker') {
+      return !!this.locker;
+    }
+    return true;
+  }
 
   emailVerified(): boolean {
     return Boolean(this.auth.user()?.email_verified);
@@ -1012,6 +1170,102 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     this.applySavedAddressToBilling(addr);
   }
 
+  onBillingSameAsShippingChanged(): void {
+    if (this.billingSameAsShipping) {
+      this.billing.line1 = this.address.line1;
+      this.billing.line2 = this.address.line2;
+      this.billing.city = this.address.city;
+      this.billing.region = this.address.region;
+      this.billing.postal = this.address.postal;
+      this.billing.country = this.address.country;
+      this.billingCountryInput = this.countryInputFromCode(this.billing.country);
+      this.billingCountryError = '';
+      return;
+    }
+
+    if (this.billing.line1.trim() || this.billing.city.trim() || this.billing.postal.trim()) return;
+
+    const currentId = (this.selectedBillingAddressId || '').trim();
+    if (currentId) {
+      this.applySelectedBillingAddress();
+      return;
+    }
+
+    const fallback =
+      this.savedAddresses.find((a) => a.is_default_billing) ??
+      this.savedAddresses.find((a) => a.is_default_shipping) ??
+      this.savedAddresses[0];
+    if (!fallback) return;
+    this.selectedBillingAddressId = fallback.id;
+    this.applySavedAddressToBilling(fallback);
+  }
+
+  editSavedAddressTitle(): string {
+    const key = this.editSavedAddressTarget === 'billing' ? 'checkout.editBillingAddressTitle' : 'checkout.editShippingAddressTitle';
+    return this.translate.instant(key);
+  }
+
+  openEditSavedAddress(target: 'shipping' | 'billing'): void {
+    if (!this.auth.isAuthenticated()) return;
+    const id = (target === 'billing' ? this.selectedBillingAddressId : this.selectedShippingAddressId).trim();
+    if (!id) return;
+    const addr = this.savedAddresses.find((a) => a.id === id);
+    if (!addr) return;
+
+    this.editSavedAddressTarget = target;
+    this.editSavedAddressId = addr.id;
+    this.editSavedAddressModel = {
+      label: addr.label ?? null,
+      line1: addr.line1 || '',
+      line2: addr.line2 ?? null,
+      city: addr.city || '',
+      region: addr.region ?? null,
+      postal_code: addr.postal_code || '',
+      country: (addr.country || 'RO').trim().toUpperCase(),
+      is_default_shipping: Boolean(addr.is_default_shipping),
+      is_default_billing: Boolean(addr.is_default_billing)
+    };
+    this.editSavedAddressError = '';
+    this.editSavedAddressOpen = true;
+  }
+
+  closeEditSavedAddress(): void {
+    this.editSavedAddressOpen = false;
+    this.editSavedAddressError = '';
+    this.editSavedAddressId = '';
+    this.editSavedAddressModel = null;
+    this.editSavedAddressSaving = false;
+  }
+
+  saveEditedSavedAddress(payload: AddressCreateRequest): void {
+    if (!this.auth.isAuthenticated()) return;
+    const id = (this.editSavedAddressId || '').trim();
+    if (!id) return;
+    if (this.editSavedAddressSaving) return;
+    this.editSavedAddressSaving = true;
+    this.editSavedAddressError = '';
+
+    this.accountService.updateAddress(id, payload).subscribe({
+      next: (updated) => {
+        this.editSavedAddressSaving = false;
+        this.savedAddresses = this.savedAddresses.map((a) => (a.id === updated.id ? updated : a));
+        if (this.editSavedAddressTarget === 'billing') {
+          this.selectedBillingAddressId = updated.id;
+          this.applySavedAddressToBilling(updated);
+        } else {
+          this.selectedShippingAddressId = updated.id;
+          this.applySavedAddressToShipping(updated);
+        }
+        this.loadSavedAddresses(true);
+        this.closeEditSavedAddress();
+      },
+      error: () => {
+        this.editSavedAddressSaving = false;
+        this.editSavedAddressError = this.translate.instant('account.addresses.errors.update');
+      }
+    });
+  }
+
   private applySavedAddressToShipping(addr: Address): void {
     this.address.line1 = addr.line1 || '';
     this.address.line2 = addr.line2 || '';
@@ -1021,6 +1275,11 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     this.address.country = (addr.country || '').trim().toUpperCase();
     this.shippingCountryInput = this.countryInputFromCode(this.address.country);
     if (this.billingSameAsShipping) {
+      this.billing.line1 = this.address.line1;
+      this.billing.line2 = this.address.line2;
+      this.billing.city = this.address.city;
+      this.billing.region = this.address.region;
+      this.billing.postal = this.address.postal;
       this.billing.country = this.address.country;
       this.billingCountryInput = this.countryInputFromCode(this.billing.country);
     }
@@ -1141,10 +1400,20 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     this.accountService.getAddresses().subscribe({
       next: (addresses) => {
         this.savedAddresses = Array.isArray(addresses) ? addresses : [];
-        if (!this.address.line1.trim() && !this.address.city.trim() && !this.address.postal.trim() && this.savedAddresses.length) {
+        if (this.savedAddresses.length) {
           const defaultShipping = this.savedAddresses.find((a) => a.is_default_shipping) ?? this.savedAddresses[0];
+          const defaultBilling = this.savedAddresses.find((a) => a.is_default_billing) ?? defaultShipping;
+          if (!this.selectedBillingAddressId && defaultBilling) {
+            this.selectedBillingAddressId = defaultBilling.id;
+          }
+          if (!this.billingSameAsShipping && !this.billing.line1.trim() && !this.billing.city.trim() && !this.billing.postal.trim() && defaultBilling) {
+            this.applySavedAddressToBilling(defaultBilling);
+          }
+
+          if (!this.address.line1.trim() && !this.address.city.trim() && !this.address.postal.trim()) {
           this.selectedShippingAddressId = defaultShipping.id;
           this.applySavedAddressToShipping(defaultShipping);
+          }
         }
         this.savedAddressesLoading = false;
       },
@@ -1162,12 +1431,14 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     if (this.lastGuestEmailVerified && normalized !== this.lastGuestEmailVerified) {
       this.guestEmailVerified = false;
       this.lastGuestEmailVerified = null;
+      this.clearGuestResendCooldown();
     }
     if (this.lastGuestEmailRequested && normalized !== this.lastGuestEmailRequested) {
       this.guestVerificationSent = false;
       this.guestVerificationToken = '';
       this.guestEmailError = '';
       this.lastGuestEmailRequested = null;
+      this.clearGuestResendCooldown();
     }
   }
 
@@ -1333,6 +1604,17 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   private hydrateCartAndQuote(res: CartResponse): void {
     this.cart.hydrateFromBackend(res);
     this.setQuote(res);
+    this.pricesRefreshed = true;
+    this.syncQueued = false;
+    this.syncNotice = '';
+    this.redirectToCartIfEmpty();
+  }
+
+  private redirectToCartIfEmpty(): void {
+    if (this.checkoutRedirectedToCart) return;
+    if (this.items().length) return;
+    this.checkoutRedirectedToCart = true;
+    void this.router.navigate(['/cart'], { queryParams: { from: 'checkout' }, replaceUrl: true });
   }
 
 	  private setQuote(res: CartResponse): void {
@@ -1501,16 +1783,23 @@ export class CheckoutComponent implements OnInit, OnDestroy {
         return;
       }
     }
-    const validation = this.validateCart();
-    if (validation) {
-      this.errorMessage = validation;
-      return;
-    }
-    this.errorMessage = '';
-    if (this.paymentMethod === 'paypal' && !this.paypalEnabled) {
-      this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-      return;
-    }
+	    const validation = this.validateCart();
+	    if (validation) {
+	      this.errorMessage = validation;
+	      return;
+	    }
+	    if (!this.pricesRefreshed || this.cartSyncPending()) {
+	      this.errorMessage = '';
+	      this.syncNotice = this.translate.instant('checkout.cartSyncing');
+	      this.queueCartSync(this.items(), { immediate: true });
+	      return;
+	    }
+	    this.errorMessage = '';
+	    this.syncNotice = '';
+	    if (this.paymentMethod === 'paypal' && !this.paypalEnabled) {
+	      this.errorMessage = this.translate.instant('checkout.paymentNotReady');
+	      return;
+	    }
     if (this.paymentMethod === 'netopia' && !this.netopiaEnabled) {
       this.errorMessage = this.translate.instant('checkout.paymentNotReady');
       return;
@@ -1525,18 +1814,19 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 
   retryValidation(): void {
     this.errorMessage = '';
-    this.validateCart(true);
+    this.queueCartSync(this.items(), { immediate: true });
   }
 
   private validateCart(forceRefresh = false): string | null {
     const items = this.items();
     const stockIssue = items.find((i) => i.quantity > i.stock);
     if (stockIssue) {
-      return `Only ${stockIssue.stock} left of ${stockIssue.name}. Please reduce quantity.`;
+      return this.translate.instant('checkout.stockOnlyLeft', { count: stockIssue.stock, name: stockIssue.name });
     }
+    if (!items.length) return null;
     if (!this.pricesRefreshed || forceRefresh) {
-      this.syncBackendCart(items);
-      this.pricesRefreshed = true;
+      this.syncNotice = this.translate.instant('checkout.cartSyncing');
+      this.queueCartSync(items, { immediate: forceRefresh });
       return null;
     }
     return null;
@@ -1675,7 +1965,9 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     this.loadSavedAddresses();
     const items = this.items();
     if (items.length) {
-      this.syncBackendCart(items);
+      this.queueCartSync(items, { immediate: true });
+    } else if (!this.auth.isAuthenticated()) {
+      this.redirectToCartIfEmpty();
     } else {
       this.loadCartFromServer();
     }
@@ -1683,6 +1975,14 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.syncDebounceHandle) {
+      clearTimeout(this.syncDebounceHandle);
+      this.syncDebounceHandle = null;
+    }
+    if (this.guestResendTimer) {
+      clearInterval(this.guestResendTimer);
+      this.guestResendTimer = null;
+    }
   }
 
   setPaymentMethod(method: CheckoutPaymentMethod): void {
@@ -1704,6 +2004,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 
   private syncBackendCart(items: CartItem[]): void {
     this.syncing = true;
+    this.pricesRefreshed = false;
     this.cartApi
       .sync(
         items.map((i) => ({
@@ -1718,16 +2019,46 @@ export class CheckoutComponent implements OnInit, OnDestroy {
         next: (res) => {
           this.hydrateCartAndQuote(res);
           this.syncing = false;
+          if (this.queuedSyncItems) {
+            const queued = this.queuedSyncItems;
+            this.queuedSyncItems = null;
+            this.queueCartSync(queued, { immediate: true });
+          }
         },
         error: () => {
           this.syncing = false;
+          this.pricesRefreshed = false;
           this.errorMessage = this.translate.instant('checkout.cartSyncError');
         }
       });
   }
 
+  private queueCartSync(items: CartItem[], opts?: { immediate?: boolean }): void {
+    if (!items.length) return;
+    if (this.syncing) {
+      this.queuedSyncItems = items;
+      this.syncQueued = true;
+      return;
+    }
+
+    this.syncQueued = true;
+    this.pricesRefreshed = false;
+    if (this.syncDebounceHandle) {
+      clearTimeout(this.syncDebounceHandle);
+      this.syncDebounceHandle = null;
+    }
+
+    const delayMs = opts?.immediate ? 0 : 300;
+    this.syncDebounceHandle = setTimeout(() => {
+      this.syncDebounceHandle = null;
+      this.syncQueued = false;
+      this.syncBackendCart(items);
+    }, delayMs);
+  }
+
   private loadCartFromServer(): void {
     this.syncing = true;
+    this.pricesRefreshed = false;
     this.auth.ensureAuthenticated({ silent: true }).subscribe({
       next: () => {
         this.cartApi.get().subscribe({
@@ -1737,12 +2068,14 @@ export class CheckoutComponent implements OnInit, OnDestroy {
           },
           error: () => {
             this.syncing = false;
+            this.pricesRefreshed = false;
             this.errorMessage = this.translate.instant('checkout.cartLoadError');
           }
         });
       },
       error: () => {
         this.syncing = false;
+        this.pricesRefreshed = false;
         this.errorMessage = this.translate.instant('checkout.cartLoadError');
       }
     });
@@ -1893,6 +2226,38 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       });
   }
 
+  private clearGuestResendCooldown(): void {
+    this.guestResendCooldownUntil = 0;
+    this.guestResendSecondsLeft = 0;
+    if (this.guestResendTimer) {
+      clearInterval(this.guestResendTimer);
+      this.guestResendTimer = null;
+    }
+  }
+
+  private startGuestResendCooldown(seconds: number): void {
+    const secs = Math.max(0, Math.floor(seconds));
+    if (!secs) {
+      this.clearGuestResendCooldown();
+      return;
+    }
+    this.guestResendCooldownUntil = Date.now() + secs * 1000;
+    this.updateGuestResendCooldown();
+    if (!this.guestResendTimer) {
+      this.guestResendTimer = setInterval(() => this.updateGuestResendCooldown(), 1000);
+    }
+  }
+
+  private updateGuestResendCooldown(): void {
+    const remainingMs = this.guestResendCooldownUntil - Date.now();
+    const remaining = Math.max(0, Math.ceil(remainingMs / 1000));
+    this.guestResendSecondsLeft = remaining;
+    if (remaining <= 0 && this.guestResendTimer) {
+      clearInterval(this.guestResendTimer);
+      this.guestResendTimer = null;
+    }
+  }
+
   requestGuestEmailVerification(): void {
     if (this.auth.isAuthenticated()) return;
     this.guestEmailError = '';
@@ -1901,6 +2266,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       this.guestEmailError = this.translate.instant('checkout.addressRequired');
       return;
     }
+    if (this.guestResendSecondsLeft > 0) return;
 
     // Optimistically reveal the token input so the UI doesn't feel unresponsive while the request is in-flight.
     this.guestVerificationSent = true;
@@ -1927,11 +2293,13 @@ export class CheckoutComponent implements OnInit, OnDestroy {
         clearTimeout(timeoutId);
         this.guestSendingCode = false;
         this.guestEmailError = err?.error?.detail || this.translate.instant('checkout.emailVerifySendFailed');
+        this.startGuestResendCooldown(10);
       },
       complete: () => {
         // Some environments may not emit a `next` value. Treat completion as success.
         clearTimeout(timeoutId);
         this.guestSendingCode = false;
+        this.startGuestResendCooldown(30);
       }
     });
   }
@@ -1961,7 +2329,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.guestConfirmingCode = false;
-          this.guestEmailError = err?.error?.detail || 'Invalid code';
+          this.guestEmailError = err?.error?.detail || this.translate.instant('checkout.emailVerifyInvalidCode');
         }
       });
   }

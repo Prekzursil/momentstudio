@@ -425,13 +425,13 @@ Below is a structured checklist you can turn into issues.
 - [x] Cart: show estimated delivery window based on courier selection (if available).
 - [x] Cart: persist delivery type/courier selections and prefill checkout.
 - [x] Cart: add “Save for later” list (separate from wishlist; optional).
-- [ ] Checkout: redirect to cart when cart is empty (with helpful message).
-- [ ] Checkout: stepper UI polish (completion checkmarks + scroll-to-next on continue).
-- [ ] Checkout: block placing an order while cart sync is pending (prevent stale totals).
-- [ ] Checkout: debounce cart sync and show explicit “Syncing…” indicator.
-- [ ] Checkout: preselect default saved shipping/billing addresses and allow quick switch.
-- [ ] Checkout: allow editing a selected saved address inline (opens modal) and re-apply it.
-- [ ] Checkout: improve guest email verification UX (clearer errors, resend cooldown, avoid masking specific errors).
+- [x] Checkout: redirect to cart when cart is empty (with helpful message).
+- [x] Checkout: stepper UI polish (completion checkmarks + scroll-to-next on continue).
+- [x] Checkout: block placing an order while cart sync is pending (prevent stale totals).
+- [x] Checkout: debounce cart sync and show explicit “Syncing…” indicator.
+- [x] Checkout: preselect default saved shipping/billing addresses and allow quick switch.
+- [x] Checkout: allow editing a selected saved address inline (opens modal) and re-apply it.
+- [x] Checkout: improve guest email verification UX (clearer errors, resend cooldown, avoid masking specific errors).
 - [ ] Checkout: show eligible + ineligible coupons with reasons and estimated savings.
 - [ ] Checkout: optionally auto-apply the best eligible coupon (toggleable).
 - [ ] Checkout: clearly show stacking rules (sale price + coupon) and why some coupons can’t be applied.

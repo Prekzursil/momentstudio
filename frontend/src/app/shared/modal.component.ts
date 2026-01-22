@@ -20,14 +20,14 @@ import { ButtonComponent } from './button.component';
             <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ title }}</div>
             <div class="text-slate-600 text-sm dark:text-slate-300" *ngIf="subtitle">{{ subtitle }}</div>
           </div>
-          <app-button variant="ghost" size="sm" label="Close" (action)="close()"></app-button>
+          <app-button variant="ghost" size="sm" [label]="closeLabel" (action)="close()"></app-button>
         </div>
         <div class="text-sm text-slate-700 dark:text-slate-200">
           <ng-content></ng-content>
         </div>
         <div class="flex justify-end gap-3" *ngIf="showActions">
-          <app-button variant="ghost" label="Cancel" (action)="close()"></app-button>
-          <app-button label="Confirm" (action)="confirm.emit()"></app-button>
+          <app-button variant="ghost" [label]="cancelLabel" (action)="close()"></app-button>
+          <app-button [label]="confirmLabel" (action)="confirm.emit()"></app-button>
         </div>
       </div>
     </div>
@@ -38,6 +38,9 @@ export class ModalComponent implements AfterViewInit, OnChanges {
   @Input() title = 'Modal';
   @Input() subtitle = '';
   @Input() showActions = true;
+  @Input() closeLabel = 'Close';
+  @Input() cancelLabel = 'Cancel';
+  @Input() confirmLabel = 'Confirm';
   @Output() confirm = new EventEmitter<void>();
   @Output() closed = new EventEmitter<void>();
   @ViewChild('dialogRef') dialogRef?: ElementRef<HTMLDivElement>;

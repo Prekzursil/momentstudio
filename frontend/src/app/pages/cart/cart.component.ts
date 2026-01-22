@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
@@ -77,7 +77,9 @@ const SAVED_FOR_LATER_KEY = 'cart_saved_for_later';
 
           <div *ngIf="!syncing() && !items().length" class="border border-dashed border-slate-200 rounded-2xl p-10 text-center grid gap-3 dark:border-slate-800">
             <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'cart.emptyTitle' | translate }}</p>
-            <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'cart.emptyCopy' | translate }}</p>
+            <p class="text-sm text-slate-600 dark:text-slate-300">
+              {{ (redirectedFromCheckout ? 'cart.emptyFromCheckout' : 'cart.emptyCopy') | translate }}
+            </p>
             <div class="flex justify-center">
               <app-button routerLink="/shop" [label]="'cart.backToShop' | translate"></app-button>
             </div>
@@ -463,6 +465,7 @@ export class CartComponent implements OnInit {
   courier: LockerProvider = 'sameday';
   deliveryType: CheckoutDeliveryType = 'home';
   savedForLater: SavedForLaterItem[] = [];
+  redirectedFromCheckout = false;
 
   constructor(
     private cart: CartStore,
@@ -473,7 +476,8 @@ export class CartComponent implements OnInit {
     private toast: ToastService,
     private catalog: CatalogService,
     private checkoutPrefs: CheckoutPrefsService,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private route: ActivatedRoute
   ) {
     const prefs = this.checkoutPrefs.loadDeliveryPrefs();
     this.courier = prefs.courier;
@@ -510,6 +514,9 @@ export class CartComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.route.queryParamMap.subscribe((params) => {
+      this.redirectedFromCheckout = params.get('from') === 'checkout';
+    });
     this.cart.loadFromBackend();
     this.wishlist.ensureLoaded();
   }

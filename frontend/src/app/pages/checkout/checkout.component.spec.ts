@@ -70,6 +70,8 @@ describe('CheckoutComponent', () => {
     spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
     const fixture = TestBed.createComponent(CheckoutComponent);
     const cmp = fixture.componentInstance;
+    fixture.detectChanges();
+    tick();
     cmp.paymentMethod = 'cod';
     cmp.promo = 'SAVE';
     cmp.saveAddress = false;
