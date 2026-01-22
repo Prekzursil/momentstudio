@@ -416,9 +416,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Cart: show discount breakdown in summary (sale vs coupon vs shipping) using backend quote totals.
 - [x] Cart: add promo code apply UI (signed-in only for coupons) with applied-code chip + remove action.
 - [x] Cart: add item notes/gift messages UI and persist to backend cart items.
-- [ ] Cart: add skeleton loading state while cart syncs/loads from backend.
-- [ ] Cart: replace quantity input with +/- stepper (debounced) and clamp to stock.
-- [ ] Cart: show low-stock messaging (“Only X left”) and highlight when at max quantity.
+- [x] Cart: add skeleton loading state while cart syncs/loads from backend.
+- [x] Cart: replace quantity input with +/- stepper (debounced) and clamp to stock.
+- [x] Cart: show low-stock messaging (“Only X left”) and highlight when at max quantity.
 - [ ] Cart: add “Move to wishlist” action for signed-in users.
 - [ ] Cart: add recommendations (“You may also like”) using category/featured products.
 - [ ] Cart: show free-shipping threshold progress (configurable) and suggested add-ons.

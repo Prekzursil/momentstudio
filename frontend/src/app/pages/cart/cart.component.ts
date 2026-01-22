@@ -5,7 +5,7 @@ import { RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
-import { CartStore } from '../../core/cart.store';
+import { CartItem, CartStore } from '../../core/cart.store';
 import { CartApi } from '../../core/cart.api';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { ImgFallbackDirective } from '../../shared/img-fallback.directive';
@@ -28,6 +28,7 @@ import { parseMoney } from '../../shared/money';
             <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'cart.title' | translate }}</h1>
             <div class="flex items-center gap-3">
               <span class="text-sm text-slate-600 dark:text-slate-300">{{ 'cart.items' | translate : { count: items().length } }}</span>
+              <span *ngIf="syncing()" class="text-xs text-slate-500 dark:text-slate-400">{{ 'cart.syncing' | translate }}</span>
               <app-button
                 *ngIf="items().length"
                 size="sm"
@@ -38,7 +39,23 @@ import { parseMoney } from '../../shared/money';
             </div>
           </div>
 
-          <div *ngIf="!items().length" class="border border-dashed border-slate-200 rounded-2xl p-10 text-center grid gap-3 dark:border-slate-800">
+          <div *ngIf="syncing() && !items().length" class="grid gap-3">
+            <div
+              *ngFor="let _ of skeletonRows"
+              class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 animate-pulse dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div class="flex gap-4">
+                <div class="h-24 w-24 rounded-xl bg-slate-100 dark:bg-slate-800"></div>
+                <div class="flex-1 grid gap-2">
+                  <div class="h-4 w-1/3 rounded bg-slate-100 dark:bg-slate-800"></div>
+                  <div class="h-3 w-1/4 rounded bg-slate-100 dark:bg-slate-800"></div>
+                  <div class="h-8 w-56 rounded bg-slate-100 dark:bg-slate-800"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div *ngIf="!syncing() && !items().length" class="border border-dashed border-slate-200 rounded-2xl p-10 text-center grid gap-3 dark:border-slate-800">
             <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'cart.emptyTitle' | translate }}</p>
             <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'cart.emptyCopy' | translate }}</p>
             <div class="flex justify-center">
@@ -64,24 +81,51 @@ import { parseMoney } from '../../shared/money';
                       class="font-semibold text-slate-900 dark:text-slate-50 hover:underline"
                       >{{ item.name }}</a
                     >
-                    <p class="text-sm text-slate-500 dark:text-slate-400">{{ 'cart.inStock' | translate : { count: item.stock } }}</p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">
+                      <ng-container *ngIf="isLowStock(item); else cartInStock">{{ 'cart.onlyLeft' | translate : { count: item.stock } }}</ng-container>
+                      <ng-template #cartInStock>{{ 'cart.inStock' | translate : { count: item.stock } }}</ng-template>
+                    </p>
                   </div>
                   <button class="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50" (click)="remove(item.id)">
                     {{ 'cart.remove' | translate }}
                   </button>
                 </div>
                 <div class="flex items-center gap-3 text-sm">
-                  <label class="flex items-center gap-2">
-                    {{ 'cart.qty' | translate }}
-                    <input
-                      type="number"
-                      class="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                      [value]="item.quantity"
-                      (change)="onQuantityChange(item.id, $any($event.target).value)"
-                      min="1"
-                      [max]="item.stock"
-                    />
-                  </label>
+                  <div class="flex items-center gap-2">
+                    <span class="text-slate-700 dark:text-slate-200">{{ 'cart.qty' | translate }}</span>
+                    <div
+                      class="inline-flex items-center rounded-lg border bg-white dark:bg-slate-800 dark:border-slate-700"
+                      [class.border-amber-300]="isMaxQuantity(item)"
+                      [class.dark:border-amber-700]="isMaxQuantity(item)"
+                    >
+                      <button
+                        type="button"
+                        class="px-2 py-1 text-slate-700 hover:text-slate-900 disabled:opacity-50 dark:text-slate-200 dark:hover:text-slate-50"
+                        [attr.aria-label]="'cart.decreaseQty' | translate"
+                        [disabled]="item.quantity <= 1"
+                        (click)="stepQuantity(item, -1)"
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        class="w-16 bg-transparent px-2 py-1 text-center text-slate-900 outline-none dark:text-slate-100"
+                        [value]="item.quantity"
+                        (change)="onQuantityChange(item.id, $any($event.target).value)"
+                        min="1"
+                        [max]="item.stock"
+                      />
+                      <button
+                        type="button"
+                        class="px-2 py-1 text-slate-700 hover:text-slate-900 disabled:opacity-50 dark:text-slate-200 dark:hover:text-slate-50"
+                        [attr.aria-label]="'cart.increaseQty' | translate"
+                        [disabled]="item.stock > 0 && item.quantity >= item.stock"
+                        (click)="stepQuantity(item, 1)"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
                   <span class="text-slate-600 dark:text-slate-300">
                     {{ item.price | localizedCurrency : item.currency }} {{ 'cart.each' | translate }}
                   </span>
@@ -89,6 +133,7 @@ import { parseMoney } from '../../shared/money';
                     {{ item.price * item.quantity | localizedCurrency : item.currency }}
                   </span>
                 </div>
+                <p *ngIf="isMaxQuantity(item)" class="text-xs text-amber-700 dark:text-amber-300">{{ 'cart.maxQtyReached' | translate }}</p>
                 <p *ngIf="itemErrors[item.id]" class="text-sm text-amber-700 dark:text-amber-300">{{ itemErrors[item.id] | translate }}</p>
                 <div class="grid gap-1">
                   <label class="text-xs text-slate-500 dark:text-slate-400" [attr.for]="'note-' + item.id">{{ 'cart.noteLabel' | translate }}</label>
@@ -196,6 +241,7 @@ export class CartComponent implements OnInit {
     { label: 'nav.home', url: '/' },
     { label: 'nav.cart' }
   ];
+  skeletonRows = [0, 1, 2];
   itemErrors: Record<string, string> = {};
   itemNotes: Record<string, string> = {};
   itemNoteErrors: Record<string, string> = {};
@@ -232,6 +278,7 @@ export class CartComponent implements OnInit {
   items = this.cart.items;
   subtotal = this.cart.subtotal;
   quote = this.cart.quote;
+  syncing = this.cart.syncing;
 
   get currency(): string {
     return this.quote().currency ?? this.items().find((i) => i.currency)?.currency ?? 'RON';
@@ -277,8 +324,14 @@ export class CartComponent implements OnInit {
     return Math.max(0, discount + this.couponShippingDiscount());
   }
 
-  onQuantityChange(id: string, value: number): void {
-    const qty = Number(value);
+  onQuantityChange(id: string, value: unknown): void {
+    const item = this.items().find((i) => i.id === id);
+    const stock = item?.stock ?? 0;
+    let qty = Number(value);
+    if (!Number.isFinite(qty)) return;
+    qty = Math.floor(qty);
+    if (qty < 1) qty = 1;
+    if (stock > 0) qty = Math.min(qty, stock);
     const { errorKey } = this.cart.updateQuantity(id, qty);
     if (errorKey) {
       this.itemErrors[id] = errorKey;
@@ -286,6 +339,19 @@ export class CartComponent implements OnInit {
     }
     delete this.itemErrors[id];
     if (this.promoStatus === 'success') this.pendingPromoRefresh = true;
+  }
+
+  stepQuantity(item: CartItem, delta: number): void {
+    const next = item.quantity + delta;
+    this.onQuantityChange(item.id, next);
+  }
+
+  isLowStock(item: CartItem): boolean {
+    return item.stock > 0 && item.stock <= 3;
+  }
+
+  isMaxQuantity(item: CartItem): boolean {
+    return item.stock > 0 && item.quantity >= item.stock;
   }
 
   remove(id: string): void {

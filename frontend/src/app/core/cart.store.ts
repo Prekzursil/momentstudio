@@ -33,6 +33,7 @@ export class CartStore {
   private readonly itemsSignal = signal<CartItem[]>(this.load());
   private readonly quoteSignal = signal<CartQuote>(this.localQuote(this.itemsSignal()));
   private readonly inFlightSignal = signal(0);
+  private syncTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   readonly items = this.itemsSignal.asReadonly();
   readonly quote = this.quoteSignal.asReadonly();
@@ -159,7 +160,7 @@ export class CartStore {
     updated[idx] = { ...updated[idx], quantity };
     this.itemsSignal.set(updated);
     this.persist();
-    this.syncBackend();
+    this.scheduleSyncBackend();
     return {};
   }
 
@@ -173,7 +174,7 @@ export class CartStore {
     updated[idx] = { ...updated[idx], note: trimmed || null };
     this.itemsSignal.set(updated);
     this.persist();
-    this.syncBackend();
+    this.scheduleSyncBackend();
     return {};
   }
 
@@ -222,6 +223,14 @@ export class CartStore {
       image: i.image_url ?? '',
       note: i.note ?? null
     }));
+  }
+
+  private scheduleSyncBackend(delayMs = 350): void {
+    if (this.syncTimeoutId) clearTimeout(this.syncTimeoutId);
+    this.syncTimeoutId = setTimeout(() => {
+      this.syncTimeoutId = null;
+      this.syncBackend();
+    }, delayMs);
   }
 
   private quoteFromApi(res: { totals?: any }): CartQuote {
