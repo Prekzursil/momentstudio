@@ -920,6 +920,8 @@
     "backToShop": "Înapoi la magazin",
     "qty": "Cant",
     "each": "buc",
+    "inStock": "În stoc: {{count}}",
+    "remove": "Elimină",
     "summary": "Sumar comandă",
     "subtotal": "Subtotal",
     "shipping": "Livrare",
@@ -927,12 +929,22 @@
     "calcAtCheckout": "Calculat la checkout",
     "estimatedTotal": "Total estimat",
     "checkout": "Continuă la checkout",
-    "continue": "Continuă cumpărăturile"
+    "continue": "Continuă cumpărăturile",
+    "clear": "Golește coșul",
+    "confirmClear": "Golești coșul? Toate produsele vor fi eliminate.",
+    "errors": {
+      "notFound": "Produsul nu a fost găsit.",
+      "minQty": "Cantitatea trebuie să fie cel puțin 1.",
+      "insufficientStock": "Stoc insuficient."
+    }
   },
   "checkout": {
     "title": "Checkout",
     "retry": "Reîncearcă",
     "addressRequired": "Te rugăm să completezi toate câmpurile obligatorii.",
+    "cartSyncError": "Nu am putut sincroniza coșul cu serverul.",
+    "cartLoadError": "Nu am putut încărca coșul de pe server.",
+    "checkoutFailed": "Finalizarea comenzii a eșuat.",
     "countryInvalid": "Te rugăm să selectezi o țară validă.",
     "savedAddressesTitle": "Adrese salvate",
     "manageAddresses": "Gestionează",
@@ -952,6 +964,7 @@
     "emailVerifySend": "Trimite cod",
     "emailVerifyResend": "Retrimite codul",
     "emailVerifyVerified": "Verificat",
+    "emailVerifySendFailed": "Nu am putut trimite codul de verificare.",
     "line1": "Adresă",
     "city": "Oraș",
     "region": "Județ / Stat",

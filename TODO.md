@@ -409,6 +409,57 @@ Below is a structured checklist you can turn into issues.
 - [x] Checkout: add courier selection (home delivery vs locker) and show it in order details/emails.
 - [x] Payments UX: add PayPal (optional) and show all payment options with icons + clear copy.
 - [x] Shipping: integrate official locker APIs for Sameday + Fan Courier (env-configured; optional Overpass fallback for local dev).
+### Cart & Checkout – Next Improvements (Backlog)
+- [x] Cart/Checkout: translate remaining hard-coded UI strings and error messages (no raw English).
+- [x] Cart: show quantity validation errors per item (avoid a single global error banner).
+- [x] Cart: add “Clear cart” action with confirmation (keep backend in sync).
+- [ ] Cart: show discount breakdown in summary (sale vs coupon vs shipping) using backend quote totals.
+- [ ] Cart: add promo code apply UI (signed-in only for coupons) with applied-code chip + remove action.
+- [ ] Cart: add item notes/gift messages UI and persist to backend cart items.
+- [ ] Cart: add skeleton loading state while cart syncs/loads from backend.
+- [ ] Cart: replace quantity input with +/- stepper (debounced) and clamp to stock.
+- [ ] Cart: show low-stock messaging (“Only X left”) and highlight when at max quantity.
+- [ ] Cart: add “Move to wishlist” action for signed-in users.
+- [ ] Cart: add recommendations (“You may also like”) using category/featured products.
+- [ ] Cart: show free-shipping threshold progress (configurable) and suggested add-ons.
+- [ ] Cart: show estimated delivery window based on courier selection (if available).
+- [ ] Cart: persist delivery type/courier selections and prefill checkout.
+- [ ] Cart: add “Save for later” list (separate from wishlist; optional).
+- [ ] Checkout: redirect to cart when cart is empty (with helpful message).
+- [ ] Checkout: stepper UI polish (completion checkmarks + scroll-to-next on continue).
+- [ ] Checkout: block placing an order while cart sync is pending (prevent stale totals).
+- [ ] Checkout: debounce cart sync and show explicit “Syncing…” indicator.
+- [ ] Checkout: preselect default saved shipping/billing addresses and allow quick switch.
+- [ ] Checkout: allow editing a selected saved address inline (opens modal) and re-apply it.
+- [ ] Checkout: improve guest email verification UX (clearer errors, resend cooldown, avoid masking specific errors).
+- [ ] Checkout: show eligible + ineligible coupons with reasons and estimated savings.
+- [ ] Checkout: optionally auto-apply the best eligible coupon (toggleable).
+- [ ] Checkout: clearly show stacking rules (sale price + coupon) and why some coupons can’t be applied.
+- [ ] Checkout: order summary breakdown (subtotal, discount, shipping, VAT) with consistent formatting.
+- [ ] Checkout: include item thumbnails + per-line totals in the order summary.
+- [ ] Checkout: ensure guest “create account” preserves saved address + preferences on submit.
+- [ ] Checkout: add helper copy and links per payment method (Stripe/PayPal/COD/Netopia).
+- [ ] Checkout: improve Stripe return/cancel screens (clear status, retry CTA, support link).
+- [ ] Checkout: improve PayPal return/cancel screens (clear status, retry CTA, support link).
+- [ ] Checkout: show loader when payment method is “not ready” instead of a hard error.
+- [ ] Checkout: show inline field validation (per field) with `aria-describedby` and consistent styling.
+- [ ] Checkout: add “Copy from shipping” button for billing address when not “same as shipping”.
+- [ ] Checkout: add “Save as default shipping/billing” toggles when saving address (signed-in).
+- [ ] Checkout: expose courier price/ETA differences more clearly (radio cards).
+- [ ] Checkout: add phone field to shipping address if courier requires it (configurable).
+- [ ] Checkout: add optional invoice details (company name, VAT ID) under billing.
+- [ ] Payments UX: hide/disable payment methods that are not available for current cart/currency/country.
+- [ ] Payments UX: remember last-used payment method and default to it on next checkout.
+- [ ] Payments UX: prevent double-submits and show progress on “Place order” (incl. network retries).
+- [ ] A11y: add aria-labels for cart remove/quantity controls and ensure full keyboard support.
+- [ ] A11y: announce validation errors via `aria-live` on checkout and move focus to first error.
+- [ ] A11y: ensure focus management when steps change or modals open/close.
+- [ ] Performance: split the monolithic `CheckoutComponent` into smaller components (shipping/promo/payment).
+- [ ] Performance: add route-level prefetching/resolvers for shipping methods and CMS pricing settings.
+- [ ] Observability: add client-side analytics events for cart/checkout steps (start, abandon, success).
+- [ ] Testing: add Playwright e2e for cart → checkout → COD success.
+- [ ] Testing: add Playwright e2e for coupons eligibility + guest restriction.
+- [ ] Testing: add Playwright e2e for PayPal and Stripe return/cancel flows (smoke).
 
 ## Frontend - Auth & Account
 - [x] Login page with validation.

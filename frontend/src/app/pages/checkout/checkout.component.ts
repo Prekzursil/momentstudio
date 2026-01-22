@@ -1711,7 +1711,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
         },
         error: () => {
           this.syncing = false;
-          this.errorMessage = 'Could not sync cart with server';
+          this.errorMessage = this.translate.instant('checkout.cartSyncError');
         }
       });
   }
@@ -1727,13 +1727,13 @@ export class CheckoutComponent implements OnInit, OnDestroy {
           },
           error: () => {
             this.syncing = false;
-            this.errorMessage = 'Could not load cart from server';
+            this.errorMessage = this.translate.instant('checkout.cartLoadError');
           }
         });
       },
       error: () => {
         this.syncing = false;
-        this.errorMessage = 'Could not load cart from server';
+        this.errorMessage = this.translate.instant('checkout.cartLoadError');
       }
     });
   }
@@ -1877,7 +1877,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
           this.placing = false;
         },
         error: (err) => {
-          this.errorMessage = err?.error?.detail || 'Checkout failed';
+          this.errorMessage = err?.error?.detail || this.translate.instant('checkout.checkoutFailed');
           this.placing = false;
         }
       });
@@ -1902,7 +1902,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     const timeoutId = setTimeout(() => {
       if (!this.guestSendingCode) return;
       this.guestSendingCode = false;
-      this.guestEmailError = this.guestEmailError || 'Could not send verification code';
+      this.guestEmailError = this.guestEmailError || this.translate.instant('checkout.emailVerifySendFailed');
     }, 15_000);
 
     const lang = (this.translate.currentLang || 'en') === 'ro' ? 'ro' : 'en';
@@ -1916,7 +1916,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       error: (err) => {
         clearTimeout(timeoutId);
         this.guestSendingCode = false;
-        this.guestEmailError = err?.error?.detail || 'Could not send verification code';
+        this.guestEmailError = err?.error?.detail || this.translate.instant('checkout.emailVerifySendFailed');
       },
       complete: () => {
         // Some environments may not emit a `next` value. Treat completion as success.
@@ -2089,7 +2089,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
           this.placing = false;
         },
         error: (err) => {
-          this.errorMessage = err?.error?.detail || 'Checkout failed';
+          this.errorMessage = err?.error?.detail || this.translate.instant('checkout.checkoutFailed');
           this.placing = false;
         }
       });

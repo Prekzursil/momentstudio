@@ -21,7 +21,16 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
         <section class="grid gap-4">
           <div class="flex items-center justify-between">
             <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'cart.title' | translate }}</h1>
-            <span class="text-sm text-slate-600 dark:text-slate-300">{{ 'cart.items' | translate : { count: items().length } }}</span>
+            <div class="flex items-center gap-3">
+              <span class="text-sm text-slate-600 dark:text-slate-300">{{ 'cart.items' | translate : { count: items().length } }}</span>
+              <app-button
+                *ngIf="items().length"
+                size="sm"
+                variant="ghost"
+                [label]="'cart.clear' | translate"
+                (action)="clearCart()"
+              ></app-button>
+            </div>
           </div>
 
           <div *ngIf="!items().length" class="border border-dashed border-slate-200 rounded-2xl p-10 text-center grid gap-3 dark:border-slate-800">
@@ -50,10 +59,10 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
                       class="font-semibold text-slate-900 dark:text-slate-50 hover:underline"
                       >{{ item.name }}</a
                     >
-                    <p class="text-sm text-slate-500 dark:text-slate-400">In stock: {{ item.stock }}</p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">{{ 'cart.inStock' | translate : { count: item.stock } }}</p>
                   </div>
                   <button class="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50" (click)="remove(item.id)">
-                    Remove
+                    {{ 'cart.remove' | translate }}
                   </button>
                 </div>
                 <div class="flex items-center gap-3 text-sm">
@@ -75,7 +84,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
                     {{ item.price * item.quantity | localizedCurrency : item.currency }}
                   </span>
                 </div>
-                <p *ngIf="errorMsg" class="text-sm text-amber-700 dark:text-amber-300">{{ errorMsg }}</p>
+                <p *ngIf="itemErrors[item.id]" class="text-sm text-amber-700 dark:text-amber-300">{{ itemErrors[item.id] | translate }}</p>
               </div>
             </div>
           </div>
@@ -115,7 +124,7 @@ export class CartComponent implements OnInit {
     { label: 'nav.home', url: '/' },
     { label: 'nav.cart' }
   ];
-  errorMsg = '';
+  itemErrors: Record<string, string> = {};
 
   constructor(private cart: CartStore, private translate: TranslateService) {}
 
@@ -132,11 +141,22 @@ export class CartComponent implements OnInit {
 
   onQuantityChange(id: string, value: number): void {
     const qty = Number(value);
-    const { error } = this.cart.updateQuantity(id, qty);
-    this.errorMsg = error ?? '';
+    const { errorKey } = this.cart.updateQuantity(id, qty);
+    if (errorKey) {
+      this.itemErrors[id] = errorKey;
+      return;
+    }
+    delete this.itemErrors[id];
   }
 
   remove(id: string): void {
     this.cart.remove(id);
+    delete this.itemErrors[id];
+  }
+
+  clearCart(): void {
+    if (!confirm(this.translate.instant('cart.confirmClear'))) return;
+    this.cart.clear();
+    this.itemErrors = {};
   }
 }

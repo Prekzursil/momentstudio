@@ -123,12 +123,12 @@ export class CartStore {
     });
   }
 
-  updateQuantity(id: string, quantity: number): { error?: string } {
+  updateQuantity(id: string, quantity: number): { errorKey?: string } {
     const items = this.itemsSignal();
     const idx = items.findIndex((i) => i.id === id);
-    if (idx === -1) return { error: 'Item not found' };
-    if (quantity < 1) return { error: 'Quantity must be at least 1' };
-    if (quantity > items[idx].stock) return { error: 'Not enough stock available' };
+    if (idx === -1) return { errorKey: 'cart.errors.notFound' };
+    if (quantity < 1) return { errorKey: 'cart.errors.minQty' };
+    if (quantity > items[idx].stock) return { errorKey: 'cart.errors.insufficientStock' };
     const updated = [...items];
     updated[idx] = { ...updated[idx], quantity };
     this.itemsSignal.set(updated);

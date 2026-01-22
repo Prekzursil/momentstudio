@@ -920,6 +920,8 @@
     "backToShop": "Back to shop",
     "qty": "Qty",
     "each": "each",
+    "inStock": "In stock: {{count}}",
+    "remove": "Remove",
     "summary": "Order summary",
     "subtotal": "Subtotal",
     "shipping": "Shipping",
@@ -927,12 +929,22 @@
     "calcAtCheckout": "Calculated at checkout",
     "estimatedTotal": "Estimated total",
     "checkout": "Proceed to checkout",
-    "continue": "Continue shopping"
+    "continue": "Continue shopping",
+    "clear": "Clear cart",
+    "confirmClear": "Clear your cart? This will remove all items.",
+    "errors": {
+      "notFound": "Item not found.",
+      "minQty": "Quantity must be at least 1.",
+      "insufficientStock": "Not enough stock available."
+    }
   },
   "checkout": {
     "title": "Checkout",
     "retry": "Retry",
     "addressRequired": "Please complete all required fields.",
+    "cartSyncError": "Could not sync cart with server.",
+    "cartLoadError": "Could not load cart from server.",
+    "checkoutFailed": "Checkout failed.",
     "countryInvalid": "Please select a valid country.",
     "savedAddressesTitle": "Saved addresses",
     "manageAddresses": "Manage",
@@ -952,6 +964,7 @@
     "emailVerifySend": "Send code",
     "emailVerifyResend": "Resend code",
     "emailVerifyVerified": "Verified",
+    "emailVerifySendFailed": "Could not send verification code.",
     "line1": "Address line",
     "city": "City",
     "region": "County / State",
