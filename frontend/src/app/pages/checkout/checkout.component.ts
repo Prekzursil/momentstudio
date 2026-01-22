@@ -12,6 +12,7 @@ import { ApiService } from '../../core/api.service';
 import { AccountService, Address, AddressCreateRequest } from '../../core/account.service';
 import { CouponsService, type CouponEligibilityResponse, type CouponOffer } from '../../core/coupons.service';
 import { appConfig } from '../../core/app-config';
+import { AnalyticsService } from '../../core/analytics.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthService } from '../../core/auth.service';
 import { buildE164, listPhoneCountries, PhoneCountryOption, splitE164 } from '../../shared/phone';
@@ -96,6 +97,17 @@ const CHECKOUT_SUCCESS_KEY = 'checkout_last_order';
 const CHECKOUT_PAYPAL_PENDING_KEY = 'checkout_paypal_pending';
 const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
 const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
+
+const parseBool = (value: unknown, fallback: boolean): boolean => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return Boolean(value);
+  if (typeof value === 'string') {
+    const v = value.trim().toLowerCase();
+    if (['1', 'true', 'yes', 'on'].includes(v)) return true;
+    if (['0', 'false', 'no', 'off'].includes(v)) return false;
+  }
+  return fallback;
+};
 
 @Component({
   selector: 'app-checkout',
@@ -358,6 +370,8 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
 	  private syncDebounceHandle: ReturnType<typeof setTimeout> | null = null;
   private queuedSyncItems: CartItem[] | null = null;
   private checkoutRedirectedToCart = false;
+  private checkoutStartTracked = false;
+  private checkoutFlowCompleted = false;
 
   constructor(
     private cart: CartStore,
@@ -369,6 +383,7 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
     private couponsService: CouponsService,
     private translate: TranslateService,
     private checkoutPrefs: CheckoutPrefsService,
+    private analytics: AnalyticsService,
     public auth: AuthService
   ) {
     const saved = this.loadSavedCheckout();
@@ -1168,10 +1183,49 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
   private hydrateCartAndQuote(res: CartResponse): void {
     this.cart.hydrateFromBackend(res);
     this.setQuote(res);
+    this.trackCheckoutStart();
     this.pricesRefreshed = true;
     this.syncQueued = false;
     this.syncNotice = '';
     this.redirectToCartIfEmpty();
+  }
+
+  private trackCheckoutStart(): void {
+    if (this.checkoutStartTracked) return;
+    const items = this.items();
+    if (!items.length) return;
+    this.checkoutStartTracked = true;
+    const units = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    const currency = (this.currency || items[0]?.currency || 'RON') as string;
+    this.analytics.track('checkout_start', {
+      line_items: items.length,
+      units,
+      subtotal: this.subtotal(),
+      total: this.quoteTotal(),
+      currency
+    });
+  }
+
+  private trackCheckoutAbandon(): void {
+    if (!this.checkoutStartTracked) return;
+    if (this.checkoutFlowCompleted) return;
+    const items = this.items();
+    const units = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    const currency = (this.currency || items[0]?.currency || 'RON') as string;
+    this.analytics.track('checkout_abandon', {
+      line_items: items.length,
+      units,
+      subtotal: this.subtotal(),
+      total: this.quoteTotal(),
+      currency,
+      step1_complete: this.step1Complete(),
+      step2_complete: this.step2Complete(),
+      payment_method: this.paymentMethod,
+      delivery_type: this.deliveryType,
+      courier: this.courier,
+      promo_applied: Boolean((this.promo || '').trim()),
+      signed_in: this.auth.isAuthenticated()
+    });
   }
 
   private redirectToCartIfEmpty(): void {
@@ -1183,16 +1237,6 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
 
 	  private setQuote(res: CartResponse): void {
 	    const totals = res?.totals ?? ({} as any);
-      const parseBool = (value: unknown, fallback: boolean) => {
-        if (typeof value === 'boolean') return value;
-        if (typeof value === 'number') return Boolean(value);
-        if (typeof value === 'string') {
-          const v = value.trim().toLowerCase();
-          if (['1', 'true', 'yes', 'on'].includes(v)) return true;
-          if (['0', 'false', 'no', 'off'].includes(v)) return false;
-        }
-        return fallback;
-      };
 	    const subtotal = parseMoney(totals.subtotal);
 	    const fee = parseMoney(totals.fee);
 	    const tax = parseMoney(totals.tax);
@@ -1203,10 +1247,18 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
       this.phoneRequiredHome = parseBool((totals as any).phone_required_home, true);
       this.phoneRequiredLocker = parseBool((totals as any).phone_required_locker, true);
 	    this.currency = currency || 'RON';
-      this.ensurePaymentMethodAvailable();
+	    this.ensurePaymentMethodAvailable();
 	    this.loadCouponsEligibility();
 	    this.applyPendingPromoCode();
 	  }
+
+    private applyPrefetchedPricingSettings(): void {
+      const meta = this.route.snapshot.data?.['checkoutPricingSettings'];
+      if (!meta || typeof meta !== 'object') return;
+      const obj = meta as Record<string, unknown>;
+      this.phoneRequiredHome = parseBool(obj['phone_required_home'], this.phoneRequiredHome);
+      this.phoneRequiredLocker = parseBool(obj['phone_required_locker'], this.phoneRequiredLocker);
+    }
 
   private loadCouponsEligibility(): void {
     if (!this.auth.isAuthenticated()) {
@@ -1599,6 +1651,7 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
 
   ngOnInit(): void {
     this.autoApplyBestCoupon = this.loadAutoApplyBestCouponPreference();
+    this.applyPrefetchedPricingSettings();
     this.route.queryParamMap.subscribe((params) => {
       const promo = (params.get('promo') || '').trim();
       if (!promo) return;
@@ -1611,6 +1664,7 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
     this.loadSavedAddresses();
     const items = this.items();
     if (items.length) {
+      this.trackCheckoutStart();
       this.queueCartSync(items, { immediate: true });
     } else if (!this.auth.isAuthenticated()) {
       this.redirectToCartIfEmpty();
@@ -1633,6 +1687,7 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
 	      clearTimeout(this.paymentNotReadyTimer);
 	      this.paymentNotReadyTimer = null;
 	    }
+      this.trackCheckoutAbandon();
 	  }
 
 	  setPaymentMethod(method: CheckoutPaymentMethod): void {
@@ -1880,6 +1935,7 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
             if (this.saveAddress) this.persistAddress();
             this.placing = false;
             if (res.paypal_approval_url) {
+              this.checkoutFlowCompleted = true;
               window.location.assign(res.paypal_approval_url);
               return;
             }
@@ -1891,6 +1947,7 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
             if (this.saveAddress) this.persistAddress();
             this.placing = false;
             if (res.stripe_checkout_url) {
+              this.checkoutFlowCompleted = true;
               window.location.assign(res.stripe_checkout_url);
               return;
             }
@@ -1911,6 +1968,7 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
             if (this.saveAddress) this.persistAddress();
             this.cart.clear();
             this.placing = false;
+            this.checkoutFlowCompleted = true;
             void this.router.navigate(['/checkout/success']);
             return;
           }
@@ -2129,6 +2187,7 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
             if (this.saveAddress) this.persistAddress();
             this.placing = false;
             if (res.paypal_approval_url) {
+              this.checkoutFlowCompleted = true;
               window.location.assign(res.paypal_approval_url);
               return;
             }
@@ -2140,6 +2199,7 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
             if (this.saveAddress) this.persistAddress();
             this.placing = false;
             if (res.stripe_checkout_url) {
+              this.checkoutFlowCompleted = true;
               window.location.assign(res.stripe_checkout_url);
               return;
             }
@@ -2160,6 +2220,7 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
             if (this.saveAddress) this.persistAddress();
             this.placing = false;
             this.cart.clear();
+            this.checkoutFlowCompleted = true;
             void this.router.navigate(['/checkout/success']);
             return;
           }

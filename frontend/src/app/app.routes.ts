@@ -10,6 +10,7 @@ import { ContactComponent } from './pages/contact/contact.component';
 import { adminGuard, authGuard } from './core/auth.guard';
 import { unsavedChangesGuard } from './core/unsaved-changes.guard';
 import { shopCategoriesResolver } from './core/shop.resolver';
+import { checkoutPricingSettingsResolver, checkoutShippingMethodsResolver } from './core/checkout.resolver';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent, title: 'momentstudio' },
@@ -44,7 +45,11 @@ export const routes: Routes = [
   {
     path: 'checkout',
     loadComponent: () => import('./pages/checkout/checkout.component').then((m) => m.CheckoutComponent),
-    title: 'Checkout | momentstudio'
+    title: 'Checkout | momentstudio',
+    resolve: {
+      shippingMethods: checkoutShippingMethodsResolver,
+      checkoutPricingSettings: checkoutPricingSettingsResolver
+    }
   },
   {
     path: 'checkout/paypal/return',

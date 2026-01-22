@@ -7,6 +7,7 @@ import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { CartStore } from '../../core/cart.store';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { TranslateModule } from '@ngx-translate/core';
+import { AnalyticsService } from '../../core/analytics.service';
 
 type CheckoutSuccessItem = {
   name: string;
@@ -128,10 +129,14 @@ export class SuccessComponent {
 
   summary: CheckoutSuccessSummary | null = null;
 
-  constructor(private cart: CartStore) {
+  constructor(
+    private cart: CartStore,
+    private analytics: AnalyticsService
+  ) {
     // Keep the cart in sync in case the backend cleared it while we were paying.
     this.cart.loadFromBackend();
     this.summary = this.loadSummary();
+    this.trackCheckoutSuccess();
   }
 
   private loadSummary(): CheckoutSuccessSummary | null {
@@ -146,6 +151,28 @@ export class SuccessComponent {
     } catch {
       return null;
     }
+  }
+
+  private trackCheckoutSuccess(): void {
+    const summary = this.summary;
+    if (!summary) return;
+    const items = summary.items ?? [];
+    const units = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    this.analytics.track('checkout_success', {
+      order_id: summary.order_id,
+      payment_method: summary.payment_method,
+      courier: summary.courier,
+      delivery_type: summary.delivery_type,
+      line_items: items.length,
+      units,
+      subtotal: summary.totals?.subtotal,
+      discount: summary.totals?.discount,
+      fee: summary.totals?.fee ?? 0,
+      tax: summary.totals?.tax,
+      shipping: summary.totals?.shipping,
+      total: summary.totals?.total,
+      currency: summary.totals?.currency
+    });
   }
 
   courierLabel(): string | null {
