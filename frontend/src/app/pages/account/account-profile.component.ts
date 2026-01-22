@@ -26,15 +26,21 @@ import { AccountComponent } from './account.component';
         <div class="grid gap-1">
           <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'account.sections.profile' | translate }}</h2>
           <p class="text-xs text-slate-500 dark:text-slate-400">
-            Profile completeness: {{ account.profileCompleteness().completed }}/{{ account.profileCompleteness().total }} ({{
-              account.profileCompleteness().percent
-            }}%)
+            {{
+              'account.profile.completeness'
+                | translate
+                  : {
+                      completed: account.profileCompleteness().completed,
+                      total: account.profileCompleteness().total,
+                      percent: account.profileCompleteness().percent
+                    }
+            }}
           </p>
         </div>
         <app-button
           size="sm"
           variant="ghost"
-          label="Save"
+          [label]="'account.profile.actions.save' | translate"
           [disabled]="account.savingProfile"
           (action)="account.saveProfile()"
         ></app-button>
@@ -56,42 +62,42 @@ import { AccountComponent } from './account.component';
       </div>
 
       <div class="grid gap-4">
-        <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-4">
-          <div class="grid gap-1">
-            <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">Public identity</h3>
-            <p class="text-xs text-slate-500 dark:text-slate-400">How you appear in comments and other public activity.</p>
-          </div>
+	        <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-4">
+	          <div class="grid gap-1">
+	            <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'account.profile.sections.publicIdentity.title' | translate }}</h3>
+	            <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'account.profile.sections.publicIdentity.copy' | translate }}</p>
+	          </div>
 
-          <div class="flex flex-col sm:flex-row sm:items-center gap-4">
-            <img
-              [src]="account.avatar || account.profile()?.avatar_url || account.placeholderAvatar"
-              alt="avatar"
-              class="h-16 w-16 rounded-full object-cover border border-slate-200 dark:border-slate-800"
-            />
-            <div class="flex flex-wrap items-center gap-3">
-              <label class="text-sm text-indigo-600 font-medium cursor-pointer dark:text-indigo-300">
-                Upload avatar
-                <input type="file" class="hidden" accept="image/*" (change)="onAvatarFileChange($event)" />
-              </label>
+	          <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+	            <img
+	              [src]="account.avatar || account.profile()?.avatar_url || account.placeholderAvatar"
+	              [attr.alt]="'account.profile.avatar.alt' | translate"
+	              class="h-16 w-16 rounded-full object-cover border border-slate-200 dark:border-slate-800"
+	            />
+	            <div class="flex flex-wrap items-center gap-3">
+	              <label class="text-sm text-indigo-600 font-medium cursor-pointer dark:text-indigo-300">
+	                {{ 'account.profile.avatar.upload' | translate }}
+	                <input type="file" class="hidden" accept="image/*" (change)="onAvatarFileChange($event)" />
+	              </label>
               <app-button
-                *ngIf="account.googlePicture() && (account.profile()?.avatar_url || '') !== (account.googlePicture() || '')"
-                size="sm"
-                variant="ghost"
-                label="Use Google photo"
-                [disabled]="account.avatarBusy"
-                (action)="account.useGoogleAvatar()"
-              ></app-button>
+	                *ngIf="account.googlePicture() && (account.profile()?.avatar_url || '') !== (account.googlePicture() || '')"
+	                size="sm"
+	                variant="ghost"
+	                [label]="'account.profile.avatar.useGoogle' | translate"
+	                [disabled]="account.avatarBusy"
+	                (action)="account.useGoogleAvatar()"
+	              ></app-button>
               <app-button
-                *ngIf="account.profile()?.avatar_url"
-                size="sm"
-                variant="ghost"
-                label="Remove"
-                [disabled]="account.avatarBusy"
-                (action)="account.removeAvatar()"
-              ></app-button>
-              <span class="text-xs text-slate-500 dark:text-slate-400">JPG/PNG/WebP up to 5MB</span>
-            </div>
-          </div>
+	                *ngIf="account.profile()?.avatar_url"
+	                size="sm"
+	                variant="ghost"
+	                [label]="'account.profile.avatar.remove' | translate"
+	                [disabled]="account.avatarBusy"
+	                (action)="account.removeAvatar()"
+	              ></app-button>
+	              <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'account.profile.avatar.hint' | translate }}</span>
+	            </div>
+	          </div>
 
           <div class="grid gap-3 sm:grid-cols-2">
             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -103,9 +109,9 @@ import { AccountComponent } from './account.component';
                 [required]="account.profileCompletionRequired()"
                 [(ngModel)]="account.profileName"
               />
-              <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
-                Public: {{ account.publicIdentityLabel() }}
-              </span>
+	              <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+	                {{ 'account.profile.publicLabel' | translate: { value: account.publicIdentityLabel() } }}
+	              </span>
               <span
                 *ngIf="account.displayNameCooldownSeconds() > 0"
                 class="text-xs font-normal text-amber-800 dark:text-amber-200"
@@ -127,10 +133,10 @@ import { AccountComponent } from './account.component';
                 pattern="^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$"
                 [required]="account.profileCompletionRequired()"
                 [(ngModel)]="account.profileUsername"
-              />
-              <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
-                Use this to sign in and as a stable handle in public activity.
-              </span>
+	              />
+	              <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+	                {{ 'account.profile.username.helper' | translate }}
+	              </span>
               <span
                 *ngIf="account.usernameCooldownSeconds() > 0"
                 class="text-xs font-normal text-amber-800 dark:text-amber-200"
@@ -161,39 +167,39 @@ import { AccountComponent } from './account.component';
                 >
                   {{ (showUsernamePassword ? 'auth.hide' : 'auth.show') | translate }}
                 </button>
-              </div>
-              <span class="text-xs font-normal text-slate-500 dark:text-slate-400">Required to change your username.</span>
-	            </label>
-	          </div>
+	              </div>
+	              <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{ 'account.profile.username.passwordRequired' | translate }}</span>
+		            </label>
+		          </div>
 
-	          <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
-	            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">Public preview</p>
-	            <div class="mt-3 flex items-start gap-3">
-	              <img
-	                [src]="account.avatar || account.profile()?.avatar_url || account.placeholderAvatar"
-	                alt="avatar preview"
-	                class="h-10 w-10 rounded-full object-cover border border-slate-200 dark:border-slate-800"
-	              />
+		          <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+		            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'account.profile.preview.title' | translate }}</p>
+		            <div class="mt-3 flex items-start gap-3">
+		              <img
+		                [src]="account.avatar || account.profile()?.avatar_url || account.placeholderAvatar"
+		                [attr.alt]="'account.profile.avatar.previewAlt' | translate"
+		                class="h-10 w-10 rounded-full object-cover border border-slate-200 dark:border-slate-800"
+		              />
 	              <div class="min-w-0 flex-1">
 	                <div class="flex flex-wrap items-center gap-2">
-	                  <span class="font-semibold text-slate-900 dark:text-slate-50 truncate">
-	                    {{ account.publicIdentityPreviewLabel() }}
-	                  </span>
-	                  <span class="text-xs text-slate-500 dark:text-slate-400">just now</span>
-	                </div>
-	                <p class="mt-1 text-sm text-slate-700 dark:text-slate-300">
-	                  Thanks for supporting my work!
-	                </p>
-	              </div>
-	            </div>
-	          </div>
+		                  <span class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+		                    {{ account.publicIdentityPreviewLabel() }}
+		                  </span>
+		                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'account.profile.preview.justNow' | translate }}</span>
+		                </div>
+		                <p class="mt-1 text-sm text-slate-700 dark:text-slate-300">
+		                  {{ 'account.profile.preview.message' | translate }}
+		                </p>
+		              </div>
+		            </div>
+		          </div>
 	        </div>
 	
 	        <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-3">
 	          <div class="grid gap-1">
-            <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">Private account info</h3>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Used for orders, support, and legal requirements.</p>
-          </div>
+	            <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'account.profile.sections.privateInfo.title' | translate }}</h3>
+	            <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'account.profile.sections.privateInfo.copy' | translate }}</p>
+	          </div>
 
           <div class="grid gap-3 sm:grid-cols-2">
             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -281,24 +287,24 @@ import { AccountComponent } from './account.component';
                   </span>
                 </ng-template>
               </div>
-            </div>
-
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              Preferred language
-              <select
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                name="profileLanguage"
+	            </div>
+	
+	            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	              {{ 'account.profile.settings.preferredLanguage' | translate }}
+	              <select
+	                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                name="profileLanguage"
                 [(ngModel)]="account.profileLanguage"
               >
                 <option value="en">EN</option>
                 <option value="ro">RO</option>
-              </select>
-            </label>
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              Theme
-              <select
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                name="profileTheme"
+	              </select>
+	            </label>
+	            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	              {{ 'account.profile.settings.theme' | translate }}
+	              <select
+	                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                name="profileTheme"
                 [(ngModel)]="account.profileThemePreference"
               >
                 <option value="system">{{ 'theme.system' | translate }}</option>
@@ -309,40 +315,40 @@ import { AccountComponent } from './account.component';
           </div>
         </div>
       </div>
-
-      <p *ngIf="account.profileError" class="text-sm text-rose-700 dark:text-rose-300">{{ account.profileError }}</p>
-      <p *ngIf="account.profileSaved" class="text-sm text-emerald-700 dark:text-emerald-300">Saved.</p>
-
-      <div class="grid gap-3 sm:grid-cols-2" *ngIf="account.isAuthenticated()">
-        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
-          <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">Username history</p>
+	
+	      <p *ngIf="account.profileError" class="text-sm text-rose-700 dark:text-rose-300">{{ account.profileError }}</p>
+	      <p *ngIf="account.profileSaved" class="text-sm text-emerald-700 dark:text-emerald-300">{{ 'account.profile.savedInline' | translate }}</p>
+	
+	      <div class="grid gap-3 sm:grid-cols-2" *ngIf="account.isAuthenticated()">
+	        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+	          <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'account.profile.history.usernameTitle' | translate }}</p>
           <div *ngIf="account.aliasesLoading()" class="mt-2">
             <app-skeleton height="44px"></app-skeleton>
           </div>
-          <p
-            *ngIf="!account.aliasesLoading() && account.aliases()?.usernames?.length === 0"
-            class="mt-2 text-sm text-slate-600 dark:text-slate-300"
-          >
-            No history yet.
-          </p>
+	          <p
+	            *ngIf="!account.aliasesLoading() && account.aliases()?.usernames?.length === 0"
+	            class="mt-2 text-sm text-slate-600 dark:text-slate-300"
+	          >
+	            {{ 'account.profile.history.empty' | translate }}
+	          </p>
           <ul *ngIf="!account.aliasesLoading() && account.aliases()?.usernames?.length" class="mt-2 grid gap-2 text-sm">
             <li *ngFor="let h of account.aliases()!.usernames" class="flex items-center justify-between gap-2">
               <span class="font-medium text-slate-900 dark:text-slate-50 truncate">{{ h.username }}</span>
               <span class="text-xs text-slate-500 dark:text-slate-400 shrink-0">{{ h.created_at | date: 'short' }}</span>
             </li>
           </ul>
-        </div>
-        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
-          <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">Display name history</p>
+	        </div>
+	        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+	          <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'account.profile.history.displayNameTitle' | translate }}</p>
           <div *ngIf="account.aliasesLoading()" class="mt-2">
             <app-skeleton height="44px"></app-skeleton>
           </div>
-          <p
-            *ngIf="!account.aliasesLoading() && account.aliases()?.display_names?.length === 0"
-            class="mt-2 text-sm text-slate-600 dark:text-slate-300"
-          >
-            No history yet.
-          </p>
+	          <p
+	            *ngIf="!account.aliasesLoading() && account.aliases()?.display_names?.length === 0"
+	            class="mt-2 text-sm text-slate-600 dark:text-slate-300"
+	          >
+	            {{ 'account.profile.history.empty' | translate }}
+	          </p>
           <ul *ngIf="!account.aliasesLoading() && account.aliases()?.display_names?.length" class="mt-2 grid gap-2 text-sm">
             <li *ngFor="let h of account.aliases()!.display_names" class="flex items-center justify-between gap-2">
               <span class="font-medium text-slate-900 dark:text-slate-50 truncate">{{ h.name }}#{{ h.name_tag }}</span>
@@ -351,68 +357,74 @@ import { AccountComponent } from './account.component';
           </ul>
         </div>
       </div>
-      <p *ngIf="account.aliasesError()" class="text-sm text-rose-700 dark:text-rose-300">{{ account.aliasesError() }}</p>
-      <p class="text-xs text-slate-500 dark:text-slate-400">
-        Session timeout: 30m. Your theme is saved on this device; language is saved to your profile when signed in.
-      </p>
-      </ng-template>
-    </section>
+	      <p *ngIf="account.aliasesError()" class="text-sm text-rose-700 dark:text-rose-300">{{ account.aliasesError() }}</p>
+	      <p class="text-xs text-slate-500 dark:text-slate-400">
+	        {{ 'account.profile.sessionHint' | translate }}
+	      </p>
+	      </ng-template>
+	    </section>
 
     <ng-container *ngIf="avatarCropOpen">
-      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-        <div
-          class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
-        >
-          <div class="flex items-center justify-between gap-3">
-            <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">Crop avatar</h3>
-            <button
-              type="button"
-              class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
-              (click)="cancelAvatarCrop()"
-              aria-label="Close"
-            >
-              ✕
-            </button>
-          </div>
+	      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+	        <div
+	          class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+	        >
+	          <div class="flex items-center justify-between gap-3">
+	            <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'account.profile.avatar.crop.title' | translate }}</h3>
+	            <button
+	              type="button"
+	              class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+	              (click)="cancelAvatarCrop()"
+	              [attr.aria-label]="'account.profile.avatar.crop.close' | translate"
+	            >
+	              ✕
+	            </button>
+	          </div>
 
           <div class="mt-4 flex justify-center">
             <div
               class="relative h-64 w-64 overflow-hidden rounded-full border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950"
             >
-              <img
-                *ngIf="avatarCropUrl"
-                [src]="avatarCropUrl"
-                alt="Avatar preview"
-                class="absolute left-1/2 top-1/2 max-w-none select-none"
-                [style.transform]="avatarCropTransform"
-              />
+	              <img
+	                *ngIf="avatarCropUrl"
+	                [src]="avatarCropUrl"
+	                [attr.alt]="'account.profile.avatar.previewAlt' | translate"
+	                class="absolute left-1/2 top-1/2 max-w-none select-none"
+	                [style.transform]="avatarCropTransform"
+	              />
             </div>
           </div>
 
-          <label class="mt-4 grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            Zoom
-            <input
-              type="range"
-              min="1"
-              max="3"
-              step="0.01"
+	          <label class="mt-4 grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	            {{ 'account.profile.avatar.crop.zoom' | translate }}
+	            <input
+	              type="range"
+	              min="1"
+	              max="3"
+	              step="0.01"
               class="w-full"
               [(ngModel)]="avatarCropZoom"
               [disabled]="account.avatarBusy"
-            />
-          </label>
+	            />
+	          </label>
 
-          <p *ngIf="avatarCropError" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ avatarCropError }}</p>
+	          <p *ngIf="avatarCropErrorKey" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ avatarCropErrorKey | translate }}</p>
 
-          <div class="mt-4 flex justify-end gap-2">
-            <app-button size="sm" variant="ghost" label="Cancel" [disabled]="account.avatarBusy" (action)="cancelAvatarCrop()"></app-button>
-            <app-button
-              size="sm"
-              label="Upload"
-              [disabled]="account.avatarBusy || !avatarCropReady"
-              (action)="confirmAvatarCrop()"
-            ></app-button>
-          </div>
+	          <div class="mt-4 flex justify-end gap-2">
+	            <app-button
+	              size="sm"
+	              variant="ghost"
+	              [label]="'account.profile.avatar.crop.cancel' | translate"
+	              [disabled]="account.avatarBusy"
+	              (action)="cancelAvatarCrop()"
+	            ></app-button>
+	            <app-button
+	              size="sm"
+	              [label]="'account.profile.avatar.crop.upload' | translate"
+	              [disabled]="account.avatarBusy || !avatarCropReady"
+	              (action)="confirmAvatarCrop()"
+	            ></app-button>
+	          </div>
         </div>
       </div>
     </ng-container>
@@ -424,7 +436,7 @@ export class AccountProfileComponent implements OnDestroy {
   avatarCropOpen = false;
   avatarCropUrl: string | null = null;
   avatarCropZoom = 1;
-  avatarCropError: string | null = null;
+  avatarCropErrorKey: string | null = null;
   private avatarImage: HTMLImageElement | null = null;
 
   hasUnsavedChanges(): boolean {
@@ -436,7 +448,7 @@ export class AccountProfileComponent implements OnDestroy {
   }
 
   get avatarCropReady(): boolean {
-    return Boolean(this.avatarCropUrl && this.avatarImage && !this.avatarCropError);
+    return Boolean(this.avatarCropUrl && this.avatarImage && !this.avatarCropErrorKey);
   }
 
   get avatarCropTransform(): string {
@@ -457,13 +469,13 @@ export class AccountProfileComponent implements OnDestroy {
     this.avatarCropUrl = url;
     this.avatarCropOpen = true;
     this.avatarCropZoom = 1;
-    this.avatarCropError = null;
+    this.avatarCropErrorKey = null;
     const img = new Image();
     img.onload = () => {
       this.avatarImage = img;
     };
     img.onerror = () => {
-      this.avatarCropError = 'Could not load image preview.';
+      this.avatarCropErrorKey = 'account.profile.avatar.crop.errors.previewLoad';
     };
     img.src = url;
   }
@@ -517,7 +529,7 @@ export class AccountProfileComponent implements OnDestroy {
     this.avatarCropOpen = false;
     this.avatarCropZoom = 1;
     this.avatarImage = null;
-    this.avatarCropError = null;
+    this.avatarCropErrorKey = null;
     if (this.avatarCropUrl) {
       URL.revokeObjectURL(this.avatarCropUrl);
       this.avatarCropUrl = null;

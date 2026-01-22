@@ -87,6 +87,10 @@
     "nav": {
       "sectionSelect": "Secțiune"
     },
+    "aria": {
+      "sectionSelect": "Selector secțiune cont",
+      "navigation": "Navigare cont"
+    },
     "sections": {
       "overview": "Prezentare",
       "profile": "Profil",
@@ -120,6 +124,41 @@
     },
     "profile": {
       "savedToast": "Profil salvat",
+      "completeness": "Completare profil: {{completed}}/{{total}} ({{percent}}%)",
+      "publicLabel": "Public: {{value}}",
+      "actions": {
+        "save": "Salvează"
+      },
+      "sections": {
+        "publicIdentity": {
+          "title": "Identitate publică",
+          "copy": "Cum apari în comentarii și în alte activități publice."
+        },
+        "privateInfo": {
+          "title": "Informații private",
+          "copy": "Folosit pentru comenzi, suport și cerințe legale."
+        }
+      },
+      "username": {
+        "helper": "Folosește-l pentru autentificare și ca identificator stabil în activitatea publică.",
+        "passwordRequired": "Necesară pentru a schimba numele de utilizator."
+      },
+      "preview": {
+        "title": "Previzualizare publică",
+        "justNow": "chiar acum",
+        "message": "Mulțumim că îmi susții munca!"
+      },
+      "settings": {
+        "preferredLanguage": "Limba preferată",
+        "theme": "Temă"
+      },
+      "savedInline": "Salvat.",
+      "history": {
+        "usernameTitle": "Istoric nume utilizator",
+        "displayNameTitle": "Istoric nume afișat",
+        "empty": "Nu există istoric încă."
+      },
+      "sessionHint": "Expirare sesiune: 30m. Tema este salvată pe acest dispozitiv; limba se salvează în profil când ești conectat.",
       "errors": {
         "displayNameRequired": "Numele afișat este obligatoriu.",
         "firstNameRequired": "Prenumele este obligatoriu.",
@@ -132,6 +171,22 @@
         "updated": "Avatar actualizat",
         "uploadError": "Nu am putut încărca avatarul.",
         "googleError": "Nu am putut folosi fotografia Google.",
+        "alt": "Avatar",
+        "previewAlt": "Previzualizare avatar",
+        "upload": "Încarcă avatar",
+        "useGoogle": "Folosește fotografia Google",
+        "remove": "Elimină",
+        "hint": "JPG/PNG/WebP până la 5MB",
+        "crop": {
+          "title": "Decupează avatarul",
+          "close": "Închide",
+          "zoom": "Zoom",
+          "cancel": "Anulează",
+          "upload": "Încarcă",
+          "errors": {
+            "previewLoad": "Nu am putut încărca previzualizarea imaginii."
+          }
+        },
         "removeConfirm": "Elimini avatarul?",
         "removed": "Avatar eliminat",
         "removeError": "Nu am putut elimina avatarul."
@@ -199,7 +254,32 @@
       }
     },
     "comments": {
-      "loadError": "Nu am putut încărca comentariile tale."
+      "loadError": "Nu am putut încărca comentariile tale.",
+      "actions": {
+        "refresh": "Reîmprospătează",
+        "prev": "Anterior",
+        "next": "Următor"
+      },
+      "empty": {
+        "title": "Nu există comentarii încă.",
+        "browse": "Explorează blogul"
+      },
+      "status": {
+        "posted": "Publicat",
+        "hidden": "Ascuns",
+        "deleted": "Șters"
+      },
+      "messages": {
+        "deleted": "Acest comentariu a fost șters.",
+        "hidden": "Acest comentariu a fost ascuns de moderatori."
+      },
+      "replyingTo": "Răspunzi la {{author}}",
+      "replies": {
+        "one": "răspuns",
+        "many": "răspunsuri"
+      },
+      "latest": "Ultimul: {{author}} — {{snippet}}",
+      "pageLabel": "Pagina {{page}} / {{total}}"
     },
     "security": {
       "subtitle": "Gestionează parola, emailurile și conturile conectate.",
@@ -390,9 +470,39 @@
         "idleLogout": "Ai fost deconectat din cauza inactivității."
       }
     },
+    "passwordChange": {
+      "title": "Schimbă parola",
+      "fields": {
+        "current": "Parola curentă",
+        "new": "Parolă nouă",
+        "confirm": "Confirmă parola nouă"
+      },
+      "actions": {
+        "update": "Actualizează parola",
+        "back": "Înapoi la cont"
+      },
+      "errors": {
+        "invalidForm": "Te rugăm să completezi formularul.",
+        "mismatch": "Parolele nu coincid.",
+        "updateFailed": "Nu am putut actualiza parola."
+      },
+      "toast": {
+        "updatedTitle": "Parolă actualizată",
+        "updatedDesc": "Parola ta a fost schimbată."
+      }
+    },
     "overview": {
       "title": "Prezentare",
       "quickLinks": "Acces rapid",
+      "aria": {
+        "overview": "Prezentare cont",
+        "ordersLoading": "Se încarcă rezumatul comenzilor",
+        "addressesLoading": "Se încarcă rezumatul adreselor",
+        "wishlistLoading": "Se încarcă rezumatul listei de dorințe",
+        "notificationsLoading": "Se încarcă rezumatul notificărilor",
+        "securityLoading": "Se încarcă rezumatul securității",
+        "supportLoading": "Se încarcă rezumatul tichetelor de suport"
+      },
       "wishlistHint": "Produse salvate pentru mai târziu.",
       "notificationsHint": "Controlează actualizările pe email.",
       "securityHint": "Parolă, Google, verificare.",
@@ -433,6 +543,24 @@
       "toLabel": "Până la",
       "applyFilters": "Aplică",
       "clearFilters": "Resetează",
+      "orderLabel": "Comandă #{{ref}}",
+      "itemsCount": {
+        "one": "1 produs",
+        "many": "{{count}} produse"
+      },
+      "updated": "Actualizat {{date}}",
+      "trackingLabel": "Urmărire",
+      "trackingNotAvailable": "Indisponibil",
+      "shippingLabel": "Livrare",
+      "deliveryLabel": "Modalitate livrare",
+      "lockerLabel": "Locker",
+      "itemsTitle": "Produse",
+      "qtyLabel": "Cant. {{count}}",
+      "totalsTitle": "Totaluri",
+      "vatLabel": "TVA",
+      "additionalLabel": "Suplimentar",
+      "totalLabel": "Total",
+      "actionsTitle": "Acțiuni",
       "pageLabel": "Pagina {{page}} / {{total}}",
       "prev": "Înapoi",
       "next": "Înainte",

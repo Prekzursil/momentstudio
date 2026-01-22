@@ -98,10 +98,10 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
         </header>
 
         <div class="grid gap-6">
-            <div
-              class="lg:hidden rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 grid gap-2"
-              aria-label="Account section selector"
-            >
+	            <div
+	              class="lg:hidden rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 grid gap-2"
+	              [attr.aria-label]="'account.aria.sectionSelect' | translate"
+	            >
               <label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                 {{ 'account.nav.sectionSelect' | translate }}
               </label>
@@ -125,10 +125,10 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
             </div>
 
             <div class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
-            <nav
-              class="hidden lg:grid rounded-2xl border border-slate-200 bg-white p-3 gap-1 dark:border-slate-800 dark:bg-slate-900 lg:sticky lg:top-24 lg:self-start"
-              aria-label="Account navigation"
-            >
+	            <nav
+	              class="hidden lg:grid rounded-2xl border border-slate-200 bg-white p-3 gap-1 dark:border-slate-800 dark:bg-slate-900 lg:sticky lg:top-24 lg:self-start"
+	              [attr.aria-label]="'account.aria.navigation' | translate"
+	            >
               <a
                 routerLink="/account/overview"
                 [routerLinkActiveOptions]="{ exact: true }"

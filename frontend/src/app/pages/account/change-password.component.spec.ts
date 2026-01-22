@@ -34,7 +34,7 @@ describe('ChangePasswordComponent', () => {
 
     cmp.onSubmit({ valid: true } as any);
 
-    expect(cmp.error).toContain('Passwords do not match');
+    expect(cmp.error).toContain('account.passwordChange.errors.mismatch');
     expect(auth.changePassword).not.toHaveBeenCalled();
   });
 

@@ -13,7 +13,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
   template: `
     <section
       class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-      aria-label="Account overview"
+      [attr.aria-label]="'account.overview.aria.overview' | translate"
     >
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
@@ -25,7 +25,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
         <ng-container *ngIf="!account.ordersLoaded(); else ordersCard">
           <div
             class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40"
-            aria-label="Orders summary loading"
+            [attr.aria-label]="'account.overview.aria.ordersLoading' | translate"
           >
             <app-skeleton height="12px" width="90px"></app-skeleton>
             <div class="mt-3 grid gap-2">
@@ -48,7 +48,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
         <ng-container *ngIf="!account.addressesLoaded(); else addressesCard">
           <div
             class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40"
-            aria-label="Addresses summary loading"
+            [attr.aria-label]="'account.overview.aria.addressesLoading' | translate"
           >
             <app-skeleton height="12px" width="110px"></app-skeleton>
             <div class="mt-3 grid gap-2">
@@ -71,7 +71,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
         <ng-container *ngIf="!account.wishlist.isLoaded(); else wishlistCard">
           <div
             class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40"
-            aria-label="Wishlist summary loading"
+            [attr.aria-label]="'account.overview.aria.wishlistLoading' | translate"
           >
             <app-skeleton height="12px" width="100px"></app-skeleton>
             <div class="mt-3 grid gap-2">
@@ -94,7 +94,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
         <ng-container *ngIf="account.loading(); else notificationsCard">
           <div
             class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40"
-            aria-label="Notifications summary loading"
+            [attr.aria-label]="'account.overview.aria.notificationsLoading' | translate"
           >
             <app-skeleton height="12px" width="110px"></app-skeleton>
             <div class="mt-3 grid gap-2">
@@ -117,7 +117,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
         <ng-container *ngIf="account.loading(); else securityCard">
           <div
             class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40"
-            aria-label="Security summary loading"
+            [attr.aria-label]="'account.overview.aria.securityLoading' | translate"
           >
             <app-skeleton height="12px" width="80px"></app-skeleton>
             <div class="mt-3 grid gap-2">
@@ -140,7 +140,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
         <ng-container *ngIf="!account.ticketsLoaded(); else ticketsCard">
           <div
             class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40"
-            aria-label="Support tickets summary loading"
+            [attr.aria-label]="'account.overview.aria.supportLoading' | translate"
           >
             <app-skeleton height="12px" width="90px"></app-skeleton>
             <div class="mt-3 grid gap-2">

@@ -87,6 +87,10 @@
     "nav": {
       "sectionSelect": "Section"
     },
+    "aria": {
+      "sectionSelect": "Account section selector",
+      "navigation": "Account navigation"
+    },
     "sections": {
       "overview": "Overview",
       "profile": "Profile",
@@ -120,6 +124,41 @@
     },
     "profile": {
       "savedToast": "Profile saved",
+      "completeness": "Profile completeness: {{completed}}/{{total}} ({{percent}}%)",
+      "publicLabel": "Public: {{value}}",
+      "actions": {
+        "save": "Save"
+      },
+      "sections": {
+        "publicIdentity": {
+          "title": "Public identity",
+          "copy": "How you appear in comments and other public activity."
+        },
+        "privateInfo": {
+          "title": "Private account info",
+          "copy": "Used for orders, support, and legal requirements."
+        }
+      },
+      "username": {
+        "helper": "Use this to sign in and as a stable handle in public activity.",
+        "passwordRequired": "Required to change your username."
+      },
+      "preview": {
+        "title": "Public preview",
+        "justNow": "just now",
+        "message": "Thanks for supporting my work!"
+      },
+      "settings": {
+        "preferredLanguage": "Preferred language",
+        "theme": "Theme"
+      },
+      "savedInline": "Saved.",
+      "history": {
+        "usernameTitle": "Username history",
+        "displayNameTitle": "Display name history",
+        "empty": "No history yet."
+      },
+      "sessionHint": "Session timeout: 30m. Your theme is saved on this device; language is saved to your profile when signed in.",
       "errors": {
         "displayNameRequired": "Display name is required.",
         "firstNameRequired": "First name is required.",
@@ -132,6 +171,22 @@
         "updated": "Avatar updated",
         "uploadError": "Could not upload avatar.",
         "googleError": "Could not use Google photo.",
+        "alt": "Avatar",
+        "previewAlt": "Avatar preview",
+        "upload": "Upload avatar",
+        "useGoogle": "Use Google photo",
+        "remove": "Remove",
+        "hint": "JPG/PNG/WebP up to 5MB",
+        "crop": {
+          "title": "Crop avatar",
+          "close": "Close",
+          "zoom": "Zoom",
+          "cancel": "Cancel",
+          "upload": "Upload",
+          "errors": {
+            "previewLoad": "Could not load image preview."
+          }
+        },
         "removeConfirm": "Remove your avatar?",
         "removed": "Avatar removed",
         "removeError": "Could not remove avatar."
@@ -199,7 +254,32 @@
       }
     },
     "comments": {
-      "loadError": "Could not load your comments."
+      "loadError": "Could not load your comments.",
+      "actions": {
+        "refresh": "Refresh",
+        "prev": "Prev",
+        "next": "Next"
+      },
+      "empty": {
+        "title": "No comments yet.",
+        "browse": "Browse the blog"
+      },
+      "status": {
+        "posted": "Posted",
+        "hidden": "Hidden",
+        "deleted": "Deleted"
+      },
+      "messages": {
+        "deleted": "This comment was deleted.",
+        "hidden": "This comment was hidden by moderators."
+      },
+      "replyingTo": "Replying to {{author}}",
+      "replies": {
+        "one": "reply",
+        "many": "replies"
+      },
+      "latest": "Latest: {{author}} — {{snippet}}",
+      "pageLabel": "Page {{page}} / {{total}}"
     },
     "security": {
       "subtitle": "Manage password, emails, and connected accounts.",
@@ -390,9 +470,39 @@
         "idleLogout": "You have been logged out due to inactivity."
       }
     },
+    "passwordChange": {
+      "title": "Change password",
+      "fields": {
+        "current": "Current password",
+        "new": "New password",
+        "confirm": "Confirm new password"
+      },
+      "actions": {
+        "update": "Update password",
+        "back": "Back to account"
+      },
+      "errors": {
+        "invalidForm": "Please complete the form.",
+        "mismatch": "Passwords do not match.",
+        "updateFailed": "Could not update password."
+      },
+      "toast": {
+        "updatedTitle": "Password updated",
+        "updatedDesc": "Your password has been changed."
+      }
+    },
     "overview": {
       "title": "Overview",
       "quickLinks": "Quick links",
+      "aria": {
+        "overview": "Account overview",
+        "ordersLoading": "Orders summary loading",
+        "addressesLoading": "Addresses summary loading",
+        "wishlistLoading": "Wishlist summary loading",
+        "notificationsLoading": "Notifications summary loading",
+        "securityLoading": "Security summary loading",
+        "supportLoading": "Support tickets summary loading"
+      },
       "wishlistHint": "Saved items ready for later.",
       "notificationsHint": "Control email updates.",
       "securityHint": "Password, Google link, verification.",
@@ -433,6 +543,24 @@
       "toLabel": "To",
       "applyFilters": "Apply",
       "clearFilters": "Clear",
+      "orderLabel": "Order #{{ref}}",
+      "itemsCount": {
+        "one": "1 item",
+        "many": "{{count}} items"
+      },
+      "updated": "Updated {{date}}",
+      "trackingLabel": "Tracking",
+      "trackingNotAvailable": "Not available",
+      "shippingLabel": "Shipping",
+      "deliveryLabel": "Delivery",
+      "lockerLabel": "Locker",
+      "itemsTitle": "Items",
+      "qtyLabel": "Qty {{count}}",
+      "totalsTitle": "Totals",
+      "vatLabel": "VAT",
+      "additionalLabel": "Additional",
+      "totalLabel": "Total",
+      "actionsTitle": "Actions",
       "pageLabel": "Page {{page}} / {{total}}",
       "prev": "Prev",
       "next": "Next",

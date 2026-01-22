@@ -14,8 +14,8 @@ import { AccountComponent } from './account.component';
   template: `
     <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
       <div class="flex items-center justify-between gap-3">
-        <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">My comments</h2>
-        <app-button size="sm" variant="ghost" label="Refresh" (action)="account.loadMyComments(account.myCommentsPage)"></app-button>
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'account.sections.comments' | translate }}</h2>
+        <app-button size="sm" variant="ghost" [label]="'account.comments.actions.refresh' | translate" (action)="account.loadMyComments(account.myCommentsPage)"></app-button>
       </div>
 
       <div *ngIf="account.myCommentsLoading(); else myCommentsBody" class="grid gap-3">
@@ -33,7 +33,8 @@ import { AccountComponent } from './account.component';
           *ngIf="!account.myCommentsError() && account.myComments().length === 0"
           class="border border-dashed border-slate-200 rounded-xl p-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300"
         >
-          No comments yet. <a routerLink="/blog" class="text-indigo-600 dark:text-indigo-300 font-medium">Browse the blog</a>.
+          {{ 'account.comments.empty.title' | translate }}
+          <a routerLink="/blog" class="text-indigo-600 dark:text-indigo-300 font-medium">{{ 'account.comments.empty.browse' | translate }}</a>.
         </div>
 
         <div *ngIf="!account.myCommentsError() && account.myComments().length" class="grid gap-3">
@@ -43,46 +44,58 @@ import { AccountComponent } from './account.component';
                 {{ c.post_title || c.post_slug }}
               </a>
               <span class="text-xs rounded-full px-2 py-1 whitespace-nowrap" [ngClass]="account.commentStatusChipClass(c.status)">
-                {{ c.status }}
+                {{ ('account.comments.status.' + c.status) | translate }}
               </span>
             </div>
             <p class="text-xs text-slate-500 dark:text-slate-400">{{ account.formatTimestamp(c.created_at) }}</p>
             <p *ngIf="c.body" class="text-sm text-slate-700 dark:text-slate-200">{{ c.body }}</p>
-            <p *ngIf="!c.body && c.status === 'deleted'" class="text-sm text-slate-500 dark:text-slate-400">This comment was deleted.</p>
-            <p *ngIf="!c.body && c.status === 'hidden'" class="text-sm text-slate-500 dark:text-slate-400">This comment was hidden by moderators.</p>
+            <p *ngIf="!c.body && c.status === 'deleted'" class="text-sm text-slate-500 dark:text-slate-400">{{ 'account.comments.messages.deleted' | translate }}</p>
+            <p *ngIf="!c.body && c.status === 'hidden'" class="text-sm text-slate-500 dark:text-slate-400">{{ 'account.comments.messages.hidden' | translate }}</p>
 
             <div
               *ngIf="c.parent"
               class="rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
             >
               <p class="text-xs text-slate-500 dark:text-slate-400">
-                Replying to {{ c.parent.author_name || ('blog.comments.anonymous' | translate) }}
+                {{ 'account.comments.replyingTo' | translate: { author: c.parent.author_name || ('blog.comments.anonymous' | translate) } }}
               </p>
               <p>{{ c.parent.snippet }}</p>
             </div>
 
             <div *ngIf="c.reply_count" class="text-sm text-slate-700 dark:text-slate-200">
-              {{ c.reply_count }} repl{{ c.reply_count === 1 ? 'y' : 'ies' }}
+              {{ c.reply_count }}
+              {{
+                c.reply_count === 1 ? ('account.comments.replies.one' | translate) : ('account.comments.replies.many' | translate)
+              }}
               <span *ngIf="c.last_reply">
-                · Latest: {{ c.last_reply.author_name || ('blog.comments.anonymous' | translate) }} — {{ c.last_reply.snippet }}
+                ·
+                {{
+                  'account.comments.latest'
+                    | translate: { author: c.last_reply.author_name || ('blog.comments.anonymous' | translate), snippet: c.last_reply.snippet }
+                }}
               </span>
             </div>
           </div>
 
           <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200" *ngIf="account.myCommentsMeta()">
-            <span>Page {{ account.myCommentsMeta()?.page }} / {{ account.myCommentsMeta()?.total_pages }}</span>
+            <span>
+              {{
+                'account.comments.pageLabel'
+                  | translate: { page: account.myCommentsMeta()?.page || 1, total: account.myCommentsMeta()?.total_pages || 1 }
+              }}
+            </span>
             <div class="flex gap-2">
               <app-button
                 size="sm"
                 variant="ghost"
-                label="Prev"
+                [label]="'account.comments.actions.prev' | translate"
                 [disabled]="(account.myCommentsMeta()?.page || 1) <= 1"
                 (action)="account.prevMyCommentsPage()"
               ></app-button>
               <app-button
                 size="sm"
                 variant="ghost"
-                label="Next"
+                [label]="'account.comments.actions.next' | translate"
                 [disabled]="(account.myCommentsMeta()?.page || 1) >= (account.myCommentsMeta()?.total_pages || 1)"
                 (action)="account.nextMyCommentsPage()"
               ></app-button>
