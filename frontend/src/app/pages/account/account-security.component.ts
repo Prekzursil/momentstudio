@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, OnDestroy, ViewChild, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
@@ -169,7 +169,22 @@ import { AccountComponent } from './account.component';
             <ng-container *ngIf="account.twoFactorSetupSecret && account.twoFactorSetupUrl; else twoFactorStart">
               <p class="text-sm text-slate-700 dark:text-slate-200">{{ 'account.security.twoFactor.setupHint' | translate }}</p>
 
-              <div class="grid gap-2">
+              <div class="grid gap-4 sm:grid-cols-[auto_1fr] sm:items-start">
+                <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 grid gap-2 justify-items-center">
+                  <p class="text-xs text-slate-500 dark:text-slate-400 text-center">{{ 'account.security.twoFactor.qrHint' | translate }}</p>
+                  <ng-container *ngIf="account.twoFactorSetupQrDataUrl; else qrPending">
+                    <img
+                      [src]="account.twoFactorSetupQrDataUrl"
+                      [alt]="'account.security.twoFactor.qrAlt' | translate"
+                      class="h-44 w-44 rounded-md border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-950"
+                    />
+                  </ng-container>
+                  <ng-template #qrPending>
+                    <app-skeleton height="176px" width="176px"></app-skeleton>
+                  </ng-template>
+                </div>
+
+                <div class="grid gap-2">
                 <div class="grid gap-2 sm:grid-cols-[2fr_auto] sm:items-end">
                   <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                     {{ 'account.security.twoFactor.secretLabel' | translate }}
@@ -206,6 +221,7 @@ import { AccountComponent } from './account.component';
                     [label]="'account.security.twoFactor.copyUrl' | translate"
                     (action)="account.copyTwoFactorSetupUrl()"
                   ></app-button>
+                </div>
                 </div>
               </div>
 
@@ -711,50 +727,6 @@ import { AccountComponent } from './account.component';
           <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'account.security.google.copy' | translate }}</p>
         </div>
 
-        <div class="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 grid gap-3">
-          <div class="flex items-center justify-between">
-            <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'account.security.payment.title' | translate }}</h3>
-            <div class="flex gap-2 items-center">
-              <app-button size="sm" variant="ghost" [label]="'account.security.payment.addCard' | translate" (action)="account.addCard()"></app-button>
-              <app-button
-                size="sm"
-                [label]="'account.security.payment.saveCard' | translate"
-                (action)="account.confirmCard()"
-                [disabled]="!account.cardReady || account.savingCard"
-              ></app-button>
-            </div>
-          </div>
-
-          <div *ngIf="account.paymentMethods.length === 0" class="text-sm text-slate-700 dark:text-slate-200">
-            {{ 'account.security.payment.empty' | translate }}
-          </div>
-
-          <div class="border border-dashed border-slate-200 rounded-lg p-3 text-sm dark:border-slate-700" *ngIf="account.cardElementVisible">
-            <p class="text-slate-600 dark:text-slate-300 mb-2">{{ 'account.security.payment.enterDetails' | translate }}</p>
-            <div #cardHost class="min-h-[48px]"></div>
-            <p *ngIf="account.cardError" class="text-rose-700 dark:text-rose-300 text-xs mt-2">{{ account.cardError }}</p>
-          </div>
-
-          <div
-            *ngFor="let pm of account.paymentMethods"
-            class="flex items-center justify-between text-sm border border-slate-200 rounded-lg p-3 dark:border-slate-700"
-          >
-            <div class="flex items-center gap-2">
-              <span class="font-semibold">{{ pm.brand || ('account.security.payment.card' | translate) }}</span>
-              <span *ngIf="pm.last4">•••• {{ pm.last4 }}</span>
-              <span *ngIf="pm.exp_month && pm.exp_year"
-                >({{ 'account.security.payment.exp' | translate }} {{ pm.exp_month }}/{{ pm.exp_year }})</span
-              >
-            </div>
-            <app-button
-              size="sm"
-              variant="ghost"
-              [label]="'account.security.actions.remove' | translate"
-              (action)="account.removePaymentMethod(pm.id)"
-            ></app-button>
-          </div>
-        </div>
-
         <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-3">
           <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div class="grid gap-1">
@@ -918,7 +890,7 @@ import { AccountComponent } from './account.component';
     </section>
   `
 })
-export class AccountSecurityComponent implements OnDestroy {
+export class AccountSecurityComponent {
   protected readonly account = inject(AccountComponent);
   showTwoFactorManagePassword = false;
   showTwoFactorSetupPassword = false;
@@ -928,13 +900,4 @@ export class AccountSecurityComponent implements OnDestroy {
   showRemoveSecondaryEmailPassword = false;
   showGooglePassword = false;
   showRevokeOtherSessionsPassword = false;
-
-  @ViewChild('cardHost')
-  private set cardHost(cardHost: ElementRef<HTMLDivElement> | undefined) {
-    this.account.setCardHost(cardHost);
-  }
-
-  ngOnDestroy(): void {
-    this.account.setCardHost(undefined);
-  }
 }

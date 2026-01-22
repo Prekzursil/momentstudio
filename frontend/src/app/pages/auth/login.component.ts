@@ -28,73 +28,105 @@ import { isWebAuthnSupported, serializePublicKeyCredential, toPublicKeyCredentia
   template: `
     <app-container classes="py-10 grid gap-6 max-w-xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'auth.loginTitle' | translate }}</h1>
+      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+        {{ (twoFactorToken ? 'auth.twoFactorTitle' : 'auth.loginTitle') | translate }}
+      </h1>
       <form #loginForm="ngForm" class="grid gap-4" (ngSubmit)="onSubmit(loginForm)">
-        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-          {{ 'auth.emailOrUsername' | translate }}
-          <input
-            name="identifier"
-            type="text"
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-            required
-            autocomplete="username"
-            autocapitalize="none"
-            spellcheck="false"
-            [(ngModel)]="identifier"
-          />
-        </label>
-        <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-          <label for="login-password">{{ 'auth.password' | translate }}</label>
-          <div class="relative">
+        <ng-container *ngIf="!twoFactorToken; else twoFactorStep">
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'auth.emailOrUsername' | translate }}
             <input
-              id="login-password"
-              name="password"
-              [type]="showPassword ? 'text' : 'password'"
-              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              name="identifier"
+              type="text"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
               required
-              autocomplete="current-password"
-              [(ngModel)]="password"
+              autocomplete="username"
+              autocapitalize="none"
+              spellcheck="false"
+              [(ngModel)]="identifier"
             />
-            <button
-              type="button"
-              class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
-              (click)="showPassword = !showPassword"
-              [attr.aria-label]="(showPassword ? 'auth.hidePassword' : 'auth.showPassword') | translate"
-            >
-              {{ (showPassword ? 'auth.hide' : 'auth.show') | translate }}
-            </button>
+          </label>
+          <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            <label for="login-password">{{ 'auth.password' | translate }}</label>
+            <div class="relative">
+              <input
+                id="login-password"
+                name="password"
+                [type]="showPassword ? 'text' : 'password'"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                required
+                autocomplete="current-password"
+                [(ngModel)]="password"
+              />
+              <button
+                type="button"
+                class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
+                (click)="showPassword = !showPassword"
+                [attr.aria-label]="(showPassword ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+              >
+                {{ (showPassword ? 'auth.hide' : 'auth.show') | translate }}
+              </button>
+            </div>
           </div>
-        </div>
-        <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-          <input
-            type="checkbox"
-            name="keepSignedIn"
-            class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/40 dark:border-slate-600 dark:bg-slate-800"
-            [(ngModel)]="keepSignedIn"
-          />
-          {{ 'auth.keepSignedIn' | translate }}
-        </label>
-        <app-captcha-turnstile
-          *ngIf="captchaEnabled"
-          [siteKey]="captchaSiteKey"
-          (tokenChange)="captchaToken = $event"
-        ></app-captcha-turnstile>
-        <div class="flex items-center justify-between text-sm">
-          <a routerLink="/password-reset" class="text-indigo-600 dark:text-indigo-300 font-medium">{{ 'auth.forgot' | translate }}</a>
-          <a routerLink="/register" class="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-50">{{ 'auth.createAccount' | translate }}</a>
-        </div>
-        <app-button [label]="'auth.login' | translate" type="submit"></app-button>
-        <div class="border-t border-slate-200 pt-4 grid gap-2 dark:border-slate-800">
-          <p class="text-sm text-slate-600 dark:text-slate-300 text-center">{{ 'auth.orContinue' | translate }}</p>
-          <app-button
-            *ngIf="passkeySupported"
-            variant="ghost"
-            [label]="'auth.passkeyContinue' | translate"
-            [disabled]="passkeyBusy"
-            (action)="startPasskey()"
-          ></app-button>
-          <app-button variant="ghost" [label]="'auth.googleContinue' | translate" (action)="startGoogle()"></app-button>
-        </div>
+          <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+            <input
+              type="checkbox"
+              name="keepSignedIn"
+              class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/40 dark:border-slate-600 dark:bg-slate-800"
+              [(ngModel)]="keepSignedIn"
+            />
+            {{ 'auth.keepSignedIn' | translate }}
+          </label>
+          <app-captcha-turnstile
+            *ngIf="captchaEnabled"
+            [siteKey]="captchaSiteKey"
+            (tokenChange)="captchaToken = $event"
+          ></app-captcha-turnstile>
+          <div class="flex items-center justify-between text-sm">
+            <a routerLink="/password-reset" class="text-indigo-600 dark:text-indigo-300 font-medium">{{ 'auth.forgot' | translate }}</a>
+            <a routerLink="/register" class="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-50">{{
+              'auth.createAccount' | translate
+            }}</a>
+          </div>
+          <app-button [label]="'auth.login' | translate" type="submit" [disabled]="loading"></app-button>
+          <div class="border-t border-slate-200 pt-4 grid gap-2 dark:border-slate-800">
+            <p class="text-sm text-slate-600 dark:text-slate-300 text-center">{{ 'auth.orContinue' | translate }}</p>
+            <app-button
+              *ngIf="passkeySupported"
+              variant="ghost"
+              [label]="'auth.passkeyContinue' | translate"
+              [disabled]="passkeyBusy || loading"
+              (action)="startPasskey()"
+            ></app-button>
+            <app-button variant="ghost" [label]="'auth.googleContinue' | translate" [disabled]="loading" (action)="startGoogle()"></app-button>
+          </div>
+        </ng-container>
+
+        <ng-template #twoFactorStep>
+          <p class="text-sm text-slate-600 dark:text-slate-300">
+            {{ 'auth.twoFactorCopy' | translate }}<span *ngIf="twoFactorUserEmail"> ({{ twoFactorUserEmail }})</span>
+          </p>
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'auth.twoFactorCodeLabel' | translate }}
+            <input
+              name="twoFactorCode"
+              type="text"
+              autocomplete="one-time-code"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              required
+              [(ngModel)]="twoFactorCode"
+            />
+          </label>
+          <div class="grid gap-2">
+            <app-button [label]="'auth.twoFactorSubmit' | translate" type="submit" [disabled]="loading"></app-button>
+            <app-button
+              variant="ghost"
+              [label]="'auth.twoFactorBack' | translate"
+              [disabled]="loading"
+              (action)="cancelTwoFactor()"
+            ></app-button>
+          </div>
+        </ng-template>
       </form>
     </app-container>
   `
@@ -114,8 +146,23 @@ export class LoginComponent {
   captchaSiteKey = appConfig.captchaSiteKey || '';
   captchaEnabled = Boolean(this.captchaSiteKey);
   passkeySupported = isWebAuthnSupported();
+  twoFactorToken: string | null = null;
+  twoFactorUserEmail: string | null = null;
+  twoFactorCode = '';
 
   constructor(private toast: ToastService, private auth: AuthService, private router: Router, private translate: TranslateService) {}
+
+  cancelTwoFactor(): void {
+    this.twoFactorToken = null;
+    this.twoFactorUserEmail = null;
+    this.twoFactorCode = '';
+    this.loading = false;
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem('two_factor_token');
+      sessionStorage.removeItem('two_factor_user');
+      sessionStorage.removeItem('two_factor_remember');
+    }
+  }
 
   startPasskey(): void {
     if (this.passkeyBusy) return;
@@ -180,6 +227,45 @@ export class LoginComponent {
   }
 
   onSubmit(form: NgForm): void {
+    if (this.twoFactorToken) {
+      if (!form.valid) {
+        this.toast.error(this.translate.instant('auth.completeForm'));
+        return;
+      }
+      const token = this.twoFactorToken;
+      const code = this.twoFactorCode.trim();
+      if (!code) {
+        this.toast.error(this.translate.instant('auth.completeForm'));
+        return;
+      }
+      this.loading = true;
+      this.auth.completeTwoFactorLogin(token, code, this.keepSignedIn).subscribe({
+        next: (authRes) => {
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.removeItem('two_factor_token');
+            sessionStorage.removeItem('two_factor_user');
+            sessionStorage.removeItem('two_factor_remember');
+          }
+          this.twoFactorToken = null;
+          this.twoFactorUserEmail = null;
+          this.twoFactorCode = '';
+          this.toast.success(this.translate.instant('auth.successLogin'), authRes?.user?.email);
+          void this.router.navigateByUrl('/account');
+        },
+        error: (err) => {
+          if (err?.status === 401) {
+            this.toast.error(this.translate.instant('auth.twoFactorInvalid'));
+            return;
+          }
+          const message = err?.error?.detail || this.translate.instant('auth.twoFactorInvalid');
+          this.toast.error(message);
+        },
+        complete: () => {
+          this.loading = false;
+        }
+      });
+      return;
+    }
     if (!form.valid) {
       this.toast.error(this.translate.instant('auth.completeForm'));
       return;
@@ -195,13 +281,15 @@ export class LoginComponent {
       next: (res) => {
         const anyRes = res as any;
         if (anyRes?.requires_two_factor && anyRes?.two_factor_token) {
+          this.twoFactorToken = anyRes.two_factor_token;
+          this.twoFactorUserEmail = anyRes?.user?.email || null;
+          this.twoFactorCode = '';
           if (typeof sessionStorage !== 'undefined') {
             sessionStorage.setItem('two_factor_token', anyRes.two_factor_token);
             sessionStorage.setItem('two_factor_user', JSON.stringify(anyRes.user ?? null));
             sessionStorage.setItem('two_factor_remember', JSON.stringify(this.keepSignedIn));
           }
           this.toast.info(this.translate.instant('auth.twoFactorRequired'));
-          void this.router.navigateByUrl('/login/2fa');
           return;
         }
         this.toast.success(this.translate.instant('auth.successLogin'), anyRes?.user?.email);

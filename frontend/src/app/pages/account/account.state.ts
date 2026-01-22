@@ -256,6 +256,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   twoFactorSetupPassword = '';
   twoFactorSetupSecret: string | null = null;
   twoFactorSetupUrl: string | null = null;
+  twoFactorSetupQrDataUrl: string | null = null;
   twoFactorEnableCode = '';
   twoFactorRecoveryCodes: string[] | null = null;
   twoFactorManagePassword = '';
@@ -264,6 +265,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   enablingTwoFactor = false;
   disablingTwoFactor = false;
   regeneratingTwoFactorCodes = false;
+  private twoFactorQrRequestId = 0;
 
   passkeys = signal<PasskeyInfo[]>([]);
   passkeysLoaded = signal<boolean>(false);
@@ -477,7 +479,6 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
       case 'security':
         this.loadCooldowns();
         this.loadSecondaryEmails();
-        this.loadPaymentMethods();
         this.loadSessions();
         this.loadSecurityEvents();
         this.loadTwoFactorStatus();
@@ -2541,6 +2542,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
       next: (res: TwoFactorSetupResponse) => {
         this.twoFactorSetupSecret = res.secret;
         this.twoFactorSetupUrl = res.otpauth_url;
+        void this.updateTwoFactorSetupQr();
         this.twoFactorSetupPassword = '';
         this.twoFactorEnableCode = '';
         this.toast.info(this.t('account.security.activity.two_factor_setup_started'));
@@ -2570,6 +2572,7 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
         this.twoFactorRecoveryCodes = res.recovery_codes ?? [];
         this.twoFactorSetupSecret = null;
         this.twoFactorSetupUrl = null;
+        this.twoFactorSetupQrDataUrl = null;
         this.twoFactorEnableCode = '';
         this.toast.success(this.t('account.security.activity.two_factor_enabled'));
         this.loadTwoFactorStatus(true);
@@ -2597,6 +2600,23 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     if (!this.twoFactorSetupUrl) return;
     const ok = await this.copyToClipboard(this.twoFactorSetupUrl);
     this.toast.success(ok ? this.t('account.security.twoFactor.copied') : this.t('account.security.twoFactor.copyUrl'));
+  }
+
+  private async updateTwoFactorSetupQr(): Promise<void> {
+    const requestId = ++this.twoFactorQrRequestId;
+    this.twoFactorSetupQrDataUrl = null;
+    const url = (this.twoFactorSetupUrl || '').trim();
+    if (!url) return;
+    try {
+      const mod = await import('qrcode');
+      const toDataURL = (mod as any).toDataURL as ((text: string, options?: any) => Promise<string>) | undefined;
+      if (typeof toDataURL !== 'function') return;
+      const dataUrl = await toDataURL(url, { margin: 1, width: 196 });
+      if (requestId !== this.twoFactorQrRequestId) return;
+      this.twoFactorSetupQrDataUrl = dataUrl;
+    } catch {
+      // ignore
+    }
   }
 
   async copyTwoFactorRecoveryCodes(): Promise<void> {

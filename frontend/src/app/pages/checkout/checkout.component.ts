@@ -9,6 +9,7 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { CartStore, CartItem } from '../../core/cart.store';
 import { CartApi, CartResponse } from '../../core/cart.api';
 import { ApiService } from '../../core/api.service';
+import { AccountService, Address } from '../../core/account.service';
 import { CouponsService, type CouponEligibilityResponse, type CouponOffer } from '../../core/coupons.service';
 import { appConfig } from '../../core/app-config';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -323,6 +324,32 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                     <p *ngIf="guestEmailError" class="text-xs text-amber-700 dark:text-amber-300">{{ guestEmailError }}</p>
                   </div>
                 </label>
+                <ng-container *ngIf="auth.isAuthenticated()">
+                  <div class="sm:col-span-2 flex items-center justify-between gap-2">
+                    <p class="text-xs font-semibold text-slate-600 uppercase tracking-[0.2em] dark:text-slate-300">
+                      {{ 'checkout.savedAddressesTitle' | translate }}
+                    </p>
+                    <a routerLink="/account/addresses" class="text-xs text-indigo-600 dark:text-indigo-300">{{
+                      'checkout.manageAddresses' | translate
+                    }}</a>
+                  </div>
+                  <div *ngIf="savedAddressesLoading" class="sm:col-span-2 text-xs text-slate-600 dark:text-slate-300">
+                    {{ 'notifications.loading' | translate }}
+                  </div>
+                  <p *ngIf="savedAddressesError" class="sm:col-span-2 text-xs text-rose-700 dark:text-rose-300">{{ savedAddressesError }}</p>
+                  <label *ngIf="savedAddresses.length" class="text-sm grid gap-1 sm:col-span-2">
+                    {{ 'checkout.savedShippingAddress' | translate }}
+                    <select
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      name="savedShippingAddress"
+                      [(ngModel)]="selectedShippingAddressId"
+                      (ngModelChange)="applySelectedShippingAddress()"
+                    >
+                      <option value="">{{ 'checkout.savedAddressSelect' | translate }}</option>
+                      <option *ngFor="let a of savedAddresses" [value]="a.id">{{ formatSavedAddress(a) }}</option>
+                    </select>
+                  </label>
+                </ng-container>
                 <label class="text-sm grid gap-1 sm:col-span-2">
                   {{ 'checkout.line1' | translate }}
                   <input
@@ -347,26 +374,14 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                   </label>
                   <label class="text-sm grid gap-1">
                     {{ 'checkout.region' | translate }}
-                    <ng-container *ngIf="address.country === 'RO'; else regionFreeShipping">
-                      <select
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        name="region"
-                        autocomplete="shipping address-level1"
-                        [(ngModel)]="address.region"
-                        required
-                      >
-                        <option value="">{{ 'checkout.regionSelect' | translate }}</option>
-                        <option *ngFor="let r of roCounties" [value]="r">{{ r }}</option>
-                      </select>
-                    </ng-container>
-                    <ng-template #regionFreeShipping>
-                      <input
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                        name="region"
-                        autocomplete="shipping address-level1"
-                        [(ngModel)]="address.region"
-                      />
-                    </ng-template>
+                    <input
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      name="region"
+                      autocomplete="shipping address-level1"
+                      [(ngModel)]="address.region"
+                      [attr.list]="address.country === 'RO' ? 'roCounties' : null"
+                      [required]="address.country === 'RO'"
+                    />
                   </label>
                   <label class="text-sm grid gap-1">
                     {{ 'checkout.postal' | translate }}
@@ -381,16 +396,17 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                 </div>
                 <label class="text-sm grid gap-1 sm:col-span-2">
                   {{ 'checkout.country' | translate }}
-                  <select
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    name="country"
+                  <input
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                    name="countryInput"
                     autocomplete="shipping country"
-                    [(ngModel)]="address.country"
+                    [attr.list]="'countryOptions'"
+                    [(ngModel)]="shippingCountryInput"
+                    (ngModelChange)="shippingCountryError = ''"
+                    (blur)="normalizeShippingCountry()"
                     required
-                  >
-                    <option value="">{{ 'checkout.countrySelect' | translate }}</option>
-                    <option *ngFor="let c of countries" [value]="c.code">{{ c.flag }} {{ c.name }}</option>
-                  </select>
+                  />
+                  <p *ngIf="shippingCountryError" class="text-xs text-amber-700 dark:text-amber-300">{{ shippingCountryError }}</p>
                 </label>
               </div>
 
@@ -461,6 +477,20 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                   </label>
                 </div>
                 <div *ngIf="!billingSameAsShipping" class="grid sm:grid-cols-2 gap-3">
+                  <ng-container *ngIf="auth.isAuthenticated()">
+                    <label *ngIf="savedAddresses.length" class="text-sm grid gap-1 sm:col-span-2">
+                      {{ 'checkout.savedBillingAddress' | translate }}
+                      <select
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        name="savedBillingAddress"
+                        [(ngModel)]="selectedBillingAddressId"
+                        (ngModelChange)="applySelectedBillingAddress()"
+                      >
+                        <option value="">{{ 'checkout.savedAddressSelect' | translate }}</option>
+                        <option *ngFor="let a of savedAddresses" [value]="a.id">{{ formatSavedAddress(a) }}</option>
+                      </select>
+                    </label>
+                  </ng-container>
                   <label class="text-sm grid gap-1 sm:col-span-2">
                     {{ 'checkout.line1' | translate }}
                     <input
@@ -485,26 +515,14 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                     </label>
                     <label class="text-sm grid gap-1">
                       {{ 'checkout.region' | translate }}
-                      <ng-container *ngIf="billing.country === 'RO'; else regionFreeBilling">
-                        <select
-                          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                          name="billingRegion"
-                          autocomplete="billing address-level1"
-                          [(ngModel)]="billing.region"
-                          required
-                        >
-                          <option value="">{{ 'checkout.regionSelect' | translate }}</option>
-                          <option *ngFor="let r of roCounties" [value]="r">{{ r }}</option>
-                        </select>
-                      </ng-container>
-                      <ng-template #regionFreeBilling>
-                        <input
-                          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                          name="billingRegion"
-                          autocomplete="billing address-level1"
-                          [(ngModel)]="billing.region"
-                        />
-                      </ng-template>
+                      <input
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                        name="billingRegion"
+                        autocomplete="billing address-level1"
+                        [(ngModel)]="billing.region"
+                        [attr.list]="billing.country === 'RO' ? 'roCounties' : null"
+                        [required]="billing.country === 'RO'"
+                      />
                     </label>
                     <label class="text-sm grid gap-1">
                       {{ 'checkout.postal' | translate }}
@@ -519,21 +537,28 @@ const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
                   </div>
                   <label class="text-sm grid gap-1 sm:col-span-2">
                     {{ 'checkout.country' | translate }}
-                    <select
-                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                      name="billingCountry"
+                    <input
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      name="billingCountryInput"
                       autocomplete="billing country"
-                      [(ngModel)]="billing.country"
+                      [attr.list]="'countryOptions'"
+                      [(ngModel)]="billingCountryInput"
+                      (ngModelChange)="billingCountryError = ''"
+                      (blur)="normalizeBillingCountry()"
                       required
-                    >
-                      <option value="">{{ 'checkout.countrySelect' | translate }}</option>
-                      <option *ngFor="let c of countries" [value]="c.code">{{ c.flag }} {{ c.name }}</option>
-                    </select>
+                    />
+                    <p *ngIf="billingCountryError" class="text-xs text-amber-700 dark:text-amber-300">{{ billingCountryError }}</p>
                   </label>
                 </div>
               </div>
               <datalist id="roCities">
                 <option *ngFor="let c of roCities" [value]="c"></option>
+              </datalist>
+              <datalist id="roCounties">
+                <option *ngFor="let r of roCounties" [value]="r"></option>
+              </datalist>
+              <datalist id="countryOptions">
+                <option *ngFor="let c of countries" [value]="formatCountryOption(c)"></option>
               </datalist>
               <label class="flex items-center gap-2 text-sm">
                 <input type="checkbox" [(ngModel)]="saveAddress" name="saveAddress" />
@@ -834,6 +859,15 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   countries: PhoneCountryOption[] = [];
   readonly roCounties = RO_COUNTIES;
   readonly roCities = RO_CITIES;
+  shippingCountryInput = '';
+  billingCountryInput = '';
+  shippingCountryError = '';
+  billingCountryError = '';
+  savedAddresses: Address[] = [];
+  savedAddressesLoading = false;
+  savedAddressesError = '';
+  selectedShippingAddressId = '';
+  selectedBillingAddressId = '';
   addressError = '';
   errorMessage = '';
   pricesRefreshed = false;
@@ -897,6 +931,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private cartApi: CartApi,
     private api: ApiService,
+    private accountService: AccountService,
     private couponsService: CouponsService,
     private translate: TranslateService,
     public auth: AuthService
@@ -915,6 +950,8 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     this.countries = this.phoneCountries;
     if (!this.address.country) this.address.country = 'RO';
     if (!this.billing.country) this.billing.country = this.address.country;
+    this.shippingCountryInput = this.countryInputFromCode(this.address.country);
+    this.billingCountryInput = this.countryInputFromCode(this.billing.country);
   }
 
   items = this.cart.items;
@@ -923,6 +960,192 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 
   emailVerified(): boolean {
     return Boolean(this.auth.user()?.email_verified);
+  }
+
+  private prefillFromUser(): void {
+    const user = this.auth.user();
+    if (!user) return;
+    if (!this.address.email) {
+      this.address.email = user.email || '';
+    }
+    if (!this.address.name) {
+      const parts = [user.first_name, user.middle_name, user.last_name].filter((p) => (p || '').trim());
+      const fullName = parts.join(' ').trim();
+      this.address.name = fullName || user.name || '';
+    }
+  }
+
+  formatSavedAddress(addr: Address): string {
+    const label = (addr.label || '').trim();
+    const line1 = (addr.line1 || '').trim();
+    const city = (addr.city || '').trim();
+    const region = (addr.region || '').trim();
+    const country = (addr.country || '').trim();
+    const place = [city, region].filter((p) => p).join(', ');
+    const tail = [place, country].filter((p) => p).join(' · ');
+    const title = label || this.translate.instant('account.addresses.labels.address');
+    const body = [line1, tail].filter((p) => p).join(' · ');
+    return body ? `${title} — ${body}` : title;
+  }
+
+  applySelectedShippingAddress(): void {
+    const id = (this.selectedShippingAddressId || '').trim();
+    if (!id) return;
+    const addr = this.savedAddresses.find((a) => a.id === id);
+    if (!addr) return;
+    this.applySavedAddressToShipping(addr);
+  }
+
+  applySelectedBillingAddress(): void {
+    const id = (this.selectedBillingAddressId || '').trim();
+    if (!id) return;
+    const addr = this.savedAddresses.find((a) => a.id === id);
+    if (!addr) return;
+    this.applySavedAddressToBilling(addr);
+  }
+
+  private applySavedAddressToShipping(addr: Address): void {
+    this.address.line1 = addr.line1 || '';
+    this.address.line2 = addr.line2 || '';
+    this.address.city = addr.city || '';
+    this.address.region = addr.region || '';
+    this.address.postal = addr.postal_code || '';
+    this.address.country = (addr.country || '').trim().toUpperCase();
+    this.shippingCountryInput = this.countryInputFromCode(this.address.country);
+    if (this.billingSameAsShipping) {
+      this.billing.country = this.address.country;
+      this.billingCountryInput = this.countryInputFromCode(this.billing.country);
+    }
+    this.addressError = '';
+    this.shippingCountryError = '';
+    this.saveAddress = false;
+  }
+
+  private applySavedAddressToBilling(addr: Address): void {
+    this.billing.line1 = addr.line1 || '';
+    this.billing.line2 = addr.line2 || '';
+    this.billing.city = addr.city || '';
+    this.billing.region = addr.region || '';
+    this.billing.postal = addr.postal_code || '';
+    this.billing.country = (addr.country || '').trim().toUpperCase();
+    this.billingCountryInput = this.countryInputFromCode(this.billing.country);
+    this.billingCountryError = '';
+    this.saveAddress = false;
+  }
+
+  formatCountryOption(country: PhoneCountryOption): string {
+    return `${country.code} — ${country.name}`;
+  }
+
+  normalizeShippingCountry(): void {
+    this.shippingCountryError = '';
+    const code = this.resolveCountryCode(this.shippingCountryInput);
+    if (!code) {
+      this.shippingCountryError = this.translate.instant('checkout.countryInvalid');
+      return;
+    }
+    this.address.country = code;
+    this.shippingCountryInput = this.countryInputFromCode(code);
+    if (this.billingSameAsShipping) {
+      this.billing.country = code;
+      this.billingCountryInput = this.countryInputFromCode(code);
+    }
+  }
+
+  normalizeBillingCountry(): void {
+    this.billingCountryError = '';
+    const code = this.resolveCountryCode(this.billingCountryInput);
+    if (!code) {
+      this.billingCountryError = this.translate.instant('checkout.countryInvalid');
+      return;
+    }
+    this.billing.country = code;
+    this.billingCountryInput = this.countryInputFromCode(code);
+  }
+
+  private normalizeCheckoutCountries(): boolean {
+    this.shippingCountryError = '';
+    this.billingCountryError = '';
+    const shippingCode = this.resolveCountryCode(this.shippingCountryInput);
+    if (!shippingCode) {
+      this.shippingCountryError = this.translate.instant('checkout.countryInvalid');
+      return false;
+    }
+    this.address.country = shippingCode;
+    this.shippingCountryInput = this.countryInputFromCode(shippingCode);
+    if (this.billingSameAsShipping) {
+      this.billing.country = shippingCode;
+      this.billingCountryInput = this.countryInputFromCode(shippingCode);
+      return true;
+    }
+    const billingCode = this.resolveCountryCode(this.billingCountryInput);
+    if (!billingCode) {
+      this.billingCountryError = this.translate.instant('checkout.countryInvalid');
+      return false;
+    }
+    this.billing.country = billingCode;
+    this.billingCountryInput = this.countryInputFromCode(billingCode);
+    return true;
+  }
+
+  private resolveCountryCode(raw: string): string | null {
+    const trimmed = (raw || '').trim();
+    if (!trimmed) return null;
+
+    const codeMatch = trimmed.match(/^([A-Za-z]{2})\b/);
+    if (codeMatch) {
+      const code = codeMatch[1].toUpperCase();
+      if (this.countries.some((c) => c.code === code)) return code;
+    }
+
+    const normalized = trimmed.toLowerCase();
+    const byName = this.countries.find((c) => c.name.toLowerCase() === normalized);
+    if (byName) return byName.code;
+
+    const withoutParen = normalized.replace(/\s*\([a-z]{2}\)\s*$/, '').trim();
+    if (withoutParen && withoutParen !== normalized) {
+      const match = this.countries.find((c) => c.name.toLowerCase() === withoutParen);
+      if (match) return match.code;
+    }
+
+    const withoutSuffixCode = normalized.replace(/\s*[-—]\s*[a-z]{2}\s*$/, '').trim();
+    if (withoutSuffixCode && withoutSuffixCode !== normalized) {
+      const match = this.countries.find((c) => c.name.toLowerCase() === withoutSuffixCode);
+      if (match) return match.code;
+    }
+
+    return null;
+  }
+
+  private countryInputFromCode(code: string): string {
+    const normalized = (code || '').trim().toUpperCase();
+    if (!normalized) return '';
+    const match = this.countries.find((c) => c.code === normalized);
+    if (!match) return normalized;
+    return this.formatCountryOption(match);
+  }
+
+  private loadSavedAddresses(force: boolean = false): void {
+    if (!this.auth.isAuthenticated()) return;
+    if (this.savedAddressesLoading && !force) return;
+    this.savedAddressesLoading = true;
+    this.savedAddressesError = '';
+    this.accountService.getAddresses().subscribe({
+      next: (addresses) => {
+        this.savedAddresses = Array.isArray(addresses) ? addresses : [];
+        if (!this.address.line1.trim() && !this.address.city.trim() && !this.address.postal.trim() && this.savedAddresses.length) {
+          const defaultShipping = this.savedAddresses.find((a) => a.is_default_shipping) ?? this.savedAddresses[0];
+          this.selectedShippingAddressId = defaultShipping.id;
+          this.applySavedAddressToShipping(defaultShipping);
+        }
+        this.savedAddressesLoading = false;
+      },
+      error: () => {
+        this.savedAddresses = [];
+        this.savedAddressesError = this.translate.instant('checkout.savedAddressesLoadError');
+        this.savedAddressesLoading = false;
+      }
+    });
   }
 
   onEmailChanged(): void {
@@ -1233,6 +1456,11 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   placeOrder(form: NgForm): void {
+    if (!this.normalizeCheckoutCountries()) {
+      this.addressError = this.translate.instant('checkout.countryInvalid');
+      return;
+    }
+    form.control.updateValueAndValidity();
     if (!form.valid) {
       this.addressError = this.translate.instant('checkout.addressRequired');
       return;
@@ -1433,6 +1661,8 @@ export class CheckoutComponent implements OnInit, OnDestroy {
         this.pendingPromoCode = normalized;
       }
     });
+    this.prefillFromUser();
+    this.loadSavedAddresses();
     const items = this.items();
     if (items.length) {
       this.syncBackendCart(items);

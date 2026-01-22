@@ -376,6 +376,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Coupons v2: block guest coupon entry and require sign-in.
 - [x] Shipping method selection UI.
 - [x] Address form with validation and country selector.
+- [x] Checkout: allow selecting saved account addresses (autofill shipping/billing).
+- [x] Checkout: replace country/region dropdowns with free-form inputs (suggestions + ISO code mapping).
 - [x] Payment form with Stripe elements.
 - [x] Checkout: add billing address section with “same as shipping” toggle and attach billing to orders.
 - [x] Payments UX: add payment method selector with icons (card via Stripe, cash on delivery).
@@ -424,7 +426,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Fetch real profile, addresses, and order history from backend; replace account dashboard mock data.
 - [x] Implement avatar upload wired to storage backend.
 - [x] Add backend email verification tokens/endpoints + frontend resend/confirm wiring.
-- [x] Implement saved payment methods (Stripe setup intents) and wire UI add/remove card.
+- [x] Security: remove saved payment methods section (cards handled via Stripe/PayPal/Netopia checkout flows).
 - [x] Client/session idle-timeout handling (auto logout + messaging).
 - [x] Replace address prompt UX with form/modal wired to address CRUD APIs.
 - [x] Integrate Stripe Elements card entry UI instead of manual payment_method prompts.
@@ -449,6 +451,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Wishlist: investigate reports of add/remove not persisting and add e2e coverage for save/unsave flows.
 - [x] Account UX: unify email management UI in Security (single email section; reduce duplication; align Change password placement).
 - [x] Account UX: translate Security page strings (remove hard-coded English).
+- [x] Security: show QR code during 2FA setup and prompt for 2FA inline on login.
+- [ ] Payments: remove `/payment-methods` API + DB table (reduce storage/compliance scope).
 ### Account UX – Next Improvements (Backlog)
 - [x] Account UX: lazy-load per-section data (don’t fetch orders/addresses/comments on every Account route).
 - [x] Account UX: add “Retry” actions for section load failures (per card, not just global error).
