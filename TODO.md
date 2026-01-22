@@ -240,7 +240,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Load testing plan (k6/locust) and scripts.
 - [x] SQL injection and XSS validation tests.
 - [x] Dependency vulnerability scanning (pip/npm).
-- [ ] Frontend deps: resolve `npm audit` vulnerabilities (pin/upgrade).
+- [x] Frontend deps: resolve `npm audit` vulnerabilities (pin/upgrade).
 - [x] Backpressure handling (429) for expensive endpoints.
 - [x] Maintenance mode toggle.
 
@@ -249,7 +249,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Tailwind CSS and design tokens.
 - [x] Main layout (header/footer/responsive nav).
 - [x] Shared components: button, input, card, modal, toast.
-- [ ] Frontend build: replace CommonJS `qrcode` dependency (avoid Angular optimization bailout).
+- [x] Frontend build: replace CommonJS `qrcode` dependency (avoid Angular optimization bailout).
 - [x] Fix shared standalone components missing `NgIf` imports so buttons/labels render correctly.
 - [x] Header: improve theme/language control layout and add a global product search field.
 - [x] Footer: remove year suffix from tagline and replace Pinterest link with Facebook.

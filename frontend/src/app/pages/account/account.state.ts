@@ -2392,10 +2392,13 @@ export class AccountState implements OnInit, OnDestroy {
     const url = (this.twoFactorSetupUrl || '').trim();
     if (!url) return;
     try {
-      const mod = await import('qrcode');
-      const toDataURL = (mod as any).toDataURL as ((text: string, options?: any) => Promise<string>) | undefined;
-      if (typeof toDataURL !== 'function') return;
-      const dataUrl = await toDataURL(url, { margin: 1, width: 196 });
+      const { Byte, Encoder } = await import('@nuintun/qrcode');
+      const encoder = new Encoder({ level: 'M' });
+      const qr = encoder.encode(new Byte(url));
+      const margin = 1;
+      const desiredSizePx = 196;
+      const moduleSize = Math.max(2, Math.floor(desiredSizePx / (qr.size + margin * 2)));
+      const dataUrl = qr.toDataURL(moduleSize, { margin });
       if (requestId !== this.twoFactorQrRequestId) return;
       this.twoFactorSetupQrDataUrl = dataUrl;
     } catch {
