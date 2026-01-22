@@ -17,6 +17,7 @@ export interface CartTotals {
   shipping: string;
   total: string;
   currency?: string;
+  free_shipping_threshold_ron?: string | null;
 }
 
 export interface CartResponse {

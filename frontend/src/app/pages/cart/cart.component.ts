@@ -18,6 +18,22 @@ import { WishlistService } from '../../core/wishlist.service';
 import { ToastService } from '../../core/toast.service';
 import { CatalogService, Product } from '../../core/catalog.service';
 import { ProductCardComponent } from '../../shared/product-card.component';
+import { LockerProvider } from '../../core/shipping.service';
+import { CheckoutDeliveryType, CheckoutPrefsService } from '../../core/checkout-prefs.service';
+
+type SavedForLaterItem = {
+  product_id: string;
+  variant_id?: string | null;
+  quantity: number;
+  name: string;
+  slug: string;
+  price: number;
+  currency: string;
+  image?: string;
+  saved_at: string;
+};
+
+const SAVED_FOR_LATER_KEY = 'cart_saved_for_later';
 
 @Component({
   selector: 'app-cart',
@@ -89,21 +105,35 @@ import { ProductCardComponent } from '../../shared/product-card.component';
                       <ng-container *ngIf="isLowStock(item); else cartInStock">{{ 'cart.onlyLeft' | translate : { count: item.stock } }}</ng-container>
                       <ng-template #cartInStock>{{ 'cart.inStock' | translate : { count: item.stock } }}</ng-template>
                     </p>
-                  </div>
-                  <div class="flex items-center gap-3">
-                    <button
-                      *ngIf="auth.isAuthenticated()"
-                      class="text-sm text-slate-500 hover:text-slate-900 disabled:opacity-50 dark:text-slate-400 dark:hover:text-slate-50"
-                      [disabled]="movingToWishlist[item.id]"
-                      (click)="moveToWishlist(item)"
-                    >
-                      {{ 'cart.moveToWishlist' | translate }}
-                    </button>
-                    <button class="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50" (click)="remove(item.id)">
-                      {{ 'cart.remove' | translate }}
-                    </button>
-                  </div>
-                </div>
+	                  </div>
+	                  <div class="flex items-center gap-3">
+	                    <button
+	                      type="button"
+	                      class="text-sm text-slate-500 hover:text-slate-900 disabled:opacity-50 dark:text-slate-400 dark:hover:text-slate-50"
+	                      [disabled]="savingForLater[item.id]"
+	                      (click)="saveForLater(item)"
+	                    >
+	                      {{ 'cart.saveForLater' | translate }}
+	                    </button>
+	                    <button
+	                      *ngIf="auth.isAuthenticated()"
+	                      type="button"
+	                      class="text-sm text-slate-500 hover:text-slate-900 disabled:opacity-50 dark:text-slate-400 dark:hover:text-slate-50"
+	                      [disabled]="movingToWishlist[item.id] || savingForLater[item.id]"
+	                      (click)="moveToWishlist(item)"
+	                    >
+	                      {{ 'cart.moveToWishlist' | translate }}
+	                    </button>
+	                    <button
+	                      type="button"
+	                      class="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+	                      [disabled]="savingForLater[item.id]"
+	                      (click)="remove(item.id)"
+	                    >
+	                      {{ 'cart.remove' | translate }}
+	                    </button>
+	                  </div>
+	                </div>
                 <div class="flex items-center gap-3 text-sm">
                   <div class="flex items-center gap-2">
                     <span class="text-slate-700 dark:text-slate-200">{{ 'cart.qty' | translate }}</span>
@@ -169,9 +199,9 @@ import { ProductCardComponent } from '../../shared/product-card.component';
           </div>
         </section>
 
-        <aside class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
-          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'cart.summary' | translate }}</h2>
-          <div class="grid gap-3">
+	        <aside class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+	          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'cart.summary' | translate }}</h2>
+	          <div class="grid gap-3">
             <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
               <span>{{ 'cart.subtotal' | translate }}</span>
               <span>{{ quoteSubtotal() | localizedCurrency : currency }}</span>
@@ -195,15 +225,92 @@ import { ProductCardComponent } from '../../shared/product-card.component';
               <span>{{ 'checkout.promo' | translate }}</span>
               <span class="text-emerald-700 dark:text-emerald-300">-{{ quotePromoSavings() | localizedCurrency : currency }}</span>
             </div>
-            <div class="border-t border-slate-200 pt-3 flex items-center justify-between text-base font-semibold text-slate-900 dark:border-slate-800 dark:text-slate-50">
-              <span>{{ 'cart.estimatedTotal' | translate }}</span>
-              <span>{{ quoteTotal() | localizedCurrency : currency }}</span>
-            </div>
-          </div>
+	            <div class="border-t border-slate-200 pt-3 flex items-center justify-between text-base font-semibold text-slate-900 dark:border-slate-800 dark:text-slate-50">
+	              <span>{{ 'cart.estimatedTotal' | translate }}</span>
+	              <span>{{ quoteTotal() | localizedCurrency : currency }}</span>
+	            </div>
+	          </div>
 
-          <div class="grid gap-2">
-            <div class="flex items-center justify-between gap-2">
-              <label class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'checkout.step3' | translate }}</label>
+	          <div *ngIf="items().length" class="grid gap-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-700 dark:bg-slate-800/40 dark:text-slate-200">
+	            <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'checkout.deliveryTitle' | translate }}</p>
+	            <div class="grid gap-2">
+	              <div class="grid grid-cols-2 gap-2">
+	                <button
+	                  type="button"
+	                  class="rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+	                  [ngClass]="
+	                    deliveryType === 'home'
+	                      ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'
+	                      : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800'
+	                  "
+	                  (click)="setDeliveryType('home')"
+	                  [attr.aria-pressed]="deliveryType === 'home'"
+	                >
+	                  {{ 'checkout.deliveryHome' | translate }}
+	                </button>
+	                <button
+	                  type="button"
+	                  class="rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+	                  [ngClass]="
+	                    deliveryType === 'locker'
+	                      ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'
+	                      : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800'
+	                  "
+	                  (click)="setDeliveryType('locker')"
+	                  [attr.aria-pressed]="deliveryType === 'locker'"
+	                >
+	                  {{ 'checkout.deliveryLocker' | translate }}
+	                </button>
+	              </div>
+	              <label class="grid gap-1 text-xs font-semibold text-slate-500 dark:text-slate-300">
+	                {{ 'checkout.courier' | translate }}
+	                <select
+	                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                  name="courier"
+	                  [(ngModel)]="courier"
+	                  (ngModelChange)="onCourierChanged()"
+	                >
+	                  <option value="sameday">{{ 'checkout.courierSameday' | translate }}</option>
+	                  <option value="fan_courier">{{ 'checkout.courierFanCourier' | translate }}</option>
+	                </select>
+	              </label>
+	              <p *ngIf="deliveryEstimateKey()" class="text-xs text-slate-600 dark:text-slate-300">
+	                {{ deliveryEstimateKey() | translate : deliveryEstimateParams() }}
+	              </p>
+	            </div>
+	          </div>
+
+	          <div *ngIf="items().length && freeShippingThreshold() !== null" class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+	            <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'cart.freeShippingTitle' | translate }}</p>
+	            <p *ngIf="freeShippingAppliedByCoupon()" class="text-sm text-emerald-700 dark:text-emerald-300">
+	              {{ 'cart.freeShippingApplied' | translate }}
+	            </p>
+	            <ng-container *ngIf="!freeShippingAppliedByCoupon()">
+	              <p *ngIf="freeShippingRemaining() !== null && freeShippingRemaining() > 0" class="text-sm">
+	                {{ 'cart.freeShippingRemaining' | translate : { amount: (freeShippingRemaining() | localizedCurrency : currency) } }}
+	              </p>
+	              <p *ngIf="freeShippingRemaining() !== null && freeShippingRemaining() <= 0" class="text-sm text-emerald-700 dark:text-emerald-300">
+	                {{ 'cart.freeShippingUnlocked' | translate }}
+	              </p>
+	              <div class="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+	                <div class="h-full bg-emerald-500" [style.width.%]="freeShippingProgressPct()"></div>
+	              </div>
+	              <div *ngIf="freeShippingRemaining() !== null && freeShippingRemaining() > 0 && suggestedAddOns().length" class="grid gap-1">
+	                <p class="text-xs font-semibold text-slate-500 dark:text-slate-300">{{ 'cart.suggestedAddOns' | translate }}</p>
+	                <a
+	                  *ngFor="let p of suggestedAddOns()"
+	                  [routerLink]="['/products', p.slug]"
+	                  class="text-xs text-indigo-700 hover:underline dark:text-indigo-300"
+	                >
+	                  {{ p.name }} · {{ displayProductPrice(p) | localizedCurrency : p.currency }}
+	                </a>
+	              </div>
+	            </ng-container>
+	          </div>
+	
+	          <div class="grid gap-2">
+	            <div class="flex items-center justify-between gap-2">
+	              <label class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'checkout.step3' | translate }}</label>
               <button
                 *ngIf="promoStatus === 'success' && promo"
                 type="button"
@@ -245,16 +352,70 @@ import { ProductCardComponent } from '../../shared/product-card.component';
             [disabled]="!items().length"
           ></app-button>
           <app-button variant="ghost" [label]="'cart.continue' | translate" [routerLink]="['/shop']"></app-button>
-        </aside>
-      </div>
+	        </aside>
+	      </div>
 
-      <section *ngIf="items().length" class="grid gap-4">
-        <div class="flex items-center justify-between gap-3">
-          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'cart.recommendationsTitle' | translate }}</h2>
-          <a routerLink="/shop" class="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-50">
-            {{ 'cart.recommendationsBrowse' | translate }}
-          </a>
-        </div>
+	      <section *ngIf="savedForLater.length" class="grid gap-4">
+	        <div class="flex items-center justify-between gap-3">
+	          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'cart.savedForLaterTitle' | translate }}</h2>
+	        </div>
+	        <div class="grid gap-3">
+	          <div
+	            *ngFor="let saved of savedForLater"
+	            class="flex flex-wrap items-start gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+	          >
+	            <a [routerLink]="['/products', saved.slug]" class="shrink-0">
+	              <img
+	                [src]="saved.image || 'assets/placeholder/product-placeholder.svg'"
+	                [alt]="saved.name"
+	                class="h-24 w-24 rounded-xl object-cover border border-slate-100 dark:border-slate-800"
+	                [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
+	              />
+	            </a>
+	            <div class="flex-1 grid gap-2">
+	              <div class="flex items-start justify-between gap-3">
+	                <div>
+	                  <a
+	                    [routerLink]="['/products', saved.slug]"
+	                    class="font-semibold text-slate-900 dark:text-slate-50 hover:underline"
+	                  >
+	                    {{ saved.name }}
+	                  </a>
+	                  <p class="text-sm text-slate-600 dark:text-slate-300">
+	                    {{ 'cart.qty' | translate }}: {{ saved.quantity }} · {{ saved.price | localizedCurrency : saved.currency }}
+	                  </p>
+	                </div>
+	                <div class="flex items-center gap-3">
+	                  <button
+	                    type="button"
+	                    class="text-sm text-indigo-700 hover:text-indigo-900 disabled:opacity-50 dark:text-indigo-300 dark:hover:text-indigo-200"
+	                    [disabled]="restoringSaved[saveKey(saved)]"
+	                    (click)="moveSavedToCart(saved)"
+	                  >
+	                    {{ 'cart.moveToCart' | translate }}
+	                  </button>
+	                  <button
+	                    type="button"
+	                    class="text-sm text-slate-500 hover:text-slate-900 disabled:opacity-50 dark:text-slate-400 dark:hover:text-slate-50"
+	                    [disabled]="restoringSaved[saveKey(saved)]"
+	                    (click)="removeSavedForLater(saved)"
+	                  >
+	                    {{ 'cart.remove' | translate }}
+	                  </button>
+	                </div>
+	              </div>
+	            </div>
+	          </div>
+	        </div>
+	      </section>
+
+	      <section *ngIf="items().length" class="grid gap-4">
+	        <div class="flex items-center justify-between gap-3">
+	          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'cart.recommendationsTitle' | translate }}</h2>
+	          <a routerLink="/shop" class="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-50">
+	            {{ 'cart.recommendationsBrowse' | translate }}
+	          </a>
+	        </div>
 
         <div *ngIf="recommendationsLoading" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div
@@ -286,6 +447,8 @@ export class CartComponent implements OnInit {
   itemNotes: Record<string, string> = {};
   itemNoteErrors: Record<string, string> = {};
   movingToWishlist: Record<string, boolean> = {};
+  savingForLater: Record<string, boolean> = {};
+  restoringSaved: Record<string, boolean> = {};
   promo = '';
   promoMessage = '';
   promoStatus: 'success' | 'warn' | 'info' = 'info';
@@ -297,6 +460,9 @@ export class CartComponent implements OnInit {
   recommendationsLoading = false;
   recommendationsError = '';
   private recommendationsKey = '';
+  courier: LockerProvider = 'sameday';
+  deliveryType: CheckoutDeliveryType = 'home';
+  savedForLater: SavedForLaterItem[] = [];
 
   constructor(
     private cart: CartStore,
@@ -306,8 +472,14 @@ export class CartComponent implements OnInit {
     private wishlist: WishlistService,
     private toast: ToastService,
     private catalog: CatalogService,
+    private checkoutPrefs: CheckoutPrefsService,
     private translate: TranslateService
   ) {
+    const prefs = this.checkoutPrefs.loadDeliveryPrefs();
+    this.courier = prefs.courier;
+    this.deliveryType = prefs.deliveryType;
+    this.savedForLater = this.loadSavedForLater();
+
     effect(() => {
       if (this.cart.syncing()) return;
       if (!this.pendingPromoRefresh) return;
@@ -391,6 +563,77 @@ export class CartComponent implements OnInit {
     return Math.max(0, discount + this.couponShippingDiscount());
   }
 
+  freeShippingThreshold(): number | null {
+    const threshold = this.quote().freeShippingThresholdRon;
+    if (threshold === null) return null;
+    if (!Number.isFinite(threshold) || threshold < 0) return null;
+    return threshold;
+  }
+
+  freeShippingRemaining(): number | null {
+    const threshold = this.freeShippingThreshold();
+    if (threshold === null) return null;
+    const taxable = Math.max(0, this.quoteSubtotal() - this.quoteDiscount());
+    return Math.max(0, threshold - taxable);
+  }
+
+  freeShippingProgressPct(): number {
+    const threshold = this.freeShippingThreshold();
+    if (threshold === null) return 0;
+    if (threshold <= 0) return 100;
+    const taxable = Math.max(0, this.quoteSubtotal() - this.quoteDiscount());
+    return Math.max(0, Math.min(100, (taxable / threshold) * 100));
+  }
+
+  suggestedAddOns(): Product[] {
+    const remaining = this.freeShippingRemaining();
+    if (remaining === null || remaining <= 0) return [];
+    const sorted = [...(this.recommendations ?? [])].sort(
+      (a, b) => this.displayProductPrice(a) - this.displayProductPrice(b)
+    );
+    const under = sorted.filter((p) => this.displayProductPrice(p) <= remaining);
+    return (under.length ? under : sorted).slice(0, 2);
+  }
+
+  freeShippingAppliedByCoupon(): boolean {
+    return this.couponShippingDiscount() > 0;
+  }
+
+  setDeliveryType(value: CheckoutDeliveryType): void {
+    this.deliveryType = value;
+    this.checkoutPrefs.saveDeliveryPrefs({ courier: this.courier, deliveryType: this.deliveryType });
+  }
+
+  onCourierChanged(): void {
+    this.checkoutPrefs.saveDeliveryPrefs({ courier: this.courier, deliveryType: this.deliveryType });
+  }
+
+  deliveryEstimate(): { min: number; max: number } | null {
+    const est: Record<LockerProvider, Record<CheckoutDeliveryType, { min: number; max: number }>> = {
+      sameday: { home: { min: 1, max: 2 }, locker: { min: 1, max: 3 } },
+      fan_courier: { home: { min: 1, max: 3 }, locker: { min: 2, max: 4 } }
+    };
+    return est[this.courier]?.[this.deliveryType] ?? null;
+  }
+
+  deliveryEstimateKey(): string | null {
+    const est = this.deliveryEstimate();
+    if (!est) return null;
+    return est.min === est.max ? 'cart.deliveryEstimateSingle' : 'cart.deliveryEstimateRange';
+  }
+
+  deliveryEstimateParams(): Record<string, number> {
+    const est = this.deliveryEstimate();
+    if (!est) return {};
+    return est.min === est.max ? { days: est.min } : { min: est.min, max: est.max };
+  }
+
+  displayProductPrice(product: Product): number {
+    const sale = product?.sale_price;
+    if (typeof sale === 'number' && Number.isFinite(sale) && sale < product.base_price) return sale;
+    return product.base_price ?? 0;
+  }
+
   onQuantityChange(id: string, value: unknown): void {
     const item = this.items().find((i) => i.id === id);
     const stock = item?.stock ?? 0;
@@ -427,7 +670,121 @@ export class CartComponent implements OnInit {
     delete this.itemNotes[id];
     delete this.itemNoteErrors[id];
     delete this.movingToWishlist[id];
+    delete this.savingForLater[id];
     if (this.promoStatus === 'success') this.pendingPromoRefresh = true;
+  }
+
+  saveForLater(item: CartItem): void {
+    if (!item?.id) return;
+    if (this.savingForLater[item.id]) return;
+    this.savingForLater[item.id] = true;
+    this.cart.remove(item.id, {
+      onSuccess: () => {
+        this.addSavedForLater(item);
+        delete this.savingForLater[item.id];
+      },
+      onError: () => {
+        delete this.savingForLater[item.id];
+        this.toast.error(this.translate.instant('cart.saveForLater'), this.translate.instant('cart.saveForLaterFailed'));
+      }
+    });
+  }
+
+  saveKey(item: Pick<SavedForLaterItem, 'product_id' | 'variant_id'>): string {
+    return `${item.product_id}::${item.variant_id || ''}`;
+  }
+
+  moveSavedToCart(saved: SavedForLaterItem): void {
+    const key = this.saveKey(saved);
+    if (this.restoringSaved[key]) return;
+    this.restoringSaved[key] = true;
+    this.cartApi
+      .addItem({
+        product_id: saved.product_id,
+        variant_id: saved.variant_id ?? undefined,
+        quantity: saved.quantity
+      })
+      .subscribe({
+        next: () => {
+          this.removeSavedForLater(saved);
+          this.cart.loadFromBackend();
+          delete this.restoringSaved[key];
+        },
+        error: () => {
+          delete this.restoringSaved[key];
+          this.toast.error(this.translate.instant('cart.moveToCart'), this.translate.instant('cart.moveToCartFailed'));
+        }
+      });
+  }
+
+  removeSavedForLater(saved: SavedForLaterItem): void {
+    const key = this.saveKey(saved);
+    this.savedForLater = this.savedForLater.filter((item) => this.saveKey(item) !== key);
+    this.persistSavedForLater();
+    delete this.restoringSaved[key];
+  }
+
+  private addSavedForLater(item: CartItem): void {
+    const key = this.saveKey({ product_id: item.product_id, variant_id: item.variant_id ?? null });
+    const next: SavedForLaterItem[] = [];
+    let merged = false;
+    for (const existing of this.savedForLater) {
+      if (this.saveKey(existing) === key) {
+        next.push({
+          ...existing,
+          quantity: existing.quantity + item.quantity,
+          saved_at: new Date().toISOString()
+        });
+        merged = true;
+      } else {
+        next.push(existing);
+      }
+    }
+    if (!merged) {
+      next.unshift({
+        product_id: item.product_id,
+        variant_id: item.variant_id ?? null,
+        quantity: item.quantity,
+        name: item.name,
+        slug: item.slug,
+        price: item.price,
+        currency: item.currency,
+        image: item.image,
+        saved_at: new Date().toISOString()
+      });
+    }
+    this.savedForLater = next.slice(0, 50);
+    this.persistSavedForLater();
+  }
+
+  private loadSavedForLater(): SavedForLaterItem[] {
+    if (typeof localStorage === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem(SAVED_FOR_LATER_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as any;
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .map((entry) => ({
+          product_id: String(entry?.product_id || ''),
+          variant_id: entry?.variant_id == null ? null : String(entry.variant_id),
+          quantity: Math.max(1, Number(entry?.quantity || 1)),
+          name: String(entry?.name || ''),
+          slug: String(entry?.slug || ''),
+          price: Number(entry?.price || 0),
+          currency: String(entry?.currency || 'RON'),
+          image: entry?.image ? String(entry.image) : '',
+          saved_at: String(entry?.saved_at || '')
+        }))
+        .filter((entry) => entry.product_id && entry.slug && entry.name && Number.isFinite(entry.price));
+    } catch {
+      return [];
+    }
+  }
+
+  private persistSavedForLater(): void {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(SAVED_FOR_LATER_KEY, JSON.stringify(this.savedForLater));
   }
 
   clearCart(): void {

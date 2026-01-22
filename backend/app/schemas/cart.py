@@ -11,6 +11,7 @@ class Totals(BaseModel):
     shipping: Decimal
     total: Decimal
     currency: str | None = "RON"
+    free_shipping_threshold_ron: Decimal | None = None
 
 
 class CartItemCreate(BaseModel):

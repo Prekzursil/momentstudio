@@ -421,10 +421,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Cart: show low-stock messaging (“Only X left”) and highlight when at max quantity.
 - [x] Cart: add “Move to wishlist” action for signed-in users.
 - [x] Cart: add recommendations (“You may also like”) using category/featured products.
-- [ ] Cart: show free-shipping threshold progress (configurable) and suggested add-ons.
-- [ ] Cart: show estimated delivery window based on courier selection (if available).
-- [ ] Cart: persist delivery type/courier selections and prefill checkout.
-- [ ] Cart: add “Save for later” list (separate from wishlist; optional).
+- [x] Cart: show free-shipping threshold progress (configurable) and suggested add-ons.
+- [x] Cart: show estimated delivery window based on courier selection (if available).
+- [x] Cart: persist delivery type/courier selections and prefill checkout.
+- [x] Cart: add “Save for later” list (separate from wishlist; optional).
 - [ ] Checkout: redirect to cart when cart is empty (with helpful message).
 - [ ] Checkout: stepper UI polish (completion checkmarks + scroll-to-next on continue).
 - [ ] Checkout: block placing an order while cart sync is pending (prevent stale totals).

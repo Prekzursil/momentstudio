@@ -19,6 +19,7 @@ import { LockerPickerComponent } from '../../shared/locker-picker.component';
 import { LockerProvider, LockerRead } from '../../core/shipping.service';
 import { RO_CITIES, RO_COUNTIES } from '../../shared/ro-geo';
 import { parseMoney } from '../../shared/money';
+import { CheckoutPrefsService } from '../../core/checkout-prefs.service';
 
 type CheckoutShippingAddress = {
   name: string;
@@ -934,6 +935,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     private accountService: AccountService,
     private couponsService: CouponsService,
     private translate: TranslateService,
+    private checkoutPrefs: CheckoutPrefsService,
     public auth: AuthService
   ) {
     const saved = this.loadSavedCheckout();
@@ -945,6 +947,12 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       this.deliveryType = saved.deliveryType ?? 'home';
       this.locker = saved.locker ?? null;
     }
+    const prefs = this.checkoutPrefs.tryLoadDeliveryPrefs();
+    if (prefs) {
+      this.courier = prefs.courier;
+      this.deliveryType = prefs.deliveryType;
+    }
+    if (this.deliveryType === 'home') this.locker = null;
     this.paymentMethod = this.defaultPaymentMethod();
     this.phoneCountries = listPhoneCountries(this.translate.currentLang || 'en');
     this.countries = this.phoneCountries;
@@ -1643,6 +1651,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     if (value === 'home') {
       this.locker = null;
     }
+    this.checkoutPrefs.saveDeliveryPrefs({ courier: this.courier, deliveryType: this.deliveryType });
   }
 
   onCourierChanged(): void {
@@ -1650,6 +1659,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     if (this.deliveryType === 'locker') {
       this.locker = null;
     }
+    this.checkoutPrefs.saveDeliveryPrefs({ courier: this.courier, deliveryType: this.deliveryType });
   }
 
   ngOnInit(): void {

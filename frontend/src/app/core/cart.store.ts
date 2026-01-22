@@ -24,6 +24,7 @@ export interface CartQuote {
   shipping: number;
   total: number;
   currency: string;
+  freeShippingThresholdRon: number | null;
 }
 
 const STORAGE_KEY = 'cart_cache';
@@ -178,7 +179,7 @@ export class CartStore {
     return {};
   }
 
-  remove(id: string): void {
+  remove(id: string, handlers?: { onSuccess?: () => void; onError?: () => void }): void {
     const item = this.itemsSignal().find((i) => i.id === id);
     if (!item) return;
     this.api.deleteItem(id).subscribe({
@@ -189,9 +190,11 @@ export class CartStore {
           return next;
         });
         this.syncBackend();
+        handlers?.onSuccess?.();
       },
       error: () => {
         // keep local state unchanged on failure
+        handlers?.onError?.();
       }
     });
   }
@@ -236,20 +239,23 @@ export class CartStore {
   private quoteFromApi(res: { totals?: any }): CartQuote {
     const totals = res?.totals ?? {};
     const currency = (totals.currency ?? 'RON') as string;
+    const thresholdRaw = totals.free_shipping_threshold_ron;
     return {
       subtotal: parseMoney(totals.subtotal),
       fee: parseMoney(totals.fee),
       tax: parseMoney(totals.tax),
       shipping: parseMoney(totals.shipping),
       total: parseMoney(totals.total),
-      currency: currency || 'RON'
+      currency: currency || 'RON',
+      freeShippingThresholdRon:
+        thresholdRaw === undefined || thresholdRaw === null ? null : parseMoney(thresholdRaw),
     };
   }
 
   private localQuote(items: CartItem[]): CartQuote {
     const currency = items.find((i) => i.currency)?.currency ?? 'RON';
     const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    return { subtotal, fee: 0, tax: 0, shipping: 0, total: subtotal, currency };
+    return { subtotal, fee: 0, tax: 0, shipping: 0, total: subtotal, currency, freeShippingThresholdRon: null };
   }
 
   private persist(next?: CartItem[]): void {

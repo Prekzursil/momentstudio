@@ -198,6 +198,7 @@ def _calculate_totals(
         shipping=breakdown.shipping,
         total=breakdown.total,
         currency=currency,
+        free_shipping_threshold_ron=threshold,
     )
 
 
@@ -251,17 +252,23 @@ async def serialize_cart(
     currency = next(
         (getattr(item.product, "currency", None) for item in hydrated.items if getattr(item, "product", None)), "RON"
     ) or "RON"
+    checkout = checkout_settings or CheckoutSettings()
+    threshold = (
+        free_shipping_threshold_ron if free_shipping_threshold_ron is not None else checkout.free_shipping_threshold_ron
+    )
     totals = totals_override or _calculate_totals(
         hydrated,
         shipping_method=shipping_method,
         promo=promo,
-        checkout_settings=checkout_settings,
+        checkout_settings=checkout,
         shipping_fee_ron=shipping_fee_ron,
         free_shipping_threshold_ron=free_shipping_threshold_ron,
         currency=currency,
     )
     if totals_override and getattr(totals_override, "currency", None) is None:
         totals = Totals(**totals_override.model_dump(), currency=currency)
+    if totals is not None:
+        totals.free_shipping_threshold_ron = threshold
     return CartRead(
         id=hydrated.id,
         user_id=hydrated.user_id,
