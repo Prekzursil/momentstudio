@@ -926,6 +926,8 @@
     "maxQtyReached": "Max quantity for this item.",
     "decreaseQty": "Decrease quantity",
     "increaseQty": "Increase quantity",
+    "moveToWishlist": "Move to wishlist",
+    "moveToWishlistFailed": "Could not add item to wishlist.",
     "remove": "Remove",
     "noteLabel": "Note (optional)",
     "notePlaceholder": "Add a gift note (optional)",

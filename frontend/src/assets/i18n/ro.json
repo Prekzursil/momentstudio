@@ -926,6 +926,8 @@
     "maxQtyReached": "Cantitate maximă pentru acest produs.",
     "decreaseQty": "Scade cantitatea",
     "increaseQty": "Crește cantitatea",
+    "moveToWishlist": "Mută în lista de dorințe",
+    "moveToWishlistFailed": "Nu am putut adăuga produsul în lista de dorințe.",
     "remove": "Elimină",
     "noteLabel": "Notă (opțional)",
     "notePlaceholder": "Adaugă o notă cadou (opțional)",

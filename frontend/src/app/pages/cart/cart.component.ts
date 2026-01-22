@@ -14,6 +14,8 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthService } from '../../core/auth.service';
 import { CouponOffer, CouponsService } from '../../core/coupons.service';
 import { parseMoney } from '../../shared/money';
+import { WishlistService } from '../../core/wishlist.service';
+import { ToastService } from '../../core/toast.service';
 
 @Component({
   selector: 'app-cart',
@@ -86,9 +88,19 @@ import { parseMoney } from '../../shared/money';
                       <ng-template #cartInStock>{{ 'cart.inStock' | translate : { count: item.stock } }}</ng-template>
                     </p>
                   </div>
-                  <button class="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50" (click)="remove(item.id)">
-                    {{ 'cart.remove' | translate }}
-                  </button>
+                  <div class="flex items-center gap-3">
+                    <button
+                      *ngIf="auth.isAuthenticated()"
+                      class="text-sm text-slate-500 hover:text-slate-900 disabled:opacity-50 dark:text-slate-400 dark:hover:text-slate-50"
+                      [disabled]="movingToWishlist[item.id]"
+                      (click)="moveToWishlist(item)"
+                    >
+                      {{ 'cart.moveToWishlist' | translate }}
+                    </button>
+                    <button class="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50" (click)="remove(item.id)">
+                      {{ 'cart.remove' | translate }}
+                    </button>
+                  </div>
                 </div>
                 <div class="flex items-center gap-3 text-sm">
                   <div class="flex items-center gap-2">
@@ -245,6 +257,7 @@ export class CartComponent implements OnInit {
   itemErrors: Record<string, string> = {};
   itemNotes: Record<string, string> = {};
   itemNoteErrors: Record<string, string> = {};
+  movingToWishlist: Record<string, boolean> = {};
   promo = '';
   promoMessage = '';
   promoStatus: 'success' | 'warn' | 'info' = 'info';
@@ -258,6 +271,8 @@ export class CartComponent implements OnInit {
     public auth: AuthService,
     private cartApi: CartApi,
     private coupons: CouponsService,
+    private wishlist: WishlistService,
+    private toast: ToastService,
     private translate: TranslateService
   ) {
     effect(() => {
@@ -273,6 +288,7 @@ export class CartComponent implements OnInit {
 
   ngOnInit(): void {
     this.cart.loadFromBackend();
+    this.wishlist.ensureLoaded();
   }
 
   items = this.cart.items;
@@ -359,6 +375,7 @@ export class CartComponent implements OnInit {
     delete this.itemErrors[id];
     delete this.itemNotes[id];
     delete this.itemNoteErrors[id];
+    delete this.movingToWishlist[id];
     if (this.promoStatus === 'success') this.pendingPromoRefresh = true;
   }
 
@@ -368,6 +385,7 @@ export class CartComponent implements OnInit {
     this.itemErrors = {};
     this.itemNotes = {};
     this.itemNoteErrors = {};
+    this.movingToWishlist = {};
     this.resetPromoState();
   }
 
@@ -382,6 +400,36 @@ export class CartComponent implements OnInit {
     }
     delete this.itemNoteErrors[id];
     if (this.promoStatus === 'success') this.pendingPromoRefresh = true;
+  }
+
+  moveToWishlist(item: CartItem): void {
+    if (!this.auth.isAuthenticated()) return;
+    const productId = item.product_id;
+    if (!productId) return;
+
+    if (this.wishlist.isWishlisted(productId)) {
+      this.cart.remove(item.id);
+      this.toast.info(this.translate.instant('wishlist.addedTitle'), this.translate.instant('wishlist.addedBody', { name: item.name }));
+      return;
+    }
+
+    this.movingToWishlist[item.id] = true;
+    this.wishlist.add(productId).subscribe({
+      next: (product) => {
+        this.wishlist.addLocal(product);
+        this.cart.remove(item.id);
+        this.toast.success(
+          this.translate.instant('wishlist.addedTitle'),
+          this.translate.instant('wishlist.addedBody', { name: item.name })
+        );
+        delete this.movingToWishlist[item.id];
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('cart.moveToWishlistFailed');
+        this.toast.error(this.translate.instant('cart.moveToWishlist'), msg);
+        delete this.movingToWishlist[item.id];
+      }
+    });
   }
 
   clearPromo(): void {
