@@ -73,9 +73,6 @@ class User(Base):
     verification_tokens: Mapped[list["EmailVerificationToken"]] = relationship(
         "EmailVerificationToken", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
     )
-    payment_methods: Mapped[list["PaymentMethod"]] = relationship(
-        "PaymentMethod", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
-    )
     username_history: Mapped[list["UserUsernameHistory"]] = relationship(
         "UserUsernameHistory", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
     )
@@ -231,21 +228,6 @@ class EmailVerificationToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     user: Mapped[User] = relationship("User", back_populates="verification_tokens")
-
-
-class PaymentMethod(Base):
-    __tablename__ = "payment_methods"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    stripe_payment_method_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-    brand: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    last4: Mapped[str | None] = mapped_column(String(4), nullable=True)
-    exp_month: Mapped[int | None] = mapped_column(nullable=True)
-    exp_year: Mapped[int | None] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
-    user: Mapped[User] = relationship("User", back_populates="payment_methods")
 
 
 class AdminAuditLog(Base):

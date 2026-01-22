@@ -240,6 +240,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Load testing plan (k6/locust) and scripts.
 - [x] SQL injection and XSS validation tests.
 - [x] Dependency vulnerability scanning (pip/npm).
+- [ ] Frontend deps: resolve `npm audit` vulnerabilities (pin/upgrade).
 - [x] Backpressure handling (429) for expensive endpoints.
 - [x] Maintenance mode toggle.
 
@@ -248,6 +249,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Tailwind CSS and design tokens.
 - [x] Main layout (header/footer/responsive nav).
 - [x] Shared components: button, input, card, modal, toast.
+- [ ] Frontend build: replace CommonJS `qrcode` dependency (avoid Angular optimization bailout).
 - [x] Fix shared standalone components missing `NgIf` imports so buttons/labels render correctly.
 - [x] Header: improve theme/language control layout and add a global product search field.
 - [x] Footer: remove year suffix from tagline and replace Pinterest link with Facebook.
@@ -452,7 +454,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Account UX: unify email management UI in Security (single email section; reduce duplication; align Change password placement).
 - [x] Account UX: translate Security page strings (remove hard-coded English).
 - [x] Security: show QR code during 2FA setup and prompt for 2FA inline on login.
-- [ ] Payments: remove `/payment-methods` API + DB table (reduce storage/compliance scope).
+- [x] Payments: remove `/payment-methods` API + DB table (reduce storage/compliance scope).
 ### Account UX – Next Improvements (Backlog)
 - [x] Account UX: lazy-load per-section data (don’t fetch orders/addresses/comments on every Account route).
 - [x] Account UX: add “Retry” actions for section load failures (per card, not just global error).

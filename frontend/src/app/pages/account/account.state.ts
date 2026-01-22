@@ -3,14 +3,12 @@
 // This was extracted from the previous monolithic Account component so that the
 // new routed subpages can share behavior without bundling the legacy template.
 
-import { AfterViewInit, Directive, ElementRef, effect, EffectRef, OnDestroy, OnInit, signal } from '@angular/core';
+import { Directive, effect, EffectRef, OnDestroy, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
 import { TranslateService } from '@ngx-translate/core';
-import type { Stripe, StripeCardElement, StripeCardElementChangeEvent, StripeElements } from '@stripe/stripe-js';
 import { filter, map, of, Subscription, switchMap } from 'rxjs';
 
 import { ApiService } from '../../core/api.service';
-import { appConfig } from '../../core/app-config';
 import {
   AuthService,
   AuthUser,
@@ -39,7 +37,7 @@ import { BlogMyComment, BlogService, PaginationMeta } from '../../core/blog.serv
 import { CartStore } from '../../core/cart.store';
 import { LanguageService } from '../../core/language.service';
 import { NotificationsService } from '../../core/notifications.service';
-import { ThemeMode, ThemePreference, ThemeService } from '../../core/theme.service';
+import { ThemePreference, ThemeService } from '../../core/theme.service';
 import { ToastService } from '../../core/toast.service';
 import { TicketListItem, TicketsService } from '../../core/tickets.service';
 import { WishlistService } from '../../core/wishlist.service';
@@ -92,7 +90,7 @@ type NotificationPrefsSnapshot = {
 };
 
 @Directive()
-export class AccountState implements OnInit, AfterViewInit, OnDestroy {
+export class AccountState implements OnInit, OnDestroy {
   private now = signal<number>(Date.now());
   private nowInterval?: ReturnType<typeof setInterval>;
 
@@ -134,20 +132,6 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
   loading = signal<boolean>(false);
   error = signal<string | null>(null);
 
-  paymentMethods: any[] = [];
-  paymentMethodsLoaded = signal<boolean>(false);
-  paymentMethodsLoading = signal<boolean>(false);
-  paymentMethodsError = signal<string | null>(null);
-  cardElementVisible = false;
-  savingCard = false;
-  cardReady = false;
-  cardError: string | null = null;
-  private stripe: Stripe | null = null;
-  private elements?: StripeElements;
-  private card?: StripeCardElement;
-  private clientSecret: string | null = null;
-  private cardElementRef?: ElementRef<HTMLDivElement>;
-  private stripeThemeEffect?: EffectRef;
   private phoneCountriesEffect?: EffectRef;
   showAddressForm = false;
   editingAddressId: string | null = null;
@@ -327,12 +311,6 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     private lang: LanguageService,
     private translate: TranslateService
   ) {
-    this.stripeThemeEffect = effect(() => {
-      const mode = this.theme.mode()();
-      if (this.card) {
-        this.card.update({ style: this.buildStripeCardStyle(mode) });
-      }
-    });
     this.phoneCountriesEffect = effect(() => {
       this.phoneCountries = listPhoneCountries(this.lang.language());
     });
@@ -373,20 +351,6 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     window.addEventListener('beforeunload', this.handleBeforeUnload);
   }
 
-  ngAfterViewInit(): void {
-    // Stripe Elements is initialized only when needed (e.g. when adding a payment method).
-  }
-
-  setCardHost(cardHost: ElementRef<HTMLDivElement> | undefined): void {
-    this.cardElementRef = cardHost;
-
-    if (!cardHost) {
-      this.unmountCardElement();
-      return;
-    }
-
-    this.mountCardElement();
-  }
 
   retryAccountLoad(): void {
     this.profileLoaded = false;
@@ -1235,16 +1199,6 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     if (workKeys.has(normalized)) return 'work';
     if (otherKeys.has(normalized)) return 'other';
     return raw;
-  }
-
-  addCard(): void {
-    this.cardError = null;
-    this.savingCard = false;
-    this.cardElementVisible = true;
-    void this.setupStripe().then(() => {
-      if (!this.stripe) return;
-      this.createSetupIntent();
-    });
   }
 
   primaryVerificationResendRemainingSeconds(): number {
@@ -2132,181 +2086,11 @@ export class AccountState implements OnInit, AfterViewInit, OnDestroy {
     if (this.idleTimer) {
       clearTimeout(this.idleTimer);
     }
-    if (this.card) {
-      this.card.destroy();
-    }
     this.routerEventsSub?.unsubscribe();
-    this.stripeThemeEffect?.destroy();
     this.phoneCountriesEffect?.destroy();
     window.removeEventListener('mousemove', this.handleUserActivity);
     window.removeEventListener('keydown', this.handleUserActivity);
     window.removeEventListener('beforeunload', this.handleBeforeUnload);
-  }
-
-  private async setupStripe(): Promise<void> {
-    if (this.stripe) return;
-    const publishableKey = this.getStripePublishableKey();
-    if (!publishableKey) {
-      this.cardError = this.t('account.security.payment.stripeKeyMissing');
-      return;
-    }
-    const { loadStripe } = await import('@stripe/stripe-js');
-    this.stripe = await loadStripe(publishableKey);
-    if (!this.stripe) {
-      this.cardError = this.t('account.security.payment.stripeInitError');
-      return;
-    }
-    this.elements = this.stripe.elements();
-    this.card = this.elements.create('card', { style: this.buildStripeCardStyle(this.theme.mode()()) });
-    this.mountCardElement();
-  }
-
-  private buildStripeCardStyle(mode: ThemeMode) {
-    const base =
-      mode === 'dark'
-        ? {
-            color: '#f8fafc',
-            iconColor: '#f8fafc',
-            fontFamily: 'Inter, system-ui, sans-serif',
-            fontSize: '16px',
-            '::placeholder': { color: '#94a3b8' }
-          }
-        : {
-            color: '#0f172a',
-            iconColor: '#0f172a',
-            fontFamily: 'Inter, system-ui, sans-serif',
-            fontSize: '16px',
-            '::placeholder': { color: '#64748b' }
-          };
-    return {
-      base,
-      invalid: {
-        color: mode === 'dark' ? '#fca5a5' : '#b91c1c'
-      }
-    };
-  }
-
-  private getStripePublishableKey(): string | null {
-    return appConfig.stripePublishableKey || null;
-  }
-
-  private createSetupIntent(): void {
-    this.api.post<{ client_secret: string; customer_id: string }>('/payment-methods/setup-intent', {}).subscribe({
-      next: (res) => {
-        this.clientSecret = res.client_secret;
-      },
-      error: () => {
-        const msg = this.t('account.security.payment.setupIntentError');
-        this.cardError = msg;
-        this.toast.error(msg);
-      }
-    });
-  }
-
-  private cardChangeListenerAttached = false;
-  private cardMountedHost?: HTMLElement;
-
-  private unmountCardElement(): void {
-    if (!this.card || !this.cardReady) return;
-    try {
-      this.card.unmount();
-    } catch {
-      // ignore
-    }
-    this.cardReady = false;
-    this.cardMountedHost = undefined;
-  }
-
-  private mountCardElement(): void {
-    if (!this.card || !this.cardElementRef) return;
-
-    const host = this.cardElementRef.nativeElement;
-    if (this.cardReady && this.cardMountedHost === host) return;
-
-    if (this.cardReady && this.cardMountedHost && this.cardMountedHost !== host) {
-      this.unmountCardElement();
-    }
-
-    try {
-      this.card.mount(host);
-      this.cardMountedHost = host;
-      this.cardReady = true;
-    } catch {
-      return;
-    }
-
-    if (!this.cardChangeListenerAttached) {
-      this.card.on('change', (event: StripeCardElementChangeEvent) => {
-        this.cardError = event.error ? event.error.message ?? this.t('account.security.payment.cardErrorFallback') : null;
-      });
-      this.cardChangeListenerAttached = true;
-    }
-  }
-
-  async confirmCard(): Promise<void> {
-    if (!this.stripe || !this.card || !this.clientSecret) {
-      this.cardError = this.t('account.security.payment.formNotReady');
-      return;
-    }
-    this.savingCard = true;
-    const result = await this.stripe.confirmCardSetup(this.clientSecret, {
-      payment_method: { card: this.card }
-    });
-    if (result.error) {
-      this.cardError = result.error.message ?? this.t('account.security.payment.saveCardError');
-      this.savingCard = false;
-      return;
-    }
-    const pmId = result.setupIntent?.payment_method;
-    if (!pmId) {
-      this.cardError = this.t('account.security.payment.missingPaymentMethod');
-      this.savingCard = false;
-      return;
-    }
-    this.api.post('/payment-methods/attach', { payment_method_id: pmId }).subscribe({
-      next: () => {
-        this.toast.success(this.t('account.security.payment.saved'));
-        this.loadPaymentMethods(true);
-        this.cardError = null;
-        this.clientSecret = null;
-        this.savingCard = false;
-      },
-      error: () => {
-        this.cardError = this.t('account.security.payment.attachError');
-        this.savingCard = false;
-      }
-    });
-  }
-
-  private loadPaymentMethods(force: boolean = false): void {
-    if (!this.auth.isAuthenticated()) return;
-    if (this.paymentMethodsLoading() && !force) return;
-    if (this.paymentMethodsLoaded() && !force) return;
-    this.paymentMethodsLoading.set(true);
-    this.paymentMethodsError.set(null);
-    this.api.get<any[]>('/payment-methods').subscribe({
-      next: (methods) => {
-        this.paymentMethods = methods;
-        this.paymentMethodsLoaded.set(true);
-      },
-      error: () => {
-        this.paymentMethods = [];
-        this.paymentMethodsError.set('account.security.payment.loadError');
-        this.paymentMethodsLoading.set(false);
-      },
-      complete: () => this.paymentMethodsLoading.set(false)
-    });
-  }
-
-  removePaymentMethod(id: string): void {
-    if (!confirm(this.t('account.security.payment.removeConfirm'))) return;
-    this.api.delete(`/payment-methods/${id}`).subscribe({
-      next: () => {
-        this.toast.success(this.t('account.security.payment.removed'));
-        this.paymentMethods = this.paymentMethods.filter((pm) => pm.id !== id);
-      },
-      error: () => this.toast.error(this.t('account.security.payment.removeError'))
-    });
   }
 
   private loadSecondaryEmails(force: boolean = false): void {
