@@ -463,7 +463,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Testing: add Playwright e2e for cart → checkout → COD success.
 - [x] Testing: add Playwright e2e for coupons eligibility + guest restriction.
 - [x] Testing: add Playwright e2e for PayPal and Stripe return/cancel flows (smoke).
-- [ ] Checkout: audit `phone_required_*` defaults between cart totals, CMS settings, and backend checkout enforcement (avoid UI/backend mismatch).
+- [x] Checkout: audit `phone_required_*` defaults between cart totals, CMS settings, and backend checkout enforcement (avoid UI/backend mismatch).
 
 ## Frontend - Auth & Account
 - [x] Login page with validation.

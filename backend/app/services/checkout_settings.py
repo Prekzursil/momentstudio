@@ -100,7 +100,7 @@ def _parse_int(value: object | None, *, fallback: int) -> int:
 
 
 async def get_checkout_settings(session: AsyncSession) -> CheckoutSettings:
-    block = await content_service.get_published_by_key(session, "site.checkout")
+    block = await content_service.get_published_by_key_following_redirects(session, "site.checkout")
     meta = (getattr(block, "meta", None) or {}) if block else {}
     shipping_fee = _parse_decimal(meta.get("shipping_fee_ron"), fallback=DEFAULT_SHIPPING_FEE_RON)
     threshold = _parse_decimal(meta.get("free_shipping_threshold_ron"), fallback=DEFAULT_FREE_SHIPPING_THRESHOLD_RON)
