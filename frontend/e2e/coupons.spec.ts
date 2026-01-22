@@ -124,6 +124,8 @@ test('coupons v2: apply coupon and prevent reuse after redemption', async ({ pag
   await page.goto('/checkout');
   await cartLoad;
 
+  await expect(page.getByText(code)).toBeVisible();
+
   await page.locator('input[name="promo"]').fill(code);
   await page.getByRole('button', { name: 'Apply' }).first().click();
 
@@ -151,4 +153,56 @@ test('coupons v2: apply coupon and prevent reuse after redemption', async ({ pag
   await page.getByRole('button', { name: 'Apply' }).click();
   await expect(page.getByText('Coupon not eligible')).toBeVisible();
   await expect(page.getByText('You already used this coupon')).toBeVisible();
+});
+
+test('coupons v2: guests are prompted to sign in', async ({ page, request }) => {
+  const sessionId = `guest-e2e-${Date.now()}`;
+  await page.addInitScript((sid) => {
+    localStorage.setItem('cart_session_id', sid);
+  }, sessionId);
+
+  const listRes = await request.get('/api/v1/catalog/products?sort=newest&page=1&limit=25');
+  expect(listRes.ok()).toBeTruthy();
+  const listPayload = (await listRes.json()) as any;
+
+  const items = Array.isArray(listPayload?.items) ? listPayload.items : [];
+  const candidates = items
+    .filter((p: any) => typeof p?.id === 'string' && p.id.length > 0)
+    .filter((p: any) => {
+      const stock = typeof p?.stock_quantity === 'number' ? p.stock_quantity : 0;
+      return stock > 0 || !!p?.allow_backorder;
+    });
+
+  if (!candidates.length) {
+    test.skip(true, 'No in-stock products available for guest coupon restriction e2e.');
+    return;
+  }
+
+  const product = candidates[0];
+  const syncRes = await request.post('/api/v1/cart/sync', {
+    headers: { 'X-Session-Id': sessionId },
+    data: {
+      items: [
+        {
+          product_id: product.id,
+          variant_id: null,
+          quantity: 1
+        }
+      ]
+    }
+  });
+  expect(syncRes.ok()).toBeTruthy();
+
+  const cartLoad = page.waitForResponse(
+    (res) => res.url().includes('/api/v1/cart') && res.request().method() === 'GET' && res.status() === 200
+  );
+  await page.goto('/cart');
+  await cartLoad;
+
+  await page.getByRole('link', { name: 'Proceed to checkout' }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
+
+  await expect(page.getByText('Sign in to use coupons.')).toBeVisible();
+  await expect(page.locator('#checkout-step-3').getByRole('link', { name: 'Sign in' })).toBeVisible();
+  await expect(page.locator('input[name="promo"]')).toHaveCount(0);
 });

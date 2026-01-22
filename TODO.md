@@ -458,11 +458,12 @@ Below is a structured checklist you can turn into issues.
 - [x] A11y: ensure focus management when steps change or modals open/close.
 - [x] Checkout A11y: tie guest “create account” phone validation to the field (`aria-invalid`/`aria-describedby`) instead of only showing a passive hint.
 - [x] Performance: split the monolithic `CheckoutComponent` into smaller components (shipping/promo/payment).
-- [ ] Performance: add route-level prefetching/resolvers for shipping methods and CMS pricing settings.
-- [ ] Observability: add client-side analytics events for cart/checkout steps (start, abandon, success).
-- [ ] Testing: add Playwright e2e for cart → checkout → COD success.
-- [ ] Testing: add Playwright e2e for coupons eligibility + guest restriction.
-- [ ] Testing: add Playwright e2e for PayPal and Stripe return/cancel flows (smoke).
+- [x] Performance: add route-level prefetching/resolvers for shipping methods and CMS pricing settings.
+- [x] Observability: add client-side analytics events for cart/checkout steps (start, abandon, success).
+- [x] Testing: add Playwright e2e for cart → checkout → COD success.
+- [x] Testing: add Playwright e2e for coupons eligibility + guest restriction.
+- [x] Testing: add Playwright e2e for PayPal and Stripe return/cancel flows (smoke).
+- [ ] Checkout: audit `phone_required_*` defaults between cart totals, CMS settings, and backend checkout enforcement (avoid UI/backend mismatch).
 
 ## Frontend - Auth & Account
 - [x] Login page with validation.
