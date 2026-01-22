@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { PasswordStrengthComponent } from '../../shared/password-strength.component';
@@ -23,10 +23,10 @@ import { AuthService } from '../../core/auth.service';
   ],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-xl">
-      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">Change password</h1>
+      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'account.passwordChange.title' | translate }}</h1>
       <form #changeForm="ngForm" class="grid gap-4" (ngSubmit)="onSubmit(changeForm)">
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-          Current password
+          {{ 'account.passwordChange.fields.current' | translate }}
           <div class="relative">
             <input
               name="current"
@@ -47,7 +47,7 @@ import { AuthService } from '../../core/auth.service';
           </div>
         </label>
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-          New password
+          {{ 'account.passwordChange.fields.new' | translate }}
           <div class="relative">
             <input
               name="password"
@@ -70,7 +70,7 @@ import { AuthService } from '../../core/auth.service';
         </label>
         <app-password-strength [password]="password"></app-password-strength>
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-          Confirm new password
+          {{ 'account.passwordChange.fields.confirm' | translate }}
           <div class="relative">
             <input
               name="confirm"
@@ -90,9 +90,9 @@ import { AuthService } from '../../core/auth.service';
             </button>
           </div>
         </label>
-        <p *ngIf="error" class="text-sm text-amber-700 dark:text-amber-300">{{ error }}</p>
-        <app-button label="Update password" type="submit"></app-button>
-        <a routerLink="/account" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">Back to account</a>
+        <p *ngIf="error" class="text-sm text-amber-700 dark:text-amber-300">{{ error | translate }}</p>
+        <app-button [label]="'account.passwordChange.actions.update' | translate" type="submit"></app-button>
+        <a routerLink="/account" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">{{ 'account.passwordChange.actions.back' | translate }}</a>
       </form>
     </app-container>
   `
@@ -106,29 +106,37 @@ export class ChangePasswordComponent {
   showNew = false;
   showConfirm = false;
 
-  constructor(private toast: ToastService, private auth: AuthService) {}
+  constructor(private toast: ToastService, private auth: AuthService, private translate: TranslateService) {}
 
   onSubmit(form: NgForm): void {
     if (!form.valid) {
-      this.error = 'Please complete the form.';
+      this.error = 'account.passwordChange.errors.invalidForm';
       return;
     }
     if (this.password !== this.confirm) {
-      this.error = 'Passwords do not match.';
+      this.error = 'account.passwordChange.errors.mismatch';
       return;
     }
     this.error = '';
     this.auth.changePassword(this.current, this.password).subscribe({
       next: () => {
-        this.toast.success('Password updated', 'Your password has been changed.');
+        this.toast.success(
+          this.translate.instant('account.passwordChange.toast.updatedTitle'),
+          this.translate.instant('account.passwordChange.toast.updatedDesc')
+        );
         this.current = '';
         this.password = '';
         this.confirm = '';
       },
       error: (err) => {
-        const message = err?.error?.detail || 'Could not update password.';
-        this.error = message;
-        this.toast.error(message);
+        const detail = typeof err?.error?.detail === 'string' ? err.error.detail.trim() : '';
+        if (detail) {
+          this.error = detail;
+          this.toast.error(detail);
+          return;
+        }
+        this.error = 'account.passwordChange.errors.updateFailed';
+        this.toast.error(this.translate.instant('account.passwordChange.errors.updateFailed'));
       }
     });
   }

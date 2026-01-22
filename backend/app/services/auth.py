@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.core import security
+from app.core import totp as totp_core
 from app.core.config import settings
 from app.models.user import (
     EmailVerificationToken,
@@ -22,6 +23,7 @@ from app.models.user import (
     UserUsernameHistory,
     UserDisplayNameHistory,
     UserEmailHistory,
+    UserSecurityEvent,
     UserSecondaryEmail,
 )
 from app.schemas.user import UserCreate
@@ -764,21 +766,178 @@ async def confirm_reset_token(session: AsyncSession, token: str, new_password: s
     return user
 
 
-async def create_refresh_session(session: AsyncSession, user_id: uuid.UUID, *, persistent: bool = True) -> RefreshSession:
+def _truncate(value: str | None, max_len: int) -> str | None:
+    clean = (value or "").strip()
+    if not clean:
+        return None
+    return clean[:max_len]
+
+
+async def create_refresh_session(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    persistent: bool = True,
+    user_agent: str | None = None,
+    ip_address: str | None = None,
+) -> RefreshSession:
     jti = secrets.token_hex(16)
     expires_at = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_exp_days)
-    refresh_session = RefreshSession(user_id=user_id, jti=jti, expires_at=expires_at, persistent=persistent, revoked=False)
+    refresh_session = RefreshSession(
+        user_id=user_id,
+        jti=jti,
+        expires_at=expires_at,
+        persistent=persistent,
+        revoked=False,
+        user_agent=_truncate(user_agent, 255),
+        ip_address=_truncate(ip_address, 45),
+    )
     session.add(refresh_session)
     await session.flush()
     return refresh_session
 
 
-async def issue_tokens_for_user(session: AsyncSession, user: User, *, persistent: bool = True) -> dict[str, str]:
-    refresh_session = await create_refresh_session(session, user.id, persistent=persistent)
+async def issue_tokens_for_user(
+    session: AsyncSession,
+    user: User,
+    *,
+    persistent: bool = True,
+    user_agent: str | None = None,
+    ip_address: str | None = None,
+) -> dict[str, str]:
+    refresh_session = await create_refresh_session(
+        session, user.id, persistent=persistent, user_agent=user_agent, ip_address=ip_address
+    )
     access = security.create_access_token(str(user.id), refresh_session.jti)
     refresh = security.create_refresh_token(str(user.id), refresh_session.jti, refresh_session.expires_at)
     await session.commit()
     return {"access_token": access, "refresh_token": refresh}
+
+
+async def record_security_event(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    event_type: str,
+    *,
+    user_agent: str | None = None,
+    ip_address: str | None = None,
+) -> None:
+    session.add(
+        UserSecurityEvent(
+            user_id=user_id,
+            event_type=(event_type or "").strip()[:50] or "unknown",
+            user_agent=_truncate(user_agent, 255),
+            ip_address=_truncate(ip_address, 45),
+        )
+    )
+    await session.commit()
+
+
+_RECOVERY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def _normalize_recovery_code(raw: str) -> str:
+    return "".join(ch for ch in (raw or "").strip().upper() if ch.isalnum())
+
+
+def _format_recovery_code(raw: str) -> str:
+    clean = _normalize_recovery_code(raw)
+    if not clean:
+        return ""
+    return "-".join(clean[i : i + 4] for i in range(0, len(clean), 4))
+
+
+def _generate_recovery_codes(*, count: int) -> tuple[list[str], list[str]]:
+    count = max(1, int(count))
+    codes: set[str] = set()
+    while len(codes) < count:
+        raw = "".join(secrets.choice(_RECOVERY_ALPHABET) for _ in range(12))
+        codes.add(raw)
+    formatted = [_format_recovery_code(code) for code in sorted(codes)]
+    hashed = [security.hash_password(_normalize_recovery_code(code)) for code in formatted]
+    return formatted, hashed
+
+
+def _two_factor_secret(user: User) -> str | None:
+    token = (getattr(user, "two_factor_totp_secret", None) or "").strip()
+    if not token:
+        return None
+    return totp_core.decrypt_secret(token)
+
+
+async def start_two_factor_setup(session: AsyncSession, user: User) -> tuple[str, str]:
+    if bool(getattr(user, "two_factor_enabled", False)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Two-factor is already enabled")
+    secret = totp_core.generate_base32_secret()
+    user.two_factor_totp_secret = totp_core.encrypt_secret(secret)
+    user.two_factor_recovery_codes = None
+    user.two_factor_confirmed_at = None
+    user.two_factor_enabled = False
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+    issuer = settings.app_name.replace(" API", "").strip() or settings.app_name
+    otpauth_url = totp_core.build_otpauth_url(issuer=issuer, account_name=user.email, secret=secret)
+    return secret, otpauth_url
+
+
+async def enable_two_factor(session: AsyncSession, user: User, code: str) -> list[str]:
+    if bool(getattr(user, "two_factor_enabled", False)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Two-factor is already enabled")
+    secret = _two_factor_secret(user)
+    if not secret:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Two-factor setup is not started")
+    if not totp_core.verify_totp_code(secret=secret, code=code):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor code")
+    formatted, hashed = _generate_recovery_codes(count=int(settings.two_factor_recovery_codes_count or 10))
+    user.two_factor_enabled = True
+    user.two_factor_confirmed_at = datetime.now(timezone.utc)
+    user.two_factor_recovery_codes = hashed
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+    return formatted
+
+
+async def disable_two_factor(session: AsyncSession, user: User) -> None:
+    user.two_factor_enabled = False
+    user.two_factor_totp_secret = None
+    user.two_factor_recovery_codes = None
+    user.two_factor_confirmed_at = None
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+
+
+async def regenerate_recovery_codes(session: AsyncSession, user: User) -> list[str]:
+    if not bool(getattr(user, "two_factor_enabled", False)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Two-factor is not enabled")
+    formatted, hashed = _generate_recovery_codes(count=int(settings.two_factor_recovery_codes_count or 10))
+    user.two_factor_recovery_codes = hashed
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+    return formatted
+
+
+async def verify_two_factor_code(session: AsyncSession, user: User, code: str) -> bool:
+    secret = _two_factor_secret(user)
+    if secret and totp_core.verify_totp_code(secret=secret, code=code):
+        return True
+
+    candidate = _normalize_recovery_code(code)
+    if not candidate:
+        return False
+    hashes = list(getattr(user, "two_factor_recovery_codes", None) or [])
+    for idx, hashed in enumerate(hashes):
+        if security.verify_password(candidate, hashed):
+            hashes.pop(idx)
+            user.two_factor_recovery_codes = hashes or None
+            session.add(user)
+            await session.commit()
+            await session.refresh(user)
+            return True
+    return False
 
 
 async def _revoke_other_verification_tokens(session: AsyncSession, user_id: uuid.UUID) -> None:

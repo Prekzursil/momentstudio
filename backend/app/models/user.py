@@ -1,12 +1,18 @@
+from __future__ import annotations
+
 import enum
 import uuid
 from datetime import datetime, date
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Date, DateTime, Enum, String, func, ForeignKey, Integer, UniqueConstraint, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.models.passkeys import UserPasskey
 
 
 class UserRole(str, enum.Enum):
@@ -36,6 +42,10 @@ class User(Base):
     notify_blog_comments: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     notify_blog_comment_replies: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     notify_marketing: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    two_factor_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    two_factor_totp_secret: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    two_factor_recovery_codes: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    two_factor_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     google_sub: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True, index=True)
     google_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     google_picture_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -63,9 +73,6 @@ class User(Base):
     verification_tokens: Mapped[list["EmailVerificationToken"]] = relationship(
         "EmailVerificationToken", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
     )
-    payment_methods: Mapped[list["PaymentMethod"]] = relationship(
-        "PaymentMethod", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
-    )
     username_history: Mapped[list["UserUsernameHistory"]] = relationship(
         "UserUsernameHistory", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
     )
@@ -77,6 +84,9 @@ class User(Base):
     )
     secondary_emails: Mapped[list["UserSecondaryEmail"]] = relationship(
         "UserSecondaryEmail", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
+    )
+    passkeys: Mapped[list["UserPasskey"]] = relationship(
+        "UserPasskey", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
     )
 
 
@@ -185,9 +195,26 @@ class RefreshSession(Base):
     revoked_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     rotated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     replaced_by_jti: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     user: Mapped[User] = relationship("User", back_populates="refresh_sessions")
+
+
+class UserSecurityEvent(Base):
+    __tablename__ = "user_security_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user: Mapped[User] = relationship("User", lazy="joined")
 
 
 class EmailVerificationToken(Base):
@@ -201,21 +228,6 @@ class EmailVerificationToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     user: Mapped[User] = relationship("User", back_populates="verification_tokens")
-
-
-class PaymentMethod(Base):
-    __tablename__ = "payment_methods"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    stripe_payment_method_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-    brand: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    last4: Mapped[str | None] = mapped_column(String(4), nullable=True)
-    exp_month: Mapped[int | None] = mapped_column(nullable=True)
-    exp_year: Mapped[int | None] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
-    user: Mapped[User] = relationship("User", back_populates="payment_methods")
 
 
 class AdminAuditLog(Base):

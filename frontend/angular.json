@@ -22,32 +22,61 @@
               "src/styles.css"
             ],
             "scripts": [],
-            "allowedCommonJsDependencies": ["leaflet"],
-            "budgets": [
-              {
-                "type": "initial",
-                "maximumWarning": "1250kb",
-                "maximumError": "1300kb"
-              },
-              {
-                "type": "bundle",
-                "name": "main",
-                "maximumWarning": "1000kb",
-                "maximumError": "1100kb"
-              },
-              {
-                "type": "anyComponentStyle",
-                "maximumWarning": "50kb",
-                "maximumError": "80kb"
-              }
-            ]
-          }
+            "allowedCommonJsDependencies": ["leaflet"]
+          },
+          "configurations": {
+            "development": {
+              "optimization": false,
+              "buildOptimizer": false,
+              "sourceMap": true,
+              "namedChunks": true,
+              "extractLicenses": false,
+              "vendorChunk": true
+            },
+            "production": {
+              "optimization": true,
+              "buildOptimizer": true,
+              "sourceMap": false,
+              "namedChunks": false,
+              "extractLicenses": true,
+              "vendorChunk": false,
+              "outputHashing": "all",
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "1250kb",
+                  "maximumError": "1300kb"
+                },
+                {
+                  "type": "bundle",
+                  "name": "main",
+                  "maximumWarning": "1000kb",
+                  "maximumError": "1100kb"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "50kb",
+                  "maximumError": "80kb"
+                }
+              ]
+            }
+          },
+          "defaultConfiguration": "production"
         },
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
           "options": {
-            "buildTarget": "app:build"
-          }
+            "buildTarget": "app:build:development"
+          },
+          "configurations": {
+            "development": {
+              "buildTarget": "app:build:development"
+            },
+            "production": {
+              "buildTarget": "app:build:production"
+            }
+          },
+          "defaultConfiguration": "development"
         },
         "test": {
           "builder": "@angular-devkit/build-angular:karma",
@@ -67,6 +96,9 @@
     }
   },
   "cli": {
-    "analytics": false
+    "analytics": false,
+    "cache": {
+      "enabled": true
+    }
   }
 }

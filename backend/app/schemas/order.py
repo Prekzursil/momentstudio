@@ -81,6 +81,19 @@ class OrderRead(BaseModel):
     events: list["OrderEventRead"] = Field(default_factory=list)
 
 
+class OrderPaginationMeta(BaseModel):
+    total_items: int
+    total_pages: int
+    page: int
+    limit: int
+    pending_count: int = 0
+
+
+class OrderListResponse(BaseModel):
+    items: list[OrderRead]
+    meta: OrderPaginationMeta
+
+
 class OrderCreate(BaseModel):
     shipping_address_id: UUID | None = None
     billing_address_id: UUID | None = None
@@ -94,6 +107,10 @@ class OrderUpdate(BaseModel):
     tracking_url: str | None = Field(default=None, max_length=255)
     shipping_method_id: UUID | None = None
     shipped_quantity: int | None = Field(default=None, ge=0)
+
+
+class OrderCancelRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=2000)
 
 
 class OrderEventRead(BaseModel):

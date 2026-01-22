@@ -54,6 +54,7 @@ Below is a structured checklist you can turn into issues.
 
 ## Backend - Catalog & Products
 - [x] Category model + migration.
+- [x] Categories: add parent/child hierarchy (subcategories) and include descendants when filtering products by category.
 - [x] Product model + migration.
 - [x] ProductImage model + migration.
 - [x] (Optional) ProductVariant model + migration.
@@ -187,6 +188,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin preview endpoint with token.
 - [x] Content change audit log.
 - [x] Static page slugs for SEO (about/faq/shipping/returns/care).
+- [x] CMS: add dynamic pages under `/pages/:slug` (content keys `page.<slug>`).
+- [x] CMS: add banner + carousel blocks (shared slide schema) and migrate legacy homepage hero to a banner block.
+- [x] CMS: allow changing page URLs with redirects (advanced).
+- [x] CMS: redirects – add admin UI to list/manage redirects (view/delete stale entries).
+- [x] CMS: pages – enforce reserved slug validation server-side on page creation (not just frontend).
 
 ## Backend - Email & Notifications
 - [x] Email settings (SMTP).
@@ -234,6 +240,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Load testing plan (k6/locust) and scripts.
 - [x] SQL injection and XSS validation tests.
 - [x] Dependency vulnerability scanning (pip/npm).
+- [x] Frontend deps: resolve `npm audit` vulnerabilities (pin/upgrade).
 - [x] Backpressure handling (429) for expensive endpoints.
 - [x] Maintenance mode toggle.
 
@@ -242,6 +249,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Tailwind CSS and design tokens.
 - [x] Main layout (header/footer/responsive nav).
 - [x] Shared components: button, input, card, modal, toast.
+- [x] Frontend build: replace CommonJS `qrcode` dependency (avoid Angular optimization bailout).
 - [x] Fix shared standalone components missing `NgIf` imports so buttons/labels render correctly.
 - [x] Header: improve theme/language control layout and add a global product search field.
 - [x] Footer: remove year suffix from tagline and replace Pinterest link with Facebook.
@@ -305,13 +313,14 @@ Below is a structured checklist you can turn into issues.
 - [x] Tag/label pills (featured/new/limited).
 - [x] Product gallery zoom/lightbox.
 - [x] Persist filters in query params.
+- [x] Shop: support `/shop/:category` route + `sub=<slug>` query param for subcategories.
 - [x] Empty state for product lists.
 - [x] Error state/retry for product lists.
 - [x] Breadcrumbs for category/product pages.
 - [x] Recently viewed carousel.
 - [x] Localized currency display.
 - [x] SEO meta tags per product/category.
-- [x] CMS/Home: render homepage hero from `home.hero` content block (headline/subtitle/CTA/image) with RO/EN support and sensible fallbacks.
+- [x] CMS/Home: render homepage banners/carousels from `home.sections` (shared slide schema) with RO/EN support and sensible fallbacks.
 - [x] CMS/Home: drive homepage section ordering from `home.sections` content block and support enabling/disabling sections.
 - [x] CMS/Home: add a CMS-editable “Our story” teaser section via `home.story` (markdown + CTA to `/about`).
 - [x] CMS/Site settings: manage Instagram/Facebook links (labels + URLs + optional thumbnails) via a `site.social` content block (meta JSON) and reuse in footer/contact/home.
@@ -369,6 +378,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Coupons v2: block guest coupon entry and require sign-in.
 - [x] Shipping method selection UI.
 - [x] Address form with validation and country selector.
+- [x] Checkout: allow selecting saved account addresses (autofill shipping/billing).
+- [x] Checkout: replace country/region dropdowns with free-form inputs (suggestions + ISO code mapping).
 - [x] Payment form with Stripe elements.
 - [x] Checkout: add billing address section with “same as shipping” toggle and attach billing to orders.
 - [x] Payments UX: add payment method selector with icons (card via Stripe, cash on delivery).
@@ -417,7 +428,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Fetch real profile, addresses, and order history from backend; replace account dashboard mock data.
 - [x] Implement avatar upload wired to storage backend.
 - [x] Add backend email verification tokens/endpoints + frontend resend/confirm wiring.
-- [x] Implement saved payment methods (Stripe setup intents) and wire UI add/remove card.
+- [x] Security: remove saved payment methods section (cards handled via Stripe/PayPal/Netopia checkout flows).
 - [x] Client/session idle-timeout handling (auto logout + messaging).
 - [x] Replace address prompt UX with form/modal wired to address CRUD APIs.
 - [x] Integrate Stripe Elements card entry UI instead of manual payment_method prompts.
@@ -440,7 +451,61 @@ Below is a structured checklist you can turn into issues.
 - [x] Forms: audit and set proper HTML `autocomplete` attributes across checkout/profile/tickets/contact forms for better browser autofill.
 - [x] Auth UX: ensure header/profile dropdown always reflects server auth state after restart (clear stale UI on 401/refresh failure) and sign-out works consistently in all menus.
 - [x] Wishlist: investigate reports of add/remove not persisting and add e2e coverage for save/unsave flows.
-- [ ] Account UX: unify email management UI in Security (single email section; reduce duplication; align Change password placement).
+- [x] Account UX: unify email management UI in Security (single email section; reduce duplication; align Change password placement).
+- [x] Account UX: translate Security page strings (remove hard-coded English).
+- [x] Security: show QR code during 2FA setup and prompt for 2FA inline on login.
+- [x] Payments: remove `/payment-methods` API + DB table (reduce storage/compliance scope).
+### Account UX – Next Improvements (Backlog)
+- [x] Account UX: lazy-load per-section data (don’t fetch orders/addresses/comments on every Account route).
+- [x] Account UX: add “Retry” actions for section load failures (per card, not just global error).
+- [x] Account i18n: translate remaining hard-coded AccountState strings (toasts/prompts/labels).
+- [x] Account UX: warn on unsaved changes (Profile/Addresses/Notifications).
+- [x] Account nav: show badges (unread notifications, coupons count, pending orders).
+- [x] Account UX: remember last visited tab and restore on `/account`.
+- [x] Account mobile: collapse sidebar into a dropdown or bottom nav.
+- [x] Account desktop: make sidebar sticky.
+- [x] Account UX: add per-section skeleton loaders (avoid whole-page skeletons).
+- [x] Account a11y: add an `aria-live` region for critical status updates/toasts.
+- [x] Orders: migrate to server-side pagination (don’t fetch all orders at once).
+- [x] Orders: add search by reference code + date-range filter.
+- [x] Orders: surface payment method + payment state prominently on each order.
+- [x] Orders: show delivery tracking status (when available) alongside tracking number.
+- [x] Orders: add “Request return” flow from eligible orders.
+- [x] Orders: add item-level reorder (not only whole-order reorder).
+- [x] Orders: move receipt/invoice actions to the order header for quick access.
+- [x] Orders: allow cancel request for eligible states (with confirmation + reason).
+- [x] Orders: show “manual refund required” banner with next steps (when applicable).
+- [x] Receipts: show share expiry + revoke/copy states in Account orders UI.
+- [x] Addresses: add country-specific validation hints (postal code, required fields).
+- [x] Addresses: optional address autocomplete (feature-flag).
+- [x] Addresses: support “billing same as shipping” per address.
+- [x] Addresses: add “Duplicate address” action.
+- [x] Addresses: convert address label to a dropdown (Home/Work/Other) with custom fallback.
+- [x] Wishlist: add bulk actions (remove selected / add selected to cart).
+- [x] Wishlist: show stock + price-change chips since saved.
+- [x] Wishlist: add “notify me when back in stock” for wishlist items.
+- [x] Coupons: show ineligible reasons + “you need X more subtotal” progress.
+- [x] Coupons: suggest best coupon for the current cart (without auto-applying).
+- [x] Notifications: add template previews per notification type.
+- [x] Notifications: show last-updated timestamp per preference group.
+- [x] Notifications: clarify transactional vs marketing preferences (copy + grouping).
+- [x] Security: list active sessions/devices + revoke others.
+- [x] Security: show a recent security activity feed (logins/email changes/password changes).
+- [x] Security: add 2FA (TOTP) + recovery codes.
+- [x] Security: add passkeys (WebAuthn) for sign-in.
+- [x] Security: add password strength meter + show/hide toggles where missing.
+- [x] Security: show cooldown timers (username/display name/email changes).
+- [x] Emails: improve per-email verification state/actions UX (clearer status + inline actions).
+- [x] Emails: add resend-verification cooldown countdown (anti-spam UX).
+- [x] Emails: require re-auth for more sensitive actions (unlink Google/remove primary/etc).
+- [x] Google linking: clarify “unlink required” restriction with better copy and UX.
+- [x] Profile: separate “public identity” vs “private account info” sections.
+- [x] Profile: improve phone input UX (formatting preview, validation hints).
+- [x] Profile: add avatar crop/preview UI before upload.
+- [x] Profile: add a public-profile preview card (how you appear in comments).
+- [x] Privacy: show export progress + notify when ready (background job UX).
+- [x] Privacy: show deletion cooldown progress + consequences checklist.
+- [x] Support: show recent tickets inside Account (overview or dedicated section).
 
 ## Frontend - Admin Dashboard
 - [x] /admin layout with sidebar + guard.

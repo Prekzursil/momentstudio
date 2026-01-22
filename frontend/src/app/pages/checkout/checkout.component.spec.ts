@@ -10,6 +10,7 @@ import { ActivatedRoute } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { AuthService } from '../../core/auth.service';
 import { RouterTestingModule } from '@angular/router/testing';
+import { AccountService } from '../../core/account.service';
 
 describe('CheckoutComponent', () => {
   const itemsSignal = signal([
@@ -30,6 +31,7 @@ describe('CheckoutComponent', () => {
 
   let cartApi: any;
   let apiService: any;
+  let accountService: any;
   let auth: any;
 
   beforeEach(() => {
@@ -40,6 +42,9 @@ describe('CheckoutComponent', () => {
     apiService = jasmine.createSpyObj('ApiService', ['post', 'get']);
     apiService.post.and.returnValue(of({ order_id: 'order1', reference_code: 'REF', client_secret: 'pi_secret' }));
     apiService.get.and.returnValue(of({ eligible: [], ineligible: [] }));
+
+    accountService = jasmine.createSpyObj('AccountService', ['getAddresses']);
+    accountService.getAddresses.and.returnValue(of([]));
 
     auth = jasmine.createSpyObj('AuthService', ['isAuthenticated', 'user']);
     auth.isAuthenticated.and.returnValue(true);
@@ -53,6 +58,7 @@ describe('CheckoutComponent', () => {
         { provide: CartStore, useValue: { items: itemsSignal, subtotal: subtotalSignal, clear: jasmine.createSpy('clear'), hydrateFromBackend: jasmine.createSpy('hydrateFromBackend') } },
         { provide: CartApi, useValue: cartApi },
         { provide: ApiService, useValue: apiService },
+        { provide: AccountService, useValue: accountService },
         { provide: AuthService, useValue: auth },
         { provide: ActivatedRoute, useValue: { snapshot: { params: {}, queryParamMap: emptyQueryParamMap }, queryParamMap: of(emptyQueryParamMap) } }
       ]
@@ -77,7 +83,8 @@ describe('CheckoutComponent', () => {
       region: 'ST',
     } as any;
 
-    cmp.placeOrder({ valid: true } as any);
+    cmp.shippingCountryInput = 'US';
+    cmp.placeOrder({ valid: true, control: { updateValueAndValidity: () => {} } } as any);
     tick();
 
     expect(cartApi.sync).toHaveBeenCalled();

@@ -10,6 +10,7 @@
     "shop": "Magazin",
     "about": "Povestea noastră",
     "contact": "Contact",
+    "page": "Pagină",
     "admin": "Admin",
     "viewAdmin": "Vezi admin",
     "account": "Cont",
@@ -83,6 +84,13 @@
     "header": {
       "signedInAs": "Conectat ca"
     },
+    "nav": {
+      "sectionSelect": "Secțiune"
+    },
+    "aria": {
+      "sectionSelect": "Selector secțiune cont",
+      "navigation": "Navigare cont"
+    },
     "sections": {
       "overview": "Prezentare",
       "profile": "Profil",
@@ -92,26 +100,564 @@
       "comments": "Comentariile mele",
       "privacy": "Confidențialitate & date"
     },
+    "loadError": "Nu am putut încărca detaliile contului chiar acum.",
+    "signedOut": "Te-ai deconectat",
+    "unsaved": {
+      "confirmDiscard": "Ai modificări nesalvate. Le arunci și părăsești pagina?"
+    },
+    "verification": {
+      "sentStatus": "Email de verificare trimis. Introdu codul primit.",
+      "sentToast": "Email de verificare trimis",
+      "resendIn": "Retrimite în {{seconds}}s",
+      "sendError": "Nu am putut trimite emailul de verificare",
+      "tokenRequired": "Introdu codul de verificare.",
+      "verifiedStatus": "Email verificat",
+      "verifiedToast": "Email verificat",
+      "invalidTokenStatus": "Cod invalid sau expirat",
+      "invalidTokenToast": "Cod invalid sau expirat"
+    },
+    "cooldowns": {
+      "username": "Numele de utilizator poate fi schimbat din nou în {{time}}.",
+      "displayName": "Numele afișat poate fi schimbat din nou în {{time}}.",
+      "email": "Emailul principal poate fi schimbat din nou în {{time}}.",
+      "loadError": "Nu am putut încărca informațiile despre limitări."
+    },
+    "profile": {
+      "savedToast": "Profil salvat",
+      "completeness": "Completare profil: {{completed}}/{{total}} ({{percent}}%)",
+      "publicLabel": "Public: {{value}}",
+      "actions": {
+        "save": "Salvează"
+      },
+      "sections": {
+        "publicIdentity": {
+          "title": "Identitate publică",
+          "copy": "Cum apari în comentarii și în alte activități publice."
+        },
+        "privateInfo": {
+          "title": "Informații private",
+          "copy": "Folosit pentru comenzi, suport și cerințe legale."
+        }
+      },
+      "username": {
+        "helper": "Folosește-l pentru autentificare și ca identificator stabil în activitatea publică.",
+        "passwordRequired": "Necesară pentru a schimba numele de utilizator."
+      },
+      "preview": {
+        "title": "Previzualizare publică",
+        "justNow": "chiar acum",
+        "message": "Mulțumim că îmi susții munca!"
+      },
+      "settings": {
+        "preferredLanguage": "Limba preferată",
+        "theme": "Temă"
+      },
+      "savedInline": "Salvat.",
+      "history": {
+        "usernameTitle": "Istoric nume utilizator",
+        "displayNameTitle": "Istoric nume afișat",
+        "empty": "Nu există istoric încă."
+      },
+      "sessionHint": "Expirare sesiune: 30m. Tema este salvată pe acest dispozitiv; limba se salvează în profil când ești conectat.",
+      "errors": {
+        "displayNameRequired": "Numele afișat este obligatoriu.",
+        "firstNameRequired": "Prenumele este obligatoriu.",
+        "lastNameRequired": "Numele de familie este obligatoriu.",
+        "dobRequired": "Data nașterii este obligatorie.",
+        "dobFuture": "Data nașterii nu poate fi în viitor.",
+        "saveError": "Nu am putut salva profilul."
+      },
+      "avatar": {
+        "updated": "Avatar actualizat",
+        "uploadError": "Nu am putut încărca avatarul.",
+        "googleError": "Nu am putut folosi fotografia Google.",
+        "alt": "Avatar",
+        "previewAlt": "Previzualizare avatar",
+        "upload": "Încarcă avatar",
+        "useGoogle": "Folosește fotografia Google",
+        "remove": "Elimină",
+        "hint": "JPG/PNG/WebP până la 5MB",
+        "crop": {
+          "title": "Decupează avatarul",
+          "close": "Închide",
+          "zoom": "Zoom",
+          "cancel": "Anulează",
+          "upload": "Încarcă",
+          "errors": {
+            "previewLoad": "Nu am putut încărca previzualizarea imaginii."
+          }
+        },
+        "removeConfirm": "Elimini avatarul?",
+        "removed": "Avatar eliminat",
+        "removeError": "Nu am putut elimina avatarul."
+      },
+      "aliases": {
+        "loadError": "Nu am putut încărca istoricul de username/nume afișat."
+      },
+      "phone": {
+        "formattedPreview": "Previzualizare: {{value}}",
+        "e164Preview": "Se salvează ca: {{value}}"
+      }
+    },
+    "privacy": {
+      "title": "Confidențialitate și date",
+      "export": {
+        "title": "Descarcă datele mele",
+        "copy": "Exportă profilul, comenzile, lista de dorințe și activitatea pe blog ca JSON.",
+        "notifyCopy": "Te vom anunța când exportul este gata.",
+        "ready": "Exportul este gata.",
+        "readyWithExpiry": "Exportul este gata. Expiră {{date}}.",
+        "failedCopy": "Export eșuat. Te rugăm să încerci din nou.",
+        "loadError": "Nu am putut încărca statusul exportului.",
+        "startedToast": "Export pornit",
+        "startError": "Nu am putut porni exportul.",
+        "readyToast": "Export gata",
+        "actionGenerate": "Generează export",
+        "actionGenerating": "Se generează…",
+        "actionDownload": "Descarcă",
+        "actionDownloading": "Se descarcă…",
+        "actionRetry": "Reîncearcă",
+        "actionWorking": "Se lucrează…",
+        "status": {
+          "pending": "În așteptare",
+          "running": "Se generează",
+          "succeeded": "Gata",
+          "failed": "Eșuat"
+        },
+        "downloaded": "Export descărcat",
+        "downloadError": "Nu am putut descărca exportul."
+      },
+      "deletion": {
+        "title": "Șterge contul",
+        "scheduledBadge": "Programată",
+        "copy": "Cererea de ștergere programează eliminarea contului după {{hours}} ore.",
+        "scheduledFor": "Programată pentru {{date}}.",
+        "remaining": "Timp rămas: {{time}}",
+        "cancelAction": "Anulează ștergerea",
+        "confirmCopy": "Tastează DELETE pentru confirmare. Poți anula în fereastra de {{hours}}h.",
+        "consequencesTitle": "Înainte să continui",
+        "consequences": {
+          "logout": "Vei fi deconectat de pe toate dispozitivele.",
+          "anonymize": "Datele personale vor fi anonimizate.",
+          "noAccess": "Vei pierde accesul la cont, comenzi și cupoane.",
+          "irreversible": "Această acțiune nu poate fi anulată după finalizare."
+        },
+        "confirmPlaceholder": "DELETE",
+        "confirmAria": "Confirmă ștergerea contului",
+        "passwordAria": "Confirmă parola pentru ștergerea contului",
+        "requestAction": "Cere ștergerea",
+        "loadError": "Nu am putut încărca statusul de ștergere.",
+        "scheduled": "Ștergere programată",
+        "requestError": "Nu am putut cere ștergerea contului.",
+        "canceled": "Ștergere anulată",
+        "cancelError": "Nu am putut anula ștergerea contului."
+      }
+    },
+    "comments": {
+      "loadError": "Nu am putut încărca comentariile tale.",
+      "actions": {
+        "refresh": "Reîmprospătează",
+        "prev": "Anterior",
+        "next": "Următor"
+      },
+      "empty": {
+        "title": "Nu există comentarii încă.",
+        "browse": "Explorează blogul"
+      },
+      "status": {
+        "posted": "Publicat",
+        "hidden": "Ascuns",
+        "deleted": "Șters"
+      },
+      "messages": {
+        "deleted": "Acest comentariu a fost șters.",
+        "hidden": "Acest comentariu a fost ascuns de moderatori."
+      },
+      "replyingTo": "Răspunzi la {{author}}",
+      "replies": {
+        "one": "răspuns",
+        "many": "răspunsuri"
+      },
+      "latest": "Ultimul: {{author}} — {{snippet}}",
+      "pageLabel": "Pagina {{page}} / {{total}}"
+    },
+    "security": {
+      "subtitle": "Gestionează parola, emailurile și conturile conectate.",
+      "password": {
+        "title": "Parolă",
+        "copy": "Schimbă parola pentru a-ți păstra contul în siguranță.",
+        "action": "Schimbă parola"
+      },
+      "twoFactor": {
+        "title": "Autentificare în doi pași",
+        "copy": "Protejează-ți contul cu o aplicație de autentificare și coduri de recuperare.",
+        "enabled": "Activată",
+        "disabled": "Dezactivată",
+        "setupPasswordLabel": "Confirmă parola",
+        "setupAction": "Începe configurarea",
+        "setupHint": "Adaugă acest cont în aplicația de autentificare, apoi introdu un cod pentru a activa autentificarea în doi pași.",
+        "qrHint": "Scanează acest cod QR în aplicația de autentificare.",
+        "qrAlt": "Cod QR pentru configurarea autentificării în doi pași.",
+        "secretLabel": "Secret",
+        "setupUrlLabel": "URL de configurare",
+        "copySecret": "Copiază secretul",
+        "copyUrl": "Copiază URL-ul",
+        "codeLabel": "Cod de verificare",
+        "enableAction": "Activează",
+        "recoveryTitle": "Coduri de recuperare",
+        "recoveryCopy": "Salvează aceste coduri într-un loc sigur. Fiecare cod poate fi folosit o singură dată.",
+        "recoveryRemaining": "{{count}} cod(uri) de recuperare rămase.",
+        "copyCodes": "Copiază codurile",
+        "copied": "Copiat în clipboard.",
+        "managePasswordLabel": "Confirmă parola",
+        "manageCodeLabel": "Cod de verificare sau cod de recuperare",
+        "regenerateAction": "Regenerare coduri",
+        "regenerateConfirm": "Regenerăm codurile de recuperare? Codurile vechi nu vor mai funcționa.",
+        "disableAction": "Dezactivează",
+        "disableConfirm": "Dezactivezi autentificarea în doi pași?",
+        "loadError": "Nu am putut încărca statusul autentificării în doi pași.",
+        "startError": "Nu am putut începe configurarea autentificării în doi pași.",
+        "enableError": "Nu am putut activa autentificarea în doi pași.",
+        "disableError": "Nu am putut dezactiva autentificarea în doi pași.",
+        "regenerateError": "Nu am putut regenera codurile de recuperare."
+      },
+      "passkeys": {
+        "title": "Passkeys",
+        "copy": "Folosește biometrie sau PIN-ul dispozitivului pentru autentificare fără parolă.",
+        "enabled": "Activat",
+        "disabled": "Neconfigurat",
+        "notSupported": "Passkeys nu sunt suportate pe acest dispozitiv.",
+        "none": "Nu există passkeys încă.",
+        "defaultName": "Passkey",
+        "nameLabel": "Nume (opțional)",
+        "passwordLabel": "Confirmă parola",
+        "addAction": "Adaugă passkey",
+        "added": "Passkey adăugat",
+        "cancelled": "Promptul pentru passkey a fost anulat.",
+        "removeConfirm": "Elimini acest passkey?",
+        "removed": "Passkey eliminat",
+        "created": "Creat",
+        "lastUsed": "Ultima utilizare",
+        "backedUp": "Backup activ",
+        "loadError": "Nu am putut încărca passkeys.",
+        "addError": "Nu am putut adăuga passkey.",
+        "removeError": "Nu am putut elimina passkey."
+      },
+      "emails": {
+        "title": "Emailuri",
+        "copy": "Gestionează emailurile pe care le poți folosi pentru autentificare.",
+        "primaryHint": "Pentru a schimba emailul principal, adaugă și verifică un alt email, apoi setează-l ca principal (necesită parola).",
+        "googleWarning": "Google este conectat. Deconectează-l mai jos înainte să schimbi emailul principal.",
+        "googleWarningLink": "Mergi la Google",
+        "addLabel": "Adaugă email",
+        "addAction": "Adaugă",
+        "primary": "Principal",
+        "secondary": "Secundar",
+        "resend": "Retrimite codul",
+        "resendIn": "Retrimite în {{seconds}}s",
+        "makePrimary": "Setează ca principal",
+        "confirmPassword": "Confirmă parola",
+        "verifyCode": "Cod de verificare",
+        "verify": "Verifică",
+        "loadError": "Nu am putut încărca emailurile secundare.",
+        "enterEmail": "Introdu o adresă de email.",
+        "verificationSent": "Cod de verificare trimis. Introdu-l mai jos pentru verificare.",
+        "verificationResent": "Cod de verificare retrimis.",
+        "verificationEmailSent": "Email de verificare trimis",
+        "enterVerificationCode": "Introdu codul de verificare.",
+        "verified": "Email secundar verificat.",
+        "added": "Email secundar adăugat",
+        "removed": "Email secundar eliminat",
+        "removeConfirm": "Elimini acest email secundar?",
+        "makePrimaryPasswordRequired": "Confirmă parola pentru a schimba emailul principal.",
+        "primaryUpdated": "Email principal actualizat",
+        "addError": "Nu am putut adăuga emailul secundar.",
+        "resendError": "Nu am putut retrimite emailul de verificare.",
+        "verifyError": "Nu am putut verifica emailul secundar.",
+        "removeError": "Nu am putut elimina emailul secundar.",
+        "primaryUpdateError": "Nu am putut actualiza emailul principal."
+      },
+      "status": {
+        "verified": "Verificat",
+        "unverified": "Neverificat"
+      },
+      "actions": {
+        "confirm": "Confirmă",
+        "cancel": "Anulează",
+        "remove": "Elimină"
+      },
+      "google": {
+        "profileAlt": "Profil Google",
+        "title": "Google",
+        "none": "Niciun cont Google conectat",
+        "passwordPlaceholder": "Confirmă parola",
+        "passwordAria": "Confirmă parola pentru contul Google",
+        "link": "Conectează Google",
+        "unlink": "Deconectează",
+        "copy": "Conectarea Google îți permite să te autentifici mai rapid. Nu postăm niciodată fără permisiune.",
+        "passwordRequiredLink": "Introdu parola pentru a conecta Google.",
+        "startLinkError": "Nu am putut porni conectarea Google.",
+        "passwordRequiredUnlink": "Introdu parola pentru a deconecta Google.",
+        "unlinked": "Cont Google deconectat",
+        "unlinkError": "Nu am putut deconecta contul Google."
+      },
+      "payment": {
+        "title": "Metode de plată",
+        "addCard": "Adaugă card",
+        "saveCard": "Salvează cardul",
+        "empty": "Nu ai carduri salvate încă.",
+        "enterDetails": "Introdu detaliile cardului:",
+        "card": "Card",
+        "exp": "exp",
+        "loadError": "Nu am putut încărca metodele de plată.",
+        "stripeKeyMissing": "Cheia Stripe publishable nu este configurată",
+        "stripeInitError": "Nu am putut inițializa Stripe.",
+        "setupIntentError": "Nu am putut începe configurarea cardului",
+        "cardErrorFallback": "Eroare card",
+        "formNotReady": "Formularul de card nu este pregătit.",
+        "saveCardError": "Nu am putut salva cardul",
+        "missingPaymentMethod": "Metoda de plată lipsește din setup intent.",
+        "saved": "Card salvat",
+        "attachError": "Nu am putut atașa metoda de plată",
+        "removeConfirm": "Elimini această metodă de plată?",
+        "removed": "Metodă de plată eliminată",
+        "removeError": "Nu am putut elimina metoda de plată"
+      },
+      "devices": {
+        "title": "Dispozitive",
+        "copy": "Vezi unde ești autentificat. Dacă ceva pare necunoscut, deconectează celelalte dispozitive.",
+        "action": "Deconectează celelalte dispozitive",
+        "current": "Acest dispozitiv",
+        "unknownDevice": "Dispozitiv necunoscut",
+        "created": "Autentificat",
+        "expires": "Expiră",
+        "persistent": "Memorat",
+        "none": "Nu există sesiuni active.",
+        "loadError": "Nu am putut încărca sesiunile active.",
+        "revokeConfirm": "Deconectezi celelalte dispozitive?",
+        "revoked": "Ai deconectat {{count}} alt(e) dispozitiv(e).",
+        "noneRevoked": "Nu există alte dispozitive de deconectat.",
+        "revokeError": "Nu am putut deconecta celelalte dispozitive."
+      },
+      "activity": {
+        "title": "Activitate recentă",
+        "copy": "Autentificări și modificări de securitate pentru contul tău.",
+        "refresh": "Reîmprospătează",
+        "none": "Nu există activitate recentă.",
+        "loadError": "Nu am putut încărca activitatea de securitate.",
+        "login_password": "Autentificat cu parolă",
+        "login_google": "Autentificat cu Google",
+        "email_changed": "Email schimbat",
+        "password_changed": "Parolă schimbată",
+        "password_reset": "Parolă resetată",
+        "two_factor_setup_started": "Configurare autentificare în doi pași începută",
+        "two_factor_enabled": "Autentificare în doi pași activată",
+        "two_factor_disabled": "Autentificare în doi pași dezactivată",
+        "two_factor_recovery_regenerated": "Coduri de recuperare regenerate",
+        "login_passkey": "Autentificat cu passkey",
+        "passkey_added": "Passkey adăugat",
+        "passkey_removed": "Passkey eliminat",
+        "unknown": "Eveniment de securitate"
+      },
+      "session": {
+        "title": "Sesiune",
+        "copy": "Vei fi deconectat după o perioadă de inactivitate pentru a-ți păstra contul în siguranță.",
+        "logoutNow": "Deconectează-te acum",
+        "refresh": "Reîmprospătează sesiunea",
+        "refreshed": "Sesiune reîmprospătată",
+        "expired": "Sesiunea a expirat. Te rugăm să te autentifici din nou.",
+        "refreshError": "Nu am putut reîmprospăta sesiunea.",
+        "idleLogout": "Ai fost deconectat din cauza inactivității."
+      }
+    },
+    "passwordChange": {
+      "title": "Schimbă parola",
+      "fields": {
+        "current": "Parola curentă",
+        "new": "Parolă nouă",
+        "confirm": "Confirmă parola nouă"
+      },
+      "actions": {
+        "update": "Actualizează parola",
+        "back": "Înapoi la cont"
+      },
+      "errors": {
+        "invalidForm": "Te rugăm să completezi formularul.",
+        "mismatch": "Parolele nu coincid.",
+        "updateFailed": "Nu am putut actualiza parola."
+      },
+      "toast": {
+        "updatedTitle": "Parolă actualizată",
+        "updatedDesc": "Parola ta a fost schimbată."
+      }
+    },
     "overview": {
       "title": "Prezentare",
       "quickLinks": "Acces rapid",
+      "aria": {
+        "overview": "Prezentare cont",
+        "ordersLoading": "Se încarcă rezumatul comenzilor",
+        "addressesLoading": "Se încarcă rezumatul adreselor",
+        "wishlistLoading": "Se încarcă rezumatul listei de dorințe",
+        "notificationsLoading": "Se încarcă rezumatul notificărilor",
+        "securityLoading": "Se încarcă rezumatul securității",
+        "supportLoading": "Se încarcă rezumatul tichetelor de suport"
+      },
       "wishlistHint": "Produse salvate pentru mai târziu.",
       "notificationsHint": "Controlează actualizările pe email.",
-      "securityHint": "Parolă, Google, verificare."
+      "securityHint": "Parolă, Google, verificare.",
+      "noOrders": "Nu ai comenzi încă",
+      "noOrdersCopy": "Comenzile recente vor apărea aici.",
+      "lastOrderLabel": "#{{ref}} · {{status}}",
+      "noAddresses": "Nu ai adrese încă",
+      "noAddressesCopy": "Adaugă o adresă de livrare pentru checkout mai rapid.",
+      "savedAddressFallback": "Adresă salvată",
+      "wishlistCountOne": "1 produs salvat",
+      "wishlistCountMany": "{{count}} produse salvate",
+      "notificationsAllOff": "Toate oprite",
+      "notificationsEnabled": "{{count}} active",
+      "security": {
+        "emailVerified": "Email verificat",
+        "emailUnverified": "Email neverificat",
+        "googleLinked": "Google conectat",
+        "googleUnlinked": "Google deconectat"
+      },
+      "support": {
+        "title": "Suport",
+        "hint": "Vezi tichetele și răspunsurile.",
+        "none": "Niciun tichet încă",
+        "noneCopy": "Discuțiile tale de suport vor apărea aici.",
+        "openOne": "1 tichet deschis",
+        "openMany": "{{count}} tichete deschise",
+        "allResolved": "Toate rezolvate",
+        "loadError": "Nu am putut încărca tichetele.",
+        "loadErrorCopy": "Deschide inboxul de suport pentru a vedea conversațiile."
+      }
     },
     "orders": {
       "shopNew": "Vezi produse",
       "statusLabel": "Stare",
+      "searchLabel": "Caută",
+      "searchPlaceholder": "Cod referință",
+      "fromLabel": "De la",
+      "toLabel": "Până la",
+      "applyFilters": "Aplică",
+      "clearFilters": "Resetează",
+      "orderLabel": "Comandă #{{ref}}",
+      "itemsCount": {
+        "one": "1 produs",
+        "many": "{{count}} produse"
+      },
+      "updated": "Actualizat {{date}}",
+      "trackingLabel": "Urmărire",
+      "trackingNotAvailable": "Indisponibil",
+      "shippingLabel": "Livrare",
+      "deliveryLabel": "Modalitate livrare",
+      "lockerLabel": "Locker",
+      "itemsTitle": "Produse",
+      "qtyLabel": "Cant. {{count}}",
+      "totalsTitle": "Totaluri",
+      "vatLabel": "TVA",
+      "additionalLabel": "Suplimentar",
+      "totalLabel": "Total",
+      "actionsTitle": "Acțiuni",
+      "pageLabel": "Pagina {{page}} / {{total}}",
+      "prev": "Înapoi",
+      "next": "Înainte",
       "empty": "Nu ai comenzi încă.",
+      "loadError": "Nu am putut încărca comenzile tale.",
+      "invalidDateRange": "Interval de date invalid.",
+      "trackingStatusLabel": "Status livrare",
+      "trackingStatus": {
+        "inTransit": "În tranzit",
+        "delivered": "Livrat"
+      },
+      "return": {
+        "open": "Solicită retur",
+        "requested": "Retur solicitat",
+        "title": "Retur",
+        "hint": "Selectează cantitățile și spune-ne de ce vrei să returnezi aceste produse.",
+        "cancel": "Anulează",
+        "reasonLabel": "Motiv",
+        "reasonPh": "Spune-ne de ce vrei să returnezi aceste produse…",
+        "messageLabel": "Mesaj (opțional)",
+        "messagePh": "Ce ar trebui să știm? (opțional)…",
+        "itemsLabel": "Produse",
+        "qtyLabel": "Cantitate de returnat",
+        "submit": "Trimite cererea",
+        "success": "Cererea de retur a fost trimisă.",
+        "errors": {
+          "notEligible": "Această comandă nu este încă eligibilă pentru retur.",
+          "alreadyExists": "Există deja o cerere de retur pentru această comandă.",
+          "reasonRequired": "Motivul este obligatoriu.",
+          "itemsRequired": "Selectează cel puțin un produs pentru retur.",
+          "invalidQuantity": "Cantitate selectată invalidă.",
+          "create": "Nu am putut trimite cererea de retur."
+        }
+      },
+      "cancel": {
+        "open": "Solicită anulare",
+        "requested": "Anulare solicitată",
+        "title": "Anulare",
+        "hint": "Spune-ne de ce vrei să anulezi această comandă. O vom revizui cât mai curând.",
+        "close": "Închide",
+        "reasonLabel": "Motiv",
+        "reasonPh": "Spune-ne de ce vrei să anulezi…",
+        "submit": "Trimite cererea",
+        "confirm": "Soliciți anularea comenzii #{{ref}}?",
+        "success": "Cererea de anulare a fost trimisă.",
+        "errors": {
+          "notEligible": "Această comandă nu mai poate fi anulată.",
+          "reasonRequired": "Motivul este obligatoriu.",
+          "alreadyRequested": "Ai solicitat deja anularea pentru această comandă.",
+          "create": "Nu am putut trimite cererea de anulare."
+        }
+      },
       "browse": "Explorează produsele",
       "reorder": "Recomandă din nou",
       "receiptPdf": "Chitanță (PDF)",
       "receiptShare": "Partajează chitanța",
-      "receiptRevoke": "Revocă partajarea"
+      "receiptRevoke": "Revocă partajarea",
+      "reorderSuccess": "Produsele au fost adăugate în coș",
+      "reorderError": "Nu am putut reface comanda.",
+      "receiptDownloadError": "Nu am putut descărca chitanța.",
+      "receiptCopied": "Linkul chitanței a fost copiat",
+      "receiptReady": "Linkul chitanței este gata",
+      "receiptGenerated": "Linkul chitanței a fost generat",
+      "receiptGenerateError": "Nu am putut genera linkul chitanței.",
+      "receiptRevokeConfirm": "Revoci linkurile de chitanță partajate pentru această comandă?",
+      "receiptRevoked": "Linkurile de chitanță au fost revocate",
+      "receiptRevokeError": "Nu am putut revoca linkurile de chitanță.",
+      "refund": {
+        "manualRequiredTitle": "Rambursare în așteptare",
+        "manualRequiredCopy": "Comanda a fost anulată după confirmarea plății. Echipa noastră va procesa rambursarea manual.",
+        "manualRequiredHint": "Dacă ai întrebări, contactează suportul.",
+        "contact": "Contactează suportul"
+      },
+      "delivery": {
+        "home": "Livrare la domiciliu",
+        "locker": "Ridicare de la locker"
+      }
     },
     "wishlist": {
       "browse": "Explorează produsele",
-      "empty": "Nu ai produse salvate încă."
+      "empty": "Nu ai produse salvate încă.",
+      "selectAll": "Selectează tot",
+      "selectedCount": "{{count}} selectate",
+      "addSelectedToCart": "Adaugă selectatele în coș",
+      "removeSelected": "Elimină selectatele",
+      "clearSelection": "Golește selecția",
+      "backInStock": "Înapoi în stoc",
+      "outOfStock": "Acum indisponibil",
+      "priceUp": "Preț +",
+      "priceDown": "Preț -",
+      "confirm": {
+        "removeSelected": "Elimini produsele selectate din lista de dorințe?"
+      },
+      "messages": {
+        "addedToCart": "Adăugat în coș",
+        "removedSelected": "Eliminat din lista de dorințe"
+      }
     },
     "coupons": {
       "coupon": "Cupon",
@@ -135,12 +681,38 @@
     "addresses": {
       "add": "Adaugă adresă",
       "empty": "Nu ai adrese încă.",
+      "loadError": "Nu am putut încărca adresele tale.",
       "defaultShipping": "Livrare implicită",
       "defaultBilling": "Facturare implicită",
       "makeDefaultShipping": "Setează ca livrare implicită",
       "makeDefaultBilling": "Setează ca facturare implicită",
       "edit": "Editează",
-      "delete": "Șterge"
+      "duplicate": "Duplică",
+      "delete": "Șterge",
+      "labels": {
+        "address": "Adresă",
+        "home": "Acasă",
+        "work": "Serviciu",
+        "other": "Altul",
+        "custom": "Personalizat"
+      },
+      "messages": {
+        "updated": "Adresă actualizată",
+        "added": "Adresă adăugată",
+        "removed": "Adresă eliminată",
+        "defaultShippingUpdated": "Livrarea implicită a fost actualizată",
+        "defaultBillingUpdated": "Facturarea implicită a fost actualizată"
+      },
+      "confirm": {
+        "remove": "Elimini această adresă?"
+      },
+      "errors": {
+        "update": "Nu am putut actualiza adresa.",
+        "add": "Nu am putut adăuga adresa.",
+        "remove": "Nu am putut elimina adresa.",
+        "defaultShipping": "Nu am putut seta livrarea implicită.",
+        "defaultBilling": "Nu am putut seta facturarea implicită."
+      }
     },
     "completeProfile": {
       "title": "Completează profilul",
@@ -153,9 +725,11 @@
       "lastUpdated": "Ultima actualizare: {{date}}",
       "showPreview": "Arată previzualizare",
       "hidePreview": "Ascunde previzualizare",
-      "communityHeading": "Comunitate",
-      "adminHeading": "Alerte admin",
-      "marketingHeading": "Marketing",
+      "transactionalTitle": "Tranzacțional (întotdeauna activ)",
+      "transactionalCopy": "Actualizările comenzilor și emailurile de securitate sunt trimise întotdeauna. Preferințele de mai jos afectează doar emailurile opționale (comunitate/admin/marketing).",
+      "communityHeading": "Comunitate (opțional)",
+      "adminHeading": "Alerte admin (opțional)",
+      "marketingHeading": "Marketing (opțional)",
       "replyLabel": "Trimite-mi email când cineva răspunde la comentariul meu de pe blog.",
       "adminLabel": "Trimite-mi email când se postează comentarii noi pe blog (admin).",
       "marketingLabel": "Trimite-mi ocazional noutăți și actualizări despre produse.",
@@ -280,7 +854,9 @@
     "searchPlaceholder": "Caută produse",
     "search": "Căutare",
     "categories": "Categorii",
+    "subcategories": "Subcategorii",
     "sale": "La reducere",
+    "all": "Toate",
     "allCategories": "Toate categoriile",
     "priceRange": "Interval de preț",
     "ariaMinPrice": "Preț minim",
@@ -357,6 +933,13 @@
     "title": "Checkout",
     "retry": "Reîncearcă",
     "addressRequired": "Te rugăm să completezi toate câmpurile obligatorii.",
+    "countryInvalid": "Te rugăm să selectezi o țară validă.",
+    "savedAddressesTitle": "Adrese salvate",
+    "manageAddresses": "Gestionează",
+    "savedShippingAddress": "Adresă de livrare",
+    "savedBillingAddress": "Adresă de facturare",
+    "savedAddressSelect": "Selectează o adresă",
+    "savedAddressesLoadError": "Nu am putut încărca adresele salvate.",
     "paymentNotReady": "Plata nu este încă inițializată. Așteaptă puțin.",
     "paymentFailed": "Plata a eșuat.",
     "paymentConfirmError": "Confirmarea plății a eșuat. Încearcă din nou.",
@@ -448,7 +1031,9 @@
     "couponsLoadError": "Nu am putut încărca cupoanele.",
     "availableCoupons": "Cupoane disponibile",
     "unavailableCoupons": "Cupoane indisponibile",
+    "bestCouponTitle": "Cel mai bun cupon pentru acest coș",
     "couponNotEligible": "Cupon neeligibil",
+    "couponMinSubtotalRemaining": "Adaugă încă {{amount}} RON pentru a ajunge la subtotalul minim de {{min}} RON.",
     "couponReasons": {
       "inactive": "Inactiv",
       "not_started": "Nu a început încă",
@@ -526,6 +1111,10 @@
     "errorRegister": "Nu am putut crea contul. Încearcă din nou.",
     "errorReset": "Nu am putut reseta parola. Încearcă din nou.",
     "orContinue": "Sau continuă cu",
+    "passkeyContinue": "Continuă cu passkey",
+    "passkeyNotSupported": "Passkeys nu sunt suportate pe acest dispozitiv.",
+    "passkeyCancelled": "Promptul pentru passkey a fost anulat.",
+    "passkeyError": "Nu am putut să te autentificăm cu passkey. Încearcă din nou.",
     "googleContinue": "Continuă cu Google",
     "googleError": "Autentificarea cu Google a eșuat. Încearcă din nou.",
     "googleFinishing": "Finalizăm autentificarea cu Google...",
@@ -543,7 +1132,15 @@
     "captchaUnavailable": "CAPTCHA nu este disponibilă.",
     "captchaFailedTryAgain": "CAPTCHA a eșuat. Încearcă din nou.",
     "captchaFailedLoad": "CAPTCHA nu a putut fi încărcată.",
-    "currentPasswordRequired": "Parola curentă este necesară pentru a schimba numele de utilizator."
+    "currentPasswordRequired": "Parola curentă este necesară pentru a schimba numele de utilizator.",
+    "twoFactorRequired": "Este necesară verificarea în doi pași.",
+    "twoFactorTitle": "Verificare în doi pași",
+    "twoFactorCopy": "Introdu codul din aplicația de autentificare (sau un cod de recuperare).",
+    "twoFactorCodeLabel": "Cod de verificare",
+    "twoFactorSubmit": "Verifică",
+    "twoFactorBack": "Înapoi la autentificare",
+    "twoFactorInvalid": "Cod de verificare invalid.",
+    "twoFactorMissing": "Sesiunea de verificare lipsește. Te rugăm să te autentifici din nou."
   },
   "theme": {
     "switched": "Tema a fost schimbată",
@@ -555,6 +1152,7 @@
   "validation": {
     "required": "Acest câmp este obligatoriu.",
     "invalidEmail": "Introdu o adresă de email validă.",
+    "invalidPostal": "Introdu un cod poștal valid.",
     "usernameInvalid": "Utilizatorul trebuie să aibă 3–30 caractere și poate conține litere, cifre, '.', '_', '-'.",
     "passwordMin": "Parola trebuie să aibă cel puțin 6 caractere.",
     "passwordMismatch": "Parolele nu coincid.",
@@ -562,11 +1160,18 @@
   },
   "addressForm": {
     "label": "Etichetă",
+    "customLabelPlaceholder": "Etichetă personalizată",
     "line1": "Adresă (linia 1)",
     "line2": "Adresă (linia 2)",
     "defaultShipping": "Setează ca livrare implicită",
     "defaultBilling": "Setează ca facturare implicită",
     "useAsBillingToo": "Folosește și ca facturare",
+    "postalHint": "Exemplu: {{example}}",
+    "autocomplete": {
+      "label": "Caută adresa (opțional)",
+      "placeholder": "Începe să tastezi adresa…",
+      "poweredBy": "Sugestii de la OpenStreetMap"
+    },
     "cancel": "Anulează",
     "save": "Salvează"
   },
@@ -612,12 +1217,15 @@
       "cancel": "Anulează",
       "retry": "Reîncearcă",
       "edit": "Editează",
+      "changeUrl": "Schimbă URL-ul",
       "refresh": "Reîncarcă",
       "search": "Caută",
       "copy": "Copiază",
       "use": "Folosește",
       "prev": "Anterior",
-      "next": "Înainte"
+      "next": "Înainte",
+      "up": "Sus",
+      "down": "Jos"
     },
     "support": {
       "title": "Inbox suport",
@@ -849,13 +1457,34 @@
         "builder": {
           "title": "Blocuri tip page builder",
           "hint": "Opțional: construiește pagini mai bogate (Povestea noastră/Contact) din blocuri. Dacă există blocuri, magazinul le afișează în locul conținutului Markdown.",
+          "newPageTitle": "Titlu pagină nouă",
+          "status": "Stare",
+          "createPage": "Creează pagină",
           "page": "Pagină",
+          "changeUrlPrompt": "Noul URL (slug) pentru această pagină",
+          "changeUrlConfirm": "Schimbi URL-ul din /pages/{{old}} în /pages/{{next}}? Linkurile existente vor redirecționa.",
           "addBlock": "Adaugă bloc",
-          "success": { "save": "Blocurile au fost salvate." },
-          "errors": { "save": "Nu am putut salva blocurile." }
+          "success": { "save": "Blocurile au fost salvate.", "rename": "URL-ul paginii a fost actualizat (redirecționare creată)." },
+          "errors": { "load": "Nu am putut încărca blocurile.", "save": "Nu am putut salva blocurile.", "rename": "Nu s-a putut schimba URL-ul paginii." }
         },
-        "success": { "save": "Conținut salvat." },
-        "errors": { "save": "Nu am putut salva conținutul." }
+        "redirects": {
+          "title": "Redirecționări",
+          "hint": "Create automat când schimbi URL-ul unei pagini. Redirecționările expirate indică către conținut lipsă.",
+          "search": "Caută redirecționări",
+          "empty": "Nu există redirecționări.",
+          "stale": "Redirecționare expirată: pagina țintă nu mai există.",
+          "deleteConfirm": "Ștergi această redirecționare?",
+          "success": { "deleted": "Redirecționare ștearsă." },
+          "errors": { "load": "Nu am putut încărca redirecționările.", "delete": "Nu am putut șterge redirecționarea." }
+        },
+        "success": { "save": "Conținut salvat.", "created": "Pagina a fost creată." },
+        "errors": {
+          "load": "Nu am putut încărca paginile.",
+          "save": "Nu am putut salva conținutul.",
+          "create": "Nu am putut crea pagina.",
+          "reservedTitle": "URL rezervat",
+          "reservedCopy": "Alege un titlu diferit."
+        }
       }
     },
     "home": {
@@ -890,7 +1519,9 @@
           "why": "De ce",
           "text": "Text",
           "image": "Imagine",
-          "gallery": "Galerie"
+          "gallery": "Galerie",
+          "banner": "Banner",
+          "carousel": "Carusel"
         },
         "enabled": "Activată",
         "drag": "trage",
@@ -904,7 +1535,30 @@
           "caption": "Legendă (opțional)",
           "gallery": "Imagini galerie",
           "galleryEmpty": "Nu există imagini încă. Adaugă una pentru a afișa acest bloc.",
-          "image": "Imagine"
+          "image": "Imagine",
+          "variant": "Aspect",
+          "size": "Dimensiune",
+          "textStyle": "Stil text",
+          "slides": "Slide-uri",
+          "slide": "Slide",
+          "autoplay": "Redare automată",
+          "interval": "Interval (ms)",
+          "arrows": "Săgeți",
+          "dots": "Puncte",
+          "pauseOnHover": "Pauză la hover"
+        },
+        "variants": {
+          "split": "Împărțit",
+          "full": "Lățime completă"
+        },
+        "sizes": {
+          "s": "Mic",
+          "m": "Mediu",
+          "l": "Mare"
+        },
+        "textStyle": {
+          "dark": "Text închis",
+          "light": "Text deschis"
         },
         "success": {
           "save": "Ordinea secțiunilor a fost salvată."
@@ -1232,6 +1886,8 @@
       "add": "Adaugă categorie",
       "slug": "Slug",
       "slugAutoHint": "Slug-ul este generat automat din nume.",
+      "parent": "Categorie părinte",
+      "parentNone": "Fără părinte",
       "description": "Descriere",
       "translations": {
         "button": "Traduceri",
@@ -1251,12 +1907,14 @@
       "success": {
         "add": "Categorie adăugată",
         "delete": "Categorie ștearsă",
-        "reorder": "Ordinea categoriilor a fost salvată"
+        "reorder": "Ordinea categoriilor a fost salvată",
+        "updateParent": "Categoria părinte a fost actualizată"
       },
       "errors": {
         "add": "Nu am putut adăuga categoria",
         "delete": "Nu am putut șterge categoria",
-        "reorder": "Nu am putut reordona categoriile"
+        "reorder": "Nu am putut reordona categoriile",
+        "updateParent": "Nu am putut actualiza categoria părinte"
       }
     },
     "orders": {

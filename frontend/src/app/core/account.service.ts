@@ -34,6 +34,8 @@ export interface Order {
   status: string;
   cancel_reason?: string | null;
   payment_method?: string;
+  paypal_capture_id?: string | null;
+  stripe_payment_intent_id?: string | null;
   payment_retry_count?: number;
   total_amount: number;
   tax_amount?: number;
@@ -53,7 +55,43 @@ export interface Order {
   billing_address_id?: string | null;
   created_at: string;
   updated_at: string;
+  events?: Array<{ id: string; event: string; note?: string | null; created_at: string }>;
   items: OrderItem[];
+}
+
+export interface OrderPaginationMeta {
+  total_items: number;
+  total_pages: number;
+  page: number;
+  limit: number;
+  pending_count: number;
+}
+
+export interface OrderListResponse {
+  items: Order[];
+  meta: OrderPaginationMeta;
+}
+
+export type ReturnRequestStatus = 'requested' | 'approved' | 'rejected' | 'received' | 'refunded' | 'closed';
+
+export interface ReturnRequestItemRead {
+  id: string;
+  order_item_id?: string | null;
+  quantity: number;
+  product_id?: string | null;
+  product_name?: string | null;
+}
+
+export interface ReturnRequestRead {
+  id: string;
+  order_id: string;
+  order_reference?: string | null;
+  status: ReturnRequestStatus;
+  reason: string;
+  customer_message?: string | null;
+  created_at: string;
+  updated_at: string;
+  items: ReturnRequestItemRead[];
 }
 
 export interface AddressCreateRequest {
@@ -75,6 +113,20 @@ export interface AccountDeletionStatus {
   cooldown_hours: number;
 }
 
+export type UserDataExportStatus = 'pending' | 'running' | 'succeeded' | 'failed';
+
+export interface UserDataExportJob {
+  id: string;
+  status: UserDataExportStatus;
+  progress: number;
+  error_message?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  expires_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ReceiptShareToken {
   token: string;
   receipt_url: string;
@@ -86,6 +138,21 @@ export interface ReceiptShareToken {
 export class AccountService {
   constructor(private api: ApiService) {}
 
+  private normalizeOrder(order: any): Order {
+    return {
+      ...order,
+      total_amount: parseMoney(order?.total_amount),
+      tax_amount: parseMoney(order?.tax_amount),
+      fee_amount: parseMoney(order?.fee_amount),
+      shipping_amount: parseMoney(order?.shipping_amount),
+      items: (order?.items ?? []).map((it: any) => ({
+        ...it,
+        unit_price: parseMoney(it?.unit_price),
+        subtotal: parseMoney(it?.subtotal)
+      }))
+    };
+  }
+
   getProfile(): Observable<AuthUser> {
     return this.api.get<AuthUser>('/auth/me');
   }
@@ -95,34 +162,74 @@ export class AccountService {
   }
 
   getOrders(): Observable<Order[]> {
-    return this.api.get<Order[]>('/orders').pipe(
-      map((orders: any[]) =>
-        (orders ?? []).map((o) => ({
-          ...o,
-          total_amount: parseMoney(o?.total_amount),
-          tax_amount: parseMoney(o?.tax_amount),
-          fee_amount: parseMoney(o?.fee_amount),
-          shipping_amount: parseMoney(o?.shipping_amount),
-          items: (o?.items ?? []).map((it: any) => ({
-            ...it,
-            unit_price: parseMoney(it?.unit_price),
-            subtotal: parseMoney(it?.subtotal)
-          }))
-        }))
-      )
+    return this.api.get<Order[]>('/orders').pipe(map((orders: any[]) => (orders ?? []).map((o) => this.normalizeOrder(o))));
+  }
+
+  getOrdersPage(params: {
+    q?: string;
+    status?: string;
+    from?: string;
+    to?: string;
+    page?: number;
+    limit?: number;
+  }): Observable<OrderListResponse> {
+    return this.api.get<any>('/orders/me', params).pipe(
+      map((resp) => {
+        const metaRaw = resp?.meta ?? {};
+        const totalItems = Number(metaRaw?.total_items);
+        const totalPages = Number(metaRaw?.total_pages);
+        const page = Number(metaRaw?.page);
+        const limit = Number(metaRaw?.limit);
+        const pending = Number(metaRaw?.pending_count);
+        return {
+          items: (resp?.items ?? []).map((o: any) => this.normalizeOrder(o)),
+          meta: {
+            total_items: Number.isFinite(totalItems) ? totalItems : 0,
+            total_pages: Number.isFinite(totalPages) ? totalPages : 1,
+            page: Number.isFinite(page) ? page : 1,
+            limit: Number.isFinite(limit) ? limit : Number(params?.limit ?? 10) || 10,
+            pending_count: Number.isFinite(pending) ? pending : 0
+          }
+        } satisfies OrderListResponse;
+      })
     );
+  }
+
+  createReturnRequest(payload: {
+    order_id: string;
+    reason: string;
+    customer_message?: string | null;
+    items: Array<{ order_item_id: string; quantity: number }>;
+  }): Observable<ReturnRequestRead> {
+    return this.api.post<ReturnRequestRead>('/returns', payload as any);
   }
 
   downloadExport(): Observable<Blob> {
     return this.api.getBlob('/auth/me/export');
   }
 
+  startExportJob(): Observable<UserDataExportJob> {
+    return this.api.post<UserDataExportJob>('/auth/me/export/jobs', {});
+  }
+
+  getLatestExportJob(): Observable<UserDataExportJob> {
+    return this.api.get<UserDataExportJob>('/auth/me/export/jobs/latest');
+  }
+
+  getExportJob(jobId: string): Observable<UserDataExportJob> {
+    return this.api.get<UserDataExportJob>(`/auth/me/export/jobs/${encodeURIComponent(jobId)}`);
+  }
+
+  downloadExportJob(jobId: string): Observable<Blob> {
+    return this.api.getBlob(`/auth/me/export/jobs/${encodeURIComponent(jobId)}/download`);
+  }
+
   getDeletionStatus(): Observable<AccountDeletionStatus> {
     return this.api.get<AccountDeletionStatus>('/auth/me/delete/status');
   }
 
-  requestAccountDeletion(confirm: string): Observable<AccountDeletionStatus> {
-    return this.api.post<AccountDeletionStatus>('/auth/me/delete', { confirm });
+  requestAccountDeletion(confirm: string, password: string): Observable<AccountDeletionStatus> {
+    return this.api.post<AccountDeletionStatus>('/auth/me/delete', { confirm, password });
   }
 
   cancelAccountDeletion(): Observable<AccountDeletionStatus> {
@@ -131,6 +238,12 @@ export class AccountService {
 
   reorderOrder(orderId: string): Observable<unknown> {
     return this.api.post(`/orders/${orderId}/reorder`, {});
+  }
+
+  requestOrderCancellation(orderId: string, reason: string): Observable<Order> {
+    return this.api
+      .post<any>(`/orders/${orderId}/cancel-request`, { reason })
+      .pipe(map((order) => this.normalizeOrder(order)));
   }
 
   downloadReceipt(orderId: string): Observable<Blob> {

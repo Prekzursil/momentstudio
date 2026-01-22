@@ -9,6 +9,8 @@ import { CardComponent } from '../../shared/card.component';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { MarkdownService } from '../../core/markdown.service';
 import { PageBlock, pageBlocksToPlainText, parsePageBlocks } from '../../shared/page-blocks';
+import { BannerBlockComponent } from '../../shared/banner-block.component';
+import { CarouselBlockComponent } from '../../shared/carousel-block.component';
 
 interface ContentImage {
   url: string;
@@ -25,7 +27,7 @@ interface ContentBlock {
 @Component({
   selector: 'app-about',
   standalone: true,
-  imports: [CommonModule, ContainerComponent, BreadcrumbComponent, CardComponent, TranslateModule],
+  imports: [CommonModule, ContainerComponent, BreadcrumbComponent, CardComponent, TranslateModule, BannerBlockComponent, CarouselBlockComponent],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-3xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -97,6 +99,20 @@ interface ContentBlock {
                         <p *ngIf="img.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ img.caption }}</p>
                       </div>
                     </div>
+                  </div>
+
+                  <div *ngSwitchCase="'banner'" class="grid gap-2">
+                    <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                      {{ b.title }}
+                    </h2>
+                    <app-banner-block [slide]="b.slide"></app-banner-block>
+                  </div>
+
+                  <div *ngSwitchCase="'carousel'" class="grid gap-2">
+                    <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                      {{ b.title }}
+                    </h2>
+                    <app-carousel-block [slides]="b.slides" [settings]="b.settings"></app-carousel-block>
                   </div>
                 </ng-container>
               </ng-container>

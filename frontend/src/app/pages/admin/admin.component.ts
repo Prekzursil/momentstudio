@@ -23,7 +23,9 @@ import {
   AdminProductDetail,
   FeaturedCollection,
   ContentBlockVersionListItem,
-  ContentBlockVersionRead
+  ContentBlockVersionRead,
+  ContentPageListItem,
+  ContentRedirectRead
 } from '../../core/admin.service';
 import { AdminBlogComment, BlogService } from '../../core/blog.service';
 import { FxAdminService, FxAdminStatus } from '../../core/fx-admin.service';
@@ -36,12 +38,13 @@ import { diffLines } from 'diff';
 import { formatIdentity } from '../../shared/user-identity';
 import { ContentRevisionsComponent } from './shared/content-revisions.component';
 import { AssetLibraryComponent } from './shared/asset-library.component';
+import { BannerBlockComponent } from '../../shared/banner-block.component';
+import { CarouselBlockComponent } from '../../shared/carousel-block.component';
 
 type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
 type UiLang = 'en' | 'ro';
 
 type HomeSectionId =
-  | 'hero'
   | 'featured_products'
   | 'sale_products'
   | 'new_arrivals'
@@ -50,7 +53,7 @@ type HomeSectionId =
   | 'recently_viewed'
   | 'why';
 
-type HomeBlockType = HomeSectionId | 'text' | 'image' | 'gallery';
+type HomeBlockType = HomeSectionId | 'text' | 'image' | 'gallery' | 'banner' | 'carousel';
 
 type LocalizedText = { en: string; ro: string };
 
@@ -58,6 +61,26 @@ type HomeGalleryImageDraft = {
   url: string;
   alt: LocalizedText;
   caption: LocalizedText;
+};
+
+type SlideDraft = {
+  image_url: string;
+  alt: LocalizedText;
+  headline: LocalizedText;
+  subheadline: LocalizedText;
+  cta_label: LocalizedText;
+  cta_url: string;
+  variant: 'full' | 'split';
+  size: 'S' | 'M' | 'L';
+  text_style: 'light' | 'dark';
+};
+
+type CarouselSettingsDraft = {
+  autoplay: boolean;
+  interval_ms: number;
+  show_dots: boolean;
+  show_arrows: boolean;
+  pause_on_hover: boolean;
 };
 
 type HomeBlockDraft = {
@@ -71,10 +94,13 @@ type HomeBlockDraft = {
   alt: LocalizedText;
   caption: LocalizedText;
   images: HomeGalleryImageDraft[];
+  slide: SlideDraft;
+  slides: SlideDraft[];
+  settings: CarouselSettingsDraft;
 };
 
-type PageBuilderKey = 'page.about' | 'page.contact';
-type PageBlockType = 'text' | 'image' | 'gallery';
+type PageBuilderKey = `page.${string}`;
+type PageBlockType = 'text' | 'image' | 'gallery' | 'banner' | 'carousel';
 type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
 
 @Component({
@@ -91,6 +117,8 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
     SkeletonComponent,
     ContentRevisionsComponent,
     AssetLibraryComponent,
+    BannerBlockComponent,
+    CarouselBlockComponent,
     TranslateModule
   ],
  template: `
@@ -458,19 +486,56 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                 <div class="mt-3 grid gap-3">
                   <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.site.pages.builder.hint' | translate }}</p>
 
+                  <div class="grid gap-3 md:grid-cols-[1fr_180px_auto] items-end">
+                    <app-input [label]="'adminUi.site.pages.builder.newPageTitle' | translate" [(value)]="newCustomPageTitle"></app-input>
+                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {{ 'adminUi.site.pages.builder.status' | translate }}
+                      <select
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        [(ngModel)]="newCustomPageStatus"
+                      >
+                        <option [ngValue]="'draft'">{{ 'adminUi.status.draft' | translate }}</option>
+                        <option [ngValue]="'published'">{{ 'adminUi.status.published' | translate }}</option>
+                      </select>
+                    </label>
+                    <app-button
+                      size="sm"
+                      [label]="'adminUi.site.pages.builder.createPage' | translate"
+                      [disabled]="creatingCustomPage || !(newCustomPageTitle || '').trim()"
+                      (action)="createCustomPage()"
+                    ></app-button>
+                  </div>
+
+                  <div *ngIf="contentPagesError" class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+                    {{ contentPagesError }}
+                  </div>
+
                   <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
                     <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                       {{ 'adminUi.site.pages.builder.page' | translate }}
                       <select
                         class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                         [(ngModel)]="pageBlocksKey"
+                        (ngModelChange)="onPageBlocksKeyChange($event)"
                       >
-                        <option [ngValue]="'page.about'">{{ 'adminUi.site.pages.aboutLabel' | translate }}</option>
-                        <option [ngValue]="'page.contact'">{{ 'adminUi.site.pages.contactLabel' | translate }}</option>
+                        <ng-container *ngIf="contentPages.length; else defaultPages">
+                          <option *ngFor="let p of contentPages" [ngValue]="p.key">{{ p.title || p.slug }} · {{ p.slug }}</option>
+                        </ng-container>
+                        <ng-template #defaultPages>
+                          <option [ngValue]="'page.about'">{{ 'adminUi.site.pages.aboutLabel' | translate }}</option>
+                          <option [ngValue]="'page.contact'">{{ 'adminUi.site.pages.contactLabel' | translate }}</option>
+                        </ng-template>
                       </select>
                     </label>
 
-                    <div class="flex items-end gap-2">
+                    <div class="flex flex-wrap items-end gap-2">
+                      <app-button
+                        *ngIf="canRenamePageKey(pageBlocksKey)"
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.actions.changeUrl' | translate"
+                        (action)="renameCustomPageUrl()"
+                      ></app-button>
                       <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                         {{ 'adminUi.site.pages.builder.addBlock' | translate }}
                         <select
@@ -480,6 +545,8 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                           <option [ngValue]="'text'">{{ 'adminUi.home.sections.blocks.text' | translate }}</option>
                           <option [ngValue]="'image'">{{ 'adminUi.home.sections.blocks.image' | translate }}</option>
                           <option [ngValue]="'gallery'">{{ 'adminUi.home.sections.blocks.gallery' | translate }}</option>
+                          <option [ngValue]="'banner'">{{ 'adminUi.home.sections.blocks.banner' | translate }}</option>
+                          <option [ngValue]="'carousel'">{{ 'adminUi.home.sections.blocks.carousel' | translate }}</option>
                         </select>
                       </label>
                       <app-button size="sm" [label]="'adminUi.actions.add' | translate" (action)="addPageBlock(pageBlocksKey)"></app-button>
@@ -488,7 +555,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
 
                   <div class="grid gap-2">
                     <div
-                      *ngFor="let block of pageBlocks[pageBlocksKey]"
+                      *ngFor="let block of (pageBlocks[pageBlocksKey] || [])"
                       class="rounded-xl border border-dashed border-slate-300 p-3 text-sm bg-white dark:border-slate-700 dark:bg-slate-900"
                       draggable="true"
                       (dragstart)="onPageBlockDragStart(pageBlocksKey, block.key)"
@@ -662,6 +729,211 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                               </details>
                             </div>
                           </ng-container>
+
+                          <ng-container *ngSwitchCase="'banner'">
+                            <div class="grid gap-3">
+                              <div class="grid gap-3 md:grid-cols-2">
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                                  {{ 'adminUi.home.sections.fields.imageUrl' | translate }}
+                                  <input
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="block.slide.image_url"
+                                  />
+                                </label>
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.sections.fields.alt' | translate }}
+                                  <input
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="block.slide.alt[infoLang]"
+                                  />
+                                </label>
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.hero.headline' | translate }}
+                                  <input
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="block.slide.headline[infoLang]"
+                                  />
+                                </label>
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                                  {{ 'adminUi.home.hero.subtitle' | translate }}
+                                  <input
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="block.slide.subheadline[infoLang]"
+                                  />
+                                </label>
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.hero.ctaLabel' | translate }}
+                                  <input
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="block.slide.cta_label[infoLang]"
+                                  />
+                                </label>
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.hero.ctaUrl' | translate }}
+                                  <input
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="block.slide.cta_url"
+                                  />
+                                </label>
+                              </div>
+
+                              <div class="grid gap-3 md:grid-cols-3">
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.sections.fields.variant' | translate }}
+                                  <select
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="block.slide.variant"
+                                  >
+                                    <option [ngValue]="'split'">{{ 'adminUi.home.sections.variants.split' | translate }}</option>
+                                    <option [ngValue]="'full'">{{ 'adminUi.home.sections.variants.full' | translate }}</option>
+                                  </select>
+                                </label>
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.sections.fields.size' | translate }}
+                                  <select
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="block.slide.size"
+                                  >
+                                    <option [ngValue]="'S'">{{ 'adminUi.home.sections.sizes.s' | translate }}</option>
+                                    <option [ngValue]="'M'">{{ 'adminUi.home.sections.sizes.m' | translate }}</option>
+                                    <option [ngValue]="'L'">{{ 'adminUi.home.sections.sizes.l' | translate }}</option>
+                                  </select>
+                                </label>
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.sections.fields.textStyle' | translate }}
+                                  <select
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="block.slide.text_style"
+                                  >
+                                    <option [ngValue]="'dark'">{{ 'adminUi.home.sections.textStyle.dark' | translate }}</option>
+                                    <option [ngValue]="'light'">{{ 'adminUi.home.sections.textStyle.light' | translate }}</option>
+                                  </select>
+                                </label>
+                              </div>
+
+                              <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                                <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                                  {{ 'adminUi.site.assets.library.title' | translate }}
+                                </summary>
+                                <div class="mt-3">
+                                  <app-asset-library
+                                    [allowUpload]="true"
+                                    [allowSelect]="true"
+                                    [uploadKey]="pageBlocksKey"
+                                    [initialKey]="pageBlocksKey"
+                                    (select)="setPageBannerSlideImage(pageBlocksKey, block.key, $event)"
+                                  ></app-asset-library>
+                                </div>
+                              </details>
+
+                              <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                                <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                                  {{ 'adminUi.home.sections.fields.preview' | translate }}
+                                </summary>
+                                <div class="mt-3">
+                                  <app-banner-block [slide]="toPreviewSlide(block.slide, infoLang)"></app-banner-block>
+                                </div>
+                              </details>
+                            </div>
+                          </ng-container>
+
+                          <ng-container *ngSwitchCase="'carousel'">
+                            <div class="grid gap-3">
+                              <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 grid gap-3 dark:border-slate-800 dark:bg-slate-950/30">
+                                <div class="flex items-center justify-between">
+                                  <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.fields.slides' | translate }}</p>
+                                  <app-button size="sm" [label]="'adminUi.actions.add' | translate" (action)="addPageCarouselSlide(pageBlocksKey, block.key)"></app-button>
+                                </div>
+                                <div *ngFor="let slide of block.slides; let idx = index" class="rounded-xl border border-slate-200 bg-white p-3 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
+                                  <div class="flex items-center justify-between gap-2">
+                                    <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.home.sections.fields.slide' | translate }} {{ idx + 1 }}</p>
+                                    <div class="flex items-center gap-2">
+                                      <app-button size="sm" variant="ghost" [label]="'adminUi.actions.up' | translate" (action)="movePageCarouselSlide(pageBlocksKey, block.key, idx, -1)"></app-button>
+                                      <app-button size="sm" variant="ghost" [label]="'adminUi.actions.down' | translate" (action)="movePageCarouselSlide(pageBlocksKey, block.key, idx, 1)"></app-button>
+                                      <app-button size="sm" variant="ghost" [label]="'adminUi.actions.remove' | translate" (action)="removePageCarouselSlide(pageBlocksKey, block.key, idx)"></app-button>
+                                    </div>
+                                  </div>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.imageUrl' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="slide.image_url"
+                                    />
+                                  </label>
+                                  <div class="grid gap-3 md:grid-cols-2">
+                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                      {{ 'adminUi.home.sections.fields.alt' | translate }}
+                                      <input
+                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                        [(ngModel)]="slide.alt[infoLang]"
+                                      />
+                                    </label>
+                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                      {{ 'adminUi.home.hero.headline' | translate }}
+                                      <input
+                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                        [(ngModel)]="slide.headline[infoLang]"
+                                      />
+                                    </label>
+                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                                      {{ 'adminUi.home.hero.subtitle' | translate }}
+                                      <input
+                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                        [(ngModel)]="slide.subheadline[infoLang]"
+                                      />
+                                    </label>
+                                  </div>
+                                  <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                                    <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                                      {{ 'adminUi.site.assets.library.title' | translate }}
+                                    </summary>
+                                    <div class="mt-3">
+                                      <app-asset-library
+                                        [allowUpload]="true"
+                                        [allowSelect]="true"
+                                        [uploadKey]="pageBlocksKey"
+                                        [initialKey]="pageBlocksKey"
+                                        (select)="setPageCarouselSlideImage(pageBlocksKey, block.key, idx, $event)"
+                                      ></app-asset-library>
+                                    </div>
+                                  </details>
+                                </div>
+                              </div>
+
+                              <div class="grid gap-3 md:grid-cols-2">
+                                <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  <input type="checkbox" [(ngModel)]="block.settings.autoplay" />
+                                  <span>{{ 'adminUi.home.sections.fields.autoplay' | translate }}</span>
+                                </label>
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.sections.fields.interval' | translate }}
+                                  <input
+                                    type="number"
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="block.settings.interval_ms"
+                                    [disabled]="!block.settings.autoplay"
+                                  />
+                                </label>
+                                <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  <input type="checkbox" [(ngModel)]="block.settings.show_arrows" />
+                                  <span>{{ 'adminUi.home.sections.fields.arrows' | translate }}</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  <input type="checkbox" [(ngModel)]="block.settings.show_dots" />
+                                  <span>{{ 'adminUi.home.sections.fields.dots' | translate }}</span>
+                                </label>
+                              </div>
+
+                              <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                                <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                                  {{ 'adminUi.home.sections.fields.preview' | translate }}
+                                </summary>
+                                <div class="mt-3">
+                                  <app-carousel-block [slides]="toPreviewSlides(block.slides, infoLang)" [settings]="block.settings"></app-carousel-block>
+                                </div>
+                              </details>
+                            </div>
+                          </ng-container>
                         </ng-container>
                       </div>
                     </div>
@@ -675,6 +947,72 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="pageBlocksError[pageBlocksKey]">
                       {{ pageBlocksError[pageBlocksKey] }}
                     </span>
+                  </div>
+                </div>
+              </details>
+
+              <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.site.pages.redirects.title' | translate }}
+                </summary>
+                <div class="mt-3 grid gap-3">
+                  <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.site.pages.redirects.hint' | translate }}</p>
+
+                  <div class="flex flex-wrap gap-2 items-end">
+                    <app-input [label]="'adminUi.site.pages.redirects.search' | translate" [(value)]="redirectsQuery"></app-input>
+                    <app-button size="sm" variant="ghost" [label]="'adminUi.actions.search' | translate" (action)="loadContentRedirects(true)"></app-button>
+                  </div>
+
+                  <div *ngIf="redirectsError" class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+                    {{ redirectsError }}
+                  </div>
+
+                  <div *ngIf="redirectsLoading" class="text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'notifications.loading' | translate }}
+                  </div>
+
+                  <div *ngIf="!redirectsLoading && !redirectsError && redirects.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.site.pages.redirects.empty' | translate }}
+                  </div>
+
+                  <div *ngIf="!redirectsLoading && redirects.length" class="grid gap-2">
+                    <div
+                      *ngFor="let r of redirects"
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div class="min-w-0">
+                        <p class="text-sm font-medium text-slate-900 dark:text-slate-50 truncate">
+                          <span class="font-mono">{{ redirectKeyToUrl(r.from_key) }}</span>
+                          <span class="mx-2 text-slate-500 dark:text-slate-400">→</span>
+                          <span class="font-mono">{{ redirectKeyToUrl(r.to_key) }}</span>
+                        </p>
+                        <p *ngIf="!r.target_exists" class="text-xs text-rose-700 dark:text-rose-300">
+                          {{ 'adminUi.site.pages.redirects.stale' | translate }}
+                        </p>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400">{{ r.created_at | date: 'short' }}</p>
+                      </div>
+                      <app-button size="sm" variant="ghost" [label]="'adminUi.actions.delete' | translate" (action)="deleteContentRedirect(r.id)"></app-button>
+                    </div>
+                  </div>
+
+                  <div *ngIf="redirectsMeta.total_pages > 1" class="flex items-center gap-2">
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.actions.prev' | translate"
+                      [disabled]="redirectsMeta.page <= 1"
+                      (action)="setRedirectsPage(redirectsMeta.page - 1)"
+                    ></app-button>
+                    <span class="text-xs text-slate-600 dark:text-slate-300">
+                      {{ redirectsMeta.page }} / {{ redirectsMeta.total_pages }}
+                    </span>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.actions.next' | translate"
+                      [disabled]="redirectsMeta.page >= redirectsMeta.total_pages"
+                      (action)="setRedirectsPage(redirectsMeta.page + 1)"
+                    ></app-button>
                   </div>
                 </div>
               </details>
@@ -699,55 +1037,6 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                   <app-content-revisions [contentKey]="pagesRevisionKey" [titleKey]="pagesRevisionTitleKey()"></app-content-revisions>
                 </div>
               </details>
-            </div>
-          </section>
-
-          <section *ngIf="section() === 'home'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.home.hero.title' | translate }}</h2>
-              <div class="flex gap-2 text-sm">
-                <button
-                  class="px-3 py-1 rounded border"
-                  [class.bg-slate-900]="heroLang === 'en'"
-                  [class.text-white]="heroLang === 'en'"
-                  (click)="selectHeroLang('en')"
-                >
-                  EN
-                </button>
-                <button
-                  class="px-3 py-1 rounded border"
-                  [class.bg-slate-900]="heroLang === 'ro'"
-                  [class.text-white]="heroLang === 'ro'"
-                  (click)="selectHeroLang('ro')"
-                >
-                  RO
-                </button>
-              </div>
-            </div>
-            <div class="grid md:grid-cols-2 gap-3 text-sm">
-              <app-input [label]="'adminUi.home.hero.headline' | translate" [(value)]="heroForm.title"></app-input>
-              <app-input [label]="'adminUi.home.hero.subtitle' | translate" [(value)]="heroForm.subtitle"></app-input>
-              <app-input [label]="'adminUi.home.hero.ctaLabel' | translate" [(value)]="heroForm.cta_label"></app-input>
-              <app-input [label]="'adminUi.home.hero.ctaUrl' | translate" [(value)]="heroForm.cta_url"></app-input>
-              <app-input [label]="'adminUi.home.hero.imageUrl' | translate" [(value)]="heroForm.image"></app-input>
-            </div>
-            <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
-              <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
-                {{ 'adminUi.site.assets.library.title' | translate }}
-              </summary>
-              <div class="mt-3">
-                <app-asset-library
-                  [allowUpload]="false"
-                  [allowSelect]="true"
-                  [initialKey]="'site.assets'"
-                  (select)="onHeroImageSelected($event)"
-                ></app-asset-library>
-              </div>
-            </details>
-            <div class="flex gap-2">
-              <app-button [label]="'adminUi.actions.save' | translate" (action)="saveHero()"></app-button>
-              <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="heroMessage()">{{ heroMessage() }}</span>
-              <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="heroError()">{{ heroError() }}</span>
             </div>
           </section>
 
@@ -792,6 +1081,8 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                   <option [ngValue]="'text'">{{ 'adminUi.home.sections.blocks.text' | translate }}</option>
                   <option [ngValue]="'image'">{{ 'adminUi.home.sections.blocks.image' | translate }}</option>
                   <option [ngValue]="'gallery'">{{ 'adminUi.home.sections.blocks.gallery' | translate }}</option>
+                  <option [ngValue]="'banner'">{{ 'adminUi.home.sections.blocks.banner' | translate }}</option>
+                  <option [ngValue]="'carousel'">{{ 'adminUi.home.sections.blocks.carousel' | translate }}</option>
                 </select>
               </label>
               <app-button size="sm" [label]="'adminUi.actions.add' | translate" (action)="addHomeBlock()"></app-button>
@@ -967,6 +1258,272 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                           </details>
                         </div>
                       </ng-container>
+
+                      <ng-container *ngSwitchCase="'banner'">
+                        <div class="grid gap-3">
+                          <div class="grid gap-3 md:grid-cols-2">
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                              {{ 'adminUi.home.sections.fields.imageUrl' | translate }}
+                              <input
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.slide.image_url"
+                              />
+                            </label>
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.home.sections.fields.alt' | translate }}
+                              <input
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.slide.alt[homeBlocksLang]"
+                              />
+                            </label>
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.home.hero.headline' | translate }}
+                              <input
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.slide.headline[homeBlocksLang]"
+                              />
+                            </label>
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                              {{ 'adminUi.home.hero.subtitle' | translate }}
+                              <input
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.slide.subheadline[homeBlocksLang]"
+                              />
+                            </label>
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.home.hero.ctaLabel' | translate }}
+                              <input
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.slide.cta_label[homeBlocksLang]"
+                              />
+                            </label>
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.home.hero.ctaUrl' | translate }}
+                              <input
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.slide.cta_url"
+                              />
+                            </label>
+                          </div>
+
+                          <div class="grid gap-3 md:grid-cols-3">
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.home.sections.fields.variant' | translate }}
+                              <select
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.slide.variant"
+                              >
+                                <option [ngValue]="'split'">{{ 'adminUi.home.sections.variants.split' | translate }}</option>
+                                <option [ngValue]="'full'">{{ 'adminUi.home.sections.variants.full' | translate }}</option>
+                              </select>
+                            </label>
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.home.sections.fields.size' | translate }}
+                              <select
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.slide.size"
+                              >
+                                <option [ngValue]="'S'">{{ 'adminUi.home.sections.sizes.s' | translate }}</option>
+                                <option [ngValue]="'M'">{{ 'adminUi.home.sections.sizes.m' | translate }}</option>
+                                <option [ngValue]="'L'">{{ 'adminUi.home.sections.sizes.l' | translate }}</option>
+                              </select>
+                            </label>
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.home.sections.fields.textStyle' | translate }}
+                              <select
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.slide.text_style"
+                              >
+                                <option [ngValue]="'dark'">{{ 'adminUi.home.sections.textStyle.dark' | translate }}</option>
+                                <option [ngValue]="'light'">{{ 'adminUi.home.sections.textStyle.light' | translate }}</option>
+                              </select>
+                            </label>
+                          </div>
+
+                          <details class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+                            <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                              {{ 'adminUi.site.assets.library.title' | translate }}
+                            </summary>
+                            <div class="mt-3">
+                              <app-asset-library
+                                [allowUpload]="true"
+                                [allowSelect]="true"
+                                [initialKey]="'site.assets'"
+                                (select)="setBannerSlideImage(block.key, $event)"
+                              ></app-asset-library>
+                            </div>
+                          </details>
+
+                          <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.fields.preview' | translate }}</p>
+                            <app-banner-block
+                              class="mt-3"
+                              [slide]="toPreviewSlide(block.slide)"
+                              [tagline]="homeBlocksLang === 'en' ? 'art. handcrafted' : 'artă. meșteșug'"
+                            ></app-banner-block>
+                          </div>
+                        </div>
+                      </ng-container>
+
+                      <ng-container *ngSwitchCase="'carousel'">
+                        <div class="grid gap-3">
+                          <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.fields.slides' | translate }}</p>
+                            <div class="mt-3 grid gap-3">
+                              <div
+                                *ngFor="let slide of block.slides; let idx = index"
+                                class="rounded-xl border border-slate-200 bg-slate-50 p-3 grid gap-3 dark:border-slate-800 dark:bg-slate-950/30"
+                              >
+                                <div class="flex items-center justify-between gap-2">
+                                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                                    {{ 'adminUi.home.sections.fields.slide' | translate }} {{ idx + 1 }}
+                                  </p>
+                                  <div class="flex items-center gap-2">
+                                    <app-button size="sm" variant="ghost" [label]="'adminUi.actions.up' | translate" (action)="moveCarouselSlide(block.key, idx, -1)"></app-button>
+                                    <app-button size="sm" variant="ghost" [label]="'adminUi.actions.down' | translate" (action)="moveCarouselSlide(block.key, idx, 1)"></app-button>
+                                    <app-button size="sm" variant="ghost" [label]="'adminUi.actions.delete' | translate" (action)="removeCarouselSlide(block.key, idx)"></app-button>
+                                  </div>
+                                </div>
+
+                                <div class="grid gap-3 md:grid-cols-2">
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                                    {{ 'adminUi.home.sections.fields.imageUrl' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="slide.image_url"
+                                    />
+                                  </label>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.alt' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="slide.alt[homeBlocksLang]"
+                                    />
+                                  </label>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.hero.headline' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="slide.headline[homeBlocksLang]"
+                                    />
+                                  </label>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                                    {{ 'adminUi.home.hero.subtitle' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="slide.subheadline[homeBlocksLang]"
+                                    />
+                                  </label>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.hero.ctaLabel' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="slide.cta_label[homeBlocksLang]"
+                                    />
+                                  </label>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.hero.ctaUrl' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="slide.cta_url"
+                                    />
+                                  </label>
+                                </div>
+
+                                <div class="grid gap-3 md:grid-cols-3">
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.variant' | translate }}
+                                    <select
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="slide.variant"
+                                    >
+                                      <option [ngValue]="'split'">{{ 'adminUi.home.sections.variants.split' | translate }}</option>
+                                      <option [ngValue]="'full'">{{ 'adminUi.home.sections.variants.full' | translate }}</option>
+                                    </select>
+                                  </label>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.size' | translate }}
+                                    <select
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="slide.size"
+                                    >
+                                      <option [ngValue]="'S'">{{ 'adminUi.home.sections.sizes.s' | translate }}</option>
+                                      <option [ngValue]="'M'">{{ 'adminUi.home.sections.sizes.m' | translate }}</option>
+                                      <option [ngValue]="'L'">{{ 'adminUi.home.sections.sizes.l' | translate }}</option>
+                                    </select>
+                                  </label>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.textStyle' | translate }}
+                                    <select
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="slide.text_style"
+                                    >
+                                      <option [ngValue]="'dark'">{{ 'adminUi.home.sections.textStyle.dark' | translate }}</option>
+                                      <option [ngValue]="'light'">{{ 'adminUi.home.sections.textStyle.light' | translate }}</option>
+                                    </select>
+                                  </label>
+                                </div>
+
+                                <details class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+                                  <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                                    {{ 'adminUi.site.assets.library.title' | translate }}
+                                  </summary>
+                                  <div class="mt-3">
+                                    <app-asset-library
+                                      [allowUpload]="true"
+                                      [allowSelect]="true"
+                                      [initialKey]="'site.assets'"
+                                      (select)="setCarouselSlideImage(block.key, idx, $event)"
+                                    ></app-asset-library>
+                                  </div>
+                                </details>
+                              </div>
+                            </div>
+
+                            <div class="mt-3 flex gap-2">
+                              <app-button size="sm" [label]="'adminUi.actions.add' | translate" (action)="addCarouselSlide(block.key)"></app-button>
+                            </div>
+                          </div>
+
+                          <div class="grid gap-3 md:grid-cols-2">
+                            <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              <input type="checkbox" [(ngModel)]="block.settings.autoplay" />
+                              <span>{{ 'adminUi.home.sections.fields.autoplay' | translate }}</span>
+                            </label>
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.home.sections.fields.interval' | translate }}
+                              <input
+                                type="number"
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.settings.interval_ms"
+                                [disabled]="!block.settings.autoplay"
+                              />
+                            </label>
+                            <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              <input type="checkbox" [(ngModel)]="block.settings.show_arrows" />
+                              <span>{{ 'adminUi.home.sections.fields.arrows' | translate }}</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              <input type="checkbox" [(ngModel)]="block.settings.show_dots" />
+                              <span>{{ 'adminUi.home.sections.fields.dots' | translate }}</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              <input type="checkbox" [(ngModel)]="block.settings.pause_on_hover" />
+                              <span>{{ 'adminUi.home.sections.fields.pauseOnHover' | translate }}</span>
+                            </label>
+                          </div>
+
+                          <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.fields.preview' | translate }}</p>
+                            <app-carousel-block
+                              class="mt-3"
+                              [slides]="toPreviewSlides(block.slides)"
+                              [settings]="block.settings"
+                              [tagline]="homeBlocksLang === 'en' ? 'art. handcrafted' : 'artă. meșteșug'"
+                            ></app-carousel-block>
+                          </div>
+                        </div>
+                      </ng-container>
                     </ng-container>
                   </div>
                 </ng-container>
@@ -988,7 +1545,6 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="homeRevisionKey"
                   >
-                    <option [ngValue]="'home.hero'">{{ 'adminUi.home.hero.title' | translate }}</option>
                     <option [ngValue]="'home.sections'">{{ 'adminUi.home.sections.title' | translate }}</option>
                     <option [ngValue]="'home.story'">{{ 'adminUi.home.story.title' | translate }}</option>
                   </select>
@@ -1189,8 +1745,18 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.categories.title' | translate }}</h2>
             </div>
-            <div class="grid md:grid-cols-[1fr_auto] gap-2 items-end text-sm">
+            <div class="grid md:grid-cols-[1fr_260px_auto] gap-2 items-end text-sm">
               <app-input [label]="'adminUi.products.table.name' | translate" [(value)]="categoryName"></app-input>
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.categories.parent' | translate }}
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="categoryParentId"
+                >
+                  <option value="">{{ 'adminUi.categories.parentNone' | translate }}</option>
+                  <option *ngFor="let cat of categories" [value]="cat.id">{{ cat.name }}</option>
+                </select>
+              </label>
               <app-button size="sm" [label]="'adminUi.categories.add' | translate" (action)="addCategory()"></app-button>
             </div>
             <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.categories.slugAutoHint' | translate }}</p>
@@ -1205,7 +1771,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
 	                  <div>
 	                    <p class="font-semibold text-slate-900 dark:text-slate-50">{{ cat.name }}</p>
 	                    <p class="text-xs text-slate-500 dark:text-slate-400">
-	                      Slug: {{ cat.slug }} · Order: {{ cat.sort_order }}
+	                      Slug: {{ cat.slug }} · Order: {{ cat.sort_order }} · Parent: {{ categoryParentLabel(cat) }}
 	                    </p>
 	                  </div>
 	                  <div class="flex flex-wrap justify-end gap-2">
@@ -1225,6 +1791,17 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
 	                    ></app-button>
 	                  </div>
 	                </div>
+                  <label class="mt-2 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                    <span class="font-semibold">{{ 'adminUi.categories.parent' | translate }}:</span>
+                    <select
+                      class="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [ngModel]="cat.parent_id || ''"
+                      (ngModelChange)="updateCategoryParent(cat, $event)"
+                    >
+                      <option value="">{{ 'adminUi.categories.parentNone' | translate }}</option>
+                      <option *ngFor="let parent of categoryParentOptions(cat)" [value]="parent.id">{{ parent.name }}</option>
+                    </select>
+                  </label>
 
 	                <div *ngIf="categoryTranslationsSlug === cat.slug" class="mt-3 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/30">
 	                  <div class="flex items-center justify-between gap-3">
@@ -2245,7 +2822,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   private routeSub?: Subscription;
 
   pagesRevisionKey = 'page.about';
-  homeRevisionKey = 'home.hero';
+  homeRevisionKey = 'home.sections';
   settingsRevisionKey = 'site.assets';
 
   summary = signal<AdminSummary | null>(null);
@@ -2255,6 +2832,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   products: AdminProduct[] = [];
   categories: AdminCategory[] = [];
   categoryName = '';
+  categoryParentId = '';
   categoryTranslationsSlug: string | null = null;
   categoryTranslationsError = signal<string | null>(null);
   categoryTranslationExists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
@@ -2268,21 +2846,10 @@ export class AdminComponent implements OnInit, OnDestroy {
   selectedIds = new Set<string>();
   allSelected = false;
   homeBlocksLang: UiLang = 'en';
-  newHomeBlockType: 'text' | 'image' | 'gallery' = 'text';
+  newHomeBlockType: 'text' | 'image' | 'gallery' | 'banner' | 'carousel' = 'text';
   homeBlocks: HomeBlockDraft[] = [];
   draggingHomeBlockKey: string | null = null;
   sectionsMessage = '';
-
-  heroLang = 'en';
-  heroForm = {
-    title: '',
-    subtitle: '',
-    cta_label: '',
-    cta_url: '',
-    image: ''
-  };
-  heroMessage = signal<string | null>(null);
-  heroError = signal<string | null>(null);
 
   featuredCollections: FeaturedCollection[] = [];
   collectionForm: { name: string; description?: string | null; product_ids: string[] } = {
@@ -2448,14 +3015,25 @@ export class AdminComponent implements OnInit, OnDestroy {
   };
   infoMessage: string | null = null;
   infoError: string | null = null;
+  contentPages: ContentPageListItem[] = [];
+  contentPagesLoading = false;
+  contentPagesError: string | null = null;
+  redirects: ContentRedirectRead[] = [];
+  redirectsMeta = { total_items: 0, total_pages: 1, page: 1, limit: 25 };
+  redirectsLoading = false;
+  redirectsError: string | null = null;
+  redirectsQuery = '';
+  newCustomPageTitle = '';
+  newCustomPageStatus: 'draft' | 'published' = 'draft';
+  creatingCustomPage = false;
   pageBlocksKey: PageBuilderKey = 'page.about';
   newPageBlockType: PageBlockType = 'text';
-  pageBlocks: Record<PageBuilderKey, PageBlockDraft[]> = { 'page.about': [], 'page.contact': [] };
-  pageBlocksMeta: Record<PageBuilderKey, Record<string, unknown>> = { 'page.about': {}, 'page.contact': {} };
-  pageBlocksMessage: Record<PageBuilderKey, string | null> = { 'page.about': null, 'page.contact': null };
-  pageBlocksError: Record<PageBuilderKey, string | null> = { 'page.about': null, 'page.contact': null };
+  pageBlocks: Record<string, PageBlockDraft[]> = {};
+  pageBlocksMeta: Record<string, Record<string, unknown>> = {};
+  pageBlocksMessage: Record<string, string | null> = {};
+  pageBlocksError: Record<string, string | null> = {};
   draggingPageBlockKey: string | null = null;
-  draggingPageBlocksKey: PageBuilderKey | null = null;
+  draggingPageBlocksKey: string | null = null;
   coupons: AdminCoupon[] = [];
   newCoupon: Partial<AdminCoupon> = { code: '', percentage_off: 0, active: true, currency: 'RON' };
   stockEdits: Record<string, number> = {};
@@ -2534,8 +3112,6 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   homeRevisionTitleKey(): string {
     switch (this.homeRevisionKey) {
-      case 'home.hero':
-        return 'adminUi.home.hero.title';
       case 'home.sections':
         return 'adminUi.home.sections.title';
       case 'home.story':
@@ -2623,7 +3199,6 @@ export class AdminComponent implements OnInit, OnDestroy {
 
     if (section === 'home') {
       this.admin.products().subscribe({ next: (p) => (this.products = p), error: () => (this.products = []) });
-      this.loadHero(this.heroLang);
       this.loadSections();
       this.loadCollections();
       this.loading.set(false);
@@ -2632,6 +3207,9 @@ export class AdminComponent implements OnInit, OnDestroy {
 
     if (section === 'pages') {
       this.loadInfo();
+      this.loadContentPages();
+      this.loadPageBlocks(this.pageBlocksKey);
+      this.loadContentRedirects(true);
       this.loading.set(false);
       return;
     }
@@ -2882,13 +3460,71 @@ export class AdminComponent implements OnInit, OnDestroy {
       this.toast.error(this.t('adminUi.products.errors.required'));
       return;
     }
-    this.admin.createCategory({ name: this.categoryName }).subscribe({
+    const parent_id = (this.categoryParentId || '').trim() || null;
+    this.admin.createCategory({ name: this.categoryName, parent_id }).subscribe({
       next: (cat) => {
         this.categories = [cat, ...this.categories];
         this.categoryName = '';
+        this.categoryParentId = '';
         this.toast.success(this.t('adminUi.categories.success.add'));
       },
       error: () => this.toast.error(this.t('adminUi.categories.errors.add'))
+    });
+  }
+
+  categoryParentLabel(cat: AdminCategory): string {
+    const parentId = (cat.parent_id ?? '').trim();
+    if (!parentId) return this.t('adminUi.categories.parentNone');
+    return this.categories.find((c) => c.id === parentId)?.name ?? this.t('adminUi.categories.parentNone');
+  }
+
+  categoryParentOptions(cat: AdminCategory): AdminCategory[] {
+    const currentId = cat.id;
+    const excluded = this.categoryDescendantIds(currentId);
+    excluded.add(currentId);
+    return this.categories
+      .filter((candidate) => !excluded.has(candidate.id))
+      .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+  }
+
+  private categoryDescendantIds(rootId: string): Set<string> {
+    const childrenByParent = new Map<string, string[]>();
+    for (const cat of this.categories) {
+      const parentId = (cat.parent_id ?? '').trim();
+      if (!parentId) continue;
+      const bucket = childrenByParent.get(parentId);
+      if (bucket) {
+        bucket.push(cat.id);
+      } else {
+        childrenByParent.set(parentId, [cat.id]);
+      }
+    }
+    const resolved = new Set<string>();
+    const stack = [...(childrenByParent.get(rootId) ?? [])];
+    while (stack.length) {
+      const next = stack.pop()!;
+      if (resolved.has(next)) continue;
+      resolved.add(next);
+      const kids = childrenByParent.get(next);
+      if (kids?.length) stack.push(...kids);
+    }
+    return resolved;
+  }
+
+  updateCategoryParent(cat: AdminCategory, raw: string): void {
+    const nextParentId = (raw ?? '').trim() || null;
+    const prevParentId = (cat.parent_id ?? '').trim() || null;
+    if (nextParentId === prevParentId) return;
+    cat.parent_id = nextParentId;
+    this.admin.updateCategory(cat.slug, { parent_id: nextParentId }).subscribe({
+      next: (updated) => {
+        cat.parent_id = updated.parent_id ?? null;
+        this.toast.success(this.t('adminUi.categories.success.updateParent'));
+      },
+      error: () => {
+        cat.parent_id = prevParentId;
+        this.toast.error(this.t('adminUi.categories.errors.updateParent'));
+      }
     });
   }
 
@@ -4377,12 +5013,6 @@ export class AdminComponent implements OnInit, OnDestroy {
         // ignore
       }
 
-      if (key === 'page.about' || key === 'page.contact') {
-        const pageKey = key as PageBuilderKey;
-        const metaObj = (meta || {}) as Record<string, unknown>;
-        this.pageBlocksMeta[pageKey] = metaObj;
-        this.pageBlocks[pageKey] = this.parsePageBlocksDraft(metaObj);
-      }
     };
 
     void loadKey('page.about', 'about');
@@ -4427,6 +5057,240 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    });
 	  }
 
+  loadContentPages(): void {
+    this.contentPagesLoading = true;
+    this.contentPagesError = null;
+    this.admin.listContentPages().subscribe({
+      next: (pages) => {
+        this.contentPages = [...(pages || [])].sort((a, b) => (a.slug || '').localeCompare(b.slug || ''));
+        this.contentPagesLoading = false;
+        if (!this.contentPages.length) return;
+        const exists = this.contentPages.some((p) => p.key === this.pageBlocksKey);
+        if (!exists) {
+          const preferred = this.contentPages.find((p) => p.key === 'page.about')?.key || this.contentPages[0].key;
+          this.pageBlocksKey = preferred as PageBuilderKey;
+        }
+      },
+      error: () => {
+        this.contentPagesLoading = false;
+        this.contentPages = [];
+        this.contentPagesError = this.t('adminUi.site.pages.errors.load');
+      }
+    });
+  }
+
+  onPageBlocksKeyChange(next: PageBuilderKey): void {
+    if (!next || this.pageBlocksKey === next) return;
+    this.pageBlocksKey = next;
+    this.loadPageBlocks(next);
+  }
+
+  loadPageBlocks(pageKey: PageBuilderKey): void {
+    this.pageBlocksMessage[pageKey] = null;
+    this.pageBlocksError[pageKey] = null;
+    this.admin.getContent(pageKey).subscribe({
+      next: (block) => {
+        this.rememberContentVersion(pageKey, block);
+        const metaObj = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
+        this.pageBlocksMeta[pageKey] = metaObj;
+        this.pageBlocks[pageKey] = this.parsePageBlocksDraft(metaObj);
+      },
+      error: (err) => {
+        if (err?.status === 404) {
+          delete this.contentVersions[pageKey];
+          this.pageBlocksMeta[pageKey] = {};
+          this.pageBlocks[pageKey] = [];
+          return;
+        }
+        this.pageBlocksError[pageKey] = this.t('adminUi.site.pages.builder.errors.load');
+      }
+    });
+  }
+
+  createCustomPage(): void {
+    const title = (this.newCustomPageTitle || '').trim();
+    if (!title) return;
+    const baseSlug = this.slugifyPageSlug(title);
+    if (this.isReservedPageSlug(baseSlug)) {
+      this.toast.error(this.t('adminUi.site.pages.errors.reservedTitle'), this.t('adminUi.site.pages.errors.reservedCopy'));
+      return;
+    }
+    const existing = new Set((this.contentPages || []).map((p) => p.slug));
+    let slug = baseSlug;
+    let counter = 2;
+    while (existing.has(slug)) {
+      slug = `${baseSlug}-${counter++}`;
+    }
+    const key = `page.${slug}` as PageBuilderKey;
+    this.creatingCustomPage = true;
+    const payload = {
+      title,
+      body_markdown: 'Page builder',
+      status: this.newCustomPageStatus,
+      meta: { version: 2, blocks: [] }
+    };
+    const done = () => {
+      this.creatingCustomPage = false;
+    };
+    this.admin.createContent(key, payload).subscribe({
+      next: () => {
+        done();
+        this.toast.success(this.t('adminUi.site.pages.success.created'));
+        this.newCustomPageTitle = '';
+        this.newCustomPageStatus = 'draft';
+        this.loadContentPages();
+        this.pageBlocksKey = key;
+        this.loadPageBlocks(key);
+      },
+      error: (err) => {
+        done();
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.toast.error(detail || this.t('adminUi.site.pages.errors.create'));
+      }
+    });
+  }
+
+  loadContentRedirects(reset: boolean = false): void {
+    if (reset) {
+      this.redirectsMeta = { ...this.redirectsMeta, page: 1 };
+    }
+    this.redirectsLoading = true;
+    this.redirectsError = null;
+    const q = (this.redirectsQuery || '').trim();
+    this.admin
+      .listContentRedirects({
+        q: q || undefined,
+        page: this.redirectsMeta.page,
+        limit: this.redirectsMeta.limit
+      })
+      .subscribe({
+        next: (res) => {
+          this.redirects = res?.items || [];
+          this.redirectsMeta = res?.meta || { total_items: 0, total_pages: 1, page: 1, limit: this.redirectsMeta.limit };
+          this.redirectsLoading = false;
+        },
+        error: () => {
+          this.redirectsLoading = false;
+          this.redirects = [];
+          this.redirectsMeta = { ...this.redirectsMeta, total_items: 0, total_pages: 1 };
+          this.redirectsError = this.t('adminUi.site.pages.redirects.errors.load');
+        }
+      });
+  }
+
+  setRedirectsPage(page: number): void {
+    const next = Math.max(1, Math.min(Number(page) || 1, this.redirectsMeta.total_pages || 1));
+    if (next === this.redirectsMeta.page) return;
+    this.redirectsMeta = { ...this.redirectsMeta, page: next };
+    this.loadContentRedirects();
+  }
+
+  deleteContentRedirect(id: string): void {
+    const value = (id || '').trim();
+    if (!value) return;
+    if (!window.confirm(this.t('adminUi.site.pages.redirects.deleteConfirm'))) return;
+    this.admin.deleteContentRedirect(value).subscribe({
+      next: () => {
+        this.toast.success(this.t('adminUi.site.pages.redirects.success.deleted'));
+        this.loadContentRedirects(true);
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.toast.error(detail || this.t('adminUi.site.pages.redirects.errors.delete'));
+      }
+    });
+  }
+
+  redirectKeyToUrl(key: string): string {
+    const value = (key || '').trim();
+    if (value.startsWith('page.')) {
+      const slug = value.split('.', 2)[1] || '';
+      return `/pages/${slug}`;
+    }
+    return value;
+  }
+
+  canRenamePageKey(key: string): boolean {
+    const value = (key || '').trim();
+    if (!value.startsWith('page.')) return false;
+    if (value === 'page.about' || value === 'page.contact' || value === 'page.faq' || value === 'page.shipping') return false;
+    return true;
+  }
+
+  renameCustomPageUrl(): void {
+    const pageKey = this.pageBlocksKey;
+    if (!this.canRenamePageKey(pageKey)) return;
+    const oldSlug = pageKey.split('.', 2)[1] || '';
+    const entered = window.prompt(this.t('adminUi.site.pages.builder.changeUrlPrompt'), oldSlug);
+    if (entered === null) return;
+    const nextSlug = this.slugifyPageSlug(entered);
+    if (!nextSlug || nextSlug === oldSlug) {
+      this.toast.error(this.t('adminUi.site.pages.builder.errors.rename'));
+      return;
+    }
+    if (this.isReservedPageSlug(nextSlug)) {
+      this.toast.error(this.t('adminUi.site.pages.errors.reservedTitle'), this.t('adminUi.site.pages.errors.reservedCopy'));
+      return;
+    }
+    if (
+      !window.confirm(
+        this.t('adminUi.site.pages.builder.changeUrlConfirm', { old: oldSlug, next: nextSlug })
+      )
+    ) {
+      return;
+    }
+    this.admin.renameContentPage(oldSlug, nextSlug).subscribe({
+      next: (res) => {
+        this.toast.success(this.t('adminUi.site.pages.builder.success.rename'));
+        this.pageBlocksKey = res.new_key as PageBuilderKey;
+        this.loadContentPages();
+        this.loadPageBlocks(this.pageBlocksKey);
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.toast.error(detail || this.t('adminUi.site.pages.builder.errors.rename'));
+      }
+    });
+  }
+
+  private isReservedPageSlug(slug: string): boolean {
+    const value = (slug || '').trim().toLowerCase();
+    if (!value) return true;
+    const reserved = new Set([
+      'admin',
+      'account',
+      'auth',
+      'blog',
+      'cart',
+      'checkout',
+      'contact',
+      'error',
+      'home',
+      'login',
+      'register',
+      'receipt',
+      'pages',
+      'products',
+      'shop',
+      'tickets',
+      'about',
+      'password-reset'
+    ]);
+    return reserved.has(value);
+  }
+
+  private slugifyPageSlug(value: string): string {
+    const raw = (value || '').trim().toLowerCase();
+    if (!raw) return 'page';
+    const cleaned = raw
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .replace(/-+/g, '-');
+    return cleaned || 'page';
+  }
+
   private parsePageBlocksDraft(meta: Record<string, unknown> | null | undefined): PageBlockDraft[] {
     const rawBlocks = meta?.['blocks'];
     if (!Array.isArray(rawBlocks) || rawBlocks.length === 0) return [];
@@ -4438,7 +5302,15 @@ export class AdminComponent implements OnInit, OnDestroy {
       if (!raw || typeof raw !== 'object') continue;
       const rec = raw as Record<string, unknown>;
       const typeRaw = typeof rec['type'] === 'string' ? String(rec['type']).trim() : '';
-      if (typeRaw !== 'text' && typeRaw !== 'image' && typeRaw !== 'gallery') continue;
+      if (
+        typeRaw !== 'text' &&
+        typeRaw !== 'image' &&
+        typeRaw !== 'gallery' &&
+        typeRaw !== 'banner' &&
+        typeRaw !== 'carousel'
+      ) {
+        continue;
+      }
       const key = typeof rec['key'] === 'string' ? String(rec['key']).trim() : '';
       const finalKey = key || `${typeRaw}_${idx + 1}`;
       if (!finalKey || seen.has(finalKey)) continue;
@@ -4455,7 +5327,10 @@ export class AdminComponent implements OnInit, OnDestroy {
         link_url: '',
         alt: this.emptyLocalizedText(),
         caption: this.emptyLocalizedText(),
-        images: []
+        images: [],
+        slide: this.emptySlideDraft(),
+        slides: [this.emptySlideDraft()],
+        settings: this.defaultCarouselSettings()
       };
 
       if (typeRaw === 'text') {
@@ -4480,6 +5355,16 @@ export class AdminComponent implements OnInit, OnDestroy {
             });
           }
         }
+      } else if (typeRaw === 'banner') {
+        draft.slide = this.toSlideDraft(rec['slide']);
+      } else if (typeRaw === 'carousel') {
+        const slidesRaw = rec['slides'];
+        const slides: SlideDraft[] = [];
+        if (Array.isArray(slidesRaw)) {
+          for (const slideRaw of slidesRaw) slides.push(this.toSlideDraft(slideRaw));
+        }
+        draft.slides = slides.length ? slides : [this.emptySlideDraft()];
+        draft.settings = this.toCarouselSettingsDraft(rec['settings']);
       }
 
       configured.push(draft);
@@ -4508,7 +5393,10 @@ export class AdminComponent implements OnInit, OnDestroy {
       link_url: '',
       alt: this.emptyLocalizedText(),
       caption: this.emptyLocalizedText(),
-      images: []
+      images: [],
+      slide: this.emptySlideDraft(),
+      slides: [this.emptySlideDraft()],
+      settings: this.defaultCarouselSettings()
     });
     this.pageBlocks[pageKey] = current;
   }
@@ -4553,6 +5441,60 @@ export class AdminComponent implements OnInit, OnDestroy {
     const value = (url || '').trim();
     if (!value) return;
     this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => (b.key === blockKey ? { ...b, url: value } : b));
+    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+  }
+
+  setPageBannerSlideImage(pageKey: PageBuilderKey, blockKey: string, url: string): void {
+    const value = (url || '').trim();
+    if (!value) return;
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+      if (b.key !== blockKey || b.type !== 'banner') return b;
+      return { ...b, slide: { ...b.slide, image_url: value } };
+    });
+    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+  }
+
+  addPageCarouselSlide(pageKey: PageBuilderKey, blockKey: string): void {
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+      if (b.key !== blockKey || b.type !== 'carousel') return b;
+      return { ...b, slides: [...(b.slides || []), this.emptySlideDraft()] };
+    });
+  }
+
+  removePageCarouselSlide(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+      if (b.key !== blockKey || b.type !== 'carousel') return b;
+      const next = [...(b.slides || [])];
+      next.splice(idx, 1);
+      return { ...b, slides: next.length ? next : [this.emptySlideDraft()] };
+    });
+  }
+
+  movePageCarouselSlide(pageKey: PageBuilderKey, blockKey: string, idx: number, delta: number): void {
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+      if (b.key !== blockKey || b.type !== 'carousel') return b;
+      const slides = [...(b.slides || [])];
+      const from = idx;
+      const to = idx + delta;
+      if (from < 0 || from >= slides.length) return b;
+      if (to < 0 || to >= slides.length) return b;
+      const [moved] = slides.splice(from, 1);
+      slides.splice(to, 0, moved);
+      return { ...b, slides };
+    });
+  }
+
+  setPageCarouselSlideImage(pageKey: PageBuilderKey, blockKey: string, idx: number, url: string): void {
+    const value = (url || '').trim();
+    if (!value) return;
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+      if (b.key !== blockKey || b.type !== 'carousel') return b;
+      const slides = [...(b.slides || [])];
+      const target = slides[idx];
+      if (!target) return b;
+      slides[idx] = { ...target, image_url: value };
+      return { ...b, slides };
+    });
     this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
   }
 
@@ -4617,6 +5559,11 @@ export class AdminComponent implements OnInit, OnDestroy {
         base['caption'] = b.caption;
       } else if (b.type === 'gallery') {
         base['images'] = b.images.map((img) => ({ url: img.url, alt: img.alt, caption: img.caption }));
+      } else if (b.type === 'banner') {
+        base['slide'] = this.serializeSlideDraft(b.slide);
+      } else if (b.type === 'carousel') {
+        base['slides'] = (b.slides || []).map((slide) => this.serializeSlideDraft(slide));
+        base['settings'] = b.settings;
       }
       return base;
     });
@@ -4627,9 +5574,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     const ok = this.t('adminUi.site.pages.builder.success.save');
     const errMsg = this.t('adminUi.site.pages.builder.errors.save');
 
-    const reload = () => {
-      this.loadInfo();
-    };
+    const reload = () => this.loadPageBlocks(pageKey);
 
     this.admin.updateContentBlock(pageKey, this.withExpectedVersion(pageKey, payload)).subscribe({
       next: (block) => {
@@ -4645,10 +5590,9 @@ export class AdminComponent implements OnInit, OnDestroy {
           return;
         }
         if (err?.status === 404) {
-          const body = (this.infoForm[pageKey === 'page.about' ? 'about' : 'contact']?.en || 'Page builder') as string;
           const createPayload = {
-            title: pageKey,
-            body_markdown: body || 'Page builder',
+            title: this.contentPages.find((p) => p.key === pageKey)?.title || pageKey,
+            body_markdown: 'Page builder',
             status: 'published',
             meta
           };
@@ -4670,86 +5614,6 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.pageBlocksMessage[pageKey] = null;
       }
     });
-  }
-
-  // Homepage hero
-  selectHeroLang(lang: string): void {
-    if (this.heroLang === lang) return;
-    this.heroLang = lang;
-    this.loadHero(lang);
-  }
-
-  loadHero(lang: string): void {
-    this.heroMessage.set(null);
-    this.heroError.set(null);
-    this.admin.getContent('home.hero', lang).subscribe({
-      next: (block) => {
-        this.rememberContentVersion('home.hero', block);
-        const meta = block.meta || {};
-        this.heroForm = {
-          title: block.title,
-          subtitle: block.body_markdown,
-          cta_label: meta['cta_label'] || '',
-          cta_url: meta['cta_url'] || '',
-          image: meta['image'] || ''
-        };
-      },
-      error: (err) => {
-        if (err?.status === 404) {
-          delete this.contentVersions['home.hero'];
-          this.heroForm = { title: '', subtitle: '', cta_label: '', cta_url: '', image: '' };
-          return;
-        }
-        this.heroError.set(this.t('adminUi.home.hero.errors.load'));
-      }
-    });
-  }
-
-  saveHero(): void {
-    const payload = {
-      title: this.heroForm.title || 'Homepage hero',
-      body_markdown: this.heroForm.subtitle || this.heroForm.title || 'Hero copy',
-      status: 'published',
-      meta: {
-        cta_label: this.heroForm.cta_label,
-        cta_url: this.heroForm.cta_url,
-        image: this.heroForm.image
-      },
-      lang: this.heroLang
-    };
-    const handleError = () => {
-      this.heroError.set(this.t('adminUi.home.hero.errors.save'));
-      this.heroMessage.set(null);
-    };
-    this.admin.updateContentBlock('home.hero', this.withExpectedVersion('home.hero', payload)).subscribe({
-      next: (block) => {
-        this.rememberContentVersion('home.hero', block);
-        this.heroMessage.set(this.t('adminUi.home.hero.success.saved'));
-        this.heroError.set(null);
-      },
-      error: (err) => {
-        if (this.handleContentConflict(err, 'home.hero', () => this.loadHero(this.heroLang))) return;
-        if (err?.status === 404) {
-          this.admin.createContent('home.hero', payload).subscribe({
-            next: (created) => {
-              this.rememberContentVersion('home.hero', created);
-              this.heroMessage.set(this.t('adminUi.home.hero.success.created'));
-              this.heroError.set(null);
-            },
-            error: handleError
-          });
-          return;
-        }
-        handleError();
-      }
-    });
-  }
-
-  onHeroImageSelected(url: string): void {
-    const value = (url || '').trim();
-    if (!value) return;
-    this.heroForm.image = value;
-    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
   }
 
   // Homepage sections (page builder blocks)
@@ -4776,9 +5640,104 @@ export class AdminComponent implements OnInit, OnDestroy {
     };
   }
 
+  private emptySlideDraft(): SlideDraft {
+    return {
+      image_url: '',
+      alt: this.emptyLocalizedText(),
+      headline: this.emptyLocalizedText(),
+      subheadline: this.emptyLocalizedText(),
+      cta_label: this.emptyLocalizedText(),
+      cta_url: '',
+      variant: 'split',
+      size: 'M',
+      text_style: 'dark'
+    };
+  }
+
+  private toSlideDraft(value: unknown): SlideDraft {
+    if (!value || typeof value !== 'object') return this.emptySlideDraft();
+    const rec = value as Record<string, unknown>;
+    const draft = this.emptySlideDraft();
+    draft.image_url =
+      typeof rec['image_url'] === 'string'
+        ? String(rec['image_url']).trim()
+        : typeof rec['image'] === 'string'
+          ? String(rec['image']).trim()
+          : draft.image_url;
+    draft.alt = this.toLocalizedText(rec['alt']);
+    draft.headline = this.toLocalizedText(rec['headline']);
+    draft.subheadline = this.toLocalizedText(rec['subheadline']);
+    draft.cta_label = this.toLocalizedText(rec['cta_label']);
+    draft.cta_url = typeof rec['cta_url'] === 'string' ? String(rec['cta_url']).trim() : '';
+    draft.variant = rec['variant'] === 'full' ? 'full' : 'split';
+    draft.size = rec['size'] === 'S' || rec['size'] === 'L' ? (rec['size'] as any) : 'M';
+    draft.text_style = rec['text_style'] === 'light' ? 'light' : 'dark';
+    return draft;
+  }
+
+  private toCarouselSettingsDraft(value: unknown): CarouselSettingsDraft {
+    const rec = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+    const base = this.defaultCarouselSettings();
+    base.autoplay = rec['autoplay'] === true;
+    const interval = typeof rec['interval_ms'] === 'number' ? rec['interval_ms'] : Number(rec['interval_ms']);
+    base.interval_ms = Number.isFinite(interval) && interval > 0 ? Math.floor(interval) : base.interval_ms;
+    base.show_dots = rec['show_dots'] === false ? false : true;
+    base.show_arrows = rec['show_arrows'] === false ? false : true;
+    base.pause_on_hover = rec['pause_on_hover'] === false ? false : true;
+    return base;
+  }
+
+  private serializeSlideDraft(slide: SlideDraft): Record<string, unknown> {
+    return {
+      image_url: (slide.image_url || '').trim(),
+      alt: slide.alt,
+      headline: slide.headline,
+      subheadline: slide.subheadline,
+      cta_label: slide.cta_label,
+      cta_url: (slide.cta_url || '').trim(),
+      variant: slide.variant,
+      size: slide.size,
+      text_style: slide.text_style
+    };
+  }
+
+  private defaultCarouselSettings(): CarouselSettingsDraft {
+    return {
+      autoplay: false,
+      interval_ms: 5000,
+      show_dots: true,
+      show_arrows: true,
+      pause_on_hover: true
+    };
+  }
+
+  toPreviewSlide(slide: SlideDraft, lang: UiLang = this.homeBlocksLang): any {
+    const other: UiLang = lang === 'ro' ? 'en' : 'ro';
+    const pick = (text: LocalizedText | null | undefined): string => {
+      if (!text) return '';
+      const preferred = (text[lang] || '').trim();
+      if (preferred) return preferred;
+      return (text[other] || '').trim();
+    };
+    return {
+      image_url: (slide.image_url || '').trim(),
+      alt: pick(slide.alt) || null,
+      headline: pick(slide.headline) || null,
+      subheadline: pick(slide.subheadline) || null,
+      cta_label: pick(slide.cta_label) || null,
+      cta_url: (slide.cta_url || '').trim() || null,
+      variant: slide.variant,
+      size: slide.size,
+      text_style: slide.text_style
+    };
+  }
+
+  toPreviewSlides(slides: SlideDraft[], lang: UiLang = this.homeBlocksLang): any[] {
+    return (slides || []).map((s) => this.toPreviewSlide(s, lang));
+  }
+
   private isHomeSectionId(value: unknown): value is HomeSectionId {
     return (
-      value === 'hero' ||
       value === 'featured_products' ||
       value === 'sale_products' ||
       value === 'new_arrivals' ||
@@ -4811,7 +5770,6 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   private defaultHomeSections(): { id: HomeSectionId; enabled: boolean }[] {
     return [
-      { id: 'hero', enabled: true },
       { id: 'featured_products', enabled: true },
       { id: 'sale_products', enabled: false },
       { id: 'new_arrivals', enabled: true },
@@ -4833,7 +5791,10 @@ export class AdminComponent implements OnInit, OnDestroy {
       link_url: '',
       alt: this.emptyLocalizedText(),
       caption: this.emptyLocalizedText(),
-      images: []
+      images: [],
+      slide: this.emptySlideDraft(),
+      slides: [this.emptySlideDraft()],
+      settings: this.defaultCarouselSettings()
     };
   }
 
@@ -4848,7 +5809,13 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   isCustomHomeBlock(block: HomeBlockDraft): boolean {
-    return block.type === 'text' || block.type === 'image' || block.type === 'gallery';
+    return (
+      block.type === 'text' ||
+      block.type === 'image' ||
+      block.type === 'gallery' ||
+      block.type === 'banner' ||
+      block.type === 'carousel'
+    );
   }
 
   homeBlockLabel(block: HomeBlockDraft): string {
@@ -4963,6 +5930,60 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
+  setBannerSlideImage(blockKey: string, url: string): void {
+    const value = (url || '').trim();
+    if (!value) return;
+    this.homeBlocks = this.homeBlocks.map((b) => {
+      if (b.key !== blockKey || b.type !== 'banner') return b;
+      return { ...b, slide: { ...b.slide, image_url: value } };
+    });
+    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+  }
+
+  addCarouselSlide(blockKey: string): void {
+    this.homeBlocks = this.homeBlocks.map((b) => {
+      if (b.key !== blockKey || b.type !== 'carousel') return b;
+      return { ...b, slides: [...(b.slides || []), this.emptySlideDraft()] };
+    });
+  }
+
+  removeCarouselSlide(blockKey: string, idx: number): void {
+    this.homeBlocks = this.homeBlocks.map((b) => {
+      if (b.key !== blockKey || b.type !== 'carousel') return b;
+      const next = [...(b.slides || [])];
+      next.splice(idx, 1);
+      return { ...b, slides: next.length ? next : [this.emptySlideDraft()] };
+    });
+  }
+
+  moveCarouselSlide(blockKey: string, idx: number, delta: number): void {
+    this.homeBlocks = this.homeBlocks.map((b) => {
+      if (b.key !== blockKey || b.type !== 'carousel') return b;
+      const slides = [...(b.slides || [])];
+      const from = idx;
+      const to = idx + delta;
+      if (from < 0 || from >= slides.length) return b;
+      if (to < 0 || to >= slides.length) return b;
+      const [moved] = slides.splice(from, 1);
+      slides.splice(to, 0, moved);
+      return { ...b, slides };
+    });
+  }
+
+  setCarouselSlideImage(blockKey: string, idx: number, url: string): void {
+    const value = (url || '').trim();
+    if (!value) return;
+    this.homeBlocks = this.homeBlocks.map((b) => {
+      if (b.key !== blockKey || b.type !== 'carousel') return b;
+      const slides = [...(b.slides || [])];
+      const target = slides[idx];
+      if (!target) return b;
+      slides[idx] = { ...target, image_url: value };
+      return { ...b, slides };
+    });
+    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+  }
+
   loadSections(): void {
     this.admin.getContent('home.sections').subscribe({
       next: (block) => {
@@ -4994,7 +6015,14 @@ export class AdminComponent implements OnInit, OnDestroy {
             const enabled = enabledRaw === false ? false : true;
             const builtIn = this.normalizeHomeSectionId(typeRaw);
             const type: HomeBlockType | null =
-              builtIn || (typeRaw === 'text' || typeRaw === 'image' || typeRaw === 'gallery' ? (typeRaw as HomeBlockType) : null);
+              builtIn ||
+              (typeRaw === 'text' ||
+              typeRaw === 'image' ||
+              typeRaw === 'gallery' ||
+              typeRaw === 'banner' ||
+              typeRaw === 'carousel'
+                ? (typeRaw as HomeBlockType)
+                : null);
             if (!type) continue;
 
             if (builtIn) {
@@ -5030,6 +6058,16 @@ export class AdminComponent implements OnInit, OnDestroy {
                   });
                 }
               }
+            } else if (type === 'banner') {
+              draft.slide = this.toSlideDraft(rec['slide']);
+            } else if (type === 'carousel') {
+              const slidesRaw = rec['slides'];
+              const slides: SlideDraft[] = [];
+              if (Array.isArray(slidesRaw)) {
+                for (const slideRaw of slidesRaw) slides.push(this.toSlideDraft(slideRaw));
+              }
+              draft.slides = slides.length ? slides : [this.emptySlideDraft()];
+              draft.settings = this.toCarouselSettingsDraft(rec['settings']);
             }
             configured.push(draft);
           }
@@ -5096,6 +6134,13 @@ export class AdminComponent implements OnInit, OnDestroy {
       } else if (b.type === 'gallery') {
         base['title'] = b.title;
         base['images'] = b.images.map((img) => ({ url: img.url, alt: img.alt, caption: img.caption }));
+      } else if (b.type === 'banner') {
+        base['title'] = b.title;
+        base['slide'] = this.serializeSlideDraft(b.slide);
+      } else if (b.type === 'carousel') {
+        base['title'] = b.title;
+        base['slides'] = (b.slides || []).map((slide) => this.serializeSlideDraft(slide));
+        base['settings'] = b.settings;
       }
       return base;
     });

@@ -3,10 +3,12 @@ from app.models.user import (
     User,
     PasswordResetToken,
     RefreshSession,
+    UserSecurityEvent,
     UserUsernameHistory,
     UserDisplayNameHistory,
     AdminAuditLog,
 )  # noqa: F401
+from app.models.passkeys import UserPasskey  # noqa: F401
 from app.models.catalog import (
     Category,
     Product,
@@ -36,12 +38,21 @@ from app.models.coupons_v2 import (  # noqa: F401
 )
 from app.models.address import Address  # noqa: F401
 from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod, OrderEvent  # noqa: F401
-from app.models.content import ContentBlock, ContentBlockVersion, ContentStatus, ContentImage, ContentAuditLog, ContentBlockTranslation  # noqa: F401
+from app.models.content import (  # noqa: F401
+    ContentBlock,
+    ContentBlockVersion,
+    ContentStatus,
+    ContentImage,
+    ContentAuditLog,
+    ContentBlockTranslation,
+    ContentRedirect,
+)
 from app.models.wishlist import WishlistItem  # noqa: F401
 from app.models.webhook import StripeWebhookEvent  # noqa: F401
 from app.models.blog import BlogComment, BlogCommentFlag  # noqa: F401
 from app.models.fx import FxRate  # noqa: F401
 from app.models.notification import UserNotification  # noqa: F401
+from app.models.user_export import UserDataExportJob, UserDataExportStatus  # noqa: F401
 from app.models.support import ContactSubmission, ContactSubmissionMessage, ContactSubmissionStatus, ContactSubmissionTopic  # noqa: F401
 from app.models.returns import ReturnRequest, ReturnRequestItem, ReturnRequestStatus  # noqa: F401
 
@@ -50,9 +61,11 @@ __all__ = [
     "User",
     "PasswordResetToken",
     "RefreshSession",
+    "UserSecurityEvent",
     "UserUsernameHistory",
     "UserDisplayNameHistory",
     "AdminAuditLog",
+    "UserPasskey",
     "Category",
     "Product",
     "ProductImage",
@@ -88,12 +101,15 @@ __all__ = [
     "ContentImage",
     "ContentAuditLog",
     "ContentBlockTranslation",
+    "ContentRedirect",
     "WishlistItem",
     "StripeWebhookEvent",
     "BlogComment",
     "BlogCommentFlag",
     "FxRate",
     "UserNotification",
+    "UserDataExportJob",
+    "UserDataExportStatus",
     "ContactSubmission",
     "ContactSubmissionMessage",
     "ContactSubmissionStatus",

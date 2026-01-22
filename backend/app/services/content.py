@@ -1,9 +1,10 @@
 from datetime import datetime, timezone
 from uuid import UUID
 import re
+import unicodedata
 
 from fastapi import HTTPException, status
-from sqlalchemy import or_
+from sqlalchemy import or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -14,10 +15,91 @@ from app.models.content import (
     ContentBlockVersion,
     ContentBlockTranslation,
     ContentImage,
+    ContentRedirect,
     ContentStatus,
 )
 from app.schemas.content import ContentBlockCreate, ContentBlockUpdate
 from app.services import storage
+
+
+_RESERVED_PAGE_SLUGS = {
+    "about",
+    "account",
+    "admin",
+    "auth",
+    "blog",
+    "cart",
+    "checkout",
+    "contact",
+    "error",
+    "faq",
+    "home",
+    "login",
+    "pages",
+    "password-reset",
+    "products",
+    "receipt",
+    "register",
+    "shop",
+    "shipping",
+    "tickets",
+}
+
+_LOCKED_PAGE_SLUGS = {
+    "about",
+    "contact",
+    "faq",
+    "shipping",
+}
+
+
+def slugify_page_slug(value: str) -> str:
+    raw = (value or "").strip().lower()
+    if not raw:
+        return ""
+    normalized = unicodedata.normalize("NFKD", raw)
+    without_marks = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    cleaned = re.sub(r"[^a-z0-9]+", "-", without_marks)
+    cleaned = cleaned.strip("-")
+    cleaned = re.sub(r"-+", "-", cleaned)
+    return cleaned
+
+
+def _validate_page_slug(value: str) -> str:
+    slug = slugify_page_slug(value)
+    if not slug:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid page slug")
+    if slug in _RESERVED_PAGE_SLUGS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug is reserved")
+    return slug
+
+
+def validate_page_key_for_create(key: str) -> None:
+    value = (key or "").strip()
+    if not value.startswith("page."):
+        return
+    slug = value.split(".", 1)[1]
+    slug_norm = slugify_page_slug(slug)
+    if not slug_norm or f"page.{slug_norm}" != value:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid page slug")
+    if slug_norm in _RESERVED_PAGE_SLUGS and slug_norm not in _LOCKED_PAGE_SLUGS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug is reserved")
+
+
+async def resolve_redirect_key(session: AsyncSession, key: str, *, max_hops: int = 10) -> str:
+    current = (key or "").strip()
+    if not current:
+        return current
+    seen: set[str] = set()
+    for _ in range(max_hops):
+        if current in seen:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Invalid content redirect loop")
+        seen.add(current)
+        redirect = await session.scalar(select(ContentRedirect).where(ContentRedirect.from_key == current))
+        if not redirect:
+            return current
+        current = redirect.to_key
+    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Invalid content redirect chain")
 
 
 def _ensure_utc(dt: datetime | None) -> datetime | None:
@@ -65,6 +147,16 @@ async def get_published_by_key(session: AsyncSession, key: str, lang: str | None
     return block
 
 
+async def get_published_by_key_following_redirects(
+    session: AsyncSession,
+    key: str,
+    *,
+    lang: str | None = None,
+) -> ContentBlock | None:
+    resolved = await resolve_redirect_key(session, key)
+    return await get_published_by_key(session, resolved, lang=lang)
+
+
 async def get_block_by_key(session: AsyncSession, key: str, lang: str | None = None) -> ContentBlock | None:
     options = [
         selectinload(ContentBlock.images),
@@ -79,6 +171,66 @@ async def get_block_by_key(session: AsyncSession, key: str, lang: str | None = N
     return block
 
 
+async def rename_page_slug(
+    session: AsyncSession,
+    *,
+    old_slug: str,
+    new_slug: str,
+    actor_id: UUID | None = None,
+) -> tuple[str, str, str, str]:
+    old_norm = slugify_page_slug(old_slug)
+    if not old_norm:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
+
+    old_key = f"page.{old_norm}"
+    block = await session.scalar(select(ContentBlock).where(ContentBlock.key == old_key))
+    if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
+    if old_norm in _LOCKED_PAGE_SLUGS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This page URL cannot be changed")
+
+    new_norm = _validate_page_slug(new_slug)
+    if old_norm == new_norm:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="New page slug must be different")
+
+    new_key = f"page.{new_norm}"
+
+    existing = await session.scalar(select(ContentBlock.id).where(ContentBlock.key == new_key))
+    if existing:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug already exists")
+
+    reserved_by_redirect = await session.scalar(select(ContentRedirect.id).where(ContentRedirect.from_key == new_key))
+    if reserved_by_redirect:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug is reserved by a redirect")
+
+    resolved_target = await resolve_redirect_key(session, new_key)
+    if resolved_target == old_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug would create a redirect loop")
+
+    block.key = new_key
+    session.add(block)
+
+    await session.execute(update(ContentRedirect).where(ContentRedirect.to_key == old_key).values(to_key=new_key))
+    redirect = await session.scalar(select(ContentRedirect).where(ContentRedirect.from_key == old_key))
+    if redirect:
+        redirect.to_key = new_key
+    else:
+        session.add(ContentRedirect(from_key=old_key, to_key=new_key))
+
+    if actor_id is not None:
+        session.add(
+            ContentAuditLog(
+                content_block_id=block.id,
+                action=f"rename:{old_norm}->{new_norm}",
+                version=block.version,
+                user_id=actor_id,
+            )
+        )
+
+    await session.commit()
+    return old_norm, new_norm, old_key, new_key
+
+
 async def upsert_block(
     session: AsyncSession, key: str, payload: ContentBlockUpdate | ContentBlockCreate, actor_id: UUID | None = None
 ) -> ContentBlock:
@@ -91,6 +243,7 @@ async def upsert_block(
     lang = data.get("lang")
     published_at = _ensure_utc(data.get("published_at"))
     if not block:
+        validate_page_key_for_create(key)
         wants_published_at = None
         if data.get("status") == ContentStatus.published:
             wants_published_at = published_at or now

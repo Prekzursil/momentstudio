@@ -10,6 +10,7 @@
     "shop": "Shop",
     "about": "Our story",
     "contact": "Contact",
+    "page": "Page",
     "admin": "Admin",
     "viewAdmin": "View admin",
     "account": "Account",
@@ -83,6 +84,13 @@
     "header": {
       "signedInAs": "Signed in as"
     },
+    "nav": {
+      "sectionSelect": "Section"
+    },
+    "aria": {
+      "sectionSelect": "Account section selector",
+      "navigation": "Account navigation"
+    },
     "sections": {
       "overview": "Overview",
       "profile": "Profile",
@@ -92,26 +100,564 @@
       "comments": "My comments",
       "privacy": "Privacy & data"
     },
+    "loadError": "Unable to load account details right now.",
+    "signedOut": "Signed out",
+    "unsaved": {
+      "confirmDiscard": "You have unsaved changes. Discard them and leave?"
+    },
+    "verification": {
+      "sentStatus": "Verification email sent. Enter the token you received.",
+      "sentToast": "Verification email sent",
+      "resendIn": "Resend in {{seconds}}s",
+      "sendError": "Could not send verification email",
+      "tokenRequired": "Enter a verification token.",
+      "verifiedStatus": "Email verified",
+      "verifiedToast": "Email verified",
+      "invalidTokenStatus": "Invalid or expired token",
+      "invalidTokenToast": "Invalid or expired token"
+    },
+    "cooldowns": {
+      "username": "Username can be changed again in {{time}}.",
+      "displayName": "Display name can be changed again in {{time}}.",
+      "email": "Primary email can be changed again in {{time}}.",
+      "loadError": "Could not load cooldown information."
+    },
+    "profile": {
+      "savedToast": "Profile saved",
+      "completeness": "Profile completeness: {{completed}}/{{total}} ({{percent}}%)",
+      "publicLabel": "Public: {{value}}",
+      "actions": {
+        "save": "Save"
+      },
+      "sections": {
+        "publicIdentity": {
+          "title": "Public identity",
+          "copy": "How you appear in comments and other public activity."
+        },
+        "privateInfo": {
+          "title": "Private account info",
+          "copy": "Used for orders, support, and legal requirements."
+        }
+      },
+      "username": {
+        "helper": "Use this to sign in and as a stable handle in public activity.",
+        "passwordRequired": "Required to change your username."
+      },
+      "preview": {
+        "title": "Public preview",
+        "justNow": "just now",
+        "message": "Thanks for supporting my work!"
+      },
+      "settings": {
+        "preferredLanguage": "Preferred language",
+        "theme": "Theme"
+      },
+      "savedInline": "Saved.",
+      "history": {
+        "usernameTitle": "Username history",
+        "displayNameTitle": "Display name history",
+        "empty": "No history yet."
+      },
+      "sessionHint": "Session timeout: 30m. Your theme is saved on this device; language is saved to your profile when signed in.",
+      "errors": {
+        "displayNameRequired": "Display name is required.",
+        "firstNameRequired": "First name is required.",
+        "lastNameRequired": "Last name is required.",
+        "dobRequired": "Date of birth is required.",
+        "dobFuture": "Date of birth cannot be in the future.",
+        "saveError": "Could not save profile."
+      },
+      "avatar": {
+        "updated": "Avatar updated",
+        "uploadError": "Could not upload avatar.",
+        "googleError": "Could not use Google photo.",
+        "alt": "Avatar",
+        "previewAlt": "Avatar preview",
+        "upload": "Upload avatar",
+        "useGoogle": "Use Google photo",
+        "remove": "Remove",
+        "hint": "JPG/PNG/WebP up to 5MB",
+        "crop": {
+          "title": "Crop avatar",
+          "close": "Close",
+          "zoom": "Zoom",
+          "cancel": "Cancel",
+          "upload": "Upload",
+          "errors": {
+            "previewLoad": "Could not load image preview."
+          }
+        },
+        "removeConfirm": "Remove your avatar?",
+        "removed": "Avatar removed",
+        "removeError": "Could not remove avatar."
+      },
+      "aliases": {
+        "loadError": "Could not load your username/display name history."
+      },
+      "phone": {
+        "formattedPreview": "Preview: {{value}}",
+        "e164Preview": "Saved as: {{value}}"
+      }
+    },
+    "privacy": {
+      "title": "Privacy & data",
+      "export": {
+        "title": "Download my data",
+        "copy": "Export your profile, orders, wishlist, and blog activity as JSON.",
+        "notifyCopy": "We'll notify you when your export is ready.",
+        "ready": "Your export is ready.",
+        "readyWithExpiry": "Your export is ready. Expires {{date}}.",
+        "failedCopy": "Export failed. Please try again.",
+        "loadError": "Could not load export status.",
+        "startedToast": "Export started",
+        "startError": "Could not start export.",
+        "readyToast": "Export ready",
+        "actionGenerate": "Generate export",
+        "actionGenerating": "Generating…",
+        "actionDownload": "Download",
+        "actionDownloading": "Downloading…",
+        "actionRetry": "Retry",
+        "actionWorking": "Working…",
+        "status": {
+          "pending": "Queued",
+          "running": "Generating",
+          "succeeded": "Ready",
+          "failed": "Failed"
+        },
+        "downloaded": "Export downloaded",
+        "downloadError": "Could not download export."
+      },
+      "deletion": {
+        "title": "Delete account",
+        "scheduledBadge": "Scheduled",
+        "copy": "Requesting deletion schedules your account to be removed after {{hours}} hours.",
+        "scheduledFor": "Scheduled for {{date}}.",
+        "remaining": "Time remaining: {{time}}",
+        "cancelAction": "Cancel deletion",
+        "confirmCopy": "Type DELETE to confirm. You can cancel during the {{hours}}h cooldown window.",
+        "consequencesTitle": "Before you continue",
+        "consequences": {
+          "logout": "You'll be signed out from all devices.",
+          "anonymize": "Your personal data will be anonymized.",
+          "noAccess": "You will lose access to your account, orders, and coupons.",
+          "irreversible": "This action can't be undone once completed."
+        },
+        "confirmPlaceholder": "DELETE",
+        "confirmAria": "Confirm account deletion",
+        "passwordAria": "Confirm password for account deletion",
+        "requestAction": "Request deletion",
+        "loadError": "Could not load deletion status.",
+        "scheduled": "Deletion scheduled",
+        "requestError": "Could not request account deletion.",
+        "canceled": "Deletion canceled",
+        "cancelError": "Could not cancel account deletion."
+      }
+    },
+    "comments": {
+      "loadError": "Could not load your comments.",
+      "actions": {
+        "refresh": "Refresh",
+        "prev": "Prev",
+        "next": "Next"
+      },
+      "empty": {
+        "title": "No comments yet.",
+        "browse": "Browse the blog"
+      },
+      "status": {
+        "posted": "Posted",
+        "hidden": "Hidden",
+        "deleted": "Deleted"
+      },
+      "messages": {
+        "deleted": "This comment was deleted.",
+        "hidden": "This comment was hidden by moderators."
+      },
+      "replyingTo": "Replying to {{author}}",
+      "replies": {
+        "one": "reply",
+        "many": "replies"
+      },
+      "latest": "Latest: {{author}} — {{snippet}}",
+      "pageLabel": "Page {{page}} / {{total}}"
+    },
+    "security": {
+      "subtitle": "Manage password, emails, and connected accounts.",
+      "password": {
+        "title": "Password",
+        "copy": "Change your password to keep your account secure.",
+        "action": "Change password"
+      },
+      "twoFactor": {
+        "title": "Two-factor authentication",
+        "copy": "Protect your account with an authenticator app and recovery codes.",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "setupPasswordLabel": "Confirm password",
+        "setupAction": "Start setup",
+        "setupHint": "Add this account to your authenticator app, then enter a code to enable two-factor.",
+        "qrHint": "Scan this QR code with your authenticator app.",
+        "qrAlt": "Two-factor setup QR code.",
+        "secretLabel": "Secret",
+        "setupUrlLabel": "Setup URL",
+        "copySecret": "Copy secret",
+        "copyUrl": "Copy URL",
+        "codeLabel": "Verification code",
+        "enableAction": "Enable",
+        "recoveryTitle": "Recovery codes",
+        "recoveryCopy": "Save these codes somewhere safe. Each code can be used once.",
+        "recoveryRemaining": "{{count}} recovery code(s) remaining.",
+        "copyCodes": "Copy codes",
+        "copied": "Copied to clipboard.",
+        "managePasswordLabel": "Confirm password",
+        "manageCodeLabel": "Verification code or recovery code",
+        "regenerateAction": "Regenerate codes",
+        "regenerateConfirm": "Regenerate recovery codes? Old codes will stop working.",
+        "disableAction": "Disable",
+        "disableConfirm": "Disable two-factor authentication?",
+        "loadError": "Could not load two-factor status.",
+        "startError": "Could not start two-factor setup.",
+        "enableError": "Could not enable two-factor.",
+        "disableError": "Could not disable two-factor.",
+        "regenerateError": "Could not regenerate recovery codes."
+      },
+      "passkeys": {
+        "title": "Passkeys",
+        "copy": "Use biometrics or a device PIN to sign in without a password.",
+        "enabled": "Enabled",
+        "disabled": "Not set",
+        "notSupported": "Passkeys are not supported on this device.",
+        "none": "No passkeys yet.",
+        "defaultName": "Passkey",
+        "nameLabel": "Name (optional)",
+        "passwordLabel": "Confirm password",
+        "addAction": "Add passkey",
+        "added": "Passkey added",
+        "cancelled": "Passkey prompt cancelled.",
+        "removeConfirm": "Remove this passkey?",
+        "removed": "Passkey removed",
+        "created": "Created",
+        "lastUsed": "Last used",
+        "backedUp": "Backed up",
+        "loadError": "Could not load passkeys.",
+        "addError": "Could not add passkey.",
+        "removeError": "Could not remove passkey."
+      },
+      "emails": {
+        "title": "Emails",
+        "copy": "Manage the emails you can use to sign in.",
+        "primaryHint": "To change your primary email, add and verify another email, then make it primary (requires password).",
+        "googleWarning": "Google is linked. Unlink it below before switching primary email.",
+        "googleWarningLink": "Go to Google",
+        "addLabel": "Add email",
+        "addAction": "Add",
+        "primary": "Primary",
+        "secondary": "Secondary",
+        "resend": "Resend code",
+        "resendIn": "Resend in {{seconds}}s",
+        "makePrimary": "Make primary",
+        "confirmPassword": "Confirm password",
+        "verifyCode": "Verify code",
+        "verify": "Verify",
+        "loadError": "Could not load secondary emails.",
+        "enterEmail": "Enter an email address.",
+        "verificationSent": "Verification code sent. Enter it below to verify.",
+        "verificationResent": "Verification code resent.",
+        "verificationEmailSent": "Verification email sent",
+        "enterVerificationCode": "Enter the verification code.",
+        "verified": "Secondary email verified.",
+        "added": "Secondary email added",
+        "removed": "Secondary email removed",
+        "removeConfirm": "Remove this secondary email?",
+        "makePrimaryPasswordRequired": "Confirm your password to switch primary email.",
+        "primaryUpdated": "Primary email updated",
+        "addError": "Could not add secondary email.",
+        "resendError": "Could not resend verification email.",
+        "verifyError": "Could not verify secondary email.",
+        "removeError": "Could not remove secondary email.",
+        "primaryUpdateError": "Could not update primary email."
+      },
+      "status": {
+        "verified": "Verified",
+        "unverified": "Unverified"
+      },
+      "actions": {
+        "confirm": "Confirm",
+        "cancel": "Cancel",
+        "remove": "Remove"
+      },
+      "google": {
+        "profileAlt": "Google profile",
+        "title": "Google",
+        "none": "No Google account linked",
+        "passwordPlaceholder": "Confirm password",
+        "passwordAria": "Confirm password for Google account",
+        "link": "Link Google",
+        "unlink": "Unlink",
+        "copy": "Linking Google lets you sign in faster. We never post without permission.",
+        "passwordRequiredLink": "Enter your password to link Google.",
+        "startLinkError": "Could not start Google link flow.",
+        "passwordRequiredUnlink": "Enter your password to unlink Google.",
+        "unlinked": "Google account disconnected",
+        "unlinkError": "Could not unlink Google account."
+      },
+      "payment": {
+        "title": "Payment methods",
+        "addCard": "Add card",
+        "saveCard": "Save card",
+        "empty": "No cards saved yet.",
+        "enterDetails": "Enter card details:",
+        "card": "Card",
+        "exp": "exp",
+        "loadError": "Could not load payment methods.",
+        "stripeKeyMissing": "Stripe publishable key is not configured",
+        "stripeInitError": "Could not initialize Stripe.",
+        "setupIntentError": "Could not start card setup",
+        "cardErrorFallback": "Card error",
+        "formNotReady": "Card form is not ready.",
+        "saveCardError": "Could not save card",
+        "missingPaymentMethod": "Payment method missing from setup intent.",
+        "saved": "Card saved",
+        "attachError": "Could not attach payment method",
+        "removeConfirm": "Remove this payment method?",
+        "removed": "Payment method removed",
+        "removeError": "Could not remove payment method"
+      },
+      "devices": {
+        "title": "Devices",
+        "copy": "Review where you're signed in. If something looks unfamiliar, sign out of other devices.",
+        "action": "Sign out other devices",
+        "current": "This device",
+        "unknownDevice": "Unknown device",
+        "created": "Signed in",
+        "expires": "Expires",
+        "persistent": "Remembered",
+        "none": "No active sessions found.",
+        "loadError": "Could not load active sessions.",
+        "revokeConfirm": "Sign out of other devices?",
+        "revoked": "Signed out of {{count}} other device(s).",
+        "noneRevoked": "No other devices to sign out.",
+        "revokeError": "Could not sign out other devices."
+      },
+      "activity": {
+        "title": "Recent activity",
+        "copy": "Sign-ins and security changes for your account.",
+        "refresh": "Refresh",
+        "none": "No recent activity.",
+        "loadError": "Could not load security activity.",
+        "login_password": "Signed in with password",
+        "login_google": "Signed in with Google",
+        "email_changed": "Email changed",
+        "password_changed": "Password changed",
+        "password_reset": "Password reset",
+        "two_factor_setup_started": "Two-factor setup started",
+        "two_factor_enabled": "Two-factor enabled",
+        "two_factor_disabled": "Two-factor disabled",
+        "two_factor_recovery_regenerated": "Recovery codes regenerated",
+        "login_passkey": "Signed in with passkey",
+        "passkey_added": "Passkey added",
+        "passkey_removed": "Passkey removed",
+        "unknown": "Security event"
+      },
+      "session": {
+        "title": "Session",
+        "copy": "You will be logged out after inactivity to keep your account safe.",
+        "logoutNow": "Logout now",
+        "refresh": "Refresh session",
+        "refreshed": "Session refreshed",
+        "expired": "Session expired. Please sign in again.",
+        "refreshError": "Could not refresh session.",
+        "idleLogout": "You have been logged out due to inactivity."
+      }
+    },
+    "passwordChange": {
+      "title": "Change password",
+      "fields": {
+        "current": "Current password",
+        "new": "New password",
+        "confirm": "Confirm new password"
+      },
+      "actions": {
+        "update": "Update password",
+        "back": "Back to account"
+      },
+      "errors": {
+        "invalidForm": "Please complete the form.",
+        "mismatch": "Passwords do not match.",
+        "updateFailed": "Could not update password."
+      },
+      "toast": {
+        "updatedTitle": "Password updated",
+        "updatedDesc": "Your password has been changed."
+      }
+    },
     "overview": {
       "title": "Overview",
       "quickLinks": "Quick links",
+      "aria": {
+        "overview": "Account overview",
+        "ordersLoading": "Orders summary loading",
+        "addressesLoading": "Addresses summary loading",
+        "wishlistLoading": "Wishlist summary loading",
+        "notificationsLoading": "Notifications summary loading",
+        "securityLoading": "Security summary loading",
+        "supportLoading": "Support tickets summary loading"
+      },
       "wishlistHint": "Saved items ready for later.",
       "notificationsHint": "Control email updates.",
-      "securityHint": "Password, Google link, verification."
+      "securityHint": "Password, Google link, verification.",
+      "noOrders": "No orders yet",
+      "noOrdersCopy": "Your recent orders will appear here.",
+      "lastOrderLabel": "#{{ref}} · {{status}}",
+      "noAddresses": "No addresses yet",
+      "noAddressesCopy": "Add a shipping address for faster checkout.",
+      "savedAddressFallback": "Saved address",
+      "wishlistCountOne": "1 saved item",
+      "wishlistCountMany": "{{count}} saved items",
+      "notificationsAllOff": "All off",
+      "notificationsEnabled": "{{count}} enabled",
+      "security": {
+        "emailVerified": "Email verified",
+        "emailUnverified": "Email unverified",
+        "googleLinked": "Google linked",
+        "googleUnlinked": "Google unlinked"
+      },
+      "support": {
+        "title": "Support",
+        "hint": "View your ticket threads and replies.",
+        "none": "No tickets yet",
+        "noneCopy": "Your support threads will appear here.",
+        "openOne": "1 open ticket",
+        "openMany": "{{count}} open tickets",
+        "allResolved": "All resolved",
+        "loadError": "Could not load tickets.",
+        "loadErrorCopy": "Open your support inbox to see your threads."
+      }
     },
     "orders": {
       "shopNew": "Shop new",
       "statusLabel": "Status",
+      "searchLabel": "Search",
+      "searchPlaceholder": "Reference code",
+      "fromLabel": "From",
+      "toLabel": "To",
+      "applyFilters": "Apply",
+      "clearFilters": "Clear",
+      "orderLabel": "Order #{{ref}}",
+      "itemsCount": {
+        "one": "1 item",
+        "many": "{{count}} items"
+      },
+      "updated": "Updated {{date}}",
+      "trackingLabel": "Tracking",
+      "trackingNotAvailable": "Not available",
+      "shippingLabel": "Shipping",
+      "deliveryLabel": "Delivery",
+      "lockerLabel": "Locker",
+      "itemsTitle": "Items",
+      "qtyLabel": "Qty {{count}}",
+      "totalsTitle": "Totals",
+      "vatLabel": "VAT",
+      "additionalLabel": "Additional",
+      "totalLabel": "Total",
+      "actionsTitle": "Actions",
+      "pageLabel": "Page {{page}} / {{total}}",
+      "prev": "Prev",
+      "next": "Next",
       "empty": "No orders yet.",
+      "loadError": "Could not load your orders.",
+      "invalidDateRange": "Invalid date range.",
+      "trackingStatusLabel": "Tracking status",
+      "trackingStatus": {
+        "inTransit": "In transit",
+        "delivered": "Delivered"
+      },
+      "return": {
+        "open": "Request return",
+        "requested": "Return requested",
+        "title": "Return",
+        "hint": "Select quantities and tell us why you want to return these items.",
+        "cancel": "Cancel",
+        "reasonLabel": "Reason",
+        "reasonPh": "Tell us why you want to return these items…",
+        "messageLabel": "Message (optional)",
+        "messagePh": "Anything we should know? (optional)…",
+        "itemsLabel": "Items",
+        "qtyLabel": "Return quantity",
+        "submit": "Submit request",
+        "success": "Return request submitted.",
+        "errors": {
+          "notEligible": "This order isn't eligible for returns yet.",
+          "alreadyExists": "A return request already exists for this order.",
+          "reasonRequired": "Reason is required.",
+          "itemsRequired": "Select at least one item to return.",
+          "invalidQuantity": "Invalid quantity selected.",
+          "create": "Could not submit return request."
+        }
+      },
+      "cancel": {
+        "open": "Request cancellation",
+        "requested": "Cancellation requested",
+        "title": "Cancellation",
+        "hint": "Tell us why you want to cancel this order. We'll review it as soon as possible.",
+        "close": "Close",
+        "reasonLabel": "Reason",
+        "reasonPh": "Tell us why you want to cancel…",
+        "submit": "Send request",
+        "confirm": "Request cancellation for order #{{ref}}?",
+        "success": "Cancellation request sent.",
+        "errors": {
+          "notEligible": "This order can't be cancelled anymore.",
+          "reasonRequired": "Reason is required.",
+          "alreadyRequested": "You already requested cancellation for this order.",
+          "create": "Could not send cancellation request."
+        }
+      },
       "browse": "Browse products",
       "reorder": "Reorder",
+      "reorderSuccess": "Added items to cart",
+      "reorderError": "Could not reorder.",
       "receiptPdf": "Receipt (PDF)",
       "receiptShare": "Share receipt",
-      "receiptRevoke": "Revoke share"
+      "receiptRevoke": "Revoke share",
+      "receiptDownloadError": "Could not download receipt.",
+      "receiptCopied": "Receipt link copied",
+      "receiptReady": "Receipt link ready",
+      "receiptGenerated": "Receipt link generated",
+      "receiptGenerateError": "Could not generate receipt link.",
+      "receiptRevokeConfirm": "Revoke previously shared receipt links for this order?",
+      "receiptRevoked": "Receipt links revoked",
+      "receiptRevokeError": "Could not revoke receipt links.",
+      "refund": {
+        "manualRequiredTitle": "Refund pending",
+        "manualRequiredCopy": "This order was cancelled after payment was captured. Our team will process a refund manually.",
+        "manualRequiredHint": "If you have questions, contact support.",
+        "contact": "Contact support"
+      },
+      "delivery": {
+        "home": "Home delivery",
+        "locker": "Locker pickup"
+      }
     },
     "wishlist": {
       "browse": "Browse products",
-      "empty": "No saved items yet."
+      "empty": "No saved items yet.",
+      "selectAll": "Select all",
+      "selectedCount": "{{count}} selected",
+      "addSelectedToCart": "Add selected to cart",
+      "removeSelected": "Remove selected",
+      "clearSelection": "Clear",
+      "backInStock": "Back in stock",
+      "outOfStock": "Now out of stock",
+      "priceUp": "Price +",
+      "priceDown": "Price -",
+      "confirm": {
+        "removeSelected": "Remove selected items from your wishlist?"
+      },
+      "messages": {
+        "addedToCart": "Added to cart",
+        "removedSelected": "Removed from wishlist"
+      }
     },
     "coupons": {
       "coupon": "Coupon",
@@ -135,12 +681,38 @@
     "addresses": {
       "add": "Add address",
       "empty": "No addresses yet.",
+      "loadError": "Could not load your addresses.",
       "defaultShipping": "Default shipping",
       "defaultBilling": "Default billing",
       "makeDefaultShipping": "Make default shipping",
       "makeDefaultBilling": "Make default billing",
       "edit": "Edit",
-      "delete": "Delete"
+      "duplicate": "Duplicate",
+      "delete": "Delete",
+      "labels": {
+        "address": "Address",
+        "home": "Home",
+        "work": "Work",
+        "other": "Other",
+        "custom": "Custom"
+      },
+      "messages": {
+        "updated": "Address updated",
+        "added": "Address added",
+        "removed": "Address removed",
+        "defaultShippingUpdated": "Default shipping updated",
+        "defaultBillingUpdated": "Default billing updated"
+      },
+      "confirm": {
+        "remove": "Remove this address?"
+      },
+      "errors": {
+        "update": "Could not update address.",
+        "add": "Could not add address.",
+        "remove": "Could not remove address.",
+        "defaultShipping": "Could not update default shipping.",
+        "defaultBilling": "Could not update default billing."
+      }
     },
     "completeProfile": {
       "title": "Complete your profile",
@@ -153,9 +725,11 @@
       "lastUpdated": "Last updated: {{date}}",
       "showPreview": "Show preview",
       "hidePreview": "Hide preview",
-      "communityHeading": "Community",
-      "adminHeading": "Admin alerts",
-      "marketingHeading": "Marketing",
+      "transactionalTitle": "Transactional (always on)",
+      "transactionalCopy": "Order updates and security emails are always sent. Preferences below only affect optional community/admin and marketing emails.",
+      "communityHeading": "Community (optional)",
+      "adminHeading": "Admin alerts (optional)",
+      "marketingHeading": "Marketing (optional)",
       "replyLabel": "Email me when someone replies to my blog comment.",
       "adminLabel": "Email me when new blog comments are posted (admin).",
       "marketingLabel": "Email me occasional product updates and news.",
@@ -280,7 +854,9 @@
     "searchPlaceholder": "Search products",
     "search": "Search",
     "categories": "Categories",
+    "subcategories": "Subcategories",
     "sale": "On sale",
+    "all": "All",
     "allCategories": "All categories",
     "priceRange": "Price range",
     "ariaMinPrice": "Minimum price",
@@ -357,6 +933,13 @@
     "title": "Checkout",
     "retry": "Retry",
     "addressRequired": "Please complete all required fields.",
+    "countryInvalid": "Please select a valid country.",
+    "savedAddressesTitle": "Saved addresses",
+    "manageAddresses": "Manage",
+    "savedShippingAddress": "Shipping address",
+    "savedBillingAddress": "Billing address",
+    "savedAddressSelect": "Select an address",
+    "savedAddressesLoadError": "Could not load saved addresses.",
     "paymentNotReady": "Payment not initialized yet. Please wait.",
     "paymentFailed": "Payment failed.",
     "paymentConfirmError": "Payment confirmation failed. Please try again.",
@@ -448,7 +1031,9 @@
     "couponsLoadError": "Could not load coupons.",
     "availableCoupons": "Available coupons",
     "unavailableCoupons": "Unavailable coupons",
+    "bestCouponTitle": "Best coupon for this cart",
     "couponNotEligible": "Coupon not eligible",
+    "couponMinSubtotalRemaining": "Add {{amount}} RON more to reach the {{min}} RON minimum subtotal.",
     "couponReasons": {
       "inactive": "Inactive",
       "not_started": "Not started yet",
@@ -526,6 +1111,10 @@
     "errorRegister": "Unable to register. Please try again.",
     "errorReset": "Unable to reset password. Please try again.",
     "orContinue": "Or continue with",
+    "passkeyContinue": "Continue with passkey",
+    "passkeyNotSupported": "Passkeys are not supported on this device.",
+    "passkeyCancelled": "Passkey prompt cancelled.",
+    "passkeyError": "Could not sign in with passkey. Please try again.",
     "googleContinue": "Continue with Google",
     "googleError": "Google sign-in failed. Please try again.",
     "googleFinishing": "Finishing Google sign-in...",
@@ -543,7 +1132,15 @@
     "captchaUnavailable": "CAPTCHA unavailable.",
     "captchaFailedTryAgain": "CAPTCHA failed. Please try again.",
     "captchaFailedLoad": "CAPTCHA failed to load.",
-    "currentPasswordRequired": "Current password is required to change your username."
+    "currentPasswordRequired": "Current password is required to change your username.",
+    "twoFactorRequired": "Two-factor verification required.",
+    "twoFactorTitle": "Two-factor verification",
+    "twoFactorCopy": "Enter the code from your authenticator app (or a recovery code).",
+    "twoFactorCodeLabel": "Verification code",
+    "twoFactorSubmit": "Verify",
+    "twoFactorBack": "Back to login",
+    "twoFactorInvalid": "Invalid verification code.",
+    "twoFactorMissing": "Two-factor session missing. Please sign in again."
   },
   "theme": {
     "switched": "Theme updated",
@@ -555,6 +1152,7 @@
   "validation": {
     "required": "This field is required.",
     "invalidEmail": "Enter a valid email address.",
+    "invalidPostal": "Enter a valid postal code.",
     "usernameInvalid": "Username must be 3–30 characters and may include letters, numbers, '.', '_', '-'.",
     "passwordMin": "Password must be at least 6 characters.",
     "passwordMismatch": "Passwords do not match.",
@@ -562,11 +1160,18 @@
   },
   "addressForm": {
     "label": "Label",
+    "customLabelPlaceholder": "Custom label",
     "line1": "Address line 1",
     "line2": "Address line 2",
     "defaultShipping": "Set as default shipping",
     "defaultBilling": "Set as default billing",
     "useAsBillingToo": "Use as billing too",
+    "postalHint": "Example: {{example}}",
+    "autocomplete": {
+      "label": "Search address (optional)",
+      "placeholder": "Start typing your address…",
+      "poweredBy": "Suggestions from OpenStreetMap"
+    },
     "cancel": "Cancel",
     "save": "Save"
   },
@@ -612,12 +1217,15 @@
       "cancel": "Cancel",
       "retry": "Retry",
       "edit": "Edit",
+      "changeUrl": "Change URL",
       "refresh": "Refresh",
       "search": "Search",
       "copy": "Copy",
       "use": "Use",
       "prev": "Prev",
-      "next": "Next"
+      "next": "Next",
+      "up": "Up",
+      "down": "Down"
     },
     "support": {
       "title": "Support inbox",
@@ -849,13 +1457,34 @@
         "builder": {
           "title": "Page builder blocks",
           "hint": "Optional: build richer About/Contact pages with blocks. If blocks are present, the storefront renders them instead of the Markdown body.",
+          "newPageTitle": "New page title",
+          "status": "Status",
+          "createPage": "Create page",
           "page": "Page",
+          "changeUrlPrompt": "New URL (slug) for this page",
+          "changeUrlConfirm": "Change URL from /pages/{{old}} to /pages/{{next}}? Existing links will redirect.",
           "addBlock": "Add block",
-          "success": { "save": "Blocks saved." },
-          "errors": { "save": "Could not save blocks." }
+          "success": { "save": "Blocks saved.", "rename": "Page URL updated (redirect created)." },
+          "errors": { "load": "Could not load page blocks.", "save": "Could not save blocks.", "rename": "Could not change page URL." }
         },
-        "success": { "save": "Content saved." },
-        "errors": { "save": "Could not save content." }
+        "redirects": {
+          "title": "Redirects",
+          "hint": "Created automatically when changing a page URL. Stale redirects point to missing content.",
+          "search": "Search redirects",
+          "empty": "No redirects found.",
+          "stale": "Stale redirect: target page no longer exists.",
+          "deleteConfirm": "Delete this redirect?",
+          "success": { "deleted": "Redirect deleted." },
+          "errors": { "load": "Could not load redirects.", "delete": "Could not delete redirect." }
+        },
+        "success": { "save": "Content saved.", "created": "Page created." },
+        "errors": {
+          "load": "Could not load pages.",
+          "save": "Could not save content.",
+          "create": "Could not create page.",
+          "reservedTitle": "Reserved URL",
+          "reservedCopy": "Please choose a different title."
+        }
       }
     },
     "home": {
@@ -890,7 +1519,9 @@
           "why": "Why",
           "text": "Text",
           "image": "Image",
-          "gallery": "Gallery"
+          "gallery": "Gallery",
+          "banner": "Banner",
+          "carousel": "Carousel"
         },
         "enabled": "Enabled",
         "drag": "drag",
@@ -904,7 +1535,30 @@
           "caption": "Caption (optional)",
           "gallery": "Gallery images",
           "galleryEmpty": "No images yet. Add one to display this block.",
-          "image": "Image"
+          "image": "Image",
+          "variant": "Layout",
+          "size": "Size",
+          "textStyle": "Text style",
+          "slides": "Slides",
+          "slide": "Slide",
+          "autoplay": "Autoplay",
+          "interval": "Interval (ms)",
+          "arrows": "Arrows",
+          "dots": "Dots",
+          "pauseOnHover": "Pause on hover"
+        },
+        "variants": {
+          "split": "Split",
+          "full": "Full width"
+        },
+        "sizes": {
+          "s": "Small",
+          "m": "Medium",
+          "l": "Large"
+        },
+        "textStyle": {
+          "dark": "Dark text",
+          "light": "Light text"
         },
         "success": {
           "save": "Sections order saved."
@@ -1232,6 +1886,8 @@
       "add": "Add category",
       "slug": "Slug",
       "slugAutoHint": "Slug is auto-generated from the name.",
+      "parent": "Parent category",
+      "parentNone": "No parent",
       "description": "Description",
       "translations": {
         "button": "Translations",
@@ -1251,12 +1907,14 @@
       "success": {
         "add": "Category added",
         "delete": "Category deleted",
-        "reorder": "Category order saved"
+        "reorder": "Category order saved",
+        "updateParent": "Category parent updated"
       },
       "errors": {
         "add": "Failed to add category",
         "delete": "Failed to delete category",
-        "reorder": "Failed to reorder categories"
+        "reorder": "Failed to reorder categories",
+        "updateParent": "Failed to update category parent"
       }
     },
     "orders": {

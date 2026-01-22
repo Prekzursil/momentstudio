@@ -14,6 +14,9 @@ class Category(Base):
     __tablename__ = "categories"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("categories.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     slug: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -28,6 +31,8 @@ class Category(Base):
         nullable=False,
     )
 
+    parent: Mapped["Category | None"] = relationship("Category", remote_side=[id], back_populates="children")
+    children: Mapped[list["Category"]] = relationship("Category", back_populates="parent")
     products: Mapped[list["Product"]] = relationship("Product", back_populates="category")
     translations: Mapped[list["CategoryTranslation"]] = relationship(
         "CategoryTranslation", back_populates="category", cascade="all, delete-orphan", lazy="selectin"

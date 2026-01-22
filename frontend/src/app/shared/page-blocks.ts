@@ -1,6 +1,22 @@
 export type UiLang = 'en' | 'ro';
 
-export type PageBlockType = 'text' | 'image' | 'gallery';
+export type PageBlockType = 'text' | 'image' | 'gallery' | 'banner' | 'carousel';
+
+export type SlideVariant = 'full' | 'split';
+export type SlideSize = 'S' | 'M' | 'L';
+export type SlideTextStyle = 'light' | 'dark';
+
+export interface Slide {
+  image_url: string;
+  alt?: string | null;
+  headline?: string | null;
+  subheadline?: string | null;
+  cta_label?: string | null;
+  cta_url?: string | null;
+  variant: SlideVariant;
+  size: SlideSize;
+  text_style: SlideTextStyle;
+}
 
 export interface PageBlockBase {
   key: string;
@@ -33,7 +49,26 @@ export interface PageGalleryBlock extends PageBlockBase {
   images: PageGalleryImage[];
 }
 
-export type PageBlock = PageTextBlock | PageImageBlock | PageGalleryBlock;
+export interface PageBannerBlock extends PageBlockBase {
+  type: 'banner';
+  slide: Slide;
+}
+
+export interface CarouselSettings {
+  autoplay: boolean;
+  interval_ms: number;
+  show_dots: boolean;
+  show_arrows: boolean;
+  pause_on_hover: boolean;
+}
+
+export interface PageCarouselBlock extends PageBlockBase {
+  type: 'carousel';
+  slides: Slide[];
+  settings: CarouselSettings;
+}
+
+export type PageBlock = PageTextBlock | PageImageBlock | PageGalleryBlock | PageBannerBlock | PageCarouselBlock;
 
 function readLocalized(value: unknown, lang: UiLang): string | null {
   if (typeof value === 'string') return value.trim() || null;
@@ -54,6 +89,94 @@ function ensureUniqueKey(value: unknown, fallback: string, existing: Set<string>
   return key;
 }
 
+function readString(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function readBoolean(value: unknown, fallback = false): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on') return true;
+    if (normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off') return false;
+  }
+  return fallback;
+}
+
+function readNumber(value: unknown, fallback: number): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value.trim());
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
+
+function normalizeVariant(value: unknown): SlideVariant {
+  const raw = readString(value);
+  return raw === 'full' ? 'full' : 'split';
+}
+
+function normalizeSize(value: unknown): SlideSize {
+  const raw = readString(value);
+  if (raw === 'S' || raw === 'M' || raw === 'L') return raw;
+  if (raw) {
+    const normalized = raw.trim().toLowerCase();
+    if (normalized === 's' || normalized === 'small') return 'S';
+    if (normalized === 'l' || normalized === 'large') return 'L';
+  }
+  return 'M';
+}
+
+function normalizeTextStyle(value: unknown): SlideTextStyle {
+  const raw = readString(value);
+  return raw === 'light' ? 'light' : 'dark';
+}
+
+function parseSlide(raw: unknown, lang: UiLang): Slide | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const rec = raw as Record<string, unknown>;
+
+  const imageUrl = readString(rec['image_url']) || readString(rec['image']) || '';
+  const headline = readLocalized(rec['headline'], lang);
+  const subheadline = readLocalized(rec['subheadline'], lang);
+  const ctaLabel = readLocalized(rec['cta_label'], lang);
+  const ctaUrl = readString(rec['cta_url']);
+
+  const alt = readLocalized(rec['alt'], lang);
+  const variant = normalizeVariant(rec['variant']);
+  const size = normalizeSize(rec['size']);
+  const textStyle = normalizeTextStyle(rec['text_style']);
+
+  const hasContent = Boolean(imageUrl || headline || subheadline || ctaLabel);
+  if (!hasContent) return null;
+
+  return {
+    image_url: imageUrl,
+    alt,
+    headline,
+    subheadline,
+    cta_label: ctaLabel,
+    cta_url: ctaUrl,
+    variant,
+    size,
+    text_style: textStyle
+  };
+}
+
+function parseCarouselSettings(raw: unknown): CarouselSettings {
+  const rec = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const autoplay = readBoolean(rec['autoplay'], false);
+  const intervalMs = Math.max(1000, readNumber(rec['interval_ms'], 5000));
+  const showDots = readBoolean(rec['show_dots'], true);
+  const showArrows = readBoolean(rec['show_arrows'], true);
+  const pauseOnHover = readBoolean(rec['pause_on_hover'], true);
+  return { autoplay, interval_ms: intervalMs, show_dots: showDots, show_arrows: showArrows, pause_on_hover: pauseOnHover };
+}
+
 export function parsePageBlocks(
   meta: Record<string, unknown> | null | undefined,
   lang: UiLang,
@@ -70,7 +193,9 @@ export function parsePageBlocks(
     const rec = raw as Record<string, unknown>;
     const typeRaw = typeof rec['type'] === 'string' ? String(rec['type']).trim() : '';
     const enabled = rec['enabled'] === false ? false : true;
-    if (typeRaw !== 'text' && typeRaw !== 'image' && typeRaw !== 'gallery') continue;
+    if (typeRaw !== 'text' && typeRaw !== 'image' && typeRaw !== 'gallery' && typeRaw !== 'banner' && typeRaw !== 'carousel') {
+      continue;
+    }
     if (!enabled) continue;
 
     const key = ensureUniqueKey(rec['key'], `${typeRaw}_${idx + 1}`, seenKeys);
@@ -104,6 +229,40 @@ export function parsePageBlocks(
         caption: readLocalized(rec['caption'], lang),
         link_url: linkUrl || null
       } satisfies PageImageBlock);
+      continue;
+    }
+
+    if (typeRaw === 'banner') {
+      const slide = parseSlide(rec['slide'], lang);
+      if (!slide) continue;
+      blocks.push({
+        key,
+        type: 'banner',
+        enabled: true,
+        title,
+        slide
+      } satisfies PageBannerBlock);
+      continue;
+    }
+
+    if (typeRaw === 'carousel') {
+      const slidesRaw = rec['slides'];
+      const slides: Slide[] = [];
+      if (Array.isArray(slidesRaw)) {
+        for (const slideRaw of slidesRaw) {
+          const slide = parseSlide(slideRaw, lang);
+          if (slide) slides.push(slide);
+        }
+      }
+      if (!slides.length) continue;
+      blocks.push({
+        key,
+        type: 'carousel',
+        enabled: true,
+        title,
+        slides,
+        settings: parseCarouselSettings(rec['settings'])
+      } satisfies PageCarouselBlock);
       continue;
     }
 
@@ -151,6 +310,19 @@ export function pageBlocksToPlainText(blocks: PageBlock[]): string {
     if (block.type === 'gallery') {
       for (const img of block.images) {
         if (img.caption) parts.push(img.caption);
+      }
+    }
+    if (block.type === 'banner') {
+      const slide = block.slide;
+      if (slide.headline) parts.push(slide.headline);
+      if (slide.subheadline) parts.push(slide.subheadline);
+      if (slide.cta_label) parts.push(slide.cta_label);
+    }
+    if (block.type === 'carousel') {
+      for (const slide of block.slides) {
+        if (slide.headline) parts.push(slide.headline);
+        if (slide.subheadline) parts.push(slide.subheadline);
+        if (slide.cta_label) parts.push(slide.cta_label);
       }
     }
   }

@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 
 import { AccountComponent } from './account.component';
@@ -15,6 +15,8 @@ import { WishlistService } from '../../core/wishlist.service';
 import { ThemeService } from '../../core/theme.service';
 import { LanguageService } from '../../core/language.service';
 import { CartStore } from '../../core/cart.store';
+import { CouponsService } from '../../core/coupons.service';
+import { NotificationsService } from '../../core/notifications.service';
 
 describe('AccountComponent', () => {
   let toast: jasmine.SpyObj<ToastService>;
@@ -23,6 +25,8 @@ describe('AccountComponent', () => {
   let blog: jasmine.SpyObj<BlogService>;
   let api: jasmine.SpyObj<ApiService>;
   let wishlist: any;
+  let coupons: jasmine.SpyObj<CouponsService>;
+  let notifications: any;
   let theme: any;
   let lang: any;
   let cart: jasmine.SpyObj<CartStore>;
@@ -85,6 +89,7 @@ describe('AccountComponent', () => {
   ];
 
   beforeEach(() => {
+    localStorage.removeItem('account.lastSection');
     toast = jasmine.createSpyObj<ToastService>('ToastService', ['success', 'error', 'info']);
     auth = jasmine.createSpyObj<AuthService>('AuthService', [
       'isAuthenticated',
@@ -107,6 +112,7 @@ describe('AccountComponent', () => {
       'getProfile',
       'getAddresses',
       'getOrders',
+      'getOrdersPage',
       'getDeletionStatus',
       'requestAccountDeletion',
       'cancelAccountDeletion',
@@ -119,6 +125,12 @@ describe('AccountComponent', () => {
     account.getProfile.and.returnValue(of(profile as any));
     account.getAddresses.and.returnValue(of(addresses));
     account.getOrders.and.returnValue(of(orders));
+    account.getOrdersPage.and.returnValue(
+      of({
+        items: orders,
+        meta: { total_items: orders.length, total_pages: 1, page: 1, limit: 5, pending_count: 0 }
+      } as any)
+    );
     account.getDeletionStatus.and.returnValue(of({ requested_at: null, scheduled_for: null, deleted_at: null, cooldown_hours: 24 }));
     account.reorderOrder.and.returnValue(of({}));
     account.downloadReceipt.and.returnValue(of(new Blob(['pdf'], { type: 'application/pdf' })));
@@ -135,6 +147,7 @@ describe('AccountComponent', () => {
     ];
     wishlist = {
       items: () => wishlistItems,
+      isLoaded: jasmine.createSpy('isLoaded').and.returnValue(true),
       ensureLoaded: jasmine.createSpy('ensureLoaded'),
       isWishlisted: jasmine.createSpy('isWishlisted').and.returnValue(true),
       add: jasmine.createSpy('add').and.returnValue(of(wishlistItems[0])),
@@ -143,6 +156,14 @@ describe('AccountComponent', () => {
       removeLocal: jasmine.createSpy('removeLocal'),
       refresh: jasmine.createSpy('refresh'),
       clear: jasmine.createSpy('clear')
+    };
+
+    coupons = jasmine.createSpyObj<CouponsService>('CouponsService', ['myCoupons', 'eligibility', 'validate']);
+    coupons.myCoupons.and.returnValue(of([] as any));
+
+    notifications = {
+      unreadCount: () => 0,
+      refreshUnreadCount: jasmine.createSpy('refreshUnreadCount')
     };
 
     const modeSig = signal<'light' | 'dark'>('light');
@@ -169,11 +190,30 @@ describe('AccountComponent', () => {
         { provide: BlogService, useValue: blog },
         { provide: ApiService, useValue: api },
         { provide: WishlistService, useValue: wishlist },
+        { provide: CouponsService, useValue: coupons },
+        { provide: NotificationsService, useValue: notifications },
         { provide: ThemeService, useValue: theme },
         { provide: LanguageService, useValue: lang },
         { provide: CartStore, useValue: cart }
       ]
     });
+
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation(
+      'en',
+      {
+        account: {
+          overview: {
+            lastOrderLabel: '#{{ref}} · {{status}}',
+            wishlistCountOne: '1 saved item',
+            wishlistCountMany: '{{count}} saved items'
+          }
+        }
+      },
+      true
+    );
+    translate.setDefaultLang('en');
+    void translate.use('en');
   });
 
   it('computes overview summaries from last order and default shipping address', () => {
@@ -183,7 +223,7 @@ describe('AccountComponent', () => {
     fixture.detectChanges();
 
     expect(account.getProfile).toHaveBeenCalled();
-    expect(wishlist.refresh).toHaveBeenCalled();
+    expect(wishlist.ensureLoaded).toHaveBeenCalled();
 
     expect(cmp.lastOrderLabel()).toContain('#REF123');
     expect(cmp.lastOrderLabel()).toContain('shipped');

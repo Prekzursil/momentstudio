@@ -1,9 +1,11 @@
 from datetime import datetime, date
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.user import UserRole
+from app.models.user_export import UserDataExportStatus
 
 
 class TokenPair(BaseModel):
@@ -41,6 +43,7 @@ class UserResponse(BaseModel):
     notify_blog_comments: bool = False
     notify_blog_comment_replies: bool = False
     notify_marketing: bool = False
+    two_factor_enabled: bool = False
     google_sub: str | None = None
     google_email: str | None = None
     google_picture_url: str | None = None
@@ -59,6 +62,50 @@ class GoogleCallbackResponse(BaseModel):
     tokens: TokenPair | None = None
     requires_completion: bool = False
     completion_token: str | None = None
+    requires_two_factor: bool = False
+    two_factor_token: str | None = None
+
+
+class TwoFactorChallengeResponse(BaseModel):
+    user: UserResponse
+    requires_two_factor: bool = True
+    two_factor_token: str
+
+
+class TwoFactorSetupResponse(BaseModel):
+    secret: str
+    otpauth_url: str
+
+
+class TwoFactorStatusResponse(BaseModel):
+    enabled: bool
+    confirmed_at: datetime | None = None
+    recovery_codes_remaining: int = 0
+
+
+class TwoFactorEnableResponse(BaseModel):
+    recovery_codes: list[str]
+
+
+class PasskeyResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str | None = None
+    created_at: datetime
+    last_used_at: datetime | None = None
+    device_type: str | None = None
+    backed_up: bool = False
+
+
+class PasskeyRegistrationOptionsResponse(BaseModel):
+    registration_token: str
+    options: dict[str, Any]
+
+
+class PasskeyAuthenticationOptionsResponse(BaseModel):
+    authentication_token: str
+    options: dict[str, Any]
 
 
 class PasswordResetRequest(BaseModel):
@@ -107,3 +154,39 @@ class AccountDeletionStatus(BaseModel):
     scheduled_for: datetime | None = None
     deleted_at: datetime | None = None
     cooldown_hours: int
+
+
+class UserDataExportJobResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    status: UserDataExportStatus
+    progress: int = 0
+    error_message: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    expires_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class RefreshSessionResponse(BaseModel):
+    id: UUID
+    created_at: datetime
+    expires_at: datetime
+    persistent: bool
+    is_current: bool = False
+    user_agent: str | None = None
+    ip_address: str | None = None
+
+
+class RefreshSessionsRevokeResponse(BaseModel):
+    revoked: int
+
+
+class UserSecurityEventResponse(BaseModel):
+    id: UUID
+    event_type: str
+    created_at: datetime
+    user_agent: str | None = None
+    ip_address: str | None = None

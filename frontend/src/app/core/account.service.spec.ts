@@ -32,13 +32,13 @@ describe('AccountService', () => {
   });
 
   it('requestAccountDeletion posts confirm text', () => {
-    service.requestAccountDeletion('DELETE').subscribe((resp) => {
+    service.requestAccountDeletion('DELETE', 'supersecret').subscribe((resp) => {
       expect(resp.cooldown_hours).toBe(24);
     });
 
     const req = httpMock.expectOne('/api/v1/auth/me/delete');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ confirm: 'DELETE' });
+    expect(req.request.body).toEqual({ confirm: 'DELETE', password: 'supersecret' });
     req.flush({ requested_at: null, scheduled_for: '2030-01-01T00:00:00+00:00', deleted_at: null, cooldown_hours: 24 });
   });
 

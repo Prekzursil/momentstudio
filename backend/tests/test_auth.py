@@ -1,5 +1,8 @@
+import base64
 import asyncio
 from datetime import datetime, timedelta, timezone
+import hashlib
+import hmac
 from typing import Callable, Dict
 
 import pytest
@@ -7,7 +10,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from webauthn.helpers import bytes_to_base64url
+
 from app.main import app
+from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_session
 from app.models.user import User, UserRole, UserDisplayNameHistory, UserUsernameHistory
@@ -66,6 +72,25 @@ def make_register_payload(
     return payload
 
 
+def _totp_code(secret: str, *, now: datetime | None = None) -> str:
+    now_dt = now or datetime.now(timezone.utc)
+    period = int(getattr(settings, "two_factor_totp_period_seconds", 30) or 30)
+    digits = int(getattr(settings, "two_factor_totp_digits", 6) or 6)
+    counter = int(now_dt.timestamp()) // period
+
+    clean = (secret or "").strip().upper().replace(" ", "")
+    padding = "=" * ((8 - len(clean) % 8) % 8)
+    key = base64.b32decode(clean + padding, casefold=True)
+
+    msg = counter.to_bytes(8, "big")
+    digest = hmac.new(key, msg, hashlib.sha1).digest()
+    offset = digest[-1] & 0x0F
+    chunk = digest[offset : offset + 4]
+    value = int.from_bytes(chunk, "big") & 0x7FFFFFFF
+    code = value % (10 ** digits)
+    return f"{code:0{digits}d}"
+
+
 def test_register_and_login_flow(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 
@@ -95,6 +120,228 @@ def test_register_and_login_flow(test_app: Dict[str, object]) -> None:
     refreshed = res.json()
     assert refreshed["access_token"]
     assert refreshed["refresh_token"]
+
+
+def test_cooldowns_endpoint_returns_next_allowed_times(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    register_payload = make_register_payload(email="cooldowns@example.com", username="cooldowns", name="Cooldowns")
+    res = client.post("/api/v1/auth/register", json=register_payload)
+    assert res.status_code == 201, res.text
+    access = res.json()["tokens"]["access_token"]
+
+    cooldowns = client.get("/api/v1/auth/me/cooldowns", headers=auth_headers(access))
+    assert cooldowns.status_code == 200, cooldowns.text
+    body = cooldowns.json()
+    assert body["username"]["remaining_seconds"] > 0
+    assert body["username"]["next_allowed_at"]
+    assert body["display_name"]["remaining_seconds"] > 0
+    assert body["display_name"]["next_allowed_at"]
+    assert body["email"]["remaining_seconds"] == 0
+    assert body["email"]["next_allowed_at"] is None
+
+
+def test_sessions_list_and_revoke_others(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    register_payload = make_register_payload(email="sess@example.com", username="sess1", name="Sess")
+    res = client.post("/api/v1/auth/register", json=register_payload)
+    assert res.status_code == 201, res.text
+    refresh_one = res.json()["tokens"]["refresh_token"]
+
+    login_two = client.post("/api/v1/auth/login", json={"identifier": "sess@example.com", "password": "supersecret"})
+    assert login_two.status_code == 200, login_two.text
+    access_two = login_two.json()["tokens"]["access_token"]
+
+    sessions_res = client.get("/api/v1/auth/me/sessions", headers=auth_headers(access_two))
+    assert sessions_res.status_code == 200, sessions_res.text
+    sessions = sessions_res.json()
+    assert len(sessions) == 2
+    assert sum(1 for s in sessions if s.get("is_current")) == 1
+
+    revoke = client.post("/api/v1/auth/me/sessions/revoke-others", headers=auth_headers(access_two), json={"password": "supersecret"})
+    assert revoke.status_code == 200, revoke.text
+    assert revoke.json()["revoked"] == 1
+
+    sessions_after = client.get("/api/v1/auth/me/sessions", headers=auth_headers(access_two))
+    assert sessions_after.status_code == 200, sessions_after.text
+    after = sessions_after.json()
+    assert len(after) == 1
+    assert after[0]["is_current"] is True
+
+    refresh_old = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_one})
+    assert refresh_old.status_code == 401, refresh_old.text
+
+
+def test_security_events_include_logins_email_and_password_changes(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    res = client.post(
+        "/api/v1/auth/register",
+        json=make_register_payload(email="activity@example.com", username="activity", password="supersecret", name="Activity"),
+    )
+    assert res.status_code == 201, res.text
+    access = res.json()["tokens"]["access_token"]
+
+    first = client.get("/api/v1/auth/me/security-events", headers=auth_headers(access))
+    assert first.status_code == 200, first.text
+    first_types = {e["event_type"] for e in first.json()}
+    assert "login_password" in first_types
+
+    pw = client.post(
+        "/api/v1/auth/password/change",
+        headers=auth_headers(access),
+        json={"current_password": "supersecret", "new_password": "newsecret"},
+    )
+    assert pw.status_code == 200, pw.text
+
+    email = client.patch(
+        "/api/v1/auth/me/email",
+        headers=auth_headers(access),
+        json={"email": "activity2@example.com", "password": "newsecret"},
+    )
+    assert email.status_code == 200, email.text
+
+    events = client.get("/api/v1/auth/me/security-events", headers=auth_headers(access))
+    assert events.status_code == 200, events.text
+    event_types = {e["event_type"] for e in events.json()}
+    assert "login_password" in event_types
+    assert "password_changed" in event_types
+    assert "email_changed" in event_types
+
+
+def test_two_factor_setup_and_login_flow(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    res = client.post(
+        "/api/v1/auth/register",
+        json=make_register_payload(email="2fa@example.com", username="twofactor", password="supersecret", name="2FA"),
+    )
+    assert res.status_code == 201, res.text
+    access = res.json()["tokens"]["access_token"]
+
+    setup = client.post("/api/v1/auth/me/2fa/setup", headers=auth_headers(access), json={"password": "supersecret"})
+    assert setup.status_code == 200, setup.text
+    secret = setup.json()["secret"]
+
+    enable = client.post(
+        "/api/v1/auth/me/2fa/enable",
+        headers=auth_headers(access),
+        json={"code": _totp_code(secret)},
+    )
+    assert enable.status_code == 200, enable.text
+    recovery_codes = enable.json()["recovery_codes"]
+    assert isinstance(recovery_codes, list)
+    assert len(recovery_codes) >= 5
+
+    status = client.get("/api/v1/auth/me/2fa", headers=auth_headers(access))
+    assert status.status_code == 200, status.text
+    assert status.json()["enabled"] is True
+    assert status.json()["recovery_codes_remaining"] == len(recovery_codes)
+
+    login = client.post("/api/v1/auth/login", json={"identifier": "2fa@example.com", "password": "supersecret"})
+    assert login.status_code == 200, login.text
+    body = login.json()
+    assert body.get("requires_two_factor") is True
+    assert body.get("two_factor_token")
+    assert body.get("tokens") is None
+
+    two_factor_token = body["two_factor_token"]
+    login2 = client.post("/api/v1/auth/login/2fa", json={"two_factor_token": two_factor_token, "code": _totp_code(secret)})
+    assert login2.status_code == 200, login2.text
+    assert login2.json()["tokens"]["access_token"]
+
+    # Recovery codes should work and be consumed.
+    recovery_code = recovery_codes[0]
+    login = client.post("/api/v1/auth/login", json={"identifier": "2fa@example.com", "password": "supersecret"})
+    token3 = login.json()["two_factor_token"]
+    login3 = client.post("/api/v1/auth/login/2fa", json={"two_factor_token": token3, "code": recovery_code})
+    assert login3.status_code == 200, login3.text
+    access2 = login3.json()["tokens"]["access_token"]
+
+    status2 = client.get("/api/v1/auth/me/2fa", headers=auth_headers(access2))
+    assert status2.status_code == 200, status2.text
+    assert status2.json()["enabled"] is True
+    assert status2.json()["recovery_codes_remaining"] == len(recovery_codes) - 1
+
+
+def test_passkeys_register_list_and_login_flow(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    res = client.post(
+        "/api/v1/auth/register",
+        json=make_register_payload(email="passkeys@example.com", username="passkeys", password="supersecret", name="Passkeys"),
+    )
+    assert res.status_code == 201, res.text
+    access = res.json()["tokens"]["access_token"]
+
+    class DummyVerifiedRegistration:
+        credential_id = b"cred123"
+        credential_public_key = b"public_key"
+        sign_count = 0
+        aaguid = "test-aaguid"
+        credential_type = "public-key"
+        credential_device_type = "single_device"
+        credential_backed_up = False
+
+    class DummyVerifiedAuthentication:
+        new_sign_count = 1
+
+    def fake_verify_registration_response(**_kwargs):
+        return DummyVerifiedRegistration()
+
+    def fake_verify_authentication_response(**_kwargs):
+        return DummyVerifiedAuthentication()
+
+    monkeypatch.setattr("app.services.passkeys.verify_registration_response", fake_verify_registration_response)
+    monkeypatch.setattr("app.services.passkeys.verify_authentication_response", fake_verify_authentication_response)
+
+    opts = client.post("/api/v1/auth/me/passkeys/register/options", headers=auth_headers(access), json={"password": "supersecret"})
+    assert opts.status_code == 200, opts.text
+    registration_token = opts.json()["registration_token"]
+    assert registration_token
+
+    verify = client.post(
+        "/api/v1/auth/me/passkeys/register/verify",
+        headers=auth_headers(access),
+        json={"registration_token": registration_token, "credential": {"id": "ignored"}, "name": "Laptop"},
+    )
+    assert verify.status_code == 200, verify.text
+    passkey_id = verify.json()["id"]
+    assert passkey_id
+
+    listed = client.get("/api/v1/auth/me/passkeys", headers=auth_headers(access))
+    assert listed.status_code == 200, listed.text
+    keys = listed.json()
+    assert isinstance(keys, list)
+    assert len(keys) == 1
+    assert keys[0]["id"] == passkey_id
+
+    auth_opts = client.post("/api/v1/auth/passkeys/login/options", json={"identifier": "passkeys", "remember": True})
+    assert auth_opts.status_code == 200, auth_opts.text
+    authentication_token = auth_opts.json()["authentication_token"]
+    assert authentication_token
+
+    raw_id = bytes_to_base64url(DummyVerifiedRegistration.credential_id)
+    login = client.post(
+        "/api/v1/auth/passkeys/login/verify",
+        json={"authentication_token": authentication_token, "credential": {"rawId": raw_id, "id": raw_id}},
+    )
+    assert login.status_code == 200, login.text
+    body = login.json()
+    assert body["tokens"]["access_token"]
+
+    deleted = client.request(
+        "DELETE",
+        f"/api/v1/auth/me/passkeys/{passkey_id}",
+        headers=auth_headers(access),
+        json={"password": "supersecret"},
+    )
+    assert deleted.status_code == 204, deleted.text
+
+    listed_after = client.get("/api/v1/auth/me/passkeys", headers=auth_headers(access))
+    assert listed_after.status_code == 200, listed_after.text
+    assert listed_after.json() == []
 
 
 def test_secondary_emails_flow(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
@@ -148,11 +395,27 @@ def test_secondary_emails_flow(monkeypatch: pytest.MonkeyPatch, test_app: Dict[s
     assert body["primary_email"] == "alt@example.com"
     assert any(e["email"] == "user@example.com" for e in body["secondary_emails"])
 
+    old_secondary = next((e for e in body["secondary_emails"] if e["email"] == "user@example.com"), None)
+    assert old_secondary and old_secondary.get("id")
+
     register_conflict = client.post(
         "/api/v1/auth/register",
         json=make_register_payload(email="user@example.com", username="dupuser", password="supersecret", name="User"),
     )
     assert register_conflict.status_code == 400
+
+    removed = client.request(
+        "DELETE",
+        f"/api/v1/auth/me/emails/{old_secondary['id']}",
+        headers=auth_headers(access),
+        json={"password": "supersecret"},
+    )
+    assert removed.status_code == 204, removed.text
+
+    emails_after = client.get("/api/v1/auth/me/emails", headers=auth_headers(access))
+    assert emails_after.status_code == 200, emails_after.text
+    after = emails_after.json()
+    assert all(e["email"] != "user@example.com" for e in after["secondary_emails"])
 
 def test_register_rejects_invalid_phone(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]

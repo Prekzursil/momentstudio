@@ -1,4 +1,5 @@
 import {
+  AsYouType,
   type CountryCode,
   getCountries,
   getCountryCallingCode,
@@ -65,6 +66,32 @@ export function buildE164(country: CountryCode, nationalNumber: string): string 
   const parsed = parsePhoneNumberFromString(digits, country);
   if (!parsed || !parsed.isValid()) return null;
   return parsed.number;
+}
+
+export function formatNationalAsYouType(country: CountryCode, nationalNumber: string): string {
+  const digits = (nationalNumber || '').replace(/[^\d]+/g, '');
+  if (!digits) return '';
+  try {
+    return new AsYouType(country).input(digits);
+  } catch {
+    return digits;
+  }
+}
+
+export function formatInternationalFromE164(e164: string): string {
+  const parsed = parsePhoneNumberFromString((e164 || '').trim());
+  if (!parsed) return (e164 || '').trim();
+  try {
+    return parsed.formatInternational();
+  } catch {
+    return parsed.number;
+  }
+}
+
+export function formatInternationalPreview(country: CountryCode, nationalNumber: string): string | null {
+  const e164 = buildE164(country, nationalNumber);
+  if (!e164) return null;
+  return formatInternationalFromE164(e164);
 }
 
 export function splitE164(e164: string): { country: CountryCode | null; nationalNumber: string } {

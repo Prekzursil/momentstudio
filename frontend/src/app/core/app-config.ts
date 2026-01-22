@@ -5,6 +5,7 @@ export interface AppConfig {
   stripePublishableKey: string;
   paypalEnabled: boolean;
   netopiaEnabled: boolean;
+  addressAutocompleteEnabled: boolean;
   sentryDsn: string;
   captchaSiteKey: string;
 }
@@ -22,6 +23,7 @@ const defaults: AppConfig = {
   stripePublishableKey: '',
   paypalEnabled: false,
   netopiaEnabled: false,
+  addressAutocompleteEnabled: false,
   sentryDsn: '',
   captchaSiteKey: ''
 };

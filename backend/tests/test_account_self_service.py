@@ -73,15 +73,27 @@ def test_account_export_and_deletion_flow(test_app: Dict[str, object]) -> None:
     assert status_res.json()["scheduled_for"] is None
     assert status_res.json()["cooldown_hours"] >= 1
 
-    bad_confirm = client.post("/api/v1/auth/me/delete", json={"confirm": "nope"}, headers=auth_headers(token))
+    bad_confirm = client.post(
+        "/api/v1/auth/me/delete",
+        json={"confirm": "nope", "password": "password123"},
+        headers=auth_headers(token),
+    )
     assert bad_confirm.status_code == 400
 
-    scheduled = client.post("/api/v1/auth/me/delete", json={"confirm": "DELETE"}, headers=auth_headers(token))
+    scheduled = client.post(
+        "/api/v1/auth/me/delete",
+        json={"confirm": "DELETE", "password": "password123"},
+        headers=auth_headers(token),
+    )
     assert scheduled.status_code == 200, scheduled.text
     scheduled_json = scheduled.json()
     assert scheduled_json["scheduled_for"] is not None
 
-    reschedule = client.post("/api/v1/auth/me/delete", json={"confirm": "DELETE"}, headers=auth_headers(token))
+    reschedule = client.post(
+        "/api/v1/auth/me/delete",
+        json={"confirm": "DELETE", "password": "password123"},
+        headers=auth_headers(token),
+    )
     assert reschedule.status_code == 400, reschedule.text
 
     canceled = client.post("/api/v1/auth/me/delete/cancel", json={}, headers=auth_headers(token))
@@ -89,7 +101,11 @@ def test_account_export_and_deletion_flow(test_app: Dict[str, object]) -> None:
     assert canceled.json()["scheduled_for"] is None
 
     # Force the scheduled_for into the past and ensure access is blocked + deletion executes.
-    scheduled_again = client.post("/api/v1/auth/me/delete", json={"confirm": "DELETE"}, headers=auth_headers(token))
+    scheduled_again = client.post(
+        "/api/v1/auth/me/delete",
+        json={"confirm": "DELETE", "password": "password123"},
+        headers=auth_headers(token),
+    )
     assert scheduled_again.status_code == 200
 
     async def expire_schedule():

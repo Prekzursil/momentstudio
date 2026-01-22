@@ -4,7 +4,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Title, Meta } from '@angular/platform-browser';
 import { of } from 'rxjs';
 import { CatalogService } from '../../core/catalog.service';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { ToastService } from '../../core/toast.service';
 
 describe('ShopComponent i18n meta', () => {
@@ -21,7 +21,7 @@ describe('ShopComponent i18n meta', () => {
         { provide: Title, useValue: title },
         { provide: Meta, useValue: meta },
         { provide: CatalogService, useValue: { listProducts: () => of({ items: [], meta: null }), listCategories: () => of([]) } },
-        { provide: ActivatedRoute, useValue: { snapshot: { data: {}, queryParams: {} }, queryParams: of({}) } },
+        { provide: ActivatedRoute, useValue: { snapshot: { data: {}, queryParams: {} }, paramMap: of(convertToParamMap({})), queryParams: of({}) } },
         { provide: Router, useValue: { navigate: () => {} } },
         { provide: ToastService, useValue: { error: () => {} } }
       ]

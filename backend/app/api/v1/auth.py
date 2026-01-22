@@ -1,3 +1,5 @@
+import asyncio
+import json
 from pathlib import Path
 import logging
 import re
@@ -8,10 +10,11 @@ from uuid import UUID
 from jose import jwt
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field, EmailStr, field_validator
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+from webauthn.helpers import base64url_to_bytes
 
 from app.core import security
 from app.core.config import settings
@@ -19,11 +22,31 @@ from app.core.dependencies import get_current_user, get_google_completion_user, 
 from app.core.rate_limit import limiter, per_identifier_limiter
 from app.core.security import decode_token
 from app.db.session import get_session
-from app.models.user import RefreshSession, User, UserSecondaryEmail
+from app.models.user import (
+    RefreshSession,
+    User,
+    UserDisplayNameHistory,
+    UserEmailHistory,
+    UserSecondaryEmail,
+    UserSecurityEvent,
+    UserUsernameHistory,
+)
+from app.models.user_export import UserDataExportJob, UserDataExportStatus
 from app.schemas.auth import (
     AuthResponse,
     GoogleCallbackResponse,
     AccountDeletionStatus,
+    UserDataExportJobResponse,
+    RefreshSessionResponse,
+    RefreshSessionsRevokeResponse,
+    UserSecurityEventResponse,
+    TwoFactorChallengeResponse,
+    TwoFactorEnableResponse,
+    TwoFactorSetupResponse,
+    TwoFactorStatusResponse,
+    PasskeyAuthenticationOptionsResponse,
+    PasskeyRegistrationOptionsResponse,
+    PasskeyResponse,
     EmailVerificationConfirm,
     SecondaryEmailConfirmRequest,
     SecondaryEmailCreateRequest,
@@ -40,6 +63,9 @@ from app.schemas.user import UserCreate
 from app.services import auth as auth_service
 from app.services import captcha as captcha_service
 from app.services import email as email_service
+from app.services import notifications as notification_service
+from app.services import passkeys as passkeys_service
+from app.services import private_storage
 from app.services import self_service
 from app.services import storage
 from app.core import metrics
@@ -51,6 +77,7 @@ register_rate_limit = per_identifier_limiter(
     lambda r: r.client.host if r.client else "anon", settings.auth_rate_limit_register, 60
 )
 login_rate_limit = limiter("auth:login", settings.auth_rate_limit_login, 60)
+two_factor_rate_limit = limiter("auth:2fa", settings.auth_rate_limit_login, 60)
 refresh_rate_limit = limiter("auth:refresh", settings.auth_rate_limit_refresh, 60)
 reset_request_rate_limit = limiter("auth:reset_request", settings.auth_rate_limit_reset_request, 60)
 reset_confirm_rate_limit = limiter("auth:reset_confirm", settings.auth_rate_limit_reset_confirm, 60)
@@ -99,6 +126,75 @@ def clear_refresh_cookie(response: Response) -> None:
         secure=settings.secure_cookies,
         samesite=settings.cookie_samesite.lower(),
     )
+
+
+def _extract_bearer_token(request: Request) -> str | None:
+    raw = (request.headers.get("authorization") or "").strip()
+    if not raw:
+        return None
+    parts = raw.split(" ", 1)
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        return None
+    token = parts[1].strip()
+    return token or None
+
+
+def _extract_refresh_session_jti(request: Request) -> str | None:
+    refresh_token = (request.cookies.get("refresh_token") or "").strip()
+    if refresh_token:
+        payload = security.decode_token(refresh_token)
+        if payload and payload.get("type") == "refresh":
+            jti = str(payload.get("jti") or "").strip()
+            if jti:
+                return jti
+
+    access_token = _extract_bearer_token(request)
+    if access_token:
+        payload = security.decode_token(access_token)
+        if payload and payload.get("type") == "access":
+            jti = str(payload.get("jti") or "").strip()
+            if jti:
+                return jti
+
+    return None
+
+
+async def _resolve_active_refresh_session_jti(
+    session: AsyncSession,
+    user_id: UUID,
+    candidate_jti: str | None,
+) -> str | None:
+    if not candidate_jti:
+        return None
+    stored = (await session.execute(select(RefreshSession).where(RefreshSession.jti == candidate_jti))).scalar_one_or_none()
+    if not stored or stored.user_id != user_id:
+        return None
+
+    now = datetime.now(timezone.utc)
+    expires_at = stored.expires_at
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if not expires_at or expires_at < now:
+        return None
+
+    if not stored.revoked:
+        return stored.jti
+
+    replacement_jti = (getattr(stored, "replaced_by_jti", None) or "").strip()
+    if not replacement_jti:
+        return None
+
+    replacement = (
+        await session.execute(select(RefreshSession).where(RefreshSession.jti == replacement_jti))
+    ).scalar_one_or_none()
+    if not replacement or replacement.user_id != user_id or replacement.revoked:
+        return None
+    replacement_expires_at = replacement.expires_at
+    if replacement_expires_at and replacement_expires_at.tzinfo is None:
+        replacement_expires_at = replacement_expires_at.replace(tzinfo=timezone.utc)
+    if not replacement_expires_at or replacement_expires_at < now:
+        return None
+    return replacement.jti
 
 
 class ChangePasswordRequest(BaseModel):
@@ -169,6 +265,11 @@ class ProfileUpdate(BaseModel):
 
 class AccountDeletionRequest(BaseModel):
     confirm: str = Field(..., min_length=1, max_length=20, description='Type "DELETE" to confirm account deletion')
+    password: str = Field(min_length=1, max_length=128, description="Confirm password")
+
+
+class ConfirmPasswordRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
 
 
 class RegisterRequest(BaseModel):
@@ -226,6 +327,44 @@ class LoginRequest(BaseModel):
     remember: bool = False
 
 
+class TwoFactorLoginRequest(BaseModel):
+    two_factor_token: str = Field(min_length=1)
+    code: str = Field(min_length=1, max_length=32)
+
+
+class TwoFactorSetupRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+
+
+class TwoFactorEnableRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=32)
+
+
+class TwoFactorDisableRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+    code: str = Field(min_length=1, max_length=32)
+
+
+class PasskeyLoginOptionsRequest(BaseModel):
+    identifier: str | None = None
+    remember: bool = False
+
+
+class PasskeyLoginVerifyRequest(BaseModel):
+    authentication_token: str = Field(min_length=1)
+    credential: dict
+
+
+class PasskeyRegistrationOptionsRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+
+
+class PasskeyRegistrationVerifyRequest(BaseModel):
+    registration_token: str = Field(min_length=1)
+    credential: dict
+    name: str | None = Field(default=None, max_length=120)
+
+
 class UsernameUpdateRequest(BaseModel):
     username: str = Field(min_length=3, max_length=30, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$")
     password: str = Field(min_length=1, max_length=128)
@@ -250,6 +389,18 @@ class DisplayNameHistoryItem(BaseModel):
 class UserAliasesResponse(BaseModel):
     usernames: list[UsernameHistoryItem]
     display_names: list[DisplayNameHistoryItem]
+
+
+class CooldownInfo(BaseModel):
+    last_changed_at: datetime | None = None
+    next_allowed_at: datetime | None = None
+    remaining_seconds: int = 0
+
+
+class UserCooldownsResponse(BaseModel):
+    username: CooldownInfo
+    display_name: CooldownInfo
+    email: CooldownInfo
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=AuthResponse)
@@ -291,15 +442,28 @@ async def register(
         first_name=user.first_name,
         lang=user.preferred_language,
     )
-    tokens = await auth_service.issue_tokens_for_user(session, user, persistent=False)
+    tokens = await auth_service.issue_tokens_for_user(
+        session,
+        user,
+        persistent=False,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     if response:
         set_refresh_cookie(response, tokens["refresh_token"], persistent=False)
+    await auth_service.record_security_event(
+        session,
+        user.id,
+        "login_password",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 
 @router.post(
     "/login",
-    response_model=AuthResponse,
+    response_model=AuthResponse | TwoFactorChallengeResponse,
     summary="Login with email or username",
     description=(
         "Accepts an `identifier` field (email or username). For backward compatibility, an `email` field is also "
@@ -312,7 +476,7 @@ async def login(
     session: AsyncSession = Depends(get_session),
     _: None = Depends(login_rate_limit),
     response: Response = None,
-) -> AuthResponse:
+) -> AuthResponse | TwoFactorChallengeResponse:
     await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
     identifier = (payload.identifier or payload.email or "").strip()
     if not identifier:
@@ -324,10 +488,279 @@ async def login(
         raise
     metrics.record_login_success()
     persistent = bool(payload.remember)
-    tokens = await auth_service.issue_tokens_for_user(session, user, persistent=persistent)
+    if bool(getattr(user, "two_factor_enabled", False)):
+        token = security.create_two_factor_token(str(user.id), remember=persistent, method="password")
+        return TwoFactorChallengeResponse(user=UserResponse.model_validate(user), two_factor_token=token)
+    tokens = await auth_service.issue_tokens_for_user(
+        session,
+        user,
+        persistent=persistent,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     if response:
         set_refresh_cookie(response, tokens["refresh_token"], persistent=persistent)
+    await auth_service.record_security_event(
+        session,
+        user.id,
+        "login_password",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
+
+
+@router.post("/login/2fa", response_model=AuthResponse, summary="Complete login with two-factor code")
+async def login_two_factor(
+    payload: TwoFactorLoginRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    _: None = Depends(two_factor_rate_limit),
+    response: Response = None,
+) -> AuthResponse:
+    token_payload = security.decode_token(payload.two_factor_token)
+    if not token_payload or token_payload.get("type") != "two_factor":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor token")
+
+    sub = token_payload.get("sub")
+    try:
+        user_id = UUID(str(sub))
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor token")
+    remember = bool(token_payload.get("remember"))
+    method = str(token_payload.get("method") or "password").strip() or "password"
+
+    user = await session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor token")
+    if getattr(user, "deleted_at", None) is not None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
+        await self_service.execute_account_deletion(session, user)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+
+    if not bool(getattr(user, "two_factor_enabled", False)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Two-factor is not enabled")
+    if not await auth_service.verify_two_factor_code(session, user, payload.code):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor code")
+
+    tokens = await auth_service.issue_tokens_for_user(
+        session,
+        user,
+        persistent=remember,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    if response:
+        set_refresh_cookie(response, tokens["refresh_token"], persistent=remember)
+
+    event_type = "login_google" if method == "google" else "login_password"
+    await auth_service.record_security_event(
+        session,
+        user.id,
+        event_type,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+
+    return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
+
+
+@router.post(
+    "/passkeys/login/options",
+    response_model=PasskeyAuthenticationOptionsResponse,
+    summary="Get WebAuthn options for passkey login",
+)
+async def passkey_login_options(
+    payload: PasskeyLoginOptionsRequest,
+    session: AsyncSession = Depends(get_session),
+    _: None = Depends(login_rate_limit),
+) -> PasskeyAuthenticationOptionsResponse:
+    identifier = (payload.identifier or "").strip()
+    user: User | None = None
+    if identifier:
+        if "@" in identifier:
+            user = await auth_service.get_user_by_login_email(session, identifier)
+        else:
+            user = await auth_service.get_user_by_username(session, identifier)
+
+    options, _ = await passkeys_service.generate_authentication_options_for_user(session, user)
+    challenge = str(options.get("challenge") or "").strip()
+    if not challenge:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate passkey challenge")
+
+    token = security.create_webauthn_token(
+        purpose="login",
+        challenge=challenge,
+        user_id=str(user.id) if user else None,
+        remember=bool(payload.remember),
+    )
+    return PasskeyAuthenticationOptionsResponse(authentication_token=token, options=options)
+
+
+@router.post(
+    "/passkeys/login/verify",
+    response_model=AuthResponse,
+    summary="Verify a passkey assertion and start a session",
+)
+async def passkey_login_verify(
+    payload: PasskeyLoginVerifyRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    _: None = Depends(login_rate_limit),
+    response: Response = None,
+) -> AuthResponse:
+    token_payload = security.decode_token(payload.authentication_token)
+    if not token_payload or token_payload.get("type") != "webauthn" or token_payload.get("purpose") != "login":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    challenge_b64 = str(token_payload.get("challenge") or "").strip()
+    if not challenge_b64:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    try:
+        expected_challenge = base64url_to_bytes(challenge_b64)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token") from exc
+
+    remember = bool(token_payload.get("remember"))
+    token_user_id = str(token_payload.get("uid") or "").strip() or None
+
+    user, _passkey = await passkeys_service.verify_passkey_authentication(
+        session,
+        credential=payload.credential,
+        expected_challenge=expected_challenge,
+        user_id=token_user_id,
+    )
+
+    if getattr(user, "google_sub", None) and not auth_service.is_profile_complete(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Complete your Google sign-in registration before using passkey login.",
+        )
+    if getattr(user, "deleted_at", None) is not None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
+        await self_service.execute_account_deletion(session, user)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+
+    metrics.record_login_success()
+    tokens = await auth_service.issue_tokens_for_user(
+        session,
+        user,
+        persistent=remember,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    if response:
+        set_refresh_cookie(response, tokens["refresh_token"], persistent=remember)
+
+    await auth_service.record_security_event(
+        session,
+        user.id,
+        "login_passkey",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
+
+
+@router.get("/me/passkeys", response_model=list[PasskeyResponse], summary="List my passkeys")
+async def list_my_passkeys(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[PasskeyResponse]:
+    passkeys = await passkeys_service.list_passkeys(session, current_user.id)
+    return [PasskeyResponse.model_validate(p) for p in passkeys]
+
+
+@router.post(
+    "/me/passkeys/register/options",
+    response_model=PasskeyRegistrationOptionsResponse,
+    summary="Start passkey registration (generates WebAuthn options)",
+)
+async def passkey_register_options(
+    payload: PasskeyRegistrationOptionsRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> PasskeyRegistrationOptionsResponse:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+
+    options, _ = await passkeys_service.generate_registration_options_for_user(session, current_user)
+    challenge = str(options.get("challenge") or "").strip()
+    if not challenge:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate passkey challenge")
+
+    token = security.create_webauthn_token(
+        purpose="register",
+        challenge=challenge,
+        user_id=str(current_user.id),
+    )
+    return PasskeyRegistrationOptionsResponse(registration_token=token, options=options)
+
+
+@router.post(
+    "/me/passkeys/register/verify",
+    response_model=PasskeyResponse,
+    summary="Finalize passkey registration",
+)
+async def passkey_register_verify(
+    payload: PasskeyRegistrationVerifyRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> PasskeyResponse:
+    token_payload = security.decode_token(payload.registration_token)
+    if not token_payload or token_payload.get("type") != "webauthn" or token_payload.get("purpose") != "register":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    token_user_id = str(token_payload.get("uid") or "").strip()
+    if token_user_id != str(current_user.id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    challenge_b64 = str(token_payload.get("challenge") or "").strip()
+    if not challenge_b64:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    try:
+        expected_challenge = base64url_to_bytes(challenge_b64)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token") from exc
+
+    passkey = await passkeys_service.register_passkey(
+        session,
+        user=current_user,
+        credential=payload.credential,
+        expected_challenge=expected_challenge,
+        name=payload.name,
+    )
+    await auth_service.record_security_event(
+        session,
+        current_user.id,
+        "passkey_added",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    return PasskeyResponse.model_validate(passkey)
+
+
+@router.delete("/me/passkeys/{passkey_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Remove a passkey")
+async def passkey_delete(
+    passkey_id: UUID,
+    payload: ConfirmPasswordRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+    removed = await passkeys_service.delete_passkey(session, user_id=current_user.id, passkey_id=passkey_id)
+    if not removed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Passkey not found")
+    await auth_service.record_security_event(
+        session,
+        current_user.id,
+        "passkey_removed",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    return None
 
 
 @router.post("/refresh", response_model=TokenPair)
@@ -418,7 +851,13 @@ async def refresh_tokens(
         return TokenPair(access_token=access, refresh_token=refresh)
 
     # Rotate the token by revoking the current refresh session and issuing a replacement.
-    replacement_session = await auth_service.create_refresh_session(session, user.id, persistent=persistent)
+    replacement_session = await auth_service.create_refresh_session(
+        session,
+        user.id,
+        persistent=persistent,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     stored.revoked = True
     stored.revoked_reason = "rotated"
     stored.rotated_at = now
@@ -454,6 +893,7 @@ async def logout(
 @router.post("/password/change", status_code=status.HTTP_200_OK)
 async def change_password(
     payload: ChangePasswordRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
@@ -464,6 +904,13 @@ async def change_password(
     session.add(current_user)
     await session.commit()
     background_tasks.add_task(email_service.send_password_changed, current_user.email, lang=current_user.preferred_language)
+    await auth_service.record_security_event(
+        session,
+        current_user.id,
+        "password_changed",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     return {"detail": "Password updated"}
 
 
@@ -497,6 +944,109 @@ async def read_me(current_user: User = Depends(get_current_user)) -> UserRespons
     return UserResponse.model_validate(current_user)
 
 
+@router.get("/me/2fa", response_model=TwoFactorStatusResponse, summary="Get my two-factor status")
+async def two_factor_status(current_user: User = Depends(get_current_user)) -> TwoFactorStatusResponse:
+    confirmed_at = getattr(current_user, "two_factor_confirmed_at", None)
+    if confirmed_at and confirmed_at.tzinfo is None:
+        confirmed_at = confirmed_at.replace(tzinfo=timezone.utc)
+    codes = list(getattr(current_user, "two_factor_recovery_codes", None) or [])
+    return TwoFactorStatusResponse(
+        enabled=bool(getattr(current_user, "two_factor_enabled", False)),
+        confirmed_at=confirmed_at,
+        recovery_codes_remaining=len(codes),
+    )
+
+
+@router.post("/me/2fa/setup", response_model=TwoFactorSetupResponse, summary="Start two-factor setup")
+async def two_factor_setup(
+    payload: TwoFactorSetupRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> TwoFactorSetupResponse:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+    secret, otpauth_url = await auth_service.start_two_factor_setup(session, current_user)
+    await auth_service.record_security_event(
+        session,
+        current_user.id,
+        "two_factor_setup_started",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    return TwoFactorSetupResponse(secret=secret, otpauth_url=otpauth_url)
+
+
+@router.post("/me/2fa/enable", response_model=TwoFactorEnableResponse, summary="Enable two-factor authentication")
+async def two_factor_enable(
+    payload: TwoFactorEnableRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> TwoFactorEnableResponse:
+    codes = await auth_service.enable_two_factor(session, current_user, payload.code)
+    await auth_service.record_security_event(
+        session,
+        current_user.id,
+        "two_factor_enabled",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    return TwoFactorEnableResponse(recovery_codes=codes)
+
+
+@router.post("/me/2fa/disable", response_model=TwoFactorStatusResponse, summary="Disable two-factor authentication")
+async def two_factor_disable(
+    payload: TwoFactorDisableRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> TwoFactorStatusResponse:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+    if not bool(getattr(current_user, "two_factor_enabled", False)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Two-factor is not enabled")
+    if not await auth_service.verify_two_factor_code(session, current_user, payload.code):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor code")
+    await auth_service.disable_two_factor(session, current_user)
+    await auth_service.record_security_event(
+        session,
+        current_user.id,
+        "two_factor_disabled",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    return TwoFactorStatusResponse(enabled=False, confirmed_at=None, recovery_codes_remaining=0)
+
+
+@router.post(
+    "/me/2fa/recovery-codes/regenerate",
+    response_model=TwoFactorEnableResponse,
+    summary="Regenerate two-factor recovery codes",
+)
+async def two_factor_regenerate_codes(
+    payload: TwoFactorDisableRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> TwoFactorEnableResponse:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+    if not bool(getattr(current_user, "two_factor_enabled", False)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Two-factor is not enabled")
+    if not await auth_service.verify_two_factor_code(session, current_user, payload.code):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor code")
+    codes = await auth_service.regenerate_recovery_codes(session, current_user)
+    await auth_service.record_security_event(
+        session,
+        current_user.id,
+        "two_factor_recovery_regenerated",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    return TwoFactorEnableResponse(recovery_codes=codes)
+
+
 @router.get(
     "/me/aliases",
     response_model=UserAliasesResponse,
@@ -514,6 +1064,66 @@ async def read_aliases(
         display_names=[
             DisplayNameHistoryItem(name=row.name, name_tag=row.name_tag, created_at=row.created_at) for row in display_names
         ],
+    )
+
+
+@router.get(
+    "/me/cooldowns",
+    response_model=UserCooldownsResponse,
+    summary="Get my profile/email change cooldowns",
+)
+async def read_cooldowns(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserCooldownsResponse:
+    now = datetime.now(timezone.utc)
+
+    def normalize_dt(value: datetime | None) -> datetime | None:
+        if not value:
+            return None
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+    def cooldown_info(*, last: datetime | None, cooldown: timedelta, enforce: bool) -> CooldownInfo:
+        last_dt = normalize_dt(last)
+        if not last_dt or not enforce:
+            return CooldownInfo(last_changed_at=last_dt, next_allowed_at=None, remaining_seconds=0)
+        next_dt = last_dt + cooldown
+        remaining = int(max(0, (next_dt - now).total_seconds()))
+        return CooldownInfo(
+            last_changed_at=last_dt,
+            next_allowed_at=next_dt if remaining > 0 else None,
+            remaining_seconds=remaining,
+        )
+
+    username_last = await session.scalar(
+        select(UserUsernameHistory.created_at)
+        .where(UserUsernameHistory.user_id == current_user.id)
+        .order_by(UserUsernameHistory.created_at.desc())
+        .limit(1)
+    )
+    display_last = await session.scalar(
+        select(UserDisplayNameHistory.created_at)
+        .where(UserDisplayNameHistory.user_id == current_user.id)
+        .order_by(UserDisplayNameHistory.created_at.desc())
+        .limit(1)
+    )
+
+    email_count = int(
+        await session.scalar(select(func.count()).select_from(UserEmailHistory).where(UserEmailHistory.user_id == current_user.id))
+        or 0
+    )
+    email_last = await session.scalar(
+        select(UserEmailHistory.created_at)
+        .where(UserEmailHistory.user_id == current_user.id)
+        .order_by(UserEmailHistory.created_at.desc())
+        .limit(1)
+    )
+
+    profile_complete = auth_service.is_profile_complete(current_user)
+    return UserCooldownsResponse(
+        username=cooldown_info(last=username_last, cooldown=auth_service.USERNAME_CHANGE_COOLDOWN, enforce=profile_complete),
+        display_name=cooldown_info(last=display_last, cooldown=auth_service.DISPLAY_NAME_CHANGE_COOLDOWN, enforce=profile_complete),
+        email=cooldown_info(last=email_last, cooldown=auth_service.EMAIL_CHANGE_COOLDOWN, enforce=email_count > 1),
     )
 
 
@@ -542,6 +1152,7 @@ async def update_username(
 )
 async def update_email(
     payload: EmailUpdateRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
@@ -554,6 +1165,13 @@ async def update_email(
     background_tasks.add_task(email_service.send_email_changed, old_email, old_email=old_email, new_email=user.email, lang=user.preferred_language)
     background_tasks.add_task(email_service.send_email_changed, user.email, old_email=old_email, new_email=user.email, lang=user.preferred_language)
     background_tasks.add_task(email_service.send_verification_email, user.email, record.token, user.preferred_language)
+    await auth_service.record_security_event(
+        session,
+        user.id,
+        "email_changed",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     return UserResponse.model_validate(user)
 
 
@@ -631,12 +1249,20 @@ async def confirm_secondary_email_verification(
 async def make_secondary_email_primary(
     secondary_email_id: UUID,
     payload: SecondaryEmailMakePrimaryRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> UserResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
     user = await auth_service.make_secondary_email_primary(session, current_user, secondary_email_id)
+    await auth_service.record_security_event(
+        session,
+        user.id,
+        "email_changed",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     return UserResponse.model_validate(user)
 
 
@@ -647,9 +1273,12 @@ async def make_secondary_email_primary(
 )
 async def delete_secondary_email(
     secondary_email_id: UUID,
+    payload: ConfirmPasswordRequest,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> None:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
     await auth_service.delete_secondary_email(session, current_user, secondary_email_id)
 
 
@@ -664,6 +1293,188 @@ async def export_me(
         content=data,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+def _export_ready_copy(lang: str | None) -> tuple[str, str]:
+    if (lang or "").strip().lower().startswith("ro"):
+        return (
+            "Exportul tău de date este gata",
+            "Îl poți descărca din cont → Confidențialitate.",
+        )
+    return ("Your data export is ready", "Download it from Account → Privacy.")
+
+
+async def _run_user_export_job(engine: AsyncEngine, *, job_id: UUID) -> None:
+    SessionLocal = async_sessionmaker(engine, expire_on_commit=False, autoflush=False, class_=AsyncSession)
+    async with SessionLocal() as session:
+        job = await session.get(UserDataExportJob, job_id)
+        if not job:
+            return
+        if job.status not in (UserDataExportStatus.pending, UserDataExportStatus.running):
+            return
+
+        now = datetime.now(timezone.utc)
+        try:
+            job.status = UserDataExportStatus.running
+            job.started_at = job.started_at or now
+            job.finished_at = None
+            job.error_message = None
+            job.progress = max(int(job.progress or 0), 1)
+            session.add(job)
+            await session.commit()
+
+            user = await session.get(User, job.user_id)
+            if not user:
+                raise RuntimeError("User not found")
+
+            job.progress = max(int(job.progress or 0), 5)
+            session.add(job)
+            await session.commit()
+
+            payload = await self_service.export_user_data(session, user)
+
+            job.progress = max(int(job.progress or 0), 70)
+            session.add(job)
+            await session.commit()
+
+            private_root = private_storage.ensure_private_root().resolve()
+            export_dir = (private_root / "exports" / str(user.id)).resolve()
+            export_dir.mkdir(parents=True, exist_ok=True)
+            export_path = export_dir / f"{job.id}.json"
+
+            content = json.dumps(payload, ensure_ascii=False, indent=2)
+            await asyncio.to_thread(export_path.write_text, content, encoding="utf-8")
+
+            job.file_path = export_path.relative_to(private_root).as_posix()
+            job.progress = 100
+            job.status = UserDataExportStatus.succeeded
+            job.finished_at = datetime.now(timezone.utc)
+            job.expires_at = job.finished_at + timedelta(days=7)
+            session.add(job)
+            await session.commit()
+
+            title, body = _export_ready_copy(getattr(user, "preferred_language", None))
+            await notification_service.create_notification(
+                session,
+                user_id=user.id,
+                type="privacy",
+                title=title,
+                body=body,
+                url="/account/privacy",
+            )
+        except Exception as exc:  # pragma: no cover
+            job.status = UserDataExportStatus.failed
+            job.error_message = str(exc)[:1000]
+            job.finished_at = datetime.now(timezone.utc)
+            job.progress = min(int(job.progress or 0), 99)
+            session.add(job)
+            await session.commit()
+
+
+@router.post("/me/export/jobs", response_model=UserDataExportJobResponse, status_code=status.HTTP_201_CREATED)
+async def start_export_job(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserDataExportJobResponse:
+    latest = (
+        (
+            await session.execute(
+                select(UserDataExportJob)
+                .where(UserDataExportJob.user_id == current_user.id)
+                .order_by(UserDataExportJob.created_at.desc())
+                .limit(1)
+            )
+        )
+        .scalars()
+        .first()
+    )
+    if latest and latest.status in (UserDataExportStatus.pending, UserDataExportStatus.running):
+        if latest.status == UserDataExportStatus.pending:
+            engine = session.bind
+            if engine is None:
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
+            background_tasks.add_task(_run_user_export_job, engine, job_id=latest.id)
+        return UserDataExportJobResponse.model_validate(latest, from_attributes=True)
+
+    if latest and latest.status == UserDataExportStatus.succeeded:
+        expires_at = latest.expires_at
+        if expires_at and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if not expires_at or expires_at > datetime.now(timezone.utc):
+            return UserDataExportJobResponse.model_validate(latest, from_attributes=True)
+
+    job = UserDataExportJob(user_id=current_user.id, status=UserDataExportStatus.pending, progress=0)
+    session.add(job)
+    await session.commit()
+    await session.refresh(job)
+
+    engine = session.bind
+    if engine is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
+    background_tasks.add_task(_run_user_export_job, engine, job_id=job.id)
+    return UserDataExportJobResponse.model_validate(job, from_attributes=True)
+
+
+@router.get("/me/export/jobs/latest", response_model=UserDataExportJobResponse)
+async def latest_export_job(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserDataExportJobResponse:
+    job = (
+        (
+            await session.execute(
+                select(UserDataExportJob)
+                .where(UserDataExportJob.user_id == current_user.id)
+                .order_by(UserDataExportJob.created_at.desc())
+                .limit(1)
+            )
+        )
+        .scalars()
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+    return UserDataExportJobResponse.model_validate(job, from_attributes=True)
+
+
+@router.get("/me/export/jobs/{job_id}", response_model=UserDataExportJobResponse)
+async def get_export_job(
+    job_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserDataExportJobResponse:
+    job = await session.get(UserDataExportJob, job_id)
+    if not job or job.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+    return UserDataExportJobResponse.model_validate(job, from_attributes=True)
+
+
+@router.get("/me/export/jobs/{job_id}/download")
+async def download_export_job(
+    job_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> FileResponse:
+    job = await session.get(UserDataExportJob, job_id)
+    if not job or job.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+    if job.status != UserDataExportStatus.succeeded or not job.file_path:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Export is not ready")
+
+    expires_at = job.expires_at
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at and expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+
+    path = private_storage.resolve_private_path(job.file_path)
+    if not path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export file not found")
+
+    stamp = (job.finished_at or job.created_at or datetime.now(timezone.utc)).date().isoformat()
+    filename = f"moment-studio-export-{stamp}.json"
+    return FileResponse(path, media_type="application/json", filename=filename, headers={"Cache-Control": "no-store"})
 
 
 @router.get("/me/delete/status", response_model=AccountDeletionStatus)
@@ -684,6 +1495,8 @@ async def request_account_deletion(
 ) -> AccountDeletionStatus:
     if payload.confirm.strip().upper() != "DELETE":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Type "DELETE" to confirm')
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
     now = datetime.now(timezone.utc)
     scheduled_for = current_user.deletion_scheduled_for
     if scheduled_for and scheduled_for.tzinfo is None:
@@ -753,6 +1566,136 @@ async def update_notification_preferences(
     await session.commit()
     await session.refresh(current_user)
     return UserResponse.model_validate(current_user)
+
+
+@router.get(
+    "/me/sessions",
+    response_model=list[RefreshSessionResponse],
+    summary="List my active sessions",
+    description="Returns active refresh sessions for the current account so you can revoke other devices.",
+)
+async def list_my_sessions(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[RefreshSessionResponse]:
+    candidate_jti = _extract_refresh_session_jti(request)
+    current_jti = await _resolve_active_refresh_session_jti(session, current_user.id, candidate_jti)
+
+    rows = (
+        await session.execute(
+            select(RefreshSession).where(RefreshSession.user_id == current_user.id, RefreshSession.revoked.is_(False))
+        )
+    ).scalars().all()
+
+    now = datetime.now(timezone.utc)
+    sessions: list[RefreshSessionResponse] = []
+    for row in rows:
+        expires_at = row.expires_at
+        if expires_at and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if not expires_at or expires_at < now:
+            continue
+        created_at = row.created_at
+        if created_at and created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        sessions.append(
+            RefreshSessionResponse(
+                id=row.id,
+                created_at=created_at,
+                expires_at=expires_at,
+                persistent=bool(getattr(row, "persistent", True)),
+                is_current=bool(current_jti and row.jti == current_jti),
+                user_agent=getattr(row, "user_agent", None),
+                ip_address=getattr(row, "ip_address", None),
+            )
+        )
+
+    sessions.sort(key=lambda entry: (entry.is_current, entry.created_at), reverse=True)
+    return sessions
+
+
+@router.post(
+    "/me/sessions/revoke-others",
+    response_model=RefreshSessionsRevokeResponse,
+    summary="Revoke other active sessions",
+    description="Revokes all other active refresh sessions, keeping only the current device signed in.",
+)
+async def revoke_other_sessions(
+    payload: ConfirmPasswordRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> RefreshSessionsRevokeResponse:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+    candidate_jti = _extract_refresh_session_jti(request)
+    current_jti = await _resolve_active_refresh_session_jti(session, current_user.id, candidate_jti)
+    if not current_jti:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not identify current session")
+
+    rows = (
+        await session.execute(
+            select(RefreshSession).where(RefreshSession.user_id == current_user.id, RefreshSession.revoked.is_(False))
+        )
+    ).scalars().all()
+
+    now = datetime.now(timezone.utc)
+    to_revoke: list[RefreshSession] = []
+    for row in rows:
+        if row.jti == current_jti:
+            continue
+        expires_at = row.expires_at
+        if expires_at and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if not expires_at or expires_at < now:
+            continue
+        row.revoked = True
+        row.revoked_reason = "revoke_others"
+        to_revoke.append(row)
+
+    if to_revoke:
+        session.add_all(to_revoke)
+        await session.commit()
+
+    return RefreshSessionsRevokeResponse(revoked=len(to_revoke))
+
+
+@router.get(
+    "/me/security-events",
+    response_model=list[UserSecurityEventResponse],
+    summary="List my recent security activity",
+    description="Returns recent security-related events like logins and credential changes.",
+)
+async def list_security_events(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=30, ge=1, le=100),
+) -> list[UserSecurityEventResponse]:
+    rows = (
+        await session.execute(
+            select(UserSecurityEvent)
+            .where(UserSecurityEvent.user_id == current_user.id)
+            .order_by(UserSecurityEvent.created_at.desc())
+            .limit(limit)
+        )
+    ).scalars().all()
+
+    events: list[UserSecurityEventResponse] = []
+    for row in rows:
+        created_at = row.created_at
+        if created_at and created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        events.append(
+            UserSecurityEventResponse(
+                id=row.id,
+                event_type=row.event_type,
+                created_at=created_at,
+                user_agent=getattr(row, "user_agent", None),
+                ip_address=getattr(row, "ip_address", None),
+            )
+        )
+    return events
 
 
 @router.patch("/me", response_model=UserResponse)
@@ -875,12 +1818,20 @@ async def request_password_reset(
 @router.post("/password-reset/confirm", status_code=status.HTTP_200_OK)
 async def confirm_password_reset(
     payload: PasswordResetConfirm,
+    request: Request,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(reset_confirm_rate_limit),
 ) -> dict[str, str]:
     user = await auth_service.confirm_reset_token(session, payload.token, payload.new_password)
     background_tasks.add_task(email_service.send_password_changed, user.email, lang=user.preferred_language)
+    await auth_service.record_security_event(
+        session,
+        user.id,
+        "password_reset",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     return {"status": "updated"}
 
 
@@ -905,6 +1856,7 @@ async def google_start(_: None = Depends(google_rate_limit)) -> dict:
 @router.post("/google/callback", response_model=GoogleCallbackResponse)
 async def google_callback(
     payload: GoogleCallback,
+    request: Request,
     session: AsyncSession = Depends(get_session),
     response: Response = None,
     _: None = Depends(google_rate_limit),
@@ -932,9 +1884,28 @@ async def google_callback(
         if getattr(existing_sub, "deleted_at", None) is not None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
         if auth_service.is_profile_complete(existing_sub):
-            tokens = await auth_service.issue_tokens_for_user(session, existing_sub)
+            if bool(getattr(existing_sub, "two_factor_enabled", False)):
+                token = security.create_two_factor_token(str(existing_sub.id), remember=True, method="google")
+                return GoogleCallbackResponse(
+                    user=UserResponse.model_validate(existing_sub),
+                    requires_two_factor=True,
+                    two_factor_token=token,
+                )
+            tokens = await auth_service.issue_tokens_for_user(
+                session,
+                existing_sub,
+                user_agent=request.headers.get("user-agent"),
+                ip_address=request.client.host if request.client else None,
+            )
             if response:
                 set_refresh_cookie(response, tokens["refresh_token"], persistent=True)
+            await auth_service.record_security_event(
+                session,
+                existing_sub.id,
+                "login_google",
+                user_agent=request.headers.get("user-agent"),
+                ip_address=request.client.host if request.client else None,
+            )
             logger.info("google_login_existing", extra={"user_id": str(existing_sub.id)})
             return GoogleCallbackResponse(user=UserResponse.model_validate(existing_sub), tokens=TokenPair(**tokens))
 
@@ -1023,6 +1994,7 @@ class GoogleCompleteRequest(BaseModel):
 @router.post("/google/complete", response_model=AuthResponse)
 async def google_complete_registration(
     payload: GoogleCompleteRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_google_completion_user),
     session: AsyncSession = Depends(get_session),
@@ -1050,9 +2022,21 @@ async def google_complete_registration(
     if not user.email_verified:
         record = await auth_service.create_email_verification(session, user)
         background_tasks.add_task(email_service.send_verification_email, user.email, record.token, user.preferred_language)
-    tokens = await auth_service.issue_tokens_for_user(session, user)
+    tokens = await auth_service.issue_tokens_for_user(
+        session,
+        user,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     if response:
         set_refresh_cookie(response, tokens["refresh_token"], persistent=True)
+    await auth_service.record_security_event(
+        session,
+        user.id,
+        "login_google",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 

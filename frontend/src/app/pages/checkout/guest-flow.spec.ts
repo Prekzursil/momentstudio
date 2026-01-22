@@ -9,6 +9,7 @@ import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { AuthService } from '../../core/auth.service';
 import { RouterTestingModule } from '@angular/router/testing';
+import { AccountService } from '../../core/account.service';
 
 describe('Checkout auth gating', () => {
   const itemsSignal = signal([
@@ -29,6 +30,7 @@ describe('Checkout auth gating', () => {
 
   let cartApi: any;
   let apiService: any;
+  let accountService: any;
   let auth: any;
 
   beforeEach(() => {
@@ -39,6 +41,9 @@ describe('Checkout auth gating', () => {
     apiService = jasmine.createSpyObj('ApiService', ['post', 'get']);
     apiService.post.and.returnValue(of({ order_id: 'order1', reference_code: 'REF', payment_method: 'cod' }));
     apiService.get.and.returnValue(of({ email: null, verified: false }));
+
+    accountService = jasmine.createSpyObj('AccountService', ['getAddresses']);
+    accountService.getAddresses.and.returnValue(of([]));
 
     auth = jasmine.createSpyObj('AuthService', ['isAuthenticated', 'user']);
     auth.isAuthenticated.and.returnValue(false);
@@ -52,6 +57,7 @@ describe('Checkout auth gating', () => {
         { provide: CartStore, useValue: { items: itemsSignal, subtotal: subtotalSignal, clear: jasmine.createSpy('clear'), hydrateFromBackend: jasmine.createSpy('hydrateFromBackend') } },
         { provide: CartApi, useValue: cartApi },
         { provide: ApiService, useValue: apiService },
+        { provide: AccountService, useValue: accountService },
         { provide: AuthService, useValue: auth },
         { provide: ActivatedRoute, useValue: { snapshot: { params: {}, queryParamMap: emptyQueryParamMap }, queryParamMap: of(emptyQueryParamMap) } }
       ]
@@ -93,7 +99,8 @@ describe('Checkout auth gating', () => {
     fixture.detectChanges();
     tick();
 
-    cmp.placeOrder({ valid: true } as any);
+    cmp.shippingCountryInput = 'RO';
+    cmp.placeOrder({ valid: true, control: { updateValueAndValidity: () => {} } } as any);
     tick();
 
     expect(apiService.post).toHaveBeenCalled();
