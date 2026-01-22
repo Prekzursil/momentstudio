@@ -413,9 +413,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Cart/Checkout: translate remaining hard-coded UI strings and error messages (no raw English).
 - [x] Cart: show quantity validation errors per item (avoid a single global error banner).
 - [x] Cart: add “Clear cart” action with confirmation (keep backend in sync).
-- [ ] Cart: show discount breakdown in summary (sale vs coupon vs shipping) using backend quote totals.
-- [ ] Cart: add promo code apply UI (signed-in only for coupons) with applied-code chip + remove action.
-- [ ] Cart: add item notes/gift messages UI and persist to backend cart items.
+- [x] Cart: show discount breakdown in summary (sale vs coupon vs shipping) using backend quote totals.
+- [x] Cart: add promo code apply UI (signed-in only for coupons) with applied-code chip + remove action.
+- [x] Cart: add item notes/gift messages UI and persist to backend cart items.
 - [ ] Cart: add skeleton loading state while cart syncs/loads from backend.
 - [ ] Cart: replace quantity input with +/- stepper (debounced) and clamp to stock.
 - [ ] Cart: show low-stock messaging (“Only X left”) and highlight when at max quantity.

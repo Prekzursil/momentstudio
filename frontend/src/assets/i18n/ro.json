@@ -922,6 +922,8 @@
     "each": "buc",
     "inStock": "În stoc: {{count}}",
     "remove": "Elimină",
+    "noteLabel": "Notă (opțional)",
+    "notePlaceholder": "Adaugă o notă cadou (opțional)",
     "summary": "Sumar comandă",
     "subtotal": "Subtotal",
     "shipping": "Livrare",
@@ -935,7 +937,8 @@
     "errors": {
       "notFound": "Produsul nu a fost găsit.",
       "minQty": "Cantitatea trebuie să fie cel puțin 1.",
-      "insufficientStock": "Stoc insuficient."
+      "insufficientStock": "Stoc insuficient.",
+      "noteTooLong": "Nota este prea lungă (maxim 255 de caractere)."
     }
   },
   "checkout": {
