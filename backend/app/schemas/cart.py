@@ -12,6 +12,8 @@ class Totals(BaseModel):
     total: Decimal
     currency: str | None = "RON"
     free_shipping_threshold_ron: Decimal | None = None
+    phone_required_home: bool = False
+    phone_required_locker: bool = False
 
 
 class CartItemCreate(BaseModel):

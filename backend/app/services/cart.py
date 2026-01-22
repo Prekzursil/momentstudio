@@ -269,6 +269,8 @@ async def serialize_cart(
         totals = Totals(**totals_override.model_dump(), currency=currency)
     if totals is not None:
         totals.free_shipping_threshold_ron = threshold
+        totals.phone_required_home = bool(getattr(checkout, "phone_required_home", False))
+        totals.phone_required_locker = bool(getattr(checkout, "phone_required_locker", False))
     return CartRead(
         id=hydrated.id,
         user_id=hydrated.user_id,

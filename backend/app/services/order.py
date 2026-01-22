@@ -49,6 +49,8 @@ async def build_order_from_cart(
     locker_lng: float | None = None,
     discount: Decimal | None = None,
     promo_code: str | None = None,
+    invoice_company: str | None = None,
+    invoice_vat_id: str | None = None,
 ) -> Order:
     if not cart.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
@@ -133,12 +135,20 @@ async def build_order_from_cart(
     promo_clean = (promo_code or "").strip().upper() or None
     if promo_clean and len(promo_clean) > 40:
         promo_clean = promo_clean[:40]
+    invoice_company_clean = (invoice_company or "").strip() or None
+    if invoice_company_clean and len(invoice_company_clean) > 200:
+        invoice_company_clean = invoice_company_clean[:200]
+    invoice_vat_clean = (invoice_vat_id or "").strip() or None
+    if invoice_vat_clean and len(invoice_vat_clean) > 64:
+        invoice_vat_clean = invoice_vat_clean[:64]
     order = Order(
         user_id=user_id,
         reference_code=ref,
         customer_email=customer_email,
         customer_name=customer_name,
         status=initial_status,
+        invoice_company=invoice_company_clean,
+        invoice_vat_id=invoice_vat_clean,
         total_amount=computed_total,
         tax_amount=computed_tax,
         fee_amount=computed_fee,

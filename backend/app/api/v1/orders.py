@@ -326,6 +326,24 @@ async def checkout(
 
     checkout_settings = await checkout_settings_service.get_checkout_settings(session)
 
+    courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = _delivery_from_payload(
+        courier=payload.courier,
+        delivery_type=payload.delivery_type,
+        locker_id=payload.locker_id,
+        locker_name=payload.locker_name,
+        locker_address=payload.locker_address,
+        locker_lat=payload.locker_lat,
+        locker_lng=payload.locker_lng,
+    )
+    phone_required = bool(
+        checkout_settings.phone_required_locker if delivery_type == "locker" else checkout_settings.phone_required_home
+    )
+    phone = (payload.phone or "").strip() or None
+    if not phone:
+        phone = (getattr(current_user, "phone", None) or "").strip() or None
+    if phone_required and not phone:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phone is required")
+
     promo = None
     applied_discount = None
     applied_coupon = None
@@ -367,6 +385,7 @@ async def checkout(
         address_user_id,
         AddressCreate(
             label="Checkout" if payload.save_address else "Checkout (One-time)",
+            phone=phone,
             line1=payload.line1,
             line2=payload.line2,
             city=payload.city,
@@ -392,6 +411,7 @@ async def checkout(
             address_user_id,
             AddressCreate(
                 label="Checkout (Billing)" if payload.save_address else "Checkout (Billing · One-time)",
+                phone=phone,
                 line1=payload.billing_line1 or payload.line1,
                 line2=payload.billing_line2,
                 city=payload.billing_city,
@@ -413,15 +433,6 @@ async def checkout(
             checkout_settings=checkout_settings,
         )
     payment_method = payload.payment_method or "stripe"
-    courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = _delivery_from_payload(
-        courier=payload.courier,
-        delivery_type=payload.delivery_type,
-        locker_id=payload.locker_id,
-        locker_name=payload.locker_name,
-        locker_address=payload.locker_address,
-        locker_lat=payload.locker_lat,
-        locker_lng=payload.locker_lng,
-    )
     stripe_session_id = None
     stripe_checkout_url = None
     payment_intent_id = None
@@ -482,6 +493,8 @@ async def checkout(
         locker_lng=locker_lng,
         discount=discount_val,
         promo_code=payload.promo_code,
+        invoice_company=payload.invoice_company,
+        invoice_vat_id=payload.invoice_vat_id,
         tax_amount=totals.tax,
         fee_amount=totals.fee,
         shipping_amount=totals.shipping,
@@ -1089,6 +1102,23 @@ async def guest_checkout(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sign in to use coupons.")
     promo = None
 
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+    courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = _delivery_from_payload(
+        courier=payload.courier,
+        delivery_type=payload.delivery_type,
+        locker_id=payload.locker_id,
+        locker_name=payload.locker_name,
+        locker_address=payload.locker_address,
+        locker_lat=payload.locker_lat,
+        locker_lng=payload.locker_lng,
+    )
+    phone_required = bool(
+        checkout_settings.phone_required_locker if delivery_type == "locker" else checkout_settings.phone_required_home
+    )
+    phone = (payload.phone or "").strip() or None
+    if phone_required and not phone:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phone is required")
+
     has_billing = bool((payload.billing_line1 or "").strip())
     billing_same_as_shipping = not has_billing
 
@@ -1097,6 +1127,7 @@ async def guest_checkout(
         user_id,
         AddressCreate(
             label="Guest Checkout" if not payload.create_account else "Checkout",
+            phone=phone,
             line1=payload.line1,
             line2=payload.line2,
             city=payload.city,
@@ -1122,6 +1153,7 @@ async def guest_checkout(
             user_id,
             AddressCreate(
                 label="Guest Checkout (Billing)" if not payload.create_account else "Checkout (Billing)",
+                phone=phone,
                 line1=payload.billing_line1 or payload.line1,
                 line2=payload.billing_line2,
                 city=payload.billing_city,
@@ -1133,7 +1165,6 @@ async def guest_checkout(
             ),
         )
 
-    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
     totals, discount_val = cart_service.calculate_totals(
         cart,
         shipping_method=shipping_method,
@@ -1141,15 +1172,6 @@ async def guest_checkout(
         checkout_settings=checkout_settings,
     )
     payment_method = payload.payment_method or "stripe"
-    courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = _delivery_from_payload(
-        courier=payload.courier,
-        delivery_type=payload.delivery_type,
-        locker_id=payload.locker_id,
-        locker_name=payload.locker_name,
-        locker_address=payload.locker_address,
-        locker_lat=payload.locker_lat,
-        locker_lng=payload.locker_lng,
-    )
     stripe_session_id = None
     stripe_checkout_url = None
     payment_intent_id = None
@@ -1210,6 +1232,8 @@ async def guest_checkout(
         locker_lng=locker_lng,
         discount=discount_val,
         promo_code=None,
+        invoice_company=payload.invoice_company,
+        invoice_vat_id=payload.invoice_vat_id,
         tax_amount=totals.tax,
         fee_amount=totals.fee,
         shipping_amount=totals.shipping,

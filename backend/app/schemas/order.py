@@ -68,6 +68,8 @@ class OrderRead(BaseModel):
     currency: str
     payment_method: str
     promo_code: str | None = None
+    invoice_company: str | None = Field(default=None, max_length=200)
+    invoice_vat_id: str | None = Field(default=None, max_length=64)
     stripe_payment_intent_id: str | None = None
     paypal_order_id: str | None = None
     paypal_capture_id: str | None = None

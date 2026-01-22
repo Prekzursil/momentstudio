@@ -445,12 +445,14 @@ Below is a structured checklist you can turn into issues.
 - [x] Checkout: show inline field validation (per field) with `aria-describedby` and consistent styling.
 - [x] Checkout: add “Copy from shipping” button for billing address when not “same as shipping”.
 - [x] Checkout: add “Save as default shipping/billing” toggles when saving address (signed-in).
-- [ ] Checkout: expose courier price/ETA differences more clearly (radio cards).
-- [ ] Checkout: add phone field to shipping address if courier requires it (configurable).
-- [ ] Checkout: add optional invoice details (company name, VAT ID) under billing.
-- [ ] Payments UX: hide/disable payment methods that are not available for current cart/currency/country.
-- [ ] Payments UX: remember last-used payment method and default to it on next checkout.
-- [ ] Payments UX: prevent double-submits and show progress on “Place order” (incl. network retries).
+- [x] Checkout: expose courier price/ETA differences more clearly (radio cards).
+- [x] Checkout: add phone field to shipping address if courier requires it (configurable).
+- [x] Checkout: add optional invoice details (company name, VAT ID) under billing.
+- [x] Payments UX: hide/disable payment methods that are not available for current cart/currency/country.
+- [x] Payments UX: remember last-used payment method and default to it on next checkout.
+- [x] Payments UX: prevent double-submits and show progress on “Place order” (incl. network retries).
+- [ ] Checkout: allow saving/editing phone on saved addresses and prefill it in checkout.
+- [ ] Receipts/Admin: show invoice details (company/VAT) on order detail + receipt PDF (redact in share links).
 - [ ] A11y: add aria-labels for cart remove/quantity controls and ensure full keyboard support.
 - [ ] A11y: announce validation errors via `aria-live` on checkout and move focus to first error.
 - [ ] A11y: ensure focus management when steps change or modals open/close.

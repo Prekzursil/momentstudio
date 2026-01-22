@@ -35,6 +35,8 @@ class Order(Base):
     reference_code: Mapped[str | None] = mapped_column(String(20), unique=True, nullable=True)
     customer_email: Mapped[str] = mapped_column(String(255), nullable=False)
     customer_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    invoice_company: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    invoice_vat_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     shipping_method_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("shipping_methods.id"), nullable=True)
     tracking_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
     tracking_url: Mapped[str | None] = mapped_column(String(255), nullable=True)

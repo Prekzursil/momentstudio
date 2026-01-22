@@ -280,6 +280,20 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
               ></app-input>
             </div>
 
+            <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950">
+              <p class="text-xs font-semibold text-slate-600 uppercase tracking-[0.2em] dark:text-slate-300">
+                {{ 'adminUi.site.checkout.phoneRequirementsTitle' | translate }}
+              </p>
+              <label class="flex items-center gap-2">
+                <input type="checkbox" [(ngModel)]="checkoutSettingsForm.phone_required_home" />
+                <span class="text-slate-700 dark:text-slate-200">{{ 'adminUi.site.checkout.phoneRequiredHome' | translate }}</span>
+              </label>
+              <label class="flex items-center gap-2">
+                <input type="checkbox" [(ngModel)]="checkoutSettingsForm.phone_required_locker" />
+                <span class="text-slate-700 dark:text-slate-200">{{ 'adminUi.site.checkout.phoneRequiredLocker' | translate }}</span>
+              </label>
+            </div>
+
             <div class="grid gap-3 text-sm">
               <label class="flex items-center gap-2">
                 <input type="checkbox" [(ngModel)]="checkoutSettingsForm.fee_enabled" />
@@ -2979,6 +2993,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   checkoutSettingsForm: {
     shipping_fee_ron: number | string;
     free_shipping_threshold_ron: number | string;
+    phone_required_home: boolean;
+    phone_required_locker: boolean;
     fee_enabled: boolean;
     fee_type: 'flat' | 'percent';
     fee_value: number | string;
@@ -2990,6 +3006,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   } = {
     shipping_fee_ron: 20,
     free_shipping_threshold_ron: 300,
+    phone_required_home: true,
+    phone_required_locker: true,
     fee_enabled: false,
     fee_type: 'flat',
     fee_value: 0,
@@ -4634,6 +4652,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         };
         const shipping = Number(meta['shipping_fee_ron']);
         const threshold = Number(meta['free_shipping_threshold_ron']);
+        const phoneRequiredHome = parseBool(meta['phone_required_home'], true);
+        const phoneRequiredLocker = parseBool(meta['phone_required_locker'], true);
         const feeEnabled = parseBool(meta['fee_enabled'], false);
         const feeTypeRaw = String(meta['fee_type'] ?? 'flat').trim().toLowerCase();
         const feeType = feeTypeRaw === 'percent' ? 'percent' : 'flat';
@@ -4650,6 +4670,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.checkoutSettingsForm = {
           shipping_fee_ron: Number.isFinite(shipping) && shipping >= 0 ? shipping : 20,
           free_shipping_threshold_ron: Number.isFinite(threshold) && threshold >= 0 ? threshold : 300,
+          phone_required_home: phoneRequiredHome,
+          phone_required_locker: phoneRequiredLocker,
           fee_enabled: feeEnabled,
           fee_type: feeType,
           fee_value: feeValue,
@@ -4665,6 +4687,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.checkoutSettingsForm = {
           shipping_fee_ron: 20,
           free_shipping_threshold_ron: 300,
+          phone_required_home: true,
+          phone_required_locker: true,
           fee_enabled: false,
           fee_type: 'flat',
           fee_value: 0,
@@ -4685,6 +4709,9 @@ export class AdminComponent implements OnInit, OnDestroy {
     const thresholdRaw = Number(this.checkoutSettingsForm.free_shipping_threshold_ron);
     const shipping = Number.isFinite(shippingRaw) && shippingRaw >= 0 ? Math.round(shippingRaw * 100) / 100 : 20;
     const threshold = Number.isFinite(thresholdRaw) && thresholdRaw >= 0 ? Math.round(thresholdRaw * 100) / 100 : 300;
+
+    const phoneRequiredHome = Boolean(this.checkoutSettingsForm.phone_required_home);
+    const phoneRequiredLocker = Boolean(this.checkoutSettingsForm.phone_required_locker);
 
     const feeEnabled = Boolean(this.checkoutSettingsForm.fee_enabled);
     const feeType = this.checkoutSettingsForm.fee_type === 'percent' ? 'percent' : 'flat';
@@ -4711,6 +4738,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         version: 1,
         shipping_fee_ron: shipping,
         free_shipping_threshold_ron: threshold,
+        phone_required_home: phoneRequiredHome,
+        phone_required_locker: phoneRequiredLocker,
         fee_enabled: feeEnabled,
         fee_type: feeType,
         fee_value: feeValue,

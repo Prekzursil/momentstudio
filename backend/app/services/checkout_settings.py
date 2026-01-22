@@ -11,6 +11,8 @@ from app.services import content as content_service
 
 DEFAULT_SHIPPING_FEE_RON = Decimal("20.00")
 DEFAULT_FREE_SHIPPING_THRESHOLD_RON = Decimal("300.00")
+DEFAULT_PHONE_REQUIRED_HOME = True
+DEFAULT_PHONE_REQUIRED_LOCKER = True
 DEFAULT_FEE_ENABLED = False
 DEFAULT_FEE_TYPE: Literal["flat", "percent"] = "flat"
 DEFAULT_FEE_VALUE = Decimal("0.00")
@@ -25,6 +27,8 @@ DEFAULT_RECEIPT_SHARE_DAYS = 365
 class CheckoutSettings:
     shipping_fee_ron: Decimal = DEFAULT_SHIPPING_FEE_RON
     free_shipping_threshold_ron: Decimal = DEFAULT_FREE_SHIPPING_THRESHOLD_RON
+    phone_required_home: bool = DEFAULT_PHONE_REQUIRED_HOME
+    phone_required_locker: bool = DEFAULT_PHONE_REQUIRED_LOCKER
     fee_enabled: bool = DEFAULT_FEE_ENABLED
     fee_type: Literal["flat", "percent"] = DEFAULT_FEE_TYPE
     fee_value: Decimal = DEFAULT_FEE_VALUE
@@ -100,6 +104,8 @@ async def get_checkout_settings(session: AsyncSession) -> CheckoutSettings:
     meta = (getattr(block, "meta", None) or {}) if block else {}
     shipping_fee = _parse_decimal(meta.get("shipping_fee_ron"), fallback=DEFAULT_SHIPPING_FEE_RON)
     threshold = _parse_decimal(meta.get("free_shipping_threshold_ron"), fallback=DEFAULT_FREE_SHIPPING_THRESHOLD_RON)
+    phone_required_home = _parse_bool(meta.get("phone_required_home"), fallback=DEFAULT_PHONE_REQUIRED_HOME)
+    phone_required_locker = _parse_bool(meta.get("phone_required_locker"), fallback=DEFAULT_PHONE_REQUIRED_LOCKER)
     fee_enabled = _parse_bool(meta.get("fee_enabled"), fallback=DEFAULT_FEE_ENABLED)
     fee_type_raw = str(meta.get("fee_type") or DEFAULT_FEE_TYPE).strip().lower()
     fee_type: Literal["flat", "percent"] = "percent" if fee_type_raw == "percent" else "flat"
@@ -126,6 +132,8 @@ async def get_checkout_settings(session: AsyncSession) -> CheckoutSettings:
     return CheckoutSettings(
         shipping_fee_ron=shipping_fee,
         free_shipping_threshold_ron=threshold,
+        phone_required_home=phone_required_home,
+        phone_required_locker=phone_required_locker,
         fee_enabled=fee_enabled,
         fee_type=fee_type,
         fee_value=fee_value,

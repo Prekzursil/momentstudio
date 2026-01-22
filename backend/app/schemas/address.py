@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class AddressBase(BaseModel):
     label: str | None = Field(default=None, max_length=50)
+    phone: str | None = Field(default=None, max_length=32, pattern=r"^\+[1-9]\d{1,14}$")
     line1: str = Field(min_length=1, max_length=200)
     line2: str | None = Field(default=None, max_length=200)
     city: str = Field(min_length=1, max_length=100)
@@ -22,6 +23,7 @@ class AddressCreate(AddressBase):
 
 class AddressUpdate(BaseModel):
     label: str | None = Field(default=None, max_length=50)
+    phone: str | None = Field(default=None, max_length=32, pattern=r"^\+[1-9]\d{1,14}$")
     line1: str | None = Field(default=None, max_length=200)
     line2: str | None = Field(default=None, max_length=200)
     city: str | None = Field(default=None, max_length=100)

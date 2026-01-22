@@ -52,6 +52,8 @@ class GuestCheckoutRequest(BaseModel):
     billing_region: str | None = Field(default=None, max_length=100)
     billing_postal_code: str | None = Field(default=None, min_length=1, max_length=20)
     billing_country: str | None = Field(default=None, min_length=2, max_length=2)
+    invoice_company: str | None = Field(default=None, max_length=200)
+    invoice_vat_id: str | None = Field(default=None, max_length=64)
     payment_method: str = Field(default="stripe", pattern="^(stripe|cod|paypal|netopia)$")
     courier: str = Field(default="sameday", pattern="^(sameday|fan_courier)$")
     delivery_type: str = Field(default="home", pattern="^(home|locker)$")
@@ -99,6 +101,7 @@ class StripeConfirmResponse(BaseModel):
 
 
 class CheckoutRequest(BaseModel):
+    phone: str | None = Field(default=None, max_length=32, pattern=r"^\+[1-9]\d{1,14}$")
     line1: str = Field(min_length=1, max_length=200)
     line2: str | None = Field(default=None, max_length=200)
     city: str = Field(min_length=1, max_length=100)
@@ -111,6 +114,8 @@ class CheckoutRequest(BaseModel):
     billing_region: str | None = Field(default=None, max_length=100)
     billing_postal_code: str | None = Field(default=None, min_length=1, max_length=20)
     billing_country: str | None = Field(default=None, min_length=2, max_length=2)
+    invoice_company: str | None = Field(default=None, max_length=200)
+    invoice_vat_id: str | None = Field(default=None, max_length=64)
     payment_method: str = Field(default="stripe", pattern="^(stripe|cod|paypal|netopia)$")
     courier: str = Field(default="sameday", pattern="^(sameday|fan_courier)$")
     delivery_type: str = Field(default="home", pattern="^(home|locker)$")

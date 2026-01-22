@@ -14,7 +14,7 @@ import { CouponsService, type CouponEligibilityResponse, type CouponOffer } from
 import { appConfig } from '../../core/app-config';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthService } from '../../core/auth.service';
-import { buildE164, listPhoneCountries, PhoneCountryOption } from '../../shared/phone';
+import { buildE164, listPhoneCountries, PhoneCountryOption, splitE164 } from '../../shared/phone';
 import { LockerPickerComponent } from '../../shared/locker-picker.component';
 import { AddressFormComponent } from '../../shared/address-form.component';
 import { LockerProvider, LockerRead } from '../../core/shipping.service';
@@ -52,6 +52,10 @@ type SavedCheckout = {
   courier?: LockerProvider;
   deliveryType?: 'home' | 'locker';
   locker?: LockerRead | null;
+  phone?: string | null;
+  invoice_company?: string | null;
+  invoice_vat_id?: string | null;
+  invoice_enabled?: boolean;
 };
 
 type CheckoutPaymentMethod = 'cod' | 'netopia' | 'paypal' | 'stripe';
@@ -268,6 +272,7 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
                         class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                         name="guestPhoneCountry"
                         [(ngModel)]="guestPhoneCountry"
+                        (ngModelChange)="onGuestPhoneChanged()"
                         required
                       >
                         <option *ngFor="let c of phoneCountries" [value]="c.code">{{ c.flag }} {{ c.dial }} {{ c.name }}</option>
@@ -277,6 +282,7 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
                         class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
                         name="guestPhoneNational"
                         [(ngModel)]="guestPhoneNational"
+                        (ngModelChange)="onGuestPhoneChanged()"
                         autocomplete="tel-national"
                         required
                         pattern="^[0-9]{6,14}$"
@@ -398,6 +404,55 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
                     <p *ngIf="guestEmailError" class="text-xs text-amber-700 dark:text-amber-300">{{ guestEmailError }}</p>
                   </div>
                 </label>
+                <div *ngIf="shippingPhoneRequired()" class="grid gap-1 text-sm sm:col-span-2">
+                  <span class="font-medium text-slate-700 dark:text-slate-200">{{ 'auth.phone' | translate }}</span>
+                  <div class="grid grid-cols-[auto_1fr] gap-2">
+                    <select
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      name="shippingPhoneCountry"
+                      [(ngModel)]="shippingPhoneCountry"
+                      required
+                    >
+                      <option *ngFor="let c of phoneCountries" [value]="c.code">{{ c.flag }} {{ c.dial }} {{ c.name }}</option>
+                    </select>
+                    <input
+                      #shippingPhoneCtrl="ngModel"
+                      type="tel"
+                      class="rounded-lg border bg-white px-3 py-2 text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      [ngClass]="
+                        (shippingPhoneCtrl.invalid && (shippingPhoneCtrl.touched || checkoutForm.submitted)) || (shippingPhoneNational && !shippingPhoneE164())
+                          ? 'border-rose-300 ring-2 ring-rose-200 dark:border-rose-900/40 dark:ring-rose-900/30'
+                          : 'border-slate-200 dark:border-slate-700'
+                      "
+                      [attr.aria-invalid]="
+                        (shippingPhoneCtrl.invalid && (shippingPhoneCtrl.touched || checkoutForm.submitted)) || (shippingPhoneNational && !shippingPhoneE164())
+                          ? 'true'
+                          : null
+                      "
+                      aria-describedby="checkout-phone-required checkout-phone-invalid"
+                      name="shippingPhoneNational"
+                      [(ngModel)]="shippingPhoneNational"
+                      autocomplete="tel-national"
+                      required
+                      pattern="^[0-9]{6,14}$"
+                    />
+                  </div>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'auth.phoneHint' | translate }}</span>
+                  <span
+                    *ngIf="shippingPhoneCtrl.invalid && (shippingPhoneCtrl.touched || checkoutForm.submitted)"
+                    id="checkout-phone-required"
+                    class="text-xs font-normal text-rose-700 dark:text-rose-300"
+                  >
+                    {{ 'validation.required' | translate }}
+                  </span>
+                  <span
+                    *ngIf="shippingPhoneNational && !shippingPhoneE164()"
+                    id="checkout-phone-invalid"
+                    class="text-xs font-normal text-rose-700 dark:text-rose-300"
+                  >
+                    {{ 'validation.phoneInvalid' | translate }}
+                  </span>
+                </div>
                 <ng-container *ngIf="auth.isAuthenticated()">
                   <div class="sm:col-span-2 flex items-center justify-between gap-2">
                     <p class="text-xs font-semibold text-slate-600 uppercase tracking-[0.2em] dark:text-slate-300">
@@ -571,61 +626,99 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
 	                </label>
 	              </div>
 
-              <div class="grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
-                <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">
-                  {{ 'checkout.deliveryTitle' | translate }}
-                </p>
-                <div class="grid sm:grid-cols-2 gap-3">
-                  <label class="text-sm grid gap-1">
-                    {{ 'checkout.deliveryType' | translate }}
-                    <div class="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        class="flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-                        [ngClass]="
-                          deliveryType === 'home'
-                            ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'
-                            : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800'
-                        "
-                        (click)="setDeliveryType('home')"
-                        [attr.aria-pressed]="deliveryType === 'home'"
-                      >
-                        {{ 'checkout.deliveryHome' | translate }}
-                      </button>
-                      <button
-                        type="button"
-                        class="flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-                        [ngClass]="
-                          deliveryType === 'locker'
-                            ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'
-                            : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800'
-                        "
-                        (click)="setDeliveryType('locker')"
-                        [attr.aria-pressed]="deliveryType === 'locker'"
-                      >
-                        {{ 'checkout.deliveryLocker' | translate }}
-                      </button>
-                    </div>
-                  </label>
-                  <label class="text-sm grid gap-1">
-                    {{ 'checkout.courier' | translate }}
-                    <select
-                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                      name="courier"
-                      [(ngModel)]="courier"
-                      (ngModelChange)="onCourierChanged()"
-                      required
-                    >
-                      <option value="sameday">{{ 'checkout.courierSameday' | translate }}</option>
-                      <option value="fan_courier">{{ 'checkout.courierFanCourier' | translate }}</option>
-                    </select>
-                  </label>
-                </div>
-                <div *ngIf="deliveryType === 'locker'" class="grid gap-2">
-                  <app-locker-picker [provider]="courier" [(selected)]="locker"></app-locker-picker>
-                  <p *ngIf="deliveryError" class="text-xs text-amber-700 dark:text-amber-300">{{ deliveryError }}</p>
-                </div>
-              </div>
+	              <div class="grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
+	                <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">
+	                  {{ 'checkout.deliveryTitle' | translate }}
+	                </p>
+	                <div class="grid sm:grid-cols-2 gap-3">
+	                  <div class="text-sm grid gap-1">
+	                    <span>{{ 'checkout.deliveryType' | translate }}</span>
+	                    <div class="grid grid-cols-2 gap-2">
+	                      <button
+	                        type="button"
+	                        class="flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+	                        [ngClass]="
+	                          deliveryType === 'home'
+	                            ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'
+	                            : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800'
+	                        "
+	                        (click)="setDeliveryType('home')"
+	                        [attr.aria-pressed]="deliveryType === 'home'"
+	                      >
+	                        {{ 'checkout.deliveryHome' | translate }}
+	                      </button>
+	                      <button
+	                        type="button"
+	                        class="flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+	                        [ngClass]="
+	                          deliveryType === 'locker'
+	                            ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'
+	                            : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800'
+	                        "
+	                        (click)="setDeliveryType('locker')"
+	                        [attr.aria-pressed]="deliveryType === 'locker'"
+	                      >
+	                        {{ 'checkout.deliveryLocker' | translate }}
+	                      </button>
+	                    </div>
+	                  </div>
+	                  <div class="text-sm grid gap-2">
+	                    <span>{{ 'checkout.courier' | translate }}</span>
+	                    <div class="grid gap-2">
+	                      <button
+	                        type="button"
+	                        class="rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+	                        [ngClass]="
+	                          courier === 'sameday'
+	                            ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'
+	                            : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800'
+	                        "
+	                        (click)="setCourier('sameday')"
+	                        [attr.aria-pressed]="courier === 'sameday'"
+	                      >
+	                        <div class="flex items-start justify-between gap-3">
+	                          <div class="min-w-0">
+	                            <p class="font-medium">{{ 'checkout.courierSameday' | translate }}</p>
+	                            <p *ngIf="courierEstimateKey('sameday')" class="text-xs text-slate-600 dark:text-slate-300">
+	                              {{ courierEstimateKey('sameday') | translate : courierEstimateParams('sameday') }}
+	                            </p>
+	                          </div>
+	                          <p class="text-xs text-slate-600 dark:text-slate-300">
+	                            {{ 'checkout.shipping' | translate }}: {{ quoteShipping() | localizedCurrency : currency }}
+	                          </p>
+	                        </div>
+	                      </button>
+	                      <button
+	                        type="button"
+	                        class="rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+	                        [ngClass]="
+	                          courier === 'fan_courier'
+	                            ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'
+	                            : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800'
+	                        "
+	                        (click)="setCourier('fan_courier')"
+	                        [attr.aria-pressed]="courier === 'fan_courier'"
+	                      >
+	                        <div class="flex items-start justify-between gap-3">
+	                          <div class="min-w-0">
+	                            <p class="font-medium">{{ 'checkout.courierFanCourier' | translate }}</p>
+	                            <p *ngIf="courierEstimateKey('fan_courier')" class="text-xs text-slate-600 dark:text-slate-300">
+	                              {{ courierEstimateKey('fan_courier') | translate : courierEstimateParams('fan_courier') }}
+	                            </p>
+	                          </div>
+	                          <p class="text-xs text-slate-600 dark:text-slate-300">
+	                            {{ 'checkout.shipping' | translate }}: {{ quoteShipping() | localizedCurrency : currency }}
+	                          </p>
+	                        </div>
+	                      </button>
+	                    </div>
+	                  </div>
+	                </div>
+	                <div *ngIf="deliveryType === 'locker'" class="grid gap-2">
+	                  <app-locker-picker [provider]="courier" [(selected)]="locker"></app-locker-picker>
+	                  <p *ngIf="deliveryError" class="text-xs text-amber-700 dark:text-amber-300">{{ deliveryError }}</p>
+	                </div>
+	              </div>
 
 	              <div class="grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
 	                <div class="flex flex-wrap items-center justify-between gap-3">
@@ -652,6 +745,35 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
 		                  </label>
 	                  </div>
 		                </div>
+                <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950">
+                  <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                    <input type="checkbox" [(ngModel)]="invoiceEnabled" name="invoiceEnabled" />
+                    {{ 'checkout.invoiceToggle' | translate }}
+                  </label>
+                  <div *ngIf="invoiceEnabled" class="grid gap-3 sm:grid-cols-2">
+                    <label class="text-sm grid gap-1 sm:col-span-2">
+                      {{ 'checkout.invoiceCompany' | translate }}
+                      <input
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                        name="invoiceCompany"
+                        [(ngModel)]="invoiceCompany"
+                        autocomplete="organization"
+                        maxlength="200"
+                      />
+                    </label>
+                    <label class="text-sm grid gap-1 sm:col-span-2">
+                      {{ 'checkout.invoiceVatId' | translate }}
+                      <input
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                        name="invoiceVatId"
+                        [(ngModel)]="invoiceVatId"
+                        autocomplete="off"
+                        maxlength="64"
+                      />
+                      <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'checkout.invoiceVatHint' | translate }}</span>
+                    </label>
+                  </div>
+                </div>
 	                <div *ngIf="!billingSameAsShipping" class="grid sm:grid-cols-2 gap-3">
                   <ng-container *ngIf="auth.isAuthenticated()">
 	                    <label *ngIf="savedAddresses.length" class="text-sm grid gap-1 sm:col-span-2">
@@ -1087,7 +1209,8 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
 	              <div class="flex flex-wrap gap-3">
                 <button
                   type="button"
-                  class="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  class="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-60"
+                  [disabled]="!isPaymentMethodAvailable('cod')"
                   [ngClass]="
                     paymentMethod === 'cod'
                       ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'
@@ -1106,7 +1229,7 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
                 <button
                   type="button"
                   class="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-60"
-                  [disabled]="!netopiaEnabled"
+                  [disabled]="!isPaymentMethodAvailable('netopia')"
                   [ngClass]="
                     paymentMethod === 'netopia'
                       ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'
@@ -1123,7 +1246,8 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
                 <button
                   *ngIf="paypalEnabled"
                   type="button"
-                  class="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  class="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-60"
+                  [disabled]="!isPaymentMethodAvailable('paypal')"
                   [ngClass]="
                     paymentMethod === 'paypal'
                       ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'
@@ -1157,13 +1281,17 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
 	                </a>
 	              </p>
 	              <p class="text-xs text-slate-600 dark:text-slate-300" *ngIf="paymentMethod === 'netopia'">
-	                <span>{{ netopiaEnabled ? ('checkout.paymentNetopiaHint' | translate) : ('checkout.paymentNetopiaDisabled' | translate) }}</span>
+	                <span>{{
+	                  netopiaEnabled
+	                    ? (isPaymentMethodAvailable('netopia') ? ('checkout.paymentNetopiaHint' | translate) : ('checkout.paymentMethodUnavailable' | translate))
+	                    : ('checkout.paymentNetopiaDisabled' | translate)
+	                }}</span>
 	                <a class="ml-1 underline text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200" routerLink="/contact">
 	                  {{ 'checkout.paymentHelpLink' | translate }}
 	                </a>
 	              </p>
 	              <p class="text-xs text-slate-600 dark:text-slate-300" *ngIf="paymentMethod === 'paypal'">
-	                <span>{{ 'checkout.paymentPayPalHint' | translate }}</span>
+	                <span>{{ isPaymentMethodAvailable('paypal') ? ('checkout.paymentPayPalHint' | translate) : ('checkout.paymentMethodUnavailable' | translate) }}</span>
 	                <a class="ml-1 underline text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200" routerLink="/contact">
 	                  {{ 'checkout.paymentHelpLink' | translate }}
 	                </a>
@@ -1181,7 +1309,16 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
 		            </div>
 
 	            <div class="flex gap-3">
-              <app-button [label]="'checkout.placeOrder' | translate" type="submit" [disabled]="placing || cartSyncPending()"></app-button>
+              <app-button
+                [label]="placing ? ('checkout.placingOrder' | translate) : ('checkout.placeOrder' | translate)"
+                type="submit"
+                [disabled]="placing || cartSyncPending()"
+              >
+                <span
+                  *ngIf="placing"
+                  class="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/70 border-t-white dark:border-slate-900/40 dark:border-t-slate-900"
+                ></span>
+              </app-button>
               <app-button variant="ghost" [label]="'checkout.backToCart' | translate" routerLink="/cart"></app-button>
             </div>
           </form>
@@ -1265,7 +1402,7 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
       </app-container>
     `
 })
-export class CheckoutComponent implements OnInit, OnDestroy {
+	export class CheckoutComponent implements OnInit, OnDestroy {
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'nav.cart', url: '/cart' },
@@ -1338,6 +1475,10 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   locker: LockerRead | null = null;
   deliveryError = '';
   private quote: CheckoutQuote | null = null;
+  private phoneRequiredHome = true;
+  private phoneRequiredLocker = true;
+  shippingPhoneCountry = 'RO';
+  shippingPhoneNational = '';
   address: CheckoutShippingAddress = {
     name: '',
     email: '',
@@ -1358,6 +1499,9 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     postal: '',
     country: ''
   };
+  invoiceEnabled = false;
+  invoiceCompany = '';
+  invoiceVatId = '';
 
 	  syncing = false;
 	  placing = false;
@@ -1390,6 +1534,15 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       this.courier = saved.courier ?? 'sameday';
       this.deliveryType = saved.deliveryType ?? 'home';
       this.locker = saved.locker ?? null;
+      const savedPhone = (saved.phone || '').trim();
+      if (savedPhone) {
+        const split = splitE164(savedPhone);
+        if (split.country) this.shippingPhoneCountry = split.country;
+        this.shippingPhoneNational = split.nationalNumber;
+      }
+      this.invoiceCompany = String(saved.invoice_company || '').trim();
+      this.invoiceVatId = String(saved.invoice_vat_id || '').trim();
+      this.invoiceEnabled = Boolean(saved.invoice_enabled) || Boolean(this.invoiceCompany || this.invoiceVatId);
     }
     const prefs = this.checkoutPrefs.tryLoadDeliveryPrefs();
     if (prefs) {
@@ -1440,6 +1593,10 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     const email = (this.address.email || '').trim();
     if (!email) return false;
     if (!this.isValidEmail(email)) return false;
+    if (this.shippingPhoneRequired()) {
+      if (this.shippingPhoneNational.trim() && !this.shippingPhoneE164()) return false;
+      if (!this.effectivePhoneE164()) return false;
+    }
     if (!this.address.line1.trim()) return false;
     if (!this.address.city.trim()) return false;
     if (!this.address.postal.trim()) return false;
@@ -1506,6 +1663,14 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       const parts = [user.first_name, user.middle_name, user.last_name].filter((p) => (p || '').trim());
       const fullName = parts.join(' ').trim();
       this.address.name = fullName || user.name || '';
+    }
+    if (!this.shippingPhoneNational.trim()) {
+      const userPhone = (typeof (user as any)?.phone === 'string' ? ((user as any).phone as string) : '').trim();
+      if (userPhone) {
+        const split = splitE164(userPhone);
+        if (split.country) this.shippingPhoneCountry = split.country;
+        this.shippingPhoneNational = split.nationalNumber;
+      }
     }
   }
 
@@ -1685,6 +1850,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       this.billing.country = code;
       this.billingCountryInput = this.countryInputFromCode(code);
     }
+    this.ensurePaymentMethodAvailable();
   }
 
   normalizeBillingCountry(): void {
@@ -1696,6 +1862,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     }
     this.billing.country = code;
     this.billingCountryInput = this.countryInputFromCode(code);
+    this.ensurePaymentMethodAvailable();
   }
 
   private normalizeCheckoutCountries(): boolean {
@@ -1711,6 +1878,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     if (this.billingSameAsShipping) {
       this.billing.country = shippingCode;
       this.billingCountryInput = this.countryInputFromCode(shippingCode);
+      this.ensurePaymentMethodAvailable();
       return true;
     }
     const billingCode = this.resolveCountryCode(this.billingCountryInput);
@@ -1720,6 +1888,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     }
     this.billing.country = billingCode;
     this.billingCountryInput = this.countryInputFromCode(billingCode);
+    this.ensurePaymentMethodAvailable();
     return true;
   }
 
@@ -1826,6 +1995,37 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   guestPhoneE164(): string | null {
     const country = (this.guestPhoneCountry || 'RO') as any;
     return buildE164(country, this.guestPhoneNational);
+  }
+
+  onGuestPhoneChanged(): void {
+    if (this.auth.isAuthenticated()) return;
+    if (!this.guestCreateAccount) return;
+    if (this.shippingPhoneNational.trim()) return;
+    const e164 = this.guestPhoneE164();
+    if (!e164) return;
+    const split = splitE164(e164);
+    if (split.country) this.shippingPhoneCountry = split.country;
+    this.shippingPhoneNational = split.nationalNumber;
+  }
+
+  shippingPhoneE164(): string | null {
+    const country = (this.shippingPhoneCountry || 'RO') as any;
+    return buildE164(country, this.shippingPhoneNational);
+  }
+
+  private effectivePhoneE164(): string | null {
+    const shipping = this.shippingPhoneE164();
+    if (shipping) return shipping;
+    const user = this.auth.user();
+    const userPhone = (typeof (user as any)?.phone === 'string' ? ((user as any).phone as string) : '').trim();
+    if (userPhone) return userPhone;
+    if (this.guestCreateAccount) return this.guestPhoneE164();
+    return null;
+  }
+
+  shippingPhoneRequired(): boolean {
+    if (this.deliveryType === 'locker') return this.phoneRequiredLocker;
+    return this.phoneRequiredHome;
   }
 
   quoteSubtotal(): number {
@@ -2032,6 +2232,16 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 
 	  private setQuote(res: CartResponse): void {
 	    const totals = res?.totals ?? ({} as any);
+      const parseBool = (value: unknown, fallback: boolean) => {
+        if (typeof value === 'boolean') return value;
+        if (typeof value === 'number') return Boolean(value);
+        if (typeof value === 'string') {
+          const v = value.trim().toLowerCase();
+          if (['1', 'true', 'yes', 'on'].includes(v)) return true;
+          if (['0', 'false', 'no', 'off'].includes(v)) return false;
+        }
+        return fallback;
+      };
 	    const subtotal = parseMoney(totals.subtotal);
 	    const fee = parseMoney(totals.fee);
 	    const tax = parseMoney(totals.tax);
@@ -2039,7 +2249,10 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 	    const total = parseMoney(totals.total);
 	    const currency = (totals.currency ?? 'RON') as string;
 	    this.quote = { subtotal, fee, tax, shipping, total, currency };
+      this.phoneRequiredHome = parseBool((totals as any).phone_required_home, true);
+      this.phoneRequiredLocker = parseBool((totals as any).phone_required_locker, true);
 	    this.currency = currency || 'RON';
+      this.ensurePaymentMethodAvailable();
 	    this.loadCouponsEligibility();
 	    this.applyPendingPromoCode();
 	  }
@@ -2161,6 +2374,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   placeOrder(form: NgForm): void {
+    if (this.placing) return;
     if (!this.normalizeCheckoutCountries()) {
       this.addressError = this.translate.instant('checkout.countryInvalid');
       return;
@@ -2198,6 +2412,10 @@ export class CheckoutComponent implements OnInit, OnDestroy {
         return;
       }
     }
+    if (this.shippingPhoneRequired() && this.shippingPhoneNational.trim() && !this.shippingPhoneE164()) {
+      this.errorMessage = this.translate.instant('validation.phoneInvalid');
+      return;
+    }
 	    const validation = this.validateCart();
 	    if (validation) {
 	      this.errorMessage = validation;
@@ -2209,18 +2427,14 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 	      this.queueCartSync(this.items(), { immediate: true });
 	      return;
 	    }
-		    this.errorMessage = '';
-		    this.syncNotice = '';
-		    if (this.paymentMethod === 'paypal' && !this.paypalEnabled) {
-		      this.showPaymentNotReady();
-		      this.scrollToStep('checkout-step-4');
-		      return;
-		    }
-	    if (this.paymentMethod === 'netopia' && !this.netopiaEnabled) {
-	      this.showPaymentNotReady();
-	      this.scrollToStep('checkout-step-4');
-	      return;
-	    }
+    this.errorMessage = '';
+    this.syncNotice = '';
+    if (!this.isPaymentMethodAvailable(this.paymentMethod)) {
+      this.showPaymentNotReady();
+      this.scrollToStep('checkout-step-4');
+      return;
+    }
+    this.checkoutPrefs.savePaymentMethod(this.paymentMethod);
     this.placing = true;
     if (this.auth.isAuthenticated()) {
       this.submitCheckout();
@@ -2257,6 +2471,10 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     localStorage.setItem(
       'checkout_address',
       JSON.stringify({
+        phone: this.effectivePhoneE164(),
+        invoice_company: (this.invoiceCompany || '').trim() || null,
+        invoice_vat_id: (this.invoiceVatId || '').trim() || null,
+        invoice_enabled: Boolean(this.invoiceEnabled),
         address: {
           name: this.address.name,
           email: this.address.email,
@@ -2293,7 +2511,16 @@ export class CheckoutComponent implements OnInit, OnDestroy {
         const addr = parsed.address as any;
         const billing = (parsed.billing as any) || null;
         const billingSame = Boolean(parsed.billingSameAsShipping);
+        const phoneRaw = typeof parsed.phone === 'string' ? parsed.phone.trim() : '';
+        const phone = /^\+[1-9]\d{1,14}$/.test(phoneRaw) ? phoneRaw : null;
+        const invoiceCompany = typeof parsed.invoice_company === 'string' ? parsed.invoice_company.trim() : '';
+        const invoiceVatId = typeof parsed.invoice_vat_id === 'string' ? parsed.invoice_vat_id.trim() : '';
+        const invoiceEnabled = Boolean(parsed.invoice_enabled);
         return {
+          phone,
+          invoice_company: invoiceCompany || null,
+          invoice_vat_id: invoiceVatId || null,
+          invoice_enabled: invoiceEnabled,
           address: {
             name: String(addr.name || ''),
             email: String(addr.email || ''),
@@ -2333,6 +2560,10 @@ export class CheckoutComponent implements OnInit, OnDestroy {
         password: ''
       };
       return {
+        phone: null,
+        invoice_company: null,
+        invoice_vat_id: null,
+        invoice_enabled: false,
         address: addr,
         billingSameAsShipping: true,
         billing: {
@@ -2361,13 +2592,39 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     this.checkoutPrefs.saveDeliveryPrefs({ courier: this.courier, deliveryType: this.deliveryType });
   }
 
-  onCourierChanged(): void {
-    this.deliveryError = '';
-    if (this.deliveryType === 'locker') {
-      this.locker = null;
-    }
-    this.checkoutPrefs.saveDeliveryPrefs({ courier: this.courier, deliveryType: this.deliveryType });
-  }
+	  onCourierChanged(): void {
+	    this.deliveryError = '';
+	    if (this.deliveryType === 'locker') {
+	      this.locker = null;
+	    }
+	    this.checkoutPrefs.saveDeliveryPrefs({ courier: this.courier, deliveryType: this.deliveryType });
+	  }
+
+	  setCourier(value: LockerProvider): void {
+	    this.courier = value;
+	    this.onCourierChanged();
+	  }
+
+	  courierEstimate(provider: LockerProvider): { min: number; max: number } | null {
+	    const est: Record<LockerProvider, Record<'home' | 'locker', { min: number; max: number }>> = {
+	      sameday: { home: { min: 1, max: 2 }, locker: { min: 1, max: 3 } },
+	      fan_courier: { home: { min: 1, max: 3 }, locker: { min: 2, max: 4 } }
+	    };
+	    return est[provider]?.[this.deliveryType] ?? null;
+	  }
+
+	  courierEstimateKey(provider: LockerProvider): string | null {
+	    const est = this.courierEstimate(provider);
+	    if (!est) return null;
+	    return est.min === est.max ? 'checkout.deliveryEstimateSingle' : 'checkout.deliveryEstimateRange';
+	  }
+
+	  courierEstimateParams(provider: LockerProvider): Record<string, number> {
+	    const est = this.courierEstimate(provider);
+	    if (!est) return {};
+	    if (est.min === est.max) return { days: est.min };
+	    return { min: est.min, max: est.max };
+	  }
 
   ngOnInit(): void {
     this.autoApplyBestCoupon = this.loadAutoApplyBestCouponPreference();
@@ -2408,21 +2665,49 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 	  }
 
 	  setPaymentMethod(method: CheckoutPaymentMethod): void {
-	    if (method === 'paypal' && !this.paypalEnabled) {
-	      this.showPaymentNotReady();
-	      return;
-	    }
-	    if (method === 'netopia' && !this.netopiaEnabled) {
+	    if (!this.isPaymentMethodAvailable(method)) {
 	      this.showPaymentNotReady();
 	      return;
 	    }
 	    this.paymentMethod = method;
+      this.checkoutPrefs.savePaymentMethod(method);
 	    this.errorMessage = '';
 	    this.paymentNotReady = false;
 	  }
 
+    private currentShippingCountryCode(): string {
+      return (
+        this.resolveCountryCode(this.shippingCountryInput) ||
+        (this.address.country || '').trim().toUpperCase() ||
+        'RO'
+      );
+    }
+
+    isPaymentMethodAvailable(method: CheckoutPaymentMethod): boolean {
+      const currency = (this.currency || 'RON').toUpperCase();
+      const country = this.currentShippingCountryCode();
+      if (method === 'cod') return currency === 'RON' && country === 'RO';
+      if (method === 'netopia') return this.netopiaEnabled && currency === 'RON' && country === 'RO';
+      if (method === 'paypal') return this.paypalEnabled && currency === 'RON';
+      return true;
+    }
+
+    private ensurePaymentMethodAvailable(): void {
+      if (this.isPaymentMethodAvailable(this.paymentMethod)) return;
+      const next = this.defaultPaymentMethod();
+      this.paymentMethod = next;
+      this.checkoutPrefs.savePaymentMethod(next);
+    }
+
 	  private defaultPaymentMethod(): CheckoutPaymentMethod {
-	    return 'cod';
+      const saved = this.checkoutPrefs.tryLoadPaymentMethod();
+      if (saved && this.isPaymentMethodAvailable(saved)) return saved;
+
+      const candidates: CheckoutPaymentMethod[] = ['cod', 'paypal', 'stripe', 'netopia'];
+      for (const candidate of candidates) {
+        if (this.isPaymentMethodAvailable(candidate)) return candidate;
+      }
+      return 'stripe';
 	  }
 
 	  private showPaymentNotReady(): void {
@@ -2567,6 +2852,9 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 
   private submitCheckout(): void {
     const body: Record<string, unknown> = {
+      phone: this.effectivePhoneE164(),
+      invoice_company: this.invoiceEnabled ? (this.invoiceCompany || '').trim() || null : null,
+      invoice_vat_id: this.invoiceEnabled ? (this.invoiceVatId || '').trim() || null : null,
       line1: this.address.line1,
       line2: this.address.line2,
       city: this.address.city,
@@ -2808,6 +3096,9 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     const payload: Record<string, unknown> = {
       name: this.address.name,
       email: this.address.email,
+      phone: this.effectivePhoneE164(),
+      invoice_company: this.invoiceEnabled ? (this.invoiceCompany || '').trim() || null : null,
+      invoice_vat_id: this.invoiceEnabled ? (this.invoiceVatId || '').trim() || null : null,
       line1: this.address.line1,
       line2: this.address.line2 || null,
       city: this.address.city,
@@ -2840,7 +3131,6 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       payload['middle_name'] = this.guestMiddleName || null;
       payload['last_name'] = this.guestLastName;
       payload['date_of_birth'] = this.guestDob;
-      payload['phone'] = this.guestPhoneE164();
       payload['preferred_language'] = preferredLanguage;
     }
 
