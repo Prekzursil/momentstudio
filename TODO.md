@@ -454,8 +454,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Checkout: allow saving/editing phone on saved addresses and prefill it in checkout.
 - [x] Receipts/Admin: show invoice details (company/VAT) on order detail + receipt PDF (redact in share links).
 - [x] A11y: add aria-labels for cart remove/quantity controls and ensure full keyboard support.
-- [ ] A11y: announce validation errors via `aria-live` on checkout and move focus to first error.
-- [ ] A11y: ensure focus management when steps change or modals open/close.
+- [x] A11y: announce validation errors via `aria-live` on checkout and move focus to first error.
+- [x] A11y: ensure focus management when steps change or modals open/close.
+- [ ] Checkout A11y: tie guest “create account” phone validation to the field (`aria-invalid`/`aria-describedby`) instead of only showing a passive hint.
 - [ ] Performance: split the monolithic `CheckoutComponent` into smaller components (shipping/promo/payment).
 - [ ] Performance: add route-level prefetching/resolvers for shipping methods and CMS pricing settings.
 - [ ] Observability: add client-side analytics events for cart/checkout steps (start, abandon, success).

@@ -1,4 +1,15 @@
-import { AfterViewInit, Component, ElementRef, EventEmitter, HostListener, Input, OnChanges, Output, ViewChild } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  EventEmitter,
+  HostListener,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+  ViewChild
+} from '@angular/core';
 import { NgIf } from '@angular/common';
 import { ButtonComponent } from './button.component';
 
@@ -12,6 +23,7 @@ import { ButtonComponent } from './button.component';
         #dialogRef
         role="dialog"
         aria-modal="true"
+        [attr.aria-label]="title"
         class="w-full max-w-lg rounded-2xl bg-white shadow-xl border border-slate-200 p-6 grid gap-4 outline-none dark:bg-slate-900 dark:border-slate-700 dark:shadow-none"
         tabindex="-1"
       >
@@ -44,6 +56,7 @@ export class ModalComponent implements AfterViewInit, OnChanges {
   @Output() confirm = new EventEmitter<void>();
   @Output() closed = new EventEmitter<void>();
   @ViewChild('dialogRef') dialogRef?: ElementRef<HTMLDivElement>;
+  private previouslyFocused: HTMLElement | null = null;
 
   @HostListener('document:keydown.escape')
   handleEscape(): void {
@@ -54,13 +67,22 @@ export class ModalComponent implements AfterViewInit, OnChanges {
     this.focusDialog();
   }
 
-  ngOnChanges(): void {
-    if (this.open) this.focusDialog();
+  ngOnChanges(changes: SimpleChanges): void {
+    if (!('open' in changes)) return;
+    const prev = Boolean(changes['open'].previousValue);
+    const next = Boolean(changes['open'].currentValue);
+    if (next) {
+      this.capturePreviousFocus();
+      this.focusDialog();
+      return;
+    }
+    if (prev) this.restorePreviousFocus();
   }
 
   close(): void {
     this.open = false;
     this.closed.emit();
+    this.restorePreviousFocus();
   }
 
   private focusDialog(): void {
@@ -70,6 +92,24 @@ export class ModalComponent implements AfterViewInit, OnChanges {
       const focusable =
         el.querySelector<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])') || el;
       focusable.focus();
+    });
+  }
+
+  private capturePreviousFocus(): void {
+    if (typeof document === 'undefined') return;
+    const active = document.activeElement;
+    if (!(active instanceof HTMLElement)) return;
+    this.previouslyFocused = active;
+  }
+
+  private restorePreviousFocus(): void {
+    if (typeof document === 'undefined') return;
+    const target = this.previouslyFocused;
+    this.previouslyFocused = null;
+    if (!target) return;
+    setTimeout(() => {
+      if (!document.contains(target)) return;
+      target.focus();
     });
   }
 }

@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
@@ -112,14 +112,15 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
 	    AddressFormComponent,
 	    ImgFallbackDirective
 	  ],
-  template: `
-      <app-container classes="py-10 grid gap-6">
-        <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-	        <div class="grid lg:grid-cols-[2fr_1fr] gap-6 items-start">
-	          <section class="grid gap-4">
-	            <div class="flex items-center justify-between gap-3">
-	              <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'checkout.title' | translate }}</h1>
-	              <span *ngIf="cartSyncPending()" class="text-xs text-slate-500 dark:text-slate-400">{{ 'checkout.syncing' | translate }}</span>
+	  template: `
+	      <app-container classes="py-10 grid gap-6">
+	        <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
+          <div class="sr-only" aria-live="assertive" aria-atomic="true">{{ liveAssertive }}</div>
+		        <div class="grid lg:grid-cols-[2fr_1fr] gap-6 items-start">
+		          <section class="grid gap-4">
+		            <div class="flex items-center justify-between gap-3">
+		              <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'checkout.title' | translate }}</h1>
+		              <span *ngIf="cartSyncPending()" class="text-xs text-slate-500 dark:text-slate-400">{{ 'checkout.syncing' | translate }}</span>
 	            </div>
 	            <div
 	              *ngIf="syncNotice"
@@ -127,13 +128,15 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
 	            >
 	              {{ syncNotice }}
 	            </div>
-	            <div
-	              *ngIf="errorMessage"
-	            class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex items-start justify-between gap-3 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
-	            >
-              <span>{{ errorMessage }}</span>
-              <app-button size="sm" variant="ghost" [label]="'checkout.retry' | translate" (action)="retryValidation()"></app-button>
-            </div>
+		            <div
+		              *ngIf="errorMessage"
+                  id="checkout-global-error"
+                  tabindex="-1"
+		            class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex items-start justify-between gap-3 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+		            >
+	              <span>{{ errorMessage }}</span>
+	              <app-button size="sm" variant="ghost" [label]="'checkout.retry' | translate" (action)="retryValidation()"></app-button>
+	            </div>
             <div
               *ngIf="!auth.isAuthenticated()"
               class="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-800 flex flex-wrap items-center justify-between gap-3 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
@@ -151,7 +154,7 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
               <span>{{ 'auth.emailVerificationNeeded' | translate }}</span>
               <app-button size="sm" variant="ghost" [label]="'auth.emailVerificationConfirm' | translate" routerLink="/account"></app-button>
             </div>
-	            <form #checkoutForm="ngForm" class="grid gap-4" (ngSubmit)="placeOrder(checkoutForm)">
+		            <form #checkoutForm="ngForm" #checkoutFormEl class="grid gap-4" (ngSubmit)="placeOrder(checkoutForm)">
 	              <div
 	                *ngIf="!auth.isAuthenticated()"
 	                id="checkout-step-1"
@@ -714,11 +717,11 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
 	                    </div>
 	                  </div>
 	                </div>
-	                <div *ngIf="deliveryType === 'locker'" class="grid gap-2">
-	                  <app-locker-picker [provider]="courier" [(selected)]="locker"></app-locker-picker>
-	                  <p *ngIf="deliveryError" class="text-xs text-amber-700 dark:text-amber-300">{{ deliveryError }}</p>
-	                </div>
-	              </div>
+		                <div *ngIf="deliveryType === 'locker'" id="checkout-locker-picker" tabindex="-1" class="grid gap-2">
+		                  <app-locker-picker [provider]="courier" [(selected)]="locker"></app-locker-picker>
+		                  <p *ngIf="deliveryError" class="text-xs text-amber-700 dark:text-amber-300">{{ deliveryError }}</p>
+		                </div>
+		              </div>
 
 	              <div class="grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
 	                <div class="flex flex-wrap items-center justify-between gap-3">
@@ -1402,12 +1405,14 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
       </app-container>
     `
 })
-	export class CheckoutComponent implements OnInit, OnDestroy {
-  crumbs = [
-    { label: 'nav.home', url: '/' },
-    { label: 'nav.cart', url: '/cart' },
-    { label: 'checkout.title' }
-  ];
+		export class CheckoutComponent implements OnInit, OnDestroy {
+    @ViewChild('checkoutFormEl') checkoutFormEl?: ElementRef<HTMLFormElement>;
+
+	  crumbs = [
+	    { label: 'nav.home', url: '/' },
+	    { label: 'nav.cart', url: '/cart' },
+	    { label: 'checkout.title' }
+	  ];
   promo = '';
   promoMessage = '';
   promoStatus: 'success' | 'warn' | 'info' = 'info';
@@ -1438,13 +1443,14 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
   editSavedAddressModel: AddressCreateRequest | null = null;
   editSavedAddressError = '';
   private editSavedAddressSaving = false;
-  addressError = '';
-  errorMessage = '';
-  syncNotice = '';
-  pricesRefreshed = false;
-  syncQueued = false;
-  saveAddress = true;
-  saveDefaultShipping = true;
+	  addressError = '';
+	  errorMessage = '';
+    liveAssertive = '';
+	  syncNotice = '';
+	  pricesRefreshed = false;
+	  syncQueued = false;
+	  saveAddress = true;
+	  saveDefaultShipping = true;
   saveDefaultBilling = true;
   guestCreateAccount = false;
   guestUsername = '';
@@ -1567,13 +1573,112 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
     return this.syncing || this.syncQueued;
   }
 
-  scrollToStep(id: string): void {
-    try {
-      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } catch {
-      // ignore
+	  scrollToStep(id: string): void {
+      if (typeof document === 'undefined') return;
+      try {
+        const step = document.getElementById(id) as HTMLElement | null;
+        if (!step) return;
+        step.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => {
+          const focusable = this.findFirstFocusableElement(step);
+          if (focusable) {
+            this.focusOnly(focusable);
+            return;
+          }
+          step.setAttribute('tabindex', step.getAttribute('tabindex') || '-1');
+          this.focusOnly(step);
+        });
+      } catch {
+        // ignore
+      }
+	  }
+
+    private findFirstFocusableElement(container: HTMLElement): HTMLElement | null {
+      const selector = 'button, [href], input, select, textarea, [tabindex]';
+      const candidates = Array.from(container.querySelectorAll<HTMLElement>(selector));
+      for (const candidate of candidates) {
+        if (candidate instanceof HTMLInputElement && candidate.type === 'hidden') continue;
+        if ('disabled' in candidate && Boolean((candidate as any).disabled)) continue;
+        if (!this.isElementVisible(candidate)) continue;
+        return candidate;
+      }
+      return null;
     }
-  }
+
+    private focusOnly(el: HTMLElement): void {
+      try {
+        el.focus();
+      } catch {
+        // ignore
+      }
+    }
+
+    private announceAssertive(message: string): void {
+      const text = (message || '').trim();
+      if (!text) return;
+      this.liveAssertive = '';
+      setTimeout(() => {
+        this.liveAssertive = text;
+      });
+    }
+
+    private focusGlobalError(): void {
+      this.focusElementById('checkout-global-error');
+    }
+
+    private focusLockerPicker(): void {
+      this.focusElementById('checkout-locker-picker');
+    }
+
+    private focusFirstInvalidField(): void {
+      if (typeof document === 'undefined') return;
+      setTimeout(() => {
+        const formEl = this.checkoutFormEl?.nativeElement;
+        if (!formEl) return;
+        const firstInvalid = this.findFirstInvalidField(formEl);
+        if (!firstInvalid) return;
+        this.scrollAndFocus(firstInvalid);
+      });
+    }
+
+    private focusElementById(id: string): void {
+      if (typeof document === 'undefined') return;
+      setTimeout(() => {
+        const el = document.getElementById(id) as HTMLElement | null;
+        if (!el) return;
+        this.scrollAndFocus(el);
+      });
+    }
+
+    private findFirstInvalidField(container: HTMLElement): HTMLElement | null {
+      const selector =
+        'input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"], input.ng-invalid, select.ng-invalid, textarea.ng-invalid';
+      const candidates = Array.from(container.querySelectorAll<HTMLElement>(selector));
+      for (const candidate of candidates) {
+        if (candidate instanceof HTMLInputElement && candidate.type === 'hidden') continue;
+        if ('disabled' in candidate && Boolean((candidate as any).disabled)) continue;
+        if (!this.isElementVisible(candidate)) continue;
+        return candidate;
+      }
+      return null;
+    }
+
+    private isElementVisible(el: HTMLElement): boolean {
+      return el.getClientRects().length > 0;
+    }
+
+    private scrollAndFocus(el: HTMLElement): void {
+      try {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } catch {
+        // ignore
+      }
+      try {
+        el.focus();
+      } catch {
+        // ignore
+      }
+    }
 
   step1Complete(): boolean {
     if (this.auth.isAuthenticated()) return true;
@@ -2380,57 +2485,77 @@ const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
     this.refreshQuote(null);
   }
 
-  placeOrder(form: NgForm): void {
-    if (this.placing) return;
-    if (!this.normalizeCheckoutCountries()) {
-      this.addressError = this.translate.instant('checkout.countryInvalid');
-      return;
-    }
-    form.control.updateValueAndValidity();
-    if (!form.valid) {
-      this.addressError = this.translate.instant('checkout.addressRequired');
-      return;
-    }
-    this.addressError = '';
-    this.deliveryError = '';
-    if (this.deliveryType === 'locker' && !this.locker) {
-      this.deliveryError = this.translate.instant('checkout.deliveryLockerRequired');
-      return;
-    }
-    if (this.auth.isAuthenticated() && !this.emailVerified()) {
-      this.errorMessage = this.translate.instant('auth.emailVerificationNeeded');
-      return;
-    }
-    if (!this.auth.isAuthenticated() && !this.guestEmailVerified) {
-      this.errorMessage = this.translate.instant('auth.emailVerificationNeeded');
-      return;
-    }
-    if (!this.auth.isAuthenticated() && this.guestCreateAccount) {
-      if (this.guestPassword.length < 6) {
-        this.errorMessage = this.translate.instant('validation.passwordMin');
-        return;
-      }
-      if (this.guestPassword !== this.guestPasswordConfirm) {
-        this.errorMessage = this.translate.instant('validation.passwordMismatch');
-        return;
-      }
-      if (!this.guestPhoneE164()) {
-        this.errorMessage = this.translate.instant('validation.phoneInvalid');
-        return;
-      }
-    }
-    if (this.shippingPhoneRequired() && this.shippingPhoneNational.trim() && !this.shippingPhoneE164()) {
-      this.errorMessage = this.translate.instant('validation.phoneInvalid');
-      return;
-    }
-	    const validation = this.validateCart();
-	    if (validation) {
-	      this.errorMessage = validation;
+	  placeOrder(form: NgForm): void {
+	    if (this.placing) return;
+	    if (!this.normalizeCheckoutCountries()) {
+	      this.addressError = this.translate.instant('checkout.countryInvalid');
+        this.announceAssertive(this.addressError);
+        this.focusFirstInvalidField();
 	      return;
 	    }
-	    if (!this.pricesRefreshed || this.cartSyncPending()) {
-	      this.errorMessage = '';
-	      this.syncNotice = this.translate.instant('checkout.cartSyncing');
+	    form.control.updateValueAndValidity();
+	    if (!form.valid) {
+	      this.addressError = this.translate.instant('checkout.addressRequired');
+        this.announceAssertive(this.addressError);
+        this.focusFirstInvalidField();
+	      return;
+	    }
+	    this.addressError = '';
+	    this.deliveryError = '';
+	    if (this.deliveryType === 'locker' && !this.locker) {
+	      this.deliveryError = this.translate.instant('checkout.deliveryLockerRequired');
+        this.announceAssertive(this.deliveryError);
+        this.focusLockerPicker();
+	      return;
+	    }
+	    if (this.auth.isAuthenticated() && !this.emailVerified()) {
+	      this.errorMessage = this.translate.instant('auth.emailVerificationNeeded');
+        this.announceAssertive(this.errorMessage);
+        this.focusGlobalError();
+	      return;
+	    }
+	    if (!this.auth.isAuthenticated() && !this.guestEmailVerified) {
+	      this.errorMessage = this.translate.instant('auth.emailVerificationNeeded');
+        this.announceAssertive(this.errorMessage);
+        this.focusGlobalError();
+	      return;
+	    }
+	    if (!this.auth.isAuthenticated() && this.guestCreateAccount) {
+	      if (this.guestPassword.length < 6) {
+	        this.errorMessage = this.translate.instant('validation.passwordMin');
+          this.announceAssertive(this.errorMessage);
+          this.focusGlobalError();
+	        return;
+	      }
+	      if (this.guestPassword !== this.guestPasswordConfirm) {
+	        this.errorMessage = this.translate.instant('validation.passwordMismatch');
+          this.announceAssertive(this.errorMessage);
+          this.focusGlobalError();
+	        return;
+	      }
+	      if (!this.guestPhoneE164()) {
+	        this.errorMessage = this.translate.instant('validation.phoneInvalid');
+          this.announceAssertive(this.errorMessage);
+          this.focusGlobalError();
+	        return;
+	      }
+	    }
+	    if (this.shippingPhoneRequired() && this.shippingPhoneNational.trim() && !this.shippingPhoneE164()) {
+	      this.errorMessage = this.translate.instant('validation.phoneInvalid');
+        this.announceAssertive(this.errorMessage);
+        this.focusGlobalError();
+	      return;
+	    }
+		    const validation = this.validateCart();
+		    if (validation) {
+		      this.errorMessage = validation;
+          this.announceAssertive(this.errorMessage);
+          this.focusGlobalError();
+		      return;
+		    }
+		    if (!this.pricesRefreshed || this.cartSyncPending()) {
+		      this.errorMessage = '';
+		      this.syncNotice = this.translate.instant('checkout.cartSyncing');
 	      this.queueCartSync(this.items(), { immediate: true });
 	      return;
 	    }
