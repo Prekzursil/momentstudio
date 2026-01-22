@@ -420,7 +420,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Cart: replace quantity input with +/- stepper (debounced) and clamp to stock.
 - [x] Cart: show low-stock messaging (“Only X left”) and highlight when at max quantity.
 - [x] Cart: add “Move to wishlist” action for signed-in users.
-- [ ] Cart: add recommendations (“You may also like”) using category/featured products.
+- [x] Cart: add recommendations (“You may also like”) using category/featured products.
 - [ ] Cart: show free-shipping threshold progress (configurable) and suggested add-ons.
 - [ ] Cart: show estimated delivery window based on courier selection (if available).
 - [ ] Cart: persist delivery type/courier selections and prefill checkout.

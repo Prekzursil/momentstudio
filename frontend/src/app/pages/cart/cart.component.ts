@@ -16,11 +16,13 @@ import { CouponOffer, CouponsService } from '../../core/coupons.service';
 import { parseMoney } from '../../shared/money';
 import { WishlistService } from '../../core/wishlist.service';
 import { ToastService } from '../../core/toast.service';
+import { CatalogService, Product } from '../../core/catalog.service';
+import { ProductCardComponent } from '../../shared/product-card.component';
 
 @Component({
   selector: 'app-cart',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent, LocalizedCurrencyPipe, TranslateModule, ImgFallbackDirective],
+  imports: [CommonModule, FormsModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent, LocalizedCurrencyPipe, TranslateModule, ImgFallbackDirective, ProductCardComponent],
   template: `
     <app-container classes="py-10 grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -245,6 +247,32 @@ import { ToastService } from '../../core/toast.service';
           <app-button variant="ghost" [label]="'cart.continue' | translate" [routerLink]="['/shop']"></app-button>
         </aside>
       </div>
+
+      <section *ngIf="items().length" class="grid gap-4">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'cart.recommendationsTitle' | translate }}</h2>
+          <a routerLink="/shop" class="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-50">
+            {{ 'cart.recommendationsBrowse' | translate }}
+          </a>
+        </div>
+
+        <div *ngIf="recommendationsLoading" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div
+            *ngFor="let _ of skeletonRows"
+            class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 animate-pulse dark:bg-slate-900 dark:border-slate-800"
+          >
+            <div class="aspect-square w-full rounded-xl bg-slate-100 dark:bg-slate-800"></div>
+            <div class="h-4 w-2/3 rounded bg-slate-100 dark:bg-slate-800"></div>
+            <div class="h-4 w-1/3 rounded bg-slate-100 dark:bg-slate-800"></div>
+          </div>
+        </div>
+
+        <p *ngIf="recommendationsError" class="text-sm text-slate-600 dark:text-slate-300">{{ recommendationsError }}</p>
+
+        <div *ngIf="!recommendationsLoading && recommendations.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <app-product-card *ngFor="let product of recommendations" [product]="product"></app-product-card>
+        </div>
+      </section>
     </app-container>
   `
 })
@@ -265,6 +293,10 @@ export class CartComponent implements OnInit {
   promoApplying = false;
   appliedCouponOffer: CouponOffer | null = null;
   private pendingPromoRefresh = false;
+  recommendations: Product[] = [];
+  recommendationsLoading = false;
+  recommendationsError = '';
+  private recommendationsKey = '';
 
   constructor(
     private cart: CartStore,
@@ -273,6 +305,7 @@ export class CartComponent implements OnInit {
     private coupons: CouponsService,
     private wishlist: WishlistService,
     private toast: ToastService,
+    private catalog: CatalogService,
     private translate: TranslateService
   ) {
     effect(() => {
@@ -283,6 +316,24 @@ export class CartComponent implements OnInit {
       if (!code) return;
       this.pendingPromoRefresh = false;
       this.refreshPromoQuote(code);
+    });
+
+    effect(() => {
+      const productIds = this.items()
+        .map((i) => i.product_id)
+        .filter(Boolean)
+        .sort()
+        .join(',');
+      if (!productIds) {
+        this.recommendations = [];
+        this.recommendationsError = '';
+        this.recommendationsLoading = false;
+        this.recommendationsKey = '';
+        return;
+      }
+      if (productIds === this.recommendationsKey) return;
+      this.recommendationsKey = productIds;
+      this.loadRecommendations(new Set(productIds.split(',')));
     });
   }
 
@@ -428,6 +479,23 @@ export class CartComponent implements OnInit {
         const msg = err?.error?.detail || this.translate.instant('cart.moveToWishlistFailed');
         this.toast.error(this.translate.instant('cart.moveToWishlist'), msg);
         delete this.movingToWishlist[item.id];
+      }
+    });
+  }
+
+  private loadRecommendations(cartProductIds: Set<string>): void {
+    this.recommendationsLoading = true;
+    this.recommendationsError = '';
+    this.catalog.listProducts({ is_featured: true, limit: 12, sort: 'newest' }).subscribe({
+      next: (res) => {
+        const items = (res?.items ?? []).filter((p) => p?.id && !cartProductIds.has(p.id));
+        this.recommendations = items.slice(0, 4);
+        this.recommendationsLoading = false;
+      },
+      error: () => {
+        this.recommendations = [];
+        this.recommendationsLoading = false;
+        this.recommendationsError = this.translate.instant('cart.recommendationsError');
       }
     });
   }

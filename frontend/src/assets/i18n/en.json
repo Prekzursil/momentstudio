@@ -941,6 +941,9 @@
     "continue": "Continue shopping",
     "clear": "Clear cart",
     "confirmClear": "Clear your cart? This will remove all items.",
+    "recommendationsTitle": "You may also like",
+    "recommendationsBrowse": "Browse products",
+    "recommendationsError": "Could not load recommendations.",
     "errors": {
       "notFound": "Item not found.",
       "minQty": "Quantity must be at least 1.",

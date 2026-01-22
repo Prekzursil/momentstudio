@@ -941,6 +941,9 @@
     "continue": "Continuă cumpărăturile",
     "clear": "Golește coșul",
     "confirmClear": "Golești coșul? Toate produsele vor fi eliminate.",
+    "recommendationsTitle": "S-ar putea să îți placă",
+    "recommendationsBrowse": "Răsfoiește produse",
+    "recommendationsError": "Nu am putut încărca recomandările.",
     "errors": {
       "notFound": "Produsul nu a fost găsit.",
       "minQty": "Cantitatea trebuie să fie cel puțin 1.",
