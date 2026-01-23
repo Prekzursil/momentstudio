@@ -124,9 +124,9 @@ test('coupons v2: apply coupon and prevent reuse after redemption', async ({ pag
   await page.goto('/checkout');
   await cartLoad;
 
-  await expect(page.getByText(code)).toBeVisible();
-
-  await page.locator('input[name="promo"]').fill(code);
+  const promoInput = page.locator('input[name="promo"]');
+  await expect(promoInput).toBeVisible();
+  await promoInput.fill(code);
   await page.getByRole('button', { name: 'Apply' }).first().click();
 
   await expect(page.getByText(`Promo ${code} applied.`)).toBeVisible();

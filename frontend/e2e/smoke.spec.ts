@@ -33,20 +33,61 @@ test('shop loads (products grid or empty state)', async ({ page }) => {
   throw new Error('Timed out waiting for shop to render products or empty state.');
 });
 
-test('guest checkout prompts for email verification', async ({ page }) => {
+test('guest checkout prompts for email verification', async ({ page, request: apiRequest }) => {
   // This flow only validates that the guest email verification UI is reachable.
   // Avoid depending on a seeded product page to reduce flakiness in CI.
+  const sessionId = `guest-e2e-${Date.now()}`;
+  await page.addInitScript((sid) => {
+    localStorage.setItem('cart_session_id', sid);
+    localStorage.removeItem('cart_cache');
+  }, sessionId);
+
+  const listRes = await apiRequest.get('/api/v1/catalog/products?sort=newest&page=1&limit=25');
+  expect(listRes.ok()).toBeTruthy();
+  const listPayload = (await listRes.json()) as any;
+
+  const items = Array.isArray(listPayload?.items) ? listPayload.items : [];
+  const candidates = items
+    .filter((p: any) => typeof p?.id === 'string' && p.id.length > 0)
+    .filter((p: any) => {
+      const stock = typeof p?.stock_quantity === 'number' ? p.stock_quantity : 0;
+      return stock > 0 || !!p?.allow_backorder;
+    });
+
+  if (!candidates.length) {
+    test.skip(true, 'No in-stock products available for guest checkout e2e.');
+    return;
+  }
+
+  const product = candidates[0];
+  const syncRes = await apiRequest.post('/api/v1/cart/sync', {
+    headers: { 'X-Session-Id': sessionId },
+    data: {
+      items: [
+        {
+          product_id: product.id,
+          variant_id: null,
+          quantity: 1
+        }
+      ]
+    }
+  });
+  expect(syncRes.ok()).toBeTruthy();
+
   const cartLoad = page.waitForResponse(
     (res) => res.url().includes('/api/v1/cart') && res.request().method() === 'GET' && res.status() === 200
   );
   await page.goto('/checkout');
   await cartLoad;
+  await expect(page).toHaveURL(/\/checkout/);
   const email = `guest-e2e-${Date.now()}@example.com`;
   await page.getByLabel('Email').fill(email);
 
-  const request = page.waitForResponse((res) => res.url().includes('/api/v1/orders/guest-checkout/email/request'));
+  const emailRequest = page.waitForResponse((res) =>
+    res.url().includes('/api/v1/orders/guest-checkout/email/request')
+  );
   await page.getByRole('button', { name: 'Send code' }).click();
-  const response = await request;
+  const response = await emailRequest;
   expect([200, 204]).toContain(response.status());
 
   await expect(page.locator('input[name="guestEmailToken"]')).toBeVisible();
