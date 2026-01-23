@@ -1067,6 +1067,74 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
     assert reorder_resp.json()["items"][0]["product_id"]
 
 
+def test_admin_order_shipments_crud(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    token, user_id = create_user_token(SessionLocal, email="buyer-shipments@example.com")
+    admin_token, _ = create_user_token(SessionLocal, email="admin-shipments@example.com", admin=True)
+    seed_cart_with_product(SessionLocal, user_id)
+
+    async def seed_shipping() -> UUID:
+        async with SessionLocal() as session:
+            method = await order_service.create_shipping_method(
+                session, ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0)
+            )
+            return method.id
+
+    shipping_method_id = asyncio.run(seed_shipping())
+
+    res = client.post(
+        "/api/v1/orders",
+        json={"shipping_method_id": str(shipping_method_id)},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 201, res.text
+    order_id = res.json()["id"]
+
+    created = client.post(
+        f"/api/v1/orders/admin/{order_id}/shipments",
+        json={"tracking_number": "TRACK1", "courier": "sameday", "tracking_url": "https://example.com/track/1"},
+        headers=auth_headers(admin_token),
+    )
+    assert created.status_code == 200, created.text
+    assert created.json()["tracking_number"] == "TRACK1"
+    assert len(created.json().get("shipments") or []) == 1
+
+    listed = client.get(
+        f"/api/v1/orders/admin/{order_id}/shipments",
+        headers=auth_headers(admin_token),
+    )
+    assert listed.status_code == 200, listed.text
+    shipments = listed.json()
+    assert len(shipments) == 1
+    shipment_id = shipments[0]["id"]
+    assert shipments[0]["tracking_number"] == "TRACK1"
+
+    updated = client.patch(
+        f"/api/v1/orders/admin/{order_id}/shipments/{shipment_id}",
+        json={"tracking_url": "https://example.com/track/new"},
+        headers=auth_headers(admin_token),
+    )
+    assert updated.status_code == 200, updated.text
+    updated_shipments = updated.json().get("shipments") or []
+    assert any(s["id"] == shipment_id and s["tracking_url"] == "https://example.com/track/new" for s in updated_shipments)
+
+    duplicate = client.post(
+        f"/api/v1/orders/admin/{order_id}/shipments",
+        json={"tracking_number": "TRACK1"},
+        headers=auth_headers(admin_token),
+    )
+    assert duplicate.status_code == 409
+
+    deleted = client.delete(
+        f"/api/v1/orders/admin/{order_id}/shipments/{shipment_id}",
+        headers=auth_headers(admin_token),
+    )
+    assert deleted.status_code == 200, deleted.text
+    assert all(s["id"] != shipment_id for s in (deleted.json().get("shipments") or []))
+
+
 def test_admin_accept_requires_payment_capture_and_cancel_reason(
     test_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
 ) -> None:

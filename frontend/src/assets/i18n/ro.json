@@ -2234,6 +2234,25 @@
         "refund": "Solicită rambursare"
       },
       "itemsTitle": "Produse",
+      "shipments": {
+        "title": "Livrări",
+        "add": "Adaugă livrare",
+        "addTitle": "Adaugă livrare",
+        "editTitle": "Editează livrare",
+        "empty": "Nu există livrări încă.",
+        "courier": "Curier",
+        "courierNone": "Fără curier",
+        "trackingNumber": "Număr tracking",
+        "trackingUrl": "Link tracking",
+        "openTracking": "Deschide tracking",
+        "success": "Livrarea a fost salvată",
+        "deleted": "Livrarea a fost ștearsă",
+        "errors": {
+          "trackingRequired": "Numărul de tracking este obligatoriu.",
+          "save": "Nu am putut salva livrarea.",
+          "delete": "Nu am putut șterge livrarea."
+        }
+      },
       "addressesTitle": "Adrese",
       "shippingAddress": "Adresă livrare",
       "billingAddress": "Adresă facturare",
@@ -2324,8 +2343,12 @@
       "items": {
         "product": "Produs",
         "qty": "Cant.",
+        "shipped": "Expediat",
         "unit": "Preț",
-        "subtotal": "Subtotal"
+        "subtotal": "Subtotal",
+        "fulfill": "Îndeplinește",
+        "fulfillSuccess": "Îndeplinirea a fost actualizată",
+        "fulfillError": "Nu am putut actualiza îndeplinirea."
       },
       "pagination": "Pagina {{page}} din {{total_pages}} · {{total_items}} total",
       "prev": "Anterior",

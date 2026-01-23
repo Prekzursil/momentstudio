@@ -13,6 +13,7 @@ from app.schemas.order_fraud import AdminOrderFraudSignal
 from app.schemas.order import OrderRead
 from app.schemas.order_admin_note import OrderAdminNoteRead
 from app.schemas.order_refund import OrderRefundRead
+from app.schemas.order_shipment import OrderShipmentRead
 
 
 class AdminOrderListItem(BaseModel):
@@ -45,6 +46,7 @@ class AdminOrderRead(OrderRead):
     admin_notes: list[OrderAdminNoteRead] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     fraud_signals: list[AdminOrderFraudSignal] = Field(default_factory=list)
+    shipments: list[OrderShipmentRead] = Field(default_factory=list)
 
 
 class AdminOrderEmailResendRequest(BaseModel):

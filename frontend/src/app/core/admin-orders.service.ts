@@ -66,6 +66,15 @@ export interface AdminOrderFraudSignal {
   data?: Record<string, unknown> | null;
 }
 
+export interface AdminOrderShipment {
+  id: string;
+  order_id: string;
+  courier?: string | null;
+  tracking_number: string;
+  tracking_url?: string | null;
+  created_at: string;
+}
+
 export interface AdminOrderDetail extends Order {
   payment_retry_count?: number;
   stripe_payment_intent_id?: string | null;
@@ -82,6 +91,7 @@ export interface AdminOrderDetail extends Order {
   admin_notes?: AdminOrderNote[];
   tags?: string[];
   fraud_signals?: AdminOrderFraudSignal[];
+  shipments?: AdminOrderShipment[];
   items: OrderItem[];
 }
 
@@ -124,6 +134,7 @@ export class AdminOrdersService {
         })),
         admin_notes: o?.admin_notes ?? [],
         fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+        shipments: Array.isArray(o?.shipments) ? o.shipments : [],
         items: (o?.items ?? []).map((it: any) => ({
           ...it,
           unit_price: parseMoney(it?.unit_price),
@@ -156,6 +167,7 @@ export class AdminOrdersService {
         })),
         admin_notes: o?.admin_notes ?? [],
         fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+        shipments: Array.isArray(o?.shipments) ? o.shipments : [],
         items: (o?.items ?? []).map((it: any) => ({
           ...it,
           unit_price: parseMoney(it?.unit_price),
@@ -187,6 +199,114 @@ export class AdminOrdersService {
         })),
         admin_notes: o?.admin_notes ?? [],
         fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+        shipments: Array.isArray(o?.shipments) ? o.shipments : [],
+        items: (o?.items ?? []).map((it: any) => ({
+          ...it,
+          unit_price: parseMoney(it?.unit_price),
+          subtotal: parseMoney(it?.subtotal)
+        }))
+      }))
+    );
+  }
+
+  createShipment(
+    orderId: string,
+    payload: { courier?: string | null; tracking_number: string; tracking_url?: string | null }
+  ): Observable<AdminOrderDetail> {
+    return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/shipments`, payload).pipe(
+      map((o: any) => ({
+        ...o,
+        total_amount: parseMoney(o?.total_amount),
+        tax_amount: parseMoney(o?.tax_amount),
+        fee_amount: parseMoney(o?.fee_amount),
+        shipping_amount: parseMoney(o?.shipping_amount),
+        refunds: (o?.refunds ?? []).map((r: any) => ({
+          ...r,
+          amount: parseMoney(r?.amount)
+        })),
+        admin_notes: o?.admin_notes ?? [],
+        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+        shipments: Array.isArray(o?.shipments) ? o.shipments : [],
+        items: (o?.items ?? []).map((it: any) => ({
+          ...it,
+          unit_price: parseMoney(it?.unit_price),
+          subtotal: parseMoney(it?.subtotal)
+        }))
+      }))
+    );
+  }
+
+  updateShipment(
+    orderId: string,
+    shipmentId: string,
+    payload: { courier?: string | null; tracking_number?: string | null; tracking_url?: string | null }
+  ): Observable<AdminOrderDetail> {
+    return this.api.patch<AdminOrderDetail>(`/orders/admin/${orderId}/shipments/${shipmentId}`, payload).pipe(
+      map((o: any) => ({
+        ...o,
+        total_amount: parseMoney(o?.total_amount),
+        tax_amount: parseMoney(o?.tax_amount),
+        fee_amount: parseMoney(o?.fee_amount),
+        shipping_amount: parseMoney(o?.shipping_amount),
+        refunds: (o?.refunds ?? []).map((r: any) => ({
+          ...r,
+          amount: parseMoney(r?.amount)
+        })),
+        admin_notes: o?.admin_notes ?? [],
+        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+        shipments: Array.isArray(o?.shipments) ? o.shipments : [],
+        items: (o?.items ?? []).map((it: any) => ({
+          ...it,
+          unit_price: parseMoney(it?.unit_price),
+          subtotal: parseMoney(it?.subtotal)
+        }))
+      }))
+    );
+  }
+
+  deleteShipment(orderId: string, shipmentId: string): Observable<AdminOrderDetail> {
+    return this.api.delete<AdminOrderDetail>(`/orders/admin/${orderId}/shipments/${shipmentId}`).pipe(
+      map((o: any) => ({
+        ...o,
+        total_amount: parseMoney(o?.total_amount),
+        tax_amount: parseMoney(o?.tax_amount),
+        fee_amount: parseMoney(o?.fee_amount),
+        shipping_amount: parseMoney(o?.shipping_amount),
+        refunds: (o?.refunds ?? []).map((r: any) => ({
+          ...r,
+          amount: parseMoney(r?.amount)
+        })),
+        admin_notes: o?.admin_notes ?? [],
+        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+        shipments: Array.isArray(o?.shipments) ? o.shipments : [],
+        items: (o?.items ?? []).map((it: any) => ({
+          ...it,
+          unit_price: parseMoney(it?.unit_price),
+          subtotal: parseMoney(it?.subtotal)
+        }))
+      }))
+    );
+  }
+
+  fulfillItem(orderId: string, itemId: string, shippedQuantity: number): Observable<AdminOrderDetail> {
+    return this.api
+      .post<AdminOrderDetail>(`/orders/admin/${orderId}/items/${itemId}/fulfill`, {}, undefined, {
+        shipped_quantity: shippedQuantity
+      })
+      .pipe(
+      map((o: any) => ({
+        ...o,
+        total_amount: parseMoney(o?.total_amount),
+        tax_amount: parseMoney(o?.tax_amount),
+        fee_amount: parseMoney(o?.fee_amount),
+        shipping_amount: parseMoney(o?.shipping_amount),
+        refunds: (o?.refunds ?? []).map((r: any) => ({
+          ...r,
+          amount: parseMoney(r?.amount)
+        })),
+        admin_notes: o?.admin_notes ?? [],
+        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+        shipments: Array.isArray(o?.shipments) ? o.shipments : [],
         items: (o?.items ?? []).map((it: any) => ({
           ...it,
           unit_price: parseMoney(it?.unit_price),
@@ -251,6 +371,7 @@ export class AdminOrdersService {
         })),
         admin_notes: o?.admin_notes ?? [],
         fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+        shipments: Array.isArray(o?.shipments) ? o.shipments : [],
         items: (o?.items ?? []).map((it: any) => ({
           ...it,
           unit_price: parseMoney(it?.unit_price),

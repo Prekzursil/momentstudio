@@ -71,6 +71,7 @@ from app.schemas.order_admin import (
 )
 from app.schemas.order_admin_note import OrderAdminNoteCreate
 from app.schemas.order_admin_address import AdminOrderAddressesUpdate
+from app.schemas.order_shipment import OrderShipmentCreate, OrderShipmentUpdate, OrderShipmentRead
 from app.schemas.order_tag import OrderTagCreate, OrderTagsResponse
 from app.schemas.order_refund import AdminOrderRefundCreate
 from app.schemas.receipt import ReceiptRead, ReceiptShareTokenRead
@@ -950,6 +951,7 @@ async def _serialize_admin_order(session: AsyncSession, order: Order) -> AdminOr
         admin_notes=getattr(order, "admin_notes", []) or [],
         tags=[t.tag for t in (getattr(order, "tags", None) or [])],
         fraud_signals=fraud_signals,
+        shipments=getattr(order, "shipments", []) or [],
     )
 
 
@@ -1463,6 +1465,83 @@ async def admin_update_order_addresses(
     return await _serialize_admin_order(session, updated)
 
 
+@router.get("/admin/{order_id}/shipments", response_model=list[OrderShipmentRead])
+async def admin_list_order_shipments(
+    order_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> list[OrderShipmentRead]:
+    order = await order_service.get_order_by_id_admin(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    return getattr(order, "shipments", []) or []
+
+
+@router.post("/admin/{order_id}/shipments", response_model=AdminOrderRead)
+async def admin_create_order_shipment(
+    order_id: UUID,
+    payload: OrderShipmentCreate = Body(...),
+    session: AsyncSession = Depends(get_session),
+    admin=Depends(require_admin),
+) -> AdminOrderRead:
+    order = await order_service.get_order_by_id_admin(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    actor = (getattr(admin, "email", None) or getattr(admin, "username", None) or "admin").strip()
+    updated = await order_service.create_order_shipment(
+        session,
+        order,
+        payload,
+        actor=actor,
+        actor_user_id=getattr(admin, "id", None),
+    )
+    return await _serialize_admin_order(session, updated)
+
+
+@router.patch("/admin/{order_id}/shipments/{shipment_id}", response_model=AdminOrderRead)
+async def admin_update_order_shipment(
+    order_id: UUID,
+    shipment_id: UUID,
+    payload: OrderShipmentUpdate = Body(...),
+    session: AsyncSession = Depends(get_session),
+    admin=Depends(require_admin),
+) -> AdminOrderRead:
+    order = await order_service.get_order_by_id_admin(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    actor = (getattr(admin, "email", None) or getattr(admin, "username", None) or "admin").strip()
+    updated = await order_service.update_order_shipment(
+        session,
+        order,
+        shipment_id,
+        payload,
+        actor=actor,
+        actor_user_id=getattr(admin, "id", None),
+    )
+    return await _serialize_admin_order(session, updated)
+
+
+@router.delete("/admin/{order_id}/shipments/{shipment_id}", response_model=AdminOrderRead)
+async def admin_delete_order_shipment(
+    order_id: UUID,
+    shipment_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    admin=Depends(require_admin),
+) -> AdminOrderRead:
+    order = await order_service.get_order_by_id_admin(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    actor = (getattr(admin, "email", None) or getattr(admin, "username", None) or "admin").strip()
+    updated = await order_service.delete_order_shipment(
+        session,
+        order,
+        shipment_id,
+        actor=actor,
+        actor_user_id=getattr(admin, "id", None),
+    )
+    return await _serialize_admin_order(session, updated)
+
+
 @router.post("/admin/{order_id}/shipping-label", response_model=AdminOrderRead)
 async def admin_upload_shipping_label(
     order_id: UUID,
@@ -1744,7 +1823,7 @@ async def admin_send_confirmation_email(
     return order
 
 
-@router.post("/admin/{order_id}/items/{item_id}/fulfill", response_model=OrderRead)
+@router.post("/admin/{order_id}/items/{item_id}/fulfill", response_model=AdminOrderRead)
 async def admin_fulfill_item(
     order_id: UUID,
     item_id: UUID,
@@ -1752,10 +1831,14 @@ async def admin_fulfill_item(
     session: AsyncSession = Depends(get_session),
     _: str = Depends(require_admin),
 ):
-    order = await order_service.get_order_by_id(session, order_id)
+    order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    return await order_service.update_fulfillment(session, order, item_id, shipped_quantity)
+    await order_service.update_fulfillment(session, order, item_id, shipped_quantity)
+    refreshed = await order_service.get_order_by_id_admin(session, order_id)
+    if not refreshed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    return await _serialize_admin_order(session, refreshed)
 
 
 @router.get("/admin/{order_id}/events", response_model=list[OrderEventRead])

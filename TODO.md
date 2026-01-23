@@ -709,7 +709,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Orders: fraud signals panel – Show velocity checks, mismatched country, multiple failed payments, etc.
 - [x] Admin Orders: address edit + re-rate shipping – Edit shipping address and recompute shipping cost (audit + constraints).
 - [x] Admin Orders: timeline diff view – include address diffs once address edit lands (shipping/billing before/after blocks).
-- [ ] Admin Orders: split shipments – Support partial fulfillment with per-item shipped qty and multiple tracking numbers.
+- [x] Admin Orders: split shipments – Support partial fulfillment with per-item shipped qty and multiple tracking numbers.
 - [ ] Admin Orders: export improvements – Add CSV export columns picker + saved export templates.
 - [ ] Admin Orders: print/i18n hardening – Ensure PDFs render diacritics and locale number/date formats.
 - [ ] Admin Orders: partial refunds validation – Enforce per-item refunded qty/amount caps (cumulative) and validate amount vs selected items when items are provided.

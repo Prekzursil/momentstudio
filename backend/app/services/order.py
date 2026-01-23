@@ -8,6 +8,7 @@ import re
 
 from fastapi import HTTPException, status
 from sqlalchemy import String, cast, exists, func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -22,12 +23,14 @@ from app.models.order import (
     OrderEvent,
     OrderItem,
     OrderRefund,
+    OrderShipment,
     OrderStatus,
     OrderTag,
     ShippingMethod,
 )
 from app.schemas.order import OrderUpdate, ShippingMethodCreate
 from app.schemas.order_admin_address import AdminOrderAddressesUpdate
+from app.schemas.order_shipment import OrderShipmentCreate, OrderShipmentUpdate
 from app.services import address as address_service
 from app.services import checkout_settings as checkout_settings_service
 from app.services import pricing
@@ -398,6 +401,7 @@ async def get_order_by_id_admin(session: AsyncSession, order_id: UUID) -> Order 
         .options(
             selectinload(Order.items).selectinload(OrderItem.product),
             selectinload(Order.shipping_method),
+            selectinload(Order.shipments),
             selectinload(Order.events),
             selectinload(Order.refunds),
             selectinload(Order.admin_notes),
@@ -920,6 +924,179 @@ async def remove_order_tag(session: AsyncSession, order: Order, *, tag: str, act
     await session.delete(existing)
     session.add(OrderEvent(order_id=order.id, event="tag_removed", note=tag_clean, data={"tag": tag_clean}))
     await session.commit()
+
+    hydrated = await get_order_by_id_admin(session, order.id)
+    return hydrated or order
+
+
+async def create_order_shipment(
+    session: AsyncSession,
+    order: Order,
+    payload: OrderShipmentCreate,
+    *,
+    actor: str | None = None,
+    actor_user_id: UUID | None = None,
+) -> Order:
+    tracking_number = (payload.tracking_number or "").strip()
+    if not tracking_number:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tracking number is required")
+
+    courier = (payload.courier or "").strip() or None
+    tracking_url = (payload.tracking_url or "").strip() or None
+
+    existing = (
+        (
+            await session.execute(
+                select(OrderShipment.id).where(
+                    OrderShipment.order_id == order.id, OrderShipment.tracking_number == tracking_number
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Shipment already exists")
+
+    shipment = OrderShipment(
+        order_id=order.id,
+        courier=courier,
+        tracking_number=tracking_number,
+        tracking_url=tracking_url,
+    )
+    session.add(shipment)
+
+    if not (getattr(order, "tracking_number", None) or "").strip():
+        order.tracking_number = tracking_number
+    if tracking_url and not (getattr(order, "tracking_url", None) or "").strip():
+        order.tracking_url = tracking_url
+    if courier and not (getattr(order, "courier", None) or "").strip():
+        order.courier = courier
+
+    session.add(order)
+
+    actor_clean = (actor or "").strip() or None
+    note = f"{actor_clean}: {tracking_number}" if actor_clean else tracking_number
+    session.add(
+        OrderEvent(
+            order_id=order.id,
+            event="shipment_added",
+            note=note,
+            data={"shipment": {"tracking_number": tracking_number, "tracking_url": tracking_url, "courier": courier}},
+        )
+    )
+
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Shipment already exists") from exc
+
+    hydrated = await get_order_by_id_admin(session, order.id)
+    return hydrated or order
+
+
+async def update_order_shipment(
+    session: AsyncSession,
+    order: Order,
+    shipment_id: UUID,
+    payload: OrderShipmentUpdate,
+    *,
+    actor: str | None = None,
+    actor_user_id: UUID | None = None,
+) -> Order:
+    shipment = await session.get(OrderShipment, shipment_id)
+    if not shipment or shipment.order_id != order.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipment not found")
+
+    data = payload.model_dump(exclude_unset=True)
+    previous_tracking_number = getattr(shipment, "tracking_number", None)
+    previous_tracking_url = getattr(shipment, "tracking_url", None)
+    previous_courier = getattr(shipment, "courier", None)
+
+    if "tracking_number" in data:
+        tracking_number = (str(data.get("tracking_number") or "")).strip()
+        if not tracking_number:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tracking number is required")
+        existing = (
+            (
+                await session.execute(
+                    select(OrderShipment.id).where(
+                        OrderShipment.order_id == order.id,
+                        OrderShipment.tracking_number == tracking_number,
+                        OrderShipment.id != shipment_id,
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if existing:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Shipment already exists")
+        shipment.tracking_number = tracking_number
+
+    if "tracking_url" in data:
+        shipment.tracking_url = (str(data.get("tracking_url") or "")).strip() or None
+
+    if "courier" in data:
+        shipment.courier = (str(data.get("courier") or "")).strip() or None
+
+    session.add(shipment)
+
+    changes: dict[str, dict[str, object]] = {}
+    if getattr(shipment, "tracking_number", None) != previous_tracking_number:
+        changes["tracking_number"] = {"from": previous_tracking_number, "to": getattr(shipment, "tracking_number", None)}
+    if getattr(shipment, "tracking_url", None) != previous_tracking_url:
+        changes["tracking_url"] = {"from": previous_tracking_url, "to": getattr(shipment, "tracking_url", None)}
+    if getattr(shipment, "courier", None) != previous_courier:
+        changes["courier"] = {"from": previous_courier, "to": getattr(shipment, "courier", None)}
+
+    if changes:
+        actor_clean = (actor or "").strip() or None
+        note = actor_clean or None
+        session.add(
+            OrderEvent(
+                order_id=order.id,
+                event="shipment_updated",
+                note=note,
+                data={"shipment_id": str(shipment_id), "changes": changes},
+            )
+        )
+
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Shipment already exists") from exc
+
+    hydrated = await get_order_by_id_admin(session, order.id)
+    return hydrated or order
+
+
+async def delete_order_shipment(
+    session: AsyncSession,
+    order: Order,
+    shipment_id: UUID,
+    *,
+    actor: str | None = None,
+    actor_user_id: UUID | None = None,
+) -> Order:
+    shipment = await session.get(OrderShipment, shipment_id)
+    if not shipment or shipment.order_id != order.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipment not found")
+
+    tracking_number = getattr(shipment, "tracking_number", None)
+    await session.delete(shipment)
+
+    actor_clean = (actor or "").strip() or None
+    note = f"{actor_clean}: {tracking_number}" if actor_clean and tracking_number else (actor_clean or tracking_number)
+    session.add(OrderEvent(order_id=order.id, event="shipment_deleted", note=note, data={"shipment_id": str(shipment_id)}))
+
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Could not delete shipment") from exc
 
     hydrated = await get_order_by_id_admin(session, order.id)
     return hydrated or order

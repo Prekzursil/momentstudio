@@ -10,7 +10,7 @@ import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { ToastService } from '../../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { ReceiptShareToken } from '../../../core/account.service';
-import { AdminOrderDetail, AdminOrderEvent, AdminOrderFraudSignal, AdminOrdersService } from '../../../core/admin-orders.service';
+import { AdminOrderDetail, AdminOrderEvent, AdminOrderFraudSignal, AdminOrderShipment, AdminOrdersService } from '../../../core/admin-orders.service';
 import { AdminReturnsService, ReturnRequestRead } from '../../../core/admin-returns.service';
 import { orderStatusChipClass } from '../../../shared/order-status';
 
@@ -25,6 +25,7 @@ type OrderStatus =
   | 'refunded';
 type OrderAction =
   | 'save'
+  | 'fulfill'
   | 'addressEdit'
   | 'retry'
   | 'capture'
@@ -34,6 +35,8 @@ type OrderAction =
   | 'addNote'
   | 'tagAdd'
   | 'tagRemove'
+  | 'shipmentSave'
+  | 'shipmentDelete'
   | 'deliveryEmail'
   | 'packingSlip'
   | 'labelUpload'
@@ -506,20 +509,84 @@ type OrderAction =
                       </div>
                     </div>
                   </div>
-	              </div>
-	            </div>
-	          </section>
+		              </div>
+		            </div>
+		          </section>
 
-          <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.itemsTitle' | translate }}</h2>
-	            <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-	              <table class="min-w-[720px] w-full text-sm">
+            <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
+              <div class="flex items-center justify-between gap-3">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.shipments.title' | translate }}</h2>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.orders.shipments.add' | translate"
+                  [disabled]="action() !== null"
+                  (action)="openShipmentEditor()"
+                ></app-button>
+              </div>
+
+              <div *ngIf="(order()!.shipments || []).length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.orders.shipments.empty' | translate }}
+              </div>
+
+              <div *ngIf="(order()!.shipments || []).length" class="grid gap-2">
+                <div
+                  *ngFor="let s of order()!.shipments || []"
+                  class="rounded-xl border border-slate-200 p-3 text-sm text-slate-700 dark:border-slate-800 dark:text-slate-200"
+                >
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="min-w-0 grid gap-1">
+                      <div class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                        {{ s.tracking_number }}
+                      </div>
+                      <div *ngIf="s.courier" class="text-xs text-slate-600 dark:text-slate-300">
+                        {{ 'adminUi.orders.shipments.courier' | translate }}: {{ courierName(s.courier) }}
+                      </div>
+                      <a
+                        *ngIf="s.tracking_url"
+                        class="text-xs text-indigo-600 hover:underline dark:text-indigo-300"
+                        [href]="s.tracking_url"
+                        target="_blank"
+                        rel="noopener"
+                      >
+                        {{ 'adminUi.orders.shipments.openTracking' | translate }}
+                      </a>
+                      <div class="text-xs text-slate-500 dark:text-slate-400">{{ s.created_at | date: 'short' }}</div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.actions.edit' | translate"
+                        [disabled]="action() !== null"
+                        (action)="openShipmentEditor(s)"
+                      ></app-button>
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.actions.delete' | translate"
+                        [disabled]="action() !== null"
+                        (action)="deleteShipment(s.id)"
+                      ></app-button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+	          <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
+	            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.itemsTitle' | translate }}</h2>
+		            <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+		              <table class="min-w-[920px] w-full text-sm">
                 <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
                   <tr>
                     <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.items.product' | translate }}</th>
                     <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.items.qty' | translate }}</th>
+                    <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.items.shipped' | translate }}</th>
                     <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.items.unit' | translate }}</th>
                     <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.items.subtotal' | translate }}</th>
+                    <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.items.fulfill' | translate }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -532,10 +599,31 @@ type OrderAction =
                     </td>
                     <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-200">{{ item.quantity }}</td>
                     <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-200">
+                      {{ item.shipped_quantity || 0 }} / {{ item.quantity }}
+                    </td>
+                    <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-200">
                       {{ item.unit_price | localizedCurrency : order()!.currency }}
                     </td>
                     <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-200">
                       {{ item.subtotal | localizedCurrency : order()!.currency }}
+                    </td>
+                    <td class="px-3 py-2 text-right">
+                      <div class="flex items-center justify-end gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          [max]="item.quantity"
+                          class="h-9 w-20 rounded-lg border border-slate-200 bg-white px-2 text-right text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          [(ngModel)]="fulfillmentQty[item.id]"
+                        />
+                        <app-button
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.actions.save' | translate"
+                          [disabled]="action() !== null"
+                          (action)="saveFulfillment(item.id, item.quantity)"
+                        ></app-button>
+                      </div>
                     </td>
                   </tr>
                 </tbody>
@@ -877,11 +965,90 @@ type OrderAction =
           </div>
         </div>
       </div>
-    </ng-container>
+	    </ng-container>
 
-    <ng-container *ngIf="refundWizardOpen() && order() as o">
-      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeRefundWizard()">
-        <div
+      <ng-container *ngIf="shipmentEditorOpen()">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeShipmentEditor()">
+          <div
+            class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+            (click)="$event.stopPropagation()"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <div class="grid gap-1">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                  {{
+                    (shipmentEditingId ? 'adminUi.orders.shipments.editTitle' : 'adminUi.orders.shipments.addTitle')
+                      | translate
+                  }}
+                </h3>
+                <div class="text-xs text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.orders.detailTitle' | translate }}: {{ orderRef() }}
+                </div>
+              </div>
+              <button
+                type="button"
+                class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+                (click)="closeShipmentEditor()"
+                [attr.aria-label]="'adminUi.actions.cancel' | translate"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div class="mt-4 grid gap-3">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.orders.shipments.courier' | translate }}
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="shipmentCourier"
+                >
+                  <option value="">{{ 'adminUi.orders.shipments.courierNone' | translate }}</option>
+                  <option value="sameday">{{ 'checkout.courierSameday' | translate }}</option>
+                  <option value="fan_courier">{{ 'checkout.courierFanCourier' | translate }}</option>
+                </select>
+              </label>
+
+              <app-input
+                [label]="'adminUi.orders.shipments.trackingNumber' | translate"
+                [(value)]="shipmentTrackingNumber"
+              ></app-input>
+
+              <app-input
+                [label]="'adminUi.orders.shipments.trackingUrl' | translate"
+                [placeholder]="'https://...'"
+                [(value)]="shipmentTrackingUrl"
+              ></app-input>
+
+              <div
+                *ngIf="shipmentEditorError()"
+                class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+              >
+                {{ shipmentEditorError() }}
+              </div>
+
+              <div class="flex justify-end gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.actions.cancel' | translate"
+                  [disabled]="action() !== null"
+                  (action)="closeShipmentEditor()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  [label]="'adminUi.actions.save' | translate"
+                  [disabled]="action() !== null"
+                  (action)="saveShipmentEditor()"
+                ></app-button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+
+	    <ng-container *ngIf="refundWizardOpen() && order() as o">
+	      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeRefundWizard()">
+	        <div
           class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
           (click)="$event.stopPropagation()"
         >
@@ -1149,6 +1316,8 @@ export class AdminOrderDetailComponent implements OnInit {
   addressEditorOpen = signal(false);
   addressEditorKind = signal<'shipping' | 'billing'>('shipping');
   addressEditorError = signal<string | null>(null);
+  shipmentEditorOpen = signal(false);
+  shipmentEditorError = signal<string | null>(null);
 
   statusValue: OrderStatus = 'pending_acceptance';
   trackingNumber = '';
@@ -1174,6 +1343,11 @@ export class AdminOrderDetailComponent implements OnInit {
   addressCountry = '';
   addressNote = '';
   addressRerateShipping = true;
+  fulfillmentQty: Record<string, number> = {};
+  shipmentEditingId: string | null = null;
+  shipmentCourier = '';
+  shipmentTrackingNumber = '';
+  shipmentTrackingUrl = '';
 
   shippingLabelFile: File | null = null;
   shippingLabelError = signal<string | null>(null);
@@ -1331,6 +1505,119 @@ export class AdminOrderDetailComponent implements OnInit {
       error: (err) => {
         const msg = err?.error?.detail || this.translate.instant('adminUi.orders.addressEdit.errors.update');
         this.addressEditorError.set(msg);
+        this.toast.error(msg);
+        this.action.set(null);
+      }
+    });
+  }
+
+  courierName(courier: string | null | undefined): string {
+    const raw = (courier ?? '').trim().toLowerCase();
+    if (!raw) return '—';
+    if (raw === 'sameday') return this.translate.instant('checkout.courierSameday');
+    if (raw === 'fan_courier') return this.translate.instant('checkout.courierFanCourier');
+    return (courier ?? '').trim() || '—';
+  }
+
+  openShipmentEditor(shipment?: AdminOrderShipment): void {
+    this.shipmentEditorError.set(null);
+    if (shipment) {
+      this.shipmentEditingId = shipment.id;
+      this.shipmentCourier = (shipment.courier ?? '').trim();
+      this.shipmentTrackingNumber = (shipment.tracking_number ?? '').trim();
+      this.shipmentTrackingUrl = (shipment.tracking_url ?? '').trim();
+    } else {
+      this.shipmentEditingId = null;
+      this.shipmentCourier = '';
+      this.shipmentTrackingNumber = '';
+      this.shipmentTrackingUrl = '';
+    }
+    this.shipmentEditorOpen.set(true);
+  }
+
+  closeShipmentEditor(): void {
+    this.shipmentEditorOpen.set(false);
+    this.shipmentEditorError.set(null);
+    this.shipmentEditingId = null;
+    this.shipmentCourier = '';
+    this.shipmentTrackingNumber = '';
+    this.shipmentTrackingUrl = '';
+  }
+
+  saveShipmentEditor(): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+
+    this.shipmentEditorError.set(null);
+    const trackingNumber = this.shipmentTrackingNumber.trim();
+    if (!trackingNumber) {
+      const msg = this.translate.instant('adminUi.orders.shipments.errors.trackingRequired');
+      this.shipmentEditorError.set(msg);
+      this.toast.error(msg);
+      return;
+    }
+
+    const payload: any = {
+      courier: this.shipmentCourier.trim() || null,
+      tracking_number: trackingNumber,
+      tracking_url: this.shipmentTrackingUrl.trim() || null
+    };
+
+    this.action.set('shipmentSave');
+    const req = this.shipmentEditingId
+      ? this.api.updateShipment(orderId, this.shipmentEditingId, payload)
+      : this.api.createShipment(orderId, payload);
+
+    req.subscribe({
+      next: (o) => {
+        this.order.set(o);
+        this.toast.success(this.translate.instant('adminUi.orders.shipments.success'));
+        this.closeShipmentEditor();
+        this.action.set(null);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.shipments.errors.save');
+        this.shipmentEditorError.set(msg);
+        this.toast.error(msg);
+        this.action.set(null);
+      }
+    });
+  }
+
+  deleteShipment(shipmentId: string): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    this.action.set('shipmentDelete');
+    this.api.deleteShipment(orderId, shipmentId).subscribe({
+      next: (o) => {
+        this.order.set(o);
+        this.toast.success(this.translate.instant('adminUi.orders.shipments.deleted'));
+        this.action.set(null);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.shipments.errors.delete');
+        this.toast.error(msg);
+        this.action.set(null);
+      }
+    });
+  }
+
+  saveFulfillment(itemId: string, maxQty: number): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    const rawQty = Number(this.fulfillmentQty[itemId] ?? 0);
+    const qty = Math.max(0, Math.min(Math.trunc(Number.isFinite(rawQty) ? rawQty : 0), Number(maxQty ?? 0)));
+    this.action.set('fulfill');
+    this.api.fulfillItem(orderId, itemId, qty).subscribe({
+      next: (o) => {
+        this.order.set(o);
+        this.fulfillmentQty = {};
+        (o.items || []).forEach((it) => (this.fulfillmentQty[it.id] = Number(it.shipped_quantity ?? 0)));
+        this.toast.success(this.translate.instant('adminUi.orders.items.fulfillSuccess'));
+        this.action.set(null);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.items.fulfillError');
         this.toast.error(msg);
         this.action.set(null);
       }
@@ -2091,7 +2378,9 @@ export class AdminOrderDetailComponent implements OnInit {
         this.trackingUrl = o.tracking_url ?? '';
         this.cancelReason = o.cancel_reason ?? '';
         this.returnQty = {};
+        this.fulfillmentQty = {};
         (o.items || []).forEach((it) => (this.returnQty[it.id] = 0));
+        (o.items || []).forEach((it) => (this.fulfillmentQty[it.id] = Number(it.shipped_quantity ?? 0)));
         this.loadReturns(o.id);
         this.loading.set(false);
       },

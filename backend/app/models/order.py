@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 import enum
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, func, Enum, JSON
+from sqlalchemy import DateTime, ForeignKey, Numeric, String, func, Enum, JSON, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -83,6 +83,13 @@ class Order(Base):
         "OrderItem", back_populates="order", cascade="all, delete-orphan", lazy="selectin"
     )
     shipping_method: Mapped["ShippingMethod | None"] = relationship("ShippingMethod", lazy="selectin")
+    shipments: Mapped[list["OrderShipment"]] = relationship(
+        "OrderShipment",
+        back_populates="order",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="OrderShipment.created_at",
+    )
     events: Mapped[list["OrderEvent"]] = relationship(
         "OrderEvent",
         back_populates="order",
@@ -141,6 +148,20 @@ class ShippingMethod(Base):
     rate_flat: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     rate_per_kg: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class OrderShipment(Base):
+    __tablename__ = "order_shipments"
+    __table_args__ = (UniqueConstraint("order_id", "tracking_number", name="uq_order_shipments_order_id_tracking_number"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    order_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
+    courier: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    tracking_number: Mapped[str] = mapped_column(String(50), nullable=False)
+    tracking_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    order: Mapped[Order] = relationship("Order", back_populates="shipments")
 
 
 class OrderEvent(Base):

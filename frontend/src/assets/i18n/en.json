@@ -2234,6 +2234,25 @@
         "refund": "Request refund"
       },
       "itemsTitle": "Items",
+      "shipments": {
+        "title": "Shipments",
+        "add": "Add shipment",
+        "addTitle": "Add shipment",
+        "editTitle": "Edit shipment",
+        "empty": "No shipments yet.",
+        "courier": "Courier",
+        "courierNone": "No courier",
+        "trackingNumber": "Tracking number",
+        "trackingUrl": "Tracking URL",
+        "openTracking": "Open tracking",
+        "success": "Shipment saved",
+        "deleted": "Shipment deleted",
+        "errors": {
+          "trackingRequired": "Tracking number is required.",
+          "save": "Could not save shipment.",
+          "delete": "Could not delete shipment."
+        }
+      },
       "addressesTitle": "Addresses",
       "shippingAddress": "Shipping address",
       "billingAddress": "Billing address",
@@ -2324,8 +2343,12 @@
       "items": {
         "product": "Product",
         "qty": "Qty",
+        "shipped": "Shipped",
         "unit": "Unit",
-        "subtotal": "Subtotal"
+        "subtotal": "Subtotal",
+        "fulfill": "Fulfill",
+        "fulfillSuccess": "Fulfillment updated",
+        "fulfillError": "Could not update fulfillment."
       },
       "pagination": "Page {{page}} of {{total_pages}} · {{total_items}} total",
       "prev": "Prev",
