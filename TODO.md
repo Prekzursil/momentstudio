@@ -720,8 +720,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Products: bulk publish scheduling – Set publish/unpublish dates for multiple products.
 - [x] Admin Products: image alt text + captions – Manage SEO alt text per image per language.
 - [x] Admin Products: image optimization stats – Display image size and offer one-click reprocess/resize.
-- [ ] Admin Products: variant matrix editor – Edit variant attributes/prices/stock in a grid.
-- [ ] Admin Inventory: stock adjustment ledger – Record stock changes with reason (“restock”, “damage”, “manual correction”).
+- [x] Admin Products: variant matrix editor – Edit variant attributes/prices/stock in a grid.
+- [x] Admin Inventory: stock adjustment ledger – Record stock changes with reason (“restock”, “damage”, “manual correction”).
 - [ ] Admin Inventory: low-stock restock list – A “to restock” queue with supplier notes and export.
 - [ ] Admin Inventory: reserved stock visibility – Show stock reserved in carts/orders vs available.
 - [ ] Admin Products: duplicate detection – Warn on duplicate slugs/SKUs/names; provide merge guidance.

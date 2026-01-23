@@ -249,6 +249,39 @@ class ProductVariant(Base):
     product: Mapped[Product] = relationship("Product", back_populates="variants")
 
 
+class StockAdjustmentReason(str, enum.Enum):
+    restock = "restock"
+    damage = "damage"
+    manual_correction = "manual_correction"
+
+
+class StockAdjustment(Base):
+    __tablename__ = "stock_adjustments"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    variant_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("product_variants.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    reason: Mapped[StockAdjustmentReason] = mapped_column(Enum(StockAdjustmentReason, native_enum=False), nullable=False)
+    delta: Mapped[int] = mapped_column(nullable=False)
+    before_quantity: Mapped[int] = mapped_column(nullable=False)
+    after_quantity: Mapped[int] = mapped_column(nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class ProductOption(Base):
     __tablename__ = "product_options"
 

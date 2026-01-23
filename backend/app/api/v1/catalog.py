@@ -38,6 +38,8 @@ from app.schemas.catalog import (
     ProductImageTranslationRead,
     ProductImageTranslationUpsert,
     ProductImageOptimizationStats,
+    ProductVariantMatrixUpdate,
+    ProductVariantRead,
 )
 from app.services import catalog as catalog_service
 from app.services import storage
@@ -364,6 +366,19 @@ async def bulk_update_products(
 ) -> list[Product]:
     updated = await catalog_service.bulk_update_products(session, payload, user_id=current_user.id)
     return updated
+
+
+@router.put("/products/{slug}/variants", response_model=list[ProductVariantRead])
+async def update_product_variants(
+    slug: str,
+    payload: ProductVariantMatrixUpdate,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(require_admin),
+) -> list[ProductVariantRead]:
+    product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.variants)])
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    return await catalog_service.update_product_variants(session, product=product, payload=payload, user_id=current_user.id)
 
 
 @router.get("/collections/featured", response_model=list[FeaturedCollectionRead])

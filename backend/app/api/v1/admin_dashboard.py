@@ -15,9 +15,11 @@ from app.db.session import get_session
 from app.models.catalog import Product, ProductAuditLog, Category, ProductStatus
 from app.models.content import ContentBlock, ContentAuditLog
 from app.schemas.catalog_admin import AdminProductByIdsRequest, AdminProductListItem, AdminProductListResponse
+from app.schemas.catalog import StockAdjustmentCreate, StockAdjustmentRead
 from app.schemas.admin_dashboard_search import AdminDashboardSearchResponse, AdminDashboardSearchResult
 from app.schemas.admin_dashboard_scheduled import AdminDashboardScheduledTasksResponse, ScheduledPublishItem, ScheduledPromoItem
 from app.services import exporter as exporter_service
+from app.services import catalog as catalog_service
 from app.models.order import Order, OrderStatus
 from app.models.returns import ReturnRequest, ReturnRequestStatus
 from app.models.user import AdminAuditLog, User, RefreshSession, UserRole
@@ -1204,3 +1206,23 @@ async def low_stock_products(session: AsyncSession = Depends(get_session), _: st
         }
         for p, threshold in rows
     ]
+
+
+@router.get("/stock-adjustments", response_model=list[StockAdjustmentRead])
+async def list_stock_adjustments(
+    product_id: UUID = Query(...),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> list[StockAdjustmentRead]:
+    return await catalog_service.list_stock_adjustments(session, product_id=product_id, limit=limit, offset=offset)
+
+
+@router.post("/stock-adjustments", response_model=StockAdjustmentRead, status_code=status.HTTP_201_CREATED)
+async def apply_stock_adjustment(
+    payload: StockAdjustmentCreate,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(require_admin),
+) -> StockAdjustmentRead:
+    return await catalog_service.apply_stock_adjustment(session, payload=payload, user_id=current_user.id)

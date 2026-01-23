@@ -10,7 +10,14 @@ import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { AdminProductListItem, AdminProductListResponse, AdminProductsService } from '../../../core/admin-products.service';
 import { CatalogService, Category } from '../../../core/catalog.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
-import { AdminProductImageOptimizationStats, AdminProductImageTranslation, AdminService } from '../../../core/admin.service';
+import {
+  AdminProductImageOptimizationStats,
+  AdminProductImageTranslation,
+  AdminProductVariant,
+  AdminService,
+  StockAdjustment,
+  StockAdjustmentReason,
+} from '../../../core/admin.service';
 import { ToastService } from '../../../core/toast.service';
 
 type ProductStatusFilter = 'all' | 'draft' | 'published' | 'archived';
@@ -51,6 +58,13 @@ type ImageMetaForm = {
 };
 
 type ImageMetaByLang = Record<'en' | 'ro', ImageMetaForm>;
+
+type VariantRow = {
+  id?: string;
+  name: string;
+  additional_price_delta: string;
+  stock_quantity: number;
+};
 
 @Component({
   selector: 'app-admin-products',
@@ -699,12 +713,221 @@ type ImageMetaByLang = Record<'en' | 'ro', ImageMetaForm>;
             <input type="checkbox" [(ngModel)]="form.is_bestseller" />
             {{ 'adminUi.products.form.bestseller' | translate }}
           </label>
-        </div>
+	        </div>
 
-        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-          {{ 'adminUi.products.form.shortDescription' | translate }}
-          <textarea
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
+	          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+	            <div class="grid gap-1">
+	              <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
+	                {{ 'adminUi.products.form.variantsTitle' | translate }}
+	              </h3>
+	              <p class="text-xs text-slate-500 dark:text-slate-400">
+	                {{ 'adminUi.products.form.variantsHint' | translate }}
+	              </p>
+	            </div>
+	            <div class="flex flex-wrap items-center gap-2">
+	              <app-button
+	                size="sm"
+	                variant="ghost"
+	                [label]="'adminUi.products.form.variantsAdd' | translate"
+	                (action)="addVariantRow()"
+	                [disabled]="variantsBusy()"
+	              ></app-button>
+	              <app-button
+	                size="sm"
+	                [label]="'adminUi.products.form.variantsSave' | translate"
+	                (action)="saveVariants()"
+	                [disabled]="variantsBusy() || !editingSlug()"
+	              ></app-button>
+	            </div>
+	          </div>
+
+	          <div
+	            *ngIf="variantsError()"
+	            class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+	          >
+	            {{ variantsError() }}
+	          </div>
+
+	          <div *ngIf="variants().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+	            {{ 'adminUi.products.form.variantsEmpty' | translate }}
+	          </div>
+
+	          <div *ngIf="variants().length > 0" class="overflow-x-auto">
+	            <table class="w-full text-sm">
+	              <thead>
+	                <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+	                  <th class="py-2 pr-3">{{ 'adminUi.products.form.variantsName' | translate }}</th>
+	                  <th class="py-2 pr-3 w-40">{{ 'adminUi.products.form.variantsDelta' | translate }}</th>
+	                  <th class="py-2 pr-3 w-32">{{ 'adminUi.products.form.variantsPrice' | translate }}</th>
+	                  <th class="py-2 pr-3 w-28">{{ 'adminUi.products.form.variantsStock' | translate }}</th>
+	                  <th class="py-2 w-24">{{ 'adminUi.products.table.actions' | translate }}</th>
+	                </tr>
+	              </thead>
+	              <tbody>
+	                <tr *ngFor="let v of variants(); let idx = index" class="border-t border-slate-200 dark:border-slate-800">
+	                  <td class="py-2 pr-3">
+	                    <input
+	                      class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                      type="text"
+	                      [ngModel]="v.name"
+	                      (ngModelChange)="onVariantNameChange(idx, $event)"
+	                      [disabled]="variantsBusy()"
+	                    />
+	                  </td>
+	                  <td class="py-2 pr-3">
+	                    <input
+	                      class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                      type="number"
+	                      step="0.01"
+	                      inputmode="decimal"
+	                      [ngModel]="v.additional_price_delta"
+	                      (ngModelChange)="onVariantDeltaChange(idx, $event)"
+	                      [disabled]="variantsBusy()"
+	                    />
+	                  </td>
+	                  <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">
+	                    {{ formatMoneyInput(variantComputedPrice(v.additional_price_delta)) }} RON
+	                  </td>
+	                  <td class="py-2 pr-3">
+	                    <input
+	                      class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                      type="number"
+	                      step="1"
+	                      min="0"
+	                      [ngModel]="v.stock_quantity"
+	                      (ngModelChange)="onVariantStockChange(idx, $event)"
+	                      [disabled]="variantsBusy()"
+	                    />
+	                  </td>
+	                  <td class="py-2">
+	                    <app-button
+	                      size="sm"
+	                      variant="ghost"
+	                      [label]="'adminUi.products.form.variantsRemove' | translate"
+	                      (action)="removeVariantRow(v)"
+	                      [disabled]="variantsBusy()"
+	                    ></app-button>
+	                  </td>
+	                </tr>
+	              </tbody>
+	            </table>
+	          </div>
+	        </div>
+
+	        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
+	          <div class="grid gap-1">
+	            <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
+	              {{ 'adminUi.products.form.stockLedgerTitle' | translate }}
+	            </h3>
+	            <p class="text-xs text-slate-500 dark:text-slate-400">
+	              {{ 'adminUi.products.form.stockLedgerHint' | translate }}
+	            </p>
+	          </div>
+
+	          <div
+	            *ngIf="stockAdjustmentsError()"
+	            class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+	          >
+	            {{ stockAdjustmentsError() }}
+	          </div>
+
+	          <div class="grid gap-3 md:grid-cols-5 items-end">
+	            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	              {{ 'adminUi.products.form.stockLedgerTarget' | translate }}
+	              <select
+	                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                [(ngModel)]="stockAdjustTarget"
+	                [disabled]="stockAdjustBusy() || !editingSlug()"
+	              >
+	                <option value="">{{ 'adminUi.products.form.stockLedgerTargetProduct' | translate }}</option>
+	                <option *ngFor="let v of variantsWithIds()" [value]="v.id">{{ v.name }}</option>
+	              </select>
+	            </label>
+
+	            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	              {{ 'adminUi.products.form.stockLedgerReason' | translate }}
+	              <select
+	                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                [(ngModel)]="stockAdjustReason"
+	                [disabled]="stockAdjustBusy() || !editingSlug()"
+	              >
+	                <option value="restock">{{ 'adminUi.products.form.stockReason.restock' | translate }}</option>
+	                <option value="damage">{{ 'adminUi.products.form.stockReason.damage' | translate }}</option>
+	                <option value="manual_correction">{{ 'adminUi.products.form.stockReason.manual_correction' | translate }}</option>
+	              </select>
+	            </label>
+
+	            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	              {{ 'adminUi.products.form.stockLedgerDelta' | translate }}
+	              <input
+	                class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                type="number"
+	                step="1"
+	                [(ngModel)]="stockAdjustDelta"
+	                [disabled]="stockAdjustBusy() || !editingSlug()"
+	              />
+	            </label>
+
+	            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+	              {{ 'adminUi.products.form.stockLedgerNote' | translate }}
+	              <input
+	                class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                type="text"
+	                [(ngModel)]="stockAdjustNote"
+	                [disabled]="stockAdjustBusy() || !editingSlug()"
+	              />
+	            </label>
+	          </div>
+
+	          <div class="flex items-center gap-2">
+	            <app-button
+	              size="sm"
+	              [label]="'adminUi.products.form.stockLedgerApply' | translate"
+	              (action)="applyStockAdjustment()"
+	              [disabled]="stockAdjustBusy() || !editingSlug()"
+	            ></app-button>
+	            <span *ngIf="stockAdjustBusy()" class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.products.form.stockLedgerApplying' | translate }}</span>
+	          </div>
+
+	          <div *ngIf="stockAdjustments().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+	            {{ 'adminUi.products.form.stockLedgerEmpty' | translate }}
+	          </div>
+
+	          <div *ngIf="stockAdjustments().length > 0" class="overflow-x-auto">
+	            <table class="w-full text-sm">
+	              <thead>
+	                <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+	                  <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerWhen' | translate }}</th>
+	                  <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerItem' | translate }}</th>
+	                  <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerReason' | translate }}</th>
+	                  <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerDelta' | translate }}</th>
+	                  <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerBefore' | translate }}</th>
+	                  <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerAfter' | translate }}</th>
+	                  <th class="py-2">{{ 'adminUi.products.form.stockLedgerNote' | translate }}</th>
+	                </tr>
+	              </thead>
+	              <tbody>
+	                <tr *ngFor="let row of stockAdjustments()" class="border-t border-slate-200 dark:border-slate-800">
+	                  <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ formatTimestamp(row.created_at) }}</td>
+	                  <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ stockAdjustmentTargetLabel(row) }}</td>
+	                  <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ stockReasonLabel(row.reason) }}</td>
+	                  <td class="py-2 pr-3 font-semibold" [class.text-emerald-700]="row.delta > 0" [class.text-rose-700]="row.delta < 0">
+	                    {{ row.delta > 0 ? '+' + row.delta : row.delta }}
+	                  </td>
+	                  <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ row.before_quantity }}</td>
+	                  <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ row.after_quantity }}</td>
+	                  <td class="py-2 text-slate-600 dark:text-slate-300">{{ row.note || '—' }}</td>
+	                </tr>
+	              </tbody>
+	            </table>
+	          </div>
+	        </div>
+
+	        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	          {{ 'adminUi.products.form.shortDescription' | translate }}
+	          <textarea
+	            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             rows="2"
             maxlength="280"
             [(ngModel)]="form.short_description"
@@ -991,6 +1214,21 @@ export class AdminProductsComponent implements OnInit {
     en: this.blankTranslationForm(),
     ro: this.blankTranslationForm()
   };
+
+  editingProductId = signal<string | null>(null);
+
+  variants = signal<VariantRow[]>([]);
+  variantsBusy = signal(false);
+  variantsError = signal<string | null>(null);
+  private pendingVariantDeletes = new Set<string>();
+
+  stockAdjustments = signal<StockAdjustment[]>([]);
+  stockAdjustmentsError = signal<string | null>(null);
+  stockAdjustBusy = signal(false);
+  stockAdjustTarget = '';
+  stockAdjustReason: StockAdjustmentReason = 'manual_correction';
+  stockAdjustDelta = '';
+  stockAdjustNote = '';
 
   private autoStartNewProduct = false;
   private pendingEditProductSlug: string | null = null;
@@ -1524,6 +1762,7 @@ export class AdminProductsComponent implements OnInit {
   startNew(): void {
     this.editorOpen.set(true);
     this.editingSlug.set(null);
+    this.editingProductId.set(null);
     this.editorError.set(null);
     this.editorMessage.set(null);
     this.images.set([]);
@@ -1532,6 +1771,8 @@ export class AdminProductsComponent implements OnInit {
     this.basePriceError = '';
     this.saleValueError = '';
     this.resetTranslations();
+    this.resetVariants();
+    this.resetStockLedger();
     const first = this.adminCategories()[0];
     if (first) this.form.category_id = first.id;
   }
@@ -1539,6 +1780,7 @@ export class AdminProductsComponent implements OnInit {
   closeEditor(): void {
     this.editorOpen.set(false);
     this.editingSlug.set(null);
+    this.editingProductId.set(null);
     this.editorError.set(null);
     this.editorMessage.set(null);
     this.images.set([]);
@@ -1546,6 +1788,8 @@ export class AdminProductsComponent implements OnInit {
     this.basePriceError = '';
     this.saleValueError = '';
     this.resetTranslations();
+    this.resetVariants();
+    this.resetStockLedger();
   }
 
   edit(slug: string): void {
@@ -1553,12 +1797,16 @@ export class AdminProductsComponent implements OnInit {
     this.editorError.set(null);
     this.editorMessage.set(null);
     this.editingSlug.set(slug);
+    this.editingProductId.set(null);
     this.basePriceError = '';
     this.saleValueError = '';
     this.resetTranslations();
     this.resetImageMeta();
+    this.resetVariants();
+    this.resetStockLedger();
     this.admin.getProduct(slug).subscribe({
       next: (prod: any) => {
+        this.editingProductId.set(prod?.id ? String(prod.id) : null);
         const basePrice = typeof prod.base_price === 'number' ? prod.base_price : Number(prod.base_price || 0);
         const rawSaleType = (prod.sale_type || '').toString();
         const saleType: 'percent' | 'amount' = rawSaleType === 'amount' ? 'amount' : 'percent';
@@ -1594,6 +1842,9 @@ export class AdminProductsComponent implements OnInit {
           is_bestseller: Array.isArray(prod.tags) ? prod.tags.includes('bestseller') : false
         };
         this.images.set(Array.isArray(prod.images) ? prod.images : []);
+        this.setVariantsFromProduct(prod);
+        const productId = this.editingProductId();
+        if (productId) this.loadStockAdjustments(productId);
         this.loadTranslations((prod.slug || slug).toString());
       },
       error: () => this.editorError.set(this.t('adminUi.products.errors.load'))
@@ -1712,6 +1963,10 @@ export class AdminProductsComponent implements OnInit {
         this.editorMessage.set(this.t('adminUi.products.success.save'));
         const newSlug = (prod?.slug as string | undefined) || slug || null;
         this.editingSlug.set(newSlug);
+        if (!this.editingProductId() && prod?.id) {
+          this.editingProductId.set(String(prod.id));
+          this.loadStockAdjustments(String(prod.id));
+        }
         this.images.set(Array.isArray(prod?.images) ? prod.images : this.images());
         if (prod?.status) this.form.status = prod.status;
         if (newSlug) this.loadTranslations(newSlug);
@@ -1719,6 +1974,235 @@ export class AdminProductsComponent implements OnInit {
       },
       error: () => this.editorError.set(this.t('adminUi.products.errors.save'))
     });
+  }
+
+  variantsWithIds(): VariantRow[] {
+    return this.variants().filter((v) => Boolean(v.id));
+  }
+
+  addVariantRow(): void {
+    this.variantsError.set(null);
+    this.variants.set([
+      ...this.variants(),
+      {
+        name: '',
+        additional_price_delta: '0.00',
+        stock_quantity: 0,
+      },
+    ]);
+  }
+
+  removeVariantRow(variant: VariantRow): void {
+    if (variant.id) {
+      this.pendingVariantDeletes.add(variant.id);
+    }
+    this.variants.set(this.variants().filter((v) => v !== variant));
+  }
+
+  onVariantNameChange(index: number, next: string): void {
+    this.updateVariant(index, { name: String(next ?? '') });
+  }
+
+  onVariantDeltaChange(index: number, next: string | number): void {
+    this.updateVariant(index, { additional_price_delta: String(next ?? '') });
+  }
+
+  onVariantStockChange(index: number, next: string | number): void {
+    const raw = String(next ?? '').trim();
+    const parsed = Number(raw);
+    const stock = Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
+    this.updateVariant(index, { stock_quantity: stock });
+  }
+
+  variantComputedPrice(deltaRaw: string): number {
+    const baseParsed = this.parseMoneyInput(this.form.base_price);
+    const base = baseParsed ?? 0;
+    const deltaParsed = this.parseSignedMoneyInput(deltaRaw);
+    const delta = deltaParsed ?? 0;
+    return Math.round((base + delta) * 100) / 100;
+  }
+
+  saveVariants(): void {
+    const slug = this.editingSlug();
+    if (!slug) return;
+    this.variantsError.set(null);
+
+    const payloadVariants: Array<{
+      id?: string | null;
+      name: string;
+      additional_price_delta: number;
+      stock_quantity: number;
+    }> = [];
+
+    for (const row of this.variants()) {
+      const name = (row.name || '').trim();
+      if (!name) {
+        this.variantsError.set(this.t('adminUi.products.form.variantNameRequired'));
+        return;
+      }
+      const delta = this.parseSignedMoneyInput(row.additional_price_delta);
+      if (delta === null) {
+        this.variantsError.set(this.t('adminUi.products.form.priceFormatHint'));
+        return;
+      }
+      const stock = Number(row.stock_quantity);
+      if (!Number.isInteger(stock) || stock < 0) {
+        this.variantsError.set(this.t('adminUi.products.inline.errors.stockInvalid'));
+        return;
+      }
+      payloadVariants.push({
+        id: row.id ?? null,
+        name,
+        additional_price_delta: delta,
+        stock_quantity: stock,
+      });
+    }
+
+    this.variantsBusy.set(true);
+    this.admin
+      .updateProductVariants(slug, { variants: payloadVariants, delete_variant_ids: Array.from(this.pendingVariantDeletes) })
+      .subscribe({
+        next: (updated) => {
+          this.variantsBusy.set(false);
+          this.pendingVariantDeletes = new Set<string>();
+          this.variants.set(
+            (updated || []).map((variant) => ({
+              id: String(variant.id),
+              name: String(variant.name || ''),
+              additional_price_delta: this.formatMoneyInput(Number(variant.additional_price_delta ?? 0)),
+              stock_quantity: Number(variant.stock_quantity ?? 0),
+            }))
+          );
+          this.toast.success(this.t('adminUi.products.form.variantsSaved'));
+          const productId = this.editingProductId();
+          if (productId) this.loadStockAdjustments(productId);
+        },
+        error: (err) => {
+          this.variantsBusy.set(false);
+          const detail = err?.error?.detail;
+          this.variantsError.set(typeof detail === 'string' && detail.trim() ? detail.trim() : this.t('adminUi.products.form.variantsSaveError'));
+        },
+      });
+  }
+
+  formatTimestamp(raw: string): string {
+    const dt = new Date(raw);
+    if (!raw || Number.isNaN(dt.getTime())) return raw || '';
+    try {
+      return dt.toLocaleString(this.translate.currentLang || undefined);
+    } catch {
+      return dt.toLocaleString();
+    }
+  }
+
+  stockAdjustmentTargetLabel(row: StockAdjustment): string {
+    if (row.variant_id) {
+      const match = this.variants().find((v) => v.id === row.variant_id);
+      return match?.name || `Variant ${row.variant_id.slice(0, 8)}`;
+    }
+    return this.t('adminUi.products.form.stockLedgerTargetProduct');
+  }
+
+  stockReasonLabel(reason: StockAdjustmentReason): string {
+    return this.t(`adminUi.products.form.stockReason.${reason}`);
+  }
+
+  applyStockAdjustment(): void {
+    const productId = this.editingProductId();
+    if (!productId) return;
+    this.stockAdjustmentsError.set(null);
+
+    const deltaRaw = String(this.stockAdjustDelta ?? '').trim();
+    const deltaParsed = Number(deltaRaw);
+    if (!Number.isInteger(deltaParsed) || deltaParsed === 0) {
+      this.stockAdjustmentsError.set(this.t('adminUi.products.form.stockLedgerDeltaInvalid'));
+      return;
+    }
+
+    const note = (this.stockAdjustNote || '').trim() || null;
+    const variantId = this.stockAdjustTarget ? this.stockAdjustTarget : null;
+
+    this.stockAdjustBusy.set(true);
+    this.admin
+      .applyStockAdjustment({
+        product_id: productId,
+        variant_id: variantId,
+        delta: deltaParsed,
+        reason: this.stockAdjustReason,
+        note,
+      })
+      .subscribe({
+        next: (created) => {
+          this.stockAdjustBusy.set(false);
+          this.stockAdjustDelta = '';
+          this.stockAdjustNote = '';
+          this.stockAdjustments.set([created, ...this.stockAdjustments()]);
+          if (created.variant_id) {
+            const current = this.variants();
+            const idx = current.findIndex((v) => v.id === created.variant_id);
+            if (idx >= 0) {
+              const next = current.slice();
+              next[idx] = { ...next[idx], stock_quantity: created.after_quantity };
+              this.variants.set(next);
+            }
+          } else {
+            this.form.stock_quantity = created.after_quantity;
+          }
+          this.toast.success(this.t('adminUi.products.form.stockLedgerApplied'));
+        },
+        error: (err) => {
+          this.stockAdjustBusy.set(false);
+          const detail = err?.error?.detail;
+          this.stockAdjustmentsError.set(
+            typeof detail === 'string' && detail.trim() ? detail.trim() : this.t('adminUi.products.form.stockLedgerApplyError')
+          );
+        },
+      });
+  }
+
+  private loadStockAdjustments(productId: string): void {
+    this.stockAdjustmentsError.set(null);
+    this.admin.listStockAdjustments({ product_id: productId, limit: 50, offset: 0 }).subscribe({
+      next: (rows) => this.stockAdjustments.set(Array.isArray(rows) ? rows : []),
+      error: () => this.stockAdjustmentsError.set(this.t('adminUi.products.form.stockLedgerLoadError')),
+    });
+  }
+
+  private setVariantsFromProduct(prod: any): void {
+    const rows: AdminProductVariant[] = Array.isArray(prod?.variants) ? prod.variants : [];
+    this.variants.set(
+      rows.map((variant: AdminProductVariant) => ({
+        id: String(variant.id),
+        name: String(variant.name || ''),
+        additional_price_delta: this.formatMoneyInput(Number(variant.additional_price_delta ?? 0)),
+        stock_quantity: Number(variant.stock_quantity ?? 0),
+      }))
+    );
+  }
+
+  private updateVariant(index: number, patch: Partial<VariantRow>): void {
+    const current = this.variants();
+    if (index < 0 || index >= current.length) return;
+    const next = current.slice();
+    next[index] = { ...next[index], ...patch };
+    this.variants.set(next);
+  }
+
+  private resetVariants(): void {
+    this.variants.set([]);
+    this.variantsError.set(null);
+    this.variantsBusy.set(false);
+    this.pendingVariantDeletes = new Set<string>();
+  }
+
+  private resetStockLedger(): void {
+    this.stockAdjustments.set([]);
+    this.stockAdjustmentsError.set(null);
+    this.stockAdjustBusy.set(false);
+    this.stockAdjustTarget = '';
+    this.stockAdjustReason = 'manual_correction';
+    this.stockAdjustDelta = '';
+    this.stockAdjustNote = '';
   }
 
   saveTranslation(lang: 'en' | 'ro'): void {
@@ -1989,6 +2473,16 @@ export class AdminProductsComponent implements OnInit {
     const parsed = Number(clean);
     if (!Number.isFinite(parsed)) return null;
     return Math.round(parsed * 100) / 100;
+  }
+
+  private parseSignedMoneyInput(raw: string): number | null {
+    const trimmed = String(raw ?? '').trim();
+    if (!trimmed || trimmed === '-') return null;
+    const negative = trimmed.startsWith('-');
+    const magnitudeRaw = negative ? trimmed.slice(1) : trimmed;
+    const magnitude = this.parseMoneyInput(magnitudeRaw);
+    if (magnitude === null) return null;
+    return negative ? -magnitude : magnitude;
   }
 
   private formatMoneyInput(value: number): string {

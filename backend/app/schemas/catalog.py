@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic import field_validator
 
-from app.models.catalog import ProductStatus
+from app.models.catalog import ProductStatus, StockAdjustmentReason
 
 
 class CategoryFields(BaseModel):
@@ -159,6 +159,18 @@ class ProductVariantRead(ProductVariantBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+
+
+class ProductVariantUpsert(BaseModel):
+    id: UUID | None = None
+    name: str = Field(min_length=1, max_length=120)
+    additional_price_delta: Decimal = Decimal("0.00")
+    stock_quantity: int = Field(default=0, ge=0)
+
+
+class ProductVariantMatrixUpdate(BaseModel):
+    variants: list[ProductVariantUpsert] = []
+    delete_variant_ids: list[UUID] = []
 
 
 class ProductOptionBase(BaseModel):
@@ -346,6 +358,29 @@ class BulkProductUpdateItem(BaseModel):
     publish_scheduled_for: datetime | None = None
     unpublish_scheduled_for: datetime | None = None
     status: ProductStatus | None = None
+
+
+class StockAdjustmentCreate(BaseModel):
+    product_id: UUID
+    variant_id: UUID | None = None
+    delta: int
+    reason: StockAdjustmentReason
+    note: str | None = Field(default=None, max_length=500)
+
+
+class StockAdjustmentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    product_id: UUID
+    variant_id: UUID | None
+    actor_user_id: UUID | None
+    reason: StockAdjustmentReason
+    delta: int
+    before_quantity: int
+    after_quantity: int
+    note: str | None
+    created_at: datetime
 
 
 class ProductRead(ProductBase):

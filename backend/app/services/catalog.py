@@ -22,6 +22,8 @@ from app.models.catalog import (
     ProductOption,
     ProductTranslation,
     ProductVariant,
+    StockAdjustment,
+    StockAdjustmentReason,
     ProductStatus,
     Tag,
     ProductReview,
@@ -30,6 +32,8 @@ from app.models.catalog import (
     ProductAuditLog,
     FeaturedCollection,
 )
+from app.models.cart import CartItem
+from app.models.order import OrderItem
 from app.schemas.catalog import (
     CategoryCreate,
     CategoryTranslationUpsert,
@@ -42,7 +46,9 @@ from app.schemas.catalog import (
     ProductTranslationUpsert,
     ProductUpdate,
     ProductVariantCreate,
+    ProductVariantMatrixUpdate,
     BulkProductUpdateItem,
+    StockAdjustmentCreate,
     ProductReviewCreate,
     FeaturedCollectionCreate,
     FeaturedCollectionUpdate,
@@ -719,6 +725,7 @@ async def update_product(
     session: AsyncSession, product: Product, payload: ProductUpdate, commit: bool = True, user_id: uuid.UUID | None = None
 ) -> Product:
     was_out_of_stock = is_out_of_stock(product)
+    before_stock_quantity = int(getattr(product, "stock_quantity", 0) or 0)
     before_sale_type = getattr(product, "sale_type", None)
     before_sale_value = getattr(product, "sale_value", None)
     data = payload.model_dump(exclude_unset=True)
@@ -750,6 +757,17 @@ async def update_product(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Unpublish schedule must be after publish schedule",
         )
+    if "stock_quantity" in data and int(getattr(product, "stock_quantity", 0) or 0) != before_stock_quantity:
+        _queue_stock_adjustment(
+            session,
+            product_id=product.id,
+            variant_id=None,
+            before_quantity=before_stock_quantity,
+            after_quantity=int(getattr(product, "stock_quantity", 0) or 0),
+            reason=StockAdjustmentReason.manual_correction,
+            note=None,
+            user_id=user_id,
+        )
     is_now_out_of_stock = is_out_of_stock(product)
     sale_fields_touched = any(
         key in data for key in ("sale_type", "sale_value", "sale_start_at", "sale_end_at", "sale_auto_publish")
@@ -774,6 +792,148 @@ async def update_product(
     else:
         await session.flush()
     return product
+
+
+def _queue_stock_adjustment(
+    session: AsyncSession,
+    *,
+    product_id: uuid.UUID,
+    variant_id: uuid.UUID | None,
+    before_quantity: int,
+    after_quantity: int,
+    reason: StockAdjustmentReason,
+    note: str | None,
+    user_id: uuid.UUID | None,
+) -> None:
+    if before_quantity == after_quantity:
+        return
+    adjustment = StockAdjustment(
+        product_id=product_id,
+        variant_id=variant_id,
+        actor_user_id=user_id,
+        reason=reason,
+        delta=int(after_quantity) - int(before_quantity),
+        before_quantity=int(before_quantity),
+        after_quantity=int(after_quantity),
+        note=note,
+    )
+    session.add(adjustment)
+
+
+async def update_product_variants(
+    session: AsyncSession,
+    *,
+    product: Product,
+    payload: ProductVariantMatrixUpdate,
+    user_id: uuid.UUID | None = None,
+) -> list[ProductVariant]:
+    existing_by_id: dict[uuid.UUID, ProductVariant] = {v.id: v for v in product.variants}
+
+    normalized_names: list[str] = []
+    for variant_item in payload.variants:
+        name = (variant_item.name or "").strip()
+        if not name:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Variant name is required")
+        normalized_names.append(name.casefold())
+    if len(set(normalized_names)) != len(normalized_names):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Variant names must be unique")
+
+    delete_ids = set(payload.delete_variant_ids or [])
+    for variant_id in delete_ids:
+        if any(v.id == variant_id for v in payload.variants if v.id is not None):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete a variant that is also being updated"
+            )
+
+    updated_rows: list[ProductVariant] = []
+    created_with_stock: list[ProductVariant] = []
+    for item in payload.variants:
+        name = (item.name or "").strip()
+        if item.id is not None:
+            existing_variant = existing_by_id.get(item.id)
+            if not existing_variant:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
+            before_qty = int(existing_variant.stock_quantity)
+            existing_variant.name = name
+            existing_variant.additional_price_delta = item.additional_price_delta
+            existing_variant.stock_quantity = item.stock_quantity
+            if int(existing_variant.stock_quantity) != before_qty:
+                _queue_stock_adjustment(
+                    session,
+                    product_id=product.id,
+                    variant_id=existing_variant.id,
+                    before_quantity=before_qty,
+                    after_quantity=int(existing_variant.stock_quantity),
+                    reason=StockAdjustmentReason.manual_correction,
+                    note=None,
+                    user_id=user_id,
+                )
+            session.add(existing_variant)
+            updated_rows.append(existing_variant)
+            continue
+
+        created = ProductVariant(
+            product_id=product.id,
+            name=name,
+            additional_price_delta=item.additional_price_delta,
+            stock_quantity=item.stock_quantity,
+        )
+        session.add(created)
+        if int(created.stock_quantity) != 0:
+            created_with_stock.append(created)
+        updated_rows.append(created)
+
+    for variant_id in delete_ids:
+        variant_model = existing_by_id.get(variant_id)
+        if not variant_model:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
+
+        in_cart = await session.scalar(select(CartItem.id).where(CartItem.variant_id == variant_id).limit(1))
+        if in_cart is not None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Variant is used in a cart")
+        in_order = await session.scalar(select(OrderItem.id).where(OrderItem.variant_id == variant_id).limit(1))
+        if in_order is not None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Variant is used in an order")
+        if int(getattr(variant_model, "stock_quantity", 0) or 0) != 0:
+            _queue_stock_adjustment(
+                session,
+                product_id=product.id,
+                variant_id=variant_model.id,
+                before_quantity=int(getattr(variant_model, "stock_quantity", 0) or 0),
+                after_quantity=0,
+                reason=StockAdjustmentReason.manual_correction,
+                note="Variant deleted",
+                user_id=user_id,
+            )
+        await session.delete(variant_model)
+
+    if created_with_stock:
+        await session.flush()
+        for created_variant in created_with_stock:
+            _queue_stock_adjustment(
+                session,
+                product_id=product.id,
+                variant_id=created_variant.id,
+                before_quantity=0,
+                after_quantity=int(created_variant.stock_quantity),
+                reason=StockAdjustmentReason.manual_correction,
+                note="Variant created",
+                user_id=user_id,
+            )
+
+    await session.commit()
+    await session.refresh(product, attribute_names=["variants"])
+    await _log_product_action(
+        session,
+        product.id,
+        "variants_update",
+        user_id,
+        {
+            "upserted": [str(v.id) for v in updated_rows if getattr(v, "id", None) is not None],
+            "deleted": [str(v) for v in delete_ids],
+        },
+    )
+    return list(getattr(product, "variants", []) or [])
 
 
 async def add_product_image(session: AsyncSession, product: Product, payload: ProductImageCreate) -> ProductImage:
@@ -853,6 +1013,7 @@ async def bulk_update_products(
         if not product:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Product {item.product_id} not found")
         was_out_of_stock = is_out_of_stock(product)
+        before_stock_quantity = int(getattr(product, "stock_quantity", 0) or 0)
         before_sale_type = getattr(product, "sale_type", None)
         before_sale_value = getattr(product, "sale_value", None)
         data = item.model_dump(exclude_unset=True)
@@ -912,6 +1073,19 @@ async def bulk_update_products(
                 product.status = ProductStatus.draft
 
         _set_publish_timestamp(product, product.status)
+        if "stock_quantity" in data and data.get("stock_quantity") is not None:
+            after_stock_quantity = int(getattr(product, "stock_quantity", 0) or 0)
+            if after_stock_quantity != before_stock_quantity:
+                _queue_stock_adjustment(
+                    session,
+                    product_id=product.id,
+                    variant_id=None,
+                    before_quantity=before_stock_quantity,
+                    after_quantity=after_stock_quantity,
+                    reason=StockAdjustmentReason.manual_correction,
+                    note=None,
+                    user_id=user_id,
+                )
         if was_out_of_stock and not is_out_of_stock(product):
             restocked.add(product.id)
         session.add(product)
@@ -939,6 +1113,101 @@ async def bulk_update_products(
             },
         )
     return updated
+
+
+async def list_stock_adjustments(
+    session: AsyncSession,
+    *,
+    product_id: uuid.UUID,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[StockAdjustment]:
+    stmt = (
+        select(StockAdjustment)
+        .where(StockAdjustment.product_id == product_id)
+        .order_by(StockAdjustment.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    rows = (await session.execute(stmt)).scalars().all()
+    return list(rows)
+
+
+async def apply_stock_adjustment(
+    session: AsyncSession,
+    *,
+    payload: StockAdjustmentCreate,
+    user_id: uuid.UUID | None = None,
+) -> StockAdjustment:
+    if payload.delta == 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Delta cannot be zero")
+
+    product = await session.get(Product, payload.product_id)
+    if not product or getattr(product, "is_deleted", False):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    note = (payload.note or "").strip() or None
+    variant_id: uuid.UUID | None = None
+    before_quantity = 0
+    after_quantity = 0
+    was_out_of_stock = False
+    affected_variant: ProductVariant | None = None
+
+    if payload.variant_id is not None:
+        affected_variant = await session.get(ProductVariant, payload.variant_id)
+        if not affected_variant or affected_variant.product_id != product.id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
+        variant_id = affected_variant.id
+        before_quantity = int(getattr(affected_variant, "stock_quantity", 0) or 0)
+        after_quantity = before_quantity + int(payload.delta)
+        if after_quantity < 0:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stock cannot be negative")
+        affected_variant.stock_quantity = after_quantity
+        session.add(affected_variant)
+    else:
+        was_out_of_stock = is_out_of_stock(product)
+        before_quantity = int(getattr(product, "stock_quantity", 0) or 0)
+        after_quantity = before_quantity + int(payload.delta)
+        if after_quantity < 0:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stock cannot be negative")
+        product.stock_quantity = after_quantity
+        session.add(product)
+
+    adjustment = StockAdjustment(
+        product_id=product.id,
+        variant_id=variant_id,
+        actor_user_id=user_id,
+        reason=payload.reason,
+        delta=int(payload.delta),
+        before_quantity=before_quantity,
+        after_quantity=after_quantity,
+        note=note,
+    )
+    session.add(adjustment)
+    await session.commit()
+    await session.refresh(adjustment)
+
+    if payload.variant_id is None:
+        await session.refresh(product)
+        if was_out_of_stock and not is_out_of_stock(product):
+            await fulfill_back_in_stock_requests(session, product=product)
+        await _maybe_alert_low_stock(session, product)
+
+    await _log_product_action(
+        session,
+        product.id,
+        "stock_adjustment",
+        user_id,
+        {
+            "variant_id": str(variant_id) if variant_id else None,
+            "reason": str(payload.reason),
+            "delta": int(payload.delta),
+            "before": before_quantity,
+            "after": after_quantity,
+            "note": note,
+        },
+    )
+    return adjustment
 
 
 async def get_featured_collection_by_slug(session: AsyncSession, slug: str) -> FeaturedCollection | None:

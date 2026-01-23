@@ -193,6 +193,7 @@ export interface AdminProductDetail extends AdminProduct {
   category_id?: string | null;
   stock_quantity: number;
   images?: { id: string; url: string; alt_text?: string | null; caption?: string | null }[];
+  variants?: AdminProductVariant[];
   tags?: string[];
 }
 
@@ -219,6 +220,28 @@ export interface AdminProductImageOptimizationStats {
   thumb_lg_bytes?: number | null;
   width?: number | null;
   height?: number | null;
+}
+
+export interface AdminProductVariant {
+  id: string;
+  name: string;
+  additional_price_delta: number;
+  stock_quantity: number;
+}
+
+export type StockAdjustmentReason = 'restock' | 'damage' | 'manual_correction';
+
+export interface StockAdjustment {
+  id: string;
+  product_id: string;
+  variant_id?: string | null;
+  actor_user_id?: string | null;
+  reason: StockAdjustmentReason;
+  delta: number;
+  before_quantity: number;
+  after_quantity: number;
+  note?: string | null;
+  created_at: string;
 }
 
 export interface AdminAudit {
@@ -592,6 +615,16 @@ export class AdminService {
     );
   }
 
+  updateProductVariants(
+    slug: string,
+    payload: {
+      variants: Array<{ id?: string | null; name: string; additional_price_delta: number; stock_quantity: number }>;
+      delete_variant_ids?: string[];
+    }
+  ): Observable<AdminProductVariant[]> {
+    return this.api.put<AdminProductVariant[]>(`/catalog/products/${slug}/variants`, payload);
+  }
+
   getProductImageTranslations(slug: string, imageId: string): Observable<AdminProductImageTranslation[]> {
     return this.api.get<AdminProductImageTranslation[]>(`/catalog/products/${slug}/images/${imageId}/translations`);
   }
@@ -618,6 +651,20 @@ export class AdminService {
 
   reprocessProductImage(slug: string, imageId: string): Observable<AdminProductImageOptimizationStats> {
     return this.api.post<AdminProductImageOptimizationStats>(`/catalog/products/${slug}/images/${imageId}/reprocess`, {});
+  }
+
+  listStockAdjustments(params: { product_id: string; limit?: number; offset?: number }): Observable<StockAdjustment[]> {
+    return this.api.get<StockAdjustment[]>('/admin/dashboard/stock-adjustments', params as any);
+  }
+
+  applyStockAdjustment(payload: {
+    product_id: string;
+    variant_id?: string | null;
+    delta: number;
+    reason: StockAdjustmentReason;
+    note?: string | null;
+  }): Observable<StockAdjustment> {
+    return this.api.post<StockAdjustment>('/admin/dashboard/stock-adjustments', payload);
   }
 
   updateUserRole(userId: string, role: string): Observable<AdminUser> {

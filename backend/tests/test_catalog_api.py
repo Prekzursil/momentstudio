@@ -1,5 +1,6 @@
 import asyncio
 import io
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Dict
 
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.main import app
 from app.db.base import Base
 from app.db.session import get_session
+from app.models.cart import Cart, CartItem
 from app.models.user import UserRole
 from app.models.catalog import BackInStockRequest, Category, CategoryTranslation, Product, ProductAuditLog, ProductTranslation
 from app.services.auth import create_user
@@ -1160,3 +1162,159 @@ def test_back_in_stock_fulfilled_on_restock(test_app: Dict[str, object]) -> None
 
     record = asyncio.run(read_request())
     assert record.fulfilled_at is not None
+
+
+def test_catalog_variant_matrix_update_and_delete_guards(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token = create_admin_token(SessionLocal, email="variants@example.com")
+
+    category_res = client.post(
+        "/api/v1/catalog/categories",
+        json={"name": "Cups"},
+        headers=auth_headers(admin_token),
+    )
+    assert category_res.status_code == 201, category_res.text
+    category_id = category_res.json()["id"]
+
+    create_res = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": category_id,
+            "slug": "variant-cup",
+            "name": "Variant Cup",
+            "base_price": 10.0,
+            "currency": "RON",
+            "stock_quantity": 3,
+            "status": "published",
+            "variants": [{"name": "Large", "additional_price_delta": 2.5, "stock_quantity": 2}],
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert create_res.status_code == 201, create_res.text
+    product_id = create_res.json()["id"]
+    large_id = create_res.json()["variants"][0]["id"]
+
+    update_res = client.put(
+        "/api/v1/catalog/products/variant-cup/variants",
+        json={
+            "variants": [
+                {"id": large_id, "name": "Large", "additional_price_delta": 3.0, "stock_quantity": 5},
+                {"name": "Small", "additional_price_delta": -1.0, "stock_quantity": 1},
+            ]
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert update_res.status_code == 200, update_res.text
+    variants = update_res.json()
+    assert len(variants) == 2
+    assert next(v for v in variants if v["id"] == large_id)["stock_quantity"] == 5
+    small_id = next(v for v in variants if v["name"] == "Small")["id"]
+
+    delete_res = client.put(
+        "/api/v1/catalog/products/variant-cup/variants",
+        json={
+            "variants": [{"id": large_id, "name": "Large", "additional_price_delta": 3.0, "stock_quantity": 5}],
+            "delete_variant_ids": [small_id],
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert delete_res.status_code == 200, delete_res.text
+    assert len(delete_res.json()) == 1
+
+    async def add_cart_item() -> None:
+        async with SessionLocal() as session:
+            cart = Cart(session_id="session-1")
+            session.add(cart)
+            await session.flush()
+            session.add(
+                CartItem(
+                    cart_id=cart.id,
+                    product_id=uuid.UUID(product_id),
+                    variant_id=uuid.UUID(large_id),
+                    quantity=1,
+                    unit_price_at_add=10.0,
+                )
+            )
+            await session.commit()
+
+    asyncio.run(add_cart_item())
+
+    blocked = client.put(
+        "/api/v1/catalog/products/variant-cup/variants",
+        json={"variants": [], "delete_variant_ids": [large_id]},
+        headers=auth_headers(admin_token),
+    )
+    assert blocked.status_code == 400, blocked.text
+    assert "cart" in blocked.json()["detail"].lower()
+
+
+def test_stock_adjustment_ledger_records_changes(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token = create_admin_token(SessionLocal, email="stock@example.com")
+
+    category_res = client.post(
+        "/api/v1/catalog/categories",
+        json={"name": "Art"},
+        headers=auth_headers(admin_token),
+    )
+    assert category_res.status_code == 201, category_res.text
+    category_id = category_res.json()["id"]
+
+    create_res = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": category_id,
+            "slug": "stock-cup",
+            "name": "Stock Cup",
+            "base_price": 10.0,
+            "currency": "RON",
+            "stock_quantity": 3,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert create_res.status_code == 201, create_res.text
+    product_id = create_res.json()["id"]
+
+    patch_res = client.patch(
+        "/api/v1/catalog/products/stock-cup",
+        json={"stock_quantity": 10},
+        headers=auth_headers(admin_token),
+    )
+    assert patch_res.status_code == 200, patch_res.text
+
+    list_res = client.get(
+        "/api/v1/admin/dashboard/stock-adjustments",
+        params={"product_id": product_id},
+        headers=auth_headers(admin_token),
+    )
+    assert list_res.status_code == 200, list_res.text
+    rows = list_res.json()
+    assert len(rows) == 1
+    assert rows[0]["delta"] == 7
+    assert rows[0]["before_quantity"] == 3
+    assert rows[0]["after_quantity"] == 10
+
+    apply_res = client.post(
+        "/api/v1/admin/dashboard/stock-adjustments",
+        json={"product_id": product_id, "delta": -2, "reason": "damage", "note": "broken"},
+        headers=auth_headers(admin_token),
+    )
+    assert apply_res.status_code == 201, apply_res.text
+    applied = apply_res.json()
+    assert applied["delta"] == -2
+    assert applied["after_quantity"] == 8
+
+    list_res = client.get(
+        "/api/v1/admin/dashboard/stock-adjustments",
+        params={"product_id": product_id},
+        headers=auth_headers(admin_token),
+    )
+    assert list_res.status_code == 200, list_res.text
+    rows = list_res.json()
+    assert len(rows) == 2
+    assert any(row["id"] == applied["id"] for row in rows)
