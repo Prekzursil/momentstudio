@@ -2105,14 +2105,25 @@
         "selected": "{{count}} selectate",
         "status": "Status",
         "courier": "Curier",
+        "email": "Retrimite email",
+        "emailConfirmation": "Confirmare comandă",
+        "emailDelivery": "Confirmare livrare",
         "noChange": "Fără schimbări",
         "clearCourier": "Șterge curierul",
         "apply": "Aplică",
+        "sendEmails": "Retrimite",
+        "emailNotePrompt": "Notă audit (opțională)",
+        "emailsQueued": "Am trimis la coadă emailuri pentru {{count}} comenzi.",
+        "emailsPartial": "Am trimis la coadă emailuri pentru {{success}} din {{total}} comenzi.",
+        "packingSlips": "Avize (PDF)",
+        "packingSlipsReady": "Avizele sunt gata",
         "clearSelection": "Golește selecția",
         "success": "Am actualizat {{count}} comenzi.",
         "partial": "Am actualizat {{success}} din {{total}} comenzi.",
         "errors": {
-          "chooseAction": "Alege un status sau un curier de aplicat."
+          "chooseAction": "Alege un status sau un curier de aplicat.",
+          "chooseEmail": "Alege emailul de retrimis.",
+          "packingSlips": "Nu am putut descărca avizele."
         }
       },
       "empty": "Nu există comenzi pentru aceste filtre.",

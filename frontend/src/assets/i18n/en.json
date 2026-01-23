@@ -2105,14 +2105,25 @@
         "selected": "{{count}} selected",
         "status": "Status",
         "courier": "Courier",
+        "email": "Resend email",
+        "emailConfirmation": "Order confirmation",
+        "emailDelivery": "Delivery confirmation",
         "noChange": "No change",
         "clearCourier": "Clear courier",
         "apply": "Apply",
+        "sendEmails": "Resend",
+        "emailNotePrompt": "Audit note (optional)",
+        "emailsQueued": "Queued emails for {{count}} orders.",
+        "emailsPartial": "Queued emails for {{success}} of {{total}} orders.",
+        "packingSlips": "Packing slips PDF",
+        "packingSlipsReady": "Packing slips ready",
         "clearSelection": "Clear selection",
         "success": "Updated {{count}} orders.",
         "partial": "Updated {{success}} of {{total}} orders.",
         "errors": {
-          "chooseAction": "Choose a status or courier to apply."
+          "chooseAction": "Choose a status or courier to apply.",
+          "chooseEmail": "Choose an email to resend.",
+          "packingSlips": "Could not download packing slips."
         }
       },
       "empty": "No orders match these filters.",

@@ -154,8 +154,20 @@ export class AdminOrdersService {
     return this.api.getBlob(`/orders/admin/${orderId}/packing-slip`);
   }
 
+  downloadBatchPackingSlips(orderIds: string[]): Observable<Blob> {
+    return this.api.postBlob('/orders/admin/batch/packing-slips', { order_ids: orderIds });
+  }
+
   downloadExport(): Observable<Blob> {
     return this.api.getBlob('/orders/admin/export');
+  }
+
+  resendOrderConfirmationEmail(orderId: string, note?: string | null): Observable<Order> {
+    return this.api.post<Order>(`/orders/admin/${orderId}/confirmation-email`, { note: note ?? null });
+  }
+
+  resendDeliveryEmail(orderId: string, note?: string | null): Observable<Order> {
+    return this.api.post<Order>(`/orders/admin/${orderId}/delivery-email`, { note: note ?? null });
   }
 
   shareReceipt(orderId: string): Observable<ReceiptShareToken> {

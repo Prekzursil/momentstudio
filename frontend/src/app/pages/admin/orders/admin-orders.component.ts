@@ -200,6 +200,37 @@ type AdminOrdersFilterPreset = {
                   [disabled]="bulkBusy || (!bulkStatus && !bulkCourier)"
                   (action)="applyBulkUpdate()"
                 ></app-button>
+
+                <span class="hidden sm:block h-9 w-px bg-slate-200 dark:bg-slate-800"></span>
+
+                <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.orders.bulk.email' | translate }}
+                  <select
+                    class="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="bulkEmailKind"
+                    [disabled]="bulkBusy"
+                  >
+                    <option value="">{{ 'adminUi.orders.bulk.noChange' | translate }}</option>
+                    <option value="confirmation">{{ 'adminUi.orders.bulk.emailConfirmation' | translate }}</option>
+                    <option value="delivery">{{ 'adminUi.orders.bulk.emailDelivery' | translate }}</option>
+                  </select>
+                </label>
+
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.orders.bulk.sendEmails' | translate"
+                  [disabled]="bulkBusy || !bulkEmailKind"
+                  (action)="resendBulkEmails()"
+                ></app-button>
+
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.orders.bulk.packingSlips' | translate"
+                  [disabled]="bulkBusy"
+                  (action)="downloadBatchPackingSlips()"
+                ></app-button>
                 <app-button
                   size="sm"
                   variant="ghost"
@@ -325,6 +356,7 @@ export class AdminOrdersComponent implements OnInit {
   selectedIds = new Set<string>();
   bulkStatus: '' | Exclude<OrderStatusFilter, 'all'> = '';
   bulkCourier: '' | 'sameday' | 'fan_courier' | 'clear' = '';
+  bulkEmailKind: '' | 'confirmation' | 'delivery' = '';
   bulkBusy = false;
 
   constructor(
@@ -494,8 +526,84 @@ export class AdminOrdersComponent implements OnInit {
         }
         this.bulkStatus = '';
         this.bulkCourier = '';
+        this.bulkEmailKind = '';
         this.load();
       });
+  }
+
+  resendBulkEmails(): void {
+    if (!this.selectedIds.size) return;
+    if (!this.bulkEmailKind) {
+      this.toast.error(this.translate.instant('adminUi.orders.bulk.errors.chooseEmail'));
+      return;
+    }
+
+    const notePrompt = this.translate.instant('adminUi.orders.bulk.emailNotePrompt');
+    const noteRaw = window.prompt(notePrompt) ?? null;
+    if (noteRaw === null) return;
+    const note = noteRaw.trim() || null;
+
+    const ids = Array.from(this.selectedIds);
+    this.bulkBusy = true;
+    from(ids)
+      .pipe(
+        mergeMap(
+          (id) => {
+            const req =
+              this.bulkEmailKind === 'delivery'
+                ? this.ordersApi.resendDeliveryEmail(id, note)
+                : this.ordersApi.resendOrderConfirmationEmail(id, note);
+            return req.pipe(
+              map(() => ({ id, ok: true as const })),
+              catchError(() => of({ id, ok: false as const }))
+            );
+          },
+          3
+        ),
+        toArray(),
+        finalize(() => {
+          this.bulkBusy = false;
+        })
+      )
+      .subscribe((results) => {
+        const failed = results.filter((r) => !r.ok).map((r) => r.id);
+        const successCount = results.length - failed.length;
+        if (failed.length) {
+          this.selectedIds = new Set(failed);
+          this.toast.error(
+            this.translate.instant('adminUi.orders.bulk.emailsPartial', {
+              success: successCount,
+              total: results.length
+            })
+          );
+        } else {
+          this.clearSelection();
+          this.toast.success(this.translate.instant('adminUi.orders.bulk.emailsQueued', { count: results.length }));
+        }
+        this.bulkEmailKind = '';
+      });
+  }
+
+  downloadBatchPackingSlips(): void {
+    if (!this.selectedIds.size) return;
+    const ids = Array.from(this.selectedIds);
+    this.bulkBusy = true;
+    this.ordersApi.downloadBatchPackingSlips(ids).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'packing-slips.pdf';
+        a.click();
+        URL.revokeObjectURL(url);
+        this.toast.success(this.translate.instant('adminUi.orders.bulk.packingSlipsReady'));
+        this.bulkBusy = false;
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.orders.bulk.errors.packingSlips'));
+        this.bulkBusy = false;
+      }
+    });
   }
 
   goToPage(page: number): void {

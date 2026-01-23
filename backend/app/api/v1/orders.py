@@ -7,8 +7,8 @@ from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, UploadFile, File
-from fastapi.responses import PlainTextResponse, StreamingResponse, FileResponse
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, UploadFile, File, Body, Response
+from fastapi.responses import StreamingResponse, FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -41,6 +41,7 @@ from app.services import checkout_settings as checkout_settings_service
 from app.services import auth as auth_service
 from app.services import private_storage
 from app.services import receipts as receipt_service
+from app.services import packing_slips as packing_slips_service
 from app.schemas.checkout import (
     CheckoutRequest,
     GuestCheckoutRequest,
@@ -60,7 +61,14 @@ from app.services import payments
 from app.services import paypal as paypal_service
 from app.services import address as address_service
 from app.api.v1 import cart as cart_api
-from app.schemas.order_admin import AdminOrderListItem, AdminOrderListResponse, AdminOrderRead, AdminPaginationMeta
+from app.schemas.order_admin import (
+    AdminOrderListItem,
+    AdminOrderListResponse,
+    AdminOrderRead,
+    AdminPaginationMeta,
+    AdminOrderEmailResendRequest,
+    AdminOrderIdsRequest,
+)
 from app.schemas.receipt import ReceiptRead, ReceiptShareTokenRead
 from app.services import notifications as notification_service
 from app.services import promo_usage
@@ -1565,9 +1573,11 @@ async def admin_refund_order(
 
 @router.post("/admin/{order_id}/delivery-email", response_model=OrderRead)
 async def admin_send_delivery_email(
+    background_tasks: BackgroundTasks,
     order_id: UUID,
+    payload: AdminOrderEmailResendRequest = Body(default=AdminOrderEmailResendRequest()),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    admin=Depends(require_admin),
 ) -> OrderRead:
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1575,7 +1585,51 @@ async def admin_send_delivery_email(
     to_email = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
     if not to_email:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order customer email missing")
-    await email_service.send_delivery_confirmation(to_email, order, getattr(order.user, "preferred_language", None) if order.user else None)
+    note = (payload.note or "").strip() or None
+    actor = (getattr(admin, "email", None) or getattr(admin, "username", None) or "admin").strip()
+    event_note = f"{actor}: {note}" if note else actor
+    session.add(OrderEvent(order_id=order.id, event="email_resend_delivery", note=event_note))
+    await session.commit()
+    await session.refresh(order, attribute_names=["events"])
+    background_tasks.add_task(
+        email_service.send_delivery_confirmation,
+        to_email,
+        order,
+        getattr(order.user, "preferred_language", None) if order.user else None,
+    )
+    return order
+
+
+@router.post("/admin/{order_id}/confirmation-email", response_model=OrderRead)
+async def admin_send_confirmation_email(
+    background_tasks: BackgroundTasks,
+    order_id: UUID,
+    payload: AdminOrderEmailResendRequest = Body(default=AdminOrderEmailResendRequest()),
+    session: AsyncSession = Depends(get_session),
+    admin=Depends(require_admin),
+) -> OrderRead:
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    to_email = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
+    if not to_email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order customer email missing")
+    note = (payload.note or "").strip() or None
+    actor = (getattr(admin, "email", None) or getattr(admin, "username", None) or "admin").strip()
+    event_note = f"{actor}: {note}" if note else actor
+    session.add(OrderEvent(order_id=order.id, event="email_resend_confirmation", note=event_note))
+    await session.commit()
+    await session.refresh(order, attribute_names=["events"])
+
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+    background_tasks.add_task(
+        email_service.send_order_confirmation,
+        to_email,
+        order,
+        order.items,
+        getattr(order.user, "preferred_language", None) if order.user else None,
+        receipt_share_days=checkout_settings.receipt_share_days,
+    )
     return order
 
 
@@ -1614,8 +1668,46 @@ async def admin_packing_slip(
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    content = f"Packing slip for order {order.reference_code or order.id}\nItems: {len(order.items)}"
-    return PlainTextResponse(content, media_type="application/pdf")
+    pdf = packing_slips_service.render_packing_slip_pdf(order)
+    ref = getattr(order, "reference_code", None) or str(order.id)
+    headers = {"Content-Disposition": f"attachment; filename=packing-slip-{ref}.pdf"}
+    return Response(content=pdf, media_type="application/pdf", headers=headers)
+
+
+@router.post("/admin/batch/packing-slips")
+async def admin_batch_packing_slips(
+    payload: AdminOrderIdsRequest,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+):
+    ids = list(dict.fromkeys(payload.order_ids))
+    if not ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No orders selected")
+    if len(ids) > 50:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many orders selected")
+
+    result = await session.execute(
+        select(Order)
+        .execution_options(populate_existing=True)
+        .options(
+            selectinload(Order.items).selectinload(OrderItem.product),
+            selectinload(Order.user),
+            selectinload(Order.shipping_address),
+            selectinload(Order.billing_address),
+        )
+        .where(Order.id.in_(ids))
+    )
+    orders = list(result.scalars().unique())
+    found = {o.id for o in orders}
+    missing = [str(order_id) for order_id in ids if order_id not in found]
+    if missing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"missing_order_ids": missing})
+
+    order_by_id = {o.id: o for o in orders}
+    ordered = [order_by_id[order_id] for order_id in ids if order_id in order_by_id]
+    pdf = packing_slips_service.render_batch_packing_slips_pdf(ordered)
+    headers = {"Content-Disposition": "attachment; filename=packing-slips.pdf"}
+    return Response(content=pdf, media_type="application/pdf", headers=headers)
 
 
 @router.post("/admin/{order_id}/capture-payment", response_model=OrderRead)

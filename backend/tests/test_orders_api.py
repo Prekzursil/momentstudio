@@ -619,9 +619,20 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
 
     packing = client.get(f"/api/v1/orders/admin/{order_id}/packing-slip", headers=auth_headers(admin_token))
     assert packing.status_code == 200
-    assert "Packing slip for order" in packing.text
-    assert "Items:" in packing.text
+    assert packing.headers.get("content-type", "").startswith("application/pdf")
+    assert packing.headers.get("content-disposition", "").startswith("attachment;")
+    assert packing.content.startswith(b"%PDF")
     assert sent["shipped"] == 1
+
+    batch_packing = client.post(
+        "/api/v1/orders/admin/batch/packing-slips",
+        headers=auth_headers(admin_token),
+        json={"order_ids": [order_id, stripe_order_id]},
+    )
+    assert batch_packing.status_code == 200
+    assert batch_packing.headers.get("content-type", "").startswith("application/pdf")
+    assert batch_packing.headers.get("content-disposition", "").startswith("attachment;")
+    assert batch_packing.content.startswith(b"%PDF")
 
     receipt = client.get(f"/api/v1/orders/{order_id}/receipt", headers=auth_headers(token))
     assert receipt.status_code == 200
@@ -649,6 +660,14 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     delivery = client.post(f"/api/v1/orders/admin/{order_id}/delivery-email", headers=auth_headers(admin_token))
     assert delivery.status_code == 200
     assert sent["delivered"] == 1
+
+    confirm = client.post(
+        f"/api/v1/orders/admin/{order_id}/confirmation-email",
+        headers=auth_headers(admin_token),
+        json={"note": "Resend for customer request"},
+    )
+    assert confirm.status_code == 200
+    assert sent["count"] == 2
 
 
 def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:

@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.order import OrderStatus
 from app.schemas.admin_common import AdminPaginationMeta
@@ -37,3 +37,11 @@ class AdminOrderRead(OrderRead):
     shipping_label_filename: str | None = None
     shipping_label_uploaded_at: datetime | None = None
     has_shipping_label: bool = False
+
+
+class AdminOrderEmailResendRequest(BaseModel):
+    note: str | None = Field(default=None, max_length=255)
+
+
+class AdminOrderIdsRequest(BaseModel):
+    order_ids: list[UUID] = Field(default_factory=list, min_length=1, max_length=100)
