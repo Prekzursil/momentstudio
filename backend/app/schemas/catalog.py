@@ -110,6 +110,7 @@ class ProductBase(ProductFields):
 class ProductImageBase(BaseModel):
     url: str
     alt_text: str | None = None
+    caption: str | None = None
     sort_order: int = 0
 
 
@@ -121,6 +122,27 @@ class ProductImageRead(ProductImageBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+
+
+class ProductImageTranslationUpsert(BaseModel):
+    alt_text: str | None = Field(default=None, max_length=255)
+    caption: str | None = None
+
+
+class ProductImageTranslationRead(ProductImageTranslationUpsert):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    lang: str
+
+
+class ProductImageOptimizationStats(BaseModel):
+    original_bytes: int | None = None
+    thumb_sm_bytes: int | None = None
+    thumb_md_bytes: int | None = None
+    thumb_lg_bytes: int | None = None
+    width: int | None = None
+    height: int | None = None
 
 
 class ProductVariantBase(BaseModel):

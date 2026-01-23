@@ -192,7 +192,7 @@ export interface AdminProductDetail extends AdminProduct {
   long_description?: string | null;
   category_id?: string | null;
   stock_quantity: number;
-  images?: { id: string; url: string; alt_text?: string | null }[];
+  images?: { id: string; url: string; alt_text?: string | null; caption?: string | null }[];
   tags?: string[];
 }
 
@@ -203,6 +203,22 @@ export interface AdminProductTranslation {
   long_description?: string | null;
   meta_title?: string | null;
   meta_description?: string | null;
+}
+
+export interface AdminProductImageTranslation {
+  id: string;
+  lang: 'en' | 'ro';
+  alt_text?: string | null;
+  caption?: string | null;
+}
+
+export interface AdminProductImageOptimizationStats {
+  original_bytes?: number | null;
+  thumb_sm_bytes?: number | null;
+  thumb_md_bytes?: number | null;
+  thumb_lg_bytes?: number | null;
+  width?: number | null;
+  height?: number | null;
 }
 
 export interface AdminAudit {
@@ -574,6 +590,34 @@ export class AdminService {
       `/catalog/products/${slug}/images/${imageId}/sort?sort_order=${sortOrder}`,
       {}
     );
+  }
+
+  getProductImageTranslations(slug: string, imageId: string): Observable<AdminProductImageTranslation[]> {
+    return this.api.get<AdminProductImageTranslation[]>(`/catalog/products/${slug}/images/${imageId}/translations`);
+  }
+
+  upsertProductImageTranslation(
+    slug: string,
+    imageId: string,
+    lang: 'en' | 'ro',
+    payload: { alt_text?: string | null; caption?: string | null }
+  ): Observable<AdminProductImageTranslation> {
+    return this.api.put<AdminProductImageTranslation>(
+      `/catalog/products/${slug}/images/${imageId}/translations/${lang}`,
+      payload
+    );
+  }
+
+  deleteProductImageTranslation(slug: string, imageId: string, lang: 'en' | 'ro'): Observable<void> {
+    return this.api.delete<void>(`/catalog/products/${slug}/images/${imageId}/translations/${lang}`);
+  }
+
+  getProductImageStats(slug: string, imageId: string): Observable<AdminProductImageOptimizationStats> {
+    return this.api.get<AdminProductImageOptimizationStats>(`/catalog/products/${slug}/images/${imageId}/stats`);
+  }
+
+  reprocessProductImage(slug: string, imageId: string): Observable<AdminProductImageOptimizationStats> {
+    return this.api.post<AdminProductImageOptimizationStats>(`/catalog/products/${slug}/images/${imageId}/reprocess`, {});
   }
 
   updateUserRole(userId: string, role: string): Observable<AdminUser> {

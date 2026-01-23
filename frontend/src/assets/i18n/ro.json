@@ -1972,7 +1972,18 @@
         "bestseller": "Cel mai vândut",
         "highlight": "Evidențiat",
         "publishAt": "Publică la",
-        "noImages": "Nu există imagini."
+        "noImages": "Nu există imagini.",
+        "imageMeta": "SEO imagine",
+        "imageAltText": "Text alternativ",
+        "imageCaption": "Legendă",
+        "imageSize": "Original",
+        "imageThumbs": "Miniaturi",
+        "imageReprocess": "Regenerare miniaturi",
+        "imageMetaSaved": "Textele imaginii au fost salvate",
+        "imageMetaLoadError": "Nu am putut încărca textele imaginii.",
+        "imageMetaSaveError": "Nu am putut salva textele imaginii.",
+        "imageReprocessed": "Miniaturile au fost regenerate",
+        "imageReprocessError": "Nu am putut regenera miniaturile."
       },
       "sale": {
         "title": "Reducere",

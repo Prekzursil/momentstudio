@@ -566,6 +566,107 @@ def test_product_image_upload_and_delete(tmp_path, test_app: Dict[str, object]) 
     settings.media_root = original_media
 
 
+def test_product_image_translations_and_stats(tmp_path, test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal, email="imgmetaadmin@example.com")
+
+    original_media = settings.media_root
+    settings.media_root = str(tmp_path)
+
+    try:
+        res = client.post(
+            "/api/v1/catalog/categories",
+            json={"name": "Plates"},
+            headers=auth_headers(admin_token),
+        )
+        category_id = res.json()["id"]
+
+        res = client.post(
+            "/api/v1/catalog/products",
+            json={
+                "category_id": category_id,
+                "slug": "meta-plate",
+                "name": "Meta Plate",
+                "base_price": 12,
+                "currency": "RON",
+                "stock_quantity": 2,
+            },
+            headers=auth_headers(admin_token),
+        )
+        assert res.status_code == 201
+
+        upload_res = client.post(
+            "/api/v1/catalog/products/meta-plate/images",
+            files={"file": ("pic.jpg", _jpeg_bytes(), "image/jpeg")},
+            headers=auth_headers(admin_token),
+        )
+        assert upload_res.status_code == 200
+        image_id = upload_res.json()["images"][0]["id"]
+        image_url = upload_res.json()["images"][0]["url"]
+
+        stats_res = client.get(
+            f"/api/v1/catalog/products/meta-plate/images/{image_id}/stats",
+            headers=auth_headers(admin_token),
+        )
+        assert stats_res.status_code == 200, stats_res.text
+        stats = stats_res.json()
+        assert stats["original_bytes"] is not None
+        assert stats["thumb_sm_bytes"] is not None
+        assert stats["width"] == 1
+        assert stats["height"] == 1
+
+        ro_res = client.put(
+            f"/api/v1/catalog/products/meta-plate/images/{image_id}/translations/ro",
+            json={"alt_text": "Farfurie", "caption": "Legendă"},
+            headers=auth_headers(admin_token),
+        )
+        assert ro_res.status_code == 200, ro_res.text
+        en_res = client.put(
+            f"/api/v1/catalog/products/meta-plate/images/{image_id}/translations/en",
+            json={"alt_text": "Plate", "caption": "Caption"},
+            headers=auth_headers(admin_token),
+        )
+        assert en_res.status_code == 200, en_res.text
+
+        translations = client.get(
+            f"/api/v1/catalog/products/meta-plate/images/{image_id}/translations",
+            headers=auth_headers(admin_token),
+        )
+        assert translations.status_code == 200
+        rows = translations.json()
+        langs = {row["lang"]: row for row in rows}
+        assert langs["ro"]["alt_text"] == "Farfurie"
+        assert langs["en"]["caption"] == "Caption"
+
+        ro_product = client.get(
+            "/api/v1/catalog/products/meta-plate",
+            params={"lang": "ro"},
+            headers=auth_headers(admin_token),
+        )
+        assert ro_product.status_code == 200, ro_product.text
+        assert ro_product.json()["images"][0]["alt_text"] == "Farfurie"
+        assert ro_product.json()["images"][0]["caption"] == "Legendă"
+
+        from pathlib import Path
+
+        if image_url.startswith("/media/"):
+            rel = image_url.removeprefix("/media/")
+            original_path = Path(settings.media_root) / rel
+            thumb_sm = original_path.with_name(f"{original_path.stem}-sm{original_path.suffix}")
+            if thumb_sm.exists():
+                thumb_sm.unlink()
+
+        reprocess_res = client.post(
+            f"/api/v1/catalog/products/meta-plate/images/{image_id}/reprocess",
+            headers=auth_headers(admin_token),
+        )
+        assert reprocess_res.status_code == 200, reprocess_res.text
+        assert reprocess_res.json()["thumb_sm_bytes"] is not None
+    finally:
+        settings.media_root = original_media
+
+
 def test_bulk_update_and_publish(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]

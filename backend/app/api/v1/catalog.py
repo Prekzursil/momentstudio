@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import require_admin, get_current_user_optional, require_complete_profile
 from app.db.session import get_session
-from app.models.catalog import Category, Product, ProductReview, ProductStatus
+from app.models.catalog import Category, Product, ProductImage, ProductReview, ProductStatus
 from app.models.user import UserRole
 from app.schemas.catalog import (
     CategoryCreate,
@@ -35,6 +35,9 @@ from app.schemas.catalog import (
     ProductPriceBounds,
     BackInStockRequestRead,
     BackInStockStatus,
+    ProductImageTranslationRead,
+    ProductImageTranslationUpsert,
+    ProductImageOptimizationStats,
 )
 from app.services import catalog as catalog_service
 from app.services import storage
@@ -491,7 +494,10 @@ async def get_product(
 ) -> Product:
     await catalog_service.auto_publish_due_sales(session)
     await catalog_service.apply_due_product_schedules(session)
-    product_options = [selectinload(Product.images)]
+    image_loader = selectinload(Product.images)
+    if lang:
+        image_loader = image_loader.selectinload(ProductImage.translations)
+    product_options = [image_loader]
     if lang:
         product_options.append(selectinload(Product.translations))
         product_options.append(selectinload(Product.category).selectinload(Category.translations))
@@ -599,6 +605,90 @@ async def reorder_product_image(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     updated = await catalog_service.update_product_image_sort(session, product, str(image_id), sort_order)
     return updated
+
+
+@router.get("/products/{slug}/images/{image_id}/translations", response_model=list[ProductImageTranslationRead])
+async def list_product_image_translations(
+    slug: str,
+    image_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> list[ProductImageTranslationRead]:
+    product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    image = next((img for img in product.images if str(img.id) == str(image_id)), None)
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    return await catalog_service.list_product_image_translations(session, image=image)
+
+
+@router.put("/products/{slug}/images/{image_id}/translations/{lang}", response_model=ProductImageTranslationRead)
+async def upsert_product_image_translation(
+    slug: str,
+    image_id: UUID,
+    payload: ProductImageTranslationUpsert,
+    lang: str = Path(..., pattern="^(en|ro)$"),
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> ProductImageTranslationRead:
+    product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    image = next((img for img in product.images if str(img.id) == str(image_id)), None)
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    return await catalog_service.upsert_product_image_translation(session, image=image, lang=lang, payload=payload)
+
+
+@router.delete("/products/{slug}/images/{image_id}/translations/{lang}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_product_image_translation(
+    slug: str,
+    image_id: UUID,
+    lang: str = Path(..., pattern="^(en|ro)$"),
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> None:
+    product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    image = next((img for img in product.images if str(img.id) == str(image_id)), None)
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    await catalog_service.delete_product_image_translation(session, image=image, lang=lang)
+    return None
+
+
+@router.get("/products/{slug}/images/{image_id}/stats", response_model=ProductImageOptimizationStats)
+async def get_product_image_stats(
+    slug: str,
+    image_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> ProductImageOptimizationStats:
+    product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    image = next((img for img in product.images if str(img.id) == str(image_id)), None)
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    return catalog_service.get_product_image_optimization_stats(image)
+
+
+@router.post("/products/{slug}/images/{image_id}/reprocess", response_model=ProductImageOptimizationStats)
+async def reprocess_product_image(
+    slug: str,
+    image_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> ProductImageOptimizationStats:
+    product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    image = next((img for img in product.images if str(img.id) == str(image_id)), None)
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    return catalog_service.reprocess_product_image_thumbnails(image)
 
 
 @router.post("/products/{slug}/reviews", response_model=ProductReviewRead, status_code=status.HTTP_201_CREATED)

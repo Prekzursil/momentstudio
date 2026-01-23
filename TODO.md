@@ -718,8 +718,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Products: bulk price adjustments – Apply +/- percent/amount to selected products with preview.
 - [x] Admin Products: bulk category assignment – Add/remove categories for selected products.
 - [x] Admin Products: bulk publish scheduling – Set publish/unpublish dates for multiple products.
-- [ ] Admin Products: image alt text + captions – Manage SEO alt text per image per language.
-- [ ] Admin Products: image optimization stats – Display image size and offer one-click reprocess/resize.
+- [x] Admin Products: image alt text + captions – Manage SEO alt text per image per language.
+- [x] Admin Products: image optimization stats – Display image size and offer one-click reprocess/resize.
 - [ ] Admin Products: variant matrix editor – Edit variant attributes/prices/stock in a grid.
 - [ ] Admin Inventory: stock adjustment ledger – Record stock changes with reason (“restock”, “damage”, “manual correction”).
 - [ ] Admin Inventory: low-stock restock list – A “to restock” queue with supplier notes and export.

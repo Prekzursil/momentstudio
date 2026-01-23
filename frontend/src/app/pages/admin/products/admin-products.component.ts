@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { forkJoin } from 'rxjs';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
 import { InputComponent } from '../../../shared/input.component';
@@ -9,7 +10,7 @@ import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { AdminProductListItem, AdminProductListResponse, AdminProductsService } from '../../../core/admin-products.service';
 import { CatalogService, Category } from '../../../core/catalog.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
-import { AdminService } from '../../../core/admin.service';
+import { AdminProductImageOptimizationStats, AdminProductImageTranslation, AdminService } from '../../../core/admin.service';
 import { ToastService } from '../../../core/toast.service';
 
 type ProductStatusFilter = 'all' | 'draft' | 'published' | 'archived';
@@ -43,6 +44,13 @@ type ProductTranslationForm = {
   meta_title: string;
   meta_description: string;
 };
+
+type ImageMetaForm = {
+  alt_text: string;
+  caption: string;
+};
+
+type ImageMetaByLang = Record<'en' | 'ro', ImageMetaForm>;
 
 @Component({
   selector: 'app-admin-products',
@@ -827,20 +835,92 @@ type ProductTranslationForm = {
             {{ 'adminUi.products.form.noImages' | translate }}
           </div>
 
-          <div *ngIf="images().length > 0" class="grid gap-2">
-            <div *ngFor="let img of images()" class="flex items-center gap-3 rounded-lg border border-slate-200 p-2 dark:border-slate-700">
-              <img [src]="img.url" [alt]="img.alt_text || 'image'" class="h-12 w-12 rounded object-cover" />
-              <div class="flex-1 min-w-0">
-                <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ img.alt_text || ('adminUi.products.form.image' | translate) }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ img.url }}</p>
-              </div>
-              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.delete' | translate" (action)="deleteImage(img.id)"></app-button>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-  `
+	          <div *ngIf="images().length > 0" class="grid gap-2">
+	            <div *ngFor="let img of images()" class="rounded-lg border border-slate-200 dark:border-slate-700">
+	              <div class="flex items-center gap-3 p-2">
+	                <img [src]="img.url" [alt]="img.alt_text || 'image'" class="h-12 w-12 rounded object-cover" />
+	                <div class="flex-1 min-w-0">
+	                  <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ img.alt_text || ('adminUi.products.form.image' | translate) }}</p>
+	                  <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ img.url }}</p>
+	                </div>
+	                <div class="flex items-center gap-1">
+	                  <app-button
+	                    size="sm"
+	                    variant="ghost"
+	                    [label]="'adminUi.actions.edit' | translate"
+	                    (action)="toggleImageMeta(img.id)"
+	                  ></app-button>
+	                  <app-button size="sm" variant="ghost" [label]="'adminUi.actions.delete' | translate" (action)="deleteImage(img.id)"></app-button>
+	                </div>
+	              </div>
+
+	              <div *ngIf="editingImageId() === img.id" class="grid gap-4 border-t border-slate-200 p-3 dark:border-slate-700">
+	                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+	                  <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.products.form.imageMeta' | translate }}</p>
+	                  <div class="flex flex-wrap items-center gap-2">
+	                    <app-button
+	                      size="sm"
+	                      variant="ghost"
+	                      [label]="'adminUi.products.form.imageReprocess' | translate"
+	                      (action)="reprocessImage()"
+	                      [disabled]="imageMetaBusy()"
+	                    ></app-button>
+	                    <app-button size="sm" variant="ghost" [label]="'adminUi.actions.save' | translate" (action)="saveImageMeta()" [disabled]="imageMetaBusy()"></app-button>
+	                  </div>
+	                </div>
+
+	                <p *ngIf="imageMetaError()" class="text-sm text-rose-700 dark:text-rose-300">{{ imageMetaError() }}</p>
+
+	                <div *ngIf="imageStats" class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+	                  <p>
+	                    {{ 'adminUi.products.form.imageSize' | translate }}:
+	                    <span class="font-semibold">{{ formatBytes(imageStats.original_bytes) }}</span>
+	                    <span *ngIf="imageStats.width && imageStats.height" class="text-slate-500 dark:text-slate-400">
+	                      · {{ imageStats.width }}×{{ imageStats.height }}
+	                    </span>
+	                  </p>
+	                  <p class="text-xs text-slate-500 dark:text-slate-400">
+	                    {{ 'adminUi.products.form.imageThumbs' | translate }}:
+	                    sm {{ formatBytes(imageStats.thumb_sm_bytes) }},
+	                    md {{ formatBytes(imageStats.thumb_md_bytes) }},
+	                    lg {{ formatBytes(imageStats.thumb_lg_bytes) }}
+	                  </p>
+	                </div>
+
+	                <div class="grid gap-3 lg:grid-cols-2">
+	                  <div class="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
+	                    <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">RO</p>
+	                    <app-input [label]="'adminUi.products.form.imageAltText' | translate" [(value)]="imageMeta.ro.alt_text"></app-input>
+	                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                      {{ 'adminUi.products.form.imageCaption' | translate }}
+	                      <textarea
+	                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                        rows="2"
+	                        [(ngModel)]="imageMeta.ro.caption"
+	                      ></textarea>
+	                    </label>
+	                  </div>
+
+	                  <div class="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
+	                    <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">EN</p>
+	                    <app-input [label]="'adminUi.products.form.imageAltText' | translate" [(value)]="imageMeta.en.alt_text"></app-input>
+	                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                      {{ 'adminUi.products.form.imageCaption' | translate }}
+	                      <textarea
+	                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                        rows="2"
+	                        [(ngModel)]="imageMeta.en.caption"
+	                      ></textarea>
+	                    </label>
+	                  </div>
+	                </div>
+	              </div>
+	            </div>
+	          </div>
+	        </div>
+	      </section>
+	    </div>
+	  `
 })
 export class AdminProductsComponent implements OnInit {
   crumbs = [
@@ -865,7 +945,13 @@ export class AdminProductsComponent implements OnInit {
   editingSlug = signal<string | null>(null);
   editorError = signal<string | null>(null);
   editorMessage = signal<string | null>(null);
-  images = signal<Array<{ id: string; url: string; alt_text?: string | null }>>([]);
+  images = signal<Array<{ id: string; url: string; alt_text?: string | null; caption?: string | null }>>([]);
+  editingImageId = signal<string | null>(null);
+  imageMetaBusy = signal(false);
+  imageMetaError = signal<string | null>(null);
+  imageMeta: ImageMetaByLang = this.blankImageMetaByLang();
+  imageMetaExists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
+  imageStats: AdminProductImageOptimizationStats | null = null;
   adminCategories = signal<Array<{ id: string; name: string }>>([]);
 
   form: ProductForm = this.blankForm();
@@ -1441,6 +1527,7 @@ export class AdminProductsComponent implements OnInit {
     this.editorError.set(null);
     this.editorMessage.set(null);
     this.images.set([]);
+    this.resetImageMeta();
     this.form = this.blankForm();
     this.basePriceError = '';
     this.saleValueError = '';
@@ -1455,6 +1542,7 @@ export class AdminProductsComponent implements OnInit {
     this.editorError.set(null);
     this.editorMessage.set(null);
     this.images.set([]);
+    this.resetImageMeta();
     this.basePriceError = '';
     this.saleValueError = '';
     this.resetTranslations();
@@ -1468,6 +1556,7 @@ export class AdminProductsComponent implements OnInit {
     this.basePriceError = '';
     this.saleValueError = '';
     this.resetTranslations();
+    this.resetImageMeta();
     this.admin.getProduct(slug).subscribe({
       next: (prod: any) => {
         const basePrice = typeof prod.base_price === 'number' ? prod.base_price : Number(prod.base_price || 0);
@@ -1707,10 +1796,102 @@ export class AdminProductsComponent implements OnInit {
     this.admin.deleteProductImage(slug, imageId).subscribe({
       next: (prod: any) => {
         this.toast.success(this.t('adminUi.products.success.imageDelete'));
+        if (this.editingImageId() === imageId) {
+          this.resetImageMeta();
+        }
         this.images.set(Array.isArray(prod.images) ? prod.images : []);
       },
       error: () => this.toast.error(this.t('adminUi.products.errors.deleteImage'))
     });
+  }
+
+  toggleImageMeta(imageId: string): void {
+    const slug = this.editingSlug();
+    if (!slug) return;
+
+    if (this.editingImageId() === imageId) {
+      this.resetImageMeta();
+      return;
+    }
+
+    this.editingImageId.set(imageId);
+    this.loadImageMeta(slug, imageId);
+  }
+
+  saveImageMeta(): void {
+    const slug = this.editingSlug();
+    const imageId = this.editingImageId();
+    if (!slug || !imageId) return;
+
+    this.imageMetaError.set(null);
+    this.imageMetaBusy.set(true);
+
+    const ops: any[] = [];
+    (['ro', 'en'] as const).forEach((lang) => {
+      const alt = this.imageMeta[lang].alt_text.trim();
+      const caption = this.imageMeta[lang].caption.trim();
+      if (!alt && !caption) {
+        if (this.imageMetaExists[lang]) {
+          ops.push(this.admin.deleteProductImageTranslation(slug, imageId, lang));
+        }
+        return;
+      }
+      ops.push(
+        this.admin.upsertProductImageTranslation(slug, imageId, lang, {
+          alt_text: alt || null,
+          caption: caption || null
+        })
+      );
+    });
+
+    if (!ops.length) {
+      this.imageMetaBusy.set(false);
+      this.toast.success(this.t('adminUi.products.form.imageMetaSaved'));
+      return;
+    }
+
+    forkJoin(ops).subscribe({
+      next: () => {
+        this.toast.success(this.t('adminUi.products.form.imageMetaSaved'));
+        this.loadImageMeta(slug, imageId);
+      },
+      error: () => {
+        this.imageMetaBusy.set(false);
+        this.imageMetaError.set(this.t('adminUi.products.form.imageMetaSaveError'));
+      }
+    });
+  }
+
+  reprocessImage(): void {
+    const slug = this.editingSlug();
+    const imageId = this.editingImageId();
+    if (!slug || !imageId) return;
+    this.imageMetaError.set(null);
+    this.imageMetaBusy.set(true);
+    this.admin.reprocessProductImage(slug, imageId).subscribe({
+      next: (stats) => {
+        this.imageStats = stats || null;
+        this.imageMetaBusy.set(false);
+        this.toast.success(this.t('adminUi.products.form.imageReprocessed'));
+      },
+      error: () => {
+        this.imageMetaBusy.set(false);
+        this.imageMetaError.set(this.t('adminUi.products.form.imageReprocessError'));
+      }
+    });
+  }
+
+  formatBytes(value?: number | null): string {
+    if (value === null || value === undefined || !Number.isFinite(value)) return '—';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let size = value;
+    let idx = 0;
+    while (size >= 1024 && idx < units.length - 1) {
+      size /= 1024;
+      idx += 1;
+    }
+    const rounded = idx === 0 ? Math.round(size) : Math.round(size * 10) / 10;
+    return `${rounded} ${units[idx]}`;
   }
 
   private load(): void {
@@ -1854,6 +2035,57 @@ export class AdminProductsComponent implements OnInit {
     this.translationError.set(null);
     this.translationExists = { en: false, ro: false };
     this.translations = { en: this.blankTranslationForm(), ro: this.blankTranslationForm() };
+  }
+
+  private blankImageMetaForm(): ImageMetaForm {
+    return { alt_text: '', caption: '' };
+  }
+
+  private blankImageMetaByLang(): ImageMetaByLang {
+    return { en: this.blankImageMetaForm(), ro: this.blankImageMetaForm() };
+  }
+
+  private resetImageMeta(): void {
+    this.editingImageId.set(null);
+    this.imageMetaBusy.set(false);
+    this.imageMetaError.set(null);
+    this.imageStats = null;
+    this.imageMetaExists = { en: false, ro: false };
+    this.imageMeta = this.blankImageMetaByLang();
+  }
+
+  private loadImageMeta(slug: string, imageId: string): void {
+    this.imageMetaBusy.set(true);
+    this.imageMetaError.set(null);
+    this.imageStats = null;
+    this.imageMetaExists = { en: false, ro: false };
+    this.imageMeta = this.blankImageMetaByLang();
+
+    forkJoin({
+      translations: this.admin.getProductImageTranslations(slug, imageId),
+      stats: this.admin.getProductImageStats(slug, imageId)
+    }).subscribe({
+      next: ({ translations, stats }: { translations: AdminProductImageTranslation[]; stats: AdminProductImageOptimizationStats }) => {
+        const mapped: ImageMetaByLang = this.blankImageMetaByLang();
+        const exists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
+        for (const t of translations || []) {
+          if (t.lang !== 'en' && t.lang !== 'ro') continue;
+          exists[t.lang] = true;
+          mapped[t.lang] = {
+            alt_text: (t.alt_text || '').toString(),
+            caption: (t.caption || '').toString()
+          };
+        }
+        this.imageMetaExists = exists;
+        this.imageMeta = mapped;
+        this.imageStats = stats || null;
+        this.imageMetaBusy.set(false);
+      },
+      error: () => {
+        this.imageMetaBusy.set(false);
+        this.imageMetaError.set(this.t('adminUi.products.form.imageMetaLoadError'));
+      }
+    });
   }
 
   private loadTranslations(slug: string): void {

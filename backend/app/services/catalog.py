@@ -18,6 +18,7 @@ from app.models.catalog import (
     CategoryTranslation,
     Product,
     ProductImage,
+    ProductImageTranslation,
     ProductOption,
     ProductTranslation,
     ProductVariant,
@@ -37,6 +38,7 @@ from app.schemas.catalog import (
     CategoryRead,
     ProductCreate,
     ProductImageCreate,
+    ProductImageTranslationUpsert,
     ProductTranslationUpsert,
     ProductUpdate,
     ProductVariantCreate,
@@ -46,7 +48,7 @@ from app.schemas.catalog import (
     FeaturedCollectionUpdate,
     ProductFeedItem,
 )
-from app.services.storage import delete_file
+from app.services.storage import delete_file, get_media_image_stats, regenerate_media_thumbnails
 from app.services import email as email_service
 from app.services import auth as auth_service
 from app.services import notifications as notifications_service
@@ -131,6 +133,18 @@ def apply_product_translation(product: Product, lang: str | None) -> None:
             product.meta_description = match.meta_description or product.meta_description
     if product.category:
         apply_category_translation(product.category, lang)
+    if getattr(product, "images", None):
+        for image in product.images:
+            translations = getattr(image, "translations", None)
+            if not translations:
+                continue
+            match = next((t for t in translations if t.lang == lang), None)
+            if not match:
+                continue
+            if match.alt_text is not None:
+                image.alt_text = match.alt_text
+            if match.caption is not None:
+                image.caption = match.caption
 
 
 async def list_category_translations(session: AsyncSession, category: Category) -> list[CategoryTranslation]:
@@ -242,6 +256,80 @@ async def delete_product_translation(session: AsyncSession, *, product: Product,
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product translation not found")
     await session.delete(existing)
     await session.commit()
+
+
+async def list_product_image_translations(session: AsyncSession, *, image: ProductImage) -> list[ProductImageTranslation]:
+    rows = (
+        (
+            await session.execute(
+                select(ProductImageTranslation)
+                .where(ProductImageTranslation.image_id == image.id)
+                .order_by(ProductImageTranslation.lang.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return list(rows)
+
+
+async def upsert_product_image_translation(
+    session: AsyncSession,
+    *,
+    image: ProductImage,
+    lang: str,
+    payload: ProductImageTranslationUpsert,
+) -> ProductImageTranslation:
+    existing = await session.scalar(
+        select(ProductImageTranslation).where(ProductImageTranslation.image_id == image.id, ProductImageTranslation.lang == lang)
+    )
+
+    alt_text = payload.alt_text.strip() if payload.alt_text else None
+    caption = payload.caption.strip() if payload.caption else None
+
+    if existing:
+        existing.alt_text = alt_text
+        existing.caption = caption
+        session.add(existing)
+        await session.commit()
+        await session.refresh(existing)
+        return existing
+
+    created = ProductImageTranslation(image_id=image.id, lang=lang, alt_text=alt_text, caption=caption)
+    session.add(created)
+    await session.commit()
+    await session.refresh(created)
+    return created
+
+
+async def delete_product_image_translation(session: AsyncSession, *, image: ProductImage, lang: str) -> None:
+    existing = await session.scalar(
+        select(ProductImageTranslation).where(ProductImageTranslation.image_id == image.id, ProductImageTranslation.lang == lang)
+    )
+    if not existing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product image translation not found")
+    await session.delete(existing)
+    await session.commit()
+
+
+def get_product_image_optimization_stats(image: ProductImage) -> dict[str, int | None]:
+    try:
+        return get_media_image_stats(image.url)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except Exception:  # pragma: no cover
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to read image stats")
+
+
+def reprocess_product_image_thumbnails(image: ProductImage) -> dict[str, int | None]:
+    try:
+        return regenerate_media_thumbnails(image.url)
+    except FileNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image file not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except Exception:  # pragma: no cover
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to reprocess thumbnails")
 
 
 async def get_product_by_slug(
@@ -1043,8 +1131,11 @@ async def list_products_with_filters(
     now_dt = datetime.now(timezone.utc)
     sale_active = _sale_active_clause(now_dt)
     effective_price = case((sale_active, Product.sale_price), else_=Product.base_price)
+    image_loader = selectinload(Product.images)
+    if lang:
+        image_loader = image_loader.selectinload(ProductImage.translations)
     options = [
-        selectinload(Product.images),
+        image_loader,
         selectinload(Product.tags),
     ]
     if lang:

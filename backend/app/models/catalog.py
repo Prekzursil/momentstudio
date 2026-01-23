@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Numeric, String, Table, Text, func
+from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Numeric, String, Table, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -204,12 +204,34 @@ class ProductImage(Base):
     product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=False)
     url: Mapped[str] = mapped_column(String(500), nullable=False)
     alt_text: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    caption: Mapped[str | None] = mapped_column(Text, nullable=True)
     sort_order: Mapped[int] = mapped_column(nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
     product: Mapped[Product] = relationship("Product", back_populates="images")
+    translations: Mapped[list["ProductImageTranslation"]] = relationship(
+        "ProductImageTranslation", back_populates="image", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class ProductImageTranslation(Base):
+    __tablename__ = "product_image_translations"
+    __table_args__ = (UniqueConstraint("image_id", "lang", name="uq_product_image_translations_image_lang"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    image_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("product_images.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    lang: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    alt_text: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    caption: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    image: Mapped["ProductImage"] = relationship("ProductImage", back_populates="translations")
 
 
 class ProductVariant(Base):

@@ -1972,7 +1972,18 @@
         "bestseller": "Bestseller",
         "highlight": "Highlight",
         "publishAt": "Publish at",
-        "noImages": "No images yet."
+        "noImages": "No images yet.",
+        "imageMeta": "Image SEO",
+        "imageAltText": "Alt text",
+        "imageCaption": "Caption",
+        "imageSize": "Original",
+        "imageThumbs": "Thumbnails",
+        "imageReprocess": "Reprocess thumbnails",
+        "imageMetaSaved": "Image text saved",
+        "imageMetaLoadError": "Could not load image text.",
+        "imageMetaSaveError": "Could not save image text.",
+        "imageReprocessed": "Thumbnails regenerated",
+        "imageReprocessError": "Could not reprocess image."
       },
       "sale": {
         "title": "Sale",

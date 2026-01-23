@@ -74,6 +74,56 @@ def delete_file(filepath: str) -> None:
                 sibling.unlink()
 
 
+def get_media_image_stats(url: str) -> dict[str, int | None]:
+    path = _media_url_to_path(url)
+    stats: dict[str, int | None] = {
+        "original_bytes": None,
+        "thumb_sm_bytes": None,
+        "thumb_md_bytes": None,
+        "thumb_lg_bytes": None,
+        "width": None,
+        "height": None,
+    }
+
+    if path.exists():
+        stats["original_bytes"] = path.stat().st_size
+        try:
+            with Image.open(path) as img:
+                width, height = img.size
+                stats["width"] = int(width)
+                stats["height"] = int(height)
+        except Exception:  # pragma: no cover
+            pass
+
+    for suffix in ("sm", "md", "lg"):
+        thumb_path = path.with_name(f"{path.stem}-{suffix}{path.suffix}")
+        stats[f"thumb_{suffix}_bytes"] = thumb_path.stat().st_size if thumb_path.exists() else None
+
+    return stats
+
+
+def regenerate_media_thumbnails(url: str) -> dict[str, int | None]:
+    path = _media_url_to_path(url)
+    if not path.exists():
+        raise FileNotFoundError(f"Media file not found: {url}")
+    _generate_thumbnails(path)
+    return get_media_image_stats(url)
+
+
+def _media_url_to_path(url: str) -> Path:
+    if not url.startswith("/media/"):
+        raise ValueError("Invalid media URL")
+
+    base_root = Path(settings.media_root).resolve()
+    rel = url.removeprefix("/media/")
+    path = (base_root / rel).resolve()
+    try:
+        path.relative_to(base_root)
+    except ValueError:
+        raise ValueError("Invalid media URL")
+    return path
+
+
 def _generate_thumbnails(path: Path) -> None:
     try:
         with Image.open(path) as img:
