@@ -36,7 +36,7 @@ test('shop loads (products grid or empty state)', async ({ page }) => {
 test('guest checkout prompts for email verification', async ({ page, request: apiRequest }) => {
   // This flow only validates that the guest email verification UI is reachable.
   // Avoid depending on a seeded product page to reduce flakiness in CI.
-  const sessionId = `guest-e2e-${Date.now()}`;
+  const sessionId = `guest-e2e-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   await page.addInitScript((sid) => {
     localStorage.setItem('cart_session_id', sid);
     localStorage.removeItem('cart_cache');
@@ -77,8 +77,12 @@ test('guest checkout prompts for email verification', async ({ page, request: ap
   const cartLoad = page.waitForResponse(
     (res) => res.url().includes('/api/v1/cart') && res.request().method() === 'GET' && res.status() === 200
   );
-  await page.goto('/checkout');
+  await page.goto('/cart');
   await cartLoad;
+
+  const proceed = page.getByRole('link', { name: 'Proceed to checkout' });
+  await expect(proceed).toBeVisible();
+  await proceed.click();
   await expect(page).toHaveURL(/\/checkout/);
   const email = `guest-e2e-${Date.now()}@example.com`;
   await page.getByLabel('Email').fill(email);

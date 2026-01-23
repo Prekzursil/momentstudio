@@ -156,7 +156,7 @@ test('coupons v2: apply coupon and prevent reuse after redemption', async ({ pag
 });
 
 test('coupons v2: guests are prompted to sign in', async ({ page, request }) => {
-  const sessionId = `guest-e2e-${Date.now()}`;
+  const sessionId = `guest-e2e-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   await page.addInitScript((sid) => {
     localStorage.setItem('cart_session_id', sid);
   }, sessionId);
