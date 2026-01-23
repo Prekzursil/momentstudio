@@ -685,6 +685,108 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin maintenance mode toggle (customer-facing maintenance page, admin bypass).
 - [x] Admin audit log page listing important events (login, product changes, content updates, Google linking).
 
+### Admin Dashboard – Next Improvements (Backlog)
+- [ ] Admin Dashboard: add “Today” KPI strip – Show today’s orders/GMV/refunds vs yesterday with percent deltas.
+- [ ] Admin Dashboard: add configurable date ranges – Allow last 7/30/90/custom ranges across all widgets.
+- [ ] Admin Dashboard: widget personalization – Let admins hide/reorder dashboard widgets and persist per user.
+- [ ] Admin Dashboard: alert cards for anomalies – Highlight spikes in failed payments, stockouts, or refund requests.
+- [ ] Admin Dashboard: system health panel – Show DB status and last backup timestamp.
+- [ ] Admin Dashboard: quick actions toolbar – Add buttons for “Create product”, “Create coupon”, “Export orders”, etc.
+- [ ] Admin Dashboard: global search – Search across orders/products/users by id/email/slug with typeahead.
+- [ ] Admin Dashboard: recent activity feed – Show last admin actions with deep links to affected entities.
+- [ ] Admin Dashboard: scheduled tasks overview – Show upcoming publish schedules and promo schedules.
+- [ ] Admin Dashboard: configurable low-stock thresholds – Per-category/product threshold overrides + “critical” highlight.
+- [ ] Admin Orders: saved filter presets – Persist common filter sets (e.g., “Pending acceptance”, “Cash awaiting shipment”).
+- [ ] Admin Orders: bulk status updates – Select multiple orders and set status/assign courier with one action.
+- [ ] Admin Orders: bulk email resend – Resend confirmation/delivery emails for selected orders with audit notes.
+- [ ] Admin Orders: printable batch packing slips – Generate a merged PDF for selected orders.
+- [ ] Admin Orders: shipping label management – Upload/store labels per order and show print/download history.
+- [ ] Admin Orders: one-click refund flow – Guided refund wizard with amount breakdown and required notes.
+- [ ] Admin Orders: partial refunds UI – Support item-level partial refunds and sync with payment provider.
+- [ ] Admin Orders: timeline diff view – Show field diffs (status, tracking, address changes) between events.
+- [ ] Admin Orders: customer notes – Allow internal notes per order (visible only to admins).
+- [ ] Admin Orders: tag/label system – Add tags like “VIP”, “Fraud risk”, “Gift” and filter by tag.
+- [ ] Admin Orders: fraud signals panel – Show velocity checks, mismatched country, multiple failed payments, etc.
+- [ ] Admin Orders: address edit + re-rate shipping – Edit shipping address and recompute shipping cost (audit + constraints).
+- [ ] Admin Orders: split shipments – Support partial fulfillment with per-item shipped qty and multiple tracking numbers.
+- [ ] Admin Orders: export improvements – Add CSV export columns picker + saved export templates.
+- [ ] Admin Orders: print/i18n hardening – Ensure PDFs render diacritics and locale number/date formats.
+- [ ] Admin Products: inline price editing – Spreadsheet-style editing for price/sale/stock with validation.
+- [ ] Admin Products: bulk price adjustments – Apply +/- percent/amount to selected products with preview.
+- [ ] Admin Products: bulk category assignment – Add/remove categories for selected products.
+- [ ] Admin Products: bulk publish scheduling – Set publish/unpublish dates for multiple products.
+- [ ] Admin Products: image alt text + captions – Manage SEO alt text per image per language.
+- [ ] Admin Products: image optimization stats – Display image size and offer one-click reprocess/resize.
+- [ ] Admin Products: variant matrix editor – Edit variant attributes/prices/stock in a grid.
+- [ ] Admin Inventory: stock adjustment ledger – Record stock changes with reason (“restock”, “damage”, “manual correction”).
+- [ ] Admin Inventory: low-stock restock list – A “to restock” queue with supplier notes and export.
+- [ ] Admin Inventory: reserved stock visibility – Show stock reserved in carts/orders vs available.
+- [ ] Admin Products: duplicate detection – Warn on duplicate slugs/SKUs/names; provide merge guidance.
+- [ ] Admin Products: SEO preview – Live preview of storefront card + meta snippet per language.
+- [ ] Admin Products: product relationships – Define “related products” and “upsells” used in storefront.
+- [ ] Admin Products: soft-delete recovery – View and restore deleted products/images.
+- [ ] Admin Products: audit trail for edits – Show per-field history for product changes.
+- [ ] Admin Products: import/export CSV – Import products/stock/prices via CSV with validation + error report.
+- [ ] Admin Products: markdown preview – Inline preview for descriptions with sanitation warnings.
+- [ ] Admin Products: per-product shipping overrides – Set weight/size shipping class and exceptions.
+- [ ] Admin Products: translation completeness – Dashboard for missing RO/EN fields (name/description/content).
+- [ ] Admin Products: feature flags per product – Toggle badges like “New”, “Limited”, “Handmade” with scheduling.
+- [ ] Admin Users: customer profile page – View user details, addresses, orders, tickets, and activity.
+- [ ] Admin Users: internal customer notes – Add private notes + “VIP” flag with audit trail.
+- [ ] Admin Users: safe impersonation – View storefront as a user (read-only) with explicit audit + timeout.
+- [ ] Admin Users: account lock/ban tools – Temporarily lock account or require password reset (security workflow).
+- [ ] Admin Users: email verification controls – Resend verification, view history, and owner-only overrides.
+- [ ] Admin Users: granular roles – Add roles like support/fulfillment/content with per-section permissions.
+- [ ] Admin Users: session overview – Show active sessions with geo/IP and revoke per session.
+- [ ] Admin Users: GDPR tooling – Export/delete request queue with statuses, SLAs, and audit.
+- [ ] Admin Users: segmentation – Build customer segments (repeat buyers, high AOV) for analytics/campaigns.
+- [ ] Admin Users: targeted coupon grant – Issue a one-off coupon to a customer and email them via template.
+- [ ] Admin Coupons: advanced rules UI – Minimum subtotal, category include/exclude, first-order only, etc.
+- [ ] Admin Coupons: stacking preview – Show how coupons interact with sale pricing and shipping discounts.
+- [ ] Admin Coupons: redemption analytics – Usage over time, conversion lift, and top discounted products.
+- [ ] Admin Promotions: scheduling calendar – Visual calendar for promo start/end and conflicts.
+- [ ] Admin Promotions: A/B promo testing – Optional randomized assignment and performance reporting.
+- [ ] Admin Pricing: price history charts – Track price changes per product (and sale periods).
+- [ ] Admin Pricing: FX override audit – Show who changed FX overrides and allow “revert” action.
+- [ ] Admin Pricing: rounding rules config – Configure rounding strategy for display/checkout.
+- [ ] Admin Taxes: configurable tax groups – Manage VAT rates per country/category (future-proofing).
+- [ ] Admin Promotions: code generator upgrades – Generate codes with patterns/prefixes and collision checks.
+- [ ] Admin CMS: content diff before publish – Side-by-side diff between draft and published versions.
+- [ ] Admin CMS: scheduled publishing – Schedule page/blog publish/unpublish windows.
+- [ ] Admin CMS: content rollback – Restore a previous version with one click (audit).
+- [ ] Admin CMS: broken link checker – Validate internal links/images and surface warnings.
+- [ ] Admin CMS: media library tags – Organize assets with tags and search filters.
+- [ ] Admin CMS: image focal point – Set focal point for responsive crops (hero/cards).
+- [ ] Admin CMS: translation workflow – Mark items “needs translation” and track completion per language.
+- [ ] Admin SEO: redirects bulk tools – Bulk import/export redirects and detect redirect loops.
+- [ ] Admin SEO: sitemap preview – Show which URLs appear in sitemap by language.
+- [ ] Admin SEO: structured data validator – Validate JSON-LD for products/pages and show errors.
+- [ ] Admin Blog: editorial workflow – Draft/review/publish states with author attribution.
+- [ ] Admin Blog: social preview tooling – Generate social preview images per post per language.
+- [ ] Admin CMS: page access controls – Optionally restrict certain pages to logged-in users.
+- [ ] Admin Support: unified inbox filters – Filter by status, channel, customer, and assignee.
+- [ ] Admin Support: assign/mention – Assign tickets and @mention other admins with notifications.
+- [ ] Admin Support: canned responses – Template replies with variables and EN/RO variants.
+- [ ] Admin Returns: RMA status board – Kanban view for returns pipeline (requested/approved/received/refunded).
+- [ ] Admin Returns: return label support – Upload/provide shipping labels for returns.
+- [ ] Admin Ops: maintenance banners – Schedule storefront announcement banners (planned downtime/promos).
+- [ ] Admin Ops: shipping rate simulator – Test shipping methods/rules for a sample cart/address.
+- [ ] Admin Ops: webhook monitor – View recent provider webhooks and retry failed deliveries.
+- [ ] Admin Security: enforce 2FA for admins – Require TOTP/passkey for owner/admin roles.
+- [ ] Admin Security: IP allowlist – Optional allowlist/denylist for admin access with safe bypass flow.
+- [ ] Admin Audit: retention + export – Export audit logs with retention policies and redaction options.
+- [ ] Admin Audit: tamper-evident logging – Optional hash-chaining for stronger audit integrity.
+- [ ] Admin Compliance: default PII masking – Mask customer PII by default with explicit reveal permission.
+- [ ] Admin Security: sensitive action re-auth – Require password confirmation for refunds/role changes.
+- [ ] Admin Security: admin login alerts – Notify owner of new admin login/device.
+- [ ] Admin UX: keyboard shortcuts – Add shortcuts for global search, navigation, and common order actions.
+- [ ] Admin UX: table virtualization – Improve performance for large lists (orders/products/users).
+- [ ] Admin UX: accessibility audit – Ensure focus management, ARIA labels, and keyboard navigation.
+- [ ] Admin UX: standardized error UI – Unified error state with retry and copyable correlation ID.
+- [ ] Admin Observability: client error logging – Capture admin UI errors to a backend log endpoint.
+- [ ] Admin UX: onboarding tour – First-run guided tour for owner (shipping, payments, content, taxes).
+- [ ] Admin UX: saved table layouts – Persist column visibility/order/density per admin table (orders/products/users).
+
 ## Data Portability & Backups (Extended)
 - [x] CLI command `python -m app.cli export-data` exporting users (no passwords), products, categories, orders, addresses to JSON.
 - [x] CLI command `import-data` to bootstrap a new DB from JSON exports with idempotent upserts.
