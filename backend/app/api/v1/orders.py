@@ -1476,8 +1476,9 @@ async def admin_upload_shipping_label(
 @router.get("/admin/{order_id}/shipping-label")
 async def admin_download_shipping_label(
     order_id: UUID,
+    action: str | None = Query(default=None, max_length=20),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    admin=Depends(require_admin),
 ) -> FileResponse:
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1490,6 +1491,12 @@ async def admin_download_shipping_label(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping label not found")
 
     filename = _sanitize_filename(getattr(order, "shipping_label_filename", None) or path.name)
+    action_clean = (action or "").strip().lower()
+    event = "shipping_label_printed" if action_clean == "print" else "shipping_label_downloaded"
+    actor = (getattr(admin, "email", None) or getattr(admin, "username", None) or "admin").strip()
+    note = f"{actor}: {filename}" if actor else filename
+    session.add(OrderEvent(order_id=order.id, event=event, note=note))
+    await session.commit()
     media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
     headers = {"Cache-Control": "no-store"}
     return FileResponse(path, media_type=media_type, filename=filename, headers=headers)

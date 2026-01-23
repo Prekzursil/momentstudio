@@ -33,6 +33,7 @@ type OrderAction =
   | 'packingSlip'
   | 'labelUpload'
   | 'labelDownload'
+  | 'labelPrint'
   | 'labelDelete'
   | 'receiptShare'
   | 'receiptRevoke';
@@ -196,6 +197,15 @@ type OrderAction =
                   *ngIf="order()!.has_shipping_label"
                   size="sm"
                   variant="ghost"
+                  [label]="'adminUi.orders.shippingLabelPrint' | translate"
+                  [disabled]="action() !== null"
+                  (action)="printShippingLabel()"
+                ></app-button>
+
+                <app-button
+                  *ngIf="order()!.has_shipping_label"
+                  size="sm"
+                  variant="ghost"
                   [label]="'adminUi.orders.shippingLabelDelete' | translate"
                   [disabled]="action() !== null"
                   (action)="deleteShippingLabel()"
@@ -204,6 +214,18 @@ type OrderAction =
 
               <div *ngIf="order()!.has_shipping_label" class="text-xs text-slate-600 dark:text-slate-300">
                 {{ order()!.shipping_label_filename }} · {{ order()!.shipping_label_uploaded_at | date: 'short' }}
+              </div>
+              <div *ngIf="shippingLabelHistory().length" class="mt-2 grid gap-1 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200">
+                <div class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.orders.shippingLabelHistory' | translate }}
+                </div>
+                <div *ngFor="let evt of shippingLabelHistory()" class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="font-medium text-slate-900 dark:text-slate-50 truncate">{{ shippingLabelEventLabel(evt.event) }}</div>
+                    <div *ngIf="evt.note" class="text-slate-600 dark:text-slate-300 truncate">{{ evt.note }}</div>
+                  </div>
+                  <div class="shrink-0 text-slate-500 dark:text-slate-400">{{ evt.created_at | date: 'short' }}</div>
+                </div>
               </div>
               <div *ngIf="!order()!.has_shipping_label" class="text-xs text-slate-600 dark:text-slate-300">
                 {{ 'adminUi.orders.shippingLabelNone' | translate }}
@@ -297,18 +319,13 @@ type OrderAction =
 	                </div>
 	              </div>
 
-              <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
-                <app-input
-                  [label]="'adminUi.orders.refundNote' | translate"
-                  [placeholder]="'adminUi.orders.refundNotePlaceholder' | translate"
-                  [(value)]="refundNote"
-                ></app-input>
+              <div class="flex items-center justify-end gap-2">
                 <app-button
                   size="sm"
                   variant="ghost"
                   [label]="'adminUi.orders.actions.refund' | translate"
-                  [disabled]="action() !== null"
-                  (action)="requestRefund()"
+                  [disabled]="action() !== null || !canRefund()"
+                  (action)="openRefundWizard()"
                 ></app-button>
               </div>
               <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.refundHint' | translate }}</div>
@@ -543,6 +560,85 @@ type OrderAction =
         </ng-template>
       </ng-template>
     </div>
+
+    <ng-container *ngIf="refundWizardOpen() && order() as o">
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeRefundWizard()">
+        <div
+          class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+          (click)="$event.stopPropagation()"
+        >
+          <div class="flex items-center justify-between gap-3">
+            <div class="grid gap-1">
+              <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.orders.refundWizard.title' | translate }}
+              </h3>
+              <div class="text-xs text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.orders.detailTitle' | translate }}: {{ orderRef() }}
+              </div>
+            </div>
+            <button
+              type="button"
+              class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+              (click)="closeRefundWizard()"
+              [attr.aria-label]="'adminUi.orders.refundWizard.cancel' | translate"
+            >
+              ✕
+            </button>
+          </div>
+
+          <ng-container *ngIf="refundBreakdown() as bd">
+            <div class="mt-4 grid gap-1 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/40">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-slate-600 dark:text-slate-300">{{ 'adminUi.orders.refundWizard.subtotal' | translate }}</span>
+                <span class="font-medium text-slate-900 dark:text-slate-50">{{ bd.subtotal | localizedCurrency : o.currency }}</span>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-slate-600 dark:text-slate-300">{{ 'adminUi.orders.refundWizard.shipping' | translate }}</span>
+                <span class="font-medium text-slate-900 dark:text-slate-50">{{ bd.shipping | localizedCurrency : o.currency }}</span>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-slate-600 dark:text-slate-300">{{ 'adminUi.orders.refundWizard.vat' | translate }}</span>
+                <span class="font-medium text-slate-900 dark:text-slate-50">{{ bd.vat | localizedCurrency : o.currency }}</span>
+              </div>
+              <div *ngIf="bd.fee !== 0" class="flex items-center justify-between gap-3">
+                <span class="text-slate-600 dark:text-slate-300">{{ 'adminUi.orders.refundWizard.fee' | translate }}</span>
+                <span class="font-medium text-slate-900 dark:text-slate-50">{{ bd.fee | localizedCurrency : o.currency }}</span>
+              </div>
+              <div class="mt-2 flex items-center justify-between gap-3 border-t border-slate-200 pt-2 font-semibold dark:border-slate-800">
+                <span class="text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.refundWizard.total' | translate }}</span>
+                <span class="text-slate-900 dark:text-slate-50">{{ bd.total | localizedCurrency : o.currency }}</span>
+              </div>
+            </div>
+          </ng-container>
+
+          <label class="mt-4 grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.orders.refundWizard.noteLabel' | translate }}
+            <textarea
+              class="min-h-[90px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              [(ngModel)]="refundNote"
+              [placeholder]="'adminUi.orders.refundWizard.notePlaceholder' | translate"
+            ></textarea>
+          </label>
+          <div *ngIf="refundWizardError()" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ refundWizardError() }}</div>
+
+          <div class="mt-4 flex justify-end gap-2">
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.orders.refundWizard.cancel' | translate"
+              [disabled]="action() !== null"
+              (action)="closeRefundWizard()"
+            ></app-button>
+            <app-button
+              size="sm"
+              [label]="'adminUi.orders.refundWizard.confirm' | translate"
+              [disabled]="action() !== null"
+              (action)="confirmRefund()"
+            ></app-button>
+          </div>
+        </div>
+      </div>
+    </ng-container>
   `
 })
 export class AdminOrderDetailComponent implements OnInit {
@@ -557,6 +653,8 @@ export class AdminOrderDetailComponent implements OnInit {
   creatingReturn = signal(false);
   returnCreateError = signal<string | null>(null);
   receiptShare = signal<ReceiptShareToken | null>(null);
+  refundWizardOpen = signal(false);
+  refundWizardError = signal<string | null>(null);
 
   statusValue: OrderStatus = 'pending_acceptance';
   trackingNumber = '';
@@ -628,6 +726,64 @@ export class AdminOrderDetailComponent implements OnInit {
     if (method === 'paypal') return this.translate.instant('adminUi.orders.paymentPaypal');
     if (method === 'stripe') return this.translate.instant('adminUi.orders.paymentStripe');
     return method || '—';
+  }
+
+  canRefund(): boolean {
+    const status = (this.order()?.status ?? '').toString().trim().toLowerCase();
+    return status === 'paid' || status === 'shipped' || status === 'delivered';
+  }
+
+  refundBreakdown(): { subtotal: number; shipping: number; vat: number; fee: number; total: number } | null {
+    const o = this.order();
+    if (!o) return null;
+    const total = Number(o.total_amount ?? 0);
+    const shipping = Number(o.shipping_amount ?? 0);
+    const vat = Number(o.tax_amount ?? 0);
+    const fee = Number(o.fee_amount ?? 0);
+    const subtotal = Math.max(0, total - shipping - vat - fee);
+    return { subtotal, shipping, vat, fee, total };
+  }
+
+  openRefundWizard(): void {
+    if (!this.orderId) return;
+    if (!this.order() || !this.canRefund()) return;
+    this.refundWizardError.set(null);
+    this.refundWizardOpen.set(true);
+  }
+
+  closeRefundWizard(): void {
+    this.refundWizardOpen.set(false);
+    this.refundWizardError.set(null);
+  }
+
+  confirmRefund(): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    if (!this.order() || !this.canRefund()) return;
+
+    const note = this.refundNote.trim();
+    if (!note) {
+      this.refundWizardError.set(this.translate.instant('adminUi.orders.refundWizard.noteRequired'));
+      return;
+    }
+
+    this.refundWizardError.set(null);
+    this.action.set('refund');
+    this.api.requestRefund(orderId, note).subscribe({
+      next: () => {
+        this.toast.success(this.translate.instant('adminUi.orders.success.refund'));
+        this.refundNote = '';
+        this.closeRefundWizard();
+        this.load(orderId);
+        this.action.set(null);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.errors.refund');
+        this.refundWizardError.set(msg);
+        this.toast.error(msg);
+        this.action.set(null);
+      }
+    });
   }
 
   deliveryLabel(): string {
@@ -725,7 +881,7 @@ export class AdminOrderDetailComponent implements OnInit {
     const orderId = this.order()?.id;
     if (!orderId) return;
     this.action.set('labelDownload');
-    this.api.downloadShippingLabel(orderId).subscribe({
+    this.api.downloadShippingLabel(orderId, { action: 'download' }).subscribe({
       next: (blob) => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -733,6 +889,29 @@ export class AdminOrderDetailComponent implements OnInit {
         a.download = this.order()?.shipping_label_filename || `order-${this.orderRef() || orderId}-label`;
         a.click();
         URL.revokeObjectURL(url);
+        this.load(orderId);
+        this.action.set(null);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.orders.errors.shippingLabelDownload'));
+        this.action.set(null);
+      }
+    });
+  }
+
+  printShippingLabel(): void {
+    const orderId = this.order()?.id;
+    if (!orderId) return;
+    this.action.set('labelPrint');
+    this.api.downloadShippingLabel(orderId, { action: 'print' }).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = this.order()?.shipping_label_filename || `order-${this.orderRef() || orderId}-label`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.load(orderId);
         this.action.set(null);
       },
       error: () => {
@@ -749,15 +928,7 @@ export class AdminOrderDetailComponent implements OnInit {
     this.action.set('labelDelete');
     this.api.deleteShippingLabel(orderId).subscribe({
       next: () => {
-        const current = this.order();
-        if (current) {
-          this.order.set({
-            ...current,
-            has_shipping_label: false,
-            shipping_label_filename: null,
-            shipping_label_uploaded_at: null
-          } as AdminOrderDetail);
-        }
+        this.load(orderId);
         this.toast.success(this.translate.instant('adminUi.orders.success.shippingLabelDelete'));
         this.action.set(null);
       },
@@ -766,6 +937,35 @@ export class AdminOrderDetailComponent implements OnInit {
         this.action.set(null);
       }
     });
+  }
+
+  shippingLabelHistory(): { event: string; note?: string | null; created_at: string }[] {
+    const events = this.order()?.events ?? [];
+    const shippingEvents = new Set([
+      'shipping_label_uploaded',
+      'shipping_label_downloaded',
+      'shipping_label_printed',
+      'shipping_label_deleted'
+    ]);
+    return events
+      .filter((evt) => shippingEvents.has((evt.event || '').trim()))
+      .slice()
+      .sort((a, b) => (a.created_at > b.created_at ? -1 : a.created_at < b.created_at ? 1 : 0))
+      .slice(0, 6);
+  }
+
+  shippingLabelEventLabel(event: string): string {
+    const key =
+      event === 'shipping_label_uploaded'
+        ? 'adminUi.orders.shippingLabelEvents.uploaded'
+        : event === 'shipping_label_downloaded'
+          ? 'adminUi.orders.shippingLabelEvents.downloaded'
+          : event === 'shipping_label_printed'
+            ? 'adminUi.orders.shippingLabelEvents.printed'
+            : event === 'shipping_label_deleted'
+              ? 'adminUi.orders.shippingLabelEvents.deleted'
+              : null;
+    return key ? this.translate.instant(key) : event;
   }
 
   retryPayment(): void {
@@ -803,23 +1003,7 @@ export class AdminOrderDetailComponent implements OnInit {
   }
 
   requestRefund(): void {
-    const orderId = this.orderId;
-    if (!orderId) return;
-    if (!confirm(this.translate.instant('adminUi.orders.confirmRefund'))) return;
-    this.action.set('refund');
-    const note = this.refundNote.trim();
-    this.api.requestRefund(orderId, note ? note : null).subscribe({
-      next: () => {
-        this.toast.success(this.translate.instant('adminUi.orders.success.refund'));
-        this.refundNote = '';
-        this.load(orderId);
-        this.action.set(null);
-      },
-      error: () => {
-        this.toast.error(this.translate.instant('adminUi.orders.errors.refund'));
-        this.action.set(null);
-      }
-    });
+    this.openRefundWizard();
   }
 
   sendDeliveryEmail(): void {

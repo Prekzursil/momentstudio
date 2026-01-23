@@ -2142,7 +2142,15 @@
       "shippingLabelNone": "No shipping label uploaded yet.",
       "shippingLabelUpload": "Upload",
       "shippingLabelDownload": "Download",
+      "shippingLabelPrint": "Print",
       "shippingLabelDelete": "Delete",
+      "shippingLabelHistory": "History",
+      "shippingLabelEvents": {
+        "uploaded": "Label uploaded",
+        "downloaded": "Label downloaded",
+        "printed": "Label printed",
+        "deleted": "Label deleted"
+      },
       "confirmDeleteLabel": "Delete the shipping label for this order?",
       "save": "Save changes",
       "saveHint": "Updates status and tracking; emails send on status changes.",
@@ -2176,6 +2184,19 @@
       "refundNotePlaceholder": "Add a note for audit/email (optional)",
       "refundHint": "Refund is manual; this records an event and notifies the owner inbox.",
       "confirmRefund": "Request a refund for this order?",
+      "refundWizard": {
+        "title": "Request refund",
+        "subtotal": "Subtotal",
+        "shipping": "Shipping",
+        "vat": "VAT",
+        "fee": "Fee",
+        "total": "Total",
+        "noteLabel": "Refund note",
+        "notePlaceholder": "Required. Add a note for the audit log.",
+        "noteRequired": "Refund note is required.",
+        "cancel": "Cancel",
+        "confirm": "Request refund"
+      },
       "actions": {
         "retryPayment": "Retry payment",
         "capturePayment": "Capture payment",

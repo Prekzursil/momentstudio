@@ -2142,7 +2142,15 @@
       "shippingLabelNone": "Nu există încă o etichetă încărcată.",
       "shippingLabelUpload": "Încarcă",
       "shippingLabelDownload": "Descarcă",
+      "shippingLabelPrint": "Tipărește",
       "shippingLabelDelete": "Șterge",
+      "shippingLabelHistory": "Istoric",
+      "shippingLabelEvents": {
+        "uploaded": "Etichetă încărcată",
+        "downloaded": "Etichetă descărcată",
+        "printed": "Etichetă tipărită",
+        "deleted": "Etichetă ștearsă"
+      },
       "confirmDeleteLabel": "Ștergi eticheta de livrare pentru această comandă?",
       "save": "Salvează modificările",
       "saveHint": "Actualizează statusul și tracking-ul; emailurile se trimit la schimbări de status.",
@@ -2176,6 +2184,19 @@
       "refundNotePlaceholder": "Adaugă o notă pentru audit/email (opțional)",
       "refundHint": "Rambursarea este manuală; se înregistrează un eveniment și se notifică inbox-ul proprietarului.",
       "confirmRefund": "Soliciți rambursarea acestei comenzi?",
+      "refundWizard": {
+        "title": "Solicită rambursare",
+        "subtotal": "Subtotal",
+        "shipping": "Livrare",
+        "vat": "TVA",
+        "fee": "Taxă",
+        "total": "Total",
+        "noteLabel": "Notă rambursare",
+        "notePlaceholder": "Obligatoriu. Adaugă o notă pentru audit.",
+        "noteRequired": "Nota de rambursare este obligatorie.",
+        "cancel": "Anulează",
+        "confirm": "Solicită rambursare"
+      },
       "actions": {
         "retryPayment": "Reîncearcă plata",
         "capturePayment": "Capturează plata",

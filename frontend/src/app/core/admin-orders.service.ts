@@ -121,8 +121,10 @@ export class AdminOrdersService {
     return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/shipping-label`, data);
   }
 
-  downloadShippingLabel(orderId: string): Observable<Blob> {
-    return this.api.getBlob(`/orders/admin/${orderId}/shipping-label`);
+  downloadShippingLabel(orderId: string, opts?: { action?: 'download' | 'print' }): Observable<Blob> {
+    const action = opts?.action;
+    const params = action && action !== 'download' ? { action } : undefined;
+    return this.api.getBlob(`/orders/admin/${orderId}/shipping-label`, params);
   }
 
   deleteShippingLabel(orderId: string): Observable<void> {

@@ -700,8 +700,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Orders: bulk status updates – Select multiple orders and set status/assign courier with one action.
 - [x] Admin Orders: bulk email resend – Resend confirmation/delivery emails for selected orders with audit notes.
 - [x] Admin Orders: printable batch packing slips – Generate a merged PDF for selected orders.
-- [ ] Admin Orders: shipping label management – Upload/store labels per order and show print/download history.
-- [ ] Admin Orders: one-click refund flow – Guided refund wizard with amount breakdown and required notes.
+- [x] Admin Orders: shipping label management – Upload/store labels per order and show print/download history.
+- [x] Admin Orders: one-click refund flow – Guided refund wizard with amount breakdown and required notes.
 - [ ] Admin Orders: partial refunds UI – Support item-level partial refunds and sync with payment provider.
 - [ ] Admin Orders: timeline diff view – Show field diffs (status, tracking, address changes) between events.
 - [ ] Admin Orders: customer notes – Allow internal notes per order (visible only to admins).
