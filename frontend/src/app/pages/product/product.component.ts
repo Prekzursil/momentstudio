@@ -292,6 +292,7 @@ export class ProductComponent implements OnInit, OnDestroy {
   recentlyViewed: Product[] = [];
   private ldScript?: HTMLScriptElement;
   private langSub?: Subscription;
+  private routeSub?: Subscription;
   private canonicalEl?: HTMLLinkElement;
   private document: Document = inject(DOCUMENT);
   private slug: string | null = null;
@@ -319,17 +320,26 @@ export class ProductComponent implements OnInit, OnDestroy {
       this.ldScript.remove();
     }
     this.langSub?.unsubscribe();
+    this.routeSub?.unsubscribe();
   }
 
   ngOnInit(): void {
     this.wishlist.ensureLoaded();
-    this.slug = this.route.snapshot.paramMap.get('slug');
+    this.routeSub = this.route.paramMap.subscribe((params) => {
+      const slug = params.get('slug');
+      if (slug === this.slug) {
+        return;
+      }
+      this.slug = slug;
+      this.activeImageIndex = 0;
+      this.previewOpen = false;
+      this.load();
+    });
     this.langSub = this.translate.onLangChange.subscribe(() => {
       if (this.product) {
         this.updateMeta(this.product);
       }
     });
-    this.load();
   }
 
   retryLoad(): void {

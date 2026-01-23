@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { DOCUMENT } from '@angular/common';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
@@ -37,7 +37,13 @@ describe('ProductComponent', () => {
         { provide: Router, useValue: router },
         { provide: RecentlyViewedService, useValue: { add: () => [] } },
         { provide: WishlistService, useValue: { ensureLoaded: () => {}, isWishlisted: () => false } },
-        { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => 'prod' } } } },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: { paramMap: convertToParamMap({ slug: 'prod' }) },
+            paramMap: of(convertToParamMap({ slug: 'prod' }))
+          }
+        },
         { provide: Title, useValue: jasmine.createSpyObj<Title>('Title', ['setTitle']) },
         { provide: Meta, useValue: jasmine.createSpyObj<Meta>('Meta', ['updateTag']) },
         { provide: DOCUMENT, useValue: document.implementation.createHTMLDocument('product-test') }
