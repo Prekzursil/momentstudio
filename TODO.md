@@ -307,6 +307,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Search bar hitting /products.
 - [x] Product card component (image, name, price, stock badge).
 - [x] Product detail page with gallery, variants, quantity/add-to-cart.
+- [ ] Storefront: product page add-to-cart respects selected variant (currently always sends `variant_id: null`).
 - [x] Handmade uniqueness note.
 - [x] Sort controls (price/name/newest).
 - [x] Price range slider.
@@ -722,8 +723,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Products: image optimization stats – Display image size and offer one-click reprocess/resize.
 - [x] Admin Products: variant matrix editor – Edit variant attributes/prices/stock in a grid.
 - [x] Admin Inventory: stock adjustment ledger – Record stock changes with reason (“restock”, “damage”, “manual correction”).
-- [ ] Admin Inventory: low-stock restock list – A “to restock” queue with supplier notes and export.
-- [ ] Admin Inventory: reserved stock visibility – Show stock reserved in carts/orders vs available.
+- [x] Admin Inventory: low-stock restock list – A “to restock” queue with supplier notes and export.
+- [x] Admin Inventory: reserved stock visibility – Show stock reserved in carts/orders vs available.
 - [ ] Admin Products: duplicate detection – Warn on duplicate slugs/SKUs/names; provide merge guidance.
 - [ ] Admin Products: SEO preview – Live preview of storefront card + meta snippet per language.
 - [ ] Admin Products: product relationships – Define “related products” and “upsells” used in storefront.

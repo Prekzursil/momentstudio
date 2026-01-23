@@ -46,6 +46,7 @@ export class AdminLayoutComponent {
     { path: '/admin/dashboard', labelKey: 'adminUi.nav.dashboard', exact: true },
     { path: '/admin/content', labelKey: 'adminUi.nav.content' },
     { path: '/admin/products', labelKey: 'adminUi.nav.products' },
+    { path: '/admin/inventory', labelKey: 'adminUi.nav.inventory' },
     { path: '/admin/orders', labelKey: 'adminUi.nav.orders' },
     { path: '/admin/returns', labelKey: 'adminUi.nav.returns' },
     { path: '/admin/coupons', labelKey: 'adminUi.nav.coupons' },

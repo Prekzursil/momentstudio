@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     max_concurrent_requests: int = 100
     enforce_decimal_prices: bool = True
     coupon_reservation_ttl_minutes: int = 60 * 24
+    cart_reservation_window_minutes: int = 60 * 2
     first_order_reward_coupon_validity_days: int = 30
 
     media_root: str = "uploads"

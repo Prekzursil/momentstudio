@@ -1265,12 +1265,47 @@
       "title": "Admin",
       "dashboard": "Dashboard",
       "products": "Products",
+      "inventory": "Inventory",
       "orders": "Orders",
       "returns": "Returns",
       "coupons": "Coupons",
       "users": "Users",
       "support": "Support",
       "content": "Content"
+    },
+    "inventory": {
+      "title": "Inventory",
+      "hint": "Low-stock restock list with reserved stock visibility.",
+      "filters": {
+        "includeVariants": "Include variants",
+        "defaultThreshold": "Default threshold"
+      },
+      "export": "Export CSV",
+      "exportReady": "Export downloaded",
+      "empty": "Nothing to restock right now.",
+      "table": {
+        "item": "Item",
+        "stock": "Stock",
+        "reservedCarts": "Reserved (carts)",
+        "reservedOrders": "Reserved (orders)",
+        "available": "Available",
+        "threshold": "Threshold",
+        "supplier": "Supplier",
+        "desiredQty": "Desired qty",
+        "note": "Note",
+        "updated": "Updated",
+        "actions": "Actions"
+      },
+      "actions": {
+        "saving": "Saving…"
+      },
+      "success": {
+        "noteSaved": "Restock note saved"
+      },
+      "errors": {
+        "noteSave": "Could not save restock note.",
+        "export": "Could not export restock list."
+      }
     },
     "dashboardTitle": "Admin dashboard",
     "dashboard": {

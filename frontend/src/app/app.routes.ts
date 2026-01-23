@@ -227,6 +227,11 @@ export const routes: Routes = [
         title: 'Products | Admin | momentstudio'
       },
       {
+        path: 'inventory',
+        loadComponent: () => import('./pages/admin/inventory/admin-inventory.component').then((m) => m.AdminInventoryComponent),
+        title: 'Inventory | Admin | momentstudio'
+      },
+      {
         path: 'users',
         loadComponent: () => import('./pages/admin/users/admin-users.component').then((m) => m.AdminUsersComponent),
         title: 'Users | Admin | momentstudio'

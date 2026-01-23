@@ -307,6 +307,54 @@ export interface LowStockItem {
   slug: string;
 }
 
+export type RestockListItemKind = 'product' | 'variant';
+
+export interface RestockListItem {
+  kind: RestockListItemKind;
+  product_id: string;
+  variant_id?: string | null;
+  sku: string;
+  product_slug: string;
+  product_name: string;
+  variant_name?: string | null;
+  stock_quantity: number;
+  reserved_in_carts: number;
+  reserved_in_orders: number;
+  available_quantity: number;
+  threshold: number;
+  is_critical: boolean;
+  restock_at?: string | null;
+  supplier?: string | null;
+  desired_quantity?: number | null;
+  note?: string | null;
+  note_updated_at?: string | null;
+}
+
+export interface RestockListResponse {
+  items: RestockListItem[];
+  meta: {
+    page: number;
+    limit: number;
+    total_items: number;
+    total_pages: number;
+  };
+}
+
+export interface RestockNoteUpsert {
+  product_id: string;
+  variant_id?: string | null;
+  supplier?: string | null;
+  desired_quantity?: number | null;
+  note?: string | null;
+}
+
+export interface RestockNoteRead extends RestockNoteUpsert {
+  id: string;
+  actor_user_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface FeaturedCollection {
   id: string;
   slug: string;
@@ -492,6 +540,23 @@ export class AdminService {
 
   lowStock(): Observable<LowStockItem[]> {
     return this.api.get<LowStockItem[]>('/admin/dashboard/low-stock');
+  }
+
+  restockList(params: {
+    page?: number;
+    limit?: number;
+    include_variants?: boolean;
+    default_threshold?: number;
+  }): Observable<RestockListResponse> {
+    return this.api.get<RestockListResponse>('/admin/dashboard/inventory/restock-list', params as any);
+  }
+
+  exportRestockListCsv(params: { include_variants?: boolean; default_threshold?: number }): Observable<Blob> {
+    return this.api.getBlob('/admin/dashboard/inventory/restock-list/export', params as any);
+  }
+
+  upsertRestockNote(payload: RestockNoteUpsert): Observable<RestockNoteRead | null> {
+    return this.api.put<RestockNoteRead | null>('/admin/dashboard/inventory/restock-notes', payload);
   }
 
   updateOrderStatus(orderId: string, status: string): Observable<AdminOrder> {

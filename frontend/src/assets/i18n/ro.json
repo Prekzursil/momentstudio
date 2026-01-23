@@ -1265,12 +1265,47 @@
       "title": "Administrare",
       "dashboard": "Panou",
       "products": "Produse",
+      "inventory": "Stocuri",
       "orders": "Comenzi",
       "returns": "Retururi",
       "coupons": "Cupoane",
       "users": "Utilizatori",
       "support": "Suport",
       "content": "Conținut"
+    },
+    "inventory": {
+      "title": "Stocuri",
+      "hint": "Listă de reaprovizionare cu vizibilitate pentru stocul rezervat.",
+      "filters": {
+        "includeVariants": "Include variante",
+        "defaultThreshold": "Prag implicit"
+      },
+      "export": "Export CSV",
+      "exportReady": "Export descărcat",
+      "empty": "Momentan nu sunt produse de reaprovizionat.",
+      "table": {
+        "item": "Produs",
+        "stock": "Stoc",
+        "reservedCarts": "Rezervat (coșuri)",
+        "reservedOrders": "Rezervat (comenzi)",
+        "available": "Disponibil",
+        "threshold": "Prag",
+        "supplier": "Furnizor",
+        "desiredQty": "Cantitate dorită",
+        "note": "Notă",
+        "updated": "Actualizat",
+        "actions": "Acțiuni"
+      },
+      "actions": {
+        "saving": "Se salvează…"
+      },
+      "success": {
+        "noteSaved": "Nota de reaprovizionare a fost salvată"
+      },
+      "errors": {
+        "noteSave": "Nu s-a putut salva nota de reaprovizionare.",
+        "export": "Nu s-a putut exporta lista de reaprovizionare."
+      }
     },
     "dashboardTitle": "Panou administrare",
     "dashboard": {

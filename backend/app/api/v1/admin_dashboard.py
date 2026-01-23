@@ -4,7 +4,18 @@ from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
-from sqlalchemy import String, Text, case, cast, delete, func, literal, or_, select, union_all
+from sqlalchemy import (
+    String,
+    Text,
+    case,
+    cast,
+    delete,
+    func,
+    literal,
+    or_,
+    select,
+    union_all,
+)
 from sqlalchemy.orm import aliased
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,11 +25,28 @@ from app.core.dependencies import require_admin, require_owner
 from app.db.session import get_session
 from app.models.catalog import Product, ProductAuditLog, Category, ProductStatus
 from app.models.content import ContentBlock, ContentAuditLog
-from app.schemas.catalog_admin import AdminProductByIdsRequest, AdminProductListItem, AdminProductListResponse
+from app.schemas.catalog_admin import (
+    AdminProductByIdsRequest,
+    AdminProductListItem,
+    AdminProductListResponse,
+)
 from app.schemas.catalog import StockAdjustmentCreate, StockAdjustmentRead
-from app.schemas.admin_dashboard_search import AdminDashboardSearchResponse, AdminDashboardSearchResult
-from app.schemas.admin_dashboard_scheduled import AdminDashboardScheduledTasksResponse, ScheduledPublishItem, ScheduledPromoItem
+from app.schemas.admin_dashboard_search import (
+    AdminDashboardSearchResponse,
+    AdminDashboardSearchResult,
+)
+from app.schemas.admin_dashboard_scheduled import (
+    AdminDashboardScheduledTasksResponse,
+    ScheduledPublishItem,
+    ScheduledPromoItem,
+)
+from app.schemas.inventory import (
+    RestockListResponse,
+    RestockNoteRead,
+    RestockNoteUpsert,
+)
 from app.services import exporter as exporter_service
+from app.services import inventory as inventory_service
 from app.services import catalog as catalog_service
 from app.models.order import Order, OrderStatus
 from app.models.returns import ReturnRequest, ReturnRequestStatus
@@ -44,24 +72,38 @@ async def admin_summary(
     now = datetime.now(timezone.utc)
 
     if (range_from is None) != (range_to is None):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="range_from and range_to must be provided together")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="range_from and range_to must be provided together",
+        )
 
     if range_from is not None and range_to is not None:
         if range_to < range_from:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="range_to must be on/after range_from")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="range_to must be on/after range_from",
+            )
         start = datetime.combine(range_from, datetime.min.time(), tzinfo=timezone.utc)
-        end = datetime.combine(range_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
+        end = datetime.combine(
+            range_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc
+        )
         effective_range_days = (range_to - range_from).days + 1
     else:
         start = now - timedelta(days=range_days)
         end = now
         effective_range_days = range_days
 
-    products_total = await session.scalar(select(func.count()).select_from(Product).where(Product.is_deleted.is_(False)))
+    products_total = await session.scalar(
+        select(func.count()).select_from(Product).where(Product.is_deleted.is_(False))
+    )
     orders_total = await session.scalar(select(func.count()).select_from(Order))
     users_total = await session.scalar(select(func.count()).select_from(User))
 
-    low_stock_threshold = func.coalesce(Product.low_stock_threshold, Category.low_stock_threshold, DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD)
+    low_stock_threshold = func.coalesce(
+        Product.low_stock_threshold,
+        Category.low_stock_threshold,
+        DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD,
+    )
     low_stock = await session.scalar(
         select(func.count())
         .select_from(Product)
@@ -74,36 +116,66 @@ async def admin_summary(
     )
 
     since = now - timedelta(days=30)
-    sales_30d = await session.scalar(select(func.coalesce(func.sum(Order.total_amount), 0)).where(Order.created_at >= since))
-    orders_30d = await session.scalar(select(func.count()).select_from(Order).where(Order.created_at >= since))
+    sales_30d = await session.scalar(
+        select(func.coalesce(func.sum(Order.total_amount), 0)).where(
+            Order.created_at >= since
+        )
+    )
+    orders_30d = await session.scalar(
+        select(func.count()).select_from(Order).where(Order.created_at >= since)
+    )
 
     sales_range = await session.scalar(
-        select(func.coalesce(func.sum(Order.total_amount), 0)).where(Order.created_at >= start, Order.created_at < end)
+        select(func.coalesce(func.sum(Order.total_amount), 0)).where(
+            Order.created_at >= start, Order.created_at < end
+        )
     )
-    orders_range = await session.scalar(select(func.count()).select_from(Order).where(Order.created_at >= start, Order.created_at < end))
+    orders_range = await session.scalar(
+        select(func.count())
+        .select_from(Order)
+        .where(Order.created_at >= start, Order.created_at < end)
+    )
 
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     yesterday_start = today_start - timedelta(days=1)
 
-    today_orders = await session.scalar(select(func.count()).select_from(Order).where(Order.created_at >= today_start, Order.created_at < now))
+    today_orders = await session.scalar(
+        select(func.count())
+        .select_from(Order)
+        .where(Order.created_at >= today_start, Order.created_at < now)
+    )
     yesterday_orders = await session.scalar(
-        select(func.count()).select_from(Order).where(Order.created_at >= yesterday_start, Order.created_at < today_start)
+        select(func.count())
+        .select_from(Order)
+        .where(Order.created_at >= yesterday_start, Order.created_at < today_start)
     )
     today_sales = await session.scalar(
-        select(func.coalesce(func.sum(Order.total_amount), 0)).where(Order.created_at >= today_start, Order.created_at < now)
+        select(func.coalesce(func.sum(Order.total_amount), 0)).where(
+            Order.created_at >= today_start, Order.created_at < now
+        )
     )
     yesterday_sales = await session.scalar(
-        select(func.coalesce(func.sum(Order.total_amount), 0)).where(Order.created_at >= yesterday_start, Order.created_at < today_start)
+        select(func.coalesce(func.sum(Order.total_amount), 0)).where(
+            Order.created_at >= yesterday_start, Order.created_at < today_start
+        )
     )
     today_refunds = await session.scalar(
         select(func.count())
         .select_from(Order)
-        .where(Order.status == OrderStatus.refunded, Order.updated_at >= today_start, Order.updated_at < now)
+        .where(
+            Order.status == OrderStatus.refunded,
+            Order.updated_at >= today_start,
+            Order.updated_at < now,
+        )
     )
     yesterday_refunds = await session.scalar(
         select(func.count())
         .select_from(Order)
-        .where(Order.status == OrderStatus.refunded, Order.updated_at >= yesterday_start, Order.updated_at < today_start)
+        .where(
+            Order.status == OrderStatus.refunded,
+            Order.updated_at >= yesterday_start,
+            Order.updated_at < today_start,
+        )
     )
 
     payment_window_end = now
@@ -112,12 +184,20 @@ async def admin_summary(
     failed_payments = await session.scalar(
         select(func.count())
         .select_from(Order)
-        .where(Order.status == OrderStatus.pending_payment, Order.created_at >= payment_window_start, Order.created_at < payment_window_end)
+        .where(
+            Order.status == OrderStatus.pending_payment,
+            Order.created_at >= payment_window_start,
+            Order.created_at < payment_window_end,
+        )
     )
     failed_payments_prev = await session.scalar(
         select(func.count())
         .select_from(Order)
-        .where(Order.status == OrderStatus.pending_payment, Order.created_at >= payment_prev_start, Order.created_at < payment_window_start)
+        .where(
+            Order.status == OrderStatus.pending_payment,
+            Order.created_at >= payment_prev_start,
+            Order.created_at < payment_window_start,
+        )
     )
 
     refund_window_end = now
@@ -145,7 +225,11 @@ async def admin_summary(
     stockouts = await session.scalar(
         select(func.count())
         .select_from(Product)
-        .where(Product.stock_quantity <= 0, Product.is_deleted.is_(False), Product.is_active.is_(True))
+        .where(
+            Product.stock_quantity <= 0,
+            Product.is_deleted.is_(False),
+            Product.is_active.is_(True),
+        )
     )
 
     def _delta_pct(today_value: float, yesterday_value: float) -> float | None:
@@ -167,25 +251,35 @@ async def admin_summary(
         "range_to": (end - timedelta(microseconds=1)).date().isoformat(),
         "today_orders": int(today_orders or 0),
         "yesterday_orders": int(yesterday_orders or 0),
-        "orders_delta_pct": _delta_pct(float(today_orders or 0), float(yesterday_orders or 0)),
+        "orders_delta_pct": _delta_pct(
+            float(today_orders or 0), float(yesterday_orders or 0)
+        ),
         "today_sales": float(today_sales or 0),
         "yesterday_sales": float(yesterday_sales or 0),
-        "sales_delta_pct": _delta_pct(float(today_sales or 0), float(yesterday_sales or 0)),
+        "sales_delta_pct": _delta_pct(
+            float(today_sales or 0), float(yesterday_sales or 0)
+        ),
         "today_refunds": int(today_refunds or 0),
         "yesterday_refunds": int(yesterday_refunds or 0),
-        "refunds_delta_pct": _delta_pct(float(today_refunds or 0), float(yesterday_refunds or 0)),
+        "refunds_delta_pct": _delta_pct(
+            float(today_refunds or 0), float(yesterday_refunds or 0)
+        ),
         "anomalies": {
             "failed_payments": {
                 "window_hours": 24,
                 "current": int(failed_payments or 0),
                 "previous": int(failed_payments_prev or 0),
-                "delta_pct": _delta_pct(float(failed_payments or 0), float(failed_payments_prev or 0)),
+                "delta_pct": _delta_pct(
+                    float(failed_payments or 0), float(failed_payments_prev or 0)
+                ),
             },
             "refund_requests": {
                 "window_days": 7,
                 "current": int(refund_requests or 0),
                 "previous": int(refund_requests_prev or 0),
-                "delta_pct": _delta_pct(float(refund_requests or 0), float(refund_requests_prev or 0)),
+                "delta_pct": _delta_pct(
+                    float(refund_requests or 0), float(refund_requests_prev or 0)
+                ),
             },
             "stockouts": {"count": int(stockouts or 0)},
         },
@@ -253,18 +347,22 @@ async def admin_global_search(
     like = f"%{needle.lower()}%"
 
     orders = (
-        await session.execute(
-            select(Order)
-            .where(
-                or_(
-                    func.lower(Order.customer_email).ilike(like),
-                    func.lower(func.coalesce(Order.reference_code, "")).ilike(like),
+        (
+            await session.execute(
+                select(Order)
+                .where(
+                    or_(
+                        func.lower(Order.customer_email).ilike(like),
+                        func.lower(func.coalesce(Order.reference_code, "")).ilike(like),
+                    )
                 )
+                .order_by(Order.created_at.desc())
+                .limit(5)
             )
-            .order_by(Order.created_at.desc())
-            .limit(5)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for order in orders:
         results.append(
             AdminDashboardSearchResult(
@@ -276,20 +374,24 @@ async def admin_global_search(
         )
 
     products = (
-        await session.execute(
-            select(Product)
-            .where(
-                Product.is_deleted.is_(False),
-                or_(
-                    Product.slug.ilike(like),
-                    Product.name.ilike(like),
-                    Product.sku.ilike(like),
-                ),
+        (
+            await session.execute(
+                select(Product)
+                .where(
+                    Product.is_deleted.is_(False),
+                    or_(
+                        Product.slug.ilike(like),
+                        Product.name.ilike(like),
+                        Product.sku.ilike(like),
+                    ),
+                )
+                .order_by(Product.updated_at.desc())
+                .limit(5)
             )
-            .order_by(Product.updated_at.desc())
-            .limit(5)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for product in products:
         results.append(
             AdminDashboardSearchResult(
@@ -302,20 +404,24 @@ async def admin_global_search(
         )
 
     users = (
-        await session.execute(
-            select(User)
-            .where(
-                User.deleted_at.is_(None),
-                or_(
-                    func.lower(User.email).ilike(like),
-                    func.lower(User.username).ilike(like),
-                    func.lower(User.name).ilike(like),
-                ),
+        (
+            await session.execute(
+                select(User)
+                .where(
+                    User.deleted_at.is_(None),
+                    or_(
+                        func.lower(User.email).ilike(like),
+                        func.lower(User.username).ilike(like),
+                        func.lower(User.name).ilike(like),
+                    ),
+                )
+                .order_by(User.created_at.desc())
+                .limit(5)
             )
-            .order_by(User.created_at.desc())
-            .limit(5)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for user in users:
         subtitle = (user.username or "").strip() or None
         results.append(
@@ -332,7 +438,9 @@ async def admin_global_search(
 
 
 @router.get("/products")
-async def admin_products(session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)) -> list[dict]:
+async def admin_products(
+    session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)
+) -> list[dict]:
     stmt = (
         select(Product, Category.name)
         .join(Category, Product.category_id == Category.id)
@@ -368,7 +476,11 @@ async def search_products(
     limit: int = Query(default=25, ge=1, le=100),
 ) -> AdminProductListResponse:
     offset = (page - 1) * limit
-    stmt = select(Product, Category).join(Category, Product.category_id == Category.id).where(Product.is_deleted.is_(False))
+    stmt = (
+        select(Product, Category)
+        .join(Category, Product.category_id == Category.id)
+        .where(Product.is_deleted.is_(False))
+    )
     if q:
         like = f"%{q.strip().lower()}%"
         stmt = stmt.where(
@@ -381,7 +493,9 @@ async def search_products(
     if category_slug:
         stmt = stmt.where(Category.slug == category_slug)
 
-    total = await session.scalar(stmt.with_only_columns(func.count(func.distinct(Product.id))).order_by(None))
+    total = await session.scalar(
+        stmt.with_only_columns(func.count(func.distinct(Product.id))).order_by(None)
+    )
     total_items = int(total or 0)
     total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
 
@@ -415,7 +529,12 @@ async def search_products(
     ]
     return AdminProductListResponse(
         items=items,
-        meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
+        meta={
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "page": page,
+            "limit": limit,
+        },
     )
 
 
@@ -429,7 +548,10 @@ async def products_by_ids(
     if not ids:
         return []
     if len(ids) > 200:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many product ids (max 200)")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Too many product ids (max 200)",
+        )
 
     stmt = (
         select(Product, Category)
@@ -464,7 +586,9 @@ async def products_by_ids(
 
 
 @router.get("/orders")
-async def admin_orders(session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)) -> list[dict]:
+async def admin_orders(
+    session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)
+) -> list[dict]:
     stmt = (
         select(Order, User.email)
         .join(User, Order.user_id == User.id, isouter=True)
@@ -487,8 +611,12 @@ async def admin_orders(session: AsyncSession = Depends(get_session), _: str = De
 
 
 @router.get("/users")
-async def admin_users(session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)) -> list[dict]:
-    result = await session.execute(select(User).order_by(User.created_at.desc()).limit(20))
+async def admin_users(
+    session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)
+) -> list[dict]:
+    result = await session.execute(
+        select(User).order_by(User.created_at.desc()).limit(20)
+    )
     users = result.scalars().all()
     return [
         {
@@ -527,11 +655,21 @@ async def search_users(
     if role is not None:
         stmt = stmt.where(User.role == role)
 
-    total = await session.scalar(stmt.with_only_columns(func.count(func.distinct(User.id))).order_by(None))
+    total = await session.scalar(
+        stmt.with_only_columns(func.count(func.distinct(User.id))).order_by(None)
+    )
     total_items = int(total or 0)
     total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
 
-    rows = (await session.execute(stmt.order_by(User.created_at.desc()).limit(limit).offset(offset))).scalars().all()
+    rows = (
+        (
+            await session.execute(
+                stmt.order_by(User.created_at.desc()).limit(limit).offset(offset)
+            )
+        )
+        .scalars()
+        .all()
+    )
     items = [
         AdminUserListItem(
             id=u.id,
@@ -548,7 +686,12 @@ async def search_users(
 
     return AdminUserListResponse(
         items=items,
-        meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
+        meta={
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "page": page,
+            "limit": limit,
+        },
     )
 
 
@@ -560,7 +703,9 @@ async def admin_user_aliases(
 ) -> dict:
     user = await session.get(User, user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
     usernames = await auth_service.list_username_history(session, user_id)
     display_names = await auth_service.list_display_name_history(session, user_id)
     return {
@@ -572,16 +717,24 @@ async def admin_user_aliases(
             "name_tag": user.name_tag,
             "role": user.role,
         },
-        "usernames": [{"username": row.username, "created_at": row.created_at} for row in usernames],
+        "usernames": [
+            {"username": row.username, "created_at": row.created_at}
+            for row in usernames
+        ],
         "display_names": [
-            {"name": row.name, "name_tag": row.name_tag, "created_at": row.created_at} for row in display_names
+            {"name": row.name, "name_tag": row.name_tag, "created_at": row.created_at}
+            for row in display_names
         ],
     }
 
 
 @router.get("/content")
-async def admin_content(session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)) -> list[dict]:
-    result = await session.execute(select(ContentBlock).order_by(ContentBlock.updated_at.desc()).limit(20))
+async def admin_content(
+    session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)
+) -> list[dict]:
+    result = await session.execute(
+        select(ContentBlock).order_by(ContentBlock.updated_at.desc()).limit(20)
+    )
     blocks = result.scalars().all()
     return [
         {
@@ -595,23 +748,35 @@ async def admin_content(session: AsyncSession = Depends(get_session), _: str = D
     ]
 
 
-async def _invalidate_stripe_coupon_mappings(session: AsyncSession, promo_id: UUID) -> int:
+async def _invalidate_stripe_coupon_mappings(
+    session: AsyncSession, promo_id: UUID
+) -> int:
     total = await session.scalar(
-        select(func.count()).select_from(StripeCouponMapping).where(StripeCouponMapping.promo_code_id == promo_id)
+        select(func.count())
+        .select_from(StripeCouponMapping)
+        .where(StripeCouponMapping.promo_code_id == promo_id)
     )
-    await session.execute(delete(StripeCouponMapping).where(StripeCouponMapping.promo_code_id == promo_id))
+    await session.execute(
+        delete(StripeCouponMapping).where(StripeCouponMapping.promo_code_id == promo_id)
+    )
     return int(total or 0)
 
 
 @router.get("/coupons")
-async def admin_coupons(session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)) -> list[dict]:
-    result = await session.execute(select(PromoCode).order_by(PromoCode.created_at.desc()).limit(20))
+async def admin_coupons(
+    session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)
+) -> list[dict]:
+    result = await session.execute(
+        select(PromoCode).order_by(PromoCode.created_at.desc()).limit(20)
+    )
     promos = result.scalars().all()
     return [
         {
             "id": str(p.id),
             "code": p.code,
-            "percentage_off": float(p.percentage_off) if p.percentage_off is not None else None,
+            "percentage_off": float(p.percentage_off)
+            if p.percentage_off is not None
+            else None,
             "amount_off": float(p.amount_off) if p.amount_off is not None else None,
             "currency": p.currency,
             "expires_at": p.expires_at,
@@ -632,7 +797,13 @@ async def scheduled_tasks_overview(
     now = datetime.now(timezone.utc)
 
     publish_stmt = (
-        select(Product.id, Product.slug, Product.name, Product.sale_start_at, Product.sale_end_at)
+        select(
+            Product.id,
+            Product.slug,
+            Product.name,
+            Product.sale_start_at,
+            Product.sale_end_at,
+        )
         .where(
             Product.is_deleted.is_(False),
             Product.is_active.is_(True),
@@ -657,16 +828,32 @@ async def scheduled_tasks_overview(
     ]
 
     promo_next_at = case(
-        (Promotion.starts_at.is_not(None) & (Promotion.starts_at > now), Promotion.starts_at),
+        (
+            Promotion.starts_at.is_not(None) & (Promotion.starts_at > now),
+            Promotion.starts_at,
+        ),
         else_=Promotion.ends_at,
     ).label("next_event_at")
     promo_next_type = case(
-        (Promotion.starts_at.is_not(None) & (Promotion.starts_at > now), literal("starts_at")),
+        (
+            Promotion.starts_at.is_not(None) & (Promotion.starts_at > now),
+            literal("starts_at"),
+        ),
         else_=literal("ends_at"),
     ).label("next_event_type")
     promo_stmt = (
-        select(Promotion.id, Promotion.name, Promotion.starts_at, Promotion.ends_at, promo_next_at, promo_next_type)
-        .where(Promotion.is_active.is_(True), or_(Promotion.starts_at > now, Promotion.ends_at > now))
+        select(
+            Promotion.id,
+            Promotion.name,
+            Promotion.starts_at,
+            Promotion.ends_at,
+            promo_next_at,
+            promo_next_type,
+        )
+        .where(
+            Promotion.is_active.is_(True),
+            or_(Promotion.starts_at > now, Promotion.ends_at > now),
+        )
         .order_by(promo_next_at.asc())
         .limit(limit)
     )
@@ -684,7 +871,9 @@ async def scheduled_tasks_overview(
         if row.next_event_at is not None
     ]
 
-    return AdminDashboardScheduledTasksResponse(publish_schedules=publish_items, promo_schedules=promo_items)
+    return AdminDashboardScheduledTasksResponse(
+        publish_schedules=publish_items, promo_schedules=promo_items
+    )
 
 
 @router.post("/coupons/{coupon_id}/stripe/invalidate")
@@ -695,7 +884,9 @@ async def admin_invalidate_coupon_stripe(
 ) -> dict:
     promo = await session.get(PromoCode, coupon_id)
     if not promo:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found"
+        )
     deleted = await _invalidate_stripe_coupon_mappings(session, promo.id)
     await session.commit()
     return {"deleted_mappings": deleted}
@@ -709,12 +900,17 @@ async def admin_create_coupon(
 ) -> dict:
     code = payload.get("code")
     if not code:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="code required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="code required"
+        )
     currency = payload.get("currency")
     if currency:
         currency = str(currency).strip().upper()
         if currency != "RON":
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only RON currency is supported")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Only RON currency is supported",
+            )
     promo = PromoCode(
         code=code,
         percentage_off=payload.get("percentage_off"),
@@ -729,7 +925,9 @@ async def admin_create_coupon(
     return {
         "id": str(promo.id),
         "code": promo.code,
-        "percentage_off": float(promo.percentage_off) if promo.percentage_off is not None else None,
+        "percentage_off": float(promo.percentage_off)
+        if promo.percentage_off is not None
+        else None,
         "amount_off": float(promo.amount_off) if promo.amount_off is not None else None,
         "currency": promo.currency,
         "expires_at": promo.expires_at,
@@ -748,9 +946,21 @@ async def admin_update_coupon(
 ) -> dict:
     promo = await session.get(PromoCode, coupon_id)
     if not promo:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
-    invalidate_stripe = any(field in payload for field in ["percentage_off", "amount_off", "currency", "active"])
-    for field in ["percentage_off", "amount_off", "expires_at", "max_uses", "active", "code"]:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found"
+        )
+    invalidate_stripe = any(
+        field in payload
+        for field in ["percentage_off", "amount_off", "currency", "active"]
+    )
+    for field in [
+        "percentage_off",
+        "amount_off",
+        "expires_at",
+        "max_uses",
+        "active",
+        "code",
+    ]:
         if field in payload:
             setattr(promo, field, payload[field])
     if "currency" in payload:
@@ -758,7 +968,10 @@ async def admin_update_coupon(
         if currency:
             currency = str(currency).strip().upper()
             if currency != "RON":
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only RON currency is supported")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Only RON currency is supported",
+                )
             promo.currency = currency
         else:
             promo.currency = None
@@ -770,7 +983,9 @@ async def admin_update_coupon(
     return {
         "id": str(promo.id),
         "code": promo.code,
-        "percentage_off": float(promo.percentage_off) if promo.percentage_off is not None else None,
+        "percentage_off": float(promo.percentage_off)
+        if promo.percentage_off is not None
+        else None,
         "amount_off": float(promo.amount_off) if promo.amount_off is not None else None,
         "currency": promo.currency,
         "expires_at": promo.expires_at,
@@ -781,14 +996,18 @@ async def admin_update_coupon(
 
 
 @router.get("/audit")
-async def admin_audit(session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)) -> dict:
+async def admin_audit(
+    session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)
+) -> dict:
     product_audit_stmt = (
         select(ProductAuditLog)
         .options()
         .order_by(ProductAuditLog.created_at.desc())
         .limit(20)
     )
-    content_audit_stmt = select(ContentAuditLog).order_by(ContentAuditLog.created_at.desc()).limit(20)
+    content_audit_stmt = (
+        select(ContentAuditLog).order_by(ContentAuditLog.created_at.desc()).limit(20)
+    )
     actor = aliased(User)
     subject = aliased(User)
     security_audit_stmt = (
@@ -829,7 +1048,9 @@ async def admin_audit(session: AsyncSession = Depends(get_session), _: str = Dep
                 "action": log.action,
                 "actor_user_id": str(log.actor_user_id) if log.actor_user_id else None,
                 "actor_email": actor_email,
-                "subject_user_id": str(log.subject_user_id) if log.subject_user_id else None,
+                "subject_user_id": str(log.subject_user_id)
+                if log.subject_user_id
+                else None,
                 "subject_email": subject_email,
                 "data": log.data,
                 "created_at": log.created_at,
@@ -935,11 +1156,21 @@ def _audit_filters(
         needle = user.strip().lower()
         if needle:
             actor_email = func.lower(func.coalesce(getattr(audit.c, "actor_email"), ""))  # type: ignore[attr-defined]
-            actor_username = func.lower(func.coalesce(getattr(audit.c, "actor_username"), ""))  # type: ignore[attr-defined]
-            subject_email = func.lower(func.coalesce(getattr(audit.c, "subject_email"), ""))  # type: ignore[attr-defined]
-            subject_username = func.lower(func.coalesce(getattr(audit.c, "subject_username"), ""))  # type: ignore[attr-defined]
-            actor_user_id = func.lower(func.coalesce(getattr(audit.c, "actor_user_id"), ""))  # type: ignore[attr-defined]
-            subject_user_id = func.lower(func.coalesce(getattr(audit.c, "subject_user_id"), ""))  # type: ignore[attr-defined]
+            actor_username = func.lower(
+                func.coalesce(getattr(audit.c, "actor_username"), "")
+            )  # type: ignore[attr-defined]
+            subject_email = func.lower(
+                func.coalesce(getattr(audit.c, "subject_email"), "")
+            )  # type: ignore[attr-defined]
+            subject_username = func.lower(
+                func.coalesce(getattr(audit.c, "subject_username"), "")
+            )  # type: ignore[attr-defined]
+            actor_user_id = func.lower(
+                func.coalesce(getattr(audit.c, "actor_user_id"), "")
+            )  # type: ignore[attr-defined]
+            subject_user_id = func.lower(
+                func.coalesce(getattr(audit.c, "subject_user_id"), "")
+            )  # type: ignore[attr-defined]
             filters.append(
                 or_(
                     actor_email.like(f"%{needle}%"),
@@ -958,7 +1189,9 @@ def _audit_filters(
 async def admin_audit_entries(
     session: AsyncSession = Depends(get_session),
     _: str = Depends(require_admin),
-    entity: str | None = Query(default="all", pattern="^(all|product|content|security)$"),
+    entity: str | None = Query(
+        default="all", pattern="^(all|product|content|security)$"
+    ),
     action: str | None = Query(default=None, max_length=120),
     user: str | None = Query(default=None, max_length=255),
     page: int = Query(default=1, ge=1),
@@ -966,12 +1199,20 @@ async def admin_audit_entries(
 ) -> dict:
     audit = _audit_union_subquery()
     filters = _audit_filters(audit, entity=entity, action=action, user=user)
-    total = await session.scalar(select(func.count()).select_from(audit).where(*filters))
+    total = await session.scalar(
+        select(func.count()).select_from(audit).where(*filters)
+    )
     total_items = int(total or 0)
     total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
 
     offset = (page - 1) * limit
-    q = select(audit).where(*filters).order_by(getattr(audit.c, "created_at").desc()).offset(offset).limit(limit)  # type: ignore[attr-defined]
+    q = (
+        select(audit)
+        .where(*filters)
+        .order_by(getattr(audit.c, "created_at").desc())
+        .offset(offset)
+        .limit(limit)
+    )  # type: ignore[attr-defined]
     rows = (await session.execute(q)).mappings().all()
     items = [
         {
@@ -1005,14 +1246,21 @@ async def admin_audit_entries(
 async def admin_audit_export_csv(
     session: AsyncSession = Depends(get_session),
     _: str = Depends(require_admin),
-    entity: str | None = Query(default="all", pattern="^(all|product|content|security)$"),
+    entity: str | None = Query(
+        default="all", pattern="^(all|product|content|security)$"
+    ),
     action: str | None = Query(default=None, max_length=120),
     user: str | None = Query(default=None, max_length=255),
 ) -> Response:
     audit = _audit_union_subquery()
     filters = _audit_filters(audit, entity=entity, action=action, user=user)
 
-    q = select(audit).where(*filters).order_by(getattr(audit.c, "created_at").desc()).limit(5000)  # type: ignore[attr-defined]
+    q = (
+        select(audit)
+        .where(*filters)
+        .order_by(getattr(audit.c, "created_at").desc())
+        .limit(5000)
+    )  # type: ignore[attr-defined]
     rows = (await session.execute(q)).mappings().all()
 
     buf = io.StringIO()
@@ -1066,8 +1314,14 @@ async def revoke_sessions(
 ) -> None:
     user = await session.get(User, user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    result = await session.execute(select(RefreshSession).where(RefreshSession.user_id == user_id, RefreshSession.revoked.is_(False)))
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+    result = await session.execute(
+        select(RefreshSession).where(
+            RefreshSession.user_id == user_id, RefreshSession.revoked.is_(False)
+        )
+    )
     sessions = result.scalars().all()
     for s in sessions:
         s.revoked = True
@@ -1087,12 +1341,19 @@ async def update_user_role(
 ) -> dict:
     user = await session.get(User, user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
     if user.role == UserRole.owner:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Owner role can only be transferred")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Owner role can only be transferred",
+        )
     role = payload.get("role")
     if role not in (UserRole.admin.value, UserRole.customer.value):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role"
+        )
     user.role = UserRole(role)
     session.add(user)
     await session.flush()
@@ -1116,24 +1377,34 @@ async def transfer_owner(
 ) -> dict:
     identifier = str(payload.get("identifier") or "").strip()
     if not identifier:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Identifier is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Identifier is required"
+        )
 
     confirm = str(payload.get("confirm") or "").strip()
     if confirm.upper() != "TRANSFER":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Type "TRANSFER" to confirm')
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail='Type "TRANSFER" to confirm'
+        )
 
     password = str(payload.get("password") or "")
     if not password:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Password is required"
+        )
     if not security.verify_password(password, current_owner.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
+        )
 
     if "@" in identifier:
         target = await auth_service.get_user_by_any_email(session, identifier)
     else:
         target = await auth_service.get_user_by_username(session, identifier)
     if not target:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     if target.id == current_owner.id:
         return {"old_owner_id": str(current_owner.id), "new_owner_id": str(target.id)}
@@ -1149,7 +1420,11 @@ async def transfer_owner(
             action="owner_transfer",
             actor_user_id=current_owner.id,
             subject_user_id=target.id,
-            data={"identifier": identifier, "old_owner_id": str(current_owner.id), "new_owner_id": str(target.id)},
+            data={
+                "identifier": identifier,
+                "old_owner_id": str(current_owner.id),
+                "new_owner_id": str(target.id),
+            },
         )
     )
     await session.commit()
@@ -1179,17 +1454,29 @@ async def set_maintenance(payload: dict, _: str = Depends(require_admin)) -> dic
 
 
 @router.get("/export")
-async def export_data(session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)) -> dict:
+async def export_data(
+    session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)
+) -> dict:
     return await exporter_service.export_json(session)
 
 
 @router.get("/low-stock")
-async def low_stock_products(session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)) -> list[dict]:
-    threshold_expr = func.coalesce(Product.low_stock_threshold, Category.low_stock_threshold, DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD)
+async def low_stock_products(
+    session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)
+) -> list[dict]:
+    threshold_expr = func.coalesce(
+        Product.low_stock_threshold,
+        Category.low_stock_threshold,
+        DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD,
+    )
     stmt = (
         select(Product, threshold_expr.label("threshold"))
         .join(Category, Product.category_id == Category.id)
-        .where(Product.stock_quantity < threshold_expr, Product.is_deleted.is_(False), Product.is_active.is_(True))
+        .where(
+            Product.stock_quantity < threshold_expr,
+            Product.is_deleted.is_(False),
+            Product.is_active.is_(True),
+        )
         .order_by(Product.stock_quantity.asc())
         .limit(20)
     )
@@ -1200,7 +1487,11 @@ async def low_stock_products(session: AsyncSession = Depends(get_session), _: st
             "name": p.name,
             "stock_quantity": p.stock_quantity,
             "threshold": int(threshold or DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD),
-            "is_critical": bool(p.stock_quantity <= 0 or p.stock_quantity < max(1, int((threshold or DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD) // 2))),
+            "is_critical": bool(
+                p.stock_quantity <= 0
+                or p.stock_quantity
+                < max(1, int((threshold or DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD) // 2))
+            ),
             "sku": p.sku,
             "slug": p.slug,
         }
@@ -1216,13 +1507,120 @@ async def list_stock_adjustments(
     session: AsyncSession = Depends(get_session),
     _: str = Depends(require_admin),
 ) -> list[StockAdjustmentRead]:
-    return await catalog_service.list_stock_adjustments(session, product_id=product_id, limit=limit, offset=offset)
+    return await catalog_service.list_stock_adjustments(
+        session, product_id=product_id, limit=limit, offset=offset
+    )
 
 
-@router.post("/stock-adjustments", response_model=StockAdjustmentRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/stock-adjustments",
+    response_model=StockAdjustmentRead,
+    status_code=status.HTTP_201_CREATED,
+)
 async def apply_stock_adjustment(
     payload: StockAdjustmentCreate,
     session: AsyncSession = Depends(get_session),
     current_user=Depends(require_admin),
 ) -> StockAdjustmentRead:
-    return await catalog_service.apply_stock_adjustment(session, payload=payload, user_id=current_user.id)
+    return await catalog_service.apply_stock_adjustment(
+        session, payload=payload, user_id=current_user.id
+    )
+
+
+@router.get("/inventory/restock-list", response_model=RestockListResponse)
+async def inventory_restock_list(
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
+    include_variants: bool = Query(default=True),
+    default_threshold: int = Query(
+        default=DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD, ge=1, le=1000
+    ),
+) -> RestockListResponse:
+    return await inventory_service.paginate_restock_list(
+        session,
+        page=page,
+        limit=limit,
+        include_variants=include_variants,
+        default_threshold=default_threshold,
+    )
+
+
+@router.put("/inventory/restock-notes", response_model=RestockNoteRead | None)
+async def upsert_inventory_restock_note(
+    payload: RestockNoteUpsert,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(require_admin),
+) -> RestockNoteRead | None:
+    return await inventory_service.upsert_restock_note(
+        session, payload=payload, user_id=current_user.id
+    )
+
+
+@router.get("/inventory/restock-list/export")
+async def export_inventory_restock_list(
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+    include_variants: bool = Query(default=True),
+    default_threshold: int = Query(
+        default=DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD, ge=1, le=1000
+    ),
+) -> Response:
+    rows = await inventory_service.list_restock_list(
+        session,
+        include_variants=include_variants,
+        default_threshold=default_threshold,
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "kind",
+            "sku",
+            "product_slug",
+            "product_name",
+            "variant_name",
+            "stock_quantity",
+            "reserved_in_carts",
+            "reserved_in_orders",
+            "available_quantity",
+            "threshold",
+            "supplier",
+            "desired_quantity",
+            "note",
+            "restock_at",
+            "note_updated_at",
+            "product_id",
+            "variant_id",
+        ]
+    )
+    for row in rows:
+        writer.writerow(
+            [
+                row.kind,
+                row.sku,
+                row.product_slug,
+                row.product_name,
+                row.variant_name or "",
+                row.stock_quantity,
+                row.reserved_in_carts,
+                row.reserved_in_orders,
+                row.available_quantity,
+                row.threshold,
+                row.supplier or "",
+                "" if row.desired_quantity is None else row.desired_quantity,
+                row.note or "",
+                row.restock_at.isoformat() if row.restock_at else "",
+                row.note_updated_at.isoformat() if row.note_updated_at else "",
+                str(row.product_id),
+                str(row.variant_id) if row.variant_id else "",
+            ]
+        )
+
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="restock-list.csv"'},
+    )
