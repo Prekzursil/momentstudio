@@ -10,7 +10,7 @@ import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { ToastService } from '../../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { ReceiptShareToken } from '../../../core/account.service';
-import { AdminOrderDetail, AdminOrderEvent, AdminOrdersService } from '../../../core/admin-orders.service';
+import { AdminOrderDetail, AdminOrderEvent, AdminOrderFraudSignal, AdminOrdersService } from '../../../core/admin-orders.service';
 import { AdminReturnsService, ReturnRequestRead } from '../../../core/admin-returns.service';
 import { orderStatusChipClass } from '../../../shared/order-status';
 
@@ -116,6 +116,38 @@ type OrderAction =
                 </div>
                 <div *ngIf="lockerLabel()" class="mt-1 text-xs text-slate-600 dark:text-slate-300 truncate">
                   {{ lockerLabel() }}
+                </div>
+              </div>
+            </div>
+
+            <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+              <div class="flex items-start justify-between gap-3">
+                <div class="grid gap-2">
+                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.orders.fraudSignals.title' | translate }}
+                  </div>
+                  <div *ngIf="(order()!.fraud_signals || []).length === 0" class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.orders.fraudSignals.empty' | translate }}
+                  </div>
+                  <div *ngIf="(order()!.fraud_signals || []).length" class="grid gap-2">
+                    <div *ngFor="let sig of order()!.fraud_signals || []" class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span class="inline-flex h-2.5 w-2.5 rounded-full" [ngClass]="fraudSeverityDotClass(sig.severity)"></span>
+                          <span class="font-medium text-slate-900 dark:text-slate-50">{{ fraudSignalTitle(sig) }}</span>
+                          <span
+                            class="ml-auto inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                            [ngClass]="fraudSeverityBadgeClass(sig.severity)"
+                          >
+                            {{ fraudSeverityLabel(sig.severity) }}
+                          </span>
+                        </div>
+                        <div *ngIf="fraudSignalDescription(sig) as desc" class="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
+                          {{ desc }}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1019,6 +1051,40 @@ export class AdminOrderDetailComponent implements OnInit {
     return translated === key ? tag : translated;
   }
 
+  fraudSignalTitle(signal: AdminOrderFraudSignal): string {
+    const key = `adminUi.orders.fraudSignals.signals.${signal.code}.title`;
+    const translated = this.translate.instant(key);
+    return translated === key ? signal.code : translated;
+  }
+
+  fraudSignalDescription(signal: AdminOrderFraudSignal): string {
+    const key = `adminUi.orders.fraudSignals.signals.${signal.code}.description`;
+    const params = this.fraudSignalParams(signal);
+    const translated = this.translate.instant(key, params);
+    return translated === key ? '' : translated;
+  }
+
+  fraudSeverityLabel(severity: AdminOrderFraudSignal['severity']): string {
+    const key = `adminUi.orders.fraudSignals.severity.${severity}`;
+    const translated = this.translate.instant(key);
+    return translated === key ? severity : translated;
+  }
+
+  fraudSeverityDotClass(severity: AdminOrderFraudSignal['severity']): string {
+    if (severity === 'high') return 'bg-rose-500';
+    if (severity === 'medium') return 'bg-amber-500';
+    if (severity === 'low') return 'bg-sky-500';
+    return 'bg-slate-400';
+  }
+
+  fraudSeverityBadgeClass(severity: AdminOrderFraudSignal['severity']): string {
+    if (severity === 'high') return 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200';
+    if (severity === 'medium')
+      return 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200';
+    if (severity === 'low') return 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-200';
+    return 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-200';
+  }
+
   paymentMethodLabel(): string {
     const o = this.order();
     if (!o) return '—';
@@ -1027,6 +1093,26 @@ export class AdminOrderDetailComponent implements OnInit {
     if (method === 'paypal') return this.translate.instant('adminUi.orders.paymentPaypal');
     if (method === 'stripe') return this.translate.instant('adminUi.orders.paymentStripe');
     return method || '—';
+  }
+
+  private fraudSignalParams(signal: AdminOrderFraudSignal): Record<string, unknown> {
+    const data = (signal.data ?? {}) as Record<string, unknown>;
+    if (signal.code === 'velocity_email' || signal.code === 'velocity_user') {
+      return {
+        count: data['count'],
+        window_minutes: data['window_minutes']
+      };
+    }
+    if (signal.code === 'country_mismatch') {
+      return {
+        shipping_country: data['shipping_country'],
+        billing_country: data['billing_country']
+      };
+    }
+    if (signal.code === 'payment_retries') {
+      return { count: data['count'] };
+    }
+    return data;
   }
 
   canRefund(): boolean {

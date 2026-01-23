@@ -119,6 +119,11 @@ class Settings(BaseSettings):
     fan_api_username: str | None = None
     fan_api_password: str | None = None
 
+    # Fraud/risk signals (admin-only; informational)
+    fraud_velocity_window_minutes: int = 60 * 24
+    fraud_velocity_threshold: int = 3
+    fraud_payment_retry_threshold: int = 2
+
 
 @lru_cache
 def get_settings() -> Settings:

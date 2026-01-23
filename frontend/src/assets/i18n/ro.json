@@ -2266,6 +2266,34 @@
           "remove": "Nu am putut elimina eticheta."
         }
       },
+      "fraudSignals": {
+        "title": "Semnale fraudă",
+        "empty": "Nu am detectat semnale.",
+        "severity": {
+          "info": "Info",
+          "low": "Scăzut",
+          "medium": "Mediu",
+          "high": "Ridicat"
+        },
+        "signals": {
+          "velocity_email": {
+            "title": "Viteză email",
+            "description": "{{count}} comenzi cu același email în ultimele {{window_minutes}} minute."
+          },
+          "velocity_user": {
+            "title": "Viteză cont",
+            "description": "{{count}} comenzi de la același cont în ultimele {{window_minutes}} minute."
+          },
+          "country_mismatch": {
+            "title": "Țară diferită",
+            "description": "Țara de livrare {{shipping_country}} diferă de țara de facturare {{billing_country}}."
+          },
+          "payment_retries": {
+            "title": "Reîncercări plată",
+            "description": "Plata a fost reîncercată de {{count}} ori."
+          }
+        }
+      },
       "diff": {
         "courier": "Curier",
         "shippingMethod": "Metodă livrare"

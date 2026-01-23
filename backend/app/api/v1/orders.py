@@ -931,16 +931,8 @@ async def admin_export_orders(
     return StreamingResponse(iter([buffer.getvalue()]), media_type="text/csv", headers=headers)
 
 
-@router.get("/admin/{order_id}", response_model=AdminOrderRead)
-async def admin_get_order(
-    order_id: UUID,
-    session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
-) -> AdminOrderRead:
-    order = await order_service.get_order_by_id_admin(session, order_id)
-    if not order:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-
+async def _serialize_admin_order(session: AsyncSession, order: Order) -> AdminOrderRead:
+    fraud_signals = await order_service.compute_fraud_signals(session, order)
     base = OrderRead.model_validate(order).model_dump()
     return AdminOrderRead(
         **base,
@@ -956,7 +948,21 @@ async def admin_get_order(
         refunds=getattr(order, "refunds", []) or [],
         admin_notes=getattr(order, "admin_notes", []) or [],
         tags=[t.tag for t in (getattr(order, "tags", None) or [])],
+        fraud_signals=fraud_signals,
     )
+
+
+@router.get("/admin/{order_id}", response_model=AdminOrderRead)
+async def admin_get_order(
+    order_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> AdminOrderRead:
+    order = await order_service.get_order_by_id_admin(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    return await _serialize_admin_order(session, order)
 
 
 @router.post("/guest-checkout/email/request", response_model=GuestEmailVerificationRequestResponse)
@@ -1431,21 +1437,7 @@ async def admin_update_order(
     full = await order_service.get_order_by_id_admin(session, order_id)
     if not full:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    base = OrderRead.model_validate(full).model_dump()
-    return AdminOrderRead(
-        **base,
-        customer_email=getattr(full, "customer_email", None) or (getattr(full.user, "email", None) if getattr(full, "user", None) else None),
-        customer_username=getattr(full.user, "username", None) if getattr(full, "user", None) else None,
-        shipping_address=full.shipping_address,
-        billing_address=full.billing_address,
-        tracking_url=getattr(full, "tracking_url", None),
-        shipping_label_filename=getattr(full, "shipping_label_filename", None),
-        shipping_label_uploaded_at=getattr(full, "shipping_label_uploaded_at", None),
-        has_shipping_label=bool(getattr(full, "shipping_label_path", None)),
-        refunds=getattr(full, "refunds", []) or [],
-        admin_notes=getattr(full, "admin_notes", []) or [],
-        tags=[t.tag for t in (getattr(full, "tags", None) or [])],
-    )
+    return await _serialize_admin_order(session, full)
 
 
 @router.post("/admin/{order_id}/shipping-label", response_model=AdminOrderRead)
@@ -1480,21 +1472,7 @@ async def admin_upload_shipping_label(
     full = await order_service.get_order_by_id_admin(session, order_id)
     if not full:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    base = OrderRead.model_validate(full).model_dump()
-    return AdminOrderRead(
-        **base,
-        customer_email=getattr(full, "customer_email", None) or (getattr(full.user, "email", None) if getattr(full, "user", None) else None),
-        customer_username=getattr(full.user, "username", None) if getattr(full, "user", None) else None,
-        shipping_address=full.shipping_address,
-        billing_address=full.billing_address,
-        tracking_url=getattr(full, "tracking_url", None),
-        shipping_label_filename=getattr(full, "shipping_label_filename", None),
-        shipping_label_uploaded_at=getattr(full, "shipping_label_uploaded_at", None),
-        has_shipping_label=bool(getattr(full, "shipping_label_path", None)),
-        refunds=getattr(full, "refunds", []) or [],
-        admin_notes=getattr(full, "admin_notes", []) or [],
-        tags=[t.tag for t in (getattr(full, "tags", None) or [])],
-    )
+    return await _serialize_admin_order(session, full)
 
 
 @router.get("/admin/{order_id}/shipping-label")
@@ -1626,22 +1604,7 @@ async def admin_create_order_refund(
     if updated.status == OrderStatus.refunded:
         await coupons_service.release_coupon_for_order(session, order=updated, reason="refunded")
 
-    base = OrderRead.model_validate(updated).model_dump()
-    return AdminOrderRead(
-        **base,
-        customer_email=getattr(updated, "customer_email", None)
-        or (getattr(updated.user, "email", None) if getattr(updated, "user", None) else None),
-        customer_username=getattr(updated.user, "username", None) if getattr(updated, "user", None) else None,
-        shipping_address=updated.shipping_address,
-        billing_address=updated.billing_address,
-        tracking_url=getattr(updated, "tracking_url", None),
-        shipping_label_filename=getattr(updated, "shipping_label_filename", None),
-        shipping_label_uploaded_at=getattr(updated, "shipping_label_uploaded_at", None),
-        has_shipping_label=bool(getattr(updated, "shipping_label_path", None)),
-        refunds=getattr(updated, "refunds", []) or [],
-        admin_notes=getattr(updated, "admin_notes", []) or [],
-        tags=[t.tag for t in (getattr(updated, "tags", None) or [])],
-    )
+    return await _serialize_admin_order(session, updated)
 
 
 @router.post("/admin/{order_id}/notes", response_model=AdminOrderRead)
@@ -1657,22 +1620,7 @@ async def admin_add_order_note(
 
     updated = await order_service.add_admin_note(session, order, note=payload.note, actor_user_id=getattr(admin, "id", None))
 
-    base = OrderRead.model_validate(updated).model_dump()
-    return AdminOrderRead(
-        **base,
-        customer_email=getattr(updated, "customer_email", None)
-        or (getattr(updated.user, "email", None) if getattr(updated, "user", None) else None),
-        customer_username=getattr(updated.user, "username", None) if getattr(updated, "user", None) else None,
-        shipping_address=updated.shipping_address,
-        billing_address=updated.billing_address,
-        tracking_url=getattr(updated, "tracking_url", None),
-        shipping_label_filename=getattr(updated, "shipping_label_filename", None),
-        shipping_label_uploaded_at=getattr(updated, "shipping_label_uploaded_at", None),
-        has_shipping_label=bool(getattr(updated, "shipping_label_path", None)),
-        refunds=getattr(updated, "refunds", []) or [],
-        admin_notes=getattr(updated, "admin_notes", []) or [],
-        tags=[t.tag for t in (getattr(updated, "tags", None) or [])],
-    )
+    return await _serialize_admin_order(session, updated)
 
 
 @router.post("/admin/{order_id}/tags", response_model=AdminOrderRead)
@@ -1690,22 +1638,7 @@ async def admin_add_order_tag(
         session, order, tag=payload.tag, actor_user_id=getattr(admin, "id", None)
     )
 
-    base = OrderRead.model_validate(updated).model_dump()
-    return AdminOrderRead(
-        **base,
-        customer_email=getattr(updated, "customer_email", None)
-        or (getattr(updated.user, "email", None) if getattr(updated, "user", None) else None),
-        customer_username=getattr(updated.user, "username", None) if getattr(updated, "user", None) else None,
-        shipping_address=updated.shipping_address,
-        billing_address=updated.billing_address,
-        tracking_url=getattr(updated, "tracking_url", None),
-        shipping_label_filename=getattr(updated, "shipping_label_filename", None),
-        shipping_label_uploaded_at=getattr(updated, "shipping_label_uploaded_at", None),
-        has_shipping_label=bool(getattr(updated, "shipping_label_path", None)),
-        refunds=getattr(updated, "refunds", []) or [],
-        admin_notes=getattr(updated, "admin_notes", []) or [],
-        tags=[t.tag for t in (getattr(updated, "tags", None) or [])],
-    )
+    return await _serialize_admin_order(session, updated)
 
 
 @router.delete("/admin/{order_id}/tags/{tag}", response_model=AdminOrderRead)
@@ -1723,22 +1656,7 @@ async def admin_remove_order_tag(
         session, order, tag=tag, actor_user_id=getattr(admin, "id", None)
     )
 
-    base = OrderRead.model_validate(updated).model_dump()
-    return AdminOrderRead(
-        **base,
-        customer_email=getattr(updated, "customer_email", None)
-        or (getattr(updated.user, "email", None) if getattr(updated, "user", None) else None),
-        customer_username=getattr(updated.user, "username", None) if getattr(updated, "user", None) else None,
-        shipping_address=updated.shipping_address,
-        billing_address=updated.billing_address,
-        tracking_url=getattr(updated, "tracking_url", None),
-        shipping_label_filename=getattr(updated, "shipping_label_filename", None),
-        shipping_label_uploaded_at=getattr(updated, "shipping_label_uploaded_at", None),
-        has_shipping_label=bool(getattr(updated, "shipping_label_path", None)),
-        refunds=getattr(updated, "refunds", []) or [],
-        admin_notes=getattr(updated, "admin_notes", []) or [],
-        tags=[t.tag for t in (getattr(updated, "tags", None) or [])],
-    )
+    return await _serialize_admin_order(session, updated)
 
 
 @router.post("/admin/{order_id}/delivery-email", response_model=OrderRead)

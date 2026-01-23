@@ -327,7 +327,7 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
                 label="Billing",
                 line1="456 Billing",
                 city="Bucharest",
-                country="RO",
+                country="US",
                 postal_code="000000",
             )
             session.add(shipping)
@@ -362,6 +362,17 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     order_id = order["id"]
     ref = order["reference_code"]
 
+    create_two = client.post(
+        "/api/v1/orders",
+        json={
+            "shipping_address_id": str(shipping_address_id),
+            "billing_address_id": str(billing_address_id),
+            "shipping_method_id": str(shipping_method_id),
+        },
+        headers=auth_headers(token),
+    )
+    assert create_two.status_code == 201, create_two.text
+
     forbidden = client.get("/api/v1/orders/admin/search", headers=auth_headers(token))
     assert forbidden.status_code == 403
 
@@ -383,6 +394,10 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     assert data["shipping_address"]["line1"] == "123 Main"
     assert data["billing_address"]["line1"] == "456 Billing"
 
+    signals = {signal["code"]: signal for signal in (data.get("fraud_signals") or [])}
+    assert signals["velocity_email"]["data"]["count"] >= 2
+    assert signals["country_mismatch"]["data"]["billing_country"] == "US"
+
     updated = client.patch(
         f"/api/v1/orders/admin/{order_id}",
         json={"status": "paid", "tracking_number": "TRACK999"},
@@ -394,6 +409,19 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     assert updated_data["tracking_number"] == "TRACK999"
     assert updated_data["customer_email"] == "buyer@example.com"
     assert updated_data["shipping_address"]["line1"] == "123 Main"
+
+    async def seed_payment_retries() -> None:
+        async with SessionLocal() as session:
+            db_order = (await session.execute(select(Order).where(Order.id == UUID(order_id)))).scalar_one()
+            db_order.payment_retry_count = 2
+            session.add(db_order)
+            await session.commit()
+
+    asyncio.run(seed_payment_retries())
+    detail_retry = client.get(f"/api/v1/orders/admin/{order_id}", headers=auth_headers(admin_token))
+    assert detail_retry.status_code == 200, detail_retry.text
+    retry_signals = {signal["code"]: signal for signal in (detail_retry.json().get("fraud_signals") or [])}
+    assert retry_signals["payment_retries"]["data"]["count"] == 2
 
     tagged = client.post(
         f"/api/v1/orders/admin/{order_id}/tags",

@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from app.models.order import OrderStatus
 from app.schemas.admin_common import AdminPaginationMeta
 from app.schemas.address import AddressRead
+from app.schemas.order_fraud import AdminOrderFraudSignal
 from app.schemas.order import OrderRead
 from app.schemas.order_admin_note import OrderAdminNoteRead
 from app.schemas.order_refund import OrderRefundRead
@@ -43,6 +44,7 @@ class AdminOrderRead(OrderRead):
     refunds: list[OrderRefundRead] = Field(default_factory=list)
     admin_notes: list[OrderAdminNoteRead] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
+    fraud_signals: list[AdminOrderFraudSignal] = Field(default_factory=list)
 
 
 class AdminOrderEmailResendRequest(BaseModel):

@@ -60,6 +60,12 @@ export interface AdminOrderNote {
   actor?: AdminOrderNoteActor | null;
 }
 
+export interface AdminOrderFraudSignal {
+  code: string;
+  severity: 'info' | 'low' | 'medium' | 'high';
+  data?: Record<string, unknown> | null;
+}
+
 export interface AdminOrderDetail extends Order {
   payment_retry_count?: number;
   stripe_payment_intent_id?: string | null;
@@ -75,6 +81,7 @@ export interface AdminOrderDetail extends Order {
   refunds?: AdminOrderRefund[];
   admin_notes?: AdminOrderNote[];
   tags?: string[];
+  fraud_signals?: AdminOrderFraudSignal[];
   items: OrderItem[];
 }
 
@@ -116,6 +123,7 @@ export class AdminOrdersService {
           amount: parseMoney(r?.amount)
         })),
         admin_notes: o?.admin_notes ?? [],
+        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
         items: (o?.items ?? []).map((it: any) => ({
           ...it,
           unit_price: parseMoney(it?.unit_price),
@@ -147,6 +155,7 @@ export class AdminOrdersService {
           amount: parseMoney(r?.amount)
         })),
         admin_notes: o?.admin_notes ?? [],
+        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
         items: (o?.items ?? []).map((it: any) => ({
           ...it,
           unit_price: parseMoney(it?.unit_price),
@@ -210,6 +219,7 @@ export class AdminOrdersService {
           amount: parseMoney(r?.amount)
         })),
         admin_notes: o?.admin_notes ?? [],
+        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
         items: (o?.items ?? []).map((it: any) => ({
           ...it,
           unit_price: parseMoney(it?.unit_price),
@@ -232,6 +242,7 @@ export class AdminOrdersService {
           amount: parseMoney(r?.amount)
         })),
         admin_notes: o?.admin_notes ?? [],
+        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
         items: (o?.items ?? []).map((it: any) => ({
           ...it,
           unit_price: parseMoney(it?.unit_price),
@@ -261,6 +272,7 @@ export class AdminOrdersService {
         })),
         admin_notes: o?.admin_notes ?? [],
         tags: Array.isArray(o?.tags) ? o.tags : [],
+        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
         items: (o?.items ?? []).map((it: any) => ({
           ...it,
           unit_price: parseMoney(it?.unit_price),
@@ -284,6 +296,7 @@ export class AdminOrdersService {
         })),
         admin_notes: o?.admin_notes ?? [],
         tags: Array.isArray(o?.tags) ? o.tags : [],
+        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
         items: (o?.items ?? []).map((it: any) => ({
           ...it,
           unit_price: parseMoney(it?.unit_price),

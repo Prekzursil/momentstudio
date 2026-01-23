@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Sequence
 from uuid import UUID
@@ -415,6 +415,81 @@ def _normalize_order_tag(tag: str | None) -> str | None:
     cleaned = re.sub(r"[^a-z0-9_-]", "", cleaned)
     cleaned = cleaned.strip("_-")
     return cleaned[:50] if cleaned else None
+
+
+async def compute_fraud_signals(session: AsyncSession, order: Order) -> list[dict]:
+    from app.core.config import settings
+
+    signals: list[dict] = []
+
+    now = datetime.now(timezone.utc)
+    window_minutes = max(1, int(getattr(settings, "fraud_velocity_window_minutes", 60 * 24) or 60 * 24))
+    threshold = max(2, int(getattr(settings, "fraud_velocity_threshold", 3) or 3))
+    since = now - timedelta(minutes=window_minutes)
+
+    email = (getattr(order, "customer_email", None) or "").strip().lower()
+    if email:
+        email_count = int(
+            (
+                await session.execute(
+                    select(func.count())
+                    .select_from(Order)
+                    .where(func.lower(Order.customer_email) == email, Order.created_at >= since)
+                )
+            ).scalar_one()
+            or 0
+        )
+        if email_count > 1:
+            signals.append(
+                {
+                    "code": "velocity_email",
+                    "severity": "high" if email_count >= threshold else "medium",
+                    "data": {"count": email_count, "window_minutes": window_minutes},
+                }
+            )
+
+    user_id = getattr(order, "user_id", None)
+    if user_id:
+        user_count = int(
+            (
+                await session.execute(
+                    select(func.count()).select_from(Order).where(Order.user_id == user_id, Order.created_at >= since)
+                )
+            ).scalar_one()
+            or 0
+        )
+        if user_count > 1:
+            signals.append(
+                {
+                    "code": "velocity_user",
+                    "severity": "high" if user_count >= threshold else "medium",
+                    "data": {"count": user_count, "window_minutes": window_minutes},
+                }
+            )
+
+    shipping_country = (getattr(getattr(order, "shipping_address", None), "country", None) or "").strip().upper()
+    billing_country = (getattr(getattr(order, "billing_address", None), "country", None) or "").strip().upper()
+    if shipping_country and billing_country and shipping_country != billing_country:
+        signals.append(
+            {
+                "code": "country_mismatch",
+                "severity": "low",
+                "data": {"shipping_country": shipping_country, "billing_country": billing_country},
+            }
+        )
+
+    retry_threshold = max(1, int(getattr(settings, "fraud_payment_retry_threshold", 2) or 2))
+    retries = int(getattr(order, "payment_retry_count", 0) or 0)
+    if retries > 0:
+        signals.append(
+            {
+                "code": "payment_retries",
+                "severity": "medium" if retries >= retry_threshold else "low",
+                "data": {"count": retries},
+            }
+        )
+
+    return signals
 
 
 ALLOWED_TRANSITIONS = {

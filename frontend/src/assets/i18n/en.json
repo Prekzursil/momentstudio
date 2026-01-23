@@ -2266,6 +2266,34 @@
           "remove": "Could not remove tag."
         }
       },
+      "fraudSignals": {
+        "title": "Fraud signals",
+        "empty": "No signals detected.",
+        "severity": {
+          "info": "Info",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        },
+        "signals": {
+          "velocity_email": {
+            "title": "Email velocity",
+            "description": "{{count}} orders with the same email in the last {{window_minutes}} minutes."
+          },
+          "velocity_user": {
+            "title": "Account velocity",
+            "description": "{{count}} orders from the same account in the last {{window_minutes}} minutes."
+          },
+          "country_mismatch": {
+            "title": "Country mismatch",
+            "description": "Shipping country {{shipping_country}} differs from billing country {{billing_country}}."
+          },
+          "payment_retries": {
+            "title": "Payment retries",
+            "description": "Payment was retried {{count}} times."
+          }
+        }
+      },
       "diff": {
         "courier": "Courier",
         "shippingMethod": "Shipping method"
