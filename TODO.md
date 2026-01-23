@@ -707,7 +707,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Orders: customer notes – Allow internal notes per order (visible only to admins).
 - [x] Admin Orders: tag/label system – Add tags like “VIP”, “Fraud risk”, “Gift” and filter by tag.
 - [x] Admin Orders: fraud signals panel – Show velocity checks, mismatched country, multiple failed payments, etc.
-- [ ] Admin Orders: address edit + re-rate shipping – Edit shipping address and recompute shipping cost (audit + constraints).
+- [x] Admin Orders: address edit + re-rate shipping – Edit shipping address and recompute shipping cost (audit + constraints).
 - [ ] Admin Orders: timeline diff view – include address diffs once address edit lands (shipping/billing before/after blocks).
 - [ ] Admin Orders: split shipments – Support partial fulfillment with per-item shipped qty and multiple tracking numbers.
 - [ ] Admin Orders: export improvements – Add CSV export columns picker + saved export templates.

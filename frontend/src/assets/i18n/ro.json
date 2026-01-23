@@ -2237,6 +2237,18 @@
       "addressesTitle": "Adrese",
       "shippingAddress": "Adresă livrare",
       "billingAddress": "Adresă facturare",
+      "addressEdit": {
+        "titleShipping": "Editează adresa de livrare",
+        "titleBilling": "Editează adresa de facturare",
+        "noteLabel": "Notă audit (opțională)",
+        "notePlaceholder": "De ce este necesară această schimbare?",
+        "rerate": "Recalculează livrarea",
+        "rerateHint": "Recalculează totalurile de livrare după actualizare (dezactivat după capturarea plății).",
+        "success": "Adresa a fost actualizată",
+        "errors": {
+          "update": "Nu am putut actualiza adresa."
+        }
+      },
       "invoiceTitle": "Factură",
       "invoiceCompany": "Nume firmă",
       "invoiceVatId": "CUI / TVA",

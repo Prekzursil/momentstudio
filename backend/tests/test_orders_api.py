@@ -410,6 +410,41 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     assert updated_data["customer_email"] == "buyer@example.com"
     assert updated_data["shipping_address"]["line1"] == "123 Main"
 
+    updated_address = client.patch(
+        f"/api/v1/orders/admin/{order_id}/addresses",
+        json={
+            "shipping_address": {
+                "line1": "999 New Street",
+                "city": "Cluj",
+                "postal_code": "400000",
+                "country": "RO",
+            },
+            "rerate_shipping": True,
+            "note": "Fix shipping address",
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert updated_address.status_code == 200, updated_address.text
+    updated_address_data = updated_address.json()
+    assert updated_address_data["shipping_address"]["line1"] == "999 New Street"
+    assert updated_address_data["shipping_address"]["id"] != str(shipping_address_id)
+
+    async def assert_address_snapshot() -> None:
+        async with SessionLocal() as session:
+            original = await session.get(Address, shipping_address_id)
+            assert original is not None
+            assert original.line1 == "123 Main"
+
+            db_order = await session.get(Order, UUID(order_id))
+            assert db_order is not None
+            await session.refresh(db_order, attribute_names=["shipping_address"])
+            assert db_order.shipping_address_id != shipping_address_id
+            assert db_order.shipping_address is not None
+            assert db_order.shipping_address.user_id is None
+            assert db_order.shipping_address.line1 == "999 New Street"
+
+    asyncio.run(assert_address_snapshot())
+
     async def seed_payment_retries() -> None:
         async with SessionLocal() as session:
             db_order = (await session.execute(select(Order).where(Order.id == UUID(order_id)))).scalar_one()

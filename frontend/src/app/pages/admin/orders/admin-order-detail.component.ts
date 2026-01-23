@@ -25,6 +25,7 @@ type OrderStatus =
   | 'refunded';
 type OrderAction =
   | 'save'
+  | 'addressEdit'
   | 'retry'
   | 'capture'
   | 'void'
@@ -432,11 +433,22 @@ type OrderAction =
             <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.addressesTitle' | translate }}</h2>
             <div class="grid gap-3 md:grid-cols-2">
               <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.shippingAddress' | translate }}</div>
+                <div class="flex items-center justify-between gap-3">
+                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.shippingAddress' | translate }}</div>
+                  <button
+                    type="button"
+                    class="text-xs font-semibold text-indigo-600 hover:underline disabled:opacity-40 dark:text-indigo-300"
+                    [disabled]="action() !== null || !order()!.shipping_address"
+                    (click)="openAddressEditor('shipping')"
+                  >
+                    {{ 'adminUi.actions.edit' | translate }}
+                  </button>
+                </div>
 	                <div *ngIf="order()!.shipping_address; else noShipping" class="mt-2 grid gap-1 text-sm text-slate-700 dark:text-slate-200">
 	                  <div class="font-semibold text-slate-900 dark:text-slate-50" *ngIf="order()!.shipping_address?.label">
 	                    {{ order()!.shipping_address?.label }}
 	                  </div>
+                    <div *ngIf="order()!.shipping_address!.phone">{{ order()!.shipping_address!.phone }}</div>
 	                  <div>{{ order()!.shipping_address!.line1 }}</div>
 	                  <div *ngIf="order()!.shipping_address!.line2">{{ order()!.shipping_address!.line2 }}</div>
 	                  <div>
@@ -451,11 +463,22 @@ type OrderAction =
 	              </div>
 
 	              <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-	                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.billingAddress' | translate }}</div>
+	                <div class="flex items-center justify-between gap-3">
+	                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.billingAddress' | translate }}</div>
+	                  <button
+	                    type="button"
+	                    class="text-xs font-semibold text-indigo-600 hover:underline disabled:opacity-40 dark:text-indigo-300"
+	                    [disabled]="action() !== null || !order()!.billing_address"
+	                    (click)="openAddressEditor('billing')"
+	                  >
+	                    {{ 'adminUi.actions.edit' | translate }}
+	                  </button>
+	                </div>
 	                <div *ngIf="order()!.billing_address; else noBilling" class="mt-2 grid gap-1 text-sm text-slate-700 dark:text-slate-200">
 	                  <div class="font-semibold text-slate-900 dark:text-slate-50" *ngIf="order()!.billing_address?.label">
 	                    {{ order()!.billing_address?.label }}
 	                  </div>
+                    <div *ngIf="order()!.billing_address!.phone">{{ order()!.billing_address!.phone }}</div>
 	                  <div>{{ order()!.billing_address!.line1 }}</div>
 	                  <div *ngIf="order()!.billing_address!.line2">{{ order()!.billing_address!.line2 }}</div>
 	                  <div>
@@ -708,6 +731,102 @@ type OrderAction =
         </ng-template>
       </ng-template>
     </div>
+
+    <ng-container *ngIf="addressEditorOpen()">
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeAddressEditor()">
+        <div
+          class="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+          (click)="$event.stopPropagation()"
+        >
+          <div class="flex items-center justify-between gap-3">
+            <div class="grid gap-1">
+              <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                {{
+                  (addressEditorKind() === 'shipping'
+                    ? 'adminUi.orders.addressEdit.titleShipping'
+                    : 'adminUi.orders.addressEdit.titleBilling') | translate
+                }}
+              </h3>
+              <div class="text-xs text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.orders.detailTitle' | translate }}: {{ orderRef() }}
+              </div>
+            </div>
+            <button
+              type="button"
+              class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+              (click)="closeAddressEditor()"
+              [attr.aria-label]="'adminUi.actions.cancel' | translate"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div class="mt-4 grid gap-3">
+            <div class="grid gap-3 md:grid-cols-2">
+              <app-input
+                [label]="'addressForm.label' | translate"
+                [placeholder]="'addressForm.customLabelPlaceholder' | translate"
+                [(value)]="addressLabel"
+              ></app-input>
+              <app-input [label]="'auth.phone' | translate" [placeholder]="'+40740123456'" [(value)]="addressPhone"></app-input>
+            </div>
+            <app-input [label]="'addressForm.line1' | translate" [(value)]="addressLine1"></app-input>
+            <app-input [label]="'addressForm.line2' | translate" [(value)]="addressLine2"></app-input>
+            <div class="grid gap-3 md:grid-cols-2">
+              <app-input [label]="'checkout.city' | translate" [(value)]="addressCity"></app-input>
+              <app-input [label]="'checkout.region' | translate" [(value)]="addressRegion"></app-input>
+            </div>
+            <div class="grid gap-3 md:grid-cols-2">
+              <app-input [label]="'checkout.postal' | translate" [(value)]="addressPostalCode"></app-input>
+              <app-input [label]="'checkout.country' | translate" [placeholder]="'RO'" [(value)]="addressCountry"></app-input>
+            </div>
+
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'adminUi.orders.addressEdit.noteLabel' | translate }}
+              <textarea
+                class="min-h-[84px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                [(ngModel)]="addressNote"
+                [placeholder]="'adminUi.orders.addressEdit.notePlaceholder' | translate"
+              ></textarea>
+            </label>
+
+            <label
+              *ngIf="addressEditorKind() === 'shipping'"
+              class="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
+            >
+              <input type="checkbox" class="mt-0.5" [(ngModel)]="addressRerateShipping" />
+              <span class="grid gap-1">
+                <span class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.addressEdit.rerate' | translate }}</span>
+                <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.addressEdit.rerateHint' | translate }}</span>
+              </span>
+            </label>
+
+            <div
+              *ngIf="addressEditorError()"
+              class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+            >
+              {{ addressEditorError() }}
+            </div>
+
+            <div class="flex justify-end gap-2">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.actions.cancel' | translate"
+                [disabled]="action() !== null"
+                (action)="closeAddressEditor()"
+              ></app-button>
+              <app-button
+                size="sm"
+                [label]="'adminUi.actions.save' | translate"
+                [disabled]="action() !== null"
+                (action)="saveAddressEditor()"
+              ></app-button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ng-container>
 
     <ng-container *ngIf="refundWizardOpen() && order() as o">
       <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeRefundWizard()">
@@ -976,6 +1095,9 @@ export class AdminOrderDetailComponent implements OnInit {
   partialRefundWizardOpen = signal(false);
   partialRefundWizardError = signal<string | null>(null);
   adminNoteError = signal<string | null>(null);
+  addressEditorOpen = signal(false);
+  addressEditorKind = signal<'shipping' | 'billing'>('shipping');
+  addressEditorError = signal<string | null>(null);
 
   statusValue: OrderStatus = 'pending_acceptance';
   trackingNumber = '';
@@ -991,6 +1113,16 @@ export class AdminOrderDetailComponent implements OnInit {
   returnReason = '';
   returnCustomerMessage = '';
   returnQty: Record<string, number> = {};
+  addressLabel = '';
+  addressPhone = '';
+  addressLine1 = '';
+  addressLine2 = '';
+  addressCity = '';
+  addressRegion = '';
+  addressPostalCode = '';
+  addressCountry = '';
+  addressNote = '';
+  addressRerateShipping = true;
 
   shippingLabelFile: File | null = null;
   shippingLabelError = signal<string | null>(null);
@@ -1083,6 +1215,75 @@ export class AdminOrderDetailComponent implements OnInit {
       return 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200';
     if (severity === 'low') return 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-200';
     return 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-200';
+  }
+
+  openAddressEditor(kind: 'shipping' | 'billing'): void {
+    const o = this.order();
+    if (!o) return;
+    const addr = kind === 'shipping' ? o.shipping_address : o.billing_address;
+    if (!addr) return;
+
+    this.addressEditorKind.set(kind);
+    this.addressEditorError.set(null);
+    this.addressLabel = addr.label ?? '';
+    this.addressPhone = addr.phone ?? '';
+    this.addressLine1 = addr.line1 ?? '';
+    this.addressLine2 = addr.line2 ?? '';
+    this.addressCity = addr.city ?? '';
+    this.addressRegion = addr.region ?? '';
+    this.addressPostalCode = addr.postal_code ?? '';
+    this.addressCountry = addr.country ?? '';
+    this.addressNote = '';
+    this.addressRerateShipping = true;
+    this.addressEditorOpen.set(true);
+  }
+
+  closeAddressEditor(): void {
+    this.addressEditorOpen.set(false);
+    this.addressEditorError.set(null);
+  }
+
+  saveAddressEditor(): void {
+    const orderId = this.orderId;
+    const kind = this.addressEditorKind();
+    if (!orderId) return;
+
+    this.addressEditorError.set(null);
+    this.action.set('addressEdit');
+
+    const payload: any = {
+      rerate_shipping: kind === 'shipping' ? !!this.addressRerateShipping : false,
+      note: this.addressNote.trim() || null
+    };
+
+    const address = {
+      label: this.addressLabel.trim() || null,
+      phone: this.addressPhone.trim() || null,
+      line1: this.addressLine1.trim(),
+      line2: this.addressLine2.trim() || null,
+      city: this.addressCity.trim(),
+      region: this.addressRegion.trim() || null,
+      postal_code: this.addressPostalCode.trim(),
+      country: this.addressCountry.trim().toUpperCase()
+    };
+
+    if (kind === 'shipping') payload.shipping_address = address;
+    else payload.billing_address = address;
+
+    this.api.updateAddresses(orderId, payload).subscribe({
+      next: (o) => {
+        this.order.set(o);
+        this.toast.success(this.translate.instant('adminUi.orders.addressEdit.success'));
+        this.closeAddressEditor();
+        this.action.set(null);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.addressEdit.errors.update');
+        this.addressEditorError.set(msg);
+        this.toast.error(msg);
+        this.action.set(null);
+      }
+    });
   }
 
   paymentMethodLabel(): string {

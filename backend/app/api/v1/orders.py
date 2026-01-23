@@ -70,6 +70,7 @@ from app.schemas.order_admin import (
     AdminOrderIdsRequest,
 )
 from app.schemas.order_admin_note import OrderAdminNoteCreate
+from app.schemas.order_admin_address import AdminOrderAddressesUpdate
 from app.schemas.order_tag import OrderTagCreate, OrderTagsResponse
 from app.schemas.order_refund import AdminOrderRefundCreate
 from app.schemas.receipt import ReceiptRead, ReceiptShareTokenRead
@@ -1438,6 +1439,28 @@ async def admin_update_order(
     if not full:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
     return await _serialize_admin_order(session, full)
+
+
+@router.patch("/admin/{order_id}/addresses", response_model=AdminOrderRead)
+async def admin_update_order_addresses(
+    order_id: UUID,
+    payload: AdminOrderAddressesUpdate = Body(...),
+    session: AsyncSession = Depends(get_session),
+    admin=Depends(require_admin),
+) -> AdminOrderRead:
+    order = await order_service.get_order_by_id_admin(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    actor = (getattr(admin, "email", None) or getattr(admin, "username", None) or "admin").strip()
+    updated = await order_service.update_order_addresses(
+        session,
+        order,
+        payload,
+        actor=actor,
+        actor_user_id=getattr(admin, "id", None),
+    )
+    return await _serialize_admin_order(session, updated)
 
 
 @router.post("/admin/{order_id}/shipping-label", response_model=AdminOrderRead)

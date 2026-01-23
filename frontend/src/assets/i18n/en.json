@@ -2237,6 +2237,18 @@
       "addressesTitle": "Addresses",
       "shippingAddress": "Shipping address",
       "billingAddress": "Billing address",
+      "addressEdit": {
+        "titleShipping": "Edit shipping address",
+        "titleBilling": "Edit billing address",
+        "noteLabel": "Audit note (optional)",
+        "notePlaceholder": "Why is this change needed?",
+        "rerate": "Re-rate shipping",
+        "rerateHint": "Recomputes shipping totals after the address update (disabled after captured payments).",
+        "success": "Address updated",
+        "errors": {
+          "update": "Could not update address."
+        }
+      },
       "invoiceTitle": "Invoice",
       "invoiceCompany": "Company",
       "invoiceVatId": "VAT ID",

@@ -14,6 +14,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.models.cart import Cart
+from app.models.address import Address
 from app.models.catalog import Product, ProductStatus
 from app.models.order import (
     Order,
@@ -26,6 +27,8 @@ from app.models.order import (
     ShippingMethod,
 )
 from app.schemas.order import OrderUpdate, ShippingMethodCreate
+from app.schemas.order_admin_address import AdminOrderAddressesUpdate
+from app.services import address as address_service
 from app.services import checkout_settings as checkout_settings_service
 from app.services import pricing
 from app.services import payments
@@ -514,6 +517,120 @@ def _has_payment_captured(order: Order) -> bool:
     return False
 
 
+def _address_snapshot(addr: Address | None) -> dict[str, object] | None:
+    if not addr:
+        return None
+    return {
+        "label": getattr(addr, "label", None),
+        "phone": getattr(addr, "phone", None),
+        "line1": getattr(addr, "line1", None),
+        "line2": getattr(addr, "line2", None),
+        "city": getattr(addr, "city", None),
+        "region": getattr(addr, "region", None),
+        "postal_code": getattr(addr, "postal_code", None),
+        "country": getattr(addr, "country", None),
+    }
+
+
+async def _ensure_order_address_snapshot(session: AsyncSession, order: Order, kind: str) -> Address:
+    if kind not in {"shipping", "billing"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid address kind")
+    attr_name = f"{kind}_address"
+    id_attr = f"{kind}_address_id"
+    existing = getattr(order, attr_name, None)
+    if not existing:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Order has no {kind} address")
+    if getattr(existing, "user_id", None) is None:
+        return existing
+
+    snapshot = Address(
+        user_id=None,
+        label=getattr(existing, "label", None),
+        phone=getattr(existing, "phone", None),
+        line1=getattr(existing, "line1", None),
+        line2=getattr(existing, "line2", None),
+        city=getattr(existing, "city", None),
+        region=getattr(existing, "region", None),
+        postal_code=getattr(existing, "postal_code", None),
+        country=getattr(existing, "country", None),
+        is_default_shipping=False,
+        is_default_billing=False,
+    )
+    session.add(snapshot)
+    await session.flush()
+    setattr(order, id_attr, snapshot.id)
+    setattr(order, attr_name, snapshot)
+    session.add(order)
+    await session.flush()
+    return snapshot
+
+
+def _apply_address_update(addr: Address, updates: dict) -> None:
+    forbidden = {"is_default_shipping", "is_default_billing", "user_id", "id", "created_at", "updated_at"}
+    cleaned = {k: v for k, v in (updates or {}).items() if k not in forbidden}
+
+    for field in ("line1", "city", "postal_code", "country"):
+        if field in cleaned and (cleaned[field] is None or not str(cleaned[field]).strip()):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{field} is required")
+
+    target_country = str(cleaned.get("country", getattr(addr, "country", "")) or "").strip()
+    target_postal = str(cleaned.get("postal_code", getattr(addr, "postal_code", "")) or "").strip()
+    country, postal_code = address_service._validate_address_fields(target_country, target_postal)
+    cleaned["country"] = country
+    cleaned["postal_code"] = postal_code
+
+    for field, value in cleaned.items():
+        if isinstance(value, str):
+            value = value.strip()
+        setattr(addr, field, value)
+    addr.is_default_shipping = False
+    addr.is_default_billing = False
+
+
+async def _rerate_order_shipping(session: AsyncSession, order: Order) -> dict[str, dict[str, str]]:
+    previous_shipping = pricing.quantize_money(Decimal(getattr(order, "shipping_amount", 0) or 0))
+    previous_tax = pricing.quantize_money(Decimal(getattr(order, "tax_amount", 0) or 0))
+    previous_total = pricing.quantize_money(Decimal(getattr(order, "total_amount", 0) or 0))
+
+    taxable_subtotal = (
+        Decimal(order.total_amount)
+        - Decimal(order.shipping_amount)
+        - Decimal(order.tax_amount)
+        - Decimal(getattr(order, "fee_amount", 0) or 0)
+    )
+    if taxable_subtotal < 0:
+        taxable_subtotal = Decimal("0.00")
+    taxable_subtotal = pricing.quantize_money(taxable_subtotal)
+
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+    shipping_amount = Decimal(checkout_settings.shipping_fee_ron)
+    threshold = checkout_settings.free_shipping_threshold_ron
+    if threshold is not None and threshold >= 0 and taxable_subtotal >= threshold:
+        shipping_amount = Decimal("0.00")
+    shipping_amount = pricing.quantize_money(shipping_amount)
+
+    fee_amount = pricing.quantize_money(Decimal(getattr(order, "fee_amount", 0) or 0))
+    vat_amount = pricing.compute_vat(
+        taxable_subtotal=taxable_subtotal,
+        shipping=shipping_amount,
+        fee=fee_amount,
+        enabled=checkout_settings.vat_enabled,
+        vat_rate_percent=checkout_settings.vat_rate_percent,
+        apply_to_shipping=checkout_settings.vat_apply_to_shipping,
+        apply_to_fee=checkout_settings.vat_apply_to_fee,
+    )
+
+    order.shipping_amount = shipping_amount
+    order.tax_amount = vat_amount
+    order.total_amount = pricing.quantize_money(taxable_subtotal + fee_amount + shipping_amount + vat_amount)
+
+    return {
+        "shipping_amount": {"from": str(previous_shipping), "to": str(order.shipping_amount)},
+        "tax_amount": {"from": str(previous_tax), "to": str(order.tax_amount)},
+        "total_amount": {"from": str(previous_total), "to": str(order.total_amount)},
+    }
+
+
 async def update_order(
     session: AsyncSession, order: Order, payload: OrderUpdate, shipping_method: ShippingMethod | None = None
 ) -> Order:
@@ -695,6 +812,58 @@ async def update_order(
     session.add(order)
     await session.commit()
     hydrated = await get_order_by_id(session, order.id)
+    return hydrated or order
+
+
+async def update_order_addresses(
+    session: AsyncSession,
+    order: Order,
+    payload: AdminOrderAddressesUpdate,
+    *,
+    actor: str | None = None,
+    actor_user_id: UUID | None = None,
+) -> Order:
+    if order.status in {OrderStatus.shipped, OrderStatus.delivered, OrderStatus.cancelled, OrderStatus.refunded}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order addresses cannot be edited in this status")
+
+    await session.refresh(order, attribute_names=["shipping_address", "billing_address", "items"])
+
+    changes: dict[str, object] = {}
+    shipping_updates = payload.shipping_address.model_dump(exclude_unset=True) if payload.shipping_address else {}
+    billing_updates = payload.billing_address.model_dump(exclude_unset=True) if payload.billing_address else {}
+
+    if not shipping_updates and not billing_updates:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No address updates provided")
+
+    if shipping_updates:
+        previous = _address_snapshot(getattr(order, "shipping_address", None))
+        addr = await _ensure_order_address_snapshot(session, order, "shipping")
+        _apply_address_update(addr, shipping_updates)
+        changes["shipping_address"] = {"from": previous, "to": _address_snapshot(addr)}
+        session.add(addr)
+
+    if billing_updates:
+        previous = _address_snapshot(getattr(order, "billing_address", None))
+        addr = await _ensure_order_address_snapshot(session, order, "billing")
+        _apply_address_update(addr, billing_updates)
+        changes["billing_address"] = {"from": previous, "to": _address_snapshot(addr)}
+        session.add(addr)
+
+    if payload.rerate_shipping and shipping_updates:
+        if _has_payment_captured(order):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot re-rate shipping after payment capture")
+        amount_changes = await _rerate_order_shipping(session, order)
+        changes.update(amount_changes)
+
+    note_clean = (payload.note or "").strip() or None
+    actor_clean = (actor or "").strip() or None
+    note = f"{actor_clean}: {note_clean}" if actor_clean and note_clean else (actor_clean or note_clean)
+    session.add(OrderEvent(order_id=order.id, event="addresses_updated", note=note, data={"changes": changes, "actor_user_id": str(actor_user_id) if actor_user_id else None}))
+
+    session.add(order)
+    await session.commit()
+
+    hydrated = await get_order_by_id_admin(session, order.id)
     return hydrated or order
 
 

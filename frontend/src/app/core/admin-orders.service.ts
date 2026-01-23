@@ -165,6 +165,37 @@ export class AdminOrdersService {
     );
   }
 
+  updateAddresses(
+    orderId: string,
+    payload: {
+      shipping_address?: Partial<Address> | null;
+      billing_address?: Partial<Address> | null;
+      rerate_shipping?: boolean;
+      note?: string | null;
+    }
+  ): Observable<AdminOrderDetail> {
+    return this.api.patch<AdminOrderDetail>(`/orders/admin/${orderId}/addresses`, payload).pipe(
+      map((o: any) => ({
+        ...o,
+        total_amount: parseMoney(o?.total_amount),
+        tax_amount: parseMoney(o?.tax_amount),
+        fee_amount: parseMoney(o?.fee_amount),
+        shipping_amount: parseMoney(o?.shipping_amount),
+        refunds: (o?.refunds ?? []).map((r: any) => ({
+          ...r,
+          amount: parseMoney(r?.amount)
+        })),
+        admin_notes: o?.admin_notes ?? [],
+        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+        items: (o?.items ?? []).map((it: any) => ({
+          ...it,
+          unit_price: parseMoney(it?.unit_price),
+          subtotal: parseMoney(it?.subtotal)
+        }))
+      }))
+    );
+  }
+
   uploadShippingLabel(orderId: string, file: File): Observable<AdminOrderDetail> {
     const data = new FormData();
     data.append('file', file);
