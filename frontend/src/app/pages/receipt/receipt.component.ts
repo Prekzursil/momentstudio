@@ -94,7 +94,7 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
                 {{ receipt.status }}
               </p>
               <p class="mt-1 text-sm text-slate-700 dark:text-slate-200" *ngIf="receipt.payment_method">
-                Payment / Plată: {{ receipt.payment_method }}
+                Payment / Plată: {{ paymentMethodLabel() }}
               </p>
               <p class="mt-1 text-sm text-slate-700 dark:text-slate-200" *ngIf="receipt.courier || receipt.delivery_type">
                 Delivery / Livrare: {{ receipt.courier || '—' }} · {{ receipt.delivery_type || '—' }}
@@ -212,6 +212,16 @@ export class ReceiptComponent implements OnInit, OnDestroy {
   private sub?: Subscription;
 
   constructor(private route: ActivatedRoute, private receipts: ReceiptService, public auth: AuthService) {}
+
+  paymentMethodLabel(): string {
+    const method = (this.receipt?.payment_method ?? '').trim().toLowerCase();
+    if (!method) return '';
+    if (method === 'stripe') return 'Stripe';
+    if (method === 'paypal') return 'PayPal';
+    if (method === 'netopia') return 'Netopia';
+    if (method === 'cod') return 'Cash / Numerar';
+    return method.toUpperCase();
+  }
 
   ngOnInit(): void {
     this.sub = this.route.paramMap.subscribe((params) => {

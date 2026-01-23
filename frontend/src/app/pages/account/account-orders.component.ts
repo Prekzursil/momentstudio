@@ -159,9 +159,24 @@ import { AccountComponent } from './account.component';
                 <app-button
                   size="sm"
                   variant="ghost"
-                  [label]="'account.orders.receiptShare' | translate"
+                  [label]="
+                    account.receiptCopiedId() === order.id
+                      ? ('account.orders.receiptCopiedShort' | translate)
+                      : ('account.orders.receiptShare' | translate)
+                  "
                   [disabled]="account.sharingReceiptId === order.id"
                   (action)="account.shareReceipt(order)"
+                ></app-button>
+                <app-button
+                  *ngIf="account.receiptShares()[order.id]"
+                  size="sm"
+                  variant="ghost"
+                  [label]="
+                    account.receiptCopiedId() === order.id
+                      ? ('account.orders.receiptCopiedShort' | translate)
+                      : ('account.orders.receiptCopyLink' | translate)
+                  "
+                  (action)="account.copyReceiptLink(order)"
                 ></app-button>
                 <app-button
                   *ngIf="account.receiptShares()[order.id]"

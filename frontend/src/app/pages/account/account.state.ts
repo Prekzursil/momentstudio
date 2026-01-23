@@ -1009,8 +1009,28 @@ export class AccountState implements OnInit, OnDestroy {
   }
 
   receiptShares = signal<Record<string, ReceiptShareToken>>({});
+  receiptCopiedId = signal<string | null>(null);
   sharingReceiptId: string | null = null;
   revokingReceiptId: string | null = null;
+  private receiptCopiedTimer: number | null = null;
+
+  copyReceiptLink(order: Order): void {
+    if (typeof navigator === 'undefined') return;
+    const existing = this.receiptShares()[order.id];
+    const expiresAt = existing?.expires_at ? new Date(existing.expires_at) : null;
+
+    if (!existing?.receipt_url) {
+      this.toast.error(this.t('account.orders.receiptGenerateError'));
+      return;
+    }
+
+    if (!expiresAt || expiresAt.getTime() <= Date.now() + 30_000) {
+      this.shareReceipt(order);
+      return;
+    }
+
+    void this.copyReceiptUrl(order.id, existing.receipt_url, 'account.orders.receiptReady');
+  }
 
   shareReceipt(order: Order): void {
     if (typeof navigator === 'undefined') return;
@@ -1019,9 +1039,7 @@ export class AccountState implements OnInit, OnDestroy {
     const existing = this.receiptShares()[order.id];
     const expiresAt = existing?.expires_at ? new Date(existing.expires_at) : null;
     if (existing?.receipt_url && expiresAt && expiresAt.getTime() > Date.now() + 30_000) {
-      void this.copyToClipboard(existing.receipt_url).then((ok) => {
-        this.toast.success(ok ? this.t('account.orders.receiptCopied') : this.t('account.orders.receiptReady'));
-      });
+      void this.copyReceiptUrl(order.id, existing.receipt_url, 'account.orders.receiptReady');
       return;
     }
 
@@ -1029,9 +1047,7 @@ export class AccountState implements OnInit, OnDestroy {
     this.account.shareReceipt(order.id).subscribe({
       next: (token) => {
         this.receiptShares.set({ ...this.receiptShares(), [order.id]: token });
-        void this.copyToClipboard(token.receipt_url).then((ok) => {
-          this.toast.success(ok ? this.t('account.orders.receiptCopied') : this.t('account.orders.receiptGenerated'));
-        });
+        void this.copyReceiptUrl(order.id, token.receipt_url, 'account.orders.receiptGenerated');
       },
       error: (err) => {
         const message = err?.error?.detail || this.t('account.orders.receiptGenerateError');
@@ -1058,6 +1074,22 @@ export class AccountState implements OnInit, OnDestroy {
       },
       complete: () => (this.revokingReceiptId = null)
     });
+  }
+
+  private async copyReceiptUrl(orderId: string, url: string, readyKey: string): Promise<void> {
+    const ok = await this.copyToClipboard(url);
+    if (ok) {
+      this.toast.success(this.t('account.orders.receiptCopied'));
+      this.receiptCopiedId.set(orderId);
+      if (typeof window !== 'undefined') {
+        if (this.receiptCopiedTimer) window.clearTimeout(this.receiptCopiedTimer);
+        this.receiptCopiedTimer = window.setTimeout(() => {
+          if (this.receiptCopiedId() === orderId) this.receiptCopiedId.set(null);
+        }, 2200);
+      }
+    } else {
+      this.toast.success(this.t(readyKey));
+    }
   }
 
   private async copyToClipboard(text: string): Promise<boolean> {
