@@ -1229,8 +1229,8 @@ async def create_order_refund(
     if items:
         items_by_id = {it.id: it for it in (order.items or [])}
         refunded_qty: dict[UUID, int] = {}
-        for refund in order.refunds or []:
-            payload = refund.data if isinstance(refund.data, dict) else {}
+        for existing_refund in order.refunds or []:
+            payload = existing_refund.data if isinstance(existing_refund.data, dict) else {}
             rows = payload.get("items") if isinstance(payload, dict) else None
             if not isinstance(rows, list):
                 continue
