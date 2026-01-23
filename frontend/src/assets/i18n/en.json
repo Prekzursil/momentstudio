@@ -1280,12 +1280,37 @@
       "rangeFrom": "From",
       "rangeTo": "To",
       "applyRange": "Apply range",
+      "quickActionsTitle": "Quick actions",
+      "quickActions": {
+        "createProduct": "Create product",
+        "createCoupon": "Create coupon",
+        "exportOrders": "Export orders"
+      },
       "customizeWidgets": "Customize widgets",
       "widgetsTitle": "Dashboard widgets",
       "widgets": {
         "kpis": "Today KPIs",
         "counts": "Totals",
         "range": "Range metrics"
+      },
+      "alertsTitle": "Alerts",
+      "alertsEmpty": "No alerts right now.",
+      "alerts": {
+        "failedPayments": "Payment failures",
+        "refundRequests": "Refund requests",
+        "stockouts": "Stockouts",
+        "stockoutsHint": "Products currently out of stock.",
+        "windowHours": "Last {{hours}}h",
+        "windowDays": "Last {{days}}d",
+        "vsPrevious": "vs previous"
+      },
+      "systemHealthTitle": "System health",
+      "systemHealth": {
+        "db": "Database",
+        "backup": "Last backup",
+        "ready": "Ready",
+        "unavailable": "Unavailable",
+        "backupNotConfigured": "Not configured"
       },
       "rangeErrors": {
         "missing": "Select both start and end dates.",

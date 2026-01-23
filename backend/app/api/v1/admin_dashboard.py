@@ -17,6 +17,7 @@ from app.models.content import ContentBlock, ContentAuditLog
 from app.schemas.catalog_admin import AdminProductByIdsRequest, AdminProductListItem, AdminProductListResponse
 from app.services import exporter as exporter_service
 from app.models.order import Order, OrderStatus
+from app.models.returns import ReturnRequest, ReturnRequestStatus
 from app.models.user import AdminAuditLog, User, RefreshSession, UserRole
 from app.models.promo import PromoCode, StripeCouponMapping
 from app.services import auth as auth_service
@@ -92,6 +93,48 @@ async def admin_summary(
         .where(Order.status == OrderStatus.refunded, Order.updated_at >= yesterday_start, Order.updated_at < today_start)
     )
 
+    payment_window_end = now
+    payment_window_start = now - timedelta(hours=24)
+    payment_prev_start = payment_window_start - timedelta(hours=24)
+    failed_payments = await session.scalar(
+        select(func.count())
+        .select_from(Order)
+        .where(Order.status == OrderStatus.pending_payment, Order.created_at >= payment_window_start, Order.created_at < payment_window_end)
+    )
+    failed_payments_prev = await session.scalar(
+        select(func.count())
+        .select_from(Order)
+        .where(Order.status == OrderStatus.pending_payment, Order.created_at >= payment_prev_start, Order.created_at < payment_window_start)
+    )
+
+    refund_window_end = now
+    refund_window_start = now - timedelta(days=7)
+    refund_prev_start = refund_window_start - timedelta(days=7)
+    refund_requests = await session.scalar(
+        select(func.count())
+        .select_from(ReturnRequest)
+        .where(
+            ReturnRequest.status == ReturnRequestStatus.requested,
+            ReturnRequest.created_at >= refund_window_start,
+            ReturnRequest.created_at < refund_window_end,
+        )
+    )
+    refund_requests_prev = await session.scalar(
+        select(func.count())
+        .select_from(ReturnRequest)
+        .where(
+            ReturnRequest.status == ReturnRequestStatus.requested,
+            ReturnRequest.created_at >= refund_prev_start,
+            ReturnRequest.created_at < refund_window_start,
+        )
+    )
+
+    stockouts = await session.scalar(
+        select(func.count())
+        .select_from(Product)
+        .where(Product.stock_quantity <= 0, Product.is_deleted.is_(False), Product.is_active.is_(True))
+    )
+
     def _delta_pct(today_value: float, yesterday_value: float) -> float | None:
         if yesterday_value == 0:
             return None
@@ -118,6 +161,22 @@ async def admin_summary(
         "today_refunds": int(today_refunds or 0),
         "yesterday_refunds": int(yesterday_refunds or 0),
         "refunds_delta_pct": _delta_pct(float(today_refunds or 0), float(yesterday_refunds or 0)),
+        "anomalies": {
+            "failed_payments": {
+                "window_hours": 24,
+                "current": int(failed_payments or 0),
+                "previous": int(failed_payments_prev or 0),
+                "delta_pct": _delta_pct(float(failed_payments or 0), float(failed_payments_prev or 0)),
+            },
+            "refund_requests": {
+                "window_days": 7,
+                "current": int(refund_requests or 0),
+                "previous": int(refund_requests_prev or 0),
+                "delta_pct": _delta_pct(float(refund_requests or 0), float(refund_requests_prev or 0)),
+            },
+            "stockouts": {"count": int(stockouts or 0)},
+        },
+        "system": {"db_ready": True, "backup_last_at": settings.backup_last_at},
     }
 
 

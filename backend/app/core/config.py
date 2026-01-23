@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     environment: str = "local"
 
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/adrianaart"
+    backup_last_at: str | None = None
     secret_key: str = "dev-secret-key"
     stripe_secret_key: str = "sk_test_placeholder"
     stripe_webhook_secret: str | None = None

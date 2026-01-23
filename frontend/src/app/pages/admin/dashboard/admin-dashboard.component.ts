@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { Router } from '@angular/router';
 import { BreadcrumbComponent, Crumb } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
 import { CardComponent } from '../../../shared/card.component';
@@ -11,9 +12,11 @@ import { AuthService } from '../../../core/auth.service';
 import {
   AdminAuditEntriesResponse,
   AdminAuditEntity,
+  AdminDashboardWindowMetric,
   AdminService,
   AdminSummary
 } from '../../../core/admin.service';
+import { AdminOrdersService } from '../../../core/admin-orders.service';
 import { ToastService } from '../../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 
@@ -45,22 +48,38 @@ type MetricWidgetId = 'kpis' | 'counts' | 'range';
         <app-skeleton [rows]="6"></app-skeleton>
       </div>
 
-      <ng-template #dashboardTpl>
-        <section class="grid gap-3">
-          <div class="flex items-center justify-between gap-3 flex-wrap">
-            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboardTitle' | translate }}</h1>
-            <app-button
-              size="sm"
-              variant="ghost"
-              [label]="'adminUi.dashboard.customizeWidgets' | translate"
-              (action)="toggleCustomizeWidgets()"
-            ></app-button>
-          </div>
+	      <ng-template #dashboardTpl>
+	        <section class="grid gap-3">
+	          <div class="flex items-center justify-between gap-3 flex-wrap">
+	            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboardTitle' | translate }}</h1>
+	            <app-button
+	              size="sm"
+	              variant="ghost"
+	              [label]="'adminUi.dashboard.customizeWidgets' | translate"
+	              (action)="toggleCustomizeWidgets()"
+	            ></app-button>
+	          </div>
 
-          <div
-            *ngIf="customizeWidgetsOpen()"
-            class="rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900"
-          >
+	          <div class="flex flex-wrap items-center justify-between gap-3">
+	            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+	              {{ 'adminUi.dashboard.quickActionsTitle' | translate }}
+	            </p>
+	            <div class="flex flex-wrap gap-2">
+	              <app-button size="sm" [label]="'adminUi.dashboard.quickActions.createProduct' | translate" (action)="goToCreateProduct()"></app-button>
+	              <app-button size="sm" [label]="'adminUi.dashboard.quickActions.createCoupon' | translate" (action)="goToCreateCoupon()"></app-button>
+	              <app-button
+	                size="sm"
+	                variant="ghost"
+	                [label]="'adminUi.dashboard.quickActions.exportOrders' | translate"
+	                (action)="downloadOrdersExport()"
+	              ></app-button>
+	            </div>
+	          </div>
+
+	          <div
+	            *ngIf="customizeWidgetsOpen()"
+	            class="rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900"
+	          >
             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
               {{ 'adminUi.dashboard.widgetsTitle' | translate }}
             </p>
@@ -213,12 +232,102 @@ type MetricWidgetId = 'kpis' | 'counts' | 'range';
                 </div>
               </ng-container>
             </ng-container>
-          </ng-container>
-        </section>
+	          </ng-container>
+	        </section>
 
-        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-          <div class="flex items-center justify-between gap-3 flex-wrap">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.audit.title' | translate }}</h2>
+	        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	          <div class="flex items-center justify-between gap-3 flex-wrap">
+	            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboard.alertsTitle' | translate }}</h2>
+	          </div>
+
+	          <div *ngIf="!hasAnomalyAlerts()" class="text-sm text-slate-600 dark:text-slate-300">
+	            {{ 'adminUi.dashboard.alertsEmpty' | translate }}
+	          </div>
+
+	          <div *ngIf="hasAnomalyAlerts()" class="grid gap-4 md:grid-cols-3">
+	            <div
+	              *ngIf="failedPaymentsAlert() as failed"
+	              class="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-slate-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+	            >
+	              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700 dark:text-rose-200">
+	                {{ 'adminUi.dashboard.alerts.failedPayments' | translate }}
+	              </p>
+	              <div class="mt-2 text-2xl font-semibold text-rose-900 dark:text-rose-50">{{ failed.current }}</div>
+	              <p class="mt-1 text-xs text-rose-700 dark:text-rose-200">
+	                {{ 'adminUi.dashboard.alerts.windowHours' | translate: { hours: failed.window_hours || 24 } }} ·
+	                {{ 'adminUi.dashboard.alerts.vsPrevious' | translate }}: {{ failed.previous }} · {{ deltaLabel(failed.delta_pct) }}
+	              </p>
+	            </div>
+
+	            <div
+	              *ngIf="refundRequestsAlert() as refunds"
+	              class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-slate-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+	            >
+	              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">
+	                {{ 'adminUi.dashboard.alerts.refundRequests' | translate }}
+	              </p>
+	              <div class="mt-2 text-2xl font-semibold text-amber-900 dark:text-amber-50">{{ refunds.current }}</div>
+	              <p class="mt-1 text-xs text-amber-700 dark:text-amber-200">
+	                {{ 'adminUi.dashboard.alerts.windowDays' | translate: { days: refunds.window_days || 7 } }} ·
+	                {{ 'adminUi.dashboard.alerts.vsPrevious' | translate }}: {{ refunds.previous }} · {{ deltaLabel(refunds.delta_pct) }}
+	              </p>
+	            </div>
+
+	            <div
+	              *ngIf="stockoutsAlertCount() as stockouts"
+	              class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-slate-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+	            >
+	              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">
+	                {{ 'adminUi.dashboard.alerts.stockouts' | translate }}
+	              </p>
+	              <div class="mt-2 text-2xl font-semibold text-amber-900 dark:text-amber-50">{{ stockouts }}</div>
+	              <p class="mt-1 text-xs text-amber-700 dark:text-amber-200">
+	                {{ 'adminUi.dashboard.alerts.stockoutsHint' | translate }}
+	              </p>
+	            </div>
+	          </div>
+	        </section>
+
+	        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	          <div class="flex items-center justify-between gap-3 flex-wrap">
+	            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+	              {{ 'adminUi.dashboard.systemHealthTitle' | translate }}
+	            </h2>
+	          </div>
+
+	          <div class="grid gap-3 md:grid-cols-2">
+	            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+	              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+	                {{ 'adminUi.dashboard.systemHealth.db' | translate }}
+	              </p>
+	              <p class="mt-2 font-semibold text-slate-900 dark:text-slate-50">
+	                {{
+	                  summary()?.system?.db_ready
+	                    ? ('adminUi.dashboard.systemHealth.ready' | translate)
+	                    : ('adminUi.dashboard.systemHealth.unavailable' | translate)
+	                }}
+	              </p>
+	            </div>
+
+	            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+	              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+	                {{ 'adminUi.dashboard.systemHealth.backup' | translate }}
+	              </p>
+	              <ng-container *ngIf="summary()?.system?.backup_last_at as backupLastAt; else backupEmpty">
+	                <p class="mt-2 font-semibold text-slate-900 dark:text-slate-50">{{ backupLastAt | date: 'medium' }}</p>
+	              </ng-container>
+	              <ng-template #backupEmpty>
+	                <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+	                  {{ 'adminUi.dashboard.systemHealth.backupNotConfigured' | translate }}
+	                </p>
+	              </ng-template>
+	            </div>
+	          </div>
+	        </section>
+
+	        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	          <div class="flex items-center justify-between gap-3 flex-wrap">
+	            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.audit.title' | translate }}</h2>
             <div class="flex items-center gap-2">
               <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.audit.exportLimitNote' | translate }}</span>
               <app-button size="sm" [label]="'adminUi.audit.export' | translate" (action)="downloadAuditCsv()"></app-button>
@@ -414,7 +523,9 @@ export class AdminDashboardComponent implements OnInit {
 
   constructor(
     private admin: AdminService,
+    private ordersApi: AdminOrdersService,
     private auth: AuthService,
+    private router: Router,
     private toast: ToastService,
     private translate: TranslateService
   ) {}
@@ -485,6 +596,49 @@ export class AdminDashboardComponent implements OnInit {
     const rounded = Math.round(deltaPct * 10) / 10;
     const sign = rounded > 0 ? '+' : '';
     return `${sign}${rounded}%`;
+  }
+
+  goToCreateProduct(): void {
+    void this.router.navigate(['/admin/products'], { state: { openNewProduct: true } });
+  }
+
+  goToCreateCoupon(): void {
+    void this.router.navigate(['/admin/coupons'], { state: { openNewPromotion: true } });
+  }
+
+  downloadOrdersExport(): void {
+    this.ordersApi.downloadExport().subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'orders.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      error: () => this.toast.error(this.translate.instant('adminUi.orders.errors.export'))
+    });
+  }
+
+  failedPaymentsAlert(): AdminDashboardWindowMetric | null {
+    const metric = this.summary()?.anomalies?.failed_payments;
+    if (!metric || !metric.current) return null;
+    return metric;
+  }
+
+  refundRequestsAlert(): AdminDashboardWindowMetric | null {
+    const metric = this.summary()?.anomalies?.refund_requests;
+    if (!metric || !metric.current) return null;
+    return metric;
+  }
+
+  stockoutsAlertCount(): number | null {
+    const count = this.summary()?.anomalies?.stockouts?.count ?? 0;
+    return count > 0 ? count : null;
+  }
+
+  hasAnomalyAlerts(): boolean {
+    return Boolean(this.failedPaymentsAlert() || this.refundRequestsAlert() || this.stockoutsAlertCount() !== null);
   }
 
   toggleCustomizeWidgets(): void {

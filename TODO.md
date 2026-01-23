@@ -689,9 +689,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Dashboard: add “Today” KPI strip – Show today’s orders/GMV/refunds vs yesterday with percent deltas.
 - [x] Admin Dashboard: add configurable date ranges – Allow last 7/30/90/custom ranges across all widgets.
 - [x] Admin Dashboard: widget personalization – Let admins hide/reorder dashboard widgets and persist per user.
-- [ ] Admin Dashboard: alert cards for anomalies – Highlight spikes in failed payments, stockouts, or refund requests.
-- [ ] Admin Dashboard: system health panel – Show DB status and last backup timestamp.
-- [ ] Admin Dashboard: quick actions toolbar – Add buttons for “Create product”, “Create coupon”, “Export orders”, etc.
+- [x] Admin Dashboard: alert cards for anomalies – Highlight spikes in failed payments, stockouts, or refund requests.
+- [x] Admin Dashboard: system health panel – Show DB status and last backup timestamp.
+- [x] Admin Dashboard: quick actions toolbar – Add buttons for “Create product”, “Create coupon”, “Export orders”, etc.
 - [ ] Admin Dashboard: global search – Search across orders/products/users by id/email/slug with typeahead.
 - [ ] Admin Dashboard: recent activity feed – Show last admin actions with deep links to affected entities.
 - [ ] Admin Dashboard: scheduled tasks overview – Show upcoming publish schedules and promo schedules.

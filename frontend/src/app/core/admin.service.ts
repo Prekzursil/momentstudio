@@ -23,6 +23,27 @@ export interface AdminSummary {
   today_refunds: number;
   yesterday_refunds: number;
   refunds_delta_pct: number | null;
+  anomalies?: AdminDashboardAnomalies;
+  system?: AdminDashboardSystemHealth;
+}
+
+export interface AdminDashboardWindowMetric {
+  window_hours?: number;
+  window_days?: number;
+  current: number;
+  previous: number;
+  delta_pct: number | null;
+}
+
+export interface AdminDashboardAnomalies {
+  failed_payments: AdminDashboardWindowMetric;
+  refund_requests: AdminDashboardWindowMetric;
+  stockouts: { count: number };
+}
+
+export interface AdminDashboardSystemHealth {
+  db_ready: boolean;
+  backup_last_at: string | null;
 }
 
 export interface AdminProduct {

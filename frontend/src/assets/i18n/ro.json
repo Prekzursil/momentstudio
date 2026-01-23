@@ -1280,12 +1280,37 @@
       "rangeFrom": "De la",
       "rangeTo": "Până la",
       "applyRange": "Aplică intervalul",
+      "quickActionsTitle": "Acțiuni rapide",
+      "quickActions": {
+        "createProduct": "Creează produs",
+        "createCoupon": "Creează cupon",
+        "exportOrders": "Exportă comenzi"
+      },
       "customizeWidgets": "Personalizează widgeturile",
       "widgetsTitle": "Widgeturi panou",
       "widgets": {
         "kpis": "KPI astăzi",
         "counts": "Totaluri",
         "range": "Statistici interval"
+      },
+      "alertsTitle": "Alerte",
+      "alertsEmpty": "Nicio alertă momentan.",
+      "alerts": {
+        "failedPayments": "Plăți eșuate",
+        "refundRequests": "Cereri de retur",
+        "stockouts": "Stocuri epuizate",
+        "stockoutsHint": "Produse momentan fără stoc.",
+        "windowHours": "Ultimele {{hours}}h",
+        "windowDays": "Ultimele {{days}} zile",
+        "vsPrevious": "față de perioada anterioară"
+      },
+      "systemHealthTitle": "Stare sistem",
+      "systemHealth": {
+        "db": "Baza de date",
+        "backup": "Ultimul backup",
+        "ready": "Pregătit",
+        "unavailable": "Indisponibil",
+        "backupNotConfigured": "Nu este configurat"
       },
       "rangeErrors": {
         "missing": "Selectează ambele date (început și sfârșit).",

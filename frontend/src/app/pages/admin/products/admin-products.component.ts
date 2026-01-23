@@ -621,6 +621,8 @@ export class AdminProductsComponent implements OnInit {
     ro: this.blankTranslationForm()
   };
 
+  private autoStartNewProduct = false;
+
   constructor(
     private productsApi: AdminProductsService,
     private catalog: CatalogService,
@@ -630,6 +632,7 @@ export class AdminProductsComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.autoStartNewProduct = Boolean((history.state as any)?.openNewProduct);
     this.loadCategories();
     this.loadAdminCategories();
     this.load();
@@ -1073,8 +1076,18 @@ export class AdminProductsComponent implements OnInit {
       next: (cats: any[]) => {
         const mapped = (cats || []).map((c) => ({ id: c.id, name: c.name }));
         this.adminCategories.set(mapped);
+        if (this.autoStartNewProduct) {
+          this.autoStartNewProduct = false;
+          this.startNew();
+        }
       },
-      error: () => this.adminCategories.set([])
+      error: () => {
+        this.adminCategories.set([]);
+        if (this.autoStartNewProduct) {
+          this.autoStartNewProduct = false;
+          this.startNew();
+        }
+      }
     });
   }
 
