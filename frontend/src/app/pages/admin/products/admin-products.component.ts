@@ -622,6 +622,7 @@ export class AdminProductsComponent implements OnInit {
   };
 
   private autoStartNewProduct = false;
+  private pendingEditProductSlug: string | null = null;
 
   constructor(
     private productsApi: AdminProductsService,
@@ -632,7 +633,10 @@ export class AdminProductsComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.autoStartNewProduct = Boolean((history.state as any)?.openNewProduct);
+    const state = history.state as any;
+    const editSlug = typeof state?.editProductSlug === 'string' ? state.editProductSlug : '';
+    this.pendingEditProductSlug = editSlug.trim() ? editSlug.trim() : null;
+    this.autoStartNewProduct = !this.pendingEditProductSlug && Boolean(state?.openNewProduct);
     this.loadCategories();
     this.loadAdminCategories();
     this.load();
@@ -1076,19 +1080,26 @@ export class AdminProductsComponent implements OnInit {
       next: (cats: any[]) => {
         const mapped = (cats || []).map((c) => ({ id: c.id, name: c.name }));
         this.adminCategories.set(mapped);
-        if (this.autoStartNewProduct) {
-          this.autoStartNewProduct = false;
-          this.startNew();
-        }
+        this.openPendingEditor();
       },
       error: () => {
         this.adminCategories.set([]);
-        if (this.autoStartNewProduct) {
-          this.autoStartNewProduct = false;
-          this.startNew();
-        }
+        this.openPendingEditor();
       }
     });
+  }
+
+  private openPendingEditor(): void {
+    if (this.pendingEditProductSlug) {
+      const slug = this.pendingEditProductSlug;
+      this.pendingEditProductSlug = null;
+      this.edit(slug);
+      return;
+    }
+    if (this.autoStartNewProduct) {
+      this.autoStartNewProduct = false;
+      this.startNew();
+    }
   }
 
   statusPillClass(status: string): string {

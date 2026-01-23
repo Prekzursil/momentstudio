@@ -1280,6 +1280,15 @@
       "rangeFrom": "From",
       "rangeTo": "To",
       "applyRange": "Apply range",
+      "globalSearchLabel": "Global search",
+      "globalSearchPlaceholder": "Search orders, products, users…",
+      "globalSearchLoading": "Searching…",
+      "globalSearchEmpty": "No results.",
+      "globalSearchTypes": {
+        "order": "Order",
+        "product": "Product",
+        "user": "User"
+      },
       "quickActionsTitle": "Quick actions",
       "quickActions": {
         "createProduct": "Create product",
@@ -1357,6 +1366,7 @@
       "use": "Use",
       "prev": "Prev",
       "next": "Next",
+      "open": "Open",
       "up": "Up",
       "down": "Down"
     },

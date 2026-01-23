@@ -12,6 +12,9 @@ import { AuthService } from '../../../core/auth.service';
 import {
   AdminAuditEntriesResponse,
   AdminAuditEntity,
+  AdminAuditEntryUnified,
+  AdminDashboardSearchResult,
+  AdminDashboardSearchResultType,
   AdminDashboardWindowMetric,
   AdminService,
   AdminSummary
@@ -60,19 +63,77 @@ type MetricWidgetId = 'kpis' | 'counts' | 'range';
 	            ></app-button>
 	          </div>
 
-	          <div class="flex flex-wrap items-center justify-between gap-3">
+	          <div class="grid gap-3">
 	            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
 	              {{ 'adminUi.dashboard.quickActionsTitle' | translate }}
 	            </p>
-	            <div class="flex flex-wrap gap-2">
-	              <app-button size="sm" [label]="'adminUi.dashboard.quickActions.createProduct' | translate" (action)="goToCreateProduct()"></app-button>
-	              <app-button size="sm" [label]="'adminUi.dashboard.quickActions.createCoupon' | translate" (action)="goToCreateCoupon()"></app-button>
-	              <app-button
-	                size="sm"
-	                variant="ghost"
-	                [label]="'adminUi.dashboard.quickActions.exportOrders' | translate"
-	                (action)="downloadOrdersExport()"
-	              ></app-button>
+
+	            <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
+	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.globalSearchLabel' | translate }}</span>
+	                <div class="relative">
+	                  <input
+	                    class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                    [placeholder]="'adminUi.dashboard.globalSearchPlaceholder' | translate"
+	                    [(ngModel)]="globalSearchQuery"
+	                    (ngModelChange)="onGlobalSearchChange()"
+	                    (focus)="openGlobalSearch()"
+	                    (blur)="onGlobalSearchBlur()"
+	                    (keydown)="onGlobalSearchKeydown($event)"
+	                  />
+
+	                  <div
+	                    *ngIf="globalSearchOpen()"
+	                    class="absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900"
+	                  >
+	                    <div *ngIf="globalSearchLoading()" class="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">
+	                      {{ 'adminUi.dashboard.globalSearchLoading' | translate }}
+	                    </div>
+	                    <div *ngIf="globalSearchError" class="px-3 py-2 text-xs text-rose-700 dark:text-rose-300">
+	                      {{ globalSearchError }}
+	                    </div>
+
+	                    <ng-container *ngIf="!globalSearchLoading() && !globalSearchError">
+	                      <div
+	                        *ngIf="globalSearchResults().length === 0 && (globalSearchQuery || '').trim().length >= 2"
+	                        class="px-3 py-2 text-xs text-slate-600 dark:text-slate-300"
+	                      >
+	                        {{ 'adminUi.dashboard.globalSearchEmpty' | translate }}
+	                      </div>
+	                      <div *ngIf="globalSearchResults().length > 0" class="max-h-72 overflow-auto">
+	                        <button
+	                          *ngFor="let item of globalSearchResults()"
+	                          type="button"
+	                          class="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800/60"
+	                          (mousedown)="selectGlobalSearch(item)"
+	                        >
+	                          <div class="flex items-center justify-between gap-3">
+	                            <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+	                              {{ globalSearchTypeLabel(item.type) }}
+	                            </span>
+	                            <span *ngIf="item.slug || item.email" class="text-xs text-slate-500 dark:text-slate-400 truncate">
+	                              {{ item.slug || item.email }}
+	                            </span>
+	                          </div>
+	                          <div class="mt-1 font-medium text-slate-900 dark:text-slate-50 truncate">{{ item.label }}</div>
+	                          <div *ngIf="item.subtitle" class="text-xs text-slate-600 dark:text-slate-300 truncate">{{ item.subtitle }}</div>
+	                        </button>
+	                      </div>
+	                    </ng-container>
+	                  </div>
+	                </div>
+	              </label>
+
+	              <div class="flex flex-wrap gap-2">
+	                <app-button size="sm" [label]="'adminUi.dashboard.quickActions.createProduct' | translate" (action)="goToCreateProduct()"></app-button>
+	                <app-button size="sm" [label]="'adminUi.dashboard.quickActions.createCoupon' | translate" (action)="goToCreateCoupon()"></app-button>
+	                <app-button
+	                  size="sm"
+	                  variant="ghost"
+	                  [label]="'adminUi.dashboard.quickActions.exportOrders' | translate"
+	                  (action)="downloadOrdersExport()"
+	                ></app-button>
+	              </div>
 	            </div>
 	          </div>
 
@@ -386,18 +447,19 @@ type MetricWidgetId = 'kpis' | 'counts' | 'range';
             <div *ngIf="auditEntries()?.items?.length; else auditEmptyTpl" class="grid gap-2">
               <div class="overflow-auto rounded-xl border border-slate-200 dark:border-slate-800">
                 <table class="min-w-[900px] w-full text-sm">
-                  <thead class="bg-slate-50 text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
-                    <tr>
-                      <th class="text-left px-3 py-2 font-semibold">{{ 'adminUi.audit.at' | translate }}</th>
-                      <th class="text-left px-3 py-2 font-semibold">{{ 'adminUi.audit.filters.entity' | translate }}</th>
-                      <th class="text-left px-3 py-2 font-semibold">{{ 'adminUi.audit.filters.action' | translate }}</th>
-                      <th class="text-left px-3 py-2 font-semibold">{{ 'adminUi.audit.actor' | translate }}</th>
-                      <th class="text-left px-3 py-2 font-semibold">{{ 'adminUi.audit.subject' | translate }}</th>
-                      <th class="text-left px-3 py-2 font-semibold">{{ 'adminUi.audit.reference' | translate }}</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
-                    <tr *ngFor="let entry of auditEntries()?.items" class="text-slate-800 dark:text-slate-200">
+	                  <thead class="bg-slate-50 text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
+	                    <tr>
+	                      <th class="text-left px-3 py-2 font-semibold">{{ 'adminUi.audit.at' | translate }}</th>
+	                      <th class="text-left px-3 py-2 font-semibold">{{ 'adminUi.audit.filters.entity' | translate }}</th>
+	                      <th class="text-left px-3 py-2 font-semibold">{{ 'adminUi.audit.filters.action' | translate }}</th>
+	                      <th class="text-left px-3 py-2 font-semibold">{{ 'adminUi.audit.actor' | translate }}</th>
+	                      <th class="text-left px-3 py-2 font-semibold">{{ 'adminUi.audit.subject' | translate }}</th>
+	                      <th class="text-left px-3 py-2 font-semibold">{{ 'adminUi.audit.reference' | translate }}</th>
+	                      <th class="text-right px-3 py-2 font-semibold">{{ 'adminUi.actions.open' | translate }}</th>
+	                    </tr>
+	                  </thead>
+	                  <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+	                    <tr *ngFor="let entry of auditEntries()?.items" class="text-slate-800 dark:text-slate-200">
                       <td class="px-3 py-2 whitespace-nowrap">{{ entry.created_at | date: 'short' }}</td>
                       <td class="px-3 py-2 whitespace-nowrap">
                         <span class="inline-flex rounded-full px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700">
@@ -412,15 +474,24 @@ type MetricWidgetId = 'kpis' | 'counts' | 'range';
                       </td>
                       <td class="px-3 py-2 whitespace-nowrap">{{ entry.actor_email || entry.actor_user_id || '—' }}</td>
                       <td class="px-3 py-2 whitespace-nowrap">{{ entry.subject_email || entry.subject_user_id || '—' }}</td>
-                      <td class="px-3 py-2">
-                        <span class="font-mono text-xs text-slate-600 dark:text-slate-400">
-                          {{ entry.ref_key || entry.ref_id || '—' }}
-                        </span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+	                      <td class="px-3 py-2">
+	                        <span class="font-mono text-xs text-slate-600 dark:text-slate-400">
+	                          {{ entry.ref_key || entry.ref_id || '—' }}
+	                        </span>
+	                      </td>
+	                      <td class="px-3 py-2 text-right">
+	                        <app-button
+	                          size="sm"
+	                          variant="ghost"
+	                          [disabled]="!canOpenAuditEntry(entry)"
+	                          [label]="'adminUi.actions.open' | translate"
+	                          (action)="openAuditEntry(entry)"
+	                        ></app-button>
+	                      </td>
+	                    </tr>
+	                  </tbody>
+	                </table>
+	              </div>
 
               <div class="flex items-center justify-between gap-3 text-sm text-slate-600 dark:text-slate-300">
                 <span>
@@ -507,6 +578,15 @@ export class AdminDashboardComponent implements OnInit {
   rangeFrom = '';
   rangeTo = '';
   rangeError = '';
+
+  globalSearchQuery = '';
+  globalSearchLoading = signal(false);
+  globalSearchOpen = signal(false);
+  globalSearchResults = signal<AdminDashboardSearchResult[]>([]);
+  globalSearchError = '';
+  private globalSearchDebounceHandle: number | null = null;
+  private globalSearchBlurHandle: number | null = null;
+  private globalSearchRequestId = 0;
 
   auditLoading = signal(false);
   auditError = signal('');
@@ -596,6 +676,96 @@ export class AdminDashboardComponent implements OnInit {
     const rounded = Math.round(deltaPct * 10) / 10;
     const sign = rounded > 0 ? '+' : '';
     return `${sign}${rounded}%`;
+  }
+
+  openGlobalSearch(): void {
+    if (this.globalSearchBlurHandle !== null) {
+      clearTimeout(this.globalSearchBlurHandle);
+      this.globalSearchBlurHandle = null;
+    }
+    this.globalSearchOpen.set(true);
+  }
+
+  onGlobalSearchBlur(): void {
+    if (this.globalSearchBlurHandle !== null) clearTimeout(this.globalSearchBlurHandle);
+    this.globalSearchBlurHandle = window.setTimeout(() => {
+      this.globalSearchOpen.set(false);
+      this.globalSearchBlurHandle = null;
+    }, 150);
+  }
+
+  onGlobalSearchKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      this.globalSearchOpen.set(false);
+      return;
+    }
+    if (event.key !== 'Enter') return;
+    const first = this.globalSearchResults()[0];
+    if (!first) return;
+    event.preventDefault();
+    this.selectGlobalSearch(first);
+  }
+
+  onGlobalSearchChange(): void {
+    const needle = (this.globalSearchQuery || '').trim();
+    this.globalSearchError = '';
+
+    if (this.globalSearchDebounceHandle !== null) {
+      clearTimeout(this.globalSearchDebounceHandle);
+      this.globalSearchDebounceHandle = null;
+    }
+
+    if (needle.length < 2) {
+      this.globalSearchResults.set([]);
+      this.globalSearchLoading.set(false);
+      return;
+    }
+
+    this.globalSearchDebounceHandle = window.setTimeout(() => {
+      this.globalSearchDebounceHandle = null;
+      this.runGlobalSearch(needle);
+    }, 250);
+  }
+
+  private runGlobalSearch(needle: string): void {
+    this.openGlobalSearch();
+    this.globalSearchLoading.set(true);
+    const requestId = ++this.globalSearchRequestId;
+    this.admin.globalSearch(needle).subscribe({
+      next: (res) => {
+        if (requestId !== this.globalSearchRequestId) return;
+        this.globalSearchResults.set(Array.isArray(res?.items) ? res.items : []);
+        this.globalSearchLoading.set(false);
+      },
+      error: () => {
+        if (requestId !== this.globalSearchRequestId) return;
+        this.globalSearchResults.set([]);
+        this.globalSearchLoading.set(false);
+        this.globalSearchError = this.translate.instant('adminUi.errors.generic');
+      }
+    });
+  }
+
+  globalSearchTypeLabel(type: AdminDashboardSearchResultType): string {
+    return this.translate.instant(`adminUi.dashboard.globalSearchTypes.${type}`);
+  }
+
+  selectGlobalSearch(item: AdminDashboardSearchResult): void {
+    this.globalSearchOpen.set(false);
+
+    if (item.type === 'order') {
+      void this.router.navigate(['/admin/orders', item.id]);
+      return;
+    }
+
+    if (item.type === 'product') {
+      const slug = (item.slug || '').trim();
+      void this.router.navigate(['/admin/products'], { state: { editProductSlug: slug } });
+      return;
+    }
+
+    const email = (item.email || '').trim();
+    void this.router.navigate(['/admin/users'], { state: { prefillUserSearch: email, autoSelectFirst: true } });
   }
 
   goToCreateProduct(): void {
@@ -776,6 +946,35 @@ export class AdminDashboardComponent implements OnInit {
     if (entity === 'content') return this.translate.instant('adminUi.audit.content');
     if (entity === 'security') return this.translate.instant('adminUi.audit.security');
     return this.translate.instant('adminUi.audit.entityAll');
+  }
+
+  canOpenAuditEntry(entry: AdminAuditEntryUnified): boolean {
+    if (entry.entity === 'product') return Boolean((entry.ref_key || '').trim());
+    if (entry.entity === 'content') return Boolean((entry.ref_key || '').trim());
+    return false;
+  }
+
+  openAuditEntry(entry: AdminAuditEntryUnified): void {
+    if (entry.entity === 'product') {
+      const slug = (entry.ref_key || '').trim();
+      if (slug) void this.router.navigate(['/admin/products'], { state: { editProductSlug: slug } });
+      return;
+    }
+
+    if (entry.entity === 'content') {
+      const key = (entry.ref_key || '').trim();
+      if (!key) return;
+      const section = this.adminContentSectionForKey(key);
+      void this.router.navigate(['/admin/content', section], { state: { openContentKey: key } });
+    }
+  }
+
+  private adminContentSectionForKey(key: string): string {
+    if (key.startsWith('page.')) return 'pages';
+    if (key.startsWith('blog.')) return 'blog';
+    if (key.startsWith('seo.')) return 'settings';
+    if (key.startsWith('site.')) return 'settings';
+    return 'home';
   }
 
   downloadAuditCsv(): void {

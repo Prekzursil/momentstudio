@@ -46,6 +46,21 @@ export interface AdminDashboardSystemHealth {
   backup_last_at: string | null;
 }
 
+export type AdminDashboardSearchResultType = 'order' | 'product' | 'user';
+
+export interface AdminDashboardSearchResult {
+  type: AdminDashboardSearchResultType;
+  id: string;
+  label: string;
+  subtitle?: string | null;
+  slug?: string | null;
+  email?: string | null;
+}
+
+export interface AdminDashboardSearchResponse {
+  items: AdminDashboardSearchResult[];
+}
+
 export interface AdminProduct {
   id: string;
   slug: string;
@@ -347,6 +362,10 @@ export class AdminService {
 
   summary(params?: { range_days?: number; range_from?: string; range_to?: string }): Observable<AdminSummary> {
     return this.api.get<AdminSummary>('/admin/dashboard/summary', params);
+  }
+
+  globalSearch(q: string): Observable<AdminDashboardSearchResponse> {
+    return this.api.get<AdminDashboardSearchResponse>('/admin/dashboard/search', { q });
   }
 
   products(): Observable<AdminProduct[]> {

@@ -1280,6 +1280,15 @@
       "rangeFrom": "De la",
       "rangeTo": "Până la",
       "applyRange": "Aplică intervalul",
+      "globalSearchLabel": "Căutare globală",
+      "globalSearchPlaceholder": "Caută comenzi, produse, utilizatori…",
+      "globalSearchLoading": "Se caută…",
+      "globalSearchEmpty": "Niciun rezultat.",
+      "globalSearchTypes": {
+        "order": "Comandă",
+        "product": "Produs",
+        "user": "Utilizator"
+      },
       "quickActionsTitle": "Acțiuni rapide",
       "quickActions": {
         "createProduct": "Creează produs",
@@ -1357,6 +1366,7 @@
       "use": "Folosește",
       "prev": "Anterior",
       "next": "Înainte",
+      "open": "Deschide",
       "up": "Sus",
       "down": "Jos"
     },

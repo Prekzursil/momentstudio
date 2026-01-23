@@ -237,6 +237,9 @@ export class AdminUsersComponent implements OnInit {
   aliasesLoading = signal(false);
   aliasesError = signal<string | null>(null);
 
+  private pendingPrefillSearch: string | null = null;
+  private autoSelectAfterLoad = false;
+
   constructor(
     private usersApi: AdminUsersService,
     private admin: AdminService,
@@ -245,6 +248,14 @@ export class AdminUsersComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    const state = history.state as any;
+    const prefill = typeof state?.prefillUserSearch === 'string' ? state.prefillUserSearch : '';
+    this.pendingPrefillSearch = prefill.trim() ? prefill.trim() : null;
+    this.autoSelectAfterLoad = Boolean(state?.autoSelectFirst);
+    if (this.pendingPrefillSearch) {
+      this.q = this.pendingPrefillSearch;
+      this.page = 1;
+    }
     this.load();
   }
 
@@ -316,9 +327,19 @@ export class AdminUsersComponent implements OnInit {
       })
       .subscribe({
         next: (res) => {
-          this.users.set(res.items || []);
+          const items = res.items || [];
+          this.users.set(items);
           this.meta.set(res.meta || null);
           this.loading.set(false);
+
+          if (this.autoSelectAfterLoad && items.length > 0) {
+            const needle = (this.pendingPrefillSearch || '').trim().toLowerCase();
+            const match =
+              items.find((u) => u.email.toLowerCase() === needle || u.username.toLowerCase() === needle) || items[0];
+            this.autoSelectAfterLoad = false;
+            this.pendingPrefillSearch = null;
+            this.select(match);
+          }
         },
         error: () => {
           this.error.set(this.t('adminUi.users.errors.load'));
@@ -347,4 +368,3 @@ export class AdminUsersComponent implements OnInit {
     return this.translate.instant(key) as string;
   }
 }
-

@@ -255,6 +255,37 @@ def test_admin_lists_and_audit_and_feed(test_app: Dict[str, object]) -> None:
     assert any(item["slug"] == data["product_slug"] for item in feed.json())
 
 
+def test_admin_global_search(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]
+    engine = test_app["engine"]
+    asyncio.run(reset_db(engine))
+    headers = auth_headers(client, session_factory)
+    data = asyncio.run(seed_dashboard_data(session_factory))
+
+    resp_products = client.get("/api/v1/admin/dashboard/search", params={"q": data["product_slug"]}, headers=headers)
+    assert resp_products.status_code == 200
+    items = resp_products.json()["items"]
+    assert any(item["type"] == "product" and item.get("slug") == data["product_slug"] for item in items)
+
+    resp_users = client.get("/api/v1/admin/dashboard/search", params={"q": "user@example.com"}, headers=headers)
+    assert resp_users.status_code == 200
+    user_items = resp_users.json()["items"]
+    assert any(item["type"] == "user" and item.get("email") == "user@example.com" for item in user_items)
+    assert any(item["type"] == "order" for item in user_items)
+
+    async def _order_id() -> str:
+        async with session_factory() as session:
+            order = (await session.execute(select(Order).where(Order.customer_email == "user@example.com"))).scalar_one()
+            return str(order.id)
+
+    order_id = asyncio.run(_order_id())
+    resp_order = client.get("/api/v1/admin/dashboard/search", params={"q": order_id}, headers=headers)
+    assert resp_order.status_code == 200
+    order_items = resp_order.json()["items"]
+    assert any(item["type"] == "order" and item["id"] == order_id for item in order_items)
+
+
 def test_admin_audit_entries_filters_and_export(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]

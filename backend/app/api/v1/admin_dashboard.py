@@ -15,6 +15,7 @@ from app.db.session import get_session
 from app.models.catalog import Product, ProductAuditLog, Category, ProductStatus
 from app.models.content import ContentBlock, ContentAuditLog
 from app.schemas.catalog_admin import AdminProductByIdsRequest, AdminProductListItem, AdminProductListResponse
+from app.schemas.admin_dashboard_search import AdminDashboardSearchResponse, AdminDashboardSearchResult
 from app.services import exporter as exporter_service
 from app.models.order import Order, OrderStatus
 from app.models.returns import ReturnRequest, ReturnRequestStatus
@@ -178,6 +179,144 @@ async def admin_summary(
         },
         "system": {"db_ready": True, "backup_last_at": settings.backup_last_at},
     }
+
+
+@router.get("/search", response_model=AdminDashboardSearchResponse)
+async def admin_global_search(
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+    q: str = Query(..., min_length=1, max_length=255),
+) -> AdminDashboardSearchResponse:
+    needle = (q or "").strip()
+    if not needle:
+        return AdminDashboardSearchResponse(items=[])
+
+    parsed_uuid: UUID | None = None
+    try:
+        parsed_uuid = UUID(needle)
+    except ValueError:
+        parsed_uuid = None
+
+    results: list[AdminDashboardSearchResult] = []
+
+    if parsed_uuid is not None:
+        order = await session.get(Order, parsed_uuid)
+        if order:
+            results.append(
+                AdminDashboardSearchResult(
+                    type="order",
+                    id=str(order.id),
+                    label=(order.reference_code or str(order.id)),
+                    subtitle=(order.customer_email or "").strip() or None,
+                )
+            )
+
+        product = await session.get(Product, parsed_uuid)
+        if product and not product.is_deleted:
+            results.append(
+                AdminDashboardSearchResult(
+                    type="product",
+                    id=str(product.id),
+                    slug=product.slug,
+                    label=product.name,
+                    subtitle=product.slug,
+                )
+            )
+
+        user = await session.get(User, parsed_uuid)
+        if user and user.deleted_at is None:
+            subtitle = (user.username or "").strip() or None
+            results.append(
+                AdminDashboardSearchResult(
+                    type="user",
+                    id=str(user.id),
+                    email=user.email,
+                    label=user.email,
+                    subtitle=subtitle,
+                )
+            )
+
+        return AdminDashboardSearchResponse(items=results)
+
+    like = f"%{needle.lower()}%"
+
+    orders = (
+        await session.execute(
+            select(Order)
+            .where(
+                or_(
+                    func.lower(Order.customer_email).ilike(like),
+                    func.lower(func.coalesce(Order.reference_code, "")).ilike(like),
+                )
+            )
+            .order_by(Order.created_at.desc())
+            .limit(5)
+        )
+    ).scalars().all()
+    for order in orders:
+        results.append(
+            AdminDashboardSearchResult(
+                type="order",
+                id=str(order.id),
+                label=(order.reference_code or str(order.id)),
+                subtitle=(order.customer_email or "").strip() or None,
+            )
+        )
+
+    products = (
+        await session.execute(
+            select(Product)
+            .where(
+                Product.is_deleted.is_(False),
+                or_(
+                    Product.slug.ilike(like),
+                    Product.name.ilike(like),
+                    Product.sku.ilike(like),
+                ),
+            )
+            .order_by(Product.updated_at.desc())
+            .limit(5)
+        )
+    ).scalars().all()
+    for product in products:
+        results.append(
+            AdminDashboardSearchResult(
+                type="product",
+                id=str(product.id),
+                slug=product.slug,
+                label=product.name,
+                subtitle=product.slug,
+            )
+        )
+
+    users = (
+        await session.execute(
+            select(User)
+            .where(
+                User.deleted_at.is_(None),
+                or_(
+                    func.lower(User.email).ilike(like),
+                    func.lower(User.username).ilike(like),
+                    func.lower(User.name).ilike(like),
+                ),
+            )
+            .order_by(User.created_at.desc())
+            .limit(5)
+        )
+    ).scalars().all()
+    for user in users:
+        subtitle = (user.username or "").strip() or None
+        results.append(
+            AdminDashboardSearchResult(
+                type="user",
+                id=str(user.id),
+                email=user.email,
+                label=user.email,
+                subtitle=subtitle,
+            )
+        )
+
+    return AdminDashboardSearchResponse(items=results)
 
 
 @router.get("/products")
