@@ -60,7 +60,7 @@ test('owner can update About page via CMS and audit log records it', async ({ pa
 
   await page.goto('/admin/dashboard');
   await page.getByLabel('Entity').selectOption('content');
-  await page.getByRole('button', { name: 'Apply' }).click();
+  await page.getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(page.getByText('page.about').first()).toBeVisible();
 });
 

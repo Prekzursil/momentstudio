@@ -184,7 +184,7 @@ type MetricWidgetId = 'kpis' | 'counts' | 'range';
                         />
                       </label>
 
-                      <app-button size="sm" [label]="'adminUi.actions.apply' | translate" (action)="applyRange()"></app-button>
+                      <app-button size="sm" [label]="'adminUi.dashboard.applyRange' | translate" (action)="applyRange()"></app-button>
                     </div>
 
                     <p *ngIf="summary()" class="text-xs text-slate-500 dark:text-slate-400">

@@ -1279,6 +1279,7 @@
       "customRange": "Custom",
       "rangeFrom": "From",
       "rangeTo": "To",
+      "applyRange": "Apply range",
       "customizeWidgets": "Customize widgets",
       "widgetsTitle": "Dashboard widgets",
       "widgets": {

@@ -1279,6 +1279,7 @@
       "customRange": "Personalizat",
       "rangeFrom": "De la",
       "rangeTo": "Până la",
+      "applyRange": "Aplică intervalul",
       "customizeWidgets": "Personalizează widgeturile",
       "widgetsTitle": "Widgeturi panou",
       "widgets": {
