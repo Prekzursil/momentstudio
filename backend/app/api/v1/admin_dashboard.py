@@ -1,6 +1,6 @@
 import csv
 import io
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
@@ -16,7 +16,7 @@ from app.models.catalog import Product, ProductAuditLog, Category, ProductStatus
 from app.models.content import ContentBlock, ContentAuditLog
 from app.schemas.catalog_admin import AdminProductByIdsRequest, AdminProductListItem, AdminProductListResponse
 from app.services import exporter as exporter_service
-from app.models.order import Order
+from app.models.order import Order, OrderStatus
 from app.models.user import AdminAuditLog, User, RefreshSession, UserRole
 from app.models.promo import PromoCode, StripeCouponMapping
 from app.services import auth as auth_service
@@ -29,7 +29,26 @@ router = APIRouter(prefix="/admin/dashboard", tags=["admin"])
 async def admin_summary(
     session: AsyncSession = Depends(get_session),
     _: str = Depends(require_admin),
+    range_days: int = Query(default=30, ge=1, le=365),
+    range_from: date | None = Query(default=None),
+    range_to: date | None = Query(default=None),
 ) -> dict:
+    now = datetime.now(timezone.utc)
+
+    if (range_from is None) != (range_to is None):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="range_from and range_to must be provided together")
+
+    if range_from is not None and range_to is not None:
+        if range_to < range_from:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="range_to must be on/after range_from")
+        start = datetime.combine(range_from, datetime.min.time(), tzinfo=timezone.utc)
+        end = datetime.combine(range_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
+        effective_range_days = (range_to - range_from).days + 1
+    else:
+        start = now - timedelta(days=range_days)
+        end = now
+        effective_range_days = range_days
+
     products_total = await session.scalar(select(func.count()).select_from(Product).where(Product.is_deleted.is_(False)))
     orders_total = await session.scalar(select(func.count()).select_from(Order))
     users_total = await session.scalar(select(func.count()).select_from(User))
@@ -40,11 +59,43 @@ async def admin_summary(
         .where(Product.stock_quantity < 5, Product.is_deleted.is_(False), Product.is_active.is_(True))
     )
 
-    since = datetime.now(timezone.utc) - timedelta(days=30)
-    sales_30d = await session.scalar(
-        select(func.coalesce(func.sum(Order.total_amount), 0)).where(Order.created_at >= since)
-    )
+    since = now - timedelta(days=30)
+    sales_30d = await session.scalar(select(func.coalesce(func.sum(Order.total_amount), 0)).where(Order.created_at >= since))
     orders_30d = await session.scalar(select(func.count()).select_from(Order).where(Order.created_at >= since))
+
+    sales_range = await session.scalar(
+        select(func.coalesce(func.sum(Order.total_amount), 0)).where(Order.created_at >= start, Order.created_at < end)
+    )
+    orders_range = await session.scalar(select(func.count()).select_from(Order).where(Order.created_at >= start, Order.created_at < end))
+
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    yesterday_start = today_start - timedelta(days=1)
+
+    today_orders = await session.scalar(select(func.count()).select_from(Order).where(Order.created_at >= today_start, Order.created_at < now))
+    yesterday_orders = await session.scalar(
+        select(func.count()).select_from(Order).where(Order.created_at >= yesterday_start, Order.created_at < today_start)
+    )
+    today_sales = await session.scalar(
+        select(func.coalesce(func.sum(Order.total_amount), 0)).where(Order.created_at >= today_start, Order.created_at < now)
+    )
+    yesterday_sales = await session.scalar(
+        select(func.coalesce(func.sum(Order.total_amount), 0)).where(Order.created_at >= yesterday_start, Order.created_at < today_start)
+    )
+    today_refunds = await session.scalar(
+        select(func.count())
+        .select_from(Order)
+        .where(Order.status == OrderStatus.refunded, Order.updated_at >= today_start, Order.updated_at < now)
+    )
+    yesterday_refunds = await session.scalar(
+        select(func.count())
+        .select_from(Order)
+        .where(Order.status == OrderStatus.refunded, Order.updated_at >= yesterday_start, Order.updated_at < today_start)
+    )
+
+    def _delta_pct(today_value: float, yesterday_value: float) -> float | None:
+        if yesterday_value == 0:
+            return None
+        return (today_value - yesterday_value) / yesterday_value * 100.0
 
     return {
         "products": products_total or 0,
@@ -53,6 +104,20 @@ async def admin_summary(
         "low_stock": low_stock or 0,
         "sales_30d": float(sales_30d or 0),
         "orders_30d": orders_30d or 0,
+        "sales_range": float(sales_range or 0),
+        "orders_range": int(orders_range or 0),
+        "range_days": int(effective_range_days),
+        "range_from": start.date().isoformat(),
+        "range_to": (end - timedelta(microseconds=1)).date().isoformat(),
+        "today_orders": int(today_orders or 0),
+        "yesterday_orders": int(yesterday_orders or 0),
+        "orders_delta_pct": _delta_pct(float(today_orders or 0), float(yesterday_orders or 0)),
+        "today_sales": float(today_sales or 0),
+        "yesterday_sales": float(yesterday_sales or 0),
+        "sales_delta_pct": _delta_pct(float(today_sales or 0), float(yesterday_sales or 0)),
+        "today_refunds": int(today_refunds or 0),
+        "yesterday_refunds": int(yesterday_refunds or 0),
+        "refunds_delta_pct": _delta_pct(float(today_refunds or 0), float(yesterday_refunds or 0)),
     }
 
 

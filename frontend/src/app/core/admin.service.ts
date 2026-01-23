@@ -9,6 +9,20 @@ export interface AdminSummary {
   low_stock: number;
   sales_30d: number;
   orders_30d: number;
+  sales_range: number;
+  orders_range: number;
+  range_days: number;
+  range_from: string;
+  range_to: string;
+  today_orders: number;
+  yesterday_orders: number;
+  orders_delta_pct: number | null;
+  today_sales: number;
+  yesterday_sales: number;
+  sales_delta_pct: number | null;
+  today_refunds: number;
+  yesterday_refunds: number;
+  refunds_delta_pct: number | null;
 }
 
 export interface AdminProduct {
@@ -310,8 +324,8 @@ export interface OwnerTransferResponse {
 export class AdminService {
   constructor(private api: ApiService) {}
 
-  summary(): Observable<AdminSummary> {
-    return this.api.get<AdminSummary>('/admin/dashboard/summary');
+  summary(params?: { range_days?: number; range_from?: string; range_to?: string }): Observable<AdminSummary> {
+    return this.api.get<AdminSummary>('/admin/dashboard/summary', params);
   }
 
   products(): Observable<AdminProduct[]> {

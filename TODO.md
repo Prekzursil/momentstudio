@@ -686,8 +686,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin audit log page listing important events (login, product changes, content updates, Google linking).
 
 ### Admin Dashboard – Next Improvements (Backlog)
-- [ ] Admin Dashboard: add “Today” KPI strip – Show today’s orders/GMV/refunds vs yesterday with percent deltas.
-- [ ] Admin Dashboard: add configurable date ranges – Allow last 7/30/90/custom ranges across all widgets.
+- [x] Admin Dashboard: add “Today” KPI strip – Show today’s orders/GMV/refunds vs yesterday with percent deltas.
+- [x] Admin Dashboard: add configurable date ranges – Allow last 7/30/90/custom ranges across all widgets.
 - [ ] Admin Dashboard: widget personalization – Let admins hide/reorder dashboard widgets and persist per user.
 - [ ] Admin Dashboard: alert cards for anomalies – Highlight spikes in failed payments, stockouts, or refund requests.
 - [ ] Admin Dashboard: system health panel – Show DB status and last backup timestamp.

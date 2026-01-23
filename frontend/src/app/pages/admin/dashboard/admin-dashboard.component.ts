@@ -47,6 +47,81 @@ import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
         <section class="grid gap-3">
           <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboardTitle' | translate }}</h1>
 
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <div class="flex flex-wrap items-end gap-3">
+              <label class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+                <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.rangeLabel' | translate }}</span>
+                <select
+                  class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
+                  [(ngModel)]="rangePreset"
+                  (ngModelChange)="onRangePresetChange()"
+                >
+                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="7">
+                    {{ 'adminUi.dashboard.lastDays' | translate: { days: 7 } }}
+                  </option>
+                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="30">
+                    {{ 'adminUi.dashboard.lastDays' | translate: { days: 30 } }}
+                  </option>
+                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="90">
+                    {{ 'adminUi.dashboard.lastDays' | translate: { days: 90 } }}
+                  </option>
+                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="custom">
+                    {{ 'adminUi.dashboard.customRange' | translate }}
+                  </option>
+                </select>
+              </label>
+
+              <label *ngIf="rangePreset === 'custom'" class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+                <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.rangeFrom' | translate }}</span>
+                <input
+                  type="date"
+                  class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
+                  [(ngModel)]="rangeFrom"
+                />
+              </label>
+              <label *ngIf="rangePreset === 'custom'" class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+                <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.rangeTo' | translate }}</span>
+                <input
+                  type="date"
+                  class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
+                  [(ngModel)]="rangeTo"
+                />
+              </label>
+
+              <app-button size="sm" [label]="'adminUi.actions.apply' | translate" (action)="applyRange()"></app-button>
+            </div>
+
+            <p *ngIf="summary()" class="text-xs text-slate-500 dark:text-slate-400">
+              {{ summary()?.range_from | date: 'mediumDate' }} → {{ summary()?.range_to | date: 'mediumDate' }}
+            </p>
+          </div>
+
+          <div *ngIf="rangeError" class="text-sm text-rose-700 dark:text-rose-300">
+            {{ rangeError }}
+          </div>
+
+          <div class="grid md:grid-cols-3 gap-4">
+            <app-card [title]="'adminUi.cards.ordersToday' | translate">
+              <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ summary()?.today_orders || 0 }}</div>
+              <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.cards.vsYesterday' | translate }}: {{ summary()?.yesterday_orders || 0 }} · {{ deltaLabel(summary()?.orders_delta_pct) }}
+              </div>
+            </app-card>
+            <app-card [title]="'adminUi.cards.salesToday' | translate">
+              <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ (summary()?.today_sales || 0) | localizedCurrency : 'RON' }}</div>
+              <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.cards.vsYesterday' | translate }}: {{ (summary()?.yesterday_sales || 0) | localizedCurrency : 'RON' }} ·
+                {{ deltaLabel(summary()?.sales_delta_pct) }}
+              </div>
+            </app-card>
+            <app-card [title]="'adminUi.cards.refundsToday' | translate">
+              <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ summary()?.today_refunds || 0 }}</div>
+              <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.cards.vsYesterday' | translate }}: {{ summary()?.yesterday_refunds || 0 }} · {{ deltaLabel(summary()?.refunds_delta_pct) }}
+              </div>
+            </app-card>
+          </div>
+
           <div class="grid md:grid-cols-3 gap-4">
             <app-card
               [title]="'adminUi.cards.products' | translate"
@@ -67,10 +142,13 @@ import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
               [title]="'adminUi.cards.lowStock' | translate"
               [subtitle]="'adminUi.cards.countItems' | translate: { count: summary()?.low_stock || 0 }"
             ></app-card>
-            <app-card [title]="'adminUi.cards.sales30' | translate" [subtitle]="(summary()?.sales_30d || 0) | localizedCurrency : 'RON'"></app-card>
             <app-card
-              [title]="'adminUi.cards.orders30' | translate"
-              [subtitle]="'adminUi.cards.countOrders' | translate: { count: summary()?.orders_30d || 0 }"
+              [title]="'adminUi.cards.salesRange' | translate: { days: summary()?.range_days || 30 }"
+              [subtitle]="(summary()?.sales_range || 0) | localizedCurrency : 'RON'"
+            ></app-card>
+            <app-card
+              [title]="'adminUi.cards.ordersRange' | translate: { days: summary()?.range_days || 30 }"
+              [subtitle]="'adminUi.cards.countOrders' | translate: { count: summary()?.orders_range || 0 }"
             ></app-card>
           </div>
         </section>
@@ -249,6 +327,11 @@ export class AdminDashboardComponent implements OnInit {
   error = signal('');
   summary = signal<AdminSummary | null>(null);
 
+  rangePreset: '7' | '30' | '90' | 'custom' = '30';
+  rangeFrom = '';
+  rangeTo = '';
+  rangeError = '';
+
   auditLoading = signal(false);
   auditError = signal('');
   auditEntries = signal<AdminAuditEntriesResponse | null>(null);
@@ -281,7 +364,8 @@ export class AdminDashboardComponent implements OnInit {
   private loadSummary(): void {
     this.loading.set(true);
     this.error.set('');
-    this.admin.summary().subscribe({
+    this.rangeError = '';
+    this.admin.summary(this.buildSummaryParams()).subscribe({
       next: (data) => {
         this.summary.set(data);
         this.loading.set(false);
@@ -291,6 +375,48 @@ export class AdminDashboardComponent implements OnInit {
         this.loading.set(false);
       }
     });
+  }
+
+  onRangePresetChange(): void {
+    if (this.rangePreset === 'custom') return;
+    this.loadSummary();
+  }
+
+  applyRange(): void {
+    if (this.rangePreset !== 'custom') {
+      this.loadSummary();
+      return;
+    }
+    const from = (this.rangeFrom || '').trim();
+    const to = (this.rangeTo || '').trim();
+    if (!from || !to) {
+      this.rangeError = this.translate.instant('adminUi.dashboard.rangeErrors.missing');
+      return;
+    }
+    if (to < from) {
+      this.rangeError = this.translate.instant('adminUi.dashboard.rangeErrors.order');
+      return;
+    }
+    this.loadSummary();
+  }
+
+  private buildSummaryParams(): { range_days?: number; range_from?: string; range_to?: string } | undefined {
+    if (this.rangePreset === 'custom') {
+      const from = (this.rangeFrom || '').trim();
+      const to = (this.rangeTo || '').trim();
+      if (!from || !to) return undefined;
+      return { range_from: from, range_to: to };
+    }
+    const days = Number(this.rangePreset);
+    if (!Number.isFinite(days) || days <= 0) return undefined;
+    return { range_days: days };
+  }
+
+  deltaLabel(deltaPct: number | null | undefined): string {
+    if (deltaPct === null || deltaPct === undefined) return '—';
+    const rounded = Math.round(deltaPct * 10) / 10;
+    const sign = rounded > 0 ? '+' : '';
+    return `${sign}${rounded}%`;
   }
 
   private loadAudit(page: number): void {

@@ -1273,13 +1273,30 @@
       "content": "Conținut"
     },
     "dashboardTitle": "Panou administrare",
+    "dashboard": {
+      "rangeLabel": "Interval",
+      "lastDays": "Ultimele {{days}} zile",
+      "customRange": "Personalizat",
+      "rangeFrom": "De la",
+      "rangeTo": "Până la",
+      "rangeErrors": {
+        "missing": "Selectează ambele date (început și sfârșit).",
+        "order": "Data de sfârșit trebuie să fie după data de început."
+      }
+    },
     "cards": {
       "products": "Produse",
       "orders": "Comenzi",
       "users": "Utilizatori",
       "lowStock": "Stoc redus",
+      "ordersToday": "Comenzi astăzi",
+      "salesToday": "Vânzări astăzi",
+      "refundsToday": "Rambursări astăzi",
+      "vsYesterday": "vs ieri",
       "sales30": "Vânzări (30z)",
       "orders30": "Comenzi (30z)",
+      "salesRange": "Vânzări ({{days}}z)",
+      "ordersRange": "Comenzi ({{days}}z)",
       "openOrders": "Comenzi deschise",
       "recentOrders": "Comenzi recente",
       "lowStockTracked": "Stoc redus urmărit",
@@ -1292,6 +1309,7 @@
     },
     "actions": {
       "add": "Adaugă",
+      "apply": "Aplică",
       "reset": "Resetează",
       "delete": "Șterge",
       "remove": "Elimină",

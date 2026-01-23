@@ -1273,13 +1273,30 @@
       "content": "Content"
     },
     "dashboardTitle": "Admin dashboard",
+    "dashboard": {
+      "rangeLabel": "Range",
+      "lastDays": "Last {{days}}d",
+      "customRange": "Custom",
+      "rangeFrom": "From",
+      "rangeTo": "To",
+      "rangeErrors": {
+        "missing": "Select both start and end dates.",
+        "order": "End date must be on/after start date."
+      }
+    },
     "cards": {
       "products": "Products",
       "orders": "Orders",
       "users": "Users",
       "lowStock": "Low stock",
+      "ordersToday": "Orders today",
+      "salesToday": "Sales today",
+      "refundsToday": "Refunds today",
+      "vsYesterday": "vs yesterday",
       "sales30": "Sales (30d)",
       "orders30": "Orders (30d)",
+      "salesRange": "Sales ({{days}}d)",
+      "ordersRange": "Orders ({{days}}d)",
       "openOrders": "Open orders",
       "recentOrders": "Recent orders",
       "lowStockTracked": "Low stock tracked",
@@ -1292,6 +1309,7 @@
     },
     "actions": {
       "add": "Add",
+      "apply": "Apply",
       "reset": "Reset",
       "delete": "Delete",
       "remove": "Remove",
