@@ -385,6 +385,45 @@ async def auto_publish_due_sales(session: AsyncSession, *, now: datetime | None 
     return updated
 
 
+async def apply_due_product_schedules(session: AsyncSession, *, now: datetime | None = None) -> int:
+    """Apply scheduled publish/unpublish timestamps (best-effort, request-driven)."""
+    now_dt = now or datetime.now(timezone.utc)
+    updated = 0
+
+    publish_clause = and_(
+        Product.is_deleted.is_(False),
+        Product.publish_scheduled_for.is_not(None),
+        Product.publish_scheduled_for <= now_dt,
+    )
+    res = await session.execute(
+        update(Product)
+        .where(publish_clause)
+        .values(
+            status=ProductStatus.published,
+            publish_at=func.coalesce(Product.publish_at, now_dt),
+            publish_scheduled_for=None,
+        )
+    )
+    updated += int(res.rowcount or 0)
+
+    unpublish_clause = and_(
+        Product.is_deleted.is_(False),
+        Product.status == ProductStatus.published,
+        Product.unpublish_scheduled_for.is_not(None),
+        Product.unpublish_scheduled_for <= now_dt,
+    )
+    res = await session.execute(
+        update(Product)
+        .where(unpublish_clause)
+        .values(status=ProductStatus.archived, unpublish_scheduled_for=None)
+    )
+    updated += int(res.rowcount or 0)
+
+    if updated:
+        await session.commit()
+    return updated
+
+
 def _compute_sale_price(
     *,
     base_price: object,
@@ -607,11 +646,22 @@ async def update_product(
         product.tags = await _get_or_create_tags(session, data["tags"])
     if "options" in data and data["options"] is not None:
         product.options = [ProductOption(**opt.model_dump()) for opt in data["options"]]
+    if "publish_scheduled_for" in data:
+        data["publish_scheduled_for"] = _tz_aware(data.get("publish_scheduled_for"))
+    if "unpublish_scheduled_for" in data:
+        data["unpublish_scheduled_for"] = _tz_aware(data.get("unpublish_scheduled_for"))
     for field, value in data.items():
         if field == "currency" and value:
             setattr(product, field, value.upper())
         else:
             setattr(product, field, value)
+    publish_scheduled_for = _tz_aware(getattr(product, "publish_scheduled_for", None))
+    unpublish_scheduled_for = _tz_aware(getattr(product, "unpublish_scheduled_for", None))
+    if publish_scheduled_for and unpublish_scheduled_for and unpublish_scheduled_for <= publish_scheduled_for:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unpublish schedule must be after publish schedule",
+        )
     is_now_out_of_stock = is_out_of_stock(product)
     sale_fields_touched = any(
         key in data for key in ("sale_type", "sale_value", "sale_start_at", "sale_end_at", "sale_auto_publish")
@@ -694,6 +744,17 @@ async def bulk_update_products(
     session: AsyncSession, updates: list[BulkProductUpdateItem], user_id: uuid.UUID | None = None
 ) -> list[Product]:
     product_ids = [item.product_id for item in updates]
+    category_ids = {
+        item.category_id
+        for item in updates
+        if "category_id" in item.model_fields_set and item.category_id is not None  # type: ignore[attr-defined]
+    }
+    if category_ids:
+        result = await session.execute(select(Category.id).where(Category.id.in_(category_ids)))
+        found = set(result.scalars())
+        missing = category_ids - found
+        if missing:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more categories not found")
     result = await session.execute(select(Product).where(Product.id.in_(product_ids)))
     products = {p.id: p for p in result.scalars()}
 
@@ -715,6 +776,9 @@ async def bulk_update_products(
             "sale_end_at",
             "sale_auto_publish",
             "stock_quantity",
+            "category_id",
+            "publish_scheduled_for",
+            "unpublish_scheduled_for",
             "status",
         ):
             if field not in data:
@@ -725,11 +789,27 @@ async def bulk_update_products(
                 else:
                     setattr(product, field, bool(data[field]))
                 continue
+            if field == "category_id":
+                if data[field] is None:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="category_id cannot be null")
+                setattr(product, field, data[field])
+                continue
+            if field in {"publish_scheduled_for", "unpublish_scheduled_for"}:
+                setattr(product, field, _tz_aware(data[field]) if data[field] is not None else None)
+                continue
             if field in {"sale_type", "sale_value", "sale_start_at", "sale_end_at"}:
                 setattr(product, field, data[field] if data[field] is not None else None)
                 continue
             if data[field] is not None:
                 setattr(product, field, data[field])
+
+        publish_scheduled_for = _tz_aware(getattr(product, "publish_scheduled_for", None))
+        unpublish_scheduled_for = _tz_aware(getattr(product, "unpublish_scheduled_for", None))
+        if publish_scheduled_for and unpublish_scheduled_for and unpublish_scheduled_for <= publish_scheduled_for:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Unpublish schedule must be after publish schedule",
+            )
 
         sale_fields_touched = any(
             key in data for key in ("sale_type", "sale_value", "sale_start_at", "sale_end_at", "sale_auto_publish")
@@ -764,6 +844,9 @@ async def bulk_update_products(
                 "sale_value": product.sale_value,
                 "sale_price": product.sale_price,
                 "stock_quantity": product.stock_quantity,
+                "category_id": str(product.category_id) if product.category_id else None,
+                "publish_scheduled_for": getattr(product, "publish_scheduled_for", None),
+                "unpublish_scheduled_for": getattr(product, "unpublish_scheduled_for", None),
                 "status": str(product.status),
             },
         )

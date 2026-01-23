@@ -465,6 +465,9 @@ export class AdminService {
     sale_type?: 'percent' | 'amount' | null;
     sale_value?: number | null;
     stock_quantity?: number | null;
+    category_id?: string | null;
+    publish_scheduled_for?: string | null;
+    unpublish_scheduled_for?: string | null;
     status?: string | null;
   }[]): Observable<any[]> {
     return this.api.post<any[]>('/catalog/products/bulk-update', payload);

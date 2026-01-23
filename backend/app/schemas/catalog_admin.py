@@ -27,6 +27,8 @@ class AdminProductListItem(BaseModel):
     category_name: str
     updated_at: datetime
     publish_at: datetime | None = None
+    publish_scheduled_for: datetime | None = None
+    unpublish_scheduled_for: datetime | None = None
 
 
 class AdminProductListResponse(BaseModel):

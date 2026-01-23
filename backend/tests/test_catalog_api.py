@@ -1,5 +1,6 @@
 import asyncio
 import io
+from datetime import datetime, timedelta, timezone
 from typing import Dict
 
 import pytest
@@ -608,6 +609,70 @@ def test_bulk_update_and_publish(test_app: Dict[str, object]) -> None:
     assert updated[prods[0]["id"]]["stock_quantity"] == 5
     assert updated[prods[0]["id"]]["status"] == "published"
     assert updated[prods[0]["id"]]["publish_at"] is not None
+
+
+def test_bulk_category_assignment_and_publish_scheduling(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal, email="scheduleadmin@example.com")
+
+    cat1 = client.post(
+        "/api/v1/catalog/categories",
+        json={"name": "Schedule Cat 1"},
+        headers=auth_headers(admin_token),
+    ).json()["id"]
+    cat2 = client.post(
+        "/api/v1/catalog/categories",
+        json={"name": "Schedule Cat 2"},
+        headers=auth_headers(admin_token),
+    ).json()["id"]
+
+    prod = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": cat1,
+            "slug": "sched-prod",
+            "name": "Sched Prod",
+            "base_price": 10.0,
+            "currency": "RON",
+            "stock_quantity": 1,
+        },
+        headers=auth_headers(admin_token),
+    ).json()
+
+    bulk_res = client.post(
+        "/api/v1/catalog/products/bulk-update",
+        json=[{"product_id": prod["id"], "category_id": cat2}],
+        headers=auth_headers(admin_token),
+    )
+    assert bulk_res.status_code == 200, bulk_res.text
+
+    admin_view = client.get("/api/v1/catalog/products/sched-prod", headers=auth_headers(admin_token))
+    assert admin_view.status_code == 200, admin_view.text
+    assert admin_view.json()["category"]["id"] == cat2
+
+    past = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+    schedule_res = client.post(
+        "/api/v1/catalog/products/bulk-update",
+        json=[{"product_id": prod["id"], "publish_scheduled_for": past}],
+        headers=auth_headers(admin_token),
+    )
+    assert schedule_res.status_code == 200, schedule_res.text
+
+    public_view = client.get("/api/v1/catalog/products/sched-prod")
+    assert public_view.status_code == 200, public_view.text
+    assert public_view.json()["status"] == "published"
+
+    unpublish_past = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+    unpublish_res = client.post(
+        "/api/v1/catalog/products/bulk-update",
+        json=[{"product_id": prod["id"], "unpublish_scheduled_for": unpublish_past}],
+        headers=auth_headers(admin_token),
+    )
+    assert unpublish_res.status_code == 200, unpublish_res.text
+
+    public_after_unpublish = client.get("/api/v1/catalog/products/sched-prod")
+    assert public_after_unpublish.status_code == 404
 
 
 def test_product_reviews_and_related(test_app: Dict[str, object]) -> None:

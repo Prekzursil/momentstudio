@@ -2001,6 +2001,22 @@
         "success": "Updated selected products.",
         "published": "Published selected products.",
         "error": "Bulk update failed.",
+        "category": {
+          "label": "Category",
+          "placeholder": "Select category",
+          "apply": "Apply category",
+          "valueRequired": "Select a category."
+        },
+        "schedule": {
+          "publishAt": "Publish at",
+          "unpublishAt": "Unpublish at",
+          "apply": "Apply schedule",
+          "clearPublish": "Clear publish schedule",
+          "clearUnpublish": "Clear unpublish schedule",
+          "valueRequired": "Choose at least one date.",
+          "orderInvalid": "Unpublish must be after publish.",
+          "invalidDate": "Enter a valid date/time."
+        },
         "priceAdjust": {
           "mode": "Price change",
           "modePercent": "% change",

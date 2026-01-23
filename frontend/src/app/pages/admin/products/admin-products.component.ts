@@ -171,6 +171,77 @@ type ProductTranslationForm = {
 
             <div class="h-px bg-slate-200 dark:bg-slate-800/70"></div>
 
+            <div class="grid gap-3 lg:grid-cols-[260px_auto] items-end">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.products.bulk.category.label' | translate }}
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="bulkCategoryId"
+                  [disabled]="bulkBusy() || inlineBusy()"
+                >
+                  <option value="">{{ 'adminUi.products.bulk.category.placeholder' | translate }}</option>
+                  <option *ngFor="let cat of categories()" [value]="cat.id">{{ cat.name }}</option>
+                </select>
+              </label>
+
+              <app-button
+                size="sm"
+                [label]="'adminUi.products.bulk.category.apply' | translate"
+                (action)="applyCategoryToSelected()"
+                [disabled]="bulkBusy() || inlineBusy()"
+              ></app-button>
+            </div>
+
+            <div class="h-px bg-slate-200 dark:bg-slate-800/70"></div>
+
+            <div class="grid gap-3 lg:grid-cols-[240px_240px_auto] items-end">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.products.bulk.schedule.publishAt' | translate }}
+                <input
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  type="datetime-local"
+                  [(ngModel)]="bulkPublishScheduledFor"
+                  [disabled]="bulkBusy() || inlineBusy()"
+                />
+              </label>
+
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.products.bulk.schedule.unpublishAt' | translate }}
+                <input
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  type="datetime-local"
+                  [(ngModel)]="bulkUnpublishScheduledFor"
+                  [disabled]="bulkBusy() || inlineBusy()"
+                />
+              </label>
+
+              <app-button
+                size="sm"
+                [label]="'adminUi.products.bulk.schedule.apply' | translate"
+                (action)="applyScheduleToSelected()"
+                [disabled]="bulkBusy() || inlineBusy()"
+              ></app-button>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-end gap-2">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.products.bulk.schedule.clearPublish' | translate"
+                (action)="clearPublishScheduleForSelected()"
+                [disabled]="bulkBusy() || inlineBusy()"
+              ></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.products.bulk.schedule.clearUnpublish' | translate"
+                (action)="clearUnpublishScheduleForSelected()"
+                [disabled]="bulkBusy() || inlineBusy()"
+              ></app-button>
+            </div>
+
+            <div class="h-px bg-slate-200 dark:bg-slate-800/70"></div>
+
             <div class="grid gap-3 lg:grid-cols-[200px_200px_240px_auto] items-end">
               <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                 {{ 'adminUi.products.bulk.priceAdjust.mode' | translate }}
@@ -369,6 +440,19 @@ type ProductTranslationForm = {
                     <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="statusPillClass(product.status)">
                       {{ ('adminUi.status.' + product.status) | translate }}
                     </span>
+                    <div
+                      *ngIf="product.publish_scheduled_for || product.unpublish_scheduled_for"
+                      class="mt-1 grid gap-0.5 text-xs text-slate-500 dark:text-slate-400"
+                    >
+                      <div *ngIf="product.publish_scheduled_for">
+                        {{ 'adminUi.products.bulk.schedule.publishAt' | translate }}:
+                        {{ product.publish_scheduled_for | date: 'short' }}
+                      </div>
+                      <div *ngIf="product.unpublish_scheduled_for">
+                        {{ 'adminUi.products.bulk.schedule.unpublishAt' | translate }}:
+                        {{ product.unpublish_scheduled_for | date: 'short' }}
+                      </div>
+                    </div>
                   </td>
                   <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
                     {{ product.category_name }}
@@ -791,6 +875,9 @@ export class AdminProductsComponent implements OnInit {
   selected = new Set<string>();
   bulkSaleType: 'percent' | 'amount' = 'percent';
   bulkSaleValue = '';
+  bulkCategoryId = '';
+  bulkPublishScheduledFor = '';
+  bulkUnpublishScheduledFor = '';
   bulkBusy = signal(false);
   bulkError = signal<string | null>(null);
 
@@ -974,6 +1061,120 @@ export class AdminProductsComponent implements OnInit {
       next: () => {
         this.bulkBusy.set(false);
         this.toast.success(this.t('adminUi.products.bulk.published'));
+        this.clearSelection();
+        this.load();
+      },
+      error: () => {
+        this.bulkBusy.set(false);
+        this.bulkError.set(this.t('adminUi.products.bulk.error'));
+      }
+    });
+  }
+
+  applyCategoryToSelected(): void {
+    this.bulkError.set(null);
+    const categoryId = (this.bulkCategoryId || '').trim();
+    if (!categoryId) {
+      this.bulkError.set(this.t('adminUi.products.bulk.category.valueRequired'));
+      return;
+    }
+    const payload = Array.from(this.selected).map((id) => ({
+      product_id: id,
+      category_id: categoryId
+    }));
+    this.bulkBusy.set(true);
+    this.admin.bulkUpdateProducts(payload).subscribe({
+      next: () => {
+        this.bulkBusy.set(false);
+        this.toast.success(this.t('adminUi.products.bulk.success'));
+        this.clearSelection();
+        this.load();
+      },
+      error: () => {
+        this.bulkBusy.set(false);
+        this.bulkError.set(this.t('adminUi.products.bulk.error'));
+      }
+    });
+  }
+
+  applyScheduleToSelected(): void {
+    this.bulkError.set(null);
+    const publishDate = this.bulkPublishScheduledFor ? new Date(this.bulkPublishScheduledFor) : null;
+    const unpublishDate = this.bulkUnpublishScheduledFor ? new Date(this.bulkUnpublishScheduledFor) : null;
+
+    if (
+      (publishDate && Number.isNaN(publishDate.getTime())) ||
+      (unpublishDate && Number.isNaN(unpublishDate.getTime()))
+    ) {
+      this.bulkError.set(this.t('adminUi.products.bulk.schedule.invalidDate'));
+      return;
+    }
+
+    if (!publishDate && !unpublishDate) {
+      this.bulkError.set(this.t('adminUi.products.bulk.schedule.valueRequired'));
+      return;
+    }
+
+    if (publishDate && unpublishDate && unpublishDate.getTime() <= publishDate.getTime()) {
+      this.bulkError.set(this.t('adminUi.products.bulk.schedule.orderInvalid'));
+      return;
+    }
+
+    const publishIso = publishDate ? publishDate.toISOString() : null;
+    const unpublishIso = unpublishDate ? unpublishDate.toISOString() : null;
+
+    const payload = Array.from(this.selected).map((id) => ({
+      product_id: id,
+      ...(publishIso ? { publish_scheduled_for: publishIso } : {}),
+      ...(unpublishIso ? { unpublish_scheduled_for: unpublishIso } : {})
+    }));
+    this.bulkBusy.set(true);
+    this.admin.bulkUpdateProducts(payload).subscribe({
+      next: () => {
+        this.bulkBusy.set(false);
+        this.toast.success(this.t('adminUi.products.bulk.success'));
+        this.clearSelection();
+        this.load();
+      },
+      error: () => {
+        this.bulkBusy.set(false);
+        this.bulkError.set(this.t('adminUi.products.bulk.error'));
+      }
+    });
+  }
+
+  clearPublishScheduleForSelected(): void {
+    this.bulkError.set(null);
+    const payload = Array.from(this.selected).map((id) => ({
+      product_id: id,
+      publish_scheduled_for: null
+    }));
+    this.bulkBusy.set(true);
+    this.admin.bulkUpdateProducts(payload).subscribe({
+      next: () => {
+        this.bulkBusy.set(false);
+        this.toast.success(this.t('adminUi.products.bulk.success'));
+        this.clearSelection();
+        this.load();
+      },
+      error: () => {
+        this.bulkBusy.set(false);
+        this.bulkError.set(this.t('adminUi.products.bulk.error'));
+      }
+    });
+  }
+
+  clearUnpublishScheduleForSelected(): void {
+    this.bulkError.set(null);
+    const payload = Array.from(this.selected).map((id) => ({
+      product_id: id,
+      unpublish_scheduled_for: null
+    }));
+    this.bulkBusy.set(true);
+    this.admin.bulkUpdateProducts(payload).subscribe({
+      next: () => {
+        this.bulkBusy.set(false);
+        this.toast.success(this.t('adminUi.products.bulk.success'));
         this.clearSelection();
         this.load();
       },

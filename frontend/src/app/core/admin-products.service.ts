@@ -20,6 +20,8 @@ export interface AdminProductListItem {
   category_name: string;
   updated_at: string;
   publish_at?: string | null;
+  publish_scheduled_for?: string | null;
+  unpublish_scheduled_for?: string | null;
 }
 
 export interface AdminProductListResponse {

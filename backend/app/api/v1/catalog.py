@@ -77,6 +77,7 @@ async def list_products(
         category_slug = None
 
     await catalog_service.auto_publish_due_sales(session)
+    await catalog_service.apply_due_product_schedules(session)
     offset = (page - 1) * limit
     min_bound, max_bound, currency = await catalog_service.get_product_price_bounds(
         session,
@@ -128,6 +129,7 @@ async def get_product_price_bounds(
         category_slug = None
 
     await catalog_service.auto_publish_due_sales(session)
+    await catalog_service.apply_due_product_schedules(session)
     min_price, max_price, currency = await catalog_service.get_product_price_bounds(
         session,
         category_slug=category_slug,
@@ -364,6 +366,7 @@ async def bulk_update_products(
 @router.get("/collections/featured", response_model=list[FeaturedCollectionRead])
 async def list_featured_collections(session: AsyncSession = Depends(get_session)) -> list[FeaturedCollectionRead]:
     await catalog_service.auto_publish_due_sales(session)
+    await catalog_service.apply_due_product_schedules(session)
     collections = await catalog_service.list_featured_collections(session)
     payload: list[FeaturedCollectionRead] = []
     for collection in collections:
@@ -434,6 +437,7 @@ async def recently_viewed_products(
     current_user=Depends(get_current_user_optional),
 ) -> list[Product]:
     await catalog_service.auto_publish_due_sales(session)
+    await catalog_service.apply_due_product_schedules(session)
     products = await catalog_service.get_recently_viewed(
         session, getattr(current_user, "id", None) if current_user else None, session_id, limit
     )
@@ -486,6 +490,7 @@ async def get_product(
     current_user=Depends(get_current_user_optional),
 ) -> Product:
     await catalog_service.auto_publish_due_sales(session)
+    await catalog_service.apply_due_product_schedules(session)
     product_options = [selectinload(Product.images)]
     if lang:
         product_options.append(selectinload(Product.translations))
@@ -640,6 +645,7 @@ async def related_products(
     current_user=Depends(get_current_user_optional),
 ) -> list[Product]:
     await catalog_service.auto_publish_due_sales(session)
+    await catalog_service.apply_due_product_schedules(session)
     product = await catalog_service.get_product_by_slug(
         session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
     )

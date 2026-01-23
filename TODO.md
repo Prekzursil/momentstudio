@@ -716,8 +716,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Orders: partial refund notifications – Email customer on partial refund (amount + note) and include the refund in receipt/share views.
 - [x] Admin Products: inline price editing – Spreadsheet-style editing for price/sale/stock with validation.
 - [x] Admin Products: bulk price adjustments – Apply +/- percent/amount to selected products with preview.
-- [ ] Admin Products: bulk category assignment – Add/remove categories for selected products.
-- [ ] Admin Products: bulk publish scheduling – Set publish/unpublish dates for multiple products.
+- [x] Admin Products: bulk category assignment – Add/remove categories for selected products.
+- [x] Admin Products: bulk publish scheduling – Set publish/unpublish dates for multiple products.
 - [ ] Admin Products: image alt text + captions – Manage SEO alt text per image per language.
 - [ ] Admin Products: image optimization stats – Display image size and offer one-click reprocess/resize.
 - [ ] Admin Products: variant matrix editor – Edit variant attributes/prices/stock in a grid.

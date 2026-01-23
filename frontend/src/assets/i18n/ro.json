@@ -2001,6 +2001,22 @@
         "success": "Produsele selectate au fost actualizate.",
         "published": "Produsele selectate au fost publicate.",
         "error": "Actualizarea în masă a eșuat.",
+        "category": {
+          "label": "Categorie",
+          "placeholder": "Selectează categoria",
+          "apply": "Aplică categoria",
+          "valueRequired": "Selectează o categorie."
+        },
+        "schedule": {
+          "publishAt": "Publică la",
+          "unpublishAt": "Retrage la",
+          "apply": "Aplică programarea",
+          "clearPublish": "Șterge programarea publicării",
+          "clearUnpublish": "Șterge programarea retragerii",
+          "valueRequired": "Alege cel puțin o dată.",
+          "orderInvalid": "Retragerea trebuie să fie după publicare.",
+          "invalidDate": "Introdu o dată/oră validă."
+        },
         "priceAdjust": {
           "mode": "Schimbare preț",
           "modePercent": "Procent",

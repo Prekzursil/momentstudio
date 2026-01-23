@@ -244,6 +244,8 @@ class ProductUpdate(BaseModel):
     sku: str | None = Field(default=None, min_length=3, max_length=64)
     status: ProductStatus | None = None
     publish_at: datetime | None = None
+    publish_scheduled_for: datetime | None = None
+    unpublish_scheduled_for: datetime | None = None
     tags: list[str] | None = None
     options: list[ProductOptionCreate] | None = None
     allow_backorder: bool | None = None
@@ -318,6 +320,9 @@ class BulkProductUpdateItem(BaseModel):
     sale_end_at: datetime | None = None
     sale_auto_publish: bool | None = None
     stock_quantity: int | None = Field(default=None, ge=0)
+    category_id: UUID | None = None
+    publish_scheduled_for: datetime | None = None
+    unpublish_scheduled_for: datetime | None = None
     status: ProductStatus | None = None
 
 

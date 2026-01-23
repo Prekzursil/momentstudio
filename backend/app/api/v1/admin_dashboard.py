@@ -406,6 +406,8 @@ async def search_products(
             category_name=cat.name,
             updated_at=prod.updated_at,
             publish_at=prod.publish_at,
+            publish_scheduled_for=getattr(prod, "publish_scheduled_for", None),
+            unpublish_scheduled_for=getattr(prod, "unpublish_scheduled_for", None),
         )
         for prod, cat in rows
     ]
@@ -452,6 +454,8 @@ async def products_by_ids(
             category_name=cat.name,
             updated_at=prod.updated_at,
             publish_at=prod.publish_at,
+            publish_scheduled_for=getattr(prod, "publish_scheduled_for", None),
+            unpublish_scheduled_for=getattr(prod, "unpublish_scheduled_for", None),
         )
         for prod, cat in rows
     ]

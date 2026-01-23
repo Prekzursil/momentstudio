@@ -97,6 +97,8 @@ class Product(Base):
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     status: Mapped[ProductStatus] = mapped_column(Enum(ProductStatus), nullable=False, default=ProductStatus.draft)
     publish_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    publish_scheduled_for: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    unpublish_scheduled_for: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     rating_average: Mapped[float] = mapped_column(Numeric(3, 2), nullable=False, default=0)
     rating_count: Mapped[int] = mapped_column(nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
