@@ -269,12 +269,15 @@ async def void_payment_intent(intent_id: str) -> dict:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
-async def refund_payment_intent(intent_id: str) -> dict:
-    """Refund a captured PaymentIntent."""
+async def refund_payment_intent(intent_id: str, *, amount_cents: int | None = None) -> dict:
+    """Refund a captured PaymentIntent (supports partial refunds via `amount_cents`)."""
     if not settings.stripe_secret_key:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
     init_stripe()
     try:
-        return stripe.Refund.create(payment_intent=intent_id)
+        payload: dict = {"payment_intent": intent_id}
+        if amount_cents is not None:
+            payload["amount"] = int(amount_cents)
+        return stripe.Refund.create(**payload)
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc

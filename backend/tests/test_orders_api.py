@@ -17,7 +17,7 @@ from app.models.address import Address
 from app.models.catalog import Category, Product, ProductStatus
 from app.models.cart import Cart, CartItem
 from app.models.coupons_v2 import Coupon, CouponRedemption, CouponReservation, CouponVisibility, Promotion, PromotionDiscountType
-from app.models.order import Order, OrderEvent, OrderStatus
+from app.models.order import Order, OrderEvent, OrderStatus, OrderItem
 from app.models.user import User, UserRole
 from app.services.auth import create_user, issue_tokens_for_user
 from app.schemas.user import UserCreate
@@ -659,6 +659,7 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
 
     delivery = client.post(f"/api/v1/orders/admin/{order_id}/delivery-email", headers=auth_headers(admin_token))
     assert delivery.status_code == 200
+
     assert sent["delivered"] == 1
 
     confirm = client.post(
@@ -668,6 +669,134 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     )
     assert confirm.status_code == 200
     assert sent["count"] == 2
+
+
+def test_admin_partial_refunds(test_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token, _ = create_user_token(SessionLocal, email="admin-refunds@example.com", admin=True)
+    customer_token, customer_id = create_user_token(SessionLocal, email="buyer-refunds@example.com")
+
+    async def seed_paid_order(*, payment_method: str, intent_id: str | None = None) -> tuple[str, str]:
+        async with SessionLocal() as session:
+            category = Category(slug=f"refund-cat-{payment_method}", name="Refunds")
+            product = Product(
+                category=category,
+                slug=f"refund-item-{payment_method}",
+                sku=f"RFND-{payment_method.upper()}",
+                name="Refund Item",
+                base_price=Decimal("20.00"),
+                currency="RON",
+                stock_quantity=5,
+                status=ProductStatus.published,
+            )
+            session.add(product)
+            await session.flush()
+
+            order = Order(
+                user_id=customer_id,
+                status=OrderStatus.paid,
+                reference_code=f"REF-{payment_method.upper()}",
+                customer_email="buyer-refunds@example.com",
+                customer_name="Buyer",
+                total_amount=Decimal("100.00"),
+                tax_amount=Decimal("0.00"),
+                fee_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+                payment_method=payment_method,
+                stripe_payment_intent_id=intent_id,
+            )
+            session.add(order)
+            await session.flush()
+
+            item = OrderItem(
+                order_id=order.id,
+                product_id=product.id,
+                quantity=5,
+                unit_price=Decimal("20.00"),
+                subtotal=Decimal("100.00"),
+            )
+            session.add(item)
+            session.add(OrderEvent(order_id=order.id, event="payment_captured", note="seed"))
+            await session.commit()
+            return str(order.id), str(item.id)
+
+    order_id, item_id = asyncio.run(seed_paid_order(payment_method="cod"))
+
+    # Unauthorized
+    forbidden = client.post(
+        f"/api/v1/orders/admin/{order_id}/refunds",
+        headers=auth_headers(customer_token),
+        json={"amount": "10.00", "note": "Nope", "process_payment": False},
+    )
+    assert forbidden.status_code == 403
+
+    # Manual partial refund record
+    partial = client.post(
+        f"/api/v1/orders/admin/{order_id}/refunds",
+        headers=auth_headers(admin_token),
+        json={
+            "amount": "10.00",
+            "note": "Partial refund for one item",
+            "items": [{"order_item_id": item_id, "quantity": 1}],
+            "process_payment": False,
+        },
+    )
+    assert partial.status_code == 200, partial.text
+    assert partial.json()["status"] == "paid"
+    assert any(evt["event"] == "refund_partial" for evt in partial.json().get("events", []))
+    refunds = partial.json().get("refunds") or []
+    assert len(refunds) == 1
+    assert refunds[0]["provider"] == "manual"
+
+    # Cannot refund beyond remaining amount
+    too_much = client.post(
+        f"/api/v1/orders/admin/{order_id}/refunds",
+        headers=auth_headers(admin_token),
+        json={"amount": "95.00", "note": "Too much", "process_payment": False},
+    )
+    assert too_much.status_code == 400
+
+    # Final partial refund completes the order refund
+    final = client.post(
+        f"/api/v1/orders/admin/{order_id}/refunds",
+        headers=auth_headers(admin_token),
+        json={"amount": "90.00", "note": "Complete refund", "process_payment": False},
+    )
+    assert final.status_code == 200
+    assert final.json()["status"] == "refunded"
+    assert len(final.json().get("refunds") or []) == 2
+
+    # Stripe sync path (monkeypatched)
+    stripe_order_id, stripe_item_id = asyncio.run(seed_paid_order(payment_method="stripe", intent_id="pi_test_123"))
+    called: dict[str, object] = {}
+
+    async def fake_refund_payment_intent(intent: str, *, amount_cents: int | None = None) -> dict:
+        called["intent"] = intent
+        called["amount_cents"] = amount_cents
+        return {"id": "re_test_123"}
+
+    monkeypatch.setattr(payments_service, "refund_payment_intent", fake_refund_payment_intent)
+
+    stripe_refund = client.post(
+        f"/api/v1/orders/admin/{stripe_order_id}/refunds",
+        headers=auth_headers(admin_token),
+        json={
+            "amount": "12.34",
+            "note": "Stripe partial refund",
+            "items": [{"order_item_id": stripe_item_id, "quantity": 1}],
+            "process_payment": True,
+        },
+    )
+    assert stripe_refund.status_code == 200, stripe_refund.text
+    payload = stripe_refund.json()
+    assert called.get("intent") == "pi_test_123"
+    assert called.get("amount_cents") == 1234
+    assert len(payload.get("refunds") or []) == 1
+    assert payload["refunds"][0]["provider"] == "stripe"
+    assert payload["refunds"][0]["provider_refund_id"] == "re_test_123"
 
 
 def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:

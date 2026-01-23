@@ -340,15 +340,32 @@ async def capture_order(*, paypal_order_id: str) -> str:
     return ""
 
 
-async def refund_capture(*, paypal_capture_id: str) -> str:
-    """Refund a captured PayPal payment and return the PayPal refund id (if available)."""
+async def refund_capture(
+    *,
+    paypal_capture_id: str,
+    amount_ron: Decimal | None = None,
+    currency_code: str | None = None,
+    fx_eur_per_ron: float | None = None,
+    fx_usd_per_ron: float | None = None,
+) -> str:
+    """Refund a captured PayPal payment and return the PayPal refund id (if available).
+
+    If `amount_ron` is provided, the refund is partial; the function converts from RON into the
+    configured PayPal settlement currency (EUR/USD) using the latest available FX rates.
+    """
     token = await _get_access_token()
     refund_url = f"{_base_url()}/v2/payments/captures/{paypal_capture_id}/refund"
+    payload: dict = {}
+    if amount_ron is not None:
+        currency = _paypal_currency(currency_code)
+        fx_per_ron = await _fx_per_ron(currency, fx_eur_per_ron=fx_eur_per_ron, fx_usd_per_ron=fx_usd_per_ron)
+        amount_converted = _convert_ron(Decimal(amount_ron), fx_per_ron)
+        payload = {"amount": {"value": _format_amount(amount_converted), "currency_code": currency}}
     try:
         async with httpx.AsyncClient(timeout=20) as client:
             resp = await client.post(
                 refund_url,
-                json={},
+                json=payload,
                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             )
             resp.raise_for_status()

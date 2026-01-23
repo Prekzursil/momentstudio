@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 import enum
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, func, Enum
+from sqlalchemy import DateTime, ForeignKey, Numeric, String, func, Enum, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -90,6 +90,13 @@ class Order(Base):
         lazy="selectin",
         order_by="OrderEvent.created_at",
     )
+    refunds: Mapped[list["OrderRefund"]] = relationship(
+        "OrderRefund",
+        back_populates="order",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="OrderRefund.created_at",
+    )
 
 
 class OrderItem(Base):
@@ -132,3 +139,19 @@ class OrderEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     order: Mapped[Order] = relationship("Order", back_populates="events")
+
+
+class OrderRefund(Base):
+    __tablename__ = "order_refunds"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    order_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="RON")
+    provider: Mapped[str] = mapped_column(String(20), nullable=False, default="manual")
+    provider_refund_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    note: Mapped[str | None] = mapped_column(String, nullable=True)
+    data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    order: Mapped[Order] = relationship("Order", back_populates="refunds")

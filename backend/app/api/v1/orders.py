@@ -69,6 +69,7 @@ from app.schemas.order_admin import (
     AdminOrderEmailResendRequest,
     AdminOrderIdsRequest,
 )
+from app.schemas.order_refund import AdminOrderRefundCreate
 from app.schemas.receipt import ReceiptRead, ReceiptShareTokenRead
 from app.services import notifications as notification_service
 from app.services import promo_usage
@@ -938,6 +939,7 @@ async def admin_get_order(
         shipping_label_filename=getattr(order, "shipping_label_filename", None),
         shipping_label_uploaded_at=getattr(order, "shipping_label_uploaded_at", None),
         has_shipping_label=bool(getattr(order, "shipping_label_path", None)),
+        refunds=getattr(order, "refunds", []) or [],
     )
 
 
@@ -1424,6 +1426,7 @@ async def admin_update_order(
         shipping_label_filename=getattr(full, "shipping_label_filename", None),
         shipping_label_uploaded_at=getattr(full, "shipping_label_uploaded_at", None),
         has_shipping_label=bool(getattr(full, "shipping_label_path", None)),
+        refunds=getattr(full, "refunds", []) or [],
     )
 
 
@@ -1470,6 +1473,7 @@ async def admin_upload_shipping_label(
         shipping_label_filename=getattr(full, "shipping_label_filename", None),
         shipping_label_uploaded_at=getattr(full, "shipping_label_uploaded_at", None),
         has_shipping_label=bool(getattr(full, "shipping_label_path", None)),
+        refunds=getattr(full, "refunds", []) or [],
     )
 
 
@@ -1576,6 +1580,46 @@ async def admin_refund_order(
             lang=owner.preferred_language if owner else None,
         )
     return updated
+
+
+@router.post("/admin/{order_id}/refunds", response_model=AdminOrderRead)
+async def admin_create_order_refund(
+    order_id: UUID,
+    payload: AdminOrderRefundCreate = Body(...),
+    session: AsyncSession = Depends(get_session),
+    admin_user=Depends(require_admin),
+) -> AdminOrderRead:
+    order = await order_service.get_order_by_id_admin(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    items = [(row.order_item_id, int(row.quantity)) for row in (payload.items or [])]
+    updated = await order_service.create_order_refund(
+        session,
+        order,
+        amount=payload.amount,
+        note=payload.note,
+        items=items,
+        process_payment=bool(payload.process_payment),
+        actor=(getattr(admin_user, "email", None) or getattr(admin_user, "username", None) or "admin").strip(),
+    )
+    if updated.status == OrderStatus.refunded:
+        await coupons_service.release_coupon_for_order(session, order=updated, reason="refunded")
+
+    base = OrderRead.model_validate(updated).model_dump()
+    return AdminOrderRead(
+        **base,
+        customer_email=getattr(updated, "customer_email", None)
+        or (getattr(updated.user, "email", None) if getattr(updated, "user", None) else None),
+        customer_username=getattr(updated.user, "username", None) if getattr(updated, "user", None) else None,
+        shipping_address=updated.shipping_address,
+        billing_address=updated.billing_address,
+        tracking_url=getattr(updated, "tracking_url", None),
+        shipping_label_filename=getattr(updated, "shipping_label_filename", None),
+        shipping_label_uploaded_at=getattr(updated, "shipping_label_uploaded_at", None),
+        has_shipping_label=bool(getattr(updated, "shipping_label_path", None)),
+        refunds=getattr(updated, "refunds", []) or [],
+    )
 
 
 @router.post("/admin/{order_id}/delivery-email", response_model=OrderRead)

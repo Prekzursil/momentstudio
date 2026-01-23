@@ -28,6 +28,7 @@ type OrderAction =
   | 'retry'
   | 'capture'
   | 'void'
+  | 'partialRefund'
   | 'refund'
   | 'deliveryEmail'
   | 'packingSlip'
@@ -319,7 +320,14 @@ type OrderAction =
 	                </div>
 	              </div>
 
-              <div class="flex items-center justify-end gap-2">
+              <div class="flex flex-wrap items-center justify-end gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.orders.actions.partialRefund' | translate"
+                  [disabled]="action() !== null || !canRefund()"
+                  (action)="openPartialRefundWizard()"
+                ></app-button>
                 <app-button
                   size="sm"
                   variant="ghost"
@@ -639,6 +647,176 @@ type OrderAction =
         </div>
       </div>
     </ng-container>
+
+    <ng-container *ngIf="partialRefundWizardOpen() && order() as o">
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closePartialRefundWizard()">
+        <div
+          class="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+          (click)="$event.stopPropagation()"
+        >
+          <div class="flex items-center justify-between gap-3">
+            <div class="grid gap-1">
+              <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.orders.partialRefundWizard.title' | translate }}
+              </h3>
+              <div class="text-xs text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.orders.detailTitle' | translate }}: {{ orderRef() }}
+              </div>
+            </div>
+            <button
+              type="button"
+              class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+              (click)="closePartialRefundWizard()"
+              [attr.aria-label]="'adminUi.orders.partialRefundWizard.cancel' | translate"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div class="mt-4 grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/40">
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-slate-600 dark:text-slate-300">{{ 'adminUi.orders.partialRefundWizard.remaining' | translate }}</span>
+              <span class="font-semibold text-slate-900 dark:text-slate-50">{{ refundableRemaining() | localizedCurrency : o.currency }}</span>
+            </div>
+            <div *ngIf="refundsTotal() > 0" class="text-xs text-slate-500 dark:text-slate-400">
+              {{ 'adminUi.orders.partialRefundWizard.alreadyRefunded' | translate }}:
+              {{ refundsTotal() | localizedCurrency : o.currency }}
+            </div>
+          </div>
+
+          <div class="mt-4 grid gap-2">
+            <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+              {{ 'adminUi.orders.partialRefundWizard.itemsTitle' | translate }}
+            </div>
+            <div
+              *ngFor="let it of o.items"
+              class="rounded-xl border border-slate-200 p-3 text-sm text-slate-700 dark:border-slate-800 dark:text-slate-200"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="grid gap-1">
+                  <div class="font-semibold text-slate-900 dark:text-slate-50">
+                    {{ it.product?.name || it.product_id }}
+                  </div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.orders.partialRefundWizard.purchasedQty' | translate }}: {{ it.quantity }}
+                    · {{ it.unit_price | localizedCurrency : o.currency }}
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    class="h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                    [disabled]="partialRefundQtyFor(it.id) <= 0"
+                    (click)="adjustPartialRefundQty(it.id, -1, it.quantity)"
+                  >
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    min="0"
+                    [max]="it.quantity"
+                    class="h-8 w-16 rounded-lg border border-slate-200 bg-white px-2 text-center text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [ngModel]="partialRefundQtyFor(it.id)"
+                    (ngModelChange)="setPartialRefundQty(it.id, $event, it.quantity)"
+                  />
+                  <button
+                    type="button"
+                    class="h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                    [disabled]="partialRefundQtyFor(it.id) >= it.quantity"
+                    (click)="adjustPartialRefundQty(it.id, 1, it.quantity)"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <div *ngIf="partialRefundQtyFor(it.id) > 0" class="mt-2 flex items-center justify-end text-xs text-slate-600 dark:text-slate-300">
+                {{ partialRefundLineTotal(it) | localizedCurrency : o.currency }}
+              </div>
+            </div>
+          </div>
+
+          <label class="mt-4 grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.orders.partialRefundWizard.amountLabel' | translate }}
+            <input
+              type="number"
+              step="0.01"
+              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              [(ngModel)]="partialRefundAmount"
+              [placeholder]="'adminUi.orders.partialRefundWizard.amountPlaceholder' | translate"
+            />
+            <div class="text-xs text-slate-500 dark:text-slate-400">
+              {{ 'adminUi.orders.partialRefundWizard.amountHint' | translate }}:
+              {{ partialRefundSelectionTotal(o) | localizedCurrency : o.currency }}
+            </div>
+          </label>
+
+          <label class="mt-3 grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.orders.partialRefundWizard.noteLabel' | translate }}
+            <textarea
+              class="min-h-[90px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              [(ngModel)]="partialRefundNote"
+              [placeholder]="'adminUi.orders.partialRefundWizard.notePlaceholder' | translate"
+            ></textarea>
+          </label>
+
+          <label class="mt-3 flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
+            <input
+              type="checkbox"
+              class="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800"
+              [(ngModel)]="partialRefundProcessPayment"
+              [disabled]="!canProcessPartialRefund()"
+            />
+            <span class="grid gap-1">
+              <span class="font-medium">{{ 'adminUi.orders.partialRefundWizard.processPaymentLabel' | translate }}</span>
+              <span class="text-xs text-slate-500 dark:text-slate-400">
+                {{ processPartialRefundHint() }}
+              </span>
+            </span>
+          </label>
+
+          <div *ngIf="partialRefundWizardError()" class="mt-2 text-sm text-rose-700 dark:text-rose-300">
+            {{ partialRefundWizardError() }}
+          </div>
+
+          <div class="mt-4 flex justify-end gap-2">
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.orders.partialRefundWizard.cancel' | translate"
+              [disabled]="action() !== null"
+              (action)="closePartialRefundWizard()"
+            ></app-button>
+            <app-button
+              size="sm"
+              [label]="'adminUi.orders.partialRefundWizard.confirm' | translate"
+              [disabled]="action() !== null"
+              (action)="confirmPartialRefund()"
+            ></app-button>
+          </div>
+
+          <div *ngIf="(o.refunds || []).length > 0" class="mt-4 grid gap-2">
+            <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+              {{ 'adminUi.orders.partialRefundWizard.historyTitle' | translate }}
+            </div>
+            <div
+              *ngFor="let r of o.refunds"
+              class="rounded-xl border border-slate-200 p-3 text-sm text-slate-700 dark:border-slate-800 dark:text-slate-200"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <div class="font-semibold text-slate-900 dark:text-slate-50">
+                  {{ r.amount | localizedCurrency : o.currency }} · {{ r.provider }}
+                </div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">{{ r.created_at | date: 'short' }}</div>
+              </div>
+              <div *ngIf="r.note" class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ r.note }}</div>
+              <div *ngIf="r.provider_refund_id" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.orders.partialRefundWizard.providerRefundId' | translate }}: {{ r.provider_refund_id }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ng-container>
   `
 })
 export class AdminOrderDetailComponent implements OnInit {
@@ -655,12 +833,18 @@ export class AdminOrderDetailComponent implements OnInit {
   receiptShare = signal<ReceiptShareToken | null>(null);
   refundWizardOpen = signal(false);
   refundWizardError = signal<string | null>(null);
+  partialRefundWizardOpen = signal(false);
+  partialRefundWizardError = signal<string | null>(null);
 
   statusValue: OrderStatus = 'pending_acceptance';
   trackingNumber = '';
   trackingUrl = '';
   cancelReason = '';
   refundNote = '';
+  partialRefundNote = '';
+  partialRefundAmount = '';
+  partialRefundProcessPayment = false;
+  partialRefundQty: Record<string, number> = {};
   returnReason = '';
   returnCustomerMessage = '';
   returnQty: Record<string, number> = {};
@@ -784,6 +968,156 @@ export class AdminOrderDetailComponent implements OnInit {
         this.action.set(null);
       }
     });
+  }
+
+  refundsTotal(): number {
+    const refunds = this.order()?.refunds ?? [];
+    return refunds.reduce((sum, refund) => sum + Number(refund?.amount ?? 0), 0);
+  }
+
+  refundableRemaining(): number {
+    const total = Number(this.order()?.total_amount ?? 0);
+    const remaining = total - this.refundsTotal();
+    return remaining > 0 ? remaining : 0;
+  }
+
+  partialRefundQtyFor(orderItemId: string): number {
+    return Number(this.partialRefundQty?.[orderItemId] ?? 0);
+  }
+
+  partialRefundLineTotal(it: AdminOrderDetail['items'][number]): number {
+    const qty = this.partialRefundQtyFor(it.id);
+    const unit = Number(it.unit_price ?? 0);
+    return Math.max(0, qty * unit);
+  }
+
+  partialRefundSelectionTotal(order: AdminOrderDetail): number {
+    return (order.items ?? []).reduce((sum, item) => sum + this.partialRefundLineTotal(item), 0);
+  }
+
+  canProcessPartialRefund(): boolean {
+    const o = this.order();
+    if (!o) return false;
+    const method = (o.payment_method ?? '').trim().toLowerCase();
+    if (method === 'stripe') return !!o.stripe_payment_intent_id;
+    if (method === 'paypal') return !!o.paypal_capture_id;
+    return false;
+  }
+
+  processPartialRefundHint(): string {
+    const o = this.order();
+    if (!o) return '';
+    const method = (o.payment_method ?? '').trim().toLowerCase();
+
+    if (this.canProcessPartialRefund()) {
+      return this.translate.instant('adminUi.orders.partialRefundWizard.processPaymentHintSupported');
+    }
+    if (method === 'stripe') {
+      return this.translate.instant('adminUi.orders.partialRefundWizard.processPaymentHintMissingStripe');
+    }
+    if (method === 'paypal') {
+      return this.translate.instant('adminUi.orders.partialRefundWizard.processPaymentHintMissingPaypal');
+    }
+    return this.translate.instant('adminUi.orders.partialRefundWizard.processPaymentHintUnsupported');
+  }
+
+  openPartialRefundWizard(): void {
+    if (!this.orderId) return;
+    const o = this.order();
+    if (!o || !this.canRefund()) return;
+
+    this.partialRefundWizardError.set(null);
+    this.partialRefundNote = '';
+    this.partialRefundProcessPayment = false;
+    this.partialRefundQty = Object.fromEntries((o.items ?? []).map((it) => [it.id, 0]));
+    this.partialRefundAmount = this.partialRefundSelectionTotal(o).toFixed(2);
+    this.partialRefundWizardOpen.set(true);
+  }
+
+  closePartialRefundWizard(): void {
+    this.partialRefundWizardOpen.set(false);
+    this.partialRefundWizardError.set(null);
+  }
+
+  setPartialRefundQty(orderItemId: string, rawValue: unknown, max: number): void {
+    const numeric = typeof rawValue === 'number' ? rawValue : Number(rawValue);
+    const safe = Number.isFinite(numeric) ? Math.trunc(numeric) : 0;
+    const clamped = Math.max(0, Math.min(max, safe));
+
+    this.partialRefundQty = { ...this.partialRefundQty, [orderItemId]: clamped };
+
+    const o = this.order();
+    if (o) this.partialRefundAmount = this.partialRefundSelectionTotal(o).toFixed(2);
+  }
+
+  adjustPartialRefundQty(orderItemId: string, delta: number, max: number): void {
+    this.setPartialRefundQty(orderItemId, this.partialRefundQtyFor(orderItemId) + delta, max);
+  }
+
+  confirmPartialRefund(): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    const o = this.order();
+    if (!o || !this.canRefund()) return;
+
+    const note = this.partialRefundNote.trim();
+    if (!note) {
+      this.partialRefundWizardError.set(this.translate.instant('adminUi.orders.partialRefundWizard.noteRequired'));
+      return;
+    }
+
+    const items = Object.entries(this.partialRefundQty)
+      .filter(([, qty]) => qty > 0)
+      .map(([orderItemId, qty]) => ({
+        order_item_id: orderItemId,
+        quantity: qty
+      }));
+    if (!items.length) {
+      this.partialRefundWizardError.set(this.translate.instant('adminUi.orders.partialRefundWizard.itemsRequired'));
+      return;
+    }
+
+    const amount = Number(this.partialRefundAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      this.partialRefundWizardError.set(this.translate.instant('adminUi.orders.partialRefundWizard.amountRequired'));
+      return;
+    }
+
+    const remaining = this.refundableRemaining();
+    if (amount > remaining + 0.00001) {
+      this.partialRefundWizardError.set(this.translate.instant('adminUi.orders.partialRefundWizard.amountTooHigh'));
+      return;
+    }
+
+    const processPayment = !!this.partialRefundProcessPayment && this.canProcessPartialRefund();
+
+    this.partialRefundWizardError.set(null);
+    this.action.set('partialRefund');
+    this.api
+      .createPartialRefund(orderId, {
+        amount: amount.toFixed(2),
+        note,
+        items,
+        process_payment: processPayment
+      })
+      .subscribe({
+        next: () => {
+          this.toast.success(this.translate.instant('adminUi.orders.success.partialRefund'));
+          this.partialRefundNote = '';
+          this.partialRefundAmount = '';
+          this.partialRefundProcessPayment = false;
+          this.partialRefundQty = {};
+          this.closePartialRefundWizard();
+          this.load(orderId);
+          this.action.set(null);
+        },
+        error: (err) => {
+          const msg = err?.error?.detail || this.translate.instant('adminUi.orders.errors.partialRefund');
+          this.partialRefundWizardError.set(msg);
+          this.toast.error(msg);
+          this.action.set(null);
+        }
+      });
   }
 
   deliveryLabel(): string {

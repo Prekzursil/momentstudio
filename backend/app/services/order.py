@@ -1,5 +1,5 @@
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Sequence
 from uuid import UUID
 import random
@@ -14,11 +14,12 @@ from sqlalchemy.sql.elements import ColumnElement
 
 from app.models.cart import Cart
 from app.models.catalog import Product, ProductStatus
-from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod, OrderEvent
+from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod, OrderEvent, OrderRefund
 from app.schemas.order import OrderUpdate, ShippingMethodCreate
 from app.services import checkout_settings as checkout_settings_service
 from app.services import pricing
 from app.services import payments
+from app.services import paypal
 from app.services import promo_usage
 
 
@@ -379,6 +380,7 @@ async def get_order_by_id_admin(session: AsyncSession, order_id: UUID) -> Order 
             selectinload(Order.items).selectinload(OrderItem.product),
             selectinload(Order.shipping_method),
             selectinload(Order.events),
+            selectinload(Order.refunds),
             selectinload(Order.user),
             selectinload(Order.shipping_address),
             selectinload(Order.billing_address),
@@ -604,6 +606,111 @@ async def refund_order(session: AsyncSession, order: Order, note: str | None = N
     session.add(order)
     await session.commit()
     hydrated = await get_order_by_id(session, order.id)
+    return hydrated or order
+
+
+async def create_order_refund(
+    session: AsyncSession,
+    order: Order,
+    *,
+    amount: Decimal,
+    note: str,
+    items: list[tuple[UUID, int]] | None = None,
+    process_payment: bool = False,
+    actor: str | None = None,
+) -> Order:
+    if order.status not in {OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Refund allowed only for paid/shipped/delivered orders")
+
+    await session.refresh(order, attribute_names=["refunds", "items"])
+    already_refunded = sum((Decimal(r.amount) for r in (order.refunds or [])), Decimal("0.00"))
+    total_amount = pricing.quantize_money(Decimal(order.total_amount))
+    remaining = pricing.quantize_money(total_amount - already_refunded)
+    if remaining <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order already fully refunded")
+
+    amount_q = pricing.quantize_money(Decimal(amount))
+    if amount_q <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid refund amount")
+    if amount_q > remaining:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Refund amount exceeds remaining refundable")
+
+    note_clean = (note or "").strip()
+    if not note_clean:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Refund note is required")
+    note_clean = note_clean[:2000]
+
+    selected_items: list[dict] = []
+    if items:
+        items_by_id = {it.id: it for it in (order.items or [])}
+        for item_id, qty in items:
+            q = int(qty or 0)
+            if q <= 0:
+                continue
+            order_item = items_by_id.get(item_id)
+            if not order_item:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order item")
+            if q > int(order_item.quantity):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid refund quantity")
+            selected_items.append({"order_item_id": str(order_item.id), "quantity": q})
+
+    provider = "manual"
+    provider_refund_id: str | None = None
+
+    if process_payment:
+        method = (getattr(order, "payment_method", None) or "").strip().lower()
+        if method == "stripe":
+            payment_intent_id = (getattr(order, "stripe_payment_intent_id", None) or "").strip()
+            if not payment_intent_id:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stripe payment intent id required")
+            cents = int((amount_q * 100).to_integral_value(rounding=ROUND_HALF_UP))
+            refund = await payments.refund_payment_intent(payment_intent_id, amount_cents=cents)
+            provider = "stripe"
+            provider_refund_id = refund.get("id") if isinstance(refund, dict) else None
+        elif method == "paypal":
+            capture_id = (getattr(order, "paypal_capture_id", None) or "").strip()
+            if not capture_id:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="PayPal capture id required")
+            provider = "paypal"
+            provider_refund_id = (await paypal.refund_capture(paypal_capture_id=capture_id, amount_ron=amount_q)) or None
+        else:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Automatic refunds not supported for this payment method")
+
+    record = OrderRefund(
+        order_id=order.id,
+        amount=amount_q,
+        currency=order.currency,
+        provider=provider,
+        provider_refund_id=provider_refund_id,
+        note=note_clean,
+        data={
+            "items": selected_items,
+            "actor": actor,
+            "process_payment": bool(process_payment),
+        }
+        if (selected_items or actor or process_payment)
+        else None,
+    )
+    session.add(record)
+
+    prefix = (actor or "").strip()
+    event_note = f"{amount_q} {order.currency} ({provider}{' ' + provider_refund_id if provider_refund_id else ''})"
+    if prefix:
+        event_note = f"{prefix}: {event_note}"
+    if note_clean:
+        event_note = f"{event_note} - {note_clean}"
+    session.add(OrderEvent(order_id=order.id, event="refund_partial", note=event_note[:2000]))
+
+    remaining_after = pricing.quantize_money(total_amount - (already_refunded + amount_q))
+    if remaining_after <= 0 and order.status != OrderStatus.refunded:
+        previous = OrderStatus(order.status)
+        order.status = OrderStatus.refunded
+        session.add(OrderEvent(order_id=order.id, event="status_change", note=f"{previous.value} -> refunded"))
+        session.add(OrderEvent(order_id=order.id, event="refund_completed", note="Order fully refunded via partial refunds"))
+        session.add(order)
+
+    await session.commit()
+    hydrated = await get_order_by_id_admin(session, order.id)
     return hydrated or order
 
 

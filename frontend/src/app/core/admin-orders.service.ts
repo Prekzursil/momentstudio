@@ -34,6 +34,17 @@ export interface AdminOrderEvent {
   created_at: string;
 }
 
+export interface AdminOrderRefund {
+  id: string;
+  amount: number;
+  currency: string;
+  provider: string;
+  provider_refund_id?: string | null;
+  note?: string | null;
+  created_at: string;
+  data?: Record<string, unknown> | null;
+}
+
 export interface AdminOrderDetail extends Order {
   payment_retry_count?: number;
   stripe_payment_intent_id?: string | null;
@@ -46,6 +57,7 @@ export interface AdminOrderDetail extends Order {
   shipping_label_uploaded_at?: string | null;
   has_shipping_label?: boolean;
   events?: AdminOrderEvent[];
+  refunds?: AdminOrderRefund[];
   items: OrderItem[];
 }
 
@@ -80,6 +92,10 @@ export class AdminOrdersService {
         tax_amount: parseMoney(o?.tax_amount),
         fee_amount: parseMoney(o?.fee_amount),
         shipping_amount: parseMoney(o?.shipping_amount),
+        refunds: (o?.refunds ?? []).map((r: any) => ({
+          ...r,
+          amount: parseMoney(r?.amount)
+        })),
         items: (o?.items ?? []).map((it: any) => ({
           ...it,
           unit_price: parseMoney(it?.unit_price),
@@ -106,6 +122,10 @@ export class AdminOrdersService {
         tax_amount: parseMoney(o?.tax_amount),
         fee_amount: parseMoney(o?.fee_amount),
         shipping_amount: parseMoney(o?.shipping_amount),
+        refunds: (o?.refunds ?? []).map((r: any) => ({
+          ...r,
+          amount: parseMoney(r?.amount)
+        })),
         items: (o?.items ?? []).map((it: any) => ({
           ...it,
           unit_price: parseMoney(it?.unit_price),
@@ -146,6 +166,35 @@ export class AdminOrdersService {
   requestRefund(orderId: string, note?: string | null): Observable<Order> {
     const suffix = note ? `?note=${encodeURIComponent(note)}` : '';
     return this.api.post<Order>(`/orders/admin/${orderId}/refund${suffix}`, {});
+  }
+
+  createPartialRefund(
+    orderId: string,
+    payload: {
+      amount: string;
+      note: string;
+      items?: Array<{ order_item_id: string; quantity: number }>;
+      process_payment?: boolean;
+    }
+  ): Observable<AdminOrderDetail> {
+    return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/refunds`, payload).pipe(
+      map((o: any) => ({
+        ...o,
+        total_amount: parseMoney(o?.total_amount),
+        tax_amount: parseMoney(o?.tax_amount),
+        fee_amount: parseMoney(o?.fee_amount),
+        shipping_amount: parseMoney(o?.shipping_amount),
+        refunds: (o?.refunds ?? []).map((r: any) => ({
+          ...r,
+          amount: parseMoney(r?.amount)
+        })),
+        items: (o?.items ?? []).map((it: any) => ({
+          ...it,
+          unit_price: parseMoney(it?.unit_price),
+          subtotal: parseMoney(it?.subtotal)
+        }))
+      }))
+    );
   }
 
   sendDeliveryEmail(orderId: string): Observable<Order> {
