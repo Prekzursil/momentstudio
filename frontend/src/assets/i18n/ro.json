@@ -2084,6 +2084,7 @@
       "export": "Exportă CSV",
       "search": "Caută",
       "statusFilter": "Status",
+      "tagFilter": "Etichetă",
       "from": "De la",
       "to": "Până la",
       "presets": {
@@ -2246,6 +2247,25 @@
       "notesEmpty": "Nu există note interne încă.",
       "notesAddLabel": "Notă nouă",
       "notesPlaceholder": "Scrie o notă internă pentru această comandă…",
+      "tags": {
+        "all": "Toate etichetele",
+        "vip": "VIP",
+        "fraud_risk": "Risc fraudă",
+        "gift": "Cadou",
+        "none": "Nicio etichetă încă.",
+        "addLabel": "Adaugă etichetă",
+        "select": "Alege",
+        "add": "Adaugă",
+        "removeLabel": "Elimină eticheta: {{tag}}",
+        "success": {
+          "add": "Etichetă adăugată",
+          "remove": "Etichetă eliminată"
+        },
+        "errors": {
+          "add": "Nu am putut adăuga eticheta.",
+          "remove": "Nu am putut elimina eticheta."
+        }
+      },
       "diff": {
         "courier": "Curier",
         "shippingMethod": "Metodă livrare"
@@ -2255,6 +2275,7 @@
         "reference": "Referință",
         "customer": "Client",
         "status": "Status",
+        "tags": "Etichete",
         "total": "Total",
         "created": "Creată"
       },

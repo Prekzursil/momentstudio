@@ -705,7 +705,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Orders: partial refunds UI – Support item-level partial refunds and sync with payment provider.
 - [x] Admin Orders: timeline diff view – Show field diffs (status, tracking, address changes) between events.
 - [x] Admin Orders: customer notes – Allow internal notes per order (visible only to admins).
-- [ ] Admin Orders: tag/label system – Add tags like “VIP”, “Fraud risk”, “Gift” and filter by tag.
+- [x] Admin Orders: tag/label system – Add tags like “VIP”, “Fraud risk”, “Gift” and filter by tag.
 - [ ] Admin Orders: fraud signals panel – Show velocity checks, mismatched country, multiple failed payments, etc.
 - [ ] Admin Orders: address edit + re-rate shipping – Edit shipping address and recompute shipping cost (audit + constraints).
 - [ ] Admin Orders: timeline diff view – include address diffs once address edit lands (shipping/billing before/after blocks).

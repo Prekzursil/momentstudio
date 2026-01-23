@@ -2084,6 +2084,7 @@
       "export": "Export CSV",
       "search": "Search",
       "statusFilter": "Status",
+      "tagFilter": "Tag",
       "from": "From",
       "to": "To",
       "presets": {
@@ -2246,6 +2247,25 @@
       "notesEmpty": "No internal notes yet.",
       "notesAddLabel": "Add note",
       "notesPlaceholder": "Write an internal note for this order…",
+      "tags": {
+        "all": "All tags",
+        "vip": "VIP",
+        "fraud_risk": "Fraud risk",
+        "gift": "Gift",
+        "none": "No tags yet.",
+        "addLabel": "Add tag",
+        "select": "Select",
+        "add": "Add",
+        "removeLabel": "Remove tag: {{tag}}",
+        "success": {
+          "add": "Tag added",
+          "remove": "Tag removed"
+        },
+        "errors": {
+          "add": "Could not add tag.",
+          "remove": "Could not remove tag."
+        }
+      },
       "diff": {
         "courier": "Courier",
         "shippingMethod": "Shipping method"
@@ -2255,6 +2275,7 @@
         "reference": "Reference",
         "customer": "Customer",
         "status": "Status",
+        "tags": "Tags",
         "total": "Total",
         "created": "Created"
       },

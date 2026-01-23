@@ -31,6 +31,8 @@ type OrderAction =
   | 'partialRefund'
   | 'refund'
   | 'addNote'
+  | 'tagAdd'
+  | 'tagRemove'
   | 'deliveryEmail'
   | 'packingSlip'
   | 'labelUpload'
@@ -114,6 +116,59 @@ type OrderAction =
                 </div>
                 <div *ngIf="lockerLabel()" class="mt-1 text-xs text-slate-600 dark:text-slate-300 truncate">
                   {{ lockerLabel() }}
+                </div>
+              </div>
+            </div>
+
+            <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+              <div class="flex items-start justify-between gap-3 flex-wrap">
+                <div class="grid gap-2">
+                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.orders.table.tags' | translate }}
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    <ng-container *ngFor="let tagValue of order()!.tags || []">
+                      <span
+                        class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                      >
+                        {{ tagLabel(tagValue) }}
+                        <button
+                          type="button"
+                          class="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                          [disabled]="action() !== null"
+                          (click)="removeTag(tagValue)"
+                          [attr.aria-label]="'adminUi.orders.tags.removeLabel' | translate: { tag: tagLabel(tagValue) }"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    </ng-container>
+                    <span *ngIf="(order()!.tags || []).length === 0" class="text-xs text-slate-400">
+                      {{ 'adminUi.orders.tags.none' | translate }}
+                    </span>
+                  </div>
+                </div>
+                <div class="flex items-end gap-2">
+                  <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.orders.tags.addLabel' | translate }}
+                    <select
+                      class="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [(ngModel)]="tagToAdd"
+                      [disabled]="action() !== null"
+                    >
+                      <option value="">{{ 'adminUi.orders.tags.select' | translate }}</option>
+                      <option value="vip">{{ 'adminUi.orders.tags.vip' | translate }}</option>
+                      <option value="fraud_risk">{{ 'adminUi.orders.tags.fraud_risk' | translate }}</option>
+                      <option value="gift">{{ 'adminUi.orders.tags.gift' | translate }}</option>
+                    </select>
+                  </label>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.orders.tags.add' | translate"
+                    [disabled]="action() !== null || !tagToAdd"
+                    (action)="addTag()"
+                  ></app-button>
                 </div>
               </div>
             </div>
@@ -900,6 +955,7 @@ export class AdminOrderDetailComponent implements OnInit {
   partialRefundProcessPayment = false;
   partialRefundQty: Record<string, number> = {};
   adminNoteText = '';
+  tagToAdd = '';
   returnReason = '';
   returnCustomerMessage = '';
   returnQty: Record<string, number> = {};
@@ -955,6 +1011,12 @@ export class AdminOrderDetailComponent implements OnInit {
     const username = (o.customer_username ?? '').trim();
     if (email && username) return `${email} (${username})`;
     return email || username || this.translate.instant('adminUi.orders.guest');
+  }
+
+  tagLabel(tag: string): string {
+    const key = `adminUi.orders.tags.${tag}`;
+    const translated = this.translate.instant(key);
+    return translated === key ? tag : translated;
   }
 
   paymentMethodLabel(): string {
@@ -1122,6 +1184,50 @@ export class AdminOrderDetailComponent implements OnInit {
       error: (err) => {
         const msg = err?.error?.detail || this.translate.instant('adminUi.orders.errors.note');
         this.adminNoteError.set(msg);
+        this.toast.error(msg);
+        this.action.set(null);
+      }
+    });
+  }
+
+  addTag(): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+
+    const tag = this.tagToAdd.trim();
+    if (!tag) return;
+
+    this.action.set('tagAdd');
+    this.api.addOrderTag(orderId, tag).subscribe({
+      next: (updated) => {
+        this.order.set(updated);
+        this.toast.success(this.translate.instant('adminUi.orders.tags.success.add'));
+        this.tagToAdd = '';
+        this.action.set(null);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.tags.errors.add');
+        this.toast.error(msg);
+        this.action.set(null);
+      }
+    });
+  }
+
+  removeTag(tag: string): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    const cleaned = (tag ?? '').trim();
+    if (!cleaned) return;
+
+    this.action.set('tagRemove');
+    this.api.removeOrderTag(orderId, cleaned).subscribe({
+      next: (updated) => {
+        this.order.set(updated);
+        this.toast.success(this.translate.instant('adminUi.orders.tags.success.remove'));
+        this.action.set(null);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.tags.errors.remove');
         this.toast.error(msg);
         this.action.set(null);
       }

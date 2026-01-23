@@ -4,9 +4,10 @@ from typing import Sequence
 from uuid import UUID
 import random
 import string
+import re
 
 from fastapi import HTTPException, status
-from sqlalchemy import String, cast, func, or_
+from sqlalchemy import String, cast, exists, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -14,7 +15,16 @@ from sqlalchemy.sql.elements import ColumnElement
 
 from app.models.cart import Cart
 from app.models.catalog import Product, ProductStatus
-from app.models.order import Order, OrderAdminNote, OrderEvent, OrderItem, OrderRefund, OrderStatus, ShippingMethod
+from app.models.order import (
+    Order,
+    OrderAdminNote,
+    OrderEvent,
+    OrderItem,
+    OrderRefund,
+    OrderStatus,
+    OrderTag,
+    ShippingMethod,
+)
 from app.schemas.order import OrderUpdate, ShippingMethodCreate
 from app.services import checkout_settings as checkout_settings_service
 from app.services import pricing
@@ -312,6 +322,7 @@ async def admin_search_orders(
     q: str | None = None,
     status: OrderStatus | None = None,
     pending_any: bool = False,
+    tag: str | None = None,
     from_dt=None,
     to_dt=None,
     page: int = 1,
@@ -324,11 +335,16 @@ async def admin_search_orders(
     from app.models.user import User
 
     cleaned_q = (q or "").strip()
+    tag_clean = _normalize_order_tag(tag) if tag is not None else None
     page = max(1, int(page or 1))
     limit = max(1, min(100, int(limit or 20)))
     offset = (page - 1) * limit
 
     filters: list[ColumnElement[bool]] = []
+    if tag_clean:
+        filters.append(
+            exists(select(OrderTag.id).where(OrderTag.order_id == Order.id, OrderTag.tag == tag_clean))
+        )
     if pending_any:
         filters.append(Order.status.in_([OrderStatus.pending_payment, OrderStatus.pending_acceptance]))
     elif status:
@@ -382,6 +398,7 @@ async def get_order_by_id_admin(session: AsyncSession, order_id: UUID) -> Order 
             selectinload(Order.events),
             selectinload(Order.refunds),
             selectinload(Order.admin_notes),
+            selectinload(Order.tags),
             selectinload(Order.user),
             selectinload(Order.shipping_address),
             selectinload(Order.billing_address),
@@ -389,6 +406,15 @@ async def get_order_by_id_admin(session: AsyncSession, order_id: UUID) -> Order 
         .where(Order.id == order_id)
     )
     return result.scalar_one_or_none()
+
+
+def _normalize_order_tag(tag: str | None) -> str | None:
+    if tag is None:
+        return None
+    cleaned = re.sub(r"\s+", "_", str(tag).strip().lower())
+    cleaned = re.sub(r"[^a-z0-9_-]", "", cleaned)
+    cleaned = cleaned.strip("_-")
+    return cleaned[:50] if cleaned else None
 
 
 ALLOWED_TRANSITIONS = {
@@ -604,6 +630,51 @@ async def add_admin_note(session: AsyncSession, order: Order, *, note: str, acto
     note_clean = note_clean[:5000]
 
     session.add(OrderAdminNote(order_id=order.id, actor_user_id=actor_user_id, note=note_clean))
+    await session.commit()
+
+    hydrated = await get_order_by_id_admin(session, order.id)
+    return hydrated or order
+
+
+async def list_order_tags(session: AsyncSession) -> list[str]:
+    result = await session.execute(select(OrderTag.tag).distinct().order_by(OrderTag.tag))
+    return [row[0] for row in result.all() if row and row[0]]
+
+
+async def add_order_tag(session: AsyncSession, order: Order, *, tag: str, actor_user_id: UUID | None = None) -> Order:
+    tag_clean = _normalize_order_tag(tag)
+    if not tag_clean:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tag is required")
+
+    existing = (
+        await session.execute(select(OrderTag).where(OrderTag.order_id == order.id, OrderTag.tag == tag_clean))
+    ).scalar_one_or_none()
+    if existing:
+        hydrated = await get_order_by_id_admin(session, order.id)
+        return hydrated or order
+
+    session.add(OrderTag(order_id=order.id, actor_user_id=actor_user_id, tag=tag_clean))
+    session.add(OrderEvent(order_id=order.id, event="tag_added", note=tag_clean, data={"tag": tag_clean}))
+    await session.commit()
+
+    hydrated = await get_order_by_id_admin(session, order.id)
+    return hydrated or order
+
+
+async def remove_order_tag(session: AsyncSession, order: Order, *, tag: str, actor_user_id: UUID | None = None) -> Order:
+    tag_clean = _normalize_order_tag(tag)
+    if not tag_clean:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tag is required")
+
+    existing = (
+        await session.execute(select(OrderTag).where(OrderTag.order_id == order.id, OrderTag.tag == tag_clean))
+    ).scalar_one_or_none()
+    if not existing:
+        hydrated = await get_order_by_id_admin(session, order.id)
+        return hydrated or order
+
+    await session.delete(existing)
+    session.add(OrderEvent(order_id=order.id, event="tag_removed", note=tag_clean, data={"tag": tag_clean}))
     await session.commit()
 
     hydrated = await get_order_by_id_admin(session, order.id)

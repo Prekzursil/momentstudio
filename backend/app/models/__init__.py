@@ -37,7 +37,16 @@ from app.models.coupons_v2 import (  # noqa: F401
     CouponVisibility,
 )
 from app.models.address import Address  # noqa: F401
-from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod, OrderEvent, OrderRefund, OrderAdminNote  # noqa: F401
+from app.models.order import (  # noqa: F401
+    Order,
+    OrderItem,
+    OrderStatus,
+    ShippingMethod,
+    OrderEvent,
+    OrderRefund,
+    OrderAdminNote,
+    OrderTag,
+)
 from app.models.content import (  # noqa: F401
     ContentBlock,
     ContentBlockVersion,
@@ -97,6 +106,7 @@ __all__ = [
     "OrderEvent",
     "OrderRefund",
     "OrderAdminNote",
+    "OrderTag",
     "ContentBlock",
     "ContentBlockVersion",
     "ContentStatus",

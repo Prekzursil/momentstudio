@@ -20,6 +20,7 @@ export interface AdminOrderListItem {
   created_at: string;
   customer_email?: string | null;
   customer_username?: string | null;
+  tags?: string[];
 }
 
 export interface AdminOrderListResponse {
@@ -73,6 +74,7 @@ export interface AdminOrderDetail extends Order {
   events?: AdminOrderEvent[];
   refunds?: AdminOrderRefund[];
   admin_notes?: AdminOrderNote[];
+  tags?: string[];
   items: OrderItem[];
 }
 
@@ -83,6 +85,7 @@ export class AdminOrdersService {
   search(params: {
     q?: string;
     status?: string;
+    tag?: string;
     from?: string;
     to?: string;
     page?: number;
@@ -93,7 +96,8 @@ export class AdminOrdersService {
         ...(res ?? {}),
         items: (res?.items ?? []).map((o: any) => ({
           ...o,
-          total_amount: parseMoney(o?.total_amount)
+          total_amount: parseMoney(o?.total_amount),
+          tags: Array.isArray(o?.tags) ? o.tags : []
         }))
       }))
     );
@@ -228,6 +232,58 @@ export class AdminOrdersService {
           amount: parseMoney(r?.amount)
         })),
         admin_notes: o?.admin_notes ?? [],
+        items: (o?.items ?? []).map((it: any) => ({
+          ...it,
+          unit_price: parseMoney(it?.unit_price),
+          subtotal: parseMoney(it?.subtotal)
+        }))
+      }))
+    );
+  }
+
+  listOrderTags(): Observable<string[]> {
+    return this.api.get<{ items?: string[] }>('/orders/admin/tags').pipe(
+      map((res: any) => (Array.isArray(res?.items) ? res.items : []).filter((t: any) => typeof t === 'string' && t.length))
+    );
+  }
+
+  addOrderTag(orderId: string, tag: string): Observable<AdminOrderDetail> {
+    return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/tags`, { tag }).pipe(
+      map((o: any) => ({
+        ...o,
+        total_amount: parseMoney(o?.total_amount),
+        tax_amount: parseMoney(o?.tax_amount),
+        fee_amount: parseMoney(o?.fee_amount),
+        shipping_amount: parseMoney(o?.shipping_amount),
+        refunds: (o?.refunds ?? []).map((r: any) => ({
+          ...r,
+          amount: parseMoney(r?.amount)
+        })),
+        admin_notes: o?.admin_notes ?? [],
+        tags: Array.isArray(o?.tags) ? o.tags : [],
+        items: (o?.items ?? []).map((it: any) => ({
+          ...it,
+          unit_price: parseMoney(it?.unit_price),
+          subtotal: parseMoney(it?.subtotal)
+        }))
+      }))
+    );
+  }
+
+  removeOrderTag(orderId: string, tag: string): Observable<AdminOrderDetail> {
+    return this.api.delete<AdminOrderDetail>(`/orders/admin/${orderId}/tags/${encodeURIComponent(tag)}`).pipe(
+      map((o: any) => ({
+        ...o,
+        total_amount: parseMoney(o?.total_amount),
+        tax_amount: parseMoney(o?.tax_amount),
+        fee_amount: parseMoney(o?.fee_amount),
+        shipping_amount: parseMoney(o?.shipping_amount),
+        refunds: (o?.refunds ?? []).map((r: any) => ({
+          ...r,
+          amount: parseMoney(r?.amount)
+        })),
+        admin_notes: o?.admin_notes ?? [],
+        tags: Array.isArray(o?.tags) ? o.tags : [],
         items: (o?.items ?? []).map((it: any) => ({
           ...it,
           unit_price: parseMoney(it?.unit_price),

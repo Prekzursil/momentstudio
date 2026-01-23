@@ -395,6 +395,45 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     assert updated_data["customer_email"] == "buyer@example.com"
     assert updated_data["shipping_address"]["line1"] == "123 Main"
 
+    tagged = client.post(
+        f"/api/v1/orders/admin/{order_id}/tags",
+        json={"tag": "VIP"},
+        headers=auth_headers(admin_token),
+    )
+    assert tagged.status_code == 200, tagged.text
+    tagged_data = tagged.json()
+    assert tagged_data["tags"] == ["vip"]
+
+    tags_list = client.get("/api/v1/orders/admin/tags", headers=auth_headers(admin_token))
+    assert tags_list.status_code == 200, tags_list.text
+    assert "vip" in tags_list.json()["items"]
+
+    tagged_search = client.get(
+        "/api/v1/orders/admin/search",
+        params={"tag": "vip", "page": 1, "limit": 10},
+        headers=auth_headers(admin_token),
+    )
+    assert tagged_search.status_code == 200, tagged_search.text
+    tagged_payload = tagged_search.json()
+    assert any(item["id"] == order_id for item in tagged_payload["items"])
+
+    removed = client.delete(
+        f"/api/v1/orders/admin/{order_id}/tags/vip",
+        headers=auth_headers(admin_token),
+    )
+    assert removed.status_code == 200, removed.text
+    removed_data = removed.json()
+    assert removed_data["tags"] == []
+
+    tagged_search_after = client.get(
+        "/api/v1/orders/admin/search",
+        params={"tag": "vip", "page": 1, "limit": 10},
+        headers=auth_headers(admin_token),
+    )
+    assert tagged_search_after.status_code == 200, tagged_search_after.text
+    tagged_payload_after = tagged_search_after.json()
+    assert not any(item["id"] == order_id for item in tagged_payload_after["items"])
+
 
 def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]

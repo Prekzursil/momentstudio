@@ -33,6 +33,7 @@ type AdminOrdersFilterPreset = {
   filters: {
     q: string;
     status: OrderStatusFilter;
+    tag: string;
     fromDate: string;
     toDate: string;
     limit: number;
@@ -65,7 +66,7 @@ type AdminOrdersFilterPreset = {
       </div>
 
       <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
-	        <div class="grid gap-3 lg:grid-cols-[1fr_240px_240px_240px_auto] items-end">
+	        <div class="grid gap-3 lg:grid-cols-[1fr_220px_220px_220px_220px_auto] items-end">
 	          <app-input [label]="'adminUi.orders.search' | translate" [(value)]="q"></app-input>
 
           <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -83,6 +84,17 @@ type AdminOrdersFilterPreset = {
 	              <option value="delivered">{{ 'adminUi.orders.delivered' | translate }}</option>
               <option value="cancelled">{{ 'adminUi.orders.cancelled' | translate }}</option>
               <option value="refunded">{{ 'adminUi.orders.refunded' | translate }}</option>
+            </select>
+          </label>
+
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.orders.tagFilter' | translate }}
+            <select
+              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              [(ngModel)]="tag"
+            >
+              <option value="">{{ 'adminUi.orders.tags.all' | translate }}</option>
+              <option *ngFor="let tagOption of tagOptions()" [value]="tagOption">{{ tagLabel(tagOption) }}</option>
             </select>
           </label>
 
@@ -242,7 +254,7 @@ type AdminOrdersFilterPreset = {
             </div>
 
 	          <div *ngIf="orders().length > 0" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-	            <table class="min-w-[920px] w-full text-sm">
+	            <table class="min-w-[1050px] w-full text-sm">
 	              <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
 	                <tr>
                     <th class="text-left font-semibold px-3 py-2">
@@ -257,6 +269,7 @@ type AdminOrdersFilterPreset = {
 	                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.reference' | translate }}</th>
 	                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.customer' | translate }}</th>
 	                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.status' | translate }}</th>
+	                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.tags' | translate }}</th>
 	                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.total' | translate }}</th>
 	                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.created' | translate }}</th>
 	                  <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.table.actions' | translate }}</th>
@@ -285,6 +298,16 @@ type AdminOrdersFilterPreset = {
                     <span [ngClass]="statusPillClass(order.status)" class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold">
                       {{ ('adminUi.orders.' + order.status) | translate }}
                     </span>
+                  </td>
+                  <td class="px-3 py-2">
+                    <div class="flex flex-wrap gap-1">
+                      <ng-container *ngFor="let tagValue of order.tags || []">
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                          {{ tagLabel(tagValue) }}
+                        </span>
+                      </ng-container>
+                      <span *ngIf="(order.tags || []).length === 0" class="text-xs text-slate-400">—</span>
+                    </div>
                   </td>
                   <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
                     {{ order.total_amount | localizedCurrency : order.currency }}
@@ -345,6 +368,7 @@ export class AdminOrdersComponent implements OnInit {
 
   q = '';
   status: OrderStatusFilter = 'all';
+  tag = '';
   fromDate = '';
   toDate = '';
   page = 1;
@@ -352,6 +376,7 @@ export class AdminOrdersComponent implements OnInit {
 
   presets: AdminOrdersFilterPreset[] = [];
   selectedPresetId = '';
+  tagOptions = signal<string[]>(['vip', 'fraud_risk', 'gift']);
 
   selectedIds = new Set<string>();
   bulkStatus: '' | Exclude<OrderStatusFilter, 'all'> = '';
@@ -369,6 +394,16 @@ export class AdminOrdersComponent implements OnInit {
 
   ngOnInit(): void {
     this.presets = this.loadPresets();
+    this.ordersApi.listOrderTags().subscribe({
+      next: (tags) => {
+        const merged = new Set<string>(['vip', 'fraud_risk', 'gift']);
+        for (const t of tags) merged.add(t);
+        this.tagOptions.set(Array.from(merged).sort());
+      },
+      error: () => {
+        // ignore
+      }
+    });
     this.load();
   }
 
@@ -382,6 +417,7 @@ export class AdminOrdersComponent implements OnInit {
   resetFilters(): void {
     this.q = '';
     this.status = 'all';
+    this.tag = '';
     this.fromDate = '';
     this.toDate = '';
     this.page = 1;
@@ -398,6 +434,7 @@ export class AdminOrdersComponent implements OnInit {
 
     this.q = preset.filters.q;
     this.status = preset.filters.status;
+    this.tag = preset.filters.tag;
     this.fromDate = preset.filters.fromDate;
     this.toDate = preset.filters.toDate;
     this.limit = preset.filters.limit;
@@ -422,6 +459,7 @@ export class AdminOrdersComponent implements OnInit {
       filters: {
         q: this.q,
         status: this.status,
+        tag: this.tag,
         fromDate: this.fromDate,
         toDate: this.toDate,
         limit: this.limit
@@ -636,6 +674,12 @@ export class AdminOrdersComponent implements OnInit {
     return email || username || this.translate.instant('adminUi.orders.guest');
   }
 
+  tagLabel(tag: string): string {
+    const key = `adminUi.orders.tags.${tag}`;
+    const translated = this.translate.instant(key);
+    return translated === key ? tag : translated;
+  }
+
   statusPillClass(status: string): string {
     return orderStatusChipClass(status);
   }
@@ -651,6 +695,8 @@ export class AdminOrdersComponent implements OnInit {
     const q = this.q.trim();
     if (q) params.q = q;
     if (this.status !== 'all') params.status = this.status;
+    const tag = this.tag.trim();
+    if (tag) params.tag = tag;
     if (this.fromDate) params.from = `${this.fromDate}T00:00:00Z`;
     if (this.toDate) params.to = `${this.toDate}T23:59:59Z`;
 
@@ -687,6 +733,7 @@ export class AdminOrdersComponent implements OnInit {
           filters: {
             q: String(candidate?.filters?.q ?? ''),
             status: (candidate?.filters?.status ?? 'all') as OrderStatusFilter,
+            tag: String(candidate?.filters?.tag ?? ''),
             fromDate: String(candidate?.filters?.fromDate ?? ''),
             toDate: String(candidate?.filters?.toDate ?? ''),
             limit:

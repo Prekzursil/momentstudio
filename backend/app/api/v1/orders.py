@@ -70,6 +70,7 @@ from app.schemas.order_admin import (
     AdminOrderIdsRequest,
 )
 from app.schemas.order_admin_note import OrderAdminNoteCreate
+from app.schemas.order_tag import OrderTagCreate, OrderTagsResponse
 from app.schemas.order_refund import AdminOrderRefundCreate
 from app.schemas.receipt import ReceiptRead, ReceiptShareTokenRead
 from app.services import notifications as notification_service
@@ -846,6 +847,7 @@ async def admin_list_orders(
 async def admin_search_orders(
     q: str | None = Query(default=None, max_length=200),
     status: str | None = Query(default=None),
+    tag: str | None = Query(default=None, max_length=50),
     from_dt: datetime | None = Query(default=None, alias="from"),
     to_dt: datetime | None = Query(default=None, alias="to"),
     page: int = Query(default=1, ge=1),
@@ -869,6 +871,7 @@ async def admin_search_orders(
         q=q,
         status=parsed_status,
         pending_any=pending_any,
+        tag=tag,
         from_dt=from_dt,
         to_dt=to_dt,
         page=page,
@@ -884,12 +887,22 @@ async def admin_search_orders(
             created_at=order.created_at,
             customer_email=email,
             customer_username=username,
+            tags=[t.tag for t in (getattr(order, "tags", None) or [])],
         )
         for (order, email, username) in rows
     ]
     total_pages = max(1, (int(total_items) + limit - 1) // limit)
     meta = AdminPaginationMeta(total_items=int(total_items), total_pages=total_pages, page=page, limit=limit)
     return AdminOrderListResponse(items=items, meta=meta)
+
+
+@router.get("/admin/tags", response_model=OrderTagsResponse)
+async def admin_list_order_tags(
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> OrderTagsResponse:
+    tags = await order_service.list_order_tags(session)
+    return OrderTagsResponse(items=tags)
 
 
 @router.get("/admin/export")
@@ -942,6 +955,7 @@ async def admin_get_order(
         has_shipping_label=bool(getattr(order, "shipping_label_path", None)),
         refunds=getattr(order, "refunds", []) or [],
         admin_notes=getattr(order, "admin_notes", []) or [],
+        tags=[t.tag for t in (getattr(order, "tags", None) or [])],
     )
 
 
@@ -1430,6 +1444,7 @@ async def admin_update_order(
         has_shipping_label=bool(getattr(full, "shipping_label_path", None)),
         refunds=getattr(full, "refunds", []) or [],
         admin_notes=getattr(full, "admin_notes", []) or [],
+        tags=[t.tag for t in (getattr(full, "tags", None) or [])],
     )
 
 
@@ -1478,6 +1493,7 @@ async def admin_upload_shipping_label(
         has_shipping_label=bool(getattr(full, "shipping_label_path", None)),
         refunds=getattr(full, "refunds", []) or [],
         admin_notes=getattr(full, "admin_notes", []) or [],
+        tags=[t.tag for t in (getattr(full, "tags", None) or [])],
     )
 
 
@@ -1624,6 +1640,7 @@ async def admin_create_order_refund(
         has_shipping_label=bool(getattr(updated, "shipping_label_path", None)),
         refunds=getattr(updated, "refunds", []) or [],
         admin_notes=getattr(updated, "admin_notes", []) or [],
+        tags=[t.tag for t in (getattr(updated, "tags", None) or [])],
     )
 
 
@@ -1654,6 +1671,73 @@ async def admin_add_order_note(
         has_shipping_label=bool(getattr(updated, "shipping_label_path", None)),
         refunds=getattr(updated, "refunds", []) or [],
         admin_notes=getattr(updated, "admin_notes", []) or [],
+        tags=[t.tag for t in (getattr(updated, "tags", None) or [])],
+    )
+
+
+@router.post("/admin/{order_id}/tags", response_model=AdminOrderRead)
+async def admin_add_order_tag(
+    order_id: UUID,
+    payload: OrderTagCreate = Body(...),
+    session: AsyncSession = Depends(get_session),
+    admin=Depends(require_admin),
+) -> AdminOrderRead:
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    updated = await order_service.add_order_tag(
+        session, order, tag=payload.tag, actor_user_id=getattr(admin, "id", None)
+    )
+
+    base = OrderRead.model_validate(updated).model_dump()
+    return AdminOrderRead(
+        **base,
+        customer_email=getattr(updated, "customer_email", None)
+        or (getattr(updated.user, "email", None) if getattr(updated, "user", None) else None),
+        customer_username=getattr(updated.user, "username", None) if getattr(updated, "user", None) else None,
+        shipping_address=updated.shipping_address,
+        billing_address=updated.billing_address,
+        tracking_url=getattr(updated, "tracking_url", None),
+        shipping_label_filename=getattr(updated, "shipping_label_filename", None),
+        shipping_label_uploaded_at=getattr(updated, "shipping_label_uploaded_at", None),
+        has_shipping_label=bool(getattr(updated, "shipping_label_path", None)),
+        refunds=getattr(updated, "refunds", []) or [],
+        admin_notes=getattr(updated, "admin_notes", []) or [],
+        tags=[t.tag for t in (getattr(updated, "tags", None) or [])],
+    )
+
+
+@router.delete("/admin/{order_id}/tags/{tag}", response_model=AdminOrderRead)
+async def admin_remove_order_tag(
+    order_id: UUID,
+    tag: str,
+    session: AsyncSession = Depends(get_session),
+    admin=Depends(require_admin),
+) -> AdminOrderRead:
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    updated = await order_service.remove_order_tag(
+        session, order, tag=tag, actor_user_id=getattr(admin, "id", None)
+    )
+
+    base = OrderRead.model_validate(updated).model_dump()
+    return AdminOrderRead(
+        **base,
+        customer_email=getattr(updated, "customer_email", None)
+        or (getattr(updated.user, "email", None) if getattr(updated, "user", None) else None),
+        customer_username=getattr(updated.user, "username", None) if getattr(updated, "user", None) else None,
+        shipping_address=updated.shipping_address,
+        billing_address=updated.billing_address,
+        tracking_url=getattr(updated, "tracking_url", None),
+        shipping_label_filename=getattr(updated, "shipping_label_filename", None),
+        shipping_label_uploaded_at=getattr(updated, "shipping_label_uploaded_at", None),
+        has_shipping_label=bool(getattr(updated, "shipping_label_path", None)),
+        refunds=getattr(updated, "refunds", []) or [],
+        admin_notes=getattr(updated, "admin_notes", []) or [],
+        tags=[t.tag for t in (getattr(updated, "tags", None) or [])],
     )
 
 

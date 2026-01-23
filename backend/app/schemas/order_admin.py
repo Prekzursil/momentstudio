@@ -23,6 +23,7 @@ class AdminOrderListItem(BaseModel):
     created_at: datetime
     customer_email: str | None = None
     customer_username: str | None = None
+    tags: list[str] = Field(default_factory=list)
 
 
 class AdminOrderListResponse(BaseModel):
@@ -41,6 +42,7 @@ class AdminOrderRead(OrderRead):
     has_shipping_label: bool = False
     refunds: list[OrderRefundRead] = Field(default_factory=list)
     admin_notes: list[OrderAdminNoteRead] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
 
 
 class AdminOrderEmailResendRequest(BaseModel):
