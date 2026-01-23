@@ -22,7 +22,7 @@ from app.schemas.receipt import ReceiptAddressRead, ReceiptItemRead, ReceiptRead
 
 Font = ImageFont.FreeTypeFont | ImageFont.ImageFont
 MoneyValue = str | SupportsFloat | SupportsIndex
-_REPORTLAB_FONTS_READY = False
+_REPORTLAB_FONTS: tuple[str, str] | None = None
 
 
 def _mask_email(email: str) -> str:
@@ -146,9 +146,9 @@ def build_order_receipt(order, items: Sequence | None = None, *, redacted: bool 
 
 
 def _register_reportlab_fonts() -> tuple[str, str]:
-    global _REPORTLAB_FONTS_READY
-    if _REPORTLAB_FONTS_READY:
-        return ("Helvetica", "Helvetica-Bold")
+    global _REPORTLAB_FONTS
+    if _REPORTLAB_FONTS is not None:
+        return _REPORTLAB_FONTS
 
     regular_candidates = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -165,11 +165,26 @@ def _register_reportlab_fonts() -> tuple[str, str]:
     if regular_path and bold_path:
         pdfmetrics.registerFont(TTFont("MomentSans", regular_path))
         pdfmetrics.registerFont(TTFont("MomentSansBold", bold_path))
-        _REPORTLAB_FONTS_READY = True
-        return ("MomentSans", "MomentSansBold")
+        _REPORTLAB_FONTS = ("MomentSans", "MomentSansBold")
+        return _REPORTLAB_FONTS
 
-    _REPORTLAB_FONTS_READY = True
-    return ("Helvetica", "Helvetica-Bold")
+    _REPORTLAB_FONTS = ("Helvetica", "Helvetica-Bold")
+    return _REPORTLAB_FONTS
+
+
+def _payment_method_bilingual_label(payment_method: str) -> str:
+    value = (payment_method or "").strip().lower()
+    if not value:
+        return ""
+    if value == "stripe":
+        return "Stripe"
+    if value == "paypal":
+        return "PayPal"
+    if value == "netopia":
+        return "Netopia"
+    if value == "cod":
+        return "Cash / Numerar"
+    return value.upper()
 
 
 def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None, *, redacted: bool = False) -> bytes:
@@ -294,7 +309,7 @@ def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None, *,
     # Payment / delivery info
     info_lines: list[str] = []
     if receipt.payment_method:
-        info_lines.append(f"Payment / Plată: {xml_escape(receipt.payment_method)}")
+        info_lines.append(f"Payment / Plată: {xml_escape(_payment_method_bilingual_label(receipt.payment_method))}")
     if receipt.courier or receipt.delivery_type:
         detail = " · ".join([x for x in [receipt.courier, receipt.delivery_type] if x])
         info_lines.append(f"Delivery / Livrare: {xml_escape(detail)}")
@@ -660,9 +675,9 @@ def render_order_receipt_pdf_raster(order, items: Sequence | None = None, *, red
         y += 30
 
     y += 10
-    pm = (getattr(order, "payment_method", None) or "").strip().lower()
+    pm = (getattr(order, "payment_method", None) or "").strip()
     if pm:
-        draw.text((margin, y), f"Payment / Plată: {pm}", fill=muted, font=small_font)
+        draw.text((margin, y), f"Payment / Plată: {_payment_method_bilingual_label(pm)}", fill=muted, font=small_font)
         y += 22
     courier = (getattr(order, "courier", None) or "").strip()
     delivery_type = (getattr(order, "delivery_type", None) or "").strip()
