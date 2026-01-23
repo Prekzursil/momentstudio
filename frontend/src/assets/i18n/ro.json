@@ -1279,6 +1279,13 @@
       "customRange": "Personalizat",
       "rangeFrom": "De la",
       "rangeTo": "Până la",
+      "customizeWidgets": "Personalizează widgeturile",
+      "widgetsTitle": "Widgeturi panou",
+      "widgets": {
+        "kpis": "KPI astăzi",
+        "counts": "Totaluri",
+        "range": "Statistici interval"
+      },
       "rangeErrors": {
         "missing": "Selectează ambele date (început și sfârșit).",
         "order": "Data de sfârșit trebuie să fie după data de început."

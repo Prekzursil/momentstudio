@@ -17,6 +17,8 @@ import {
 import { ToastService } from '../../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 
+type MetricWidgetId = 'kpis' | 'counts' | 'range';
+
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
@@ -45,112 +47,173 @@ import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 
       <ng-template #dashboardTpl>
         <section class="grid gap-3">
-          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboardTitle' | translate }}</h1>
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboardTitle' | translate }}</h1>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.dashboard.customizeWidgets' | translate"
+              (action)="toggleCustomizeWidgets()"
+            ></app-button>
+          </div>
 
-          <div class="flex flex-wrap items-end justify-between gap-3">
-            <div class="flex flex-wrap items-end gap-3">
-              <label class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
-                <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.rangeLabel' | translate }}</span>
-                <select
-                  class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
-                  [(ngModel)]="rangePreset"
-                  (ngModelChange)="onRangePresetChange()"
-                >
-                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="7">
-                    {{ 'adminUi.dashboard.lastDays' | translate: { days: 7 } }}
-                  </option>
-                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="30">
-                    {{ 'adminUi.dashboard.lastDays' | translate: { days: 30 } }}
-                  </option>
-                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="90">
-                    {{ 'adminUi.dashboard.lastDays' | translate: { days: 90 } }}
-                  </option>
-                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="custom">
-                    {{ 'adminUi.dashboard.customRange' | translate }}
-                  </option>
-                </select>
-              </label>
-
-              <label *ngIf="rangePreset === 'custom'" class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
-                <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.rangeFrom' | translate }}</span>
-                <input
-                  type="date"
-                  class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
-                  [(ngModel)]="rangeFrom"
-                />
-              </label>
-              <label *ngIf="rangePreset === 'custom'" class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
-                <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.rangeTo' | translate }}</span>
-                <input
-                  type="date"
-                  class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
-                  [(ngModel)]="rangeTo"
-                />
-              </label>
-
-              <app-button size="sm" [label]="'adminUi.actions.apply' | translate" (action)="applyRange()"></app-button>
-            </div>
-
-            <p *ngIf="summary()" class="text-xs text-slate-500 dark:text-slate-400">
-              {{ summary()?.range_from | date: 'mediumDate' }} → {{ summary()?.range_to | date: 'mediumDate' }}
+          <div
+            *ngIf="customizeWidgetsOpen()"
+            class="rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900"
+          >
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              {{ 'adminUi.dashboard.widgetsTitle' | translate }}
             </p>
-          </div>
-
-          <div *ngIf="rangeError" class="text-sm text-rose-700 dark:text-rose-300">
-            {{ rangeError }}
-          </div>
-
-          <div class="grid md:grid-cols-3 gap-4">
-            <app-card [title]="'adminUi.cards.ordersToday' | translate">
-              <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ summary()?.today_orders || 0 }}</div>
-              <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                {{ 'adminUi.cards.vsYesterday' | translate }}: {{ summary()?.yesterday_orders || 0 }} · {{ deltaLabel(summary()?.orders_delta_pct) }}
+            <div class="mt-3 grid gap-2">
+              <div
+                *ngFor="let widget of metricWidgets(); let i = index"
+                class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950"
+              >
+                <label class="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-900"
+                    [checked]="!isMetricWidgetHidden(widget)"
+                    (change)="toggleMetricWidget(widget)"
+                  />
+                  <span class="text-slate-800 dark:text-slate-100">{{ metricWidgetLabel(widget) }}</span>
+                </label>
+                <div class="flex items-center gap-2">
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [disabled]="i === 0"
+                    [label]="'adminUi.actions.up' | translate"
+                    (action)="moveMetricWidget(widget, -1)"
+                  ></app-button>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [disabled]="i === metricWidgets().length - 1"
+                    [label]="'adminUi.actions.down' | translate"
+                    (action)="moveMetricWidget(widget, 1)"
+                  ></app-button>
+                </div>
               </div>
-            </app-card>
-            <app-card [title]="'adminUi.cards.salesToday' | translate">
-              <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ (summary()?.today_sales || 0) | localizedCurrency : 'RON' }}</div>
-              <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                {{ 'adminUi.cards.vsYesterday' | translate }}: {{ (summary()?.yesterday_sales || 0) | localizedCurrency : 'RON' }} ·
-                {{ deltaLabel(summary()?.sales_delta_pct) }}
-              </div>
-            </app-card>
-            <app-card [title]="'adminUi.cards.refundsToday' | translate">
-              <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ summary()?.today_refunds || 0 }}</div>
-              <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                {{ 'adminUi.cards.vsYesterday' | translate }}: {{ summary()?.yesterday_refunds || 0 }} · {{ deltaLabel(summary()?.refunds_delta_pct) }}
-              </div>
-            </app-card>
+            </div>
           </div>
 
-          <div class="grid md:grid-cols-3 gap-4">
-            <app-card
-              [title]="'adminUi.cards.products' | translate"
-              [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.products || 0 }"
-            ></app-card>
-            <app-card
-              [title]="'adminUi.cards.orders' | translate"
-              [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.orders || 0 }"
-            ></app-card>
-            <app-card
-              [title]="'adminUi.cards.users' | translate"
-              [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.users || 0 }"
-            ></app-card>
-          </div>
+          <ng-container *ngFor="let widget of metricWidgets()">
+            <ng-container *ngIf="!isMetricWidgetHidden(widget)">
+              <ng-container [ngSwitch]="widget">
+                <div *ngSwitchCase="'kpis'" class="grid md:grid-cols-3 gap-4">
+                  <app-card [title]="'adminUi.cards.ordersToday' | translate">
+                    <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ summary()?.today_orders || 0 }}</div>
+                    <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.cards.vsYesterday' | translate }}: {{ summary()?.yesterday_orders || 0 }} ·
+                      {{ deltaLabel(summary()?.orders_delta_pct) }}
+                    </div>
+                  </app-card>
+                  <app-card [title]="'adminUi.cards.salesToday' | translate">
+                    <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+                      {{ (summary()?.today_sales || 0) | localizedCurrency : 'RON' }}
+                    </div>
+                    <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.cards.vsYesterday' | translate }}: {{ (summary()?.yesterday_sales || 0) | localizedCurrency : 'RON' }} ·
+                      {{ deltaLabel(summary()?.sales_delta_pct) }}
+                    </div>
+                  </app-card>
+                  <app-card [title]="'adminUi.cards.refundsToday' | translate">
+                    <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ summary()?.today_refunds || 0 }}</div>
+                    <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.cards.vsYesterday' | translate }}: {{ summary()?.yesterday_refunds || 0 }} ·
+                      {{ deltaLabel(summary()?.refunds_delta_pct) }}
+                    </div>
+                  </app-card>
+                </div>
 
-          <div class="grid md:grid-cols-3 gap-4">
-            <app-card
-              [title]="'adminUi.cards.lowStock' | translate"
-              [subtitle]="'adminUi.cards.countItems' | translate: { count: summary()?.low_stock || 0 }"
-            ></app-card>
-            <app-card
-              [title]="'adminUi.cards.salesRange' | translate: { days: summary()?.range_days || 30 }"
-              [subtitle]="(summary()?.sales_range || 0) | localizedCurrency : 'RON'"
-            ></app-card>
-            <app-card
-              [title]="'adminUi.cards.ordersRange' | translate: { days: summary()?.range_days || 30 }"
-              [subtitle]="'adminUi.cards.countOrders' | translate: { count: summary()?.orders_range || 0 }"
-            ></app-card>
-          </div>
+                <div *ngSwitchCase="'counts'" class="grid md:grid-cols-3 gap-4">
+                  <app-card
+                    [title]="'adminUi.cards.products' | translate"
+                    [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.products || 0 }"
+                  ></app-card>
+                  <app-card
+                    [title]="'adminUi.cards.orders' | translate"
+                    [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.orders || 0 }"
+                  ></app-card>
+                  <app-card
+                    [title]="'adminUi.cards.users' | translate"
+                    [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.users || 0 }"
+                  ></app-card>
+                </div>
+
+                <div *ngSwitchCase="'range'" class="grid gap-3">
+                  <div class="flex flex-wrap items-end justify-between gap-3">
+                    <div class="flex flex-wrap items-end gap-3">
+                      <label class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+                        <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.rangeLabel' | translate }}</span>
+                        <select
+                          class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
+                          [(ngModel)]="rangePreset"
+                          (ngModelChange)="onRangePresetChange()"
+                        >
+                          <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="7">
+                            {{ 'adminUi.dashboard.lastDays' | translate: { days: 7 } }}
+                          </option>
+                          <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="30">
+                            {{ 'adminUi.dashboard.lastDays' | translate: { days: 30 } }}
+                          </option>
+                          <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="90">
+                            {{ 'adminUi.dashboard.lastDays' | translate: { days: 90 } }}
+                          </option>
+                          <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="custom">
+                            {{ 'adminUi.dashboard.customRange' | translate }}
+                          </option>
+                        </select>
+                      </label>
+
+                      <label *ngIf="rangePreset === 'custom'" class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+                        <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.rangeFrom' | translate }}</span>
+                        <input
+                          type="date"
+                          class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
+                          [(ngModel)]="rangeFrom"
+                        />
+                      </label>
+                      <label *ngIf="rangePreset === 'custom'" class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+                        <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.rangeTo' | translate }}</span>
+                        <input
+                          type="date"
+                          class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
+                          [(ngModel)]="rangeTo"
+                        />
+                      </label>
+
+                      <app-button size="sm" [label]="'adminUi.actions.apply' | translate" (action)="applyRange()"></app-button>
+                    </div>
+
+                    <p *ngIf="summary()" class="text-xs text-slate-500 dark:text-slate-400">
+                      {{ summary()?.range_from | date: 'mediumDate' }} → {{ summary()?.range_to | date: 'mediumDate' }}
+                    </p>
+                  </div>
+
+                  <div *ngIf="rangeError" class="text-sm text-rose-700 dark:text-rose-300">
+                    {{ rangeError }}
+                  </div>
+
+                  <div class="grid md:grid-cols-3 gap-4">
+                    <app-card
+                      [title]="'adminUi.cards.lowStock' | translate"
+                      [subtitle]="'adminUi.cards.countItems' | translate: { count: summary()?.low_stock || 0 }"
+                    ></app-card>
+                    <app-card
+                      [title]="'adminUi.cards.salesRange' | translate: { days: summary()?.range_days || 30 }"
+                      [subtitle]="(summary()?.sales_range || 0) | localizedCurrency : 'RON'"
+                    ></app-card>
+                    <app-card
+                      [title]="'adminUi.cards.ordersRange' | translate: { days: summary()?.range_days || 30 }"
+                      [subtitle]="'adminUi.cards.countOrders' | translate: { count: summary()?.orders_range || 0 }"
+                    ></app-card>
+                  </div>
+                </div>
+              </ng-container>
+            </ng-container>
+          </ng-container>
         </section>
 
         <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -327,6 +390,10 @@ export class AdminDashboardComponent implements OnInit {
   error = signal('');
   summary = signal<AdminSummary | null>(null);
 
+  customizeWidgetsOpen = signal(false);
+  metricWidgetOrder = signal<MetricWidgetId[]>(['kpis', 'counts', 'range']);
+  metricWidgetHidden = signal<Record<MetricWidgetId, boolean>>({ kpis: false, counts: false, range: false });
+
   rangePreset: '7' | '30' | '90' | 'custom' = '30';
   rangeFrom = '';
   rangeTo = '';
@@ -353,6 +420,7 @@ export class AdminDashboardComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.loadWidgetPrefs();
     this.loadSummary();
     this.loadAudit(1);
   }
@@ -417,6 +485,85 @@ export class AdminDashboardComponent implements OnInit {
     const rounded = Math.round(deltaPct * 10) / 10;
     const sign = rounded > 0 ? '+' : '';
     return `${sign}${rounded}%`;
+  }
+
+  toggleCustomizeWidgets(): void {
+    this.customizeWidgetsOpen.set(!this.customizeWidgetsOpen());
+  }
+
+  metricWidgets(): MetricWidgetId[] {
+    return this.metricWidgetOrder();
+  }
+
+  metricWidgetLabel(id: MetricWidgetId): string {
+    if (id === 'kpis') return this.translate.instant('adminUi.dashboard.widgets.kpis');
+    if (id === 'counts') return this.translate.instant('adminUi.dashboard.widgets.counts');
+    return this.translate.instant('adminUi.dashboard.widgets.range');
+  }
+
+  isMetricWidgetHidden(id: MetricWidgetId): boolean {
+    return Boolean(this.metricWidgetHidden()[id]);
+  }
+
+  toggleMetricWidget(id: MetricWidgetId): void {
+    const nextHidden = { ...this.metricWidgetHidden() };
+    nextHidden[id] = !nextHidden[id];
+    this.metricWidgetHidden.set(nextHidden);
+    this.saveWidgetPrefs();
+  }
+
+  moveMetricWidget(id: MetricWidgetId, direction: -1 | 1): void {
+    const order = [...this.metricWidgetOrder()];
+    const index = order.indexOf(id);
+    if (index < 0) return;
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= order.length) return;
+    const next = [...order];
+    next.splice(index, 1);
+    next.splice(nextIndex, 0, id);
+    this.metricWidgetOrder.set(next);
+    this.saveWidgetPrefs();
+  }
+
+  private widgetPrefsKey(): string {
+    const userId = this.auth.user()?.id || 'anon';
+    return `admin_dashboard_widgets_v1:${userId}`;
+  }
+
+  private loadWidgetPrefs(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(this.widgetPrefsKey());
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { order?: MetricWidgetId[]; hidden?: Partial<Record<MetricWidgetId, boolean>> };
+      const allowed: MetricWidgetId[] = ['kpis', 'counts', 'range'];
+      const order = Array.isArray(parsed?.order) ? parsed.order.filter((x): x is MetricWidgetId => allowed.includes(x)) : [];
+      const normalizedOrder = Array.from(new Set(order));
+      allowed.forEach((id) => {
+        if (!normalizedOrder.includes(id)) normalizedOrder.push(id);
+      });
+      this.metricWidgetOrder.set(normalizedOrder);
+      const hidden = parsed?.hidden || {};
+      this.metricWidgetHidden.set({
+        kpis: Boolean(hidden.kpis),
+        counts: Boolean(hidden.counts),
+        range: Boolean(hidden.range)
+      });
+    } catch {
+      // ignore
+    }
+  }
+
+  private saveWidgetPrefs(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem(
+        this.widgetPrefsKey(),
+        JSON.stringify({ order: this.metricWidgetOrder(), hidden: this.metricWidgetHidden() })
+      );
+    } catch {
+      // ignore
+    }
   }
 
   private loadAudit(page: number): void {
