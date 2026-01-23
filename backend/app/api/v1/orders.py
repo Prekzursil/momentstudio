@@ -5,6 +5,7 @@ import secrets
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
+from typing import Any, Callable
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, UploadFile, File, Body, Response
@@ -911,23 +912,58 @@ async def admin_list_order_tags(
 async def admin_export_orders(
     session: AsyncSession = Depends(get_session),
     _: str = Depends(require_admin),
+    columns: list[str] | None = Query(default=None),
 ):
     orders = await order_service.list_orders(session)
+    allowed: dict[str, Callable[[Order], Any]] = {
+        "id": lambda o: str(o.id),
+        "reference_code": lambda o: o.reference_code or "",
+        "status": lambda o: getattr(o.status, "value", str(o.status)),
+        "total_amount": lambda o: str(o.total_amount),
+        "tax_amount": lambda o: str(o.tax_amount),
+        "fee_amount": lambda o: str(getattr(o, "fee_amount", 0) or 0),
+        "shipping_amount": lambda o: str(o.shipping_amount),
+        "currency": lambda o: o.currency or "",
+        "user_id": lambda o: str(o.user_id) if o.user_id else "",
+        "customer_email": lambda o: getattr(o, "customer_email", "") or "",
+        "customer_name": lambda o: getattr(o, "customer_name", "") or "",
+        "payment_method": lambda o: getattr(o, "payment_method", "") or "",
+        "promo_code": lambda o: getattr(o, "promo_code", "") or "",
+        "courier": lambda o: getattr(o, "courier", "") or "",
+        "delivery_type": lambda o: getattr(o, "delivery_type", "") or "",
+        "tracking_number": lambda o: getattr(o, "tracking_number", "") or "",
+        "tracking_url": lambda o: getattr(o, "tracking_url", "") or "",
+        "invoice_company": lambda o: getattr(o, "invoice_company", "") or "",
+        "invoice_vat_id": lambda o: getattr(o, "invoice_vat_id", "") or "",
+        "shipping_method": lambda o: getattr(getattr(o, "shipping_method", None), "name", "") or "",
+        "locker_name": lambda o: getattr(o, "locker_name", "") or "",
+        "locker_address": lambda o: getattr(o, "locker_address", "") or "",
+        "created_at": lambda o: o.created_at.isoformat() if getattr(o, "created_at", None) else "",
+        "updated_at": lambda o: o.updated_at.isoformat() if getattr(o, "updated_at", None) else "",
+    }
+    default_columns = ["id", "reference_code", "status", "total_amount", "currency", "user_id", "created_at"]
+    if not columns:
+        selected_columns = default_columns
+    else:
+        requested: list[str] = []
+        for raw in columns:
+            for part in str(raw).split(","):
+                cleaned = part.strip()
+                if cleaned:
+                    requested.append(cleaned)
+        invalid = [c for c in requested if c not in allowed]
+        if invalid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid export columns: {', '.join(sorted(set(invalid)))}. Allowed: {', '.join(sorted(allowed.keys()))}",
+            )
+        selected_columns = requested
+
     buffer = io.StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["id", "reference_code", "status", "total_amount", "currency", "user_id", "created_at"])
+    writer.writerow(selected_columns)
     for order in orders:
-        writer.writerow(
-            [
-                order.id,
-                order.reference_code,
-                order.status.value,
-                order.total_amount,
-                order.currency,
-                order.user_id,
-                order.created_at,
-            ]
-        )
+        writer.writerow([allowed[col](order) for col in selected_columns])
     buffer.seek(0)
     headers = {"Content-Disposition": "attachment; filename=orders.csv"}
     return StreamingResponse(iter([buffer.getvalue()]), media_type="text/csv", headers=headers)

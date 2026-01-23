@@ -1061,6 +1061,22 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
     assert "text/csv" in export_resp.headers.get("content-type", "")
     assert "reference_code" in export_resp.text
 
+    export_cols = client.get(
+        "/api/v1/orders/admin/export",
+        params=[("columns", "reference_code"), ("columns", "status")],
+        headers=auth_headers(admin_token),
+    )
+    assert export_cols.status_code == 200
+    header = export_cols.text.splitlines()[0]
+    assert header == "reference_code,status"
+
+    export_invalid = client.get(
+        "/api/v1/orders/admin/export",
+        params=[("columns", "nope")],
+        headers=auth_headers(admin_token),
+    )
+    assert export_invalid.status_code == 400
+
     reorder_resp = client.post(f"/api/v1/orders/{order_id}/reorder", headers=auth_headers(token))
     assert reorder_resp.status_code == 200
     assert len(reorder_resp.json()["items"]) == 1

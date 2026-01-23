@@ -470,8 +470,10 @@ export class AdminOrdersService {
     return this.api.postBlob('/orders/admin/batch/packing-slips', { order_ids: orderIds });
   }
 
-  downloadExport(): Observable<Blob> {
-    return this.api.getBlob('/orders/admin/export');
+  downloadExport(columns?: string[]): Observable<Blob> {
+    const cols = (columns ?? []).filter((c) => (c ?? '').trim());
+    const params = cols.length ? { columns: cols } : undefined;
+    return this.api.getBlob('/orders/admin/export', params);
   }
 
   resendOrderConfirmationEmail(orderId: string, note?: string | null): Observable<Order> {

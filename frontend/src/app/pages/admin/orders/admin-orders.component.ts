@@ -40,6 +40,13 @@ type AdminOrdersFilterPreset = {
   };
 };
 
+type AdminOrdersExportTemplate = {
+  id: string;
+  name: string;
+  createdAt: string;
+  columns: string[];
+};
+
 @Component({
   selector: 'app-admin-orders',
   standalone: true,
@@ -62,7 +69,7 @@ type AdminOrdersFilterPreset = {
           <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.title' | translate }}</h1>
           <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.orders.hint' | translate }}</p>
         </div>
-        <app-button size="sm" variant="ghost" [label]="'adminUi.orders.export' | translate" (action)="downloadExport()"></app-button>
+        <app-button size="sm" variant="ghost" [label]="'adminUi.orders.export' | translate" (action)="openExportModal()"></app-button>
       </div>
 
       <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
@@ -328,7 +335,7 @@ type AdminOrdersFilterPreset = {
             </table>
           </div>
 
-          <div *ngIf="meta()" class="flex items-center justify-between gap-3 pt-2 text-sm text-slate-700 dark:text-slate-200">
+	          <div *ngIf="meta()" class="flex items-center justify-between gap-3 pt-2 text-sm text-slate-700 dark:text-slate-200">
             <div>
               {{ 'adminUi.orders.pagination' | translate: { page: meta()!.page, total_pages: meta()!.total_pages, total_items: meta()!.total_items } }}
             </div>
@@ -348,11 +355,107 @@ type AdminOrdersFilterPreset = {
                 (action)="goToPage(meta()!.page + 1)"
               ></app-button>
             </div>
+	          </div>
+	        </ng-template>
+	      </section>
+
+      <ng-container *ngIf="exportModalOpen()">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeExportModal()">
+          <div
+            class="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+            (click)="$event.stopPropagation()"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <div class="grid gap-1">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.orders.exportModal.title' | translate }}
+                </h3>
+                <div class="text-xs text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.orders.exportModal.hint' | translate }}
+                </div>
+              </div>
+              <button
+                type="button"
+                class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+                (click)="closeExportModal()"
+                [attr.aria-label]="'adminUi.actions.cancel' | translate"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div class="mt-4 grid gap-4">
+              <div class="flex flex-wrap items-end justify-between gap-3">
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.orders.exportModal.template' | translate }}
+                  <select
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="selectedExportTemplateId"
+                    (ngModelChange)="applyExportTemplate($event)"
+                  >
+                    <option value="">{{ 'adminUi.orders.exportModal.custom' | translate }}</option>
+                    <option *ngFor="let tpl of exportTemplates" [value]="tpl.id">{{ tpl.name }}</option>
+                  </select>
+                </label>
+
+                <div class="flex items-center gap-2">
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.orders.exportModal.saveTemplate' | translate"
+                    (action)="saveExportTemplate()"
+                  ></app-button>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.orders.exportModal.deleteTemplate' | translate"
+                    [disabled]="!selectedExportTemplateId"
+                    (action)="deleteExportTemplate()"
+                  ></app-button>
+                </div>
+              </div>
+
+              <div class="grid gap-2">
+                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.orders.exportModal.columnsTitle' | translate }}
+                </div>
+                <div class="grid gap-2 sm:grid-cols-2">
+                  <label
+                    *ngFor="let col of exportColumnOptions"
+                    class="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
+                  >
+                    <input
+                      type="checkbox"
+                      class="h-4 w-4"
+                      [checked]="!!exportColumns[col]"
+                      (change)="toggleExportColumn(col, $any($event.target).checked)"
+                    />
+                    <span class="font-medium text-slate-900 dark:text-slate-50">
+                      {{ ('adminUi.orders.exportColumns.' + col) | translate }}
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="flex justify-end gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.actions.cancel' | translate"
+                  (action)="closeExportModal()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  [label]="'adminUi.orders.exportModal.download' | translate"
+                  (action)="downloadExport()"
+                ></app-button>
+              </div>
+            </div>
           </div>
-        </ng-template>
-      </section>
-    </div>
-  `
+        </div>
+      </ng-container>
+	    </div>
+	  `
 })
 export class AdminOrdersComponent implements OnInit {
   crumbs = [
@@ -378,6 +481,37 @@ export class AdminOrdersComponent implements OnInit {
   selectedPresetId = '';
   tagOptions = signal<string[]>(['vip', 'fraud_risk', 'gift']);
 
+  exportModalOpen = signal(false);
+  exportTemplates: AdminOrdersExportTemplate[] = [];
+  selectedExportTemplateId = '';
+  exportColumns: Record<string, boolean> = {};
+  exportColumnOptions: string[] = [
+    'id',
+    'reference_code',
+    'status',
+    'customer_email',
+    'customer_name',
+    'total_amount',
+    'currency',
+    'tax_amount',
+    'shipping_amount',
+    'fee_amount',
+    'payment_method',
+    'promo_code',
+    'courier',
+    'delivery_type',
+    'tracking_number',
+    'tracking_url',
+    'shipping_method',
+    'invoice_company',
+    'invoice_vat_id',
+    'locker_name',
+    'locker_address',
+    'user_id',
+    'created_at',
+    'updated_at'
+  ];
+
   selectedIds = new Set<string>();
   bulkStatus: '' | Exclude<OrderStatusFilter, 'all'> = '';
   bulkCourier: '' | 'sameday' | 'fan_courier' | 'clear' = '';
@@ -394,6 +528,7 @@ export class AdminOrdersComponent implements OnInit {
 
   ngOnInit(): void {
     this.presets = this.loadPresets();
+    this.loadExportState();
     this.ordersApi.listOrderTags().subscribe({
       next: (tags) => {
         const merged = new Set<string>(['vip', 'fraud_risk', 'gift']);
@@ -653,8 +788,46 @@ export class AdminOrdersComponent implements OnInit {
     void this.router.navigate(['/admin/orders', orderId]);
   }
 
+  openExportModal(): void {
+    this.exportModalOpen.set(true);
+  }
+
+  closeExportModal(): void {
+    this.exportModalOpen.set(false);
+  }
+
+  toggleExportColumn(column: string, checked: boolean): void {
+    if (!this.exportColumnOptions.includes(column)) return;
+    this.exportColumns = { ...this.exportColumns, [column]: checked };
+    this.selectedExportTemplateId = '';
+    this.persistExportState();
+  }
+
+  applyExportTemplate(templateId: string): void {
+    this.selectedExportTemplateId = templateId || '';
+    if (!this.selectedExportTemplateId) {
+      this.persistExportState();
+      return;
+    }
+    const tpl = this.exportTemplates.find((candidate) => candidate.id === this.selectedExportTemplateId);
+    if (!tpl) return;
+    const cols = (tpl.columns || []).filter((c) => this.exportColumnOptions.includes(c));
+    this.exportColumns = {};
+    this.exportColumnOptions.forEach((c) => (this.exportColumns[c] = cols.includes(c)));
+    this.persistExportState();
+  }
+
+  private selectedExportColumns(): string[] {
+    return this.exportColumnOptions.filter((c) => !!this.exportColumns[c]);
+  }
+
   downloadExport(): void {
-    this.ordersApi.downloadExport().subscribe({
+    const columns = this.selectedExportColumns();
+    if (!columns.length) {
+      this.toast.error(this.translate.instant('adminUi.orders.exportModal.errors.noColumns'));
+      return;
+    }
+    this.ordersApi.downloadExport(columns).subscribe({
       next: (blob) => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -662,9 +835,51 @@ export class AdminOrdersComponent implements OnInit {
         a.download = 'orders.csv';
         a.click();
         URL.revokeObjectURL(url);
+        this.closeExportModal();
       },
       error: () => this.toast.error(this.translate.instant('adminUi.orders.errors.export'))
     });
+  }
+
+  saveExportTemplate(): void {
+    const columns = this.selectedExportColumns();
+    if (!columns.length) {
+      this.toast.error(this.translate.instant('adminUi.orders.exportModal.errors.noColumns'));
+      return;
+    }
+    const name = (window.prompt(this.translate.instant('adminUi.orders.exportModal.templatePrompt')) ?? '').trim();
+    if (!name) {
+      this.toast.error(this.translate.instant('adminUi.orders.exportModal.errors.templateNameRequired'));
+      return;
+    }
+
+    const id =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+    const template: AdminOrdersExportTemplate = {
+      id,
+      name,
+      createdAt: new Date().toISOString(),
+      columns
+    };
+    this.exportTemplates = [template, ...this.exportTemplates].slice(0, 20);
+    this.selectedExportTemplateId = template.id;
+    this.persistExportState();
+    this.toast.success(this.translate.instant('adminUi.orders.exportModal.success.saved'));
+  }
+
+  deleteExportTemplate(): void {
+    const tpl = this.exportTemplates.find((candidate) => candidate.id === this.selectedExportTemplateId);
+    if (!tpl) return;
+    const ok = window.confirm(
+      this.translate.instant('adminUi.orders.exportModal.confirmDelete', {
+        name: tpl.name
+      })
+    );
+    if (!ok) return;
+    this.exportTemplates = this.exportTemplates.filter((candidate) => candidate.id !== tpl.id);
+    this.selectedExportTemplateId = '';
+    this.persistExportState();
+    this.toast.success(this.translate.instant('adminUi.orders.exportModal.success.deleted'));
   }
 
   customerLabel(order: AdminOrderListItem): string {
@@ -718,6 +933,58 @@ export class AdminOrdersComponent implements OnInit {
     return `admin.orders.filters.v1:${userId || 'anonymous'}`;
   }
 
+  private exportStorageKey(): string {
+    const userId = (this.auth.user()?.id ?? '').trim();
+    return `admin.orders.export.v1:${userId || 'anonymous'}`;
+  }
+
+  private loadExportState(): void {
+    const defaultColumns = ['id', 'reference_code', 'status', 'total_amount', 'currency', 'user_id', 'created_at'];
+    try {
+      const raw = localStorage.getItem(this.exportStorageKey());
+      if (!raw) {
+        this.exportTemplates = [];
+        this.selectedExportTemplateId = '';
+        this.exportColumns = {};
+        this.exportColumnOptions.forEach((c) => (this.exportColumns[c] = defaultColumns.includes(c)));
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      const templates = Array.isArray(parsed?.templates) ? parsed.templates : [];
+      this.exportTemplates = templates
+        .filter((candidate: any) => typeof candidate?.id === 'string' && typeof candidate?.name === 'string')
+        .map((candidate: any) => ({
+          id: String(candidate.id),
+          name: String(candidate.name),
+          createdAt: String(candidate.createdAt ?? ''),
+          columns: Array.isArray(candidate.columns) ? candidate.columns.map((c: any) => String(c)) : []
+        })) as AdminOrdersExportTemplate[];
+
+      this.selectedExportTemplateId = typeof parsed?.selectedTemplateId === 'string' ? parsed.selectedTemplateId : '';
+      let columns: string[] = Array.isArray(parsed?.columns) ? parsed.columns.map((c: any) => String(c)) : [];
+
+      if (this.selectedExportTemplateId) {
+        const tpl = this.exportTemplates.find((candidate) => candidate.id === this.selectedExportTemplateId);
+        if (tpl && Array.isArray(tpl.columns) && tpl.columns.length) {
+          columns = tpl.columns.slice();
+        }
+      }
+
+      columns = columns
+        .map((c: string) => c.trim())
+        .filter((c: string) => c && this.exportColumnOptions.includes(c));
+      if (!columns.length) columns = defaultColumns;
+
+      this.exportColumns = {};
+      this.exportColumnOptions.forEach((c) => (this.exportColumns[c] = columns.includes(c)));
+    } catch {
+      this.exportTemplates = [];
+      this.selectedExportTemplateId = '';
+      this.exportColumns = {};
+      this.exportColumnOptions.forEach((c) => (this.exportColumns[c] = defaultColumns.includes(c)));
+    }
+  }
+
   private loadPresets(): AdminOrdersFilterPreset[] {
     try {
       const raw = localStorage.getItem(this.storageKey());
@@ -750,6 +1017,21 @@ export class AdminOrdersComponent implements OnInit {
   private persistPresets(): void {
     try {
       localStorage.setItem(this.storageKey(), JSON.stringify(this.presets));
+    } catch {
+      // ignore
+    }
+  }
+
+  private persistExportState(): void {
+    try {
+      localStorage.setItem(
+        this.exportStorageKey(),
+        JSON.stringify({
+          templates: this.exportTemplates,
+          selectedTemplateId: this.selectedExportTemplateId,
+          columns: this.selectedExportColumns()
+        })
+      );
     } catch {
       // ignore
     }
