@@ -313,8 +313,9 @@ async def checkout(
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     current_user=Depends(require_verified_email),
+    session_id: str | None = Depends(cart_api.session_header),
 ) -> GuestCheckoutResponse:
-    user_cart = await cart_service.get_cart(session, current_user.id, None)
+    user_cart = await cart_service.get_cart(session, current_user.id, session_id)
     if not user_cart.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
 

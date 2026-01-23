@@ -50,6 +50,7 @@ from app.services import checkout_settings as checkout_settings_service
 from app.services import coupons_v2 as coupons_service
 from app.services import email as email_service
 from app.services import cart as cart_service
+from app.api.v1 import cart as cart_api
 
 
 router = APIRouter(prefix="/coupons", tags=["coupons"])
@@ -212,8 +213,9 @@ async def coupon_eligibility(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
     shipping_method_id: UUID | None = Query(default=None),
+    session_id: str | None = Depends(cart_api.session_header),
 ) -> CouponEligibilityResponse:
-    user_cart = await cart_service.get_cart(session, current_user.id, None)
+    user_cart = await cart_service.get_cart(session, current_user.id, session_id)
     checkout = await checkout_settings_service.get_checkout_settings(session)
     shipping_method = await _get_shipping_method(session, shipping_method_id)
     rate_flat = Decimal(getattr(shipping_method, "rate_flat", None) or 0) if shipping_method else None
@@ -237,12 +239,13 @@ async def validate_coupon(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
     shipping_method_id: UUID | None = Query(default=None),
+    session_id: str | None = Depends(cart_api.session_header),
 ) -> CouponOffer:
     code = (payload.code or "").strip().upper()
     coupon = await coupons_service.get_coupon_by_code(session, code=code)
     if not coupon:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
-    user_cart = await cart_service.get_cart(session, current_user.id, None)
+    user_cart = await cart_service.get_cart(session, current_user.id, session_id)
     checkout = await checkout_settings_service.get_checkout_settings(session)
     shipping_method = await _get_shipping_method(session, shipping_method_id)
     rate_flat = Decimal(getattr(shipping_method, "rate_flat", None) or 0) if shipping_method else None

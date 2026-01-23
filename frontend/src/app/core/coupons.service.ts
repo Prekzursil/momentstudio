@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
+import { CartApi } from './cart.api';
 
 export type PromotionDiscountType = 'percent' | 'amount' | 'free_shipping';
 export type CouponVisibility = 'public' | 'assigned';
@@ -60,16 +61,16 @@ export interface CouponEligibilityResponse {
 
 @Injectable({ providedIn: 'root' })
 export class CouponsService {
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, private cartApi: CartApi) {}
 
   eligibility(shippingMethodId?: string | null): Observable<CouponEligibilityResponse> {
     const params = shippingMethodId ? { shipping_method_id: shippingMethodId } : undefined;
-    return this.api.get<CouponEligibilityResponse>('/coupons/eligibility', params);
+    return this.api.get<CouponEligibilityResponse>('/coupons/eligibility', params, this.cartApi.headers());
   }
 
   validate(code: string, shippingMethodId?: string | null): Observable<CouponOffer> {
     const params = shippingMethodId ? { shipping_method_id: shippingMethodId } : undefined;
-    return this.api.post<CouponOffer>('/coupons/validate', { code }, undefined, params);
+    return this.api.post<CouponOffer>('/coupons/validate', { code }, this.cartApi.headers(), params);
   }
 
   myCoupons(): Observable<CouponRead[]> {
