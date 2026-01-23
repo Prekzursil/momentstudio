@@ -13,9 +13,12 @@ import {
   AdminAuditEntriesResponse,
   AdminAuditEntity,
   AdminAuditEntryUnified,
+  AdminDashboardScheduledTasksResponse,
   AdminDashboardSearchResult,
   AdminDashboardSearchResultType,
   AdminDashboardWindowMetric,
+  ScheduledPromoItem,
+  ScheduledPublishItem,
   AdminService,
   AdminSummary
 } from '../../../core/admin.service';
@@ -388,6 +391,95 @@ type MetricWidgetId = 'kpis' | 'counts' | 'range';
 
 	        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
 	          <div class="flex items-center justify-between gap-3 flex-wrap">
+	            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboard.scheduledTitle' | translate }}</h2>
+              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadScheduledTasks()"></app-button>
+	          </div>
+
+            <div *ngIf="scheduledError()" class="text-sm text-rose-700 dark:text-rose-300">
+              {{ scheduledError() }}
+            </div>
+
+            <div *ngIf="scheduledLoading()" class="text-sm text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.dashboard.scheduledLoading' | translate }}
+            </div>
+
+	          <div *ngIf="!scheduledLoading()" class="grid gap-4 lg:grid-cols-2">
+              <div class="grid gap-2">
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.dashboard.scheduledPublishesTitle' | translate }}
+                </p>
+
+                <div *ngIf="scheduledTasks()?.publish_schedules?.length; else emptyPublishesTpl" class="grid gap-2">
+                  <div
+                    *ngFor="let item of scheduledTasks()?.publish_schedules"
+                    class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+                  >
+                    <div class="min-w-0">
+                      <p class="truncate font-semibold text-slate-900 dark:text-slate-50">{{ item.name }}</p>
+                      <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                        {{ 'adminUi.dashboard.scheduledFor' | translate }}: {{ item.scheduled_for | date: 'short' }}
+                      </p>
+                      <p *ngIf="item.sale_end_at" class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                        {{ 'adminUi.dashboard.scheduledSaleEnds' | translate }}: {{ item.sale_end_at | date: 'short' }}
+                      </p>
+                    </div>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.actions.open' | translate"
+                      (action)="openScheduledPublish(item)"
+                    ></app-button>
+                  </div>
+                </div>
+
+                <ng-template #emptyPublishesTpl>
+                  <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.scheduledEmptyPublishes' | translate }}</p>
+                </ng-template>
+              </div>
+
+              <div class="grid gap-2">
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.dashboard.scheduledPromosTitle' | translate }}
+                </p>
+
+                <div *ngIf="scheduledTasks()?.promo_schedules?.length; else emptyPromosTpl" class="grid gap-2">
+                  <div
+                    *ngFor="let promo of scheduledTasks()?.promo_schedules"
+                    class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+                  >
+                    <div class="min-w-0">
+                      <p class="truncate font-semibold text-slate-900 dark:text-slate-50">{{ promo.name }}</p>
+                      <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                        {{
+                          promo.next_event_type === 'starts_at'
+                            ? ('adminUi.dashboard.promoStartsAt' | translate)
+                            : ('adminUi.dashboard.promoEndsAt' | translate)
+                        }}: {{ promo.next_event_at | date: 'short' }}
+                      </p>
+                      <p *ngIf="promo.starts_at || promo.ends_at" class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                        <ng-container *ngIf="promo.starts_at">{{ 'adminUi.dashboard.promoStartsShort' | translate }} {{ promo.starts_at | date: 'short' }}</ng-container>
+                        <ng-container *ngIf="promo.starts_at && promo.ends_at"> · </ng-container>
+                        <ng-container *ngIf="promo.ends_at">{{ 'adminUi.dashboard.promoEndsShort' | translate }} {{ promo.ends_at | date: 'short' }}</ng-container>
+                      </p>
+                    </div>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.actions.open' | translate"
+                      (action)="openScheduledPromo(promo)"
+                    ></app-button>
+                  </div>
+                </div>
+
+                <ng-template #emptyPromosTpl>
+                  <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.scheduledEmptyPromos' | translate }}</p>
+                </ng-template>
+              </div>
+	          </div>
+	        </section>
+
+	        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	          <div class="flex items-center justify-between gap-3 flex-wrap">
 	            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.audit.title' | translate }}</h2>
             <div class="flex items-center gap-2">
               <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.audit.exportLimitNote' | translate }}</span>
@@ -595,6 +687,10 @@ export class AdminDashboardComponent implements OnInit {
   auditAction = '';
   auditUser = '';
 
+  scheduledLoading = signal(false);
+  scheduledError = signal('');
+  scheduledTasks = signal<AdminDashboardScheduledTasksResponse | null>(null);
+
   ownerTransferIdentifier = '';
   ownerTransferConfirm = '';
   ownerTransferPassword = '';
@@ -613,6 +709,7 @@ export class AdminDashboardComponent implements OnInit {
   ngOnInit(): void {
     this.loadWidgetPrefs();
     this.loadSummary();
+    this.loadScheduledTasks();
     this.loadAudit(1);
   }
 
@@ -632,6 +729,22 @@ export class AdminDashboardComponent implements OnInit {
       error: () => {
         this.error.set(this.translate.instant('adminUi.errors.generic'));
         this.loading.set(false);
+      }
+    });
+  }
+
+  loadScheduledTasks(): void {
+    this.scheduledLoading.set(true);
+    this.scheduledError.set('');
+    this.admin.scheduledTasks().subscribe({
+      next: (resp) => {
+        this.scheduledTasks.set(resp);
+        this.scheduledLoading.set(false);
+      },
+      error: () => {
+        this.scheduledTasks.set({ publish_schedules: [], promo_schedules: [] });
+        this.scheduledError.set(this.translate.instant('adminUi.dashboard.scheduledError'));
+        this.scheduledLoading.set(false);
       }
     });
   }
@@ -967,6 +1080,18 @@ export class AdminDashboardComponent implements OnInit {
       const section = this.adminContentSectionForKey(key);
       void this.router.navigate(['/admin/content', section], { state: { openContentKey: key } });
     }
+  }
+
+  openScheduledPublish(item: ScheduledPublishItem): void {
+    const slug = (item.slug || '').trim();
+    if (!slug) return;
+    void this.router.navigate(['/admin/products'], { state: { editProductSlug: slug } });
+  }
+
+  openScheduledPromo(item: ScheduledPromoItem): void {
+    const id = (item.id || '').trim();
+    if (!id) return;
+    void this.router.navigate(['/admin/coupons'], { state: { editPromotionId: id } });
   }
 
   private adminContentSectionForKey(key: string): string {

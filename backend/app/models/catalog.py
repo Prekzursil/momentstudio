@@ -20,6 +20,7 @@ class Category(Base):
     slug: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    low_stock_threshold: Mapped[int | None] = mapped_column(nullable=True)
     sort_order: Mapped[int] = mapped_column(nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -84,6 +85,7 @@ class Product(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_featured: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     stock_quantity: Mapped[int] = mapped_column(nullable=False, default=0)
+    low_stock_threshold: Mapped[int | None] = mapped_column(nullable=True)
     allow_backorder: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     restock_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     weight_grams: Mapped[int | None] = mapped_column(nullable=True)

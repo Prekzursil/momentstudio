@@ -987,6 +987,7 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
   couponForm: CouponForm = this.blankCouponForm();
 
   private autoStartNewPromotion = false;
+  private preselectPromotionId: string | null = null;
 
   constructor(
     private adminCoupons: AdminCouponsV2Service,
@@ -997,7 +998,9 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.autoStartNewPromotion = Boolean((history.state as any)?.openNewPromotion);
+    const state = history.state as any;
+    this.autoStartNewPromotion = Boolean(state?.openNewPromotion);
+    this.preselectPromotionId = String(state?.editPromotionId || '').trim() || null;
     this.loadCategories();
     this.loadPromotions();
   }
@@ -1027,6 +1030,16 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
           this.autoStartNewPromotion = false;
           this.startNewPromotion();
           return;
+        }
+
+        if (this.preselectPromotionId) {
+          const desiredId = this.preselectPromotionId;
+          this.preselectPromotionId = null;
+          const found = list.find((p) => p.id === desiredId) || null;
+          if (found) {
+            this.selectPromotion(found);
+            return;
+          }
         }
 
         if (currentId) {

@@ -61,6 +61,28 @@ export interface AdminDashboardSearchResponse {
   items: AdminDashboardSearchResult[];
 }
 
+export interface ScheduledPublishItem {
+  id: string;
+  slug: string;
+  name: string;
+  scheduled_for: string;
+  sale_end_at?: string | null;
+}
+
+export interface ScheduledPromoItem {
+  id: string;
+  name: string;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  next_event_at: string;
+  next_event_type: string;
+}
+
+export interface AdminDashboardScheduledTasksResponse {
+  publish_schedules: ScheduledPublishItem[];
+  promo_schedules: ScheduledPromoItem[];
+}
+
 export interface AdminProduct {
   id: string;
   slug: string;
@@ -154,6 +176,7 @@ export interface AdminCategory {
   name: string;
   slug: string;
   description?: string | null;
+  low_stock_threshold?: number | null;
   parent_id?: string | null;
   sort_order?: number;
 }
@@ -239,6 +262,8 @@ export interface LowStockItem {
   id: string;
   name: string;
   stock_quantity: number;
+  threshold: number;
+  is_critical: boolean;
   sku: string;
   slug: string;
 }
@@ -366,6 +391,10 @@ export class AdminService {
 
   globalSearch(q: string): Observable<AdminDashboardSearchResponse> {
     return this.api.get<AdminDashboardSearchResponse>('/admin/dashboard/search', { q });
+  }
+
+  scheduledTasks(): Observable<AdminDashboardScheduledTasksResponse> {
+    return this.api.get<AdminDashboardScheduledTasksResponse>('/admin/dashboard/scheduled-tasks');
   }
 
   products(): Observable<AdminProduct[]> {

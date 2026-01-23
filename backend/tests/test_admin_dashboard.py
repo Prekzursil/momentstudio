@@ -1,5 +1,6 @@
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Dict
 
 import pytest
@@ -14,6 +15,7 @@ from app.db.session import get_session
 from app.main import app
 from app.models.catalog import Category, Product, ProductImage, ProductAuditLog, ProductStatus
 from app.models.content import ContentAuditLog, ContentBlock, ContentStatus
+from app.models.coupons_v2 import Promotion, PromotionDiscountType
 from app.models.order import Order, OrderStatus
 from app.models.promo import PromoCode
 from app.models.user import AdminAuditLog, RefreshSession, User, UserRole
@@ -316,6 +318,109 @@ def test_admin_audit_entries_filters_and_export(test_app: Dict[str, object]) -> 
     assert csv_resp.status_code == 200, csv_resp.text
     assert "text/csv" in csv_resp.headers.get("content-type", "")
     assert csv_resp.text.splitlines()[0].startswith("created_at,entity,action")
+
+
+def test_admin_scheduled_tasks_overview(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]
+    engine = test_app["engine"]
+    asyncio.run(reset_db(engine))
+    headers = auth_headers(client, session_factory)
+    asyncio.run(seed_dashboard_data(session_factory))
+
+    async def _seed_scheduled() -> tuple[str, str]:
+        async with session_factory() as session:
+            cat = (await session.execute(select(Category).where(Category.slug == "art"))).scalar_one()
+            now = datetime.now(timezone.utc)
+            scheduled_product = Product(
+                slug="scheduled-product",
+                name="Scheduled Product",
+                base_price=Decimal("10.00"),
+                currency="RON",
+                category=cat,
+                stock_quantity=10,
+                status=ProductStatus.draft,
+                sale_type="percent",
+                sale_value=Decimal("10.00"),
+                sale_price=Decimal("9.00"),
+                sale_start_at=now + timedelta(days=1),
+                sale_end_at=now + timedelta(days=2),
+                sale_auto_publish=True,
+            )
+            session.add(scheduled_product)
+
+            promo = Promotion(
+                name="Scheduled promo",
+                description="desc",
+                discount_type=PromotionDiscountType.percent,
+                percentage_off=Decimal("5.00"),
+                allow_on_sale_items=True,
+                is_active=True,
+                starts_at=now + timedelta(days=3),
+                ends_at=now + timedelta(days=4),
+                is_automatic=False,
+            )
+            session.add(promo)
+            await session.commit()
+            return scheduled_product.slug, str(promo.id)
+
+    product_slug, promo_id = asyncio.run(_seed_scheduled())
+
+    resp = client.get("/api/v1/admin/dashboard/scheduled-tasks", headers=headers)
+    assert resp.status_code == 200, resp.text
+    payload = resp.json()
+    assert any(item["slug"] == product_slug for item in payload["publish_schedules"])
+    assert any(item["id"] == promo_id for item in payload["promo_schedules"])
+
+
+def test_low_stock_threshold_overrides(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]
+    engine = test_app["engine"]
+    asyncio.run(reset_db(engine))
+    headers = auth_headers(client, session_factory)
+
+    async def _seed_thresholds() -> None:
+        async with session_factory() as session:
+            cat = Category(slug="thresholds", name="Thresholds", low_stock_threshold=10, sort_order=1)
+            session.add(cat)
+            session.add(
+                Product(
+                    slug="cat-threshold",
+                    name="Cat threshold",
+                    base_price=Decimal("10.00"),
+                    currency="RON",
+                    category=cat,
+                    stock_quantity=9,
+                    status=ProductStatus.published,
+                )
+            )
+            session.add(
+                Product(
+                    slug="product-override",
+                    name="Product override",
+                    base_price=Decimal("10.00"),
+                    currency="RON",
+                    category=cat,
+                    stock_quantity=4,
+                    low_stock_threshold=3,
+                    status=ProductStatus.published,
+                )
+            )
+            await session.commit()
+
+    asyncio.run(_seed_thresholds())
+
+    summary = client.get("/api/v1/admin/dashboard/summary", headers=headers)
+    assert summary.status_code == 200, summary.text
+    assert summary.json()["low_stock"] == 1
+
+    low_stock = client.get("/api/v1/admin/dashboard/low-stock", headers=headers)
+    assert low_stock.status_code == 200, low_stock.text
+    items = low_stock.json()
+    assert len(items) == 1
+    assert items[0]["slug"] == "cat-threshold"
+    assert items[0]["threshold"] == 10
 
 def test_category_and_image_reorder(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]

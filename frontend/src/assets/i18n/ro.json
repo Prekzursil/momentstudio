@@ -1321,6 +1321,19 @@
         "unavailable": "Indisponibil",
         "backupNotConfigured": "Nu este configurat"
       },
+      "scheduledTitle": "Sarcini programate",
+      "scheduledLoading": "Se încarcă sarcinile programate…",
+      "scheduledError": "Nu am putut încărca sarcinile programate.",
+      "scheduledPublishesTitle": "Publicări viitoare",
+      "scheduledPromosTitle": "Programări promo",
+      "scheduledFor": "Programat pentru",
+      "scheduledSaleEnds": "Reducerea se termină",
+      "scheduledEmptyPublishes": "Nu există publicări programate.",
+      "scheduledEmptyPromos": "Nu există promoții programate.",
+      "promoStartsAt": "Începe la",
+      "promoEndsAt": "Se termină la",
+      "promoStartsShort": "Începe",
+      "promoEndsShort": "Se termină",
       "rangeErrors": {
         "missing": "Selectează ambele date (început și sfârșit).",
         "order": "Data de sfârșit trebuie să fie după data de început."
@@ -2054,13 +2067,15 @@
         "add": "Categorie adăugată",
         "delete": "Categorie ștearsă",
         "reorder": "Ordinea categoriilor a fost salvată",
-        "updateParent": "Categoria părinte a fost actualizată"
+        "updateParent": "Categoria părinte a fost actualizată",
+        "updateLowStockThreshold": "Pragul de stoc redus a fost actualizat"
       },
       "errors": {
         "add": "Nu am putut adăuga categoria",
         "delete": "Nu am putut șterge categoria",
         "reorder": "Nu am putut reordona categoriile",
-        "updateParent": "Nu am putut actualiza categoria părinte"
+        "updateParent": "Nu am putut actualiza categoria părinte",
+        "updateLowStockThreshold": "Nu am putut actualiza pragul de stoc redus"
       }
     },
     "orders": {
@@ -2558,8 +2573,12 @@
     },
     "lowStock": {
       "title": "Stoc scăzut",
-      "hint": "Sub 5 unități",
-      "stock": "Stoc: {{count}}"
+      "hint": "Sub pragul configurat",
+      "thresholdLabel": "Prag",
+      "thresholdHint": "Lasă gol pentru valoarea implicită",
+      "thresholdError": "Pragul trebuie să fie un număr pozitiv sau zero.",
+      "stock": "Stoc: {{count}}",
+      "stockWithThreshold": "Stoc: {{count}} / {{threshold}}"
     }
   },
   "wishlist": {

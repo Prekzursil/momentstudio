@@ -1368,8 +1368,31 @@ async def notify_back_in_stock(emails: list[str], product_name: str) -> int:
     return sent
 
 
-async def _maybe_alert_low_stock(session: AsyncSession, product: Product, threshold: int = 2) -> None:
-    if product.stock_quantity is None or product.stock_quantity > threshold:
+DEFAULT_LOW_STOCK_ALERT_THRESHOLD = 2
+
+
+async def _effective_low_stock_threshold(
+    session: AsyncSession, *, product: Product, default_threshold: int
+) -> int:
+    override = getattr(product, "low_stock_threshold", None)
+    if override is not None:
+        return int(override)
+
+    category_override = None
+    category_obj = getattr(product, "category", None)
+    if category_obj is not None:
+        category_override = getattr(category_obj, "low_stock_threshold", None)
+    if category_override is None:
+        category_override = await session.scalar(select(Category.low_stock_threshold).where(Category.id == product.category_id))
+    if category_override is not None:
+        return int(category_override)
+
+    return int(default_threshold)
+
+
+async def _maybe_alert_low_stock(session: AsyncSession, product: Product, threshold: int = DEFAULT_LOW_STOCK_ALERT_THRESHOLD) -> None:
+    effective_threshold = await _effective_low_stock_threshold(session, product=product, default_threshold=threshold)
+    if product.stock_quantity is None or product.stock_quantity > effective_threshold:
         return
 
     to_email = await auth_service.get_owner_email(session)

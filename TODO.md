@@ -694,8 +694,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Dashboard: quick actions toolbar – Add buttons for “Create product”, “Create coupon”, “Export orders”, etc.
 - [x] Admin Dashboard: global search – Search across orders/products/users by id/email/slug with typeahead.
 - [x] Admin Dashboard: recent activity feed – Show last admin actions with deep links to affected entities.
-- [ ] Admin Dashboard: scheduled tasks overview – Show upcoming publish schedules and promo schedules.
-- [ ] Admin Dashboard: configurable low-stock thresholds – Per-category/product threshold overrides + “critical” highlight.
+- [x] Admin Dashboard: scheduled tasks overview – Show upcoming publish schedules and promo schedules.
+- [x] Admin Dashboard: configurable low-stock thresholds – Per-category/product threshold overrides + “critical” highlight.
 - [ ] Admin Orders: saved filter presets – Persist common filter sets (e.g., “Pending acceptance”, “Cash awaiting shipment”).
 - [ ] Admin Orders: bulk status updates – Select multiple orders and set status/assign courier with one action.
 - [ ] Admin Orders: bulk email resend – Resend confirmation/delivery emails for selected orders with audit notes.

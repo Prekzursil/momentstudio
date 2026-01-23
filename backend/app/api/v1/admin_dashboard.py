@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
-from sqlalchemy import String, Text, cast, delete, func, literal, or_, select, union_all
+from sqlalchemy import String, Text, case, cast, delete, func, literal, or_, select, union_all
 from sqlalchemy.orm import aliased
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,15 +16,19 @@ from app.models.catalog import Product, ProductAuditLog, Category, ProductStatus
 from app.models.content import ContentBlock, ContentAuditLog
 from app.schemas.catalog_admin import AdminProductByIdsRequest, AdminProductListItem, AdminProductListResponse
 from app.schemas.admin_dashboard_search import AdminDashboardSearchResponse, AdminDashboardSearchResult
+from app.schemas.admin_dashboard_scheduled import AdminDashboardScheduledTasksResponse, ScheduledPublishItem, ScheduledPromoItem
 from app.services import exporter as exporter_service
 from app.models.order import Order, OrderStatus
 from app.models.returns import ReturnRequest, ReturnRequestStatus
 from app.models.user import AdminAuditLog, User, RefreshSession, UserRole
 from app.models.promo import PromoCode, StripeCouponMapping
+from app.models.coupons_v2 import Promotion
 from app.services import auth as auth_service
 from app.schemas.user_admin import AdminUserListItem, AdminUserListResponse
 
 router = APIRouter(prefix="/admin/dashboard", tags=["admin"])
+
+DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD = 5
 
 
 @router.get("/summary")
@@ -55,10 +59,16 @@ async def admin_summary(
     orders_total = await session.scalar(select(func.count()).select_from(Order))
     users_total = await session.scalar(select(func.count()).select_from(User))
 
+    low_stock_threshold = func.coalesce(Product.low_stock_threshold, Category.low_stock_threshold, DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD)
     low_stock = await session.scalar(
         select(func.count())
         .select_from(Product)
-        .where(Product.stock_quantity < 5, Product.is_deleted.is_(False), Product.is_active.is_(True))
+        .join(Category, Product.category_id == Category.id)
+        .where(
+            Product.is_deleted.is_(False),
+            Product.is_active.is_(True),
+            Product.stock_quantity < low_stock_threshold,
+        )
     )
 
     since = now - timedelta(days=30)
@@ -603,6 +613,70 @@ async def admin_coupons(session: AsyncSession = Depends(get_session), _: str = D
     ]
 
 
+@router.get("/scheduled-tasks", response_model=AdminDashboardScheduledTasksResponse)
+async def scheduled_tasks_overview(
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+    limit: int = Query(default=10, ge=1, le=50),
+) -> AdminDashboardScheduledTasksResponse:
+    now = datetime.now(timezone.utc)
+
+    publish_stmt = (
+        select(Product.id, Product.slug, Product.name, Product.sale_start_at, Product.sale_end_at)
+        .where(
+            Product.is_deleted.is_(False),
+            Product.is_active.is_(True),
+            Product.status == ProductStatus.draft,
+            Product.sale_auto_publish.is_(True),
+            Product.sale_start_at.is_not(None),
+            Product.sale_start_at > now,
+        )
+        .order_by(Product.sale_start_at.asc())
+        .limit(limit)
+    )
+    publish_rows = (await session.execute(publish_stmt)).all()
+    publish_items = [
+        ScheduledPublishItem(
+            id=str(row.id),
+            slug=row.slug,
+            name=row.name,
+            scheduled_for=row.sale_start_at,
+            sale_end_at=row.sale_end_at,
+        )
+        for row in publish_rows
+    ]
+
+    promo_next_at = case(
+        (Promotion.starts_at.is_not(None) & (Promotion.starts_at > now), Promotion.starts_at),
+        else_=Promotion.ends_at,
+    ).label("next_event_at")
+    promo_next_type = case(
+        (Promotion.starts_at.is_not(None) & (Promotion.starts_at > now), literal("starts_at")),
+        else_=literal("ends_at"),
+    ).label("next_event_type")
+    promo_stmt = (
+        select(Promotion.id, Promotion.name, Promotion.starts_at, Promotion.ends_at, promo_next_at, promo_next_type)
+        .where(Promotion.is_active.is_(True), or_(Promotion.starts_at > now, Promotion.ends_at > now))
+        .order_by(promo_next_at.asc())
+        .limit(limit)
+    )
+    promo_rows = (await session.execute(promo_stmt)).all()
+    promo_items = [
+        ScheduledPromoItem(
+            id=str(row.id),
+            name=row.name,
+            starts_at=row.starts_at,
+            ends_at=row.ends_at,
+            next_event_at=row.next_event_at,
+            next_event_type=row.next_event_type,
+        )
+        for row in promo_rows
+        if row.next_event_at is not None
+    ]
+
+    return AdminDashboardScheduledTasksResponse(publish_schedules=publish_items, promo_schedules=promo_items)
+
+
 @router.post("/coupons/{coupon_id}/stripe/invalidate")
 async def admin_invalidate_coupon_stripe(
     coupon_id: UUID,
@@ -1101,20 +1175,24 @@ async def export_data(session: AsyncSession = Depends(get_session), _: str = Dep
 
 @router.get("/low-stock")
 async def low_stock_products(session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)) -> list[dict]:
+    threshold_expr = func.coalesce(Product.low_stock_threshold, Category.low_stock_threshold, DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD)
     stmt = (
-        select(Product)
-        .where(Product.stock_quantity < 5, Product.is_deleted.is_(False), Product.is_active.is_(True))
+        select(Product, threshold_expr.label("threshold"))
+        .join(Category, Product.category_id == Category.id)
+        .where(Product.stock_quantity < threshold_expr, Product.is_deleted.is_(False), Product.is_active.is_(True))
         .order_by(Product.stock_quantity.asc())
         .limit(20)
     )
-    products = (await session.execute(stmt)).scalars().all()
+    rows = (await session.execute(stmt)).all()
     return [
         {
             "id": str(p.id),
             "name": p.name,
             "stock_quantity": p.stock_quantity,
+            "threshold": int(threshold or DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD),
+            "is_critical": bool(p.stock_quantity <= 0 or p.stock_quantity < max(1, int((threshold or DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD) // 2))),
             "sku": p.sku,
             "slug": p.slug,
         }
-        for p in products
+        for p, threshold in rows
     ]

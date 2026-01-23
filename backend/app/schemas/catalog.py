@@ -11,6 +11,7 @@ from app.models.catalog import ProductStatus
 class CategoryFields(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     description: str | None = None
+    low_stock_threshold: int | None = Field(default=None, ge=0)
     sort_order: int = 0
     parent_id: UUID | None = None
 
@@ -30,6 +31,7 @@ class CategoryUpdate(BaseModel):
     slug: str | None = Field(default=None, min_length=1, max_length=120)
     name: str | None = Field(default=None, max_length=120)
     description: str | None = None
+    low_stock_threshold: int | None = Field(default=None, ge=0)
     sort_order: int | None = None
     parent_id: UUID | None = None
 
@@ -75,6 +77,7 @@ class ProductFields(BaseModel):
     is_active: bool = True
     is_featured: bool = False
     stock_quantity: int = Field(ge=0)
+    low_stock_threshold: int | None = Field(default=None, ge=0)
     allow_backorder: bool = False
     restock_at: datetime | None = None
     weight_grams: int | None = Field(default=None, ge=0)
@@ -236,6 +239,7 @@ class ProductUpdate(BaseModel):
     is_active: bool | None = None
     is_featured: bool | None = None
     stock_quantity: int | None = Field(default=None, ge=0)
+    low_stock_threshold: int | None = Field(default=None, ge=0)
     category_id: UUID | None = None
     sku: str | None = Field(default=None, min_length=3, max_length=64)
     status: ProductStatus | None = None

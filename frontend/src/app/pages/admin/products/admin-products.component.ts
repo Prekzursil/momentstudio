@@ -25,6 +25,7 @@ type ProductForm = {
   sale_end_at: string;
   sale_auto_publish: boolean;
   stock_quantity: number;
+  low_stock_threshold: string;
   status: 'draft' | 'published' | 'archived';
   is_active: boolean;
   is_featured: boolean;
@@ -388,6 +389,12 @@ type ProductTranslationForm = {
 	            </div>
 	          </div>
           <app-input [label]="'adminUi.products.table.stock' | translate" type="number" [(value)]="form.stock_quantity"></app-input>
+          <app-input
+            [label]="'adminUi.lowStock.thresholdLabel' | translate"
+            [hint]="'adminUi.lowStock.thresholdHint' | translate"
+            type="number"
+            [(value)]="form.low_stock_threshold"
+          ></app-input>
 
           <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
             {{ 'adminUi.products.table.status' | translate }}
@@ -838,6 +845,8 @@ export class AdminProductsComponent implements OnInit {
           sale_end_at: prod.sale_end_at ? this.toLocalDateTime(prod.sale_end_at) : '',
           sale_auto_publish: !!prod.sale_auto_publish,
           stock_quantity: Number(prod.stock_quantity || 0),
+          low_stock_threshold:
+            prod.low_stock_threshold === null || prod.low_stock_threshold === undefined ? '' : String(prod.low_stock_threshold),
           status: (prod.status as any) || 'draft',
           is_active: prod.is_active !== false,
           is_featured: !!prod.is_featured,
@@ -926,6 +935,17 @@ export class AdminProductsComponent implements OnInit {
       return;
     }
 
+    const lowStockRaw = (this.form.low_stock_threshold || '').trim();
+    let low_stock_threshold: number | null = null;
+    if (lowStockRaw) {
+      const parsed = Number(lowStockRaw);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        this.editorError.set(this.t('adminUi.lowStock.thresholdError'));
+        return;
+      }
+      low_stock_threshold = parsed;
+    }
+
     const payload: any = {
       name: this.form.name,
       category_id: this.form.category_id,
@@ -936,6 +956,7 @@ export class AdminProductsComponent implements OnInit {
       sale_end_at: this.form.sale_enabled && this.form.sale_end_at ? new Date(this.form.sale_end_at).toISOString() : null,
       sale_auto_publish: this.form.sale_enabled ? this.form.sale_auto_publish : false,
       stock_quantity: Number(this.form.stock_quantity),
+      low_stock_threshold,
       status: this.form.status,
       is_active: this.form.is_active,
       is_featured: this.form.is_featured,
@@ -1157,6 +1178,7 @@ export class AdminProductsComponent implements OnInit {
       sale_end_at: '',
       sale_auto_publish: false,
       stock_quantity: 0,
+      low_stock_threshold: '',
       status: 'draft',
       is_active: true,
       is_featured: false,

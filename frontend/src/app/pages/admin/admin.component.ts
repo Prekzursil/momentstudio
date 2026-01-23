@@ -1817,6 +1817,18 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     </select>
                   </label>
 
+                  <label class="mt-2 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                    <span class="font-semibold">{{ 'adminUi.lowStock.thresholdLabel' | translate }}:</span>
+                    <input
+                      type="number"
+                      min="0"
+                      class="h-8 w-28 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [ngModel]="cat.low_stock_threshold ?? ''"
+                      (ngModelChange)="updateCategoryLowStockThreshold(cat, $event)"
+                    />
+                    <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.lowStock.thresholdHint' | translate }}</span>
+                  </label>
+
 	                <div *ngIf="categoryTranslationsSlug === cat.slug" class="mt-3 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/30">
 	                  <div class="flex items-center justify-between gap-3">
 	                    <p class="text-xs font-semibold tracking-wide uppercase text-slate-600 dark:text-slate-300">
@@ -2788,7 +2800,12 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                   <p class="font-semibold text-slate-900 dark:text-slate-50">{{ item.name }}</p>
                   <p class="text-xs text-slate-500 dark:text-slate-400">{{ item.sku }} — {{ item.slug }}</p>
                 </div>
-                <span class="text-xs rounded-full bg-amber-100 px-2 py-1 text-amber-900">{{ 'adminUi.lowStock.stock' | translate:{count: item.stock_quantity} }}</span>
+                <span
+                  class="text-xs rounded-full px-2 py-1 font-semibold"
+                  [ngClass]="item.is_critical ? 'bg-rose-100 text-rose-900 dark:bg-rose-950/30 dark:text-rose-100' : 'bg-amber-100 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100'"
+                >
+                  {{ 'adminUi.lowStock.stockWithThreshold' | translate:{count: item.stock_quantity, threshold: item.threshold} }}
+                </span>
               </div>
             </div>
           </section>
@@ -3542,6 +3559,29 @@ export class AdminComponent implements OnInit, OnDestroy {
       error: () => {
         cat.parent_id = prevParentId;
         this.toast.error(this.t('adminUi.categories.errors.updateParent'));
+      }
+    });
+  }
+
+  updateCategoryLowStockThreshold(cat: AdminCategory, raw: string | number): void {
+    const prevThreshold = cat.low_stock_threshold ?? null;
+    const trimmed = String(raw ?? '').trim();
+    const nextThreshold = trimmed ? Number(trimmed) : null;
+    if (nextThreshold !== null && (!Number.isFinite(nextThreshold) || nextThreshold < 0)) {
+      cat.low_stock_threshold = prevThreshold;
+      this.toast.error(this.t('adminUi.categories.errors.updateLowStockThreshold'));
+      return;
+    }
+    if (nextThreshold === prevThreshold) return;
+    cat.low_stock_threshold = nextThreshold;
+    this.admin.updateCategory(cat.slug, { low_stock_threshold: nextThreshold }).subscribe({
+      next: (updated) => {
+        cat.low_stock_threshold = updated.low_stock_threshold ?? null;
+        this.toast.success(this.t('adminUi.categories.success.updateLowStockThreshold'));
+      },
+      error: () => {
+        cat.low_stock_threshold = prevThreshold;
+        this.toast.error(this.t('adminUi.categories.errors.updateLowStockThreshold'));
       }
     });
   }

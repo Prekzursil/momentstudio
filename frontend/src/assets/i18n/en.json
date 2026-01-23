@@ -1321,6 +1321,19 @@
         "unavailable": "Unavailable",
         "backupNotConfigured": "Not configured"
       },
+      "scheduledTitle": "Scheduled tasks",
+      "scheduledLoading": "Loading scheduled tasks…",
+      "scheduledError": "Could not load scheduled tasks.",
+      "scheduledPublishesTitle": "Upcoming publishes",
+      "scheduledPromosTitle": "Promo schedules",
+      "scheduledFor": "Scheduled for",
+      "scheduledSaleEnds": "Sale ends",
+      "scheduledEmptyPublishes": "No upcoming product publishes.",
+      "scheduledEmptyPromos": "No upcoming promo schedules.",
+      "promoStartsAt": "Starts at",
+      "promoEndsAt": "Ends at",
+      "promoStartsShort": "Starts",
+      "promoEndsShort": "Ends",
       "rangeErrors": {
         "missing": "Select both start and end dates.",
         "order": "End date must be on/after start date."
@@ -2054,13 +2067,15 @@
         "add": "Category added",
         "delete": "Category deleted",
         "reorder": "Category order saved",
-        "updateParent": "Category parent updated"
+        "updateParent": "Category parent updated",
+        "updateLowStockThreshold": "Low-stock threshold updated"
       },
       "errors": {
         "add": "Failed to add category",
         "delete": "Failed to delete category",
         "reorder": "Failed to reorder categories",
-        "updateParent": "Failed to update category parent"
+        "updateParent": "Failed to update category parent",
+        "updateLowStockThreshold": "Failed to update low-stock threshold"
       }
     },
     "orders": {
@@ -2558,8 +2573,12 @@
     },
     "lowStock": {
       "title": "Low stock",
-      "hint": "Below 5 units",
-      "stock": "Stock: {{count}}"
+      "hint": "Below configured threshold",
+      "thresholdLabel": "Threshold",
+      "thresholdHint": "Leave empty to use default",
+      "thresholdError": "Threshold must be a non-negative number.",
+      "stock": "Stock: {{count}}",
+      "stockWithThreshold": "Stock: {{count}} / {{threshold}}"
     }
   },
   "wishlist": {
