@@ -2307,6 +2307,8 @@
         }
       },
       "diff": {
+        "before": "Înainte",
+        "after": "După",
         "courier": "Curier",
         "shippingMethod": "Metodă livrare"
       },

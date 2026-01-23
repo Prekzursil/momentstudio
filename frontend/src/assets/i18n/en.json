@@ -2307,6 +2307,8 @@
         }
       },
       "diff": {
+        "before": "Before",
+        "after": "After",
         "courier": "Courier",
         "shippingMethod": "Shipping method"
       },

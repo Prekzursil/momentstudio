@@ -718,6 +718,57 @@ type OrderAction =
                     </div>
                   </div>
                 </ng-container>
+                <ng-container *ngIf="eventAddressDiff(evt) as addrDiff">
+                  <div class="mt-2 grid gap-3">
+                    <div *ngIf="addrDiff.shipping" class="grid gap-2">
+                      <div class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                        {{ 'adminUi.orders.shippingAddress' | translate }}
+                      </div>
+                      <div class="grid gap-2 md:grid-cols-2">
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs dark:border-slate-800 dark:bg-slate-950/40">
+                          <div class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                            {{ 'adminUi.orders.diff.before' | translate }}
+                          </div>
+                          <div class="mt-1 whitespace-pre-line text-slate-700 dark:text-slate-200">
+                            {{ formatAddressSnapshot(addrDiff.shipping.from) }}
+                          </div>
+                        </div>
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs dark:border-slate-800 dark:bg-slate-950/40">
+                          <div class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                            {{ 'adminUi.orders.diff.after' | translate }}
+                          </div>
+                          <div class="mt-1 whitespace-pre-line text-slate-700 dark:text-slate-200">
+                            {{ formatAddressSnapshot(addrDiff.shipping.to) }}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div *ngIf="addrDiff.billing" class="grid gap-2">
+                      <div class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                        {{ 'adminUi.orders.billingAddress' | translate }}
+                      </div>
+                      <div class="grid gap-2 md:grid-cols-2">
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs dark:border-slate-800 dark:bg-slate-950/40">
+                          <div class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                            {{ 'adminUi.orders.diff.before' | translate }}
+                          </div>
+                          <div class="mt-1 whitespace-pre-line text-slate-700 dark:text-slate-200">
+                            {{ formatAddressSnapshot(addrDiff.billing.from) }}
+                          </div>
+                        </div>
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs dark:border-slate-800 dark:bg-slate-950/40">
+                          <div class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                            {{ 'adminUi.orders.diff.after' | translate }}
+                          </div>
+                          <div class="mt-1 whitespace-pre-line text-slate-700 dark:text-slate-200">
+                            {{ formatAddressSnapshot(addrDiff.billing.to) }}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </ng-container>
                 <div *ngIf="evt.note" class="mt-1 text-slate-600 dark:text-slate-300">{{ evt.note }}</div>
               </div>
             </div>
@@ -1340,6 +1391,54 @@ export class AdminOrderDetailComponent implements OnInit {
       }
     }
     return [];
+  }
+
+  eventAddressDiff(
+    evt: AdminOrderEvent
+  ): { shipping?: { from: unknown; to: unknown }; billing?: { from: unknown; to: unknown } } | null {
+    const data = evt?.data;
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+    const rawChanges = (data as any).changes;
+    if (!rawChanges || typeof rawChanges !== 'object' || Array.isArray(rawChanges)) return null;
+
+    const shipping = (rawChanges as any).shipping_address;
+    const billing = (rawChanges as any).billing_address;
+    const result: { shipping?: { from: unknown; to: unknown }; billing?: { from: unknown; to: unknown } } = {};
+
+    if (shipping && typeof shipping === 'object' && !Array.isArray(shipping)) {
+      result.shipping = { from: (shipping as any).from ?? null, to: (shipping as any).to ?? null };
+    }
+    if (billing && typeof billing === 'object' && !Array.isArray(billing)) {
+      result.billing = { from: (billing as any).from ?? null, to: (billing as any).to ?? null };
+    }
+
+    return result.shipping || result.billing ? result : null;
+  }
+
+  formatAddressSnapshot(snapshot: unknown): string {
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return '—';
+    const raw = snapshot as any;
+    const lines: string[] = [];
+    const label = (raw.label ?? '').toString().trim();
+    const phone = (raw.phone ?? '').toString().trim();
+    const line1 = (raw.line1 ?? '').toString().trim();
+    const line2 = (raw.line2 ?? '').toString().trim();
+    const city = (raw.city ?? '').toString().trim();
+    const region = (raw.region ?? '').toString().trim();
+    const postal = (raw.postal_code ?? '').toString().trim();
+    const country = (raw.country ?? '').toString().trim();
+
+    if (label) lines.push(label);
+    if (phone) lines.push(phone);
+    if (line1) lines.push(line1);
+    if (line2) lines.push(line2);
+
+    const locality = [city, region].filter((p) => p).join(', ');
+    const localityPostal = [locality, postal].filter((p) => p).join(' ');
+    if (localityPostal) lines.push(localityPostal);
+    if (country) lines.push(country);
+
+    return lines.join('\n') || '—';
   }
 
   private eventChanges(evt: AdminOrderEvent): Array<{ label: string; from: string; to: string }> | null {
