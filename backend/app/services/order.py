@@ -1144,6 +1144,7 @@ async def get_order_by_id(session: AsyncSession, order_id: UUID) -> Order | None
             selectinload(Order.items).selectinload(OrderItem.product),
             selectinload(Order.shipping_method),
             selectinload(Order.events),
+            selectinload(Order.refunds),
             selectinload(Order.user),
             selectinload(Order.shipping_address),
             selectinload(Order.billing_address),
@@ -1227,16 +1228,55 @@ async def create_order_refund(
     selected_items: list[dict] = []
     if items:
         items_by_id = {it.id: it for it in (order.items or [])}
+        refunded_qty: dict[UUID, int] = {}
+        for refund in order.refunds or []:
+            payload = refund.data if isinstance(refund.data, dict) else {}
+            rows = payload.get("items") if isinstance(payload, dict) else None
+            if not isinstance(rows, list):
+                continue
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                raw_item_id = row.get("order_item_id")
+                raw_qty = row.get("quantity")
+                try:
+                    parsed_item_id = UUID(str(raw_item_id))
+                except Exception:
+                    continue
+                try:
+                    parsed_qty = int(raw_qty or 0)
+                except Exception:
+                    continue
+                if parsed_qty <= 0:
+                    continue
+                refunded_qty[parsed_item_id] = refunded_qty.get(parsed_item_id, 0) + parsed_qty
+
+        requested_qty: dict[UUID, int] = {}
         for item_id, qty in items:
             q = int(qty or 0)
             if q <= 0:
                 continue
+            requested_qty[item_id] = requested_qty.get(item_id, 0) + q
+
+        items_total = Decimal("0.00")
+        for item_id, q in requested_qty.items():
             order_item = items_by_id.get(item_id)
             if not order_item:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order item")
-            if q > int(order_item.quantity):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid refund quantity")
+            ordered_qty = int(order_item.quantity or 0)
+            already_qty = int(refunded_qty.get(item_id, 0))
+            remaining_qty = ordered_qty - already_qty
+            if remaining_qty <= 0:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order item already fully refunded")
+            if q > remaining_qty:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Refund quantity exceeds remaining refundable quantity")
             selected_items.append({"order_item_id": str(order_item.id), "quantity": q})
+
+            unit_price = Decimal(str(getattr(order_item, "unit_price", "0") or "0"))
+            items_total += pricing.quantize_money(unit_price * Decimal(q))
+
+        if selected_items and amount_q > pricing.quantize_money(items_total):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Refund amount exceeds selected items total")
 
     provider = "manual"
     provider_refund_id: str | None = None

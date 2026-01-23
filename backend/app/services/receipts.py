@@ -17,12 +17,28 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.core.config import settings
-from app.schemas.receipt import ReceiptAddressRead, ReceiptItemRead, ReceiptRead
+from app.schemas.receipt import ReceiptAddressRead, ReceiptItemRead, ReceiptRead, ReceiptRefundRead
 
 
 Font = ImageFont.FreeTypeFont | ImageFont.ImageFont
 MoneyValue = str | SupportsFloat | SupportsIndex
 _REPORTLAB_FONTS: tuple[str, str] | None = None
+
+
+def _order_locale(order) -> str:
+    preferred = (getattr(getattr(order, "user", None), "preferred_language", None) or "").strip().lower()
+    if preferred in {"en", "ro"}:
+        return preferred
+
+    currency = (getattr(order, "currency", None) or "").strip().upper()
+    if currency == "RON":
+        return "ro"
+
+    country = (getattr(getattr(order, "shipping_address", None), "country", None) or "").strip().upper()
+    if country == "RO":
+        return "ro"
+
+    return "en"
 
 
 def _mask_email(email: str) -> str:
@@ -105,6 +121,18 @@ def build_order_receipt(order, items: Sequence | None = None, *, redacted: bool 
             )
         )
 
+    receipt_refunds: list[ReceiptRefundRead] = []
+    for refund in getattr(order, "refunds", []) or []:
+        receipt_refunds.append(
+            ReceiptRefundRead(
+                amount=_as_decimal(getattr(refund, "amount", None)),
+                currency=(getattr(refund, "currency", None) or currency) or currency,
+                provider=(getattr(refund, "provider", None) or "").strip() or "manual",
+                note=(getattr(refund, "note", None) or "").strip() or None,
+                created_at=getattr(refund, "created_at", datetime.now(timezone.utc)),
+            )
+        )
+
     created_at = getattr(order, "created_at", datetime.now(timezone.utc))
     status_raw = getattr(order, "status", "")
     status_value = getattr(status_raw, "value", status_raw) or ""
@@ -142,6 +170,7 @@ def build_order_receipt(order, items: Sequence | None = None, *, redacted: bool 
         shipping_address=_addr(getattr(order, "shipping_address", None)),
         billing_address=_addr(getattr(order, "billing_address", None)),
         items=receipt_items,
+        refunds=receipt_refunds,
     )
 
 
@@ -160,11 +189,23 @@ def _register_reportlab_fonts() -> tuple[str, str]:
     ]
 
     regular_path = next((p for p in regular_candidates if Path(p).exists()), None)
-    bold_path = next((p for p in bold_candidates if Path(p).exists()), None)
+    bold_path = next((p for p in bold_candidates if Path(p).exists()), None) or regular_path
+    if regular_path is None and bold_path is not None:
+        regular_path = bold_path
 
     if regular_path and bold_path:
-        pdfmetrics.registerFont(TTFont("MomentSans", regular_path))
-        pdfmetrics.registerFont(TTFont("MomentSansBold", bold_path))
+        registered = set(pdfmetrics.getRegisteredFontNames())
+        if "MomentSans" not in registered:
+            pdfmetrics.registerFont(TTFont("MomentSans", regular_path))
+        if "MomentSansBold" not in registered:
+            pdfmetrics.registerFont(TTFont("MomentSansBold", bold_path))
+        pdfmetrics.registerFontFamily(
+            "MomentSans",
+            normal="MomentSans",
+            bold="MomentSansBold",
+            italic="MomentSans",
+            boldItalic="MomentSansBold",
+        )
         _REPORTLAB_FONTS = ("MomentSans", "MomentSansBold")
         return _REPORTLAB_FONTS
 
@@ -191,6 +232,7 @@ def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None, *,
     """Render a bilingual (RO/EN) receipt PDF with clickable product links."""
 
     items = items or getattr(order, "items", []) or []
+    locale = _order_locale(order)
     receipt = build_order_receipt(order, items, redacted=redacted)
 
     font_regular, font_bold = _register_reportlab_fonts()
@@ -244,7 +286,7 @@ def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None, *,
     story.append(Paragraph("Receipt / Chitanță", h1))
     story.append(Spacer(1, 6))
     ref = receipt.reference_code or str(receipt.order_id)
-    created = receipt.created_at.strftime("%Y-%m-%d %H:%M")
+    created = _format_date(receipt.created_at, locale=locale)
     story.append(Paragraph(f"Order / Comandă: <b>{xml_escape(ref)}</b>", base_style))
     story.append(Paragraph(f"Date / Dată: {xml_escape(created)}", small_muted))
     story.append(Spacer(1, 10))
@@ -334,7 +376,7 @@ def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None, *,
     def _money_cell(value: MoneyValue | None) -> str:
         if value is None:
             return "—"
-        return xml_escape(_money(value, receipt.currency))
+        return xml_escape(_money(value, receipt.currency, locale=locale))
 
     rows: list[list[object]] = [
         [
@@ -418,6 +460,22 @@ def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None, *,
         )
     )
     story.append(totals)
+
+    if receipt.refunds:
+        story.append(Spacer(1, 10))
+        story.append(Paragraph("Refunds / Rambursări", h2))
+        for refund in receipt.refunds:
+            amount = _money(refund.amount, receipt.currency, locale=locale)
+            created_at = _format_date(refund.created_at, locale=locale)
+            provider = (refund.provider or "").strip()
+            summary = f"{xml_escape(created_at)} — {xml_escape(amount)}"
+            if provider:
+                summary = f"{summary} ({xml_escape(provider)})"
+            story.append(Paragraph(summary, base_style))
+            if refund.note:
+                story.append(Paragraph(xml_escape(refund.note), small_muted))
+            story.append(Spacer(1, 4))
+
     story.append(Spacer(1, 10))
     story.append(Paragraph("Thank you! / Mulțumim!", small_muted))
 
@@ -449,18 +507,24 @@ def _load_font(size: int, *, bold: bool = False) -> Font:
     return ImageFont.load_default()
 
 
-def _money(value: MoneyValue, currency: str) -> str:
+def _money(value: MoneyValue, currency: str, *, locale: str | None = None) -> str:
     try:
-        if isinstance(value, Decimal):
-            return f"{value.quantize(Decimal('0.01'))} {currency}"
-        return f"{float(value):.2f} {currency}"
+        normalized = "ro" if (locale or "").strip().lower() == "ro" else "en"
+        amount = value if isinstance(value, Decimal) else Decimal(str(value))
+        rendered = format(amount.quantize(Decimal("0.01")), ".2f")
+        if normalized == "ro":
+            rendered = rendered.replace(".", ",")
+        return f"{rendered} {currency}"
     except Exception:
         return f"{value} {currency}"
 
 
-def _format_date(value: object) -> str:
+def _format_date(value: object, *, locale: str | None = None) -> str:
     if isinstance(value, datetime):
+        normalized = "ro" if (locale or "").strip().lower() == "ro" else "en"
         try:
+            if normalized == "ro":
+                return value.strftime("%d.%m.%Y %H:%M")
             return value.strftime("%Y-%m-%d %H:%M")
         except Exception:
             return str(value)
@@ -482,6 +546,7 @@ def render_order_receipt_pdf_raster(order, items: Sequence | None = None, *, red
     """
 
     items = items or getattr(order, "items", []) or []
+    locale = _order_locale(order)
     ref = getattr(order, "reference_code", None) or str(getattr(order, "id", ""))
     created_at = getattr(order, "created_at", None)
     currency = getattr(order, "currency", "RON") or "RON"
@@ -507,7 +572,7 @@ def render_order_receipt_pdf_raster(order, items: Sequence | None = None, *, red
     draw.text((margin, y), f"Order / Comandă: {ref}", fill=fg, font=h_font)
     y += 30
     if created_at:
-        draw.text((margin, y), f"Date / Dată: {_format_date(created_at)}", fill=muted, font=small_font)
+        draw.text((margin, y), f"Date / Dată: {_format_date(created_at, locale=locale)}", fill=muted, font=small_font)
         y += 26
     draw.line((margin, y + 14, page_w - margin, y + 14), fill=border, width=2)
     y += 40
@@ -634,9 +699,9 @@ def render_order_receipt_pdf_raster(order, items: Sequence | None = None, *, red
         draw.text((margin, y), name_lines[0], fill=fg, font=small_font)
         draw.text((page_w - margin - 240, y), str(qty), fill=fg, font=small_font)
         if unit_price is not None:
-            draw.text((page_w - margin - 170, y), _money(unit_price, currency), fill=fg, font=small_font)
+            draw.text((page_w - margin - 170, y), _money(unit_price, currency, locale=locale), fill=fg, font=small_font)
         if subtotal is not None:
-            draw.text((page_w - margin - 70, y), _money(subtotal, currency), fill=fg, font=small_font, anchor="ra")
+            draw.text((page_w - margin - 70, y), _money(subtotal, currency, locale=locale), fill=fg, font=small_font, anchor="ra")
         y += 22
 
         for extra in name_lines[1:3]:
@@ -660,7 +725,7 @@ def render_order_receipt_pdf_raster(order, items: Sequence | None = None, *, red
     def _right(label: str, value: MoneyValue) -> None:
         nonlocal y
         draw.text((page_w - margin - 240, y), label, fill=muted, font=small_font)
-        draw.text((page_w - margin - 70, y), _money(value, currency), fill=fg, font=small_font, anchor="ra")
+        draw.text((page_w - margin - 70, y), _money(value, currency, locale=locale), fill=fg, font=small_font, anchor="ra")
         y += 22
 
     if shipping_amount is not None:
@@ -671,8 +736,29 @@ def render_order_receipt_pdf_raster(order, items: Sequence | None = None, *, red
         _right("VAT / TVA", tax_amount)
     if total_amount is not None:
         draw.text((page_w - margin - 240, y), "Total / Total", fill=fg, font=h_font)
-        draw.text((page_w - margin - 70, y + 2), _money(total_amount, currency), fill=fg, font=h_font, anchor="ra")
+        draw.text((page_w - margin - 70, y + 2), _money(total_amount, currency, locale=locale), fill=fg, font=h_font, anchor="ra")
         y += 30
+
+    refunds = list(getattr(order, "refunds", []) or [])
+    if refunds:
+        y += 10
+        draw.text((margin, y), "Refunds / Rambursări", fill=fg, font=h_font)
+        y += 24
+        for refund in refunds[-5:]:
+            amount = _money(getattr(refund, "amount", 0), currency, locale=locale)
+            created = _format_date(getattr(refund, "created_at", None), locale=locale)
+            provider = (getattr(refund, "provider", None) or "").strip()
+            line = f"{created} · {amount}"
+            if provider:
+                line = f"{line} ({provider})"
+            draw.text((margin, y), line, fill=muted, font=small_font)
+            y += 20
+            note = (getattr(refund, "note", None) or "").strip()
+            if note:
+                draw.text((margin, y), note[:120], fill=fg, font=small_font)
+                y += 22
+            if y > page_h - 220:
+                break
 
     y += 10
     pm = (getattr(order, "payment_method", None) or "").strip()

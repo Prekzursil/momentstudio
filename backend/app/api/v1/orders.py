@@ -1720,6 +1720,7 @@ async def admin_refund_order(
 
 @router.post("/admin/{order_id}/refunds", response_model=AdminOrderRead)
 async def admin_create_order_refund(
+    background_tasks: BackgroundTasks,
     order_id: UUID,
     payload: AdminOrderRefundCreate = Body(...),
     session: AsyncSession = Depends(get_session),
@@ -1741,6 +1742,29 @@ async def admin_create_order_refund(
     )
     if updated.status == OrderStatus.refunded:
         await coupons_service.release_coupon_for_order(session, order=updated, reason="refunded")
+
+    refund_record = (getattr(updated, "refunds", None) or [])[-1] if (getattr(updated, "refunds", None) or []) else None
+    if refund_record:
+        customer_to = (updated.user.email if updated.user and updated.user.email else None) or getattr(updated, "customer_email", None)
+        customer_lang = updated.user.preferred_language if updated.user else None
+        if customer_to:
+            background_tasks.add_task(email_service.send_order_partial_refund_update, customer_to, updated, refund_record, lang=customer_lang)
+        if updated.user and updated.user.id:
+            amount = getattr(refund_record, "amount", None)
+            currency = getattr(updated, "currency", None) or "RON"
+            body = f"{amount} {currency}" if amount is not None else None
+            await notification_service.create_notification(
+                session,
+                user_id=updated.user.id,
+                type="order",
+                title=(
+                    "Partial refund issued"
+                    if (updated.user.preferred_language or "en") != "ro"
+                    else "Rambursare parțială"
+                ),
+                body=body,
+                url="/account/orders",
+            )
 
     return await _serialize_admin_order(session, updated)
 

@@ -16,6 +16,22 @@ _DEFAULT_TITLE: Final[str] = "Packing slips"
 _REPORTLAB_FONTS: tuple[str, str] | None = None
 
 
+def _order_locale(order: object) -> str:
+    preferred = (getattr(getattr(order, "user", None), "preferred_language", None) or "").strip().lower()
+    if preferred in {"en", "ro"}:
+        return preferred
+
+    currency = (getattr(order, "currency", None) or "").strip().upper()
+    if currency == "RON":
+        return "ro"
+
+    country = (getattr(getattr(order, "shipping_address", None), "country", None) or "").strip().upper()
+    if country == "RO":
+        return "ro"
+
+    return "en"
+
+
 def _register_reportlab_fonts() -> tuple[str, str]:
     global _REPORTLAB_FONTS
     if _REPORTLAB_FONTS is not None:
@@ -31,11 +47,23 @@ def _register_reportlab_fonts() -> tuple[str, str]:
     ]
 
     regular_path = next((p for p in regular_candidates if Path(p).exists()), None)
-    bold_path = next((p for p in bold_candidates if Path(p).exists()), None)
+    bold_path = next((p for p in bold_candidates if Path(p).exists()), None) or regular_path
+    if regular_path is None and bold_path is not None:
+        regular_path = bold_path
 
     if regular_path and bold_path:
-        pdfmetrics.registerFont(TTFont("MomentSans", regular_path))
-        pdfmetrics.registerFont(TTFont("MomentSansBold", bold_path))
+        registered = set(pdfmetrics.getRegisteredFontNames())
+        if "MomentSans" not in registered:
+            pdfmetrics.registerFont(TTFont("MomentSans", regular_path))
+        if "MomentSansBold" not in registered:
+            pdfmetrics.registerFont(TTFont("MomentSansBold", bold_path))
+        pdfmetrics.registerFontFamily(
+            "MomentSans",
+            normal="MomentSans",
+            bold="MomentSansBold",
+            italic="MomentSans",
+            boldItalic="MomentSansBold",
+        )
         _REPORTLAB_FONTS = ("MomentSans", "MomentSansBold")
         return _REPORTLAB_FONTS
 
@@ -43,10 +71,13 @@ def _register_reportlab_fonts() -> tuple[str, str]:
     return _REPORTLAB_FONTS
 
 
-def _fmt_dt(value: datetime | None) -> str:
+def _fmt_dt(value: datetime | None, *, locale: str | None = None) -> str:
     if not value:
         return ""
+    normalized = "ro" if (locale or "").strip().lower() == "ro" else "en"
     try:
+        if normalized == "ro":
+            return value.strftime("%d.%m.%Y %H:%M")
         return value.strftime("%Y-%m-%d %H:%M")
     except Exception:
         return str(value)
@@ -127,7 +158,7 @@ def render_batch_packing_slips_pdf(orders: Sequence[object], *, title: str | Non
             story.append(PageBreak())
 
         ref = getattr(order, "reference_code", None) or str(getattr(order, "id", ""))
-        created_at = _fmt_dt(getattr(order, "created_at", None))
+        created_at = _fmt_dt(getattr(order, "created_at", None), locale=_order_locale(order))
         customer_name = (getattr(order, "customer_name", None) or "").strip()
         customer_email = (getattr(order, "customer_email", None) or "").strip()
 

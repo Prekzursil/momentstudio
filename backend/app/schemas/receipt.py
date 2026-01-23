@@ -26,6 +26,14 @@ class ReceiptItemRead(BaseModel):
     product_url: str | None = None
 
 
+class ReceiptRefundRead(BaseModel):
+    amount: Decimal
+    currency: str
+    provider: str
+    note: str | None = None
+    created_at: datetime
+
+
 class ReceiptRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -52,6 +60,7 @@ class ReceiptRead(BaseModel):
     shipping_address: ReceiptAddressRead | None = None
     billing_address: ReceiptAddressRead | None = None
     items: list[ReceiptItemRead] = Field(default_factory=list)
+    refunds: list[ReceiptRefundRead] = Field(default_factory=list)
 
 
 class ReceiptShareTokenRead(BaseModel):

@@ -711,9 +711,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Orders: timeline diff view – include address diffs once address edit lands (shipping/billing before/after blocks).
 - [x] Admin Orders: split shipments – Support partial fulfillment with per-item shipped qty and multiple tracking numbers.
 - [x] Admin Orders: export improvements – Add CSV export columns picker + saved export templates.
-- [ ] Admin Orders: print/i18n hardening – Ensure PDFs render diacritics and locale number/date formats.
-- [ ] Admin Orders: partial refunds validation – Enforce per-item refunded qty/amount caps (cumulative) and validate amount vs selected items when items are provided.
-- [ ] Admin Orders: partial refund notifications – Email customer on partial refund (amount + note) and include the refund in receipt/share views.
+- [x] Admin Orders: print/i18n hardening – Ensure PDFs render diacritics and locale number/date formats.
+- [x] Admin Orders: partial refunds validation – Enforce per-item refunded qty/amount caps (cumulative) and validate amount vs selected items when items are provided.
+- [x] Admin Orders: partial refund notifications – Email customer on partial refund (amount + note) and include the refund in receipt/share views.
 - [ ] Admin Products: inline price editing – Spreadsheet-style editing for price/sale/stock with validation.
 - [ ] Admin Products: bulk price adjustments – Apply +/- percent/amount to selected products with preview.
 - [ ] Admin Products: bulk category assignment – Add/remove categories for selected products.
@@ -827,3 +827,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Perf: fix account idle-timer event listener cleanup (avoid leaking listeners with `.bind(this)`).
 - [x] Follow-up: set `<meta name="theme-color">` dynamically based on selected theme (mobile address bar).
 - [x] Follow-up: add early theme bootstrap in `frontend/src/index.html` to avoid flash of incorrect theme on load.
+- [ ] Checkout: fix address modal overflow on smaller screens (prevent action buttons/inputs rendering off-screen).
+- [ ] Notifications: deep-link notification clicks to relevant page (avoid always landing on account settings).
+- [ ] Notifications: add archived/dismissed notifications view so hidden items remain discoverable.
+- [ ] Receipts: improve share link UX (explicit “Copy link” button + visible confirmation for copy action).
+- [ ] CI: make compose-smoke E2E resilient (mock locker lookup / disable Overpass fallback to reduce flakiness).
+- [ ] Catalog: investigate product detail page sometimes failing to load from listings (route/slug/API error).

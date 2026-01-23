@@ -853,6 +853,32 @@ def test_admin_partial_refunds(test_app: Dict[str, object], monkeypatch: pytest.
     assert len(refunds) == 1
     assert refunds[0]["provider"] == "manual"
 
+    # Cannot refund more than the selected items total.
+    bad_amount = client.post(
+        f"/api/v1/orders/admin/{order_id}/refunds",
+        headers=auth_headers(admin_token),
+        json={
+            "amount": "30.00",
+            "note": "Too high for one unit",
+            "items": [{"order_item_id": item_id, "quantity": 1}],
+            "process_payment": False,
+        },
+    )
+    assert bad_amount.status_code == 400
+
+    # Cannot refund more item quantity than remains (cumulative).
+    bad_qty = client.post(
+        f"/api/v1/orders/admin/{order_id}/refunds",
+        headers=auth_headers(admin_token),
+        json={
+            "amount": "10.00",
+            "note": "Too many units",
+            "items": [{"order_item_id": item_id, "quantity": 5}],
+            "process_payment": False,
+        },
+    )
+    assert bad_qty.status_code == 400
+
     # Cannot refund beyond remaining amount
     too_much = client.post(
         f"/api/v1/orders/admin/{order_id}/refunds",

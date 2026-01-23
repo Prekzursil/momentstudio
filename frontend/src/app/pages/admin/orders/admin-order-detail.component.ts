@@ -1184,23 +1184,23 @@ type OrderAction =
                     type="button"
                     class="h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                     [disabled]="partialRefundQtyFor(it.id) <= 0"
-                    (click)="adjustPartialRefundQty(it.id, -1, it.quantity)"
+                    (click)="adjustPartialRefundQty(it.id, -1, partialRefundMaxQty(it))"
                   >
                     −
                   </button>
                   <input
                     type="number"
                     min="0"
-                    [max]="it.quantity"
+                    [max]="partialRefundMaxQty(it)"
                     class="h-8 w-16 rounded-lg border border-slate-200 bg-white px-2 text-center text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [ngModel]="partialRefundQtyFor(it.id)"
-                    (ngModelChange)="setPartialRefundQty(it.id, $event, it.quantity)"
+                    (ngModelChange)="setPartialRefundQty(it.id, $event, partialRefundMaxQty(it))"
                   />
                   <button
                     type="button"
                     class="h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                    [disabled]="partialRefundQtyFor(it.id) >= it.quantity"
-                    (click)="adjustPartialRefundQty(it.id, 1, it.quantity)"
+                    [disabled]="partialRefundQtyFor(it.id) >= partialRefundMaxQty(it)"
+                    (click)="adjustPartialRefundQty(it.id, 1, partialRefundMaxQty(it))"
                   >
                     +
                   </button>
@@ -1920,6 +1920,29 @@ export class AdminOrderDetailComponent implements OnInit {
 
   partialRefundQtyFor(orderItemId: string): number {
     return Number(this.partialRefundQty?.[orderItemId] ?? 0);
+  }
+
+  partialRefundMaxQty(it: AdminOrderDetail['items'][number]): number {
+    const ordered = Number(it.quantity ?? 0);
+    const already = this.partialRefundAlreadyRefundedQty(it.id);
+    const remaining = ordered - already;
+    return remaining > 0 ? remaining : 0;
+  }
+
+  private partialRefundAlreadyRefundedQty(orderItemId: string): number {
+    const refunds = this.order()?.refunds ?? [];
+    let qty = 0;
+    for (const refund of refunds) {
+      const items = (refund?.data as any)?.items;
+      if (!Array.isArray(items)) continue;
+      for (const row of items) {
+        if (!row) continue;
+        if (String((row as any).order_item_id ?? '') !== orderItemId) continue;
+        const q = Number((row as any).quantity ?? 0);
+        if (Number.isFinite(q) && q > 0) qty += Math.trunc(q);
+      }
+    }
+    return qty;
   }
 
   partialRefundLineTotal(it: AdminOrderDetail['items'][number]): number {

@@ -528,6 +528,57 @@ async def send_order_refunded_update(to_email: str, order, *, lang: str | None =
     return await send_email(to_email, subject, text_body, html_body)
 
 
+async def send_order_partial_refund_update(
+    to_email: str,
+    order,
+    refund,
+    *,
+    lang: str | None = None,
+) -> bool:
+    ref = getattr(order, "reference_code", None) or str(getattr(order, "id", ""))
+    account_url = f"{settings.frontend_origin.rstrip('/')}/account/orders"
+    currency = getattr(order, "currency", "RON") or "RON"
+
+    amount = _money_str(getattr(refund, "amount", 0), currency)
+    note = (getattr(refund, "note", None) or "").strip() or None
+    provider = (getattr(refund, "provider", None) or "").strip() or None
+
+    def _lines(lng: str) -> list[str]:
+        lines = [
+            (
+                f"A fost emisă o rambursare parțială pentru comanda {ref}."
+                if lng == "ro"
+                else f"A partial refund was issued for your order {ref}."
+            )
+        ]
+        lines.append(("Sumă: " if lng == "ro" else "Amount: ") + amount)
+        if provider:
+            lines.append(("Procesator: " if lng == "ro" else "Provider: ") + provider)
+        if note:
+            lines.append(("Notă: " if lng == "ro" else "Note: ") + note)
+        lines.append("")
+        lines.append(
+            f"Detalii în cont: {account_url}" if lng == "ro" else f"View in your account: {account_url}"
+        )
+        return lines
+
+    subject = _bilingual_subject(
+        f"Rambursare parțială pentru comanda {ref}",
+        f"Partial refund for order {ref}",
+        preferred_language=lang,
+    )
+    text_ro = "\n".join(_lines("ro"))
+    text_en = "\n".join(_lines("en"))
+    text_body, html_body = _bilingual_sections(
+        text_ro=text_ro,
+        text_en=text_en,
+        html_ro=_html_pre(text_ro),
+        html_en=_html_pre(text_en),
+        preferred_language=lang,
+    )
+    return await send_email(to_email, subject, text_body, html_body)
+
+
 async def send_new_order_notification(
     to_email: str, order, customer_email: str | None = None, lang: str | None = None
 ) -> bool:
