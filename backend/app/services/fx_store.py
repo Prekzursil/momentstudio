@@ -4,6 +4,9 @@ import logging
 from datetime import date, datetime, timezone
 
 from fastapi import HTTPException, status
+from sqlalchemy import func
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -32,6 +35,41 @@ async def _get_row(session: AsyncSession, *, is_override: bool) -> FxRate | None
 
 
 async def _upsert_row(session: AsyncSession, *, is_override: bool, data: FxRatesRead) -> FxRate:
+    bind = session.get_bind()
+    dialect = getattr(getattr(bind, "dialect", None), "name", "")
+    insert_fn = pg_insert if dialect == "postgresql" else (sqlite_insert if dialect == "sqlite" else None)
+
+    if insert_fn is not None:
+        stmt = insert_fn(FxRate).values(
+            base=data.base,
+            eur_per_ron=data.eur_per_ron,
+            usd_per_ron=data.usd_per_ron,
+            as_of=data.as_of,
+            source=data.source,
+            fetched_at=data.fetched_at,
+            is_override=is_override,
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[FxRate.is_override],
+            set_={
+                "base": data.base,
+                "eur_per_ron": data.eur_per_ron,
+                "usd_per_ron": data.usd_per_ron,
+                "as_of": data.as_of,
+                "source": data.source,
+                "fetched_at": data.fetched_at,
+                "updated_at": func.now(),
+            },
+        )
+        await session.execute(stmt)
+        await session.commit()
+
+        row = await _get_row(session, is_override=is_override)
+        if not row:
+            raise RuntimeError("fx_rate_upsert_failed")
+        await session.refresh(row)
+        return row
+
     existing = await _get_row(session, is_override=is_override)
     if existing:
         existing.base = data.base
@@ -58,7 +96,6 @@ async def _upsert_row(session: AsyncSession, *, is_override: bool, data: FxRates
     try:
         await session.commit()
     except IntegrityError:
-        # A concurrent request inserted the row first; fall back to update.
         await session.rollback()
         existing = await _get_row(session, is_override=is_override)
         if not existing:
