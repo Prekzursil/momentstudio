@@ -2086,6 +2086,35 @@
       "statusFilter": "Status",
       "from": "De la",
       "to": "Până la",
+      "presets": {
+        "label": "Preseturi",
+        "none": "Fără preset",
+        "save": "Salvează preset",
+        "delete": "Șterge preset",
+        "prompt": "Nume preset",
+        "confirmDelete": "Ștergi presetul „{{name}}”?",
+        "success": {
+          "saved": "Preset salvat",
+          "deleted": "Preset șters"
+        },
+        "errors": {
+          "nameRequired": "Numele presetului este obligatoriu."
+        }
+      },
+      "bulk": {
+        "selected": "{{count}} selectate",
+        "status": "Status",
+        "courier": "Curier",
+        "noChange": "Fără schimbări",
+        "clearCourier": "Șterge curierul",
+        "apply": "Aplică",
+        "clearSelection": "Golește selecția",
+        "success": "Am actualizat {{count}} comenzi.",
+        "partial": "Am actualizat {{success}} din {{total}} comenzi.",
+        "errors": {
+          "chooseAction": "Alege un status sau un curier de aplicat."
+        }
+      },
       "empty": "Nu există comenzi pentru aceste filtre.",
       "view": "Vezi",
       "guest": "Vizitator",

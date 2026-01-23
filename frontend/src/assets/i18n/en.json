@@ -2086,6 +2086,35 @@
       "statusFilter": "Status",
       "from": "From",
       "to": "To",
+      "presets": {
+        "label": "Presets",
+        "none": "No preset",
+        "save": "Save preset",
+        "delete": "Delete preset",
+        "prompt": "Preset name",
+        "confirmDelete": "Delete preset \"{{name}}\"?",
+        "success": {
+          "saved": "Preset saved",
+          "deleted": "Preset deleted"
+        },
+        "errors": {
+          "nameRequired": "Preset name is required."
+        }
+      },
+      "bulk": {
+        "selected": "{{count}} selected",
+        "status": "Status",
+        "courier": "Courier",
+        "noChange": "No change",
+        "clearCourier": "Clear courier",
+        "apply": "Apply",
+        "clearSelection": "Clear selection",
+        "success": "Updated {{count}} orders.",
+        "partial": "Updated {{success}} of {{total}} orders.",
+        "errors": {
+          "chooseAction": "Choose a status or courier to apply."
+        }
+      },
       "empty": "No orders match these filters.",
       "view": "View",
       "guest": "Guest",

@@ -91,7 +91,13 @@ export class AdminOrdersService {
 
   update(
     orderId: string,
-    payload: { status?: string; cancel_reason?: string | null; tracking_number?: string | null; tracking_url?: string | null }
+    payload: {
+      status?: string;
+      cancel_reason?: string | null;
+      courier?: string | null;
+      tracking_number?: string | null;
+      tracking_url?: string | null;
+    }
   ): Observable<AdminOrderDetail> {
     return this.api.patch<AdminOrderDetail>(`/orders/admin/${orderId}`, payload).pipe(
       map((o: any) => ({

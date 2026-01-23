@@ -523,6 +523,14 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     assert ok.json()["status"] == "paid"
     assert ok.json()["tracking_number"] == "TRACK123"
 
+    courier_update = client.patch(
+        f"/api/v1/orders/admin/{order_id}",
+        json={"courier": "sameday"},
+        headers=auth_headers(admin_token),
+    )
+    assert courier_update.status_code == 200
+    assert courier_update.json()["courier"] == "sameday"
+
     final = client.patch(
         f"/api/v1/orders/admin/{order_id}",
         json={"status": "shipped"},
