@@ -44,9 +44,9 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
 
       <div class="grid gap-1 text-sm">
         <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'addressForm.label' | translate }}</label>
-        <div class="grid gap-2 sm:grid-cols-2">
+        <div class="grid gap-2 sm:grid-cols-2 min-w-0">
           <select
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             name="labelPreset"
             [(ngModel)]="labelPreset"
             (ngModelChange)="applyLabelPreset()"
@@ -58,7 +58,7 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
           </select>
           <input
             *ngIf="labelPreset === 'custom'"
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+            class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
             name="labelCustom"
             autocomplete="off"
             [(ngModel)]="labelCustom"
@@ -71,9 +71,9 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
 
       <div class="grid gap-1 text-sm">
         <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'auth.phone' | translate }}</label>
-        <div class="grid grid-cols-[auto_1fr] gap-2">
+        <div class="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
           <select
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             name="phoneCountry"
             [(ngModel)]="phoneCountry"
             (ngModelChange)="onPhoneChanged()"
@@ -83,7 +83,7 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
           <input
             #phoneCtrl="ngModel"
             type="tel"
-            class="rounded-lg border bg-white px-3 py-2 text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+            class="w-full min-w-0 rounded-lg border bg-white px-3 py-2 text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
             [ngClass]="
               (phoneCtrl.invalid && (phoneCtrl.touched || addrForm.submitted)) || (phoneNational && !phoneE164())
                 ? 'border-rose-300 ring-2 ring-rose-200 dark:border-rose-900/40 dark:ring-rose-900/30'
@@ -152,7 +152,7 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
           >
           <ng-container *ngIf="model.country === 'RO'; else freeRegion">
             <select
-              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               name="region"
               autocomplete="address-level1"
               [(ngModel)]="model.region"
@@ -164,7 +164,7 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
           </ng-container>
           <ng-template #freeRegion>
             <input
-              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
               name="region"
               autocomplete="address-level1"
               [(ngModel)]="model.region"
@@ -177,7 +177,7 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
         <div class="grid gap-1 text-sm">
           <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'checkout.postal' | translate }} <span class="text-rose-600">*</span></label>
           <input
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+            class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
             name="postal_code"
             autocomplete="postal-code"
             [(ngModel)]="model.postal_code"
@@ -203,7 +203,7 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
         <div class="grid gap-1 text-sm">
           <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'checkout.country' | translate }} <span class="text-rose-600">*</span></label>
           <select
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             name="country"
             autocomplete="country"
             required

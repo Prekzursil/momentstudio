@@ -24,7 +24,7 @@ import { ButtonComponent } from './button.component';
         role="dialog"
         aria-modal="true"
         [attr.aria-label]="title"
-        class="w-full max-w-lg rounded-2xl bg-white shadow-xl border border-slate-200 p-6 grid gap-4 outline-none dark:bg-slate-900 dark:border-slate-700 dark:shadow-none"
+        class="w-full max-w-lg min-w-0 max-h-[85vh] overflow-y-auto overflow-x-hidden rounded-2xl bg-white shadow-xl border border-slate-200 p-6 grid gap-4 outline-none dark:bg-slate-900 dark:border-slate-700 dark:shadow-none"
         tabindex="-1"
       >
         <div class="flex items-start justify-between gap-4">

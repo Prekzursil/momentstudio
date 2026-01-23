@@ -128,9 +128,9 @@ import { LockerPickerComponent } from '../../shared/locker-picker.component';
                   </label>
 	                  <div class="grid gap-1 text-sm sm:col-span-2">
 	                    <span class="font-medium text-slate-700 dark:text-slate-200">{{ 'auth.phone' | translate }}</span>
-	                    <div class="grid grid-cols-[auto_1fr] gap-2">
+	                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
 	                      <select
-	                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                        class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
 	                        name="guestPhoneCountry"
 	                        [(ngModel)]="guestPhoneCountry"
 	                        (ngModelChange)="onGuestPhoneChanged()"
@@ -141,7 +141,7 @@ import { LockerPickerComponent } from '../../shared/locker-picker.component';
 	                      <input
 	                        #guestPhoneCtrl="ngModel"
 	                        type="tel"
-	                        class="rounded-lg border bg-white px-3 py-2 text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                        class="w-full min-w-0 rounded-lg border bg-white px-3 py-2 text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
 	                        [ngClass]="
 	                          (guestPhoneCtrl.invalid && (guestPhoneCtrl.touched || checkoutForm.submitted)) || (guestPhoneNational && !guestPhoneE164())
 	                            ? 'border-rose-300 ring-2 ring-rose-200 dark:border-rose-900/40 dark:ring-rose-900/30'
@@ -294,9 +294,9 @@ import { LockerPickerComponent } from '../../shared/locker-picker.component';
                 </label>
                 <div *ngIf="shippingPhoneRequired()" class="grid gap-1 text-sm sm:col-span-2">
                   <span class="font-medium text-slate-700 dark:text-slate-200">{{ 'auth.phone' | translate }}</span>
-                  <div class="grid grid-cols-[auto_1fr] gap-2">
+                  <div class="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
                     <select
-                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                       name="shippingPhoneCountry"
                       [(ngModel)]="shippingPhoneCountry"
                       required
@@ -306,7 +306,7 @@ import { LockerPickerComponent } from '../../shared/locker-picker.component';
                     <input
                       #shippingPhoneCtrl="ngModel"
                       type="tel"
-                      class="rounded-lg border bg-white px-3 py-2 text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                      class="w-full min-w-0 rounded-lg border bg-white px-3 py-2 text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
                       [ngClass]="
                         (shippingPhoneCtrl.invalid && (shippingPhoneCtrl.touched || checkoutForm.submitted)) || (shippingPhoneNational && !shippingPhoneE164())
                           ? 'border-rose-300 ring-2 ring-rose-200 dark:border-rose-900/40 dark:ring-rose-900/30'
@@ -354,10 +354,10 @@ import { LockerPickerComponent } from '../../shared/locker-picker.component';
                     {{ 'notifications.loading' | translate }}
                   </div>
                   <p *ngIf="savedAddressesError" class="sm:col-span-2 text-xs text-rose-700 dark:text-rose-300">{{ savedAddressesError }}</p>
-	                  <label *ngIf="savedAddresses.length" class="text-sm grid gap-1 sm:col-span-2">
+	                  <label *ngIf="savedAddresses.length" class="text-sm grid gap-1 sm:col-span-2 min-w-0">
 	                    {{ 'checkout.savedShippingAddress' | translate }}
 	                    <select
-	                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                      class="w-full min-w-0 truncate rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
 	                      name="savedShippingAddress"
 	                      [(ngModel)]="selectedShippingAddressId"
 	                      (ngModelChange)="applySelectedShippingAddress()"
@@ -664,10 +664,10 @@ import { LockerPickerComponent } from '../../shared/locker-picker.component';
                 </div>
 	                <div *ngIf="!billingSameAsShipping" class="grid sm:grid-cols-2 gap-3">
                   <ng-container *ngIf="auth.isAuthenticated()">
-	                    <label *ngIf="savedAddresses.length" class="text-sm grid gap-1 sm:col-span-2">
+	                    <label *ngIf="savedAddresses.length" class="text-sm grid gap-1 sm:col-span-2 min-w-0">
 	                      {{ 'checkout.savedBillingAddress' | translate }}
 	                      <select
-	                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                        class="w-full min-w-0 truncate rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
 	                        name="savedBillingAddress"
 	                        [(ngModel)]="selectedBillingAddressId"
 	                        (ngModelChange)="applySelectedBillingAddress()"
