@@ -3,15 +3,6 @@ import { test, expect, type APIRequestContext, type Page } from '@playwright/tes
 const OWNER_IDENTIFIER = process.env.E2E_OWNER_IDENTIFIER || 'owner';
 const OWNER_PASSWORD = process.env.E2E_OWNER_PASSWORD || 'Password123';
 
-async function loginApi(request: APIRequestContext): Promise<string> {
-  const res = await request.post('/api/v1/auth/login', {
-    data: { identifier: OWNER_IDENTIFIER, password: OWNER_PASSWORD }
-  });
-  expect(res.ok()).toBeTruthy();
-  const payload = await res.json();
-  return payload.tokens.access_token as string;
-}
-
 async function loginUi(page: Page): Promise<void> {
   await page.goto('/login');
   await page.getByLabel('Email or username').fill(OWNER_IDENTIFIER);
@@ -20,7 +11,10 @@ async function loginUi(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/account(\/overview)?$/);
 }
 
-async function seedCartWithFirstProduct(request: APIRequestContext, token: string): Promise<{ name: string } | null> {
+async function seedCartWithFirstProduct(
+  request: APIRequestContext,
+  sessionId: string
+): Promise<{ name: string } | null> {
   const listRes = await request.get('/api/v1/catalog/products?sort=newest&page=1&limit=25');
   expect(listRes.ok()).toBeTruthy();
   const listPayload = (await listRes.json()) as any;
@@ -39,8 +33,10 @@ async function seedCartWithFirstProduct(request: APIRequestContext, token: strin
   }
 
   const product = candidates[0];
+  // Use a per-test session cart to avoid cross-test cart races (CI runs tests in parallel).
+  // Authenticated pages will still pick up this session cart if no user cart exists.
   const syncRes = await request.post('/api/v1/cart/sync', {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { 'X-Session-Id': sessionId },
     data: {
       items: [
         {
@@ -60,7 +56,13 @@ async function fillShippingAddress(page: Page, email: string): Promise<void> {
   await page.locator('input[name="email"]').fill(email);
   await page.locator('input[name="line1"]').fill('Strada Test 1');
   await page.locator('input[name="city"]').fill('București');
-  await page.locator('input[name="region"]').fill('București');
+  // RO uses a county select, but the field name stays `region`.
+  const regionSelect = page.locator('select[name="region"]');
+  if (await regionSelect.isVisible()) {
+    await regionSelect.selectOption({ label: 'București' });
+  } else {
+    await page.locator('input[name="region"]').fill('București');
+  }
   await page.locator('input[name="postal"]').fill('010000');
 
   const phoneInput = page.locator('input[name="shippingPhoneNational"]');
@@ -77,8 +79,13 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('cart → checkout → COD success', async ({ page, request }) => {
-  const token = await loginApi(request);
-  const product = await seedCartWithFirstProduct(request, token);
+  const sessionId = `e2e-cod-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  await page.addInitScript((sid) => {
+    localStorage.setItem('cart_session_id', sid);
+    localStorage.removeItem('cart_cache');
+  }, sessionId);
+
+  const product = await seedCartWithFirstProduct(request, sessionId);
   if (!product) return;
 
   await loginUi(page);
@@ -108,4 +115,3 @@ test('cart → checkout → COD success', async ({ page, request }) => {
   await expect(page).toHaveURL(/\/checkout\/success$/);
   await expect(page.getByRole('heading', { name: 'Thank you for your purchase!' })).toBeVisible();
 });
-
