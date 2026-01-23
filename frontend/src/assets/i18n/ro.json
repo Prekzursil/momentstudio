@@ -2229,6 +2229,7 @@
         "deliveryEmail": "Trimite email de livrare",
         "packingSlip": "Descarcă packing slip",
         "partialRefund": "Rambursare parțială",
+        "addNote": "Adaugă notă",
         "refund": "Solicită rambursare"
       },
       "itemsTitle": "Produse",
@@ -2241,6 +2242,14 @@
       "noAddress": "Nu există adresă disponibilă.",
       "timelineTitle": "Istoric",
       "timelineEmpty": "Nu există evenimente înregistrate încă.",
+      "notesTitle": "Note interne",
+      "notesEmpty": "Nu există note interne încă.",
+      "notesAddLabel": "Notă nouă",
+      "notesPlaceholder": "Scrie o notă internă pentru această comandă…",
+      "diff": {
+        "courier": "Curier",
+        "shippingMethod": "Metodă livrare"
+      },
       "notFound": "Comanda nu a fost găsită.",
       "table": {
         "reference": "Referință",
@@ -2274,6 +2283,7 @@
         "void": "Plata a fost anulată",
         "partialRefund": "Rambursare parțială creată",
         "refund": "Rambursarea a fost solicitată",
+        "note": "Notă adăugată",
         "deliveryEmail": "Emailul de livrare a fost trimis",
         "shippingLabelUpload": "Eticheta a fost încărcată",
         "shippingLabelDelete": "Eticheta a fost ștearsă"
@@ -2288,6 +2298,8 @@
         "void": "Nu am putut anula plata.",
         "partialRefund": "Nu am putut crea rambursarea parțială.",
         "refund": "Nu am putut solicita rambursarea.",
+        "note": "Nu am putut adăuga nota.",
+        "noteRequired": "Nota este obligatorie.",
         "deliveryEmail": "Nu am putut trimite emailul de livrare.",
         "packingSlip": "Nu am putut descărca packing slip-ul.",
         "shippingLabelUpload": "Nu am putut încărca eticheta.",

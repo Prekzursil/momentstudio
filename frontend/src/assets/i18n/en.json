@@ -2229,6 +2229,7 @@
         "deliveryEmail": "Send delivery email",
         "packingSlip": "Download packing slip",
         "partialRefund": "Partial refund",
+        "addNote": "Add note",
         "refund": "Request refund"
       },
       "itemsTitle": "Items",
@@ -2241,6 +2242,14 @@
       "noAddress": "No address on file.",
       "timelineTitle": "Timeline",
       "timelineEmpty": "No events recorded yet.",
+      "notesTitle": "Internal notes",
+      "notesEmpty": "No internal notes yet.",
+      "notesAddLabel": "Add note",
+      "notesPlaceholder": "Write an internal note for this order…",
+      "diff": {
+        "courier": "Courier",
+        "shippingMethod": "Shipping method"
+      },
       "notFound": "Order not found.",
       "table": {
         "reference": "Reference",
@@ -2274,6 +2283,7 @@
         "void": "Payment voided",
         "partialRefund": "Partial refund created",
         "refund": "Refund requested",
+        "note": "Note added",
         "deliveryEmail": "Delivery email sent",
         "shippingLabelUpload": "Shipping label uploaded",
         "shippingLabelDelete": "Shipping label deleted"
@@ -2288,6 +2298,8 @@
         "void": "Could not void payment.",
         "partialRefund": "Could not create partial refund.",
         "refund": "Could not request refund.",
+        "note": "Could not add note.",
+        "noteRequired": "Note is required.",
         "deliveryEmail": "Could not send delivery email.",
         "packingSlip": "Could not download packing slip.",
         "shippingLabelUpload": "Could not upload shipping label.",

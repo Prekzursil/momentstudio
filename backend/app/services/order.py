@@ -14,7 +14,7 @@ from sqlalchemy.sql.elements import ColumnElement
 
 from app.models.cart import Cart
 from app.models.catalog import Product, ProductStatus
-from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod, OrderEvent, OrderRefund
+from app.models.order import Order, OrderAdminNote, OrderEvent, OrderItem, OrderRefund, OrderStatus, ShippingMethod
 from app.schemas.order import OrderUpdate, ShippingMethodCreate
 from app.services import checkout_settings as checkout_settings_service
 from app.services import pricing
@@ -381,6 +381,7 @@ async def get_order_by_id_admin(session: AsyncSession, order_id: UUID) -> Order 
             selectinload(Order.shipping_method),
             selectinload(Order.events),
             selectinload(Order.refunds),
+            selectinload(Order.admin_notes),
             selectinload(Order.user),
             selectinload(Order.shipping_address),
             selectinload(Order.billing_address),
@@ -417,6 +418,10 @@ async def update_order(
 ) -> Order:
     data = payload.model_dump(exclude_unset=True)
     explicit_status = bool(data.get("status"))
+    previous_tracking_number = getattr(order, "tracking_number", None)
+    previous_tracking_url = getattr(order, "tracking_url", None)
+    previous_courier = getattr(order, "courier", None)
+    previous_shipping_method_name = getattr(getattr(order, "shipping_method", None), "name", None)
     cancel_reason = data.pop("cancel_reason", None)
     cancel_reason_clean: str | None
     if cancel_reason is None:
@@ -451,7 +456,13 @@ async def update_order(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
         order.status = next_status
         data.pop("status")
-        await _log_event(session, order.id, "status_change", f"{current_status.value} -> {next_status.value}")
+        await _log_event(
+            session,
+            order.id,
+            "status_change",
+            f"{current_status.value} -> {next_status.value}",
+            data={"changes": {"status": {"from": current_status.value, "to": next_status.value}}},
+        )
 
     if cancel_reason_clean is not None:
         if not cancel_reason_clean:
@@ -462,10 +473,40 @@ async def update_order(
         if previous_reason != cancel_reason_clean:
             order.cancel_reason = cancel_reason_clean
             session.add(order)
-            session.add(OrderEvent(order_id=order.id, event="cancel_reason_updated", note="Updated"))
+            session.add(
+                OrderEvent(
+                    order_id=order.id,
+                    event="cancel_reason_updated",
+                    note="Updated",
+                    data={
+                        "changes": {
+                            "cancel_reason": {
+                                "from": previous_reason or None,
+                                "to": cancel_reason_clean,
+                            }
+                        }
+                    },
+                )
+            )
 
     if shipping_method:
         order.shipping_method_id = shipping_method.id
+        if previous_shipping_method_name != shipping_method.name:
+            session.add(
+                OrderEvent(
+                    order_id=order.id,
+                    event="shipping_method_updated",
+                    note=f"{previous_shipping_method_name or '—'} -> {shipping_method.name}",
+                    data={
+                        "changes": {
+                            "shipping_method": {
+                                "from": previous_shipping_method_name,
+                                "to": shipping_method.name,
+                            }
+                        }
+                    },
+                )
+            )
         taxable_subtotal = (
             Decimal(order.total_amount)
             - Decimal(order.shipping_amount)
@@ -501,6 +542,38 @@ async def update_order(
     for field, value in data.items():
         setattr(order, field, value)
 
+    tracking_changes: dict[str, dict[str, object]] = {}
+    if "tracking_number" in data and getattr(order, "tracking_number", None) != previous_tracking_number:
+        tracking_changes["tracking_number"] = {"from": previous_tracking_number, "to": getattr(order, "tracking_number", None)}
+    if "tracking_url" in data and getattr(order, "tracking_url", None) != previous_tracking_url:
+        tracking_changes["tracking_url"] = {"from": previous_tracking_url, "to": getattr(order, "tracking_url", None)}
+    if tracking_changes:
+        session.add(
+            OrderEvent(
+                order_id=order.id,
+                event="tracking_updated",
+                note=None,
+                data={"changes": tracking_changes},
+            )
+        )
+
+    if "courier" in data and getattr(order, "courier", None) != previous_courier:
+        session.add(
+            OrderEvent(
+                order_id=order.id,
+                event="courier_updated",
+                note=None,
+                data={
+                    "changes": {
+                        "courier": {
+                            "from": previous_courier,
+                            "to": getattr(order, "courier", None),
+                        }
+                    }
+                },
+            )
+        )
+
     tracking_in_payload = any(
         (str(data.get(key) or "").strip() for key in ("tracking_number", "tracking_url"))
     )
@@ -511,10 +584,29 @@ async def update_order(
     ):
         previous = OrderStatus(order.status)
         order.status = OrderStatus.shipped
-        await _log_event(session, order.id, "status_auto_ship", f"{previous.value} -> {OrderStatus.shipped.value}")
+        await _log_event(
+            session,
+            order.id,
+            "status_auto_ship",
+            f"{previous.value} -> {OrderStatus.shipped.value}",
+            data={"changes": {"status": {"from": previous.value, "to": OrderStatus.shipped.value}}},
+        )
     session.add(order)
     await session.commit()
     hydrated = await get_order_by_id(session, order.id)
+    return hydrated or order
+
+
+async def add_admin_note(session: AsyncSession, order: Order, *, note: str, actor_user_id: UUID | None = None) -> Order:
+    note_clean = (note or "").strip()
+    if not note_clean:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Note is required")
+    note_clean = note_clean[:5000]
+
+    session.add(OrderAdminNote(order_id=order.id, actor_user_id=actor_user_id, note=note_clean))
+    await session.commit()
+
+    hydrated = await get_order_by_id_admin(session, order.id)
     return hydrated or order
 
 
@@ -781,7 +873,9 @@ async def void_payment(session: AsyncSession, order: Order, intent_id: str | Non
     return hydrated or order
 
 
-async def _log_event(session: AsyncSession, order_id: UUID, event: str, note: str | None = None) -> None:
-    evt = OrderEvent(order_id=order_id, event=event, note=note)
+async def _log_event(
+    session: AsyncSession, order_id: UUID, event: str, note: str | None = None, data: dict | None = None
+) -> None:
+    evt = OrderEvent(order_id=order_id, event=event, note=note, data=data)
     session.add(evt)
     await session.commit()

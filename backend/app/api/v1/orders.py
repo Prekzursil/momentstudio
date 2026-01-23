@@ -69,6 +69,7 @@ from app.schemas.order_admin import (
     AdminOrderEmailResendRequest,
     AdminOrderIdsRequest,
 )
+from app.schemas.order_admin_note import OrderAdminNoteCreate
 from app.schemas.order_refund import AdminOrderRefundCreate
 from app.schemas.receipt import ReceiptRead, ReceiptShareTokenRead
 from app.services import notifications as notification_service
@@ -940,6 +941,7 @@ async def admin_get_order(
         shipping_label_uploaded_at=getattr(order, "shipping_label_uploaded_at", None),
         has_shipping_label=bool(getattr(order, "shipping_label_path", None)),
         refunds=getattr(order, "refunds", []) or [],
+        admin_notes=getattr(order, "admin_notes", []) or [],
     )
 
 
@@ -1427,6 +1429,7 @@ async def admin_update_order(
         shipping_label_uploaded_at=getattr(full, "shipping_label_uploaded_at", None),
         has_shipping_label=bool(getattr(full, "shipping_label_path", None)),
         refunds=getattr(full, "refunds", []) or [],
+        admin_notes=getattr(full, "admin_notes", []) or [],
     )
 
 
@@ -1474,6 +1477,7 @@ async def admin_upload_shipping_label(
         shipping_label_uploaded_at=getattr(full, "shipping_label_uploaded_at", None),
         has_shipping_label=bool(getattr(full, "shipping_label_path", None)),
         refunds=getattr(full, "refunds", []) or [],
+        admin_notes=getattr(full, "admin_notes", []) or [],
     )
 
 
@@ -1619,6 +1623,37 @@ async def admin_create_order_refund(
         shipping_label_uploaded_at=getattr(updated, "shipping_label_uploaded_at", None),
         has_shipping_label=bool(getattr(updated, "shipping_label_path", None)),
         refunds=getattr(updated, "refunds", []) or [],
+        admin_notes=getattr(updated, "admin_notes", []) or [],
+    )
+
+
+@router.post("/admin/{order_id}/notes", response_model=AdminOrderRead)
+async def admin_add_order_note(
+    order_id: UUID,
+    payload: OrderAdminNoteCreate = Body(...),
+    session: AsyncSession = Depends(get_session),
+    admin=Depends(require_admin),
+) -> AdminOrderRead:
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    updated = await order_service.add_admin_note(session, order, note=payload.note, actor_user_id=getattr(admin, "id", None))
+
+    base = OrderRead.model_validate(updated).model_dump()
+    return AdminOrderRead(
+        **base,
+        customer_email=getattr(updated, "customer_email", None)
+        or (getattr(updated.user, "email", None) if getattr(updated, "user", None) else None),
+        customer_username=getattr(updated.user, "username", None) if getattr(updated, "user", None) else None,
+        shipping_address=updated.shipping_address,
+        billing_address=updated.billing_address,
+        tracking_url=getattr(updated, "tracking_url", None),
+        shipping_label_filename=getattr(updated, "shipping_label_filename", None),
+        shipping_label_uploaded_at=getattr(updated, "shipping_label_uploaded_at", None),
+        has_shipping_label=bool(getattr(updated, "shipping_label_path", None)),
+        refunds=getattr(updated, "refunds", []) or [],
+        admin_notes=getattr(updated, "admin_notes", []) or [],
     )
 
 

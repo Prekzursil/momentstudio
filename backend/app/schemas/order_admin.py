@@ -10,6 +10,7 @@ from app.models.order import OrderStatus
 from app.schemas.admin_common import AdminPaginationMeta
 from app.schemas.address import AddressRead
 from app.schemas.order import OrderRead
+from app.schemas.order_admin_note import OrderAdminNoteRead
 from app.schemas.order_refund import OrderRefundRead
 
 
@@ -39,6 +40,7 @@ class AdminOrderRead(OrderRead):
     shipping_label_uploaded_at: datetime | None = None
     has_shipping_label: bool = False
     refunds: list[OrderRefundRead] = Field(default_factory=list)
+    admin_notes: list[OrderAdminNoteRead] = Field(default_factory=list)
 
 
 class AdminOrderEmailResendRequest(BaseModel):

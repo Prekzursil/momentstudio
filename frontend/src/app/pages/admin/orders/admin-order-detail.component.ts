@@ -10,7 +10,7 @@ import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { ToastService } from '../../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { ReceiptShareToken } from '../../../core/account.service';
-import { AdminOrderDetail, AdminOrdersService } from '../../../core/admin-orders.service';
+import { AdminOrderDetail, AdminOrderEvent, AdminOrdersService } from '../../../core/admin-orders.service';
 import { AdminReturnsService, ReturnRequestRead } from '../../../core/admin-returns.service';
 import { orderStatusChipClass } from '../../../shared/order-status';
 
@@ -30,6 +30,7 @@ type OrderAction =
   | 'void'
   | 'partialRefund'
   | 'refund'
+  | 'addNote'
   | 'deliveryEmail'
   | 'packingSlip'
   | 'labelUpload'
@@ -542,6 +543,48 @@ type OrderAction =
           </section>
 
           <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.notesTitle' | translate }}</h2>
+            <div *ngIf="(order()!.admin_notes || []).length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.orders.notesEmpty' | translate }}
+            </div>
+            <div *ngIf="(order()!.admin_notes || []).length > 0" class="grid gap-2">
+              <div
+                *ngFor="let note of order()!.admin_notes"
+                class="rounded-xl border border-slate-200 p-3 text-sm text-slate-700 dark:border-slate-800 dark:text-slate-200"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div class="grid gap-1">
+                    <div class="text-xs font-semibold text-slate-900 dark:text-slate-50">
+                      {{ note.actor?.email || note.actor?.username || '—' }}
+                    </div>
+                    <div class="whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">{{ note.note }}</div>
+                  </div>
+                  <div class="shrink-0 text-xs text-slate-500 dark:text-slate-400">{{ note.created_at | date: 'short' }}</div>
+                </div>
+              </div>
+            </div>
+
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'adminUi.orders.notesAddLabel' | translate }}
+              <textarea
+                class="min-h-[90px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                [(ngModel)]="adminNoteText"
+                [placeholder]="'adminUi.orders.notesPlaceholder' | translate"
+              ></textarea>
+            </label>
+            <div *ngIf="adminNoteError()" class="text-sm text-rose-700 dark:text-rose-300">{{ adminNoteError() }}</div>
+
+            <div class="flex items-center justify-end">
+              <app-button
+                size="sm"
+                [label]="'adminUi.orders.actions.addNote' | translate"
+                [disabled]="action() !== null"
+                (action)="addAdminNote()"
+              ></app-button>
+            </div>
+          </section>
+
+          <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
             <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.timelineTitle' | translate }}</h2>
             <div *ngIf="(order()!.events || []).length === 0" class="text-sm text-slate-600 dark:text-slate-300">
               {{ 'adminUi.orders.timelineEmpty' | translate }}
@@ -555,6 +598,16 @@ type OrderAction =
                   <div class="font-semibold text-slate-900 dark:text-slate-50">{{ evt.event }}</div>
                   <div class="text-xs text-slate-500 dark:text-slate-400">{{ evt.created_at | date: 'short' }}</div>
                 </div>
+                <ng-container *ngIf="eventDiffRows(evt) as diffs">
+                  <div *ngIf="diffs.length" class="mt-2 grid gap-1 text-xs text-slate-600 dark:text-slate-300">
+                    <div *ngFor="let diff of diffs" class="flex flex-wrap items-center gap-x-1 gap-y-1">
+                      <span class="font-semibold text-slate-700 dark:text-slate-200">{{ diff.label }}:</span>
+                      <span class="break-all font-mono">{{ diff.from }}</span>
+                      <span class="text-slate-400">→</span>
+                      <span class="break-all font-mono">{{ diff.to }}</span>
+                    </div>
+                  </div>
+                </ng-container>
                 <div *ngIf="evt.note" class="mt-1 text-slate-600 dark:text-slate-300">{{ evt.note }}</div>
               </div>
             </div>
@@ -835,6 +888,7 @@ export class AdminOrderDetailComponent implements OnInit {
   refundWizardError = signal<string | null>(null);
   partialRefundWizardOpen = signal(false);
   partialRefundWizardError = signal<string | null>(null);
+  adminNoteError = signal<string | null>(null);
 
   statusValue: OrderStatus = 'pending_acceptance';
   trackingNumber = '';
@@ -845,6 +899,7 @@ export class AdminOrderDetailComponent implements OnInit {
   partialRefundAmount = '';
   partialRefundProcessPayment = false;
   partialRefundQty: Record<string, number> = {};
+  adminNoteText = '';
   returnReason = '';
   returnCustomerMessage = '';
   returnQty: Record<string, number> = {};
@@ -917,6 +972,81 @@ export class AdminOrderDetailComponent implements OnInit {
     return status === 'paid' || status === 'shipped' || status === 'delivered';
   }
 
+  eventDiffRows(evt: AdminOrderEvent): Array<{ label: string; from: string; to: string }> {
+    const changes = this.eventChanges(evt);
+    if (changes) return changes;
+
+    const note = (evt?.note ?? '').toString();
+    const event = (evt?.event ?? '').toString();
+    if ((event === 'status_change' || event === 'status_auto_ship') && note.includes('->')) {
+      const parts = note.split('->').map((p) => p.trim());
+      if (parts.length >= 2) {
+        return [
+          {
+            label: this.diffLabel('status'),
+            from: this.diffValue('status', parts[0]),
+            to: this.diffValue('status', parts[1])
+          }
+        ];
+      }
+    }
+    return [];
+  }
+
+  private eventChanges(evt: AdminOrderEvent): Array<{ label: string; from: string; to: string }> | null {
+    const data = evt?.data;
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+    const rawChanges = (data as any).changes;
+    if (!rawChanges || typeof rawChanges !== 'object' || Array.isArray(rawChanges)) return null;
+
+    const rows: Array<{ label: string; from: string; to: string }> = [];
+    for (const field of Object.keys(rawChanges)) {
+      const change = (rawChanges as any)[field];
+      if (!change || typeof change !== 'object') continue;
+      const from = this.diffValue(field, (change as any).from);
+      const to = this.diffValue(field, (change as any).to);
+      if (from === to) continue;
+      rows.push({ label: this.diffLabel(field), from, to });
+    }
+    return rows.length ? rows : [];
+  }
+
+  private diffLabel(field: string): string {
+    const key =
+      field === 'tracking_number'
+        ? 'adminUi.orders.trackingNumber'
+        : field === 'tracking_url'
+          ? 'adminUi.orders.trackingUrl'
+          : field === 'status'
+            ? 'adminUi.orders.table.status'
+            : field === 'cancel_reason'
+              ? 'adminUi.orders.cancelReason'
+              : field === 'courier'
+                ? 'adminUi.orders.diff.courier'
+                : field === 'shipping_method'
+                  ? 'adminUi.orders.diff.shippingMethod'
+                  : null;
+    if (!key) return field.replaceAll('_', ' ');
+
+    const translated = this.translate.instant(key);
+    return translated && translated !== key ? translated : field.replaceAll('_', ' ');
+  }
+
+  private diffValue(field: string, value: unknown): string {
+    if (value === null || value === undefined) return '—';
+    let raw = '';
+    if (typeof value === 'string') raw = value.trim();
+    else if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') raw = String(value);
+    else return '—';
+    if (!raw) return '—';
+    if (field === 'status') {
+      const key = `adminUi.orders.${raw}`;
+      const translated = this.translate.instant(key);
+      return translated && translated !== key ? translated : raw;
+    }
+    return raw;
+  }
+
   refundBreakdown(): { subtotal: number; shipping: number; vat: number; fee: number; total: number } | null {
     const o = this.order();
     if (!o) return null;
@@ -964,6 +1094,34 @@ export class AdminOrderDetailComponent implements OnInit {
       error: (err) => {
         const msg = err?.error?.detail || this.translate.instant('adminUi.orders.errors.refund');
         this.refundWizardError.set(msg);
+        this.toast.error(msg);
+        this.action.set(null);
+      }
+    });
+  }
+
+  addAdminNote(): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+
+    const note = this.adminNoteText.trim();
+    if (!note) {
+      this.adminNoteError.set(this.translate.instant('adminUi.orders.errors.noteRequired'));
+      return;
+    }
+
+    this.adminNoteError.set(null);
+    this.action.set('addNote');
+    this.api.addAdminNote(orderId, note).subscribe({
+      next: () => {
+        this.toast.success(this.translate.instant('adminUi.orders.success.note'));
+        this.adminNoteText = '';
+        this.load(orderId);
+        this.action.set(null);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.errors.note');
+        this.adminNoteError.set(msg);
         this.toast.error(msg);
         this.action.set(null);
       }
@@ -1432,6 +1590,7 @@ export class AdminOrderDetailComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     this.receiptShare.set(null);
+    this.adminNoteError.set(null);
     this.api.get(orderId).subscribe({
       next: (o) => {
         this.order.set(o);

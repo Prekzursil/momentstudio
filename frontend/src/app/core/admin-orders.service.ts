@@ -31,6 +31,7 @@ export interface AdminOrderEvent {
   id: string;
   event: string;
   note?: string | null;
+  data?: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -43,6 +44,19 @@ export interface AdminOrderRefund {
   note?: string | null;
   created_at: string;
   data?: Record<string, unknown> | null;
+}
+
+export interface AdminOrderNoteActor {
+  id: string;
+  email: string;
+  username?: string | null;
+}
+
+export interface AdminOrderNote {
+  id: string;
+  note: string;
+  created_at: string;
+  actor?: AdminOrderNoteActor | null;
 }
 
 export interface AdminOrderDetail extends Order {
@@ -58,6 +72,7 @@ export interface AdminOrderDetail extends Order {
   has_shipping_label?: boolean;
   events?: AdminOrderEvent[];
   refunds?: AdminOrderRefund[];
+  admin_notes?: AdminOrderNote[];
   items: OrderItem[];
 }
 
@@ -96,6 +111,7 @@ export class AdminOrdersService {
           ...r,
           amount: parseMoney(r?.amount)
         })),
+        admin_notes: o?.admin_notes ?? [],
         items: (o?.items ?? []).map((it: any) => ({
           ...it,
           unit_price: parseMoney(it?.unit_price),
@@ -126,6 +142,7 @@ export class AdminOrdersService {
           ...r,
           amount: parseMoney(r?.amount)
         })),
+        admin_notes: o?.admin_notes ?? [],
         items: (o?.items ?? []).map((it: any) => ({
           ...it,
           unit_price: parseMoney(it?.unit_price),
@@ -188,6 +205,29 @@ export class AdminOrdersService {
           ...r,
           amount: parseMoney(r?.amount)
         })),
+        admin_notes: o?.admin_notes ?? [],
+        items: (o?.items ?? []).map((it: any) => ({
+          ...it,
+          unit_price: parseMoney(it?.unit_price),
+          subtotal: parseMoney(it?.subtotal)
+        }))
+      }))
+    );
+  }
+
+  addAdminNote(orderId: string, note: string): Observable<AdminOrderDetail> {
+    return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/notes`, { note }).pipe(
+      map((o: any) => ({
+        ...o,
+        total_amount: parseMoney(o?.total_amount),
+        tax_amount: parseMoney(o?.tax_amount),
+        fee_amount: parseMoney(o?.fee_amount),
+        shipping_amount: parseMoney(o?.shipping_amount),
+        refunds: (o?.refunds ?? []).map((r: any) => ({
+          ...r,
+          amount: parseMoney(r?.amount)
+        })),
+        admin_notes: o?.admin_notes ?? [],
         items: (o?.items ?? []).map((it: any) => ({
           ...it,
           unit_price: parseMoney(it?.unit_price),

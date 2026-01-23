@@ -122,6 +122,7 @@ class OrderEventRead(BaseModel):
     id: UUID
     event: str
     note: str | None = None
+    data: dict | None = None
     created_at: datetime
 
 

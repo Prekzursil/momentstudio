@@ -703,11 +703,12 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Orders: shipping label management – Upload/store labels per order and show print/download history.
 - [x] Admin Orders: one-click refund flow – Guided refund wizard with amount breakdown and required notes.
 - [x] Admin Orders: partial refunds UI – Support item-level partial refunds and sync with payment provider.
-- [ ] Admin Orders: timeline diff view – Show field diffs (status, tracking, address changes) between events.
-- [ ] Admin Orders: customer notes – Allow internal notes per order (visible only to admins).
+- [x] Admin Orders: timeline diff view – Show field diffs (status, tracking, address changes) between events.
+- [x] Admin Orders: customer notes – Allow internal notes per order (visible only to admins).
 - [ ] Admin Orders: tag/label system – Add tags like “VIP”, “Fraud risk”, “Gift” and filter by tag.
 - [ ] Admin Orders: fraud signals panel – Show velocity checks, mismatched country, multiple failed payments, etc.
 - [ ] Admin Orders: address edit + re-rate shipping – Edit shipping address and recompute shipping cost (audit + constraints).
+- [ ] Admin Orders: timeline diff view – include address diffs once address edit lands (shipping/billing before/after blocks).
 - [ ] Admin Orders: split shipments – Support partial fulfillment with per-item shipped qty and multiple tracking numbers.
 - [ ] Admin Orders: export improvements – Add CSV export columns picker + saved export templates.
 - [ ] Admin Orders: print/i18n hardening – Ensure PDFs render diacritics and locale number/date formats.
