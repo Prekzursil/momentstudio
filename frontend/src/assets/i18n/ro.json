@@ -1932,6 +1932,7 @@
       "new": "Nou",
       "delete": "Șterge",
       "edit": "Editează produs",
+      "inlineEdit": "Editare rapidă",
       "create": "Creează produs",
       "selectCategory": "Selectează categoria",
       "search": "Caută",
@@ -1999,7 +2000,29 @@
         "valueRequired": "Introdu valoarea reducerii.",
         "success": "Produsele selectate au fost actualizate.",
         "published": "Produsele selectate au fost publicate.",
-        "error": "Actualizarea în masă a eșuat."
+        "error": "Actualizarea în masă a eșuat.",
+        "priceAdjust": {
+          "mode": "Schimbare preț",
+          "modePercent": "Procent",
+          "modeAmount": "Sumă",
+          "direction": "Direcție",
+          "directionIncrease": "Crește",
+          "directionDecrease": "Scade",
+          "value": "Valoare",
+          "apply": "Aplică schimbarea",
+          "preview": "Previzualizare: {{old_min}}–{{old_max}} → {{new_min}}–{{new_max}} {{currency}}",
+          "valueRequired": "Introdu o valoare pentru schimbarea de preț.",
+          "negative": "Schimbarea ar duce un preț sub 0.",
+          "success": "Prețurile selectate au fost actualizate."
+        }
+      },
+      "inline": {
+        "success": "Produs actualizat.",
+        "errors": {
+          "save": "Actualizarea rapidă a eșuat.",
+          "stockRequired": "Stocul este obligatoriu.",
+          "stockInvalid": "Stocul trebuie să fie un număr întreg ≥ 0."
+        }
       },
       "success": {
         "save": "Produs salvat",

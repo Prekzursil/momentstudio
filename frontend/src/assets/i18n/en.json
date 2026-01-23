@@ -1932,6 +1932,7 @@
       "new": "New",
       "delete": "Delete",
       "edit": "Edit product",
+      "inlineEdit": "Quick edit",
       "create": "Create product",
       "selectCategory": "Select category",
       "search": "Search",
@@ -1999,7 +2000,29 @@
         "valueRequired": "Enter a sale value.",
         "success": "Updated selected products.",
         "published": "Published selected products.",
-        "error": "Bulk update failed."
+        "error": "Bulk update failed.",
+        "priceAdjust": {
+          "mode": "Price change",
+          "modePercent": "% change",
+          "modeAmount": "Amount change",
+          "direction": "Direction",
+          "directionIncrease": "Increase",
+          "directionDecrease": "Decrease",
+          "value": "Value",
+          "apply": "Apply price change",
+          "preview": "Preview: {{old_min}}–{{old_max}} → {{new_min}}–{{new_max}} {{currency}}",
+          "valueRequired": "Enter a price change value.",
+          "negative": "Price change would make a price negative.",
+          "success": "Updated selected prices."
+        }
+      },
+      "inline": {
+        "success": "Product updated.",
+        "errors": {
+          "save": "Inline update failed.",
+          "stockRequired": "Stock is required.",
+          "stockInvalid": "Stock must be a whole number ≥ 0."
+        }
       },
       "success": {
         "save": "Product saved",

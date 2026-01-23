@@ -116,7 +116,7 @@ type ProductTranslationForm = {
                 variant="ghost"
                 [label]="'adminUi.products.bulk.clearSelection' | translate"
                 (action)="clearSelection()"
-                [disabled]="bulkBusy()"
+                [disabled]="bulkBusy() || inlineBusy()"
               ></app-button>
             </div>
 
@@ -127,7 +127,7 @@ type ProductTranslationForm = {
                   class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   [(ngModel)]="bulkSaleType"
                   (change)="bulkSaleValue = ''"
-                  [disabled]="bulkBusy()"
+                  [disabled]="bulkBusy() || inlineBusy()"
                 >
                   <option [ngValue]="'percent'">{{ 'adminUi.products.sale.typePercent' | translate }}</option>
                   <option [ngValue]="'amount'">{{ 'adminUi.products.sale.typeAmount' | translate }}</option>
@@ -141,14 +141,14 @@ type ProductTranslationForm = {
                 inputMode="decimal"
                 [value]="bulkSaleValue"
                 (valueChange)="onBulkSaleValueChange($event)"
-                [disabled]="bulkBusy()"
+                [disabled]="bulkBusy() || inlineBusy()"
               ></app-input>
 
               <app-button
                 size="sm"
                 [label]="'adminUi.products.bulk.applySale' | translate"
                 (action)="applySaleToSelected()"
-                [disabled]="bulkBusy()"
+                [disabled]="bulkBusy() || inlineBusy()"
               ></app-button>
 
               <div class="flex flex-wrap gap-2 justify-end">
@@ -157,17 +157,68 @@ type ProductTranslationForm = {
                   variant="ghost"
                   [label]="'adminUi.products.bulk.clearSale' | translate"
                   (action)="clearSaleForSelected()"
-                  [disabled]="bulkBusy()"
+                  [disabled]="bulkBusy() || inlineBusy()"
                 ></app-button>
                 <app-button
                   size="sm"
                   variant="ghost"
                   [label]="'adminUi.products.bulk.publish' | translate"
                   (action)="publishSelected()"
-                  [disabled]="bulkBusy()"
+                  [disabled]="bulkBusy() || inlineBusy()"
                 ></app-button>
               </div>
             </div>
+
+            <div class="h-px bg-slate-200 dark:bg-slate-800/70"></div>
+
+            <div class="grid gap-3 lg:grid-cols-[200px_200px_240px_auto] items-end">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.products.bulk.priceAdjust.mode' | translate }}
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="bulkPriceMode"
+                  (change)="bulkPriceValue = ''; bulkPricePreview = null"
+                  [disabled]="bulkBusy() || inlineBusy()"
+                >
+                  <option [ngValue]="'percent'">{{ 'adminUi.products.bulk.priceAdjust.modePercent' | translate }}</option>
+                  <option [ngValue]="'amount'">{{ 'adminUi.products.bulk.priceAdjust.modeAmount' | translate }}</option>
+                </select>
+              </label>
+
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.products.bulk.priceAdjust.direction' | translate }}
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="bulkPriceDirection"
+                  (change)="updateBulkPricePreview()"
+                  [disabled]="bulkBusy() || inlineBusy()"
+                >
+                  <option [ngValue]="'increase'">{{ 'adminUi.products.bulk.priceAdjust.directionIncrease' | translate }}</option>
+                  <option [ngValue]="'decrease'">{{ 'adminUi.products.bulk.priceAdjust.directionDecrease' | translate }}</option>
+                </select>
+              </label>
+
+              <app-input
+                [label]="'adminUi.products.bulk.priceAdjust.value' | translate"
+                [placeholder]="bulkPriceMode === 'percent' ? '10' : '5.00'"
+                type="text"
+                inputMode="decimal"
+                [value]="bulkPriceValue"
+                (valueChange)="onBulkPriceValueChange($event)"
+                [disabled]="bulkBusy() || inlineBusy()"
+              ></app-input>
+
+              <app-button
+                size="sm"
+                [label]="'adminUi.products.bulk.priceAdjust.apply' | translate"
+                (action)="applyPriceAdjustmentToSelected()"
+                [disabled]="bulkBusy() || inlineBusy()"
+              ></app-button>
+            </div>
+
+            <p *ngIf="bulkPricePreview" class="text-xs text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.products.bulk.priceAdjust.preview' | translate: bulkPricePreview }}
+            </p>
 
             <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.products.bulk.note' | translate }}</p>
 
@@ -200,7 +251,7 @@ type ProductTranslationForm = {
                       type="checkbox"
                       [checked]="allSelectedOnPage()"
                       (change)="toggleSelectAll($event)"
-                      [disabled]="bulkBusy()"
+                      [disabled]="bulkBusy() || inlineBusy()"
                       aria-label="Select all"
                     />
                   </th>
@@ -224,7 +275,7 @@ type ProductTranslationForm = {
                       type="checkbox"
                       [checked]="selected.has(product.id)"
                       (change)="toggleSelected(product.id, $event)"
-                      [disabled]="bulkBusy()"
+                      [disabled]="bulkBusy() || inlineBusy()"
                       aria-label="Select"
                     />
                   </td>
@@ -235,7 +286,84 @@ type ProductTranslationForm = {
                     </div>
                   </td>
                   <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
-                    {{ product.base_price | localizedCurrency : product.currency }}
+                    <ng-container *ngIf="inlineEditId === product.id; else priceRead">
+                      <div class="grid gap-2 min-w-[240px]">
+                        <div class="grid gap-1">
+                          <input
+                            class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                            type="text"
+                            inputMode="decimal"
+                            [value]="inlineBasePrice"
+                            (input)="onInlineBasePriceChange($any($event.target).value)"
+                            [disabled]="inlineBusy()"
+                            aria-label="Base price"
+                          />
+                          <p *ngIf="inlineBasePriceError" class="text-xs text-rose-700 dark:text-rose-200">
+                            {{ inlineBasePriceError }}
+                          </p>
+                        </div>
+
+                        <label class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
+                          <input
+                            type="checkbox"
+                            [(ngModel)]="inlineSaleEnabled"
+                            (change)="onInlineSaleEnabledChange()"
+                            [disabled]="inlineBusy()"
+                          />
+                          {{ 'adminUi.products.sale.enabled' | translate }}
+                        </label>
+
+                        <div *ngIf="inlineSaleEnabled" class="grid gap-2">
+                          <div class="grid grid-cols-2 gap-2 items-end">
+                            <label class="grid gap-1 text-xs font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.products.sale.type' | translate }}
+                              <select
+                                class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="inlineSaleType"
+                                (change)="onInlineSaleTypeChange()"
+                                [disabled]="inlineBusy()"
+                              >
+                                <option [ngValue]="'percent'">{{ 'adminUi.products.sale.typePercent' | translate }}</option>
+                                <option [ngValue]="'amount'">{{ 'adminUi.products.sale.typeAmount' | translate }}</option>
+                              </select>
+                            </label>
+
+                            <label class="grid gap-1 text-xs font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.products.sale.value' | translate }}
+                              <input
+                                class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                type="text"
+                                inputMode="decimal"
+                                [placeholder]="inlineSaleType === 'percent' ? '10' : '5.00'"
+                                [value]="inlineSaleValue"
+                                (input)="onInlineSaleValueChange($any($event.target).value)"
+                                [disabled]="inlineBusy()"
+                              />
+                            </label>
+                          </div>
+
+                          <p *ngIf="inlineSaleError" class="text-xs text-rose-700 dark:text-rose-200">
+                            {{ inlineSaleError }}
+                          </p>
+                        </div>
+
+                        <p *ngIf="inlineError" class="text-xs text-rose-700 dark:text-rose-200">
+                          {{ inlineError }}
+                        </p>
+                      </div>
+                    </ng-container>
+                    <ng-template #priceRead>
+                      <div class="grid">
+                        <span>{{ product.base_price | localizedCurrency : product.currency }}</span>
+                        <span *ngIf="product.sale_type && product.sale_value" class="text-xs text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.products.sale.title' | translate }}:
+                          <ng-container *ngIf="product.sale_type === 'percent'">{{ product.sale_value }}%</ng-container>
+                          <ng-container *ngIf="product.sale_type === 'amount'">{{
+                            product.sale_value | localizedCurrency : product.currency
+                          }}</ng-container>
+                        </span>
+                      </div>
+                    </ng-template>
                   </td>
                   <td class="px-3 py-2">
                     <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="statusPillClass(product.status)">
@@ -246,7 +374,27 @@ type ProductTranslationForm = {
                     {{ product.category_name }}
                   </td>
                   <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
-                    {{ product.stock_quantity }}
+                    <ng-container *ngIf="inlineEditId === product.id; else stockRead">
+                      <div class="grid gap-1 min-w-[120px]">
+                        <input
+                          class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          type="number"
+                          min="0"
+                          step="1"
+                          inputMode="numeric"
+                          [value]="inlineStockQuantity"
+                          (input)="onInlineStockChange($any($event.target).value)"
+                          [disabled]="inlineBusy()"
+                          aria-label="Stock quantity"
+                        />
+                        <p *ngIf="inlineStockError" class="text-xs text-rose-700 dark:text-rose-200">
+                          {{ inlineStockError }}
+                        </p>
+                      </div>
+                    </ng-container>
+                    <ng-template #stockRead>
+                      {{ product.stock_quantity }}
+                    </ng-template>
                   </td>
                   <td class="px-3 py-2">
                     <span
@@ -260,7 +408,33 @@ type ProductTranslationForm = {
                     {{ product.updated_at | date: 'short' }}
                   </td>
                   <td class="px-3 py-2 text-right">
-                    <app-button size="sm" variant="ghost" [label]="'adminUi.products.edit' | translate" (action)="edit(product.slug)"></app-button>
+                    <div class="flex items-center justify-end gap-2">
+                      <ng-container *ngIf="inlineEditId === product.id; else rowActions">
+                        <app-button
+                          size="sm"
+                          [label]="'adminUi.actions.save' | translate"
+                          (action)="saveInlineEdit()"
+                          [disabled]="inlineBusy()"
+                        ></app-button>
+                        <app-button
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.actions.cancel' | translate"
+                          (action)="cancelInlineEdit()"
+                          [disabled]="inlineBusy()"
+                        ></app-button>
+                      </ng-container>
+                      <ng-template #rowActions>
+                        <app-button
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.products.inlineEdit' | translate"
+                          (action)="startInlineEdit(product)"
+                          [disabled]="bulkBusy() || inlineBusy()"
+                        ></app-button>
+                        <app-button size="sm" variant="ghost" [label]="'adminUi.products.edit' | translate" (action)="edit(product.slug)"></app-button>
+                      </ng-template>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -620,6 +794,23 @@ export class AdminProductsComponent implements OnInit {
   bulkBusy = signal(false);
   bulkError = signal<string | null>(null);
 
+  inlineEditId: string | null = null;
+  inlineBasePrice = '';
+  inlineStockQuantity = '';
+  inlineSaleEnabled = false;
+  inlineSaleType: 'percent' | 'amount' = 'percent';
+  inlineSaleValue = '';
+  inlineBasePriceError = '';
+  inlineStockError = '';
+  inlineSaleError = '';
+  inlineError = '';
+  inlineBusy = signal(false);
+
+  bulkPriceMode: 'percent' | 'amount' = 'percent';
+  bulkPriceDirection: 'increase' | 'decrease' = 'increase';
+  bulkPriceValue = '';
+  bulkPricePreview: { old_min: string; old_max: string; new_min: string; new_max: string; currency: string } | null = null;
+
   translationLoading = signal(false);
   translationError = signal<string | null>(null);
   translationExists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
@@ -652,6 +843,7 @@ export class AdminProductsComponent implements OnInit {
   applyFilters(): void {
     this.page = 1;
     this.clearSelection();
+    this.cancelInlineEdit();
     this.load();
   }
 
@@ -661,18 +853,21 @@ export class AdminProductsComponent implements OnInit {
     this.categorySlug = '';
     this.page = 1;
     this.clearSelection();
+    this.cancelInlineEdit();
     this.load();
   }
 
   goToPage(page: number): void {
     this.page = page;
     this.clearSelection();
+    this.cancelInlineEdit();
     this.load();
   }
 
   clearSelection(): void {
     this.selected = new Set<string>();
     this.bulkError.set(null);
+    this.bulkPricePreview = null;
   }
 
   toggleSelected(productId: string, event: Event): void {
@@ -686,6 +881,7 @@ export class AdminProductsComponent implements OnInit {
     if (this.selected.size === 0) {
       this.bulkError.set(null);
     }
+    this.updateBulkPricePreview();
   }
 
   allSelectedOnPage(): boolean {
@@ -705,6 +901,7 @@ export class AdminProductsComponent implements OnInit {
       ids.forEach((id) => next.delete(id));
     }
     this.selected = next;
+    this.updateBulkPricePreview();
   }
 
   onBulkSaleValueChange(next: string | number): void {
@@ -785,6 +982,256 @@ export class AdminProductsComponent implements OnInit {
         this.bulkError.set(this.t('adminUi.products.bulk.error'));
       }
     });
+  }
+
+  startInlineEdit(product: AdminProductListItem): void {
+    if (this.inlineBusy()) return;
+    this.inlineEditId = product.id;
+    this.inlineError = '';
+    this.inlineBasePriceError = '';
+    this.inlineStockError = '';
+    this.inlineSaleError = '';
+
+    const basePrice = typeof product.base_price === 'number' ? product.base_price : Number(product.base_price || 0);
+    this.inlineBasePrice = this.formatMoneyInput(Number.isFinite(basePrice) ? basePrice : 0);
+    this.inlineStockQuantity = String(Number(product.stock_quantity || 0));
+
+    const rawSaleType = (product.sale_type || '').toString();
+    const saleType: 'percent' | 'amount' = rawSaleType === 'amount' ? 'amount' : 'percent';
+    const saleValueNum = typeof product.sale_value === 'number' ? product.sale_value : Number(product.sale_value ?? 0);
+    const saleEnabled = Boolean(rawSaleType && Number.isFinite(saleValueNum) && saleValueNum > 0);
+    this.inlineSaleEnabled = saleEnabled;
+    this.inlineSaleType = saleType;
+    this.inlineSaleValue = saleEnabled
+      ? saleType === 'amount'
+        ? this.formatMoneyInput(Number.isFinite(saleValueNum) ? saleValueNum : 0)
+        : String(Math.round(saleValueNum * 100) / 100)
+      : '';
+  }
+
+  cancelInlineEdit(): void {
+    this.inlineEditId = null;
+    this.inlineBasePrice = '';
+    this.inlineStockQuantity = '';
+    this.inlineSaleEnabled = false;
+    this.inlineSaleType = 'percent';
+    this.inlineSaleValue = '';
+    this.inlineBasePriceError = '';
+    this.inlineStockError = '';
+    this.inlineSaleError = '';
+    this.inlineError = '';
+  }
+
+  onInlineBasePriceChange(next: string | number): void {
+    const raw = String(next ?? '');
+    const { clean, changed } = this.sanitizeMoneyInput(raw);
+    this.inlineBasePrice = clean;
+    this.inlineBasePriceError = changed ? this.t('adminUi.products.form.priceFormatHint') : '';
+  }
+
+  onInlineStockChange(next: string | number): void {
+    const raw = String(next ?? '');
+    this.inlineStockQuantity = raw;
+    if (!raw.trim()) {
+      this.inlineStockError = this.t('adminUi.products.inline.errors.stockRequired');
+      return;
+    }
+    const parsed = Number(raw);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      this.inlineStockError = this.t('adminUi.products.inline.errors.stockInvalid');
+      return;
+    }
+    this.inlineStockError = '';
+  }
+
+  onInlineSaleEnabledChange(): void {
+    if (this.inlineSaleEnabled) return;
+    this.inlineSaleValue = '';
+    this.inlineSaleError = '';
+  }
+
+  onInlineSaleTypeChange(): void {
+    this.inlineSaleValue = '';
+    this.inlineSaleError = '';
+  }
+
+  onInlineSaleValueChange(next: string | number): void {
+    const raw = String(next ?? '');
+    const { clean, changed } = this.sanitizeMoneyInput(raw);
+    this.inlineSaleValue = clean;
+    if (!this.inlineSaleEnabled) {
+      this.inlineSaleError = '';
+      return;
+    }
+    if (this.inlineSaleType === 'percent' && clean) {
+      const parsed = Number(clean);
+      if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
+        this.inlineSaleError = this.t('adminUi.products.sale.percentHint');
+        return;
+      }
+    }
+    this.inlineSaleError = changed ? this.t('adminUi.products.sale.valueHint') : '';
+  }
+
+  saveInlineEdit(): void {
+    const productId = this.inlineEditId;
+    if (!productId) return;
+    this.inlineError = '';
+
+    const basePrice = this.parseMoneyInput(this.inlineBasePrice);
+    if (basePrice === null) {
+      this.inlineError = this.t('adminUi.products.form.priceFormatHint');
+      return;
+    }
+
+    const stockRaw = (this.inlineStockQuantity || '').trim();
+    if (!stockRaw) {
+      this.inlineStockError = this.t('adminUi.products.inline.errors.stockRequired');
+      return;
+    }
+    const stockQuantity = Number(stockRaw);
+    if (!Number.isInteger(stockQuantity) || stockQuantity < 0) {
+      this.inlineStockError = this.t('adminUi.products.inline.errors.stockInvalid');
+      return;
+    }
+    this.inlineStockError = '';
+
+    let sale_type: 'percent' | 'amount' | null = null;
+    let sale_value: number | null = null;
+    if (this.inlineSaleEnabled) {
+      sale_type = this.inlineSaleType;
+      if (sale_type === 'amount') {
+        const parsed = this.parseMoneyInput(this.inlineSaleValue);
+        if (parsed === null) {
+          this.inlineSaleError = this.t('adminUi.products.sale.valueHint');
+          return;
+        }
+        sale_value = parsed;
+      } else {
+        const parsed = this.parseMoneyInput(this.inlineSaleValue);
+        if (parsed === null || parsed < 0 || parsed > 100) {
+          this.inlineSaleError = this.t('adminUi.products.sale.percentHint');
+          return;
+        }
+        sale_value = parsed;
+      }
+    }
+
+    this.inlineBusy.set(true);
+    this.admin
+      .bulkUpdateProducts([
+        {
+          product_id: productId,
+          base_price: basePrice,
+          stock_quantity: stockQuantity,
+          sale_type,
+          sale_value
+        }
+      ])
+      .subscribe({
+        next: () => {
+          this.inlineBusy.set(false);
+          this.toast.success(this.t('adminUi.products.inline.success'));
+          this.cancelInlineEdit();
+          this.load();
+        },
+        error: () => {
+          this.inlineBusy.set(false);
+          this.inlineError = this.t('adminUi.products.inline.errors.save');
+        }
+      });
+  }
+
+  onBulkPriceValueChange(next: string | number): void {
+    const raw = String(next ?? '');
+    const { clean } = this.sanitizeMoneyInput(raw);
+    this.bulkPriceValue = clean;
+    this.updateBulkPricePreview();
+  }
+
+  applyPriceAdjustmentToSelected(): void {
+    this.bulkError.set(null);
+    const selectedItems = this.products().filter((p) => this.selected.has(p.id));
+    if (!selectedItems.length) return;
+
+    const delta = this.parseMoneyInput(this.bulkPriceValue);
+    if (delta === null || delta <= 0) {
+      this.bulkError.set(this.t('adminUi.products.bulk.priceAdjust.valueRequired'));
+      return;
+    }
+
+    const direction = this.bulkPriceDirection === 'decrease' ? -1 : 1;
+    const payload: Array<{ product_id: string; base_price: number }> = [];
+    for (const product of selectedItems) {
+      const base = typeof product.base_price === 'number' ? product.base_price : Number(product.base_price || 0);
+      let nextPrice = base;
+      if (this.bulkPriceMode === 'percent') {
+        nextPrice = base + (base * delta * direction) / 100;
+      } else {
+        nextPrice = base + delta * direction;
+      }
+      nextPrice = Math.round(nextPrice * 100) / 100;
+      if (!Number.isFinite(nextPrice) || nextPrice < 0) {
+        this.bulkError.set(this.t('adminUi.products.bulk.priceAdjust.negative'));
+        return;
+      }
+      payload.push({ product_id: product.id, base_price: nextPrice });
+    }
+
+    this.bulkBusy.set(true);
+    this.admin.bulkUpdateProducts(payload).subscribe({
+      next: () => {
+        this.bulkBusy.set(false);
+        this.toast.success(this.t('adminUi.products.bulk.priceAdjust.success'));
+        this.clearSelection();
+        this.load();
+      },
+      error: () => {
+        this.bulkBusy.set(false);
+        this.bulkError.set(this.t('adminUi.products.bulk.error'));
+      }
+    });
+  }
+
+  updateBulkPricePreview(): void {
+    this.bulkPricePreview = null;
+    const selectedItems = this.products().filter((p) => this.selected.has(p.id));
+    if (!selectedItems.length) return;
+    const delta = this.parseMoneyInput(this.bulkPriceValue);
+    if (delta === null || delta <= 0) return;
+
+    const direction = this.bulkPriceDirection === 'decrease' ? -1 : 1;
+    const currency = selectedItems[0]?.currency || 'RON';
+
+    const oldPrices = selectedItems
+      .map((p) => (typeof p.base_price === 'number' ? p.base_price : Number(p.base_price || 0)))
+      .filter((n) => Number.isFinite(n));
+    if (!oldPrices.length) return;
+
+    const newPrices: number[] = [];
+    for (const base of oldPrices) {
+      let nextPrice = base;
+      if (this.bulkPriceMode === 'percent') {
+        nextPrice = base + (base * delta * direction) / 100;
+      } else {
+        nextPrice = base + delta * direction;
+      }
+      nextPrice = Math.round(nextPrice * 100) / 100;
+      newPrices.push(nextPrice);
+    }
+
+    const minOld = Math.min(...oldPrices);
+    const maxOld = Math.max(...oldPrices);
+    const minNew = Math.min(...newPrices);
+    const maxNew = Math.max(...newPrices);
+
+    this.bulkPricePreview = {
+      old_min: this.formatMoneyInput(minOld),
+      old_max: this.formatMoneyInput(maxOld),
+      new_min: this.formatMoneyInput(minNew),
+      new_max: this.formatMoneyInput(maxNew),
+      currency
+    };
   }
 
   startNew(): void {
@@ -1080,6 +1527,7 @@ export class AdminProductsComponent implements OnInit {
         next: (res) => {
           this.products.set(res.items || []);
           this.meta.set(res.meta || null);
+          this.updateBulkPricePreview();
           this.loading.set(false);
         },
         error: () => {

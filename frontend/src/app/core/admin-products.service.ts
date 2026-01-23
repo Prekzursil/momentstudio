@@ -9,6 +9,8 @@ export interface AdminProductListItem {
   sku: string;
   name: string;
   base_price: number;
+  sale_type?: 'percent' | 'amount' | null;
+  sale_value?: number | null;
   currency: string;
   status: string;
   is_active: boolean;

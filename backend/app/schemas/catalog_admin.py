@@ -16,6 +16,8 @@ class AdminProductListItem(BaseModel):
     sku: str
     name: str
     base_price: Decimal
+    sale_type: str | None = None
+    sale_value: Decimal | None = None
     currency: str
     status: ProductStatus
     is_active: bool
