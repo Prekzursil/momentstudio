@@ -750,13 +750,13 @@ async def bulk_update_products(
         if "category_id" in item.model_fields_set and item.category_id is not None  # type: ignore[attr-defined]
     }
     if category_ids:
-        result = await session.execute(select(Category.id).where(Category.id.in_(category_ids)))
-        found = set(result.scalars())
-        missing = category_ids - found
+        category_result = await session.execute(select(Category.id).where(Category.id.in_(category_ids)))
+        found_categories = set(category_result.scalars())
+        missing = category_ids - found_categories
         if missing:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more categories not found")
-    result = await session.execute(select(Product).where(Product.id.in_(product_ids)))
-    products = {p.id: p for p in result.scalars()}
+    product_result = await session.execute(select(Product).where(Product.id.in_(product_ids)))
+    products = {p.id: p for p in product_result.scalars()}
 
     updated: list[Product] = []
     restocked: set[uuid.UUID] = set()
