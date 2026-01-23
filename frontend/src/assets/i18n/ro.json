@@ -32,8 +32,18 @@
     "title": "Notificări",
     "loading": "Se încarcă…",
     "empty": "Nu ai notificări încă.",
+    "emptyHidden": "Nu ai notificări ascunse.",
+    "loadError": "Nu am putut încărca notificările.",
+    "viewAll": "Vezi toate",
+    "settings": "Setări",
+    "refresh": "Reîmprospătează",
+    "inbox": "Inbox",
+    "hidden": "Ascunse",
+    "inboxHint": "Notificări recente și actualizări necitite.",
+    "hiddenHint": "Notificări ascunse. Restaurează pentru a le vedea din nou.",
     "markRead": "Marchează ca citit",
-    "dismiss": "Ascunde"
+    "dismiss": "Ascunde",
+    "restore": "Restaurează"
   },
   "footer": {
     "tagline": "Artă Realizată Manual",

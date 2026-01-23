@@ -145,3 +145,37 @@ def test_notifications_mark_read_and_dismiss(test_app: Dict[str, object]) -> Non
     assert res.status_code == 200, res.text
     returned_ids = {row["id"] for row in res.json()["items"]}
     assert ids["recent_read_id"] not in returned_ids
+
+
+def test_notifications_list_include_dismissed_and_old_read(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    token, user_id = create_user_token(SessionLocal)
+    ids = seed_notifications(SessionLocal, user_id)
+
+    res = client.get(
+        "/api/v1/notifications?limit=50&include_dismissed=1&include_old_read=1",
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 200, res.text
+    returned_ids = {row["id"] for row in res.json()["items"]}
+    assert ids["dismissed_id"] in returned_ids
+    assert ids["old_read_id"] in returned_ids
+
+
+def test_notifications_restore(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    token, user_id = create_user_token(SessionLocal)
+    ids = seed_notifications(SessionLocal, user_id)
+
+    restore = client.post(f"/api/v1/notifications/{ids['dismissed_id']}/restore", headers=auth_headers(token))
+    assert restore.status_code == 200, restore.text
+    assert restore.json()["dismissed_at"] is None
+
+    res = client.get("/api/v1/notifications", headers=auth_headers(token))
+    assert res.status_code == 200, res.text
+    returned_ids = {row["id"] for row in res.json()["items"]}
+    assert ids["dismissed_id"] in returned_ids

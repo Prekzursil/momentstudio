@@ -240,10 +240,26 @@ import { NotificationsService, UserNotification } from '../core/notifications.se
                         </div>
                       </div>
                     </li>
-                  </ul>
+	                  </ul>
+	                </div>
+                <div class="px-4 py-3 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between gap-3">
+                  <a
+                    routerLink="/account/notifications"
+                    class="text-sm font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200"
+                    (click)="closeNotifications()"
+                  >
+                    {{ 'notifications.viewAll' | translate }}
+                  </a>
+                  <a
+                    routerLink="/account/notifications/settings"
+                    class="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                    (click)="closeNotifications()"
+                  >
+                    {{ 'notifications.settings' | translate }}
+                  </a>
                 </div>
-              </div>
-            </div>
+	              </div>
+	            </div>
             <div class="hidden lg:flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-2 py-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/70">
               <app-theme-segmented-control
                 [preference]="themePreference"
@@ -470,7 +486,9 @@ export class HeaderComponent implements OnDestroy {
     this.notificationsOpen = false;
     if (n.url) {
       void this.router.navigateByUrl(n.url);
+      return;
     }
+    void this.router.navigateByUrl('/account/notifications');
   }
 
   submitSearch(event: Event): void {

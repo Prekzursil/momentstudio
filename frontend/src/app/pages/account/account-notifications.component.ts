@@ -21,14 +21,20 @@ import { AccountComponent } from './account.component';
       </ng-container>
 
       <ng-template #notificationsBody>
-      <div class="flex items-start justify-between gap-3">
-        <div class="grid gap-1">
+        <div class="flex items-start justify-between gap-3">
+          <div class="grid gap-1">
           <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'account.notifications.title' | translate }}</h2>
           <p *ngIf="account.notificationLastUpdated" class="text-xs text-slate-500 dark:text-slate-400">
             {{ 'account.notifications.lastUpdated' | translate: { date: account.formatTimestamp(account.notificationLastUpdated) } }}
           </p>
         </div>
         <div class="flex items-center gap-2">
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'notifications.viewAll' | translate"
+            routerLink="/account/notifications"
+          ></app-button>
           <app-button
             size="sm"
             variant="ghost"

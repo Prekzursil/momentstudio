@@ -132,6 +132,11 @@ export const routes: Routes = [
       { path: 'coupons', loadComponent: () => import('./pages/account/account-coupons.component').then((m) => m.AccountCouponsComponent) },
       {
         path: 'notifications',
+        loadComponent: () =>
+          import('./pages/account/account-notifications-inbox.component').then((m) => m.AccountNotificationsInboxComponent)
+      },
+      {
+        path: 'notifications/settings',
         loadComponent: () => import('./pages/account/account-notifications.component').then((m) => m.AccountNotificationsComponent),
         canDeactivate: [unsavedChangesGuard]
       },

@@ -32,8 +32,18 @@
     "title": "Notifications",
     "loading": "Loading…",
     "empty": "No notifications yet.",
+    "emptyHidden": "No hidden notifications.",
+    "loadError": "Could not load notifications.",
+    "viewAll": "View all",
+    "settings": "Settings",
+    "refresh": "Refresh",
+    "inbox": "Inbox",
+    "hidden": "Hidden",
+    "inboxHint": "Recent notifications and unread updates.",
+    "hiddenHint": "Dismissed notifications. Restore to show them again.",
     "markRead": "Mark read",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "restore": "Restore"
   },
   "footer": {
     "tagline": "Handcrafted Art",
