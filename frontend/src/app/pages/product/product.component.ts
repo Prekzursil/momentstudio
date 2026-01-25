@@ -293,6 +293,7 @@ export class ProductComponent implements OnInit, OnDestroy {
   private ldScript?: HTMLScriptElement;
   private langSub?: Subscription;
   private routeSub?: Subscription;
+  private productLoadSub?: Subscription;
   private canonicalEl?: HTMLLinkElement;
   private document: Document = inject(DOCUMENT);
   private slug: string | null = null;
@@ -321,6 +322,7 @@ export class ProductComponent implements OnInit, OnDestroy {
     }
     this.langSub?.unsubscribe();
     this.routeSub?.unsubscribe();
+    this.productLoadSub?.unsubscribe();
   }
 
   ngOnInit(): void {
@@ -352,12 +354,15 @@ export class ProductComponent implements OnInit, OnDestroy {
     this.product = null;
     this.backInStockRequest = null;
     const slug = this.slug;
+    this.productLoadSub?.unsubscribe();
+    this.productLoadSub = undefined;
     if (!slug) {
       this.loading = false;
       return;
     }
-    this.catalog.getProduct(slug).subscribe({
+    this.productLoadSub = this.catalog.getProduct(slug).subscribe({
       next: (product) => {
+        if (this.slug !== slug) return;
         this.product = product;
         this.selectedVariantId = product.variants?.[0]?.id ?? null;
         this.loading = false;
@@ -374,6 +379,7 @@ export class ProductComponent implements OnInit, OnDestroy {
         this.loadBackInStockStatus();
       },
       error: (err) => {
+        if (this.slug !== slug) return;
         this.product = null;
         this.loading = false;
         const status = typeof err?.status === 'number' ? err.status : 0;

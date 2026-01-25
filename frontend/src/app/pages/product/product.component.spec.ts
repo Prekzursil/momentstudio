@@ -3,7 +3,7 @@ import { DOCUMENT } from '@angular/common';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { of } from 'rxjs';
+import { ReplaySubject, of } from 'rxjs';
 
 import { ProductComponent } from './product.component';
 import { ToastService } from '../../core/toast.service';
@@ -19,13 +19,16 @@ describe('ProductComponent', () => {
   let catalog: jasmine.SpyObj<CatalogService>;
   let auth: jasmine.SpyObj<AuthService>;
   let router: jasmine.SpyObj<Router>;
+  let routeParam$: ReplaySubject<any>;
 
   beforeEach(() => {
     toast = jasmine.createSpyObj<ToastService>('ToastService', ['success', 'error', 'info']);
     cart = jasmine.createSpyObj<CartStore>('CartStore', ['addFromProduct']);
-    catalog = jasmine.createSpyObj<CatalogService>('CatalogService', ['requestBackInStock']);
+    catalog = jasmine.createSpyObj<CatalogService>('CatalogService', ['requestBackInStock', 'getProduct']);
     auth = jasmine.createSpyObj<AuthService>('AuthService', ['isAuthenticated']);
     router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
+    routeParam$ = new ReplaySubject(1);
+    routeParam$.next(convertToParamMap({ slug: 'prod' }));
 
     TestBed.configureTestingModule({
       imports: [ProductComponent, TranslateModule.forRoot()],
@@ -41,7 +44,7 @@ describe('ProductComponent', () => {
           provide: ActivatedRoute,
           useValue: {
             snapshot: { paramMap: convertToParamMap({ slug: 'prod' }) },
-            paramMap: of(convertToParamMap({ slug: 'prod' }))
+            paramMap: routeParam$.asObservable()
           }
         },
         { provide: Title, useValue: jasmine.createSpyObj<Title>('Title', ['setTitle']) },
@@ -112,5 +115,31 @@ describe('ProductComponent', () => {
     expect(catalog.requestBackInStock).toHaveBeenCalledWith('p1');
     expect(cmp.backInStockRequest?.id).toBe('r1');
     expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('ignores stale product loads when navigating quickly between slugs', () => {
+    const productA = { id: 'a', slug: 'a', name: 'A', base_price: 10, currency: 'RON', stock_quantity: 1, images: [] } as any;
+    const productB = { id: 'b', slug: 'b', name: 'B', base_price: 12, currency: 'RON', stock_quantity: 1, images: [] } as any;
+
+    const productA$ = new ReplaySubject<any>(1);
+    const productB$ = new ReplaySubject<any>(1);
+
+    catalog.getProduct.and.callFake((slug: string) => {
+      if (slug === 'a') return productA$.asObservable();
+      if (slug === 'b') return productB$.asObservable();
+      return productB$.asObservable();
+    });
+
+    routeParam$.next(convertToParamMap({ slug: 'a' }));
+    const cmp = TestBed.createComponent(ProductComponent).componentInstance;
+    cmp.ngOnInit();
+
+    routeParam$.next(convertToParamMap({ slug: 'b' }));
+
+    productB$.next(productB);
+    expect(cmp.product?.slug).toBe('b');
+
+    productA$.next(productA);
+    expect(cmp.product?.slug).toBe('b');
   });
 });

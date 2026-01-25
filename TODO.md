@@ -833,4 +833,4 @@ Below is a structured checklist you can turn into issues.
 - [x] Notifications: add archived/dismissed notifications view so hidden items remain discoverable.
 - [x] Receipts: improve share link UX (explicit “Copy link” button + visible confirmation for copy action).
 - [x] CI: make compose-smoke E2E resilient (mock locker lookup / disable Overpass fallback to reduce flakiness).
-- [ ] Catalog: investigate product detail page sometimes failing to load from listings (route/slug/API error).
+- [x] Catalog: investigate product detail page sometimes failing to load from listings (route/slug/API error).
