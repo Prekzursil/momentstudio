@@ -105,6 +105,9 @@ export interface CouponBulkJobRead {
   status: CouponBulkJobStatus;
   require_marketing_opt_in: boolean;
   require_email_verified: boolean;
+  bucket_total?: number | null;
+  bucket_index?: number | null;
+  bucket_seed?: string | null;
   send_email: boolean;
   revoke_reason?: string | null;
   total_candidates: number;
@@ -210,21 +213,43 @@ export class AdminCouponsV2Service {
 
   previewSegmentAssign(
     couponId: string,
-    payload: { require_marketing_opt_in?: boolean; require_email_verified?: boolean; send_email?: boolean }
+    payload: {
+      require_marketing_opt_in?: boolean;
+      require_email_verified?: boolean;
+      send_email?: boolean;
+      bucket_total?: number | null;
+      bucket_index?: number | null;
+      bucket_seed?: string | null;
+    }
   ): Observable<CouponBulkSegmentPreview> {
     return this.api.post<CouponBulkSegmentPreview>(`/coupons/admin/coupons/${couponId}/assign/segment/preview`, payload);
   }
 
   previewSegmentRevoke(
     couponId: string,
-    payload: { require_marketing_opt_in?: boolean; require_email_verified?: boolean; reason?: string | null; send_email?: boolean }
+    payload: {
+      require_marketing_opt_in?: boolean;
+      require_email_verified?: boolean;
+      reason?: string | null;
+      send_email?: boolean;
+      bucket_total?: number | null;
+      bucket_index?: number | null;
+      bucket_seed?: string | null;
+    }
   ): Observable<CouponBulkSegmentPreview> {
     return this.api.post<CouponBulkSegmentPreview>(`/coupons/admin/coupons/${couponId}/revoke/segment/preview`, payload);
   }
 
   startSegmentAssignJob(
     couponId: string,
-    payload: { require_marketing_opt_in?: boolean; require_email_verified?: boolean; send_email?: boolean }
+    payload: {
+      require_marketing_opt_in?: boolean;
+      require_email_verified?: boolean;
+      send_email?: boolean;
+      bucket_total?: number | null;
+      bucket_index?: number | null;
+      bucket_seed?: string | null;
+    }
   ): Observable<CouponBulkJobRead> {
     return this.api.post<CouponBulkJobRead>(`/coupons/admin/coupons/${couponId}/assign/segment`, payload);
   }
@@ -236,6 +261,9 @@ export class AdminCouponsV2Service {
       require_email_verified?: boolean;
       reason?: string | null;
       send_email?: boolean;
+      bucket_total?: number | null;
+      bucket_index?: number | null;
+      bucket_seed?: string | null;
     }
   ): Observable<CouponBulkJobRead> {
     return this.api.post<CouponBulkJobRead>(`/coupons/admin/coupons/${couponId}/revoke/segment`, payload);

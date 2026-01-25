@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import hashlib
 import re
 from uuid import UUID
 
@@ -928,6 +929,35 @@ def _segment_user_filters(payload: object) -> list[object]:
     return filters
 
 
+@dataclass(frozen=True)
+class _BucketConfig:
+    total: int
+    index: int
+    seed: str
+
+
+def _parse_bucket_config(*, bucket_total: object, bucket_index: object, bucket_seed: object) -> _BucketConfig | None:
+    seed = (str(bucket_seed) if bucket_seed is not None else "").strip()
+    if bucket_total is None and bucket_index is None and not seed:
+        return None
+    if bucket_total is None or bucket_index is None or not seed:
+        raise ValueError("Bucket config requires bucket_total, bucket_index, and bucket_seed")
+    total = int(bucket_total)
+    index = int(bucket_index)
+    if total < 2 or total > 100:
+        raise ValueError("bucket_total must be between 2 and 100")
+    if index < 0 or index >= total:
+        raise ValueError("bucket_index must be within bucket_total range")
+    return _BucketConfig(total=total, index=index, seed=seed[:80])
+
+
+def _bucket_index_for_user(*, user_id: UUID, seed: str, total: int) -> int:
+    payload = f"{seed}:{user_id}".encode("utf-8")
+    digest = hashlib.sha256(payload).digest()
+    value = int.from_bytes(digest[:8], "big")
+    return int(value % total)
+
+
 async def _segment_sample_emails(session: AsyncSession, *, filters: list[object], limit: int = 10) -> list[str]:
     rows = (await session.execute(select(User.email).where(*filters).order_by(User.created_at.desc()).limit(limit))).scalars().all()
     return [str(e) for e in rows if e]
@@ -938,7 +968,65 @@ async def _preview_segment_assign(
     *,
     coupon_id: UUID,
     filters: list[object],
+    bucket: _BucketConfig | None = None,
 ) -> CouponBulkSegmentPreview:
+    if bucket is not None:
+        total = 0
+        already_active = 0
+        restored = 0
+        sample: list[str] = []
+
+        last_id: UUID | None = None
+        while True:
+            q = select(User.id, User.email).where(*filters).order_by(User.id).limit(_BULK_SEGMENT_BATCH_SIZE)
+            if last_id is not None:
+                q = q.where(User.id > last_id)
+            rows = (await session.execute(q)).all()
+            if not rows:
+                break
+            last_id = rows[-1][0]
+
+            bucketed = [
+                (user_id, email)
+                for user_id, email in rows
+                if _bucket_index_for_user(user_id=user_id, seed=bucket.seed, total=bucket.total) == bucket.index
+            ]
+            if not bucketed:
+                continue
+
+            user_ids = [user_id for user_id, _ in bucketed]
+            existing = (
+                (
+                    await session.execute(
+                        select(CouponAssignment.user_id, CouponAssignment.revoked_at).where(
+                            CouponAssignment.coupon_id == coupon_id,
+                            CouponAssignment.user_id.in_(user_ids),
+                        )
+                    )
+                )
+                .all()
+            )
+            status_by_user_id = {user_id: revoked_at for user_id, revoked_at in existing}
+
+            for user_id, email in bucketed:
+                total += 1
+                if email and len(sample) < 10:
+                    sample.append(str(email))
+                revoked_at = status_by_user_id.get(user_id)
+                if revoked_at is None and user_id in status_by_user_id:
+                    already_active += 1
+                elif revoked_at is not None:
+                    restored += 1
+
+        created = max(total - already_active - restored, 0)
+        return CouponBulkSegmentPreview(
+            total_candidates=total,
+            sample_emails=sample,
+            created=created,
+            restored=restored,
+            already_active=already_active,
+        )
+
     total = int((await session.execute(select(func.count()).select_from(User).where(*filters))).scalar_one())
     already_active = int(
         (
@@ -976,7 +1064,68 @@ async def _preview_segment_revoke(
     *,
     coupon_id: UUID,
     filters: list[object],
+    bucket: _BucketConfig | None = None,
 ) -> CouponBulkSegmentPreview:
+    if bucket is not None:
+        total = 0
+        revoked = 0
+        already_revoked = 0
+        not_assigned = 0
+        sample: list[str] = []
+
+        last_id: UUID | None = None
+        while True:
+            q = select(User.id, User.email).where(*filters).order_by(User.id).limit(_BULK_SEGMENT_BATCH_SIZE)
+            if last_id is not None:
+                q = q.where(User.id > last_id)
+            rows = (await session.execute(q)).all()
+            if not rows:
+                break
+            last_id = rows[-1][0]
+
+            bucketed = [
+                (user_id, email)
+                for user_id, email in rows
+                if _bucket_index_for_user(user_id=user_id, seed=bucket.seed, total=bucket.total) == bucket.index
+            ]
+            if not bucketed:
+                continue
+
+            user_ids = [user_id for user_id, _ in bucketed]
+            existing = (
+                (
+                    await session.execute(
+                        select(CouponAssignment.user_id, CouponAssignment.revoked_at).where(
+                            CouponAssignment.coupon_id == coupon_id,
+                            CouponAssignment.user_id.in_(user_ids),
+                        )
+                    )
+                )
+                .all()
+            )
+            status_by_user_id = {user_id: revoked_at for user_id, revoked_at in existing}
+
+            for user_id, email in bucketed:
+                total += 1
+                if email and len(sample) < 10:
+                    sample.append(str(email))
+                if user_id not in status_by_user_id:
+                    not_assigned += 1
+                    continue
+                revoked_at = status_by_user_id.get(user_id)
+                if revoked_at is None:
+                    revoked += 1
+                else:
+                    already_revoked += 1
+
+        return CouponBulkSegmentPreview(
+            total_candidates=total,
+            sample_emails=sample,
+            revoked=revoked,
+            already_revoked=already_revoked,
+            not_assigned=not_assigned,
+        )
+
     total = int((await session.execute(select(func.count()).select_from(User).where(*filters))).scalar_one())
     revoked = int(
         (
@@ -1034,9 +1183,17 @@ async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
             job.error_message = None
             await session.commit()
 
+            bucket = _parse_bucket_config(
+                bucket_total=getattr(job, "bucket_total", None),
+                bucket_index=getattr(job, "bucket_index", None),
+                bucket_seed=getattr(job, "bucket_seed", None),
+            )
             filters = _segment_user_filters(job)
-            total = int((await session.execute(select(func.count()).select_from(User).where(*filters))).scalar_one())
-            job.total_candidates = total
+            if bucket is None:
+                total = int((await session.execute(select(func.count()).select_from(User).where(*filters))).scalar_one())
+                job.total_candidates = total
+            else:
+                total = int(getattr(job, "total_candidates", 0) or 0)
             job.processed = 0
             job.created = 0
             job.restored = 0
@@ -1070,7 +1227,20 @@ async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
                 if not rows:
                     break
 
-                user_ids = [row[0] for row in rows]
+                if bucket is None:
+                    bucketed_rows = rows
+                else:
+                    bucketed_rows = [
+                        (user_id, email, preferred_language)
+                        for user_id, email, preferred_language in rows
+                        if _bucket_index_for_user(user_id=user_id, seed=bucket.seed, total=bucket.total) == bucket.index
+                    ]
+
+                if not bucketed_rows:
+                    last_id = rows[-1][0]
+                    continue
+
+                user_ids = [row[0] for row in bucketed_rows]
                 existing = (
                     (
                         await session.execute(
@@ -1087,7 +1257,7 @@ async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
 
                 notify: list[tuple[str, str | None]] = []
 
-                for user_id, email, preferred_language in rows:
+                for user_id, email, preferred_language in bucketed_rows:
                     assignment = assignments_by_user_id.get(user_id)
                     if job.action == CouponBulkJobAction.assign:
                         if assignment and assignment.revoked_at is None:
@@ -1468,8 +1638,16 @@ async def admin_preview_segment_assign(
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+    try:
+        bucket = _parse_bucket_config(
+            bucket_total=payload.bucket_total,
+            bucket_index=payload.bucket_index,
+            bucket_seed=payload.bucket_seed,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     filters = _segment_user_filters(payload)
-    return await _preview_segment_assign(session, coupon_id=coupon_id, filters=filters)
+    return await _preview_segment_assign(session, coupon_id=coupon_id, filters=filters, bucket=bucket)
 
 
 @router.post("/admin/coupons/{coupon_id}/revoke/segment/preview", response_model=CouponBulkSegmentPreview)
@@ -1482,8 +1660,16 @@ async def admin_preview_segment_revoke(
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+    try:
+        bucket = _parse_bucket_config(
+            bucket_total=payload.bucket_total,
+            bucket_index=payload.bucket_index,
+            bucket_seed=payload.bucket_seed,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     filters = _segment_user_filters(payload)
-    return await _preview_segment_revoke(session, coupon_id=coupon_id, filters=filters)
+    return await _preview_segment_revoke(session, coupon_id=coupon_id, filters=filters, bucket=bucket)
 
 
 @router.post("/admin/coupons/{coupon_id}/assign/segment", response_model=CouponBulkJobRead, status_code=status.HTTP_201_CREATED)
@@ -1498,8 +1684,16 @@ async def admin_start_segment_assign_job(
     if not coupon:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
 
+    try:
+        bucket = _parse_bucket_config(
+            bucket_total=payload.bucket_total,
+            bucket_index=payload.bucket_index,
+            bucket_seed=payload.bucket_seed,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     filters = _segment_user_filters(payload)
-    preview = await _preview_segment_assign(session, coupon_id=coupon_id, filters=filters)
+    preview = await _preview_segment_assign(session, coupon_id=coupon_id, filters=filters, bucket=bucket)
 
     job = CouponBulkJob(
         coupon_id=coupon_id,
@@ -1508,6 +1702,9 @@ async def admin_start_segment_assign_job(
         status=CouponBulkJobStatus.pending,
         require_marketing_opt_in=payload.require_marketing_opt_in,
         require_email_verified=payload.require_email_verified,
+        bucket_total=payload.bucket_total,
+        bucket_index=payload.bucket_index,
+        bucket_seed=(payload.bucket_seed or "").strip()[:80] or None,
         send_email=payload.send_email,
         total_candidates=preview.total_candidates,
     )
@@ -1534,8 +1731,16 @@ async def admin_start_segment_revoke_job(
     if not coupon:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
 
+    try:
+        bucket = _parse_bucket_config(
+            bucket_total=payload.bucket_total,
+            bucket_index=payload.bucket_index,
+            bucket_seed=payload.bucket_seed,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     filters = _segment_user_filters(payload)
-    preview = await _preview_segment_revoke(session, coupon_id=coupon_id, filters=filters)
+    preview = await _preview_segment_revoke(session, coupon_id=coupon_id, filters=filters, bucket=bucket)
 
     job = CouponBulkJob(
         coupon_id=coupon_id,
@@ -1544,6 +1749,9 @@ async def admin_start_segment_revoke_job(
         status=CouponBulkJobStatus.pending,
         require_marketing_opt_in=payload.require_marketing_opt_in,
         require_email_verified=payload.require_email_verified,
+        bucket_total=payload.bucket_total,
+        bucket_index=payload.bucket_index,
+        bucket_seed=(payload.bucket_seed or "").strip()[:80] or None,
         send_email=payload.send_email,
         revoke_reason=(payload.reason or "").strip()[:255] or None,
         total_candidates=preview.total_candidates,
@@ -1628,11 +1836,20 @@ async def admin_retry_bulk_job(
     if job.status in (CouponBulkJobStatus.pending, CouponBulkJobStatus.running):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Job is still in progress")
 
+    try:
+        bucket = _parse_bucket_config(
+            bucket_total=getattr(job, "bucket_total", None),
+            bucket_index=getattr(job, "bucket_index", None),
+            bucket_seed=getattr(job, "bucket_seed", None),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
     filters = _segment_user_filters(job)
     if job.action == CouponBulkJobAction.assign:
-        preview = await _preview_segment_assign(session, coupon_id=job.coupon_id, filters=filters)
+        preview = await _preview_segment_assign(session, coupon_id=job.coupon_id, filters=filters, bucket=bucket)
     else:
-        preview = await _preview_segment_revoke(session, coupon_id=job.coupon_id, filters=filters)
+        preview = await _preview_segment_revoke(session, coupon_id=job.coupon_id, filters=filters, bucket=bucket)
 
     new_job = CouponBulkJob(
         coupon_id=job.coupon_id,
@@ -1641,6 +1858,9 @@ async def admin_retry_bulk_job(
         status=CouponBulkJobStatus.pending,
         require_marketing_opt_in=job.require_marketing_opt_in,
         require_email_verified=job.require_email_verified,
+        bucket_total=getattr(job, "bucket_total", None),
+        bucket_index=getattr(job, "bucket_index", None),
+        bucket_seed=getattr(job, "bucket_seed", None),
         send_email=job.send_email,
         revoke_reason=job.revoke_reason,
         total_candidates=preview.total_candidates,

@@ -194,6 +194,9 @@ class CouponBulkResult(BaseModel):
 class CouponBulkSegmentFilters(BaseModel):
     require_marketing_opt_in: bool = False
     require_email_verified: bool = False
+    bucket_total: int | None = Field(default=None, ge=2, le=100)
+    bucket_index: int | None = Field(default=None, ge=0)
+    bucket_seed: str | None = Field(default=None, max_length=80)
 
 
 class CouponBulkSegmentAssignRequest(CouponBulkSegmentFilters):
@@ -226,6 +229,9 @@ class CouponBulkJobRead(BaseModel):
     status: CouponBulkJobStatus
     require_marketing_opt_in: bool
     require_email_verified: bool
+    bucket_total: int | None = None
+    bucket_index: int | None = None
+    bucket_seed: str | None = None
     send_email: bool
     revoke_reason: str | None = None
     total_candidates: int

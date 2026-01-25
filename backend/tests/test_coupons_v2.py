@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import hashlib
 from uuid import UUID
 
 from fastapi.testclient import TestClient
@@ -1116,9 +1117,21 @@ def test_admin_segment_bulk_job_assign_and_revoke() -> None:
         )
         coupon_id = get_coupon_id(SessionLocal, code)
 
+        seed = "ab-test"
+        payload = f"{seed}:{u1}".encode("utf-8")
+        digest = hashlib.sha256(payload).digest()
+        bucket_index = int(int.from_bytes(digest[:8], "big") % 2)
+
         preview = client.post(
             f"/api/v1/coupons/admin/coupons/{coupon_id}/assign/segment/preview",
-            json={"require_marketing_opt_in": True, "require_email_verified": True, "send_email": False},
+            json={
+                "require_marketing_opt_in": True,
+                "require_email_verified": True,
+                "send_email": False,
+                "bucket_total": 2,
+                "bucket_index": bucket_index,
+                "bucket_seed": seed,
+            },
             headers=auth_headers(admin_token),
         )
         assert preview.status_code == 200, preview.text
@@ -1128,7 +1141,14 @@ def test_admin_segment_bulk_job_assign_and_revoke() -> None:
 
         start = client.post(
             f"/api/v1/coupons/admin/coupons/{coupon_id}/assign/segment",
-            json={"require_marketing_opt_in": True, "require_email_verified": True, "send_email": False},
+            json={
+                "require_marketing_opt_in": True,
+                "require_email_verified": True,
+                "send_email": False,
+                "bucket_total": 2,
+                "bucket_index": bucket_index,
+                "bucket_seed": seed,
+            },
             headers=auth_headers(admin_token),
         )
         assert start.status_code == 201, start.text
@@ -1178,7 +1198,15 @@ def test_admin_segment_bulk_job_assign_and_revoke() -> None:
 
         revoke = client.post(
             f"/api/v1/coupons/admin/coupons/{coupon_id}/revoke/segment",
-            json={"require_marketing_opt_in": True, "require_email_verified": True, "send_email": False, "reason": "cleanup"},
+            json={
+                "require_marketing_opt_in": True,
+                "require_email_verified": True,
+                "send_email": False,
+                "reason": "cleanup",
+                "bucket_total": 2,
+                "bucket_index": bucket_index,
+                "bucket_seed": seed,
+            },
             headers=auth_headers(admin_token),
         )
         assert revoke.status_code == 201, revoke.text

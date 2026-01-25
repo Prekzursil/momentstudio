@@ -1176,6 +1176,136 @@ type PromotionScheduleRow = {
               </div>
             </div>
 
+            <div class="rounded-xl border border-slate-200 p-3 grid gap-3 dark:border-slate-800">
+              <div class="grid gap-1">
+                <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.couponsV2.ab.title' | translate }}</div>
+                <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.couponsV2.ab.hint' | translate }}</p>
+              </div>
+
+              <div *ngIf="!abCanRun()" class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3 dark:bg-amber-950/30 dark:text-amber-100 dark:border-amber-900/40">
+                {{ 'adminUi.couponsV2.ab.requiresAssigned' | translate }}
+              </div>
+
+              <div class="grid gap-3 lg:grid-cols-[1fr_auto] items-end">
+                <app-input [label]="'adminUi.couponsV2.ab.couponB' | translate" [(value)]="abCouponQuery"></app-input>
+                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.search' | translate" (action)="abSearchCoupons()"></app-button>
+              </div>
+
+              <div *ngIf="abCouponError()" class="text-sm text-rose-700 dark:text-rose-200">{{ abCouponError() }}</div>
+              <div *ngIf="abCouponLoading()" class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.couponsV2.ab.searching' | translate }}</div>
+
+              <div *ngIf="abCouponResults().length" class="rounded-lg border border-slate-200 bg-white text-sm dark:border-slate-800 dark:bg-slate-900">
+                <button
+                  *ngFor="let c of abCouponResults()"
+                  type="button"
+                  class="w-full text-left border-t border-slate-200 px-3 py-2 hover:bg-slate-50 first:border-t-0 dark:border-slate-800 dark:hover:bg-slate-800/40"
+                  (click)="selectAbCouponB(c)"
+                >
+                  <div class="font-semibold text-slate-900 dark:text-slate-50">{{ c.code }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ c.promotion?.name || c.promotion_id }}</div>
+                </button>
+              </div>
+
+              <div *ngIf="abCouponB()" class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200">
+                <div class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.couponsV2.ab.selectedB' | translate }}</div>
+                <div class="mt-1">
+                  <span class="font-semibold">{{ abCouponB()!.code }}</span>
+                  <span class="text-slate-500 dark:text-slate-400">· {{ abCouponB()!.promotion?.name || abCouponB()!.promotion_id }}</span>
+                </div>
+                <div *ngIf="abCouponB()!.visibility !== 'assigned'" class="mt-2 text-xs text-amber-800 dark:text-amber-200">
+                  {{ 'adminUi.couponsV2.ab.publicWarning' | translate }}
+                </div>
+              </div>
+
+              <div class="grid gap-2 lg:grid-cols-2">
+                <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  <input type="checkbox" class="h-5 w-5 accent-indigo-600" [(ngModel)]="abRequireMarketingOptIn" />
+                  {{ 'adminUi.couponsV2.bulk.segment.filterMarketing' | translate }}
+                </label>
+                <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  <input type="checkbox" class="h-5 w-5 accent-indigo-600" [(ngModel)]="abRequireEmailVerified" />
+                  {{ 'adminUi.couponsV2.bulk.segment.filterVerified' | translate }}
+                </label>
+              </div>
+
+              <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                <input type="checkbox" class="h-5 w-5 accent-indigo-600" [(ngModel)]="abSendEmail" />
+                {{ 'adminUi.couponsV2.bulk.sendEmailAssign' | translate }}
+              </label>
+
+                <div class="grid gap-3 lg:grid-cols-[1fr_auto] items-end">
+                  <app-input [label]="'adminUi.couponsV2.ab.seed' | translate" [(value)]="abBucketSeed"></app-input>
+                <app-button
+                  size="sm"
+                  [disabled]="abBusy() || !abCouponB() || !abCanRun()"
+                  [label]="'adminUi.couponsV2.ab.start' | translate"
+                  (action)="startAbTest()"
+                ></app-button>
+                </div>
+
+              <div *ngIf="abJobA() || abJobB()" class="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+                <div class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.couponsV2.ab.jobsTitle' | translate }}</div>
+                <div class="mt-2 grid gap-2">
+                  <div *ngIf="abJobA()" class="flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="font-semibold text-slate-900 dark:text-slate-50">{{ selectedCoupon()!.code }} · A</div>
+                      <div class="text-xs text-slate-500 dark:text-slate-400">
+                        {{ 'adminUi.couponsV2.bulk.segment.jobProgress' | translate:{ processed: abJobA()!.processed, total: abJobA()!.total_candidates } }}
+                      </div>
+                    </div>
+                    <div class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ abJobA()!.status }}</div>
+                  </div>
+                  <div *ngIf="abJobB()" class="flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="font-semibold text-slate-900 dark:text-slate-50">{{ abCouponB()!.code }} · B</div>
+                      <div class="text-xs text-slate-500 dark:text-slate-400">
+                        {{ 'adminUi.couponsV2.bulk.segment.jobProgress' | translate:{ processed: abJobB()!.processed, total: abJobB()!.total_candidates } }}
+                      </div>
+                    </div>
+                    <div class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ abJobB()!.status }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <label class="grid gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.couponsV2.ab.window' | translate }}
+                  <select
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="abAnalyticsDays"
+                    (ngModelChange)="loadAbAnalytics()"
+                  >
+                    <option [ngValue]="7">{{ 'adminUi.couponsV2.analytics.window7' | translate }}</option>
+                    <option [ngValue]="30">{{ 'adminUi.couponsV2.analytics.window30' | translate }}</option>
+                    <option [ngValue]="90">{{ 'adminUi.couponsV2.analytics.window90' | translate }}</option>
+                  </select>
+                </label>
+                <app-button size="sm" variant="ghost" [disabled]="!abCouponB()" [label]="'adminUi.actions.refresh' | translate" (action)="loadAbAnalytics()"></app-button>
+              </div>
+
+              <div *ngIf="abAnalyticsError()" class="text-sm text-rose-700 dark:text-rose-200">{{ abAnalyticsError() }}</div>
+              <div *ngIf="abAnalyticsLoading()" class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.couponsV2.ab.loading' | translate }}</div>
+
+              <div *ngIf="abAnalyticsA() && abAnalyticsB()" class="grid gap-3 lg:grid-cols-2">
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+                  <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ selectedCoupon()!.code }} · A</div>
+                  <div class="mt-2 grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+                    <div>{{ 'adminUi.couponsV2.analytics.summary.redemptions' | translate }}: {{ abAnalyticsA()!.summary.redemptions }}</div>
+                    <div>{{ 'adminUi.couponsV2.analytics.summary.totalDiscount' | translate }}: {{ formatRonString(abAnalyticsA()!.summary.total_discount_ron) }}</div>
+                    <div>{{ 'adminUi.couponsV2.analytics.summary.lift' | translate }}: {{ formatRonString(abAnalyticsA()!.summary.aov_lift) }}</div>
+                  </div>
+                </div>
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+                  <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ abCouponB()!.code }} · B</div>
+                  <div class="mt-2 grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+                    <div>{{ 'adminUi.couponsV2.analytics.summary.redemptions' | translate }}: {{ abAnalyticsB()!.summary.redemptions }}</div>
+                    <div>{{ 'adminUi.couponsV2.analytics.summary.totalDiscount' | translate }}: {{ formatRonString(abAnalyticsB()!.summary.total_discount_ron) }}</div>
+                    <div>{{ 'adminUi.couponsV2.analytics.summary.lift' | translate }}: {{ formatRonString(abAnalyticsB()!.summary.aov_lift) }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div
               *ngIf="assignmentsError()"
               class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
@@ -1306,6 +1436,26 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
   analyticsTopLimit = 10;
   analyticsOnlySelectedCoupon = false;
 
+  abCouponQuery = '';
+  abCouponLoading = signal(false);
+  abCouponError = signal<string | null>(null);
+  abCouponResults = signal<CouponRead[]>([]);
+  abCouponB = signal<CouponRead | null>(null);
+  abRequireMarketingOptIn = false;
+  abRequireEmailVerified = false;
+  abSendEmail = true;
+  abBucketSeed = '';
+  abBusy = signal(false);
+  abJobA = signal<CouponBulkJobRead | null>(null);
+  abJobB = signal<CouponBulkJobRead | null>(null);
+  private abPollHandle: number | null = null;
+
+  abAnalyticsDays = 30;
+  abAnalyticsLoading = signal(false);
+  abAnalyticsError = signal<string | null>(null);
+  abAnalyticsA = signal<CouponAnalyticsResponse | null>(null);
+  abAnalyticsB = signal<CouponAnalyticsResponse | null>(null);
+
   promotionForm: PromotionForm = this.blankPromotionForm();
   couponForm: CouponForm = this.blankCouponForm();
   stackingSampleSubtotal: string | number = 200;
@@ -1331,6 +1481,7 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopSegmentPolling();
+    this.stopAbPolling();
   }
 
   loadCategories(): void {
@@ -1410,6 +1561,7 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     this.analytics.set(null);
     this.analyticsError.set(null);
     this.analyticsLoading.set(false);
+    this.resetAbState();
   }
 
   onDiscountTypeChange(): void {
@@ -1533,6 +1685,129 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
       });
   }
 
+  abCanRun(): boolean {
+    const couponA = this.selectedCoupon();
+    if (!couponA) return false;
+    if (couponA.visibility !== 'assigned') return false;
+    const couponB = this.abCouponB();
+    if (couponB && couponB.visibility !== 'assigned') return false;
+    return true;
+  }
+
+  abSearchCoupons(): void {
+    const q = (this.abCouponQuery || '').trim();
+    if (!q) {
+      this.abCouponResults.set([]);
+      this.abCouponError.set(null);
+      this.abCouponLoading.set(false);
+      return;
+    }
+    this.abCouponLoading.set(true);
+    this.abCouponError.set(null);
+    const currentId = this.selectedCoupon()?.id || null;
+    this.adminCoupons.listCoupons({ q }).subscribe({
+      next: (list) => {
+        this.abCouponLoading.set(false);
+        const results = (Array.isArray(list) ? list : []).filter((c) => c.id !== currentId);
+        this.abCouponResults.set(results.slice(0, 10));
+      },
+      error: (err) => {
+        this.abCouponLoading.set(false);
+        this.abCouponResults.set([]);
+        this.abCouponError.set(err?.error?.detail || this.t('adminUi.couponsV2.ab.searchError'));
+      }
+    });
+  }
+
+  selectAbCouponB(coupon: CouponRead): void {
+    if (!coupon?.id) return;
+    const currentId = this.selectedCoupon()?.id || null;
+    if (currentId && coupon.id === currentId) return;
+    this.abCouponB.set(coupon);
+    this.abCouponResults.set([]);
+    this.abCouponError.set(null);
+    this.abCouponQuery = coupon.code || this.abCouponQuery;
+    if (!this.abBucketSeed.trim()) {
+      this.abBucketSeed = this.defaultAbBucketSeed();
+    }
+    this.loadAbAnalytics();
+  }
+
+  startAbTest(): void {
+    const couponA = this.selectedCoupon();
+    const couponB = this.abCouponB();
+    if (!couponA || !couponB) return;
+    if (!this.abCanRun()) {
+      this.toast.error(this.t('adminUi.couponsV2.errors.validation'), this.t('adminUi.couponsV2.ab.requiresAssigned'));
+      return;
+    }
+
+    const seed = (this.abBucketSeed || '').trim() || this.defaultAbBucketSeed();
+    this.abBucketSeed = seed;
+
+    this.abBusy.set(true);
+    this.abJobA.set(null);
+    this.abJobB.set(null);
+    this.abAnalyticsError.set(null);
+    this.stopAbPolling();
+
+    const basePayload = {
+      require_marketing_opt_in: this.abRequireMarketingOptIn,
+      require_email_verified: this.abRequireEmailVerified,
+      send_email: this.abSendEmail,
+      bucket_total: 2,
+      bucket_seed: seed
+    };
+
+    forkJoin({
+      a: this.adminCoupons.startSegmentAssignJob(couponA.id, { ...basePayload, bucket_index: 0 }),
+      b: this.adminCoupons.startSegmentAssignJob(couponB.id, { ...basePayload, bucket_index: 1 })
+    }).subscribe({
+      next: ({ a, b }) => {
+        this.abBusy.set(false);
+        this.abJobA.set(a);
+        this.abJobB.set(b);
+        this.toast.success(this.t('adminUi.couponsV2.ab.started'));
+        this.startAbPolling();
+      },
+      error: (err) => {
+        this.abBusy.set(false);
+        this.toast.error(this.t('adminUi.couponsV2.ab.startError'), err?.error?.detail || undefined);
+      }
+    });
+  }
+
+  loadAbAnalytics(): void {
+    const couponA = this.selectedCoupon();
+    const couponB = this.abCouponB();
+    if (!couponA || !couponB) {
+      this.abAnalyticsA.set(null);
+      this.abAnalyticsB.set(null);
+      this.abAnalyticsError.set(null);
+      this.abAnalyticsLoading.set(false);
+      return;
+    }
+
+    this.abAnalyticsLoading.set(true);
+    this.abAnalyticsError.set(null);
+    forkJoin({
+      a: this.adminCoupons.getAnalytics({ promotion_id: couponA.promotion_id, coupon_id: couponA.id, days: this.abAnalyticsDays }),
+      b: this.adminCoupons.getAnalytics({ promotion_id: couponB.promotion_id, coupon_id: couponB.id, days: this.abAnalyticsDays })
+    }).subscribe({
+      next: ({ a, b }) => {
+        this.abAnalyticsLoading.set(false);
+        this.abAnalyticsA.set(a);
+        this.abAnalyticsB.set(b);
+      },
+      error: (err) => {
+        this.abAnalyticsLoading.set(false);
+        this.abAnalyticsA.set(null);
+        this.abAnalyticsB.set(null);
+        this.abAnalyticsError.set(err?.error?.detail || this.t('adminUi.couponsV2.errors.loadAnalytics'));
+      }
+    });
+  }
+
   selectCoupon(coupon: CouponRead): void {
     this.selectedCoupon.set(coupon);
     this.couponForm = this.couponToForm(coupon);
@@ -1541,6 +1816,7 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     this.revokeReason = '';
     this.resetBulkState();
     this.resetSegmentState();
+    this.resetAbState();
     this.loadAssignments();
     this.loadSegmentJobs();
     if (this.analyticsOnlySelectedCoupon) this.loadAnalytics();
@@ -1554,6 +1830,7 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     this.assignments.set([]);
     this.resetBulkState();
     this.resetSegmentState();
+    this.resetAbState();
   }
 
   saveCoupon(): void {
@@ -2384,6 +2661,48 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     }
   }
 
+  private startAbPolling(): void {
+    this.stopAbPolling();
+    this.refreshAbJobs();
+    this.abPollHandle = window.setInterval(() => this.refreshAbJobs(), 2000);
+  }
+
+  private stopAbPolling(): void {
+    if (this.abPollHandle !== null) {
+      window.clearInterval(this.abPollHandle);
+      this.abPollHandle = null;
+    }
+  }
+
+  private refreshAbJobs(): void {
+    const jobA = this.abJobA();
+    const jobB = this.abJobB();
+    const terminal = (status: string) => status === 'succeeded' || status === 'failed' || status === 'cancelled';
+
+    const requests: Record<string, any> = {};
+    if (jobA && !terminal(jobA.status)) requests['a'] = this.adminCoupons.getBulkJob(jobA.id);
+    if (jobB && !terminal(jobB.status)) requests['b'] = this.adminCoupons.getBulkJob(jobB.id);
+
+    if (Object.keys(requests).length === 0) {
+      this.stopAbPolling();
+      return;
+    }
+
+    forkJoin(requests).subscribe({
+      next: (data: any) => {
+        if (data?.['a']) this.abJobA.set(data['a']);
+        if (data?.['b']) this.abJobB.set(data['b']);
+        const nextA = this.abJobA();
+        const nextB = this.abJobB();
+        if (nextA && nextB && terminal(nextA.status) && terminal(nextB.status)) {
+          this.stopAbPolling();
+          this.loadAssignments();
+        }
+      },
+      error: () => this.stopAbPolling()
+    });
+  }
+
   private refreshSegmentJob(jobId: string): void {
     this.adminCoupons.getBulkJob(jobId).subscribe({
       next: (job) => {
@@ -2443,6 +2762,30 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     this.segmentJobsError.set(null);
     this.segmentJobs.set([]);
     this.segmentJobsBusy.set(false);
+  }
+
+  private resetAbState(): void {
+    this.stopAbPolling();
+    this.abCouponQuery = '';
+    this.abCouponLoading.set(false);
+    this.abCouponError.set(null);
+    this.abCouponResults.set([]);
+    this.abCouponB.set(null);
+    this.abBucketSeed = '';
+    this.abBusy.set(false);
+    this.abJobA.set(null);
+    this.abJobB.set(null);
+    this.abAnalyticsLoading.set(false);
+    this.abAnalyticsError.set(null);
+    this.abAnalyticsA.set(null);
+    this.abAnalyticsB.set(null);
+  }
+
+  private defaultAbBucketSeed(): string {
+    const couponA = this.selectedCoupon()?.id || '';
+    const couponB = this.abCouponB()?.id || '';
+    if (!couponA || !couponB) return 'ab-test';
+    return `ab:${couponA}:${couponB}`;
   }
 
   private parseEmailsFromCsv(text: string): { emails: string[]; invalid: string[]; duplicates: number; truncated: number } {

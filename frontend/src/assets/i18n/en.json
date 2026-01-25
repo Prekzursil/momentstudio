@@ -3087,6 +3087,23 @@
         "startImmediate": "Now",
         "noEnd": "No end date"
       },
+      "ab": {
+        "title": "A/B promo test",
+        "hint": "Randomly assign a customer segment to two assigned coupons and compare performance.",
+        "requiresAssigned": "A/B testing works best with assigned coupons (visibility: assigned) to avoid leakage across groups.",
+        "couponB": "Coupon B code",
+        "searching": "Searching coupons…",
+        "searchError": "Could not search coupons",
+        "selectedB": "Selected variant B",
+        "publicWarning": "This coupon is public. Consider using assigned coupons so only the intended group can redeem it.",
+        "seed": "Bucket seed (stable)",
+        "start": "Start A/B assignment",
+        "started": "A/B assignment started",
+        "startError": "Could not start A/B assignment",
+        "jobsTitle": "A/B jobs",
+        "window": "Reporting window",
+        "loading": "Loading A/B report…"
+      },
       "scopes": {
         "title": "Scope rules",
         "includedCategories": "Included categories",

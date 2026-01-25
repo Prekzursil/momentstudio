@@ -200,6 +200,9 @@ class CouponBulkJob(Base):
     )
     require_marketing_opt_in: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     require_email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    bucket_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    bucket_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    bucket_seed: Mapped[str | None] = mapped_column(String(80), nullable=True)
     send_email: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     revoke_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
 

@@ -3087,6 +3087,23 @@
         "startImmediate": "Acum",
         "noEnd": "Fără dată de final"
       },
+      "ab": {
+        "title": "Test A/B promoții",
+        "hint": "Atribuie aleator un segment de clienți la două cupoane (atribuite) și compară performanța.",
+        "requiresAssigned": "Testele A/B funcționează cel mai bine cu cupoane atribuite (vizibilitate: atribuit) pentru a evita scurgeri între grupuri.",
+        "couponB": "Cod cupon B",
+        "searching": "Se caută cupoane…",
+        "searchError": "Nu s-au putut căuta cupoanele",
+        "selectedB": "Varianta B selectată",
+        "publicWarning": "Acest cupon este public. Recomandat să folosești cupoane atribuite ca să fie disponibil doar grupului țintă.",
+        "seed": "Seed împărțire (stabil)",
+        "start": "Pornește atribuirea A/B",
+        "started": "Atribuirea A/B a pornit",
+        "startError": "Nu s-a putut porni atribuirea A/B",
+        "jobsTitle": "Joburi A/B",
+        "window": "Perioadă raportare",
+        "loading": "Se încarcă raportul A/B…"
+      },
       "scopes": {
         "title": "Reguli de aplicare",
         "includedCategories": "Categorii incluse",
