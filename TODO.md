@@ -730,7 +730,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Products: product relationships – Define “related products” and “upsells” used in storefront.
 - [x] Admin Products: soft-delete recovery – View and restore deleted products/images.
 - [x] Admin Products: audit trail for edits – Show per-field history for product changes.
-- [ ] Admin Products: import/export CSV – Import products/stock/prices via CSV with validation + error report.
+- [x] Admin Products: import/export CSV – Import products/stock/prices via CSV with validation + error report.
 - [ ] Admin Products: markdown preview – Inline preview for descriptions with sanitation warnings.
 - [ ] Admin Products: per-product shipping overrides – Set weight/size shipping class and exceptions.
 - [ ] Admin Products: translation completeness – Dashboard for missing RO/EN fields (name/description/content).

@@ -2195,6 +2195,28 @@
         "cardTitle": "Card magazin",
         "snippetTitle": "Fragment căutare"
       },
+      "csv": {
+        "export": "Export CSV",
+        "import": "Import CSV",
+        "title": "Import CSV",
+        "hint": "Încarcă un CSV de produse (folosește Export ca șablon). Rulează mai întâi o simulare, apoi importă dacă nu există erori.",
+        "file": "Fișier CSV",
+        "dryRun": "Simulare",
+        "apply": "Importă",
+        "result": "Rezultat",
+        "created": "Create",
+        "updated": "Actualizate",
+        "errorsTitle": "Erori",
+        "noErrors": "Nu au fost găsite erori.",
+        "success": {
+          "imported": "Import CSV finalizat"
+        },
+        "errors": {
+          "noFile": "Selectează mai întâi un fișier CSV.",
+          "export": "Nu am putut exporta CSV-ul produselor.",
+          "import": "Nu am putut importa CSV-ul produselor."
+        }
+      },
       "audit": {
         "title": "Istoric modificări",
         "hint": "Modificări recente ale produsului cu istoric per câmp.",

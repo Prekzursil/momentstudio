@@ -6,6 +6,7 @@ import { forkJoin } from 'rxjs';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
 import { InputComponent } from '../../../shared/input.component';
+import { ModalComponent } from '../../../shared/modal.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import {
   AdminProductDuplicateCheckResponse,
@@ -20,6 +21,7 @@ import {
   AdminProductAuditEntry,
   AdminProductImageOptimizationStats,
   AdminProductImageTranslation,
+  AdminProductsImportResult,
   AdminProductVariant,
   AdminService,
   StockAdjustment,
@@ -83,6 +85,7 @@ type VariantRow = {
     BreadcrumbComponent,
     ButtonComponent,
     InputComponent,
+    ModalComponent,
     SkeletonComponent,
     LocalizedCurrencyPipe
   ],
@@ -95,8 +98,90 @@ type VariantRow = {
           <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.products.title' | translate }}</h1>
           <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.products.hint' | translate }}</p>
         </div>
-        <app-button size="sm" [label]="'adminUi.products.new' | translate" (action)="startNew()"></app-button>
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.export' | translate" (action)="exportProductsCsv()"></app-button>
+          <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.import' | translate" (action)="openCsvImport()"></app-button>
+          <app-button size="sm" [label]="'adminUi.products.new' | translate" (action)="startNew()"></app-button>
+        </div>
       </div>
+
+      <app-modal
+        [open]="csvImportOpen()"
+        [title]="'adminUi.products.csv.title' | translate"
+        [subtitle]="'adminUi.products.csv.hint' | translate"
+        [showActions]="false"
+        [closeLabel]="'adminUi.actions.cancel' | translate"
+        (closed)="closeCsvImport()"
+      >
+        <div class="grid gap-3">
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.products.csv.file' | translate }}
+            <input
+              type="file"
+              accept=".csv"
+              (change)="onCsvImportFileChange($event)"
+              class="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-700 dark:file:bg-slate-100 dark:file:text-slate-900 dark:hover:file:bg-slate-200"
+            />
+          </label>
+
+          <div *ngIf="csvImportFile()" class="text-xs text-slate-500 dark:text-slate-400">
+            {{ csvImportFile()?.name }}
+          </div>
+
+          <div
+            *ngIf="csvImportError()"
+            class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+          >
+            {{ csvImportError() }}
+          </div>
+
+          <div *ngIf="csvImportBusy()" class="text-sm text-slate-600 dark:text-slate-300">
+            {{ 'adminUi.actions.loading' | translate }}
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <app-button size="sm" variant="ghost" [label]="'adminUi.actions.cancel' | translate" (action)="closeCsvImport()"></app-button>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.products.csv.dryRun' | translate"
+              (action)="runCsvImport(true)"
+              [disabled]="csvImportBusy() || !csvImportFile()"
+            ></app-button>
+            <app-button
+              size="sm"
+              [label]="'adminUi.products.csv.apply' | translate"
+              (action)="runCsvImport(false)"
+              [disabled]="csvImportBusy() || !csvImportCanApply()"
+            ></app-button>
+          </div>
+
+          <div
+            *ngIf="csvImportResult() as result"
+            class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+          >
+            <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.products.csv.result' | translate }}
+            </p>
+            <div class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+              <div>{{ 'adminUi.products.csv.created' | translate }}: {{ result.created }}</div>
+              <div>{{ 'adminUi.products.csv.updated' | translate }}: {{ result.updated }}</div>
+            </div>
+
+            <div *ngIf="(result.errors || []).length > 0; else csvNoErrors" class="grid gap-2">
+              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.products.csv.errorsTitle' | translate }}
+              </p>
+              <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
+                <li *ngFor="let err of result.errors">{{ err }}</li>
+              </ul>
+            </div>
+            <ng-template #csvNoErrors>
+              <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.products.csv.noErrors' | translate }}</p>
+            </ng-template>
+          </div>
+        </div>
+      </app-modal>
 
 	      <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
 		        <div class="grid gap-3 lg:grid-cols-[1fr_180px_220px_240px_auto] items-end">
@@ -1759,6 +1844,12 @@ export class AdminProductsComponent implements OnInit {
   auditBusy = signal(false);
   auditError = signal<string | null>(null);
 
+  csvImportOpen = signal(false);
+  csvImportFile = signal<File | null>(null);
+  csvImportBusy = signal(false);
+  csvImportError = signal<string | null>(null);
+  csvImportResult = signal<AdminProductsImportResult | null>(null);
+
   variants = signal<VariantRow[]>([]);
   variantsBusy = signal(false);
   variantsError = signal<string | null>(null);
@@ -2317,6 +2408,64 @@ export class AdminProductsComponent implements OnInit {
       new_max: this.formatMoneyInput(maxNew),
       currency
     };
+  }
+
+  exportProductsCsv(): void {
+    this.admin.exportProductsCsv().subscribe({
+      next: (blob) => this.downloadBlob(blob, 'products.csv'),
+      error: () => this.toast.error(this.t('adminUi.products.csv.errors.export'))
+    });
+  }
+
+  openCsvImport(): void {
+    this.csvImportOpen.set(true);
+    this.csvImportFile.set(null);
+    this.csvImportResult.set(null);
+    this.csvImportError.set(null);
+    this.csvImportBusy.set(false);
+  }
+
+  closeCsvImport(): void {
+    this.csvImportOpen.set(false);
+  }
+
+  onCsvImportFileChange(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    const file = target?.files && target.files.length > 0 ? target.files[0] : null;
+    this.csvImportFile.set(file);
+    this.csvImportResult.set(null);
+    this.csvImportError.set(null);
+  }
+
+  csvImportCanApply(): boolean {
+    const file = this.csvImportFile();
+    const result = this.csvImportResult();
+    return Boolean(file && result && (result.errors || []).length === 0);
+  }
+
+  runCsvImport(dryRun: boolean): void {
+    const file = this.csvImportFile();
+    if (!file) {
+      this.csvImportError.set(this.t('adminUi.products.csv.errors.noFile'));
+      return;
+    }
+    this.csvImportBusy.set(true);
+    this.csvImportError.set(null);
+    this.csvImportResult.set(null);
+    this.admin.importProductsCsv(file, dryRun).subscribe({
+      next: (res) => {
+        this.csvImportResult.set(res);
+        this.csvImportBusy.set(false);
+        if (!dryRun && (!res?.errors || res.errors.length === 0)) {
+          this.toast.success(this.t('adminUi.products.csv.success.imported'));
+          this.load();
+        }
+      },
+      error: () => {
+        this.csvImportBusy.set(false);
+        this.csvImportError.set(this.t('adminUi.products.csv.errors.import'));
+      }
+    });
   }
 
 		  startNew(): void {
@@ -3636,6 +3785,19 @@ export class AdminProductsComponent implements OnInit {
     if (Number.isNaN(d.getTime())) return '';
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  private downloadBlob(blob: Blob, filename: string): void {
+    if (typeof document === 'undefined') return;
+    const url = URL.createObjectURL(blob);
+    try {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+    } finally {
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    }
   }
 
   private t(key: string): string {

@@ -2195,6 +2195,28 @@
         "cardTitle": "Storefront card",
         "snippetTitle": "Search snippet"
       },
+      "csv": {
+        "export": "Export CSV",
+        "import": "Import CSV",
+        "title": "CSV import",
+        "hint": "Upload a products CSV (use Export as a template). Run a dry-run first, then import if there are no errors.",
+        "file": "CSV file",
+        "dryRun": "Dry run",
+        "apply": "Import",
+        "result": "Result",
+        "created": "Created",
+        "updated": "Updated",
+        "errorsTitle": "Errors",
+        "noErrors": "No errors found.",
+        "success": {
+          "imported": "CSV import completed"
+        },
+        "errors": {
+          "noFile": "Select a CSV file first.",
+          "export": "Could not export products CSV.",
+          "import": "Could not import products CSV."
+        }
+      },
       "audit": {
         "title": "Audit trail",
         "hint": "Recent product changes with per-field history.",

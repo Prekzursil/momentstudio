@@ -244,6 +244,12 @@ export interface AdminProductAuditEntry {
   payload?: any | null;
 }
 
+export interface AdminProductsImportResult {
+  created: number;
+  updated: number;
+  errors: string[];
+}
+
 export interface AdminProductVariant {
   id: string;
   name: string;
@@ -633,6 +639,16 @@ export class AdminService {
 
   getProduct(slug: string): Observable<AdminProductDetail> {
     return this.api.get<AdminProductDetail>(`/catalog/products/${slug}`);
+  }
+
+  exportProductsCsv(): Observable<Blob> {
+    return this.api.getBlob('/catalog/products/export');
+  }
+
+  importProductsCsv(file: File, dryRun = true): Observable<AdminProductsImportResult> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.api.post<AdminProductsImportResult>('/catalog/products/import', form, undefined, { dry_run: dryRun });
   }
 
   getProductAudit(slug: string, limit = 50): Observable<AdminProductAuditEntry[]> {
