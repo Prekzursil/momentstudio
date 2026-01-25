@@ -755,9 +755,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Pricing: rounding rules config – Configure rounding strategy for display/checkout.
 - [x] Admin Taxes: configurable tax groups – Manage VAT rates per country/category (future-proofing).
 - [x] Admin Promotions: code generator upgrades – Generate codes with patterns/prefixes and collision checks.
-- [ ] Admin CMS: content diff before publish – Side-by-side diff between draft and published versions.
-- [ ] Admin CMS: scheduled publishing – Schedule page/blog publish/unpublish windows.
-- [ ] Admin CMS: content rollback – Restore a previous version with one click (audit).
+- [x] Admin CMS: content diff before publish – Side-by-side diff between draft and published versions.
+- [x] Admin CMS: scheduled publishing – Schedule page/blog publish/unpublish windows.
+- [x] Admin CMS: content rollback – Restore a previous version with one click (audit).
 - [ ] Admin CMS: broken link checker – Validate internal links/images and surface warnings.
 - [ ] Admin CMS: media library tags – Organize assets with tags and search filters.
 - [ ] Admin CMS: image focal point – Set focal point for responsive crops (hero/cards).

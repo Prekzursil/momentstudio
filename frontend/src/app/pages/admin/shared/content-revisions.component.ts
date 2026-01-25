@@ -58,7 +58,7 @@ import { diffLines, Change } from 'diff';
         <div *ngIf="selectedRead() && currentRead()" class="grid gap-2">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-              {{ 'adminUi.content.revisions.diffVsCurrent' | translate: { version: currentRead()!.version } }}
+              {{ 'adminUi.content.revisions.diffVsCurrent' | translate: { from: selectedRead()!.version, to: currentRead()!.version } }}
             </p>
             <button
               type="button"
@@ -138,14 +138,28 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
       }
     };
 
+    const maybeInitSelection = (): void => {
+      if (pendingCurrent) return;
+      if (this.selectedVersion) return;
+      const items = this.versions();
+      if (!items?.length) return;
+      const current = this.currentRead();
+      const latest = items[0]?.version;
+      if (!latest) return;
+      let nextVersion = latest;
+      if (current?.status === 'draft') {
+        const published = items.find((v) => v.status === 'published');
+        if (published?.version) nextVersion = published.version;
+      }
+      this.selectedVersion = nextVersion;
+      this.loadSelectedVersion();
+    };
+
     this.subs.add(
       this.admin.listContentVersions(key).subscribe({
         next: (items) => {
           this.versions.set(items || []);
-          if (items?.length) {
-            this.selectedVersion = items[0].version;
-            this.loadSelectedVersion();
-          }
+          maybeInitSelection();
           pendingVersions = false;
           finish();
         },
@@ -162,38 +176,42 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
     );
 
     this.subs.add(
-      this.admin.getContent(key).subscribe({
-        next: (block) => {
-          const version = block?.version;
-          if (!version) {
+        this.admin.getContent(key).subscribe({
+          next: (block) => {
+            const version = block?.version;
+            if (!version) {
+              pendingCurrent = false;
+              maybeInitSelection();
+              finish();
+              return;
+            }
+            this.subs.add(
+              this.admin.getContentVersion(key, version).subscribe({
+                next: (read) => {
+                  this.currentRead.set(read);
+                  this.recomputeDiff();
+                  pendingCurrent = false;
+                  maybeInitSelection();
+                  finish();
+                },
+                error: () => {
+                  this.error.set(this.t('adminUi.content.revisions.errors.loadVersion'));
+                  pendingCurrent = false;
+                  maybeInitSelection();
+                  finish();
+                }
+              })
+            );
+          },
+          error: () => {
+            // Missing content blocks simply have no history yet.
+            this.currentRead.set(null);
             pendingCurrent = false;
+            maybeInitSelection();
             finish();
-            return;
           }
-          this.subs.add(
-            this.admin.getContentVersion(key, version).subscribe({
-              next: (read) => {
-                this.currentRead.set(read);
-                this.recomputeDiff();
-                pendingCurrent = false;
-                finish();
-              },
-              error: () => {
-                this.error.set(this.t('adminUi.content.revisions.errors.loadVersion'));
-                pendingCurrent = false;
-                finish();
-              }
-            })
-          );
-        },
-        error: () => {
-          // Missing content blocks simply have no history yet.
-          this.currentRead.set(null);
-          pendingCurrent = false;
-          finish();
-        }
-      })
-    );
+        })
+      );
   }
 
   loadSelectedVersion(): void {
@@ -237,8 +255,8 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
       this.diffParts = [];
       return;
     }
-    const from = this.snapshotText(current);
-    const to = this.snapshotText(selected);
+    const from = this.snapshotText(selected);
+    const to = this.snapshotText(current);
     this.diffParts = diffLines(from, to);
   }
 
@@ -255,6 +273,7 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
       `status: ${read.status}`,
       `lang: ${read.lang ?? 'null'}`,
       `published_at: ${read.published_at ?? 'null'}`,
+      `published_until: ${read.published_until ?? 'null'}`,
       `meta:\n${meta}`,
       `body_markdown:\n${read.body_markdown || ''}`,
       `translations:\n${translations.length ? translations.join('\n\n') : '[]'}`

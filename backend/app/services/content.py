@@ -139,6 +139,7 @@ async def get_published_by_key(session: AsyncSession, key: str, lang: str | None
             ContentBlock.key == key,
             ContentBlock.status == ContentStatus.published,
             or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
+            or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
         )
     )
     block = result.scalar_one_or_none()
@@ -242,11 +243,19 @@ async def upsert_block(
         _sanitize_markdown(data["body_markdown"])
     lang = data.get("lang")
     published_at = _ensure_utc(data.get("published_at"))
+    published_until = _ensure_utc(data.get("published_until"))
     if not block:
         validate_page_key_for_create(key)
         wants_published_at = None
+        wants_published_until = None
         if data.get("status") == ContentStatus.published:
             wants_published_at = published_at or now
+            wants_published_until = published_until
+            if wants_published_until and wants_published_until <= wants_published_at:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Unpublish time must be after publish time",
+                )
         block = ContentBlock(
             key=key,
             title=data.get("title") or "",
@@ -254,6 +263,7 @@ async def upsert_block(
             status=data.get("status") or ContentStatus.draft,
             version=1,
             published_at=wants_published_at,
+            published_until=wants_published_until,
             meta=data.get("meta"),
             sort_order=data.get("sort_order", 0),
             lang=lang,
@@ -269,6 +279,7 @@ async def upsert_block(
             meta=block.meta,
             lang=block.lang,
             published_at=block.published_at,
+            published_until=block.published_until,
             translations=[],
         )
         audit = ContentAuditLog(content_block_id=block.id, action="created", version=block.version, user_id=actor_id)
@@ -316,6 +327,7 @@ async def upsert_block(
             meta=block.meta,
             lang=block.lang,
             published_at=block.published_at,
+            published_until=block.published_until,
             translations=translations_snapshot,
         )
         audit = ContentAuditLog(content_block_id=block.id, action=f"translated:{lang}", version=block.version, user_id=actor_id)
@@ -340,14 +352,25 @@ async def upsert_block(
                 block.published_at = now
         elif block.status == ContentStatus.draft:
             block.published_at = None
+            block.published_until = None
     elif "published_at" in data:
         block.published_at = published_at
+    if "published_until" in data:
+        block.published_until = published_until
     if "meta" in data:
         block.meta = data["meta"]
     if "sort_order" in data and data["sort_order"] is not None:
         block.sort_order = data["sort_order"]
     if "lang" in data and data["lang"] is not None:
         block.lang = data["lang"]
+    if block.status == ContentStatus.draft:
+        block.published_until = None
+    if block.status == ContentStatus.published:
+        if block.published_until and block.published_at and block.published_until <= block.published_at:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Unpublish time must be after publish time",
+            )
     await session.refresh(block, attribute_names=["translations"])
     session.add(block)
     translations_snapshot = _snapshot_translations(block)
@@ -360,6 +383,7 @@ async def upsert_block(
         meta=block.meta,
         lang=block.lang,
         published_at=block.published_at,
+        published_until=block.published_until,
         translations=translations_snapshot,
     )
     audit = ContentAuditLog(content_block_id=block.id, action="updated", version=block.version, user_id=actor_id)
@@ -412,8 +436,11 @@ async def rollback_to_version(
         block.lang = snapshot.lang
     if hasattr(snapshot, "published_at"):
         block.published_at = snapshot.published_at
+    if hasattr(snapshot, "published_until"):
+        block.published_until = snapshot.published_until
     if block.status == ContentStatus.draft:
         block.published_at = None
+        block.published_until = None
     elif block.status == ContentStatus.published and block.published_at is None:
         block.published_at = now
     snapshot_translations = getattr(snapshot, "translations", None)
@@ -452,6 +479,7 @@ async def rollback_to_version(
         meta=block.meta,
         lang=block.lang,
         published_at=block.published_at,
+        published_until=block.published_until,
         translations=translations_snapshot,
     )
     audit = ContentAuditLog(

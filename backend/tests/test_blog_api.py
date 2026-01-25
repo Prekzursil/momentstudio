@@ -177,6 +177,26 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert filtered_q.json()["meta"]["total_items"] == 1
     assert filtered_q.json()["items"][0]["slug"] == "second-post"
 
+    # Unpublish window: a post with a past published_until should not be visible.
+    expired = client.post(
+        "/api/v1/content/admin/blog.expired-post",
+        json={
+            "title": "Expired",
+            "body_markdown": "This is expired.",
+            "status": "published",
+            "lang": "en",
+            "published_at": (datetime.now(timezone.utc) - timedelta(days=2)).isoformat(),
+            "published_until": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert expired.status_code == 201, expired.text
+    expired_listing = client.get("/api/v1/blog/posts", params={"lang": "en"})
+    assert expired_listing.status_code == 200, expired_listing.text
+    assert expired_listing.json()["meta"]["total_items"] == 2
+    expired_detail = client.get("/api/v1/blog/posts/expired-post", params={"lang": "en"})
+    assert expired_detail.status_code == 404, expired_detail.text
+
     # Scheduling: published posts with a future published_at should not be visible yet.
     future = (datetime.now(timezone.utc) + timedelta(days=2)).isoformat()
     scheduled = client.post(
@@ -207,6 +227,7 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert "blog/first-post?lang=en" in sitemap.text
     assert "blog/second-post?lang=en" in sitemap.text
     assert "blog/scheduled-post?lang=en" not in sitemap.text
+    assert "blog/expired-post?lang=en" not in sitemap.text
 
     # Draft previews: admin can mint a token and fetch the unpublished/scheduled post.
     minted = client.post(

@@ -83,6 +83,7 @@ async def sitemap(session: AsyncSession = Depends(get_session)) -> Response:
                 ContentBlock.key.like("blog.%"),
                 ContentBlock.status == ContentStatus.published,
                 or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
+                or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
             )
         )
     ).scalars().all()

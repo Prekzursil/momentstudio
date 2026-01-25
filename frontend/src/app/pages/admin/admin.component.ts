@@ -542,6 +542,33 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     ></app-button>
                   </div>
 
+                  <div class="grid gap-3 md:grid-cols-2">
+                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {{ 'adminUi.site.pages.builder.publishAtOptional' | translate }}
+                      <input
+                        type="datetime-local"
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        [(ngModel)]="newCustomPagePublishedAt"
+                        [disabled]="newCustomPageStatus !== 'published'"
+                      />
+                      <span class="text-xs text-slate-500 dark:text-slate-400">
+                        {{ 'adminUi.site.pages.builder.publishAtHint' | translate }}
+                      </span>
+                    </label>
+                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {{ 'adminUi.site.pages.builder.unpublishAtOptional' | translate }}
+                      <input
+                        type="datetime-local"
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        [(ngModel)]="newCustomPagePublishedUntil"
+                        [disabled]="newCustomPageStatus !== 'published'"
+                      />
+                      <span class="text-xs text-slate-500 dark:text-slate-400">
+                        {{ 'adminUi.site.pages.builder.unpublishAtHint' | translate }}
+                      </span>
+                    </label>
+                  </div>
+
                   <div *ngIf="contentPagesError" class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
                     {{ contentPagesError }}
                   </div>
@@ -972,14 +999,45 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                           </ng-container>
                         </ng-container>
                       </div>
-                    </div>
                   </div>
+                </div>
 
-                  <div class="flex items-center gap-2">
-                    <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="savePageBlocks(pageBlocksKey)"></app-button>
-                    <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="pageBlocksMessage[pageBlocksKey]">
-                      {{ pageBlocksMessage[pageBlocksKey] }}
-                    </span>
+                <div class="grid gap-3 md:grid-cols-3 items-end">
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.site.pages.builder.status' | translate }}
+                    <select
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [(ngModel)]="pageBlocksStatus[pageBlocksKey]"
+                    >
+                      <option [ngValue]="'draft'">{{ 'adminUi.status.draft' | translate }}</option>
+                      <option [ngValue]="'published'">{{ 'adminUi.status.published' | translate }}</option>
+                    </select>
+                  </label>
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.site.pages.builder.publishAtOptional' | translate }}
+                    <input
+                      type="datetime-local"
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [(ngModel)]="pageBlocksPublishedAt[pageBlocksKey]"
+                      [disabled]="pageBlocksStatus[pageBlocksKey] !== 'published'"
+                    />
+                  </label>
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.site.pages.builder.unpublishAtOptional' | translate }}
+                    <input
+                      type="datetime-local"
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [(ngModel)]="pageBlocksPublishedUntil[pageBlocksKey]"
+                      [disabled]="pageBlocksStatus[pageBlocksKey] !== 'published'"
+                    />
+                  </label>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="savePageBlocks(pageBlocksKey)"></app-button>
+                  <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="pageBlocksMessage[pageBlocksKey]">
+                    {{ pageBlocksMessage[pageBlocksKey] }}
+                  </span>
                     <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="pageBlocksError[pageBlocksKey]">
                       {{ pageBlocksError[pageBlocksKey] }}
                     </span>
@@ -2347,11 +2405,24 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                   {{ 'adminUi.blog.fields.publishAtOptional' | translate }}
                   <input
                     type="datetime-local"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="blogCreate.published_at"
+                    [disabled]="blogCreate.status !== 'published'"
                   />
                   <span class="text-xs text-slate-500 dark:text-slate-400">
                     {{ 'adminUi.blog.fields.publishAtHint' | translate }}
+                  </span>
+                </label>
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.blog.fields.unpublishAtOptional' | translate }}
+                  <input
+                    type="datetime-local"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogCreate.published_until"
+                    [disabled]="blogCreate.status !== 'published'"
+                  />
+                  <span class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.blog.fields.unpublishAtHint' | translate }}
                   </span>
                 </label>
                 <div class="md:col-span-2">
@@ -2467,10 +2538,22 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     type="datetime-local"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="blogForm.published_at"
-                    [disabled]="blogEditLang !== blogBaseLang"
+                    [disabled]="blogEditLang !== blogBaseLang || blogForm.status !== 'published'"
                   />
                   <span class="text-xs text-slate-500 dark:text-slate-400">
                     {{ 'adminUi.blog.editing.publishAtBaseOnlyHint' | translate }}
+                  </span>
+                </label>
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                  {{ 'adminUi.blog.editing.unpublishAtBaseOnlyOptional' | translate }}
+                  <input
+                    type="datetime-local"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogForm.published_until"
+                    [disabled]="blogEditLang !== blogBaseLang || blogForm.status !== 'published'"
+                  />
+                  <span class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.blog.editing.unpublishAtBaseOnlyHint' | translate }}
                   </span>
                 </label>
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
@@ -3177,6 +3260,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    baseLang: 'en' | 'ro';
 	    status: 'draft' | 'published';
 	    published_at: string;
+	    published_until: string;
 	    title: string;
     body_markdown: string;
     summary: string;
@@ -3190,6 +3274,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    baseLang: 'en',
 	    status: 'draft',
 	    published_at: '',
+	    published_until: '',
 	    title: '',
     body_markdown: '',
     summary: '',
@@ -3208,6 +3293,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     body_markdown: '',
     status: 'draft',
     published_at: '',
+    published_until: '',
     summary: '',
     tags: '',
     cover_image_url: '',
@@ -3305,11 +3391,16 @@ export class AdminComponent implements OnInit, OnDestroy {
   redirectsQuery = '';
   newCustomPageTitle = '';
   newCustomPageStatus: 'draft' | 'published' = 'draft';
+  newCustomPagePublishedAt = '';
+  newCustomPagePublishedUntil = '';
   creatingCustomPage = false;
   pageBlocksKey: PageBuilderKey = 'page.about';
   newPageBlockType: PageBlockType = 'text';
   pageBlocks: Record<string, PageBlockDraft[]> = {};
   pageBlocksMeta: Record<string, Record<string, unknown>> = {};
+  pageBlocksStatus: Record<string, 'draft' | 'published'> = {};
+  pageBlocksPublishedAt: Record<string, string> = {};
+  pageBlocksPublishedUntil: Record<string, string> = {};
   pageBlocksMessage: Record<string, string | null> = {};
   pageBlocksError: Record<string, string | null> = {};
   draggingPageBlockKey: string | null = null;
@@ -4455,6 +4546,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	      baseLang: 'en',
 	      status: 'draft',
 	      published_at: '',
+	      published_until: '',
 	      title: '',
       body_markdown: '',
       summary: '',
@@ -4508,11 +4600,12 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (cover) {
       meta['cover_image_url'] = cover;
     }
-    const rt = Number(String(this.blogCreate.reading_time_minutes || '').trim());
-    if (Number.isFinite(rt) && rt > 0) {
-      meta['reading_time_minutes'] = Math.trunc(rt);
-    }
+	    const rt = Number(String(this.blogCreate.reading_time_minutes || '').trim());
+	    if (Number.isFinite(rt) && rt > 0) {
+	      meta['reading_time_minutes'] = Math.trunc(rt);
+	    }
 	    const published_at = this.blogCreate.published_at ? new Date(this.blogCreate.published_at).toISOString() : undefined;
+	    const published_until = this.blogCreate.published_until ? new Date(this.blogCreate.published_until).toISOString() : undefined;
 
 	    try {
 	      const payload = {
@@ -4521,6 +4614,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	        status: this.blogCreate.status,
 	        lang: baseLang,
 	        published_at,
+	        published_until,
 	        meta: Object.keys(meta).length ? meta : undefined
 	      };
 
@@ -4588,6 +4682,7 @@ export class AdminComponent implements OnInit, OnDestroy {
           this.blogForm.status = block.status;
         }
         this.blogForm.published_at = block.published_at ? this.toLocalDateTime(block.published_at) : '';
+        this.blogForm.published_until = block.published_until ? this.toLocalDateTime(block.published_until) : '';
         this.blogMeta = block.meta || this.blogMeta || {};
         this.syncBlogMetaToForm(lang);
       },
@@ -4611,12 +4706,18 @@ export class AdminComponent implements OnInit, OnDestroy {
         ? new Date(this.blogForm.published_at).toISOString()
         : null
       : undefined;
+    const published_until = isBase
+      ? this.blogForm.published_until
+        ? new Date(this.blogForm.published_until).toISOString()
+        : null
+      : undefined;
     if (isBase) {
       const payload = this.withExpectedVersion(key, {
         title: this.blogForm.title.trim(),
         body_markdown: this.blogForm.body_markdown,
         status: this.blogForm.status as any,
         published_at,
+        published_until,
         meta: nextMeta
       });
       this.admin.updateContentBlock(key, payload).subscribe({
@@ -4961,6 +5062,7 @@ export class AdminComponent implements OnInit, OnDestroy {
           body_markdown: block.body_markdown,
           status: block.status,
           published_at: block.published_at ? this.toLocalDateTime(block.published_at) : '',
+          published_until: block.published_until ? this.toLocalDateTime(block.published_until) : '',
           summary: '',
           tags: '',
           cover_image_url: '',
@@ -4984,6 +5086,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       body_markdown: '',
       status: 'draft',
       published_at: '',
+      published_until: '',
       summary: '',
       tags: '',
       cover_image_url: '',
@@ -5602,6 +5705,9 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.admin.getContent(pageKey).subscribe({
       next: (block) => {
         this.rememberContentVersion(pageKey, block);
+        this.pageBlocksStatus[pageKey] = block.status === 'published' ? 'published' : 'draft';
+        this.pageBlocksPublishedAt[pageKey] = block.published_at ? this.toLocalDateTime(block.published_at) : '';
+        this.pageBlocksPublishedUntil[pageKey] = block.published_until ? this.toLocalDateTime(block.published_until) : '';
         const metaObj = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
         this.pageBlocksMeta[pageKey] = metaObj;
         this.pageBlocks[pageKey] = this.parsePageBlocksDraft(metaObj);
@@ -5609,6 +5715,9 @@ export class AdminComponent implements OnInit, OnDestroy {
       error: (err) => {
         if (err?.status === 404) {
           delete this.contentVersions[pageKey];
+          this.pageBlocksStatus[pageKey] = 'draft';
+          this.pageBlocksPublishedAt[pageKey] = '';
+          this.pageBlocksPublishedUntil[pageKey] = '';
           this.pageBlocksMeta[pageKey] = {};
           this.pageBlocks[pageKey] = [];
           return;
@@ -5634,10 +5743,24 @@ export class AdminComponent implements OnInit, OnDestroy {
     }
     const key = `page.${slug}` as PageBuilderKey;
     this.creatingCustomPage = true;
+    const published_at =
+      this.newCustomPageStatus === 'published'
+        ? this.newCustomPagePublishedAt
+          ? new Date(this.newCustomPagePublishedAt).toISOString()
+          : null
+        : null;
+    const published_until =
+      this.newCustomPageStatus === 'published'
+        ? this.newCustomPagePublishedUntil
+          ? new Date(this.newCustomPagePublishedUntil).toISOString()
+          : null
+        : null;
     const payload = {
       title,
       body_markdown: 'Page builder',
       status: this.newCustomPageStatus,
+      published_at,
+      published_until,
       meta: { version: 2, blocks: [] }
     };
     const done = () => {
@@ -5649,6 +5772,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.toast.success(this.t('adminUi.site.pages.success.created'));
         this.newCustomPageTitle = '';
         this.newCustomPageStatus = 'draft';
+        this.newCustomPagePublishedAt = '';
+        this.newCustomPagePublishedUntil = '';
         this.loadContentPages();
         this.pageBlocksKey = key;
         this.loadPageBlocks(key);
@@ -6080,7 +6205,20 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
 
     const meta = { ...(this.pageBlocksMeta[pageKey] || {}), blocks };
-    const payload: Record<string, unknown> = { meta };
+    const status = this.pageBlocksStatus[pageKey] === 'published' ? 'published' : 'draft';
+    const published_at =
+      status === 'published'
+        ? this.pageBlocksPublishedAt[pageKey]
+          ? new Date(this.pageBlocksPublishedAt[pageKey]).toISOString()
+          : null
+        : null;
+    const published_until =
+      status === 'published'
+        ? this.pageBlocksPublishedUntil[pageKey]
+          ? new Date(this.pageBlocksPublishedUntil[pageKey]).toISOString()
+          : null
+        : null;
+    const payload: Record<string, unknown> = { meta, status, published_at, published_until };
 
     const ok = this.t('adminUi.site.pages.builder.success.save');
     const errMsg = this.t('adminUi.site.pages.builder.errors.save');
@@ -6090,6 +6228,9 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.admin.updateContentBlock(pageKey, this.withExpectedVersion(pageKey, payload)).subscribe({
       next: (block) => {
         this.rememberContentVersion(pageKey, block);
+        this.pageBlocksStatus[pageKey] = block.status === 'published' ? 'published' : 'draft';
+        this.pageBlocksPublishedAt[pageKey] = block.published_at ? this.toLocalDateTime(block.published_at) : '';
+        this.pageBlocksPublishedUntil[pageKey] = block.published_until ? this.toLocalDateTime(block.published_until) : '';
         this.pageBlocksMeta[pageKey] = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
         this.pageBlocksMessage[pageKey] = ok;
         this.pageBlocksError[pageKey] = null;
@@ -6104,12 +6245,17 @@ export class AdminComponent implements OnInit, OnDestroy {
           const createPayload = {
             title: this.contentPages.find((p) => p.key === pageKey)?.title || pageKey,
             body_markdown: 'Page builder',
-            status: 'published',
+            status,
+            published_at,
+            published_until,
             meta
           };
           this.admin.createContent(pageKey, createPayload).subscribe({
             next: (created) => {
               this.rememberContentVersion(pageKey, created);
+              this.pageBlocksStatus[pageKey] = created.status === 'published' ? 'published' : 'draft';
+              this.pageBlocksPublishedAt[pageKey] = created.published_at ? this.toLocalDateTime(created.published_at) : '';
+              this.pageBlocksPublishedUntil[pageKey] = created.published_until ? this.toLocalDateTime(created.published_until) : '';
               this.pageBlocksMeta[pageKey] = ((created as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
               this.pageBlocksMessage[pageKey] = ok;
               this.pageBlocksError[pageKey] = null;

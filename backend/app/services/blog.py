@@ -167,6 +167,7 @@ async def list_published_posts(
         ContentBlock.key.like(f"{BLOG_KEY_PREFIX}%"),
         ContentBlock.status == ContentStatus.published,
         or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
+        or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
     )
     query_text = (q or "").strip().lower()
     tag_text = (tag or "").strip().lower()
@@ -241,6 +242,7 @@ async def get_published_post(
             ContentBlock.key == key,
             ContentBlock.status == ContentStatus.published,
             or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
+            or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
         )
     )
     if lang:

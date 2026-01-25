@@ -13,6 +13,7 @@ class ContentBlockBase(BaseModel):
     body_markdown: str = Field(min_length=1)
     status: ContentStatus = ContentStatus.draft
     published_at: datetime | None = None
+    published_until: datetime | None = None
     meta: dict[str, Any] | None = None
     sort_order: int = 0
     lang: str | None = Field(default=None, pattern="^(en|ro)$")
@@ -35,6 +36,7 @@ class ContentBlockUpdate(BaseModel):
     body_markdown: str | None = Field(default=None)
     status: ContentStatus | None = None
     published_at: datetime | None = None
+    published_until: datetime | None = None
     meta: dict[str, Any] | None = None
     sort_order: int | None = None
     lang: str | None = Field(default=None, pattern="^(en|ro)$")
@@ -59,6 +61,7 @@ class ContentBlockRead(BaseModel):
     sort_order: int
     lang: str | None = None
     published_at: datetime | None = None
+    published_until: datetime | None = None
     created_at: datetime
     updated_at: datetime
     images: list["ContentImageRead"] = Field(default_factory=list)
@@ -72,6 +75,7 @@ class ContentPageListItem(BaseModel):
     status: ContentStatus
     updated_at: datetime
     published_at: datetime | None = None
+    published_until: datetime | None = None
 
 
 class ContentPageRenameRequest(BaseModel):
@@ -143,6 +147,7 @@ class ContentBlockVersionRead(ContentBlockVersionListItem):
     meta: dict[str, Any] | None = None
     lang: str | None = None
     published_at: datetime | None = None
+    published_until: datetime | None = None
     translations: list[ContentTranslationSnapshot] | None = None
 
 

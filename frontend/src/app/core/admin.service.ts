@@ -421,6 +421,7 @@ export interface ContentBlock {
   lang?: string | null;
   sort_order?: number;
   published_at?: string | null;
+  published_until?: string | null;
   images?: { id: string; url: string; alt_text?: string | null; sort_order?: number }[];
 }
 
@@ -443,6 +444,7 @@ export interface ContentBlockVersionRead extends ContentBlockVersionListItem {
   meta?: Record<string, any> | null;
   lang?: string | null;
   published_at?: string | null;
+  published_until?: string | null;
   translations?: ContentTranslationSnapshot[] | null;
 }
 
@@ -453,6 +455,7 @@ export interface ContentPageListItem {
   status: 'draft' | 'published';
   updated_at: string;
   published_at?: string | null;
+  published_until?: string | null;
 }
 
 export interface ContentPageRenameResponse {

@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from typing import Dict
 
@@ -80,6 +81,39 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert public.status_code == 200
     assert public.json()["title"] == "Hero"
     assert public.json()["meta"]["headline"] == "Hero"
+
+    # Publish window: an expired block should not be visible publicly.
+    now = datetime.now(timezone.utc)
+    expired = client.post(
+        "/api/v1/content/admin/site.expired",
+        json={
+            "title": "Expired",
+            "body_markdown": "Expired body",
+            "status": "published",
+            "published_at": (now - timedelta(days=2)).isoformat(),
+            "published_until": (now - timedelta(days=1)).isoformat(),
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert expired.status_code == 201, expired.text
+    expired_public = client.get("/api/v1/content/site.expired")
+    assert expired_public.status_code == 404, expired_public.text
+
+    active = client.post(
+        "/api/v1/content/admin/site.active",
+        json={
+            "title": "Active",
+            "body_markdown": "Active body",
+            "status": "published",
+            "published_at": (now - timedelta(days=1)).isoformat(),
+            "published_until": (now + timedelta(days=1)).isoformat(),
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert active.status_code == 201, active.text
+    active_public = client.get("/api/v1/content/site.active")
+    assert active_public.status_code == 200, active_public.text
+    assert active_public.json()["title"] == "Active"
 
     # Update increments version
     update = client.patch(

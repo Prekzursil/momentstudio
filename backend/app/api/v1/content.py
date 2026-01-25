@@ -272,6 +272,7 @@ async def admin_list_pages(
                 status=block.status,
                 updated_at=block.updated_at,
                 published_at=block.published_at,
+                published_until=block.published_until,
             )
         )
     return items
