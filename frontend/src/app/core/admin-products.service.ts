@@ -24,6 +24,7 @@ export interface AdminProductListItem {
   publish_at?: string | null;
   publish_scheduled_for?: string | null;
   unpublish_scheduled_for?: string | null;
+  missing_translations?: string[] | null;
 }
 
 export interface AdminProductListResponse {
@@ -56,6 +57,8 @@ export class AdminProductsService {
     q?: string;
     status?: string;
     category_slug?: string;
+    missing_translations?: boolean;
+    missing_translation_lang?: 'en' | 'ro';
     deleted?: boolean;
     page?: number;
     limit?: number;

@@ -1993,6 +1993,7 @@
         "status": "Status",
         "view": "View",
         "category": "Category",
+        "translations": "Translations",
         "stock": "Stock",
         "active": "Active",
         "updated": "Updated",
@@ -2173,6 +2174,13 @@
       "translations": {
         "title": "Translations",
         "hint": "Optional per-language overrides. If empty, the storefront falls back to the default fields.",
+        "filter": {
+          "all": "All products",
+          "missingAny": "Missing (any)",
+          "missingEn": "Missing EN",
+          "missingRo": "Missing RO"
+        },
+        "missing": "Missing:",
         "success": {
           "save": "Translation saved",
           "delete": "Translation removed"

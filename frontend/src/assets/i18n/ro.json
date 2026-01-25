@@ -1993,6 +1993,7 @@
         "status": "Status",
         "view": "Vizualizare",
         "category": "Categorie",
+        "translations": "Traduceri",
         "stock": "Stoc",
         "active": "Activ",
         "updated": "Actualizat",
@@ -2173,6 +2174,13 @@
       "translations": {
         "title": "Traduceri",
         "hint": "Suprascrieri opționale pe limbă. Dacă sunt goale, magazinul folosește câmpurile implicite.",
+        "filter": {
+          "all": "Toate produsele",
+          "missingAny": "Lipsesc (oricare)",
+          "missingEn": "Lipsește EN",
+          "missingRo": "Lipsește RO"
+        },
+        "missing": "Lipsesc:",
         "success": {
           "save": "Traducere salvată",
           "delete": "Traducere eliminată"

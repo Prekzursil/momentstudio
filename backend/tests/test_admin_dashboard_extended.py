@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
-from app.models.catalog import Category, Product, ProductImage, ProductStatus, ProductAuditLog
+from app.models.catalog import Category, Product, ProductImage, ProductStatus, ProductAuditLog, ProductTranslation
 from app.models.content import ContentBlock, ContentStatus, ContentAuditLog
 from app.models.order import Order, OrderStatus
 from app.models.promo import PromoCode, StripeCouponMapping
@@ -279,6 +279,65 @@ def test_product_trash_and_image_restore(test_app: Dict[str, object]) -> None:
     active_products = client.get("/api/v1/admin/dashboard/products/search", headers=headers)
     assert active_products.status_code == 200, active_products.text
     assert any(item["id"] == product_id for item in active_products.json().get("items", []))
+
+
+def test_admin_products_search_translation_filters(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    asyncio.run(seed(session_factory))
+    headers = auth_headers(client)
+
+    async def add_translation_data() -> None:
+        async with session_factory() as session:
+            category = (await session.execute(select(Category).where(Category.slug == "art"))).scalar_one()
+            painting = (await session.execute(select(Product).where(Product.slug == "painting"))).scalar_one()
+            session.add(ProductTranslation(product_id=painting.id, lang="en", name="Painting EN"))
+
+            session.add(
+                Product(
+                    slug="sculpture",
+                    name="Sculpture",
+                    base_price=75,
+                    currency="RON",
+                    category_id=category.id,
+                    stock_quantity=1,
+                    status=ProductStatus.published,
+                )
+            )
+            await session.commit()
+
+    asyncio.run(add_translation_data())
+
+    missing_en = client.get(
+        "/api/v1/admin/dashboard/products/search",
+        params={"missing_translation_lang": "en"},
+        headers=headers,
+    )
+    assert missing_en.status_code == 200, missing_en.text
+    items = missing_en.json().get("items", [])
+    assert any(item["slug"] == "sculpture" for item in items)
+    assert all(item["slug"] != "painting" for item in items)
+
+    missing_any = client.get(
+        "/api/v1/admin/dashboard/products/search",
+        params={"missing_translations": True},
+        headers=headers,
+    )
+    assert missing_any.status_code == 200, missing_any.text
+    any_items = missing_any.json().get("items", [])
+    assert {item["slug"] for item in any_items} >= {"painting", "sculpture"}
+
+    missing_ro = client.get(
+        "/api/v1/admin/dashboard/products/search",
+        params={"missing_translation_lang": "ro"},
+        headers=headers,
+    )
+    assert missing_ro.status_code == 200, missing_ro.text
+    ro_items = missing_ro.json().get("items", [])
+    assert {item["slug"] for item in ro_items} >= {"painting", "sculpture"}
+    assert any("ro" in (item.get("missing_translations") or []) for item in ro_items)
 
 
 def test_product_audit_trail_records_field_changes(test_app: Dict[str, object]) -> None:

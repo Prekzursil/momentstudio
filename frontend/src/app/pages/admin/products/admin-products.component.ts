@@ -192,7 +192,7 @@ type VariantRow = {
       </app-modal>
 
 	      <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
-		        <div class="grid gap-3 lg:grid-cols-[1fr_180px_220px_240px_auto] items-end">
+		        <div class="grid gap-3 lg:grid-cols-[1fr_180px_220px_240px_220px_auto] items-end">
 		          <app-input [label]="'adminUi.products.search' | translate" [(value)]="q"></app-input>
 
 	          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -227,6 +227,19 @@ type VariantRow = {
             >
               <option value="">{{ 'adminUi.products.allCategories' | translate }}</option>
               <option *ngFor="let cat of categories()" [value]="cat.slug">{{ cat.name }}</option>
+            </select>
+          </label>
+
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.products.table.translations' | translate }}
+            <select
+              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              [(ngModel)]="translationFilter"
+            >
+              <option value="all">{{ 'adminUi.products.translations.filter.all' | translate }}</option>
+              <option value="missing_any">{{ 'adminUi.products.translations.filter.missingAny' | translate }}</option>
+              <option value="missing_en">{{ 'adminUi.products.translations.filter.missingEn' | translate }}</option>
+              <option value="missing_ro">{{ 'adminUi.products.translations.filter.missingRo' | translate }}</option>
             </select>
           </label>
 
@@ -495,6 +508,17 @@ type VariantRow = {
 	                      <span class="text-xs text-slate-500 dark:text-slate-400">
 	                        {{ product.deleted_slug || product.slug }} · {{ product.sku }}
 	                      </span>
+                        <div *ngIf="(product.missing_translations || []).length" class="mt-1 flex flex-wrap items-center gap-1">
+                          <span class="text-[10px] font-semibold text-amber-700 dark:text-amber-200">
+                            {{ 'adminUi.products.translations.missing' | translate }}
+                          </span>
+                          <span
+                            *ngFor="let lang of product.missing_translations || []"
+                            class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900 dark:bg-amber-900/30 dark:text-amber-100"
+                          >
+                            {{ (lang || '').toUpperCase() }}
+                          </span>
+                        </div>
 	                    </div>
 	                  </td>
                   <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
@@ -1948,6 +1972,7 @@ export class AdminProductsComponent implements OnInit {
   q = '';
   status: ProductStatusFilter = 'all';
   categorySlug = '';
+  translationFilter: 'all' | 'missing_any' | 'missing_en' | 'missing_ro' = 'all';
   view: 'active' | 'deleted' = 'active';
   page = 1;
   limit = 25;
@@ -2092,6 +2117,7 @@ export class AdminProductsComponent implements OnInit {
     this.q = '';
     this.status = 'all';
     this.categorySlug = '';
+    this.translationFilter = 'all';
     this.page = 1;
     this.clearSelection();
     this.cancelInlineEdit();
@@ -3781,6 +3807,9 @@ export class AdminProductsComponent implements OnInit {
         q: this.q.trim() ? this.q.trim() : undefined,
         status: this.status === 'all' ? undefined : this.status,
         category_slug: this.categorySlug || undefined,
+        missing_translations: this.translationFilter === 'missing_any' ? true : undefined,
+        missing_translation_lang:
+          this.translationFilter === 'missing_en' ? 'en' : this.translationFilter === 'missing_ro' ? 'ro' : undefined,
         deleted: this.view === 'deleted' ? true : undefined,
         page: this.page,
         limit: this.limit

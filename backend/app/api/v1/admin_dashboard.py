@@ -10,6 +10,7 @@ from sqlalchemy import (
     case,
     cast,
     delete,
+    exists,
     func,
     literal,
     or_,
@@ -23,7 +24,7 @@ from app.core import security
 from app.core.config import settings
 from app.core.dependencies import require_admin, require_owner
 from app.db.session import get_session
-from app.models.catalog import Product, ProductAuditLog, Category, ProductStatus
+from app.models.catalog import Product, ProductAuditLog, Category, ProductStatus, ProductTranslation
 from app.models.content import ContentBlock, ContentAuditLog
 from app.schemas.catalog_admin import (
     AdminProductByIdsRequest,
@@ -474,6 +475,8 @@ async def search_products(
     q: str | None = Query(default=None),
     status: ProductStatus | None = Query(default=None),
     category_slug: str | None = Query(default=None),
+    missing_translations: bool = Query(default=False),
+    missing_translation_lang: str | None = Query(default=None, pattern="^(en|ro)$"),
     deleted: bool = Query(default=False),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
@@ -495,6 +498,14 @@ async def search_products(
         stmt = stmt.where(Product.status == status)
     if category_slug:
         stmt = stmt.where(Category.slug == category_slug)
+    missing_lang = (missing_translation_lang or "").strip().lower() or None
+    if missing_lang:
+        has_lang = exists().where(ProductTranslation.product_id == Product.id, ProductTranslation.lang == missing_lang)
+        stmt = stmt.where(~has_lang)
+    elif missing_translations:
+        has_en = exists().where(ProductTranslation.product_id == Product.id, ProductTranslation.lang == "en")
+        has_ro = exists().where(ProductTranslation.product_id == Product.id, ProductTranslation.lang == "ro")
+        stmt = stmt.where(or_(~has_en, ~has_ro))
 
     total = await session.scalar(
         stmt.with_only_columns(func.count(func.distinct(Product.id))).order_by(None)
@@ -507,6 +518,23 @@ async def search_products(
             stmt.order_by(Product.updated_at.desc()).limit(limit).offset(offset)
         )
     ).all()
+
+    langs_by_product: dict[UUID, set[str]] = {}
+    product_ids = [prod.id for prod, _ in rows]
+    if product_ids:
+        translation_rows = (
+            await session.execute(
+                select(ProductTranslation.product_id, ProductTranslation.lang).where(
+                    ProductTranslation.product_id.in_(product_ids),
+                    ProductTranslation.lang.in_(["en", "ro"]),
+                )
+            )
+        ).all()
+        for pid, lang in translation_rows:
+            if not pid or not lang:
+                continue
+            langs_by_product.setdefault(pid, set()).add(str(lang))
+
     items = [
         AdminProductListItem(
             id=prod.id,
@@ -529,6 +557,9 @@ async def search_products(
             publish_at=prod.publish_at,
             publish_scheduled_for=getattr(prod, "publish_scheduled_for", None),
             unpublish_scheduled_for=getattr(prod, "unpublish_scheduled_for", None),
+            missing_translations=[
+                lang for lang in ["en", "ro"] if lang not in langs_by_product.get(prod.id, set())
+            ],
         )
         for prod, cat in rows
     ]

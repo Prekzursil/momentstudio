@@ -31,6 +31,7 @@ class AdminProductListItem(BaseModel):
     publish_at: datetime | None = None
     publish_scheduled_for: datetime | None = None
     unpublish_scheduled_for: datetime | None = None
+    missing_translations: list[str] = Field(default_factory=list)
 
 
 class AdminProductListResponse(BaseModel):
