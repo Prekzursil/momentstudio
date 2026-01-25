@@ -241,9 +241,19 @@ export const routes: Routes = [
       },
       {
         path: 'users',
-        loadComponent: () => import('./pages/admin/users/admin-users.component').then((m) => m.AdminUsersComponent),
         canActivate: [adminSectionGuard('users')],
-        title: 'Users | Admin | momentstudio'
+        children: [
+          {
+            path: '',
+            loadComponent: () => import('./pages/admin/users/admin-users.component').then((m) => m.AdminUsersComponent),
+            title: 'Users | Admin | momentstudio'
+          },
+          {
+            path: 'gdpr',
+            loadComponent: () => import('./pages/admin/users/admin-gdpr.component').then((m) => m.AdminGdprComponent),
+            title: 'GDPR | Admin | momentstudio'
+          }
+        ]
       },
       {
         path: 'support',

@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, Request, Response, status
+from fastapi.responses import FileResponse
 from sqlalchemy import (
     String,
     Text,
@@ -59,8 +60,12 @@ from app.models.support import ContactSubmission
 from app.models.user import AdminAuditLog, EmailVerificationToken, User, RefreshSession, UserRole, UserSecurityEvent
 from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.coupons_v2 import Promotion
+from app.models.user_export import UserDataExportJob, UserDataExportStatus
 from app.services import auth as auth_service
 from app.services import email as email_service
+from app.services import private_storage
+from app.services import user_export as user_export_service
+from app.services import self_service
 from app.schemas.user_admin import (
     AdminEmailVerificationHistoryResponse,
     AdminEmailVerificationTokenInfo,
@@ -71,6 +76,13 @@ from app.schemas.user_admin import (
     AdminUserListResponse,
     AdminUserProfileResponse,
     AdminUserProfileUser,
+)
+from app.schemas.gdpr_admin import (
+    AdminGdprDeletionRequestItem,
+    AdminGdprDeletionRequestsResponse,
+    AdminGdprExportJobItem,
+    AdminGdprExportJobsResponse,
+    AdminGdprUserRef,
 )
 
 router = APIRouter(prefix="/admin/dashboard", tags=["admin"])
@@ -1682,6 +1694,353 @@ async def admin_revoke_user_session(
         )
         await session.commit()
 
+    return None
+
+
+@router.get("/gdpr/exports", response_model=AdminGdprExportJobsResponse)
+async def admin_gdpr_export_jobs(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("users")),
+    q: str | None = Query(default=None),
+    status_filter: UserDataExportStatus | None = Query(default=None, alias="status"),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=25, ge=1, le=100),
+) -> AdminGdprExportJobsResponse:
+    offset = (page - 1) * limit
+    stmt = select(UserDataExportJob, User).join(User, UserDataExportJob.user_id == User.id)
+
+    if q:
+        like = f"%{q.strip().lower()}%"
+        stmt = stmt.where(
+            func.lower(User.email).ilike(like)
+            | func.lower(User.username).ilike(like)
+            | func.lower(User.name).ilike(like)
+        )
+
+    if status_filter is not None:
+        stmt = stmt.where(UserDataExportJob.status == status_filter)
+
+    total_items = int(
+        await session.scalar(stmt.with_only_columns(func.count()).order_by(None)) or 0
+    )
+    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
+
+    rows = (
+        await session.execute(
+            stmt.order_by(UserDataExportJob.created_at.desc()).limit(limit).offset(offset)
+        )
+    ).all()
+
+    now = datetime.now(timezone.utc)
+    sla_days = max(1, int(getattr(settings, "gdpr_export_sla_days", 30) or 30))
+    items: list[AdminGdprExportJobItem] = []
+    for job, user in rows:
+        created_at = job.created_at if job.created_at.tzinfo else job.created_at.replace(tzinfo=timezone.utc)
+        updated_at = job.updated_at if job.updated_at.tzinfo else job.updated_at.replace(tzinfo=timezone.utc)
+        started_at = job.started_at
+        if started_at and started_at.tzinfo is None:
+            started_at = started_at.replace(tzinfo=timezone.utc)
+        finished_at = job.finished_at
+        if finished_at and finished_at.tzinfo is None:
+            finished_at = finished_at.replace(tzinfo=timezone.utc)
+        expires_at = job.expires_at
+        if expires_at and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+        sla_due_at = created_at + timedelta(days=sla_days)
+        sla_breached = False
+        if job.status != UserDataExportStatus.succeeded and now > sla_due_at:
+            sla_breached = True
+
+        items.append(
+            AdminGdprExportJobItem(
+                id=job.id,
+                user=AdminGdprUserRef(
+                    id=user.id,
+                    email=user.email,
+                    username=user.username,
+                    role=user.role,
+                ),
+                status=job.status,
+                progress=int(job.progress or 0),
+                created_at=created_at,
+                updated_at=updated_at,
+                started_at=started_at,
+                finished_at=finished_at,
+                expires_at=expires_at,
+                has_file=bool(job.file_path),
+                sla_due_at=sla_due_at,
+                sla_breached=sla_breached,
+            )
+        )
+
+    return AdminGdprExportJobsResponse(
+        items=items,
+        meta={
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "page": page,
+            "limit": limit,
+        },
+    )
+
+
+@router.post("/gdpr/exports/{job_id}/retry", response_model=AdminGdprExportJobItem)
+async def admin_gdpr_retry_export_job(
+    job_id: UUID,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin),
+) -> AdminGdprExportJobItem:
+    job = await session.get(UserDataExportJob, job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+    user = await session.get(User, job.user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    engine = session.bind
+    if engine is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
+
+    job.status = UserDataExportStatus.pending
+    job.progress = 0
+    job.error_message = None
+    job.started_at = None
+    job.finished_at = None
+    job.expires_at = None
+    job.file_path = None
+    session.add(job)
+    session.add(
+        AdminAuditLog(
+            action="gdpr.export.retry",
+            actor_user_id=current_user.id,
+            subject_user_id=user.id,
+            data={
+                "job_id": str(job.id),
+                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+                "ip_address": (request.client.host if request.client else None),
+            },
+        )
+    )
+    await session.commit()
+
+    background_tasks.add_task(user_export_service.run_user_export_job, engine, job_id=job.id)
+
+    now = datetime.now(timezone.utc)
+    created_at = job.created_at if job.created_at.tzinfo else job.created_at.replace(tzinfo=timezone.utc)
+    updated_at = job.updated_at if job.updated_at.tzinfo else job.updated_at.replace(tzinfo=timezone.utc)
+    sla_days = max(1, int(getattr(settings, "gdpr_export_sla_days", 30) or 30))
+    sla_due_at = created_at + timedelta(days=sla_days)
+    return AdminGdprExportJobItem(
+        id=job.id,
+        user=AdminGdprUserRef(id=user.id, email=user.email, username=user.username, role=user.role),
+        status=job.status,
+        progress=int(job.progress or 0),
+        created_at=created_at,
+        updated_at=updated_at,
+        started_at=None,
+        finished_at=None,
+        expires_at=None,
+        has_file=False,
+        sla_due_at=sla_due_at,
+        sla_breached=bool(now > sla_due_at),
+    )
+
+
+@router.get("/gdpr/exports/{job_id}/download")
+async def admin_gdpr_download_export_job(
+    job_id: UUID,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin),
+) -> FileResponse:
+    job = await session.get(UserDataExportJob, job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+    if job.status != UserDataExportStatus.succeeded or not job.file_path:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Export is not ready")
+
+    expires_at = job.expires_at
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at and expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+
+    path = private_storage.resolve_private_path(job.file_path)
+    if not path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export file not found")
+
+    user = await session.get(User, job.user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    session.add(
+        AdminAuditLog(
+            action="gdpr.export.download",
+            actor_user_id=current_user.id,
+            subject_user_id=user.id,
+            data={
+                "job_id": str(job.id),
+                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+                "ip_address": (request.client.host if request.client else None),
+            },
+        )
+    )
+    await session.commit()
+
+    stamp = (job.finished_at or job.created_at or datetime.now(timezone.utc)).date().isoformat()
+    filename = f"moment-studio-export-{stamp}.json"
+    return FileResponse(path, media_type="application/json", filename=filename, headers={"Cache-Control": "no-store"})
+
+
+@router.get("/gdpr/deletions", response_model=AdminGdprDeletionRequestsResponse)
+async def admin_gdpr_deletion_requests(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("users")),
+    q: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=25, ge=1, le=100),
+) -> AdminGdprDeletionRequestsResponse:
+    offset = (page - 1) * limit
+    stmt = select(User).where(User.deleted_at.is_(None), User.deletion_requested_at.is_not(None))
+
+    if q:
+        like = f"%{q.strip().lower()}%"
+        stmt = stmt.where(
+            func.lower(User.email).ilike(like)
+            | func.lower(User.username).ilike(like)
+            | func.lower(User.name).ilike(like)
+        )
+
+    total_items = int(await session.scalar(stmt.with_only_columns(func.count()).order_by(None)) or 0)
+    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
+
+    rows = (
+        (
+            await session.execute(
+                stmt.order_by(User.deletion_requested_at.desc()).limit(limit).offset(offset)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    now = datetime.now(timezone.utc)
+    sla_days = max(1, int(getattr(settings, "gdpr_deletion_sla_days", 30) or 30))
+    items: list[AdminGdprDeletionRequestItem] = []
+    for user in rows:
+        requested_at = user.deletion_requested_at
+        if requested_at and requested_at.tzinfo is None:
+            requested_at = requested_at.replace(tzinfo=timezone.utc)
+        scheduled_for = user.deletion_scheduled_for
+        if scheduled_for and scheduled_for.tzinfo is None:
+            scheduled_for = scheduled_for.replace(tzinfo=timezone.utc)
+
+        sla_due_at = (requested_at or now) + timedelta(days=sla_days)
+        status_label = "scheduled"
+        if scheduled_for and scheduled_for <= now:
+            status_label = "due"
+        elif scheduled_for:
+            status_label = "cooldown"
+
+        items.append(
+            AdminGdprDeletionRequestItem(
+                user=AdminGdprUserRef(id=user.id, email=user.email, username=user.username, role=user.role),
+                requested_at=requested_at or now,
+                scheduled_for=scheduled_for,
+                status=status_label,
+                sla_due_at=sla_due_at,
+                sla_breached=bool(now > sla_due_at),
+            )
+        )
+
+    return AdminGdprDeletionRequestsResponse(
+        items=items,
+        meta={
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "page": page,
+            "limit": limit,
+        },
+    )
+
+
+@router.post("/gdpr/deletions/{user_id}/execute", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_gdpr_execute_deletion(
+    user_id: UUID,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin),
+) -> None:
+    user = await session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user.role == UserRole.owner:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Owner account cannot be deleted")
+    if user.role in (
+        UserRole.admin,
+        UserRole.support,
+        UserRole.fulfillment,
+        UserRole.content,
+    ) and current_user.role != UserRole.owner:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the owner can delete staff accounts")
+
+    email_before = user.email
+    await self_service.execute_account_deletion(session, user)
+    session.add(
+        AdminAuditLog(
+            action="gdpr.deletion.execute",
+            actor_user_id=current_user.id,
+            subject_user_id=user.id,
+            data={
+                "email_before": email_before,
+                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+                "ip_address": (request.client.host if request.client else None),
+            },
+        )
+    )
+    await session.commit()
+    return None
+
+
+@router.post("/gdpr/deletions/{user_id}/cancel", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_gdpr_cancel_deletion(
+    user_id: UUID,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin),
+) -> None:
+    user = await session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user.role == UserRole.owner:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Owner account cannot be modified")
+    if user.role in (
+        UserRole.admin,
+        UserRole.support,
+        UserRole.fulfillment,
+        UserRole.content,
+    ) and current_user.role != UserRole.owner:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the owner can modify staff accounts")
+
+    if user.deletion_requested_at is not None or user.deletion_scheduled_for is not None:
+        user.deletion_requested_at = None
+        user.deletion_scheduled_for = None
+        session.add(user)
+        session.add(
+            AdminAuditLog(
+                action="gdpr.deletion.cancel",
+                actor_user_id=current_user.id,
+                subject_user_id=user.id,
+                data={
+                    "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+                    "ip_address": (request.client.host if request.client else None),
+                },
+            )
+        )
+        await session.commit()
     return None
 
 

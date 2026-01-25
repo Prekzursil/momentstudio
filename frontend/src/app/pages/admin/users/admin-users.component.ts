@@ -29,9 +29,12 @@ type RoleFilter = 'all' | 'customer' | 'support' | 'fulfillment' | 'content' | '
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
-      <div class="grid gap-1">
-        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.users.title' | translate }}</h1>
-        <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.users.hint' | translate }}</p>
+      <div class="flex items-start justify-between gap-3">
+        <div class="grid gap-1">
+          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.users.title' | translate }}</h1>
+          <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.users.hint' | translate }}</p>
+        </div>
+        <app-button size="sm" variant="ghost" routerLink="/admin/users/gdpr" [label]="'adminUi.users.gdprQueue' | translate"></app-button>
       </div>
 
       <div class="grid gap-6 lg:grid-cols-[1.25fr_0.75fr] items-start">

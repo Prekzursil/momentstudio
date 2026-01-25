@@ -2720,6 +2720,7 @@
     "users": {
       "title": "Users",
       "hint": "Search by email, username, or display name.",
+      "gdprQueue": "GDPR queue",
       "setRole": "Set role",
       "forceLogout": "Force logout selected",
       "search": "Search",
@@ -2827,6 +2828,62 @@
         "sessionRevoke": "Could not revoke session.",
         "revoke": "Failed to revoke sessions",
         "role": "Failed to update role"
+      }
+    },
+    "gdpr": {
+      "title": "GDPR",
+      "hint": "Monitor data export and account deletion requests and ensure they complete within SLA.",
+      "search": "Search",
+      "exportStatus": "Export status",
+      "statusAll": "All",
+      "slaBreached": "SLA breached",
+      "download": "Download",
+      "retry": "Retry",
+      "executeNow": "Execute now",
+      "cancelRequest": "Cancel request",
+      "pagination": "Page {{page}} of {{total_pages}} · {{total_items}} total",
+      "exportsTitle": "Data exports",
+      "exportsEmpty": "No export jobs found.",
+      "deletionsTitle": "Deletion requests",
+      "deletionsEmpty": "No deletion requests found.",
+      "table": {
+        "user": "User",
+        "status": "Status",
+        "requested": "Requested",
+        "scheduledFor": "Scheduled for",
+        "slaDue": "SLA due",
+        "expires": "Expires",
+        "actions": "Actions"
+      },
+      "status": {
+        "pending": "Pending",
+        "running": "Running",
+        "succeeded": "Succeeded",
+        "failed": "Failed"
+      },
+      "deletionStatus": {
+        "cooldown": "Cooldown",
+        "due": "Due",
+        "scheduled": "Scheduled"
+      },
+      "confirms": {
+        "retryExport": "Retry this export job? This will regenerate the export file.",
+        "executeDeletion": "Execute deletion now? This action is irreversible.",
+        "cancelDeletion": "Cancel this deletion request?"
+      },
+      "success": {
+        "retryExport": "Export job restarted",
+        "download": "Export downloaded",
+        "executeDeletion": "Deletion executed",
+        "cancelDeletion": "Deletion canceled"
+      },
+      "errors": {
+        "loadExports": "Could not load export jobs.",
+        "loadDeletions": "Could not load deletion requests.",
+        "retryExport": "Could not retry export job.",
+        "download": "Could not download export.",
+        "executeDeletion": "Could not execute deletion.",
+        "cancelDeletion": "Could not cancel deletion."
       }
     },
     "content": {

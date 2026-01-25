@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     webauthn_rp_name: str | None = None
     webauthn_allowed_origins: list[str] = []
     account_deletion_cooldown_hours: int = 24
+    gdpr_export_sla_days: int = 30
+    gdpr_deletion_sla_days: int = 30
     secure_cookies: bool = False
     cookie_samesite: str = "lax"
     maintenance_mode: bool = False

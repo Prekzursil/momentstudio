@@ -2720,6 +2720,7 @@
     "users": {
       "title": "Utilizatori",
       "hint": "Caută după email, utilizator sau nume afișat.",
+      "gdprQueue": "Coada GDPR",
       "setRole": "Setează rol",
       "forceLogout": "Deconectează selectatul",
       "search": "Caută",
@@ -2827,6 +2828,62 @@
         "sessionRevoke": "Nu am putut revoca sesiunea.",
         "revoke": "Nu am putut revoca sesiunile",
         "role": "Nu am putut actualiza rolul"
+      }
+    },
+    "gdpr": {
+      "title": "GDPR",
+      "hint": "Monitorizează cererile de export date și ștergere cont și asigură-te că se finalizează în termenul SLA.",
+      "search": "Caută",
+      "exportStatus": "Status export",
+      "statusAll": "Toate",
+      "slaBreached": "SLA depășit",
+      "download": "Descarcă",
+      "retry": "Reîncearcă",
+      "executeNow": "Execută acum",
+      "cancelRequest": "Anulează cererea",
+      "pagination": "Pagina {{page}} din {{total_pages}} · {{total_items}} total",
+      "exportsTitle": "Exporturi de date",
+      "exportsEmpty": "Nu există exporturi.",
+      "deletionsTitle": "Cereri de ștergere",
+      "deletionsEmpty": "Nu există cereri de ștergere.",
+      "table": {
+        "user": "Utilizator",
+        "status": "Status",
+        "requested": "Cerut",
+        "scheduledFor": "Programat pentru",
+        "slaDue": "SLA până la",
+        "expires": "Expiră",
+        "actions": "Acțiuni"
+      },
+      "status": {
+        "pending": "În așteptare",
+        "running": "În derulare",
+        "succeeded": "Finalizat",
+        "failed": "Eșuat"
+      },
+      "deletionStatus": {
+        "cooldown": "Așteptare",
+        "due": "Scadent",
+        "scheduled": "Programat"
+      },
+      "confirms": {
+        "retryExport": "Reîncerci acest export? Fișierul va fi regenerat.",
+        "executeDeletion": "Execuți ștergerea acum? Această acțiune este ireversibilă.",
+        "cancelDeletion": "Anulezi această cerere de ștergere?"
+      },
+      "success": {
+        "retryExport": "Export repornit",
+        "download": "Export descărcat",
+        "executeDeletion": "Ștergere executată",
+        "cancelDeletion": "Ștergere anulată"
+      },
+      "errors": {
+        "loadExports": "Nu am putut încărca exporturile.",
+        "loadDeletions": "Nu am putut încărca cererile de ștergere.",
+        "retryExport": "Nu am putut reporni exportul.",
+        "download": "Nu am putut descărca exportul.",
+        "executeDeletion": "Nu am putut executa ștergerea.",
+        "cancelDeletion": "Nu am putut anula ștergerea."
       }
     },
     "content": {

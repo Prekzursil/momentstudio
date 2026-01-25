@@ -742,7 +742,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Users: email verification controls – Resend verification, view history, and owner-only overrides.
 - [x] Admin Users: granular roles – Add roles like support/fulfillment/content with per-section permissions.
 - [x] Admin Users: session overview – Show active sessions with geo/IP and revoke per session.
-- [ ] Admin Users: GDPR tooling – Export/delete request queue with statuses, SLAs, and audit.
+- [x] Admin Users: GDPR tooling – Export/delete request queue with statuses, SLAs, and audit.
 - [ ] Admin Users: segmentation – Build customer segments (repeat buyers, high AOV) for analytics/campaigns.
 - [ ] Admin Users: targeted coupon grant – Issue a one-off coupon to a customer and email them via template.
 - [ ] Admin Coupons: advanced rules UI – Minimum subtotal, category include/exclude, first-order only, etc.

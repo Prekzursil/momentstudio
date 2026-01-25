@@ -95,6 +95,47 @@ export interface AdminEmailVerificationHistoryResponse {
   tokens: AdminEmailVerificationTokenInfo[];
 }
 
+export interface AdminGdprUserRef {
+  id: string;
+  email: string;
+  username: string;
+  role: string;
+}
+
+export interface AdminGdprExportJobItem {
+  id: string;
+  user: AdminGdprUserRef;
+  status: 'pending' | 'running' | 'succeeded' | 'failed';
+  progress: number;
+  created_at: string;
+  updated_at: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  expires_at?: string | null;
+  has_file: boolean;
+  sla_due_at: string;
+  sla_breached: boolean;
+}
+
+export interface AdminGdprExportJobsResponse {
+  items: AdminGdprExportJobItem[];
+  meta: AdminPaginationMeta;
+}
+
+export interface AdminGdprDeletionRequestItem {
+  user: AdminGdprUserRef;
+  requested_at: string;
+  scheduled_for?: string | null;
+  status: string;
+  sla_due_at: string;
+  sla_breached: boolean;
+}
+
+export interface AdminGdprDeletionRequestsResponse {
+  items: AdminGdprDeletionRequestItem[];
+  meta: AdminPaginationMeta;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdminUsersService {
   constructor(private api: ApiService) {}
@@ -137,5 +178,34 @@ export class AdminUsersService {
 
   overrideEmailVerification(userId: string): Observable<AdminUserProfileUser> {
     return this.api.post<AdminUserProfileUser>(`/admin/dashboard/users/${userId}/email/verification/override`, {});
+  }
+
+  listGdprExportJobs(params: {
+    q?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+  }): Observable<AdminGdprExportJobsResponse> {
+    return this.api.get<AdminGdprExportJobsResponse>('/admin/dashboard/gdpr/exports', params as any);
+  }
+
+  retryGdprExportJob(jobId: string): Observable<AdminGdprExportJobItem> {
+    return this.api.post<AdminGdprExportJobItem>(`/admin/dashboard/gdpr/exports/${jobId}/retry`, {});
+  }
+
+  downloadGdprExportJob(jobId: string): Observable<Blob> {
+    return this.api.getBlob(`/admin/dashboard/gdpr/exports/${jobId}/download`);
+  }
+
+  listGdprDeletionRequests(params: { q?: string; page?: number; limit?: number }): Observable<AdminGdprDeletionRequestsResponse> {
+    return this.api.get<AdminGdprDeletionRequestsResponse>('/admin/dashboard/gdpr/deletions', params as any);
+  }
+
+  executeGdprDeletion(userId: string): Observable<void> {
+    return this.api.post<void>(`/admin/dashboard/gdpr/deletions/${userId}/execute`, {});
+  }
+
+  cancelGdprDeletion(userId: string): Observable<void> {
+    return this.api.post<void>(`/admin/dashboard/gdpr/deletions/${userId}/cancel`, {});
   }
 }
