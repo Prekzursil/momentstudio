@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import re
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
@@ -18,13 +19,14 @@ from app.models.coupons_v2 import (
     CouponBulkJob,
     CouponBulkJobAction,
     CouponBulkJobStatus,
+    CouponVisibility,
     Promotion,
     PromotionScope,
     PromotionScopeEntityType,
     PromotionScopeMode,
 )
 from app.models.order import ShippingMethod
-from app.models.user import User
+from app.models.user import AdminAuditLog, User
 from app.schemas.coupons_v2 import (
     CouponAssignRequest,
     CouponAssignmentRead,
@@ -36,6 +38,7 @@ from app.schemas.coupons_v2 import (
     CouponBulkSegmentAssignRequest,
     CouponBulkSegmentPreview,
     CouponBulkSegmentRevokeRequest,
+    CouponIssueToUserRequest,
     CouponUpdate,
     CouponEligibilityResponse,
     CouponOffer,
@@ -206,6 +209,11 @@ def _to_offer(result: coupons_service.CouponEligibility) -> CouponOffer:
         global_remaining=result.global_remaining,
         customer_remaining=result.customer_remaining,
     )
+
+
+def _sanitize_coupon_prefix(value: str) -> str:
+    cleaned = re.sub(r"[^A-Z0-9]+", "", (value or "").upper()).strip("-")
+    return cleaned[:20]
 
 
 @router.get("/eligibility", response_model=CouponEligibilityResponse)
@@ -556,6 +564,93 @@ async def admin_create_coupon(
     session.add(coupon)
     await session.commit()
     await session.refresh(coupon)
+    await session.refresh(coupon, attribute_names=["promotion"])
+    if coupon.promotion:
+        await session.refresh(coupon.promotion, attribute_names=["scopes"])
+    coupon_read = CouponRead.model_validate(coupon, from_attributes=True)
+    coupon_read.promotion = _to_promotion_read(coupon.promotion) if coupon.promotion else None
+    return coupon_read
+
+
+@router.post("/admin/coupons/issue", response_model=CouponRead, status_code=status.HTTP_201_CREATED)
+async def admin_issue_coupon_to_user(
+    payload: CouponIssueToUserRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    actor: User = Depends(require_admin_section("coupons")),
+) -> CouponRead:
+    user = await session.get(User, payload.user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    promotion = (
+        (await session.execute(select(Promotion).options(selectinload(Promotion.scopes)).where(Promotion.id == payload.promotion_id)))
+        .scalars()
+        .first()
+    )
+    if not promotion:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found")
+
+    prefix_source = payload.prefix or promotion.key or promotion.name or "COUPON"
+    prefix = _sanitize_coupon_prefix(prefix_source) or "COUPON"
+
+    code = ""
+    for _ in range(10):
+        candidate = coupons_service.generate_coupon_code(prefix=prefix, length=12)
+        exists = (await session.execute(select(func.count()).select_from(Coupon).where(Coupon.code == candidate))).scalar_one()
+        if int(exists) == 0:
+            code = candidate
+            break
+    if not code:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate coupon code")
+
+    starts_at = datetime.now(timezone.utc)
+    ends_at = payload.ends_at
+    if ends_at and getattr(ends_at, "tzinfo", None) is None:
+        ends_at = ends_at.replace(tzinfo=timezone.utc)
+    if ends_at is None and payload.validity_days is not None:
+        ends_at = starts_at + timedelta(days=int(payload.validity_days))
+    if ends_at and ends_at < starts_at:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Coupon ends_at must be in the future")
+
+    coupon = Coupon(
+        promotion_id=promotion.id,
+        code=code,
+        visibility=CouponVisibility.assigned,
+        is_active=True,
+        starts_at=starts_at,
+        ends_at=ends_at,
+        global_max_redemptions=None,
+        per_customer_max_redemptions=int(payload.per_customer_max_redemptions or 1),
+    )
+    session.add(coupon)
+    await session.flush()
+    session.add(CouponAssignment(coupon_id=coupon.id, user_id=user.id))
+    session.add(
+        AdminAuditLog(
+            action="coupon_issued",
+            actor_user_id=getattr(actor, "id", None),
+            subject_user_id=user.id,
+            data={
+                "promotion_id": str(promotion.id),
+                "coupon_id": str(coupon.id),
+                "code": coupon.code,
+            },
+        )
+    )
+    await session.commit()
+
+    if payload.send_email and user.email:
+        background_tasks.add_task(
+            email_service.send_coupon_assigned,
+            user.email,
+            coupon_code=coupon.code,
+            promotion_name=promotion.name,
+            promotion_description=promotion.description,
+            ends_at=ends_at,
+            lang=user.preferred_language,
+        )
+
     await session.refresh(coupon, attribute_names=["promotion"])
     if coupon.promotion:
         await session.refresh(coupon.promotion, attribute_names=["scopes"])

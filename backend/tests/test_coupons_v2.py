@@ -847,6 +847,69 @@ def test_admin_bulk_assign_and_revoke_coupon() -> None:
         app.dependency_overrides.clear()
 
 
+def test_admin_issue_coupon_to_user() -> None:
+    client, SessionLocal = make_test_client()
+    try:
+        admin_token, admin_id = create_user_token(SessionLocal, email="admin-issue@example.com", username="admin_issue")
+        promote_user(SessionLocal, user_id=admin_id, role=UserRole.admin)
+
+        _, user_id = create_user_token(SessionLocal, email="target-user@example.com", username="target_user")
+
+        base_code = create_promotion_and_coupon(
+            SessionLocal,
+            name="VIP promo",
+            discount_type=PromotionDiscountType.percent,
+            percentage_off=Decimal("10"),
+            code="VIPBASE",
+        )
+
+        async def _get_promotion_id() -> str:
+            async with SessionLocal() as session:
+                coupon = (await session.execute(select(Coupon).where(Coupon.code == base_code.strip().upper()))).scalars().first()
+                assert coupon is not None
+                return str(coupon.promotion_id)
+
+        promotion_id = asyncio.run(_get_promotion_id())
+
+        res = client.post(
+            "/api/v1/coupons/admin/coupons/issue",
+            json={
+                "user_id": str(user_id),
+                "promotion_id": promotion_id,
+                "prefix": "VIP",
+                "validity_days": 30,
+                "send_email": False,
+            },
+            headers=auth_headers(admin_token),
+        )
+        assert res.status_code == 201, res.text
+        payload = res.json()
+        assert payload["promotion_id"] == promotion_id
+        assert payload["visibility"] == "assigned"
+        assert payload["code"].startswith("VIP-")
+
+        async def _assert_assignment() -> None:
+            async with SessionLocal() as session:
+                assignment = (
+                    (
+                        await session.execute(
+                            select(CouponAssignment).where(
+                                CouponAssignment.coupon_id == UUID(payload["id"]),
+                                CouponAssignment.user_id == user_id,
+                            )
+                        )
+                    )
+                    .scalars()
+                    .first()
+                )
+                assert assignment is not None
+                assert assignment.revoked_at is None
+
+        asyncio.run(_assert_assignment())
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_admin_segment_bulk_job_assign_and_revoke() -> None:
     client, SessionLocal = make_test_client()
     try:

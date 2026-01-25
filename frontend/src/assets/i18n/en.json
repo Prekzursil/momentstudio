@@ -2778,6 +2778,16 @@
       "sessionExpires": "Expires",
       "revokeSession": "Revoke",
       "unknownDevice": "Unknown device",
+      "couponGrantTitle": "Grant coupon",
+      "couponPromotionsLoading": "Loading promotions…",
+      "couponPromotionsEmpty": "No promotions available.",
+      "couponPromotion": "Promotion",
+      "couponPrefix": "Code prefix (optional)",
+      "couponValidityDays": "Validity (days)",
+      "couponSendEmail": "Email customer",
+      "issueCoupon": "Issue coupon",
+      "copyCouponCode": "Copy code",
+      "couponIssuedCode": "Issued code",
       "emailVerificationTitle": "Email verification",
       "resendVerification": "Resend verification",
       "loadVerificationHistory": "Load history",
@@ -2813,7 +2823,9 @@
         "impersonate": "Opened in a new tab",
         "security": "Security updated",
         "verificationResent": "Verification email sent",
-        "verificationOverridden": "Marked verified"
+        "verificationOverridden": "Marked verified",
+        "couponIssued": "Coupon issued",
+        "couponCopied": "Copied"
       },
       "errors": {
         "load": "Could not load users.",
@@ -2828,7 +2840,9 @@
         "sessionsLoad": "Could not load sessions.",
         "sessionRevoke": "Could not revoke session.",
         "revoke": "Failed to revoke sessions",
-        "role": "Failed to update role"
+        "role": "Failed to update role",
+        "couponPromotions": "Could not load promotions.",
+        "couponIssued": "Could not issue coupon."
       }
     },
     "gdpr": {

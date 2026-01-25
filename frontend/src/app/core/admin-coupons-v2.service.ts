@@ -55,6 +55,16 @@ export interface CouponAssignPayload {
   send_email?: boolean;
 }
 
+export interface CouponIssueToUserPayload {
+  user_id: string;
+  promotion_id: string;
+  prefix?: string | null;
+  validity_days?: number | null;
+  ends_at?: string | null;
+  per_customer_max_redemptions?: number;
+  send_email?: boolean;
+}
+
 export interface CouponRevokePayload extends CouponAssignPayload {
   reason?: string | null;
 }
@@ -132,6 +142,10 @@ export class AdminCouponsV2Service {
 
   createCoupon(payload: CouponCreatePayload): Observable<CouponRead> {
     return this.api.post<CouponRead>('/coupons/admin/coupons', payload);
+  }
+
+  issueCouponToUser(payload: CouponIssueToUserPayload): Observable<CouponRead> {
+    return this.api.post<CouponRead>('/coupons/admin/coupons/issue', payload);
   }
 
   updateCoupon(couponId: string, payload: CouponUpdatePayload): Observable<CouponRead> {

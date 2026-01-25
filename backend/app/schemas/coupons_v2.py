@@ -101,6 +101,16 @@ class CouponCreate(BaseModel):
     per_customer_max_redemptions: int | None = Field(default=None, ge=1)
 
 
+class CouponIssueToUserRequest(BaseModel):
+    user_id: UUID
+    promotion_id: UUID
+    prefix: str | None = Field(default=None, max_length=20)
+    validity_days: int | None = Field(default=None, ge=1, le=3650)
+    ends_at: datetime | None = None
+    per_customer_max_redemptions: int = Field(default=1, ge=1)
+    send_email: bool = True
+
+
 class CouponUpdate(BaseModel):
     is_active: bool | None = None
     starts_at: datetime | None = None

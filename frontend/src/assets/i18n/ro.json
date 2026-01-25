@@ -2778,6 +2778,16 @@
       "sessionExpires": "Expiră",
       "revokeSession": "Revocă",
       "unknownDevice": "Dispozitiv necunoscut",
+      "couponGrantTitle": "Acordă cupon",
+      "couponPromotionsLoading": "Se încarcă promoțiile…",
+      "couponPromotionsEmpty": "Nu există promoții.",
+      "couponPromotion": "Promoție",
+      "couponPrefix": "Prefix cod (opțional)",
+      "couponValidityDays": "Valabilitate (zile)",
+      "couponSendEmail": "Trimite email clientului",
+      "issueCoupon": "Emite cupon",
+      "copyCouponCode": "Copiază codul",
+      "couponIssuedCode": "Cod emis",
       "emailVerificationTitle": "Verificare email",
       "resendVerification": "Retrimite verificarea",
       "loadVerificationHistory": "Încarcă istoricul",
@@ -2813,7 +2823,9 @@
         "impersonate": "Deschis într-o filă nouă",
         "security": "Securitatea a fost actualizată",
         "verificationResent": "Email de verificare trimis",
-        "verificationOverridden": "Marcat ca verificat"
+        "verificationOverridden": "Marcat ca verificat",
+        "couponIssued": "Cupon emis",
+        "couponCopied": "Cod copiat"
       },
       "errors": {
         "load": "Nu am putut încărca utilizatorii.",
@@ -2828,7 +2840,9 @@
         "sessionsLoad": "Nu am putut încărca sesiunile.",
         "sessionRevoke": "Nu am putut revoca sesiunea.",
         "revoke": "Nu am putut revoca sesiunile",
-        "role": "Nu am putut actualiza rolul"
+        "role": "Nu am putut actualiza rolul",
+        "couponPromotions": "Nu am putut încărca promoțiile.",
+        "couponIssued": "Nu am putut emite cuponul."
       }
     },
     "gdpr": {

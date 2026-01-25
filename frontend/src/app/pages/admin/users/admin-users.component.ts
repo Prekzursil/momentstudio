@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AdminUserAliasesResponse, AdminUserSession, AdminService } from '../../../core/admin.service';
+import { AdminCouponsV2Service } from '../../../core/admin-coupons-v2.service';
 import {
   AdminEmailVerificationHistoryResponse,
   AdminUserListItem,
@@ -12,6 +13,7 @@ import {
   AdminUsersService
 } from '../../../core/admin-users.service';
 import { AuthService } from '../../../core/auth.service';
+import type { PromotionRead } from '../../../core/coupons.service';
 import { ToastService } from '../../../core/toast.service';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
@@ -357,6 +359,88 @@ type RoleFilter = 'all' | 'customer' | 'support' | 'fulfillment' | 'content' | '
               </div>
             </div>
 
+            <div *ngIf="canIssueCoupons()" class="rounded-xl border border-slate-200 p-3 grid gap-3 dark:border-slate-800">
+              <div class="flex items-center justify-between gap-3">
+                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.users.couponGrantTitle' | translate }}
+                </div>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.actions.refresh' | translate"
+                  [disabled]="couponPromotionsLoading()"
+                  (action)="ensureCouponPromotions(true)"
+                ></app-button>
+              </div>
+
+              <div *ngIf="couponPromotionsLoading()" class="text-sm text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.users.couponPromotionsLoading' | translate }}
+              </div>
+              <div *ngIf="couponPromotionsError()" class="text-sm text-rose-700 dark:text-rose-200">
+                {{ couponPromotionsError() }}
+              </div>
+
+              <div *ngIf="couponPromotions() && couponPromotions()!.length === 0 && !couponPromotionsLoading()" class="text-sm text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.users.couponPromotionsEmpty' | translate }}
+              </div>
+
+              <ng-container *ngIf="couponPromotions() && couponPromotions()!.length > 0">
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.users.couponPromotion' | translate }}
+                  <select
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="couponPromotionId"
+                  >
+                    <option *ngFor="let p of couponPromotions()!" [value]="p.id">{{ p.name }}</option>
+                  </select>
+                </label>
+
+                <div class="grid gap-3 lg:grid-cols-2">
+                  <app-input [label]="'adminUi.users.couponPrefix' | translate" [(value)]="couponPrefix"></app-input>
+                  <app-input
+                    [label]="'adminUi.users.couponValidityDays' | translate"
+                    type="number"
+                    [min]="1"
+                    [(value)]="couponValidityDays"
+                  ></app-input>
+                </div>
+
+                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                  <input type="checkbox" class="h-5 w-5 accent-indigo-600" [(ngModel)]="couponSendEmail" />
+                  {{ 'adminUi.users.couponSendEmail' | translate }}
+                </label>
+
+                <div class="flex flex-wrap items-center gap-2">
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.users.issueCoupon' | translate"
+                    [disabled]="couponIssueBusy() || !couponPromotionId"
+                    (action)="issueCoupon()"
+                  ></app-button>
+                  <app-button
+                    *ngIf="couponIssuedCode()"
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.users.copyCouponCode' | translate"
+                    (action)="copyIssuedCoupon()"
+                  ></app-button>
+                </div>
+
+                <div *ngIf="couponIssueError()" class="text-sm text-rose-700 dark:text-rose-200">
+                  {{ couponIssueError() }}
+                </div>
+
+                <div
+                  *ngIf="couponIssuedCode()"
+                  class="rounded-lg border border-slate-200 bg-white p-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+                >
+                  {{ 'adminUi.users.couponIssuedCode' | translate }}:
+                  <span class="font-semibold">{{ couponIssuedCode() }}</span>
+                </div>
+              </ng-container>
+            </div>
+
             <div class="rounded-xl border border-slate-200 p-3 grid gap-3 dark:border-slate-800">
               <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
                 {{ 'adminUi.users.emailVerificationTitle' | translate }}
@@ -622,11 +706,23 @@ export class AdminUsersComponent implements OnInit {
   sessionsError = signal<string | null>(null);
   revokingSessionId = signal<string | null>(null);
 
+  couponPromotions = signal<PromotionRead[] | null>(null);
+  couponPromotionsLoading = signal(false);
+  couponPromotionsError = signal<string | null>(null);
+  couponPromotionId = '';
+  couponPrefix = '';
+  couponValidityDays: string | number = 30;
+  couponSendEmail = true;
+  couponIssueBusy = signal(false);
+  couponIssueError = signal<string | null>(null);
+  couponIssuedCode = signal<string | null>(null);
+
   private pendingPrefillSearch: string | null = null;
   private autoSelectAfterLoad = false;
 
   constructor(
     private usersApi: AdminUsersService,
+    private couponsApi: AdminCouponsV2Service,
     private admin: AdminService,
     private auth: AuthService,
     private toast: ToastService,
@@ -673,9 +769,12 @@ export class AdminUsersComponent implements OnInit {
     this.emailHistoryError.set(null);
     this.sessions.set(null);
     this.sessionsError.set(null);
+    this.couponIssueError.set(null);
+    this.couponIssuedCode.set(null);
     this.loadAliases(user.id);
     this.loadProfile(user.id);
     this.loadSessions(user.id);
+    this.ensureCouponPromotions();
   }
 
   updateRole(): void {
@@ -767,6 +866,75 @@ export class AdminUsersComponent implements OnInit {
 
   canManageRoles(): boolean {
     return this.auth.isAdmin();
+  }
+
+  canIssueCoupons(): boolean {
+    return this.auth.canAccessAdminSection('coupons');
+  }
+
+  ensureCouponPromotions(force = false): void {
+    if (!this.canIssueCoupons()) return;
+    if (!force && this.couponPromotions() !== null) return;
+    this.couponPromotionsLoading.set(true);
+    this.couponPromotionsError.set(null);
+    this.couponsApi.listPromotions().subscribe({
+      next: (promos) => {
+        const list = promos || [];
+        this.couponPromotions.set(list);
+        if (!this.couponPromotionId && list.length > 0) {
+          this.couponPromotionId = list[0].id;
+        }
+        this.couponPromotionsLoading.set(false);
+      },
+      error: () => {
+        this.couponPromotionsError.set(this.t('adminUi.users.errors.couponPromotions'));
+        this.couponPromotions.set([]);
+        this.couponPromotionsLoading.set(false);
+      }
+    });
+  }
+
+  issueCoupon(): void {
+    const user = this.selectedUser();
+    if (!user) return;
+    if (!this.canIssueCoupons()) return;
+    const promotionId = (this.couponPromotionId || '').trim();
+    if (!promotionId) return;
+
+    const prefix = this.couponPrefix.trim() ? this.couponPrefix.trim() : null;
+    const rawDays = typeof this.couponValidityDays === 'string' ? Number(this.couponValidityDays) : this.couponValidityDays;
+    const validityDays = Number.isFinite(rawDays) && Number(rawDays) > 0 ? Math.floor(Number(rawDays)) : null;
+
+    this.couponIssueBusy.set(true);
+    this.couponIssueError.set(null);
+    this.couponIssuedCode.set(null);
+    this.couponsApi
+      .issueCouponToUser({
+        user_id: user.id,
+        promotion_id: promotionId,
+        prefix,
+        validity_days: validityDays,
+        send_email: this.couponSendEmail
+      })
+      .subscribe({
+        next: (coupon) => {
+          this.couponIssuedCode.set(coupon.code);
+          this.toast.success(this.t('adminUi.users.success.couponIssued'));
+          this.couponIssueBusy.set(false);
+        },
+        error: () => {
+          this.couponIssueError.set(this.t('adminUi.users.errors.couponIssued'));
+          this.toast.error(this.t('adminUi.users.errors.couponIssued'));
+          this.couponIssueBusy.set(false);
+        }
+      });
+  }
+
+  copyIssuedCoupon(): void {
+    const code = this.couponIssuedCode();
+    if (!code) return;
+    void navigator.clipboard?.writeText(code);
+    this.toast.success(this.t('adminUi.users.success.couponCopied'));
   }
 
   lockForMinutes(minutes: number): void {
