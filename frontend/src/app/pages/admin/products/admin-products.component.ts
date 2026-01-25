@@ -17,6 +17,7 @@ import { CatalogService, Category } from '../../../core/catalog.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import {
   AdminDeletedProductImage,
+  AdminProductAuditEntry,
   AdminProductImageOptimizationStats,
   AdminProductImageTranslation,
   AdminProductVariant,
@@ -1092,15 +1093,86 @@ type VariantRow = {
                     (action)="saveRelationships()"
                     [disabled]="relationshipsSaving() || !editingSlug()"
                   ></app-button>
-                </div>
-              </div>
-		        </div>
+	                </div>
+	              </div>
+			        </div>
 
-		        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
-		          <div class="grid gap-1">
-		            <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
-		              {{ 'adminUi.products.form.stockLedgerTitle' | translate }}
-	            </h3>
+			        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
+			          <div class="flex flex-wrap items-start justify-between gap-3">
+			            <div class="grid gap-1">
+			              <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
+			                {{ 'adminUi.products.audit.title' | translate }}
+			              </h3>
+			              <p class="text-xs text-slate-500 dark:text-slate-400">
+			                {{ 'adminUi.products.audit.hint' | translate }}
+			              </p>
+			            </div>
+			            <app-button
+			              size="sm"
+			              variant="ghost"
+			              [label]="'adminUi.actions.refresh' | translate"
+			              (action)="refreshAudit()"
+			              [disabled]="auditBusy() || !editingSlug()"
+			            ></app-button>
+			          </div>
+
+			          <div
+			            *ngIf="auditError()"
+			            class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+			          >
+			            {{ auditError() }}
+			          </div>
+
+			          <div *ngIf="auditBusy()" class="text-sm text-slate-600 dark:text-slate-300">
+			            {{ 'adminUi.actions.loading' | translate }}
+			          </div>
+
+			          <div *ngIf="!auditBusy() && auditEntries().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+			            {{ 'adminUi.products.audit.empty' | translate }}
+			          </div>
+
+			          <div *ngIf="auditEntries().length > 0" class="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+			            <table class="w-full text-sm">
+			              <thead class="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950/20 dark:text-slate-400">
+			                <tr>
+			                  <th class="px-3 py-2">{{ 'adminUi.products.audit.when' | translate }}</th>
+			                  <th class="px-3 py-2">{{ 'adminUi.products.audit.action' | translate }}</th>
+			                  <th class="px-3 py-2">{{ 'adminUi.products.audit.user' | translate }}</th>
+			                  <th class="px-3 py-2">{{ 'adminUi.products.audit.details' | translate }}</th>
+			                </tr>
+			              </thead>
+			              <tbody>
+			                <tr *ngFor="let entry of auditEntries()" class="border-t border-slate-200 dark:border-slate-800">
+			                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ entry.created_at | date: 'short' }}</td>
+			                  <td class="px-3 py-2 font-semibold text-slate-900 dark:text-slate-50">{{ entry.action }}</td>
+			                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+			                    {{ entry.user_email || entry.user_id || '—' }}
+			                  </td>
+			                  <td class="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">
+			                    <div *ngIf="entry.payload?.changes as changes; else auditFallback" class="grid gap-1">
+			                      <div *ngFor="let item of changes | keyvalue" class="grid gap-1 sm:grid-cols-[160px_1fr] sm:gap-3">
+			                        <span class="font-semibold text-slate-700 dark:text-slate-200">{{ item.key }}</span>
+			                        <span class="truncate">
+			                          {{ formatAuditValue(item.value?.before) }} → {{ formatAuditValue(item.value?.after) }}
+			                        </span>
+			                      </div>
+			                    </div>
+			                    <ng-template #auditFallback>
+			                      <span *ngIf="entry.payload as payload; else auditEmpty">{{ formatAuditValue(payload) }}</span>
+			                      <ng-template #auditEmpty>—</ng-template>
+			                    </ng-template>
+			                  </td>
+			                </tr>
+			              </tbody>
+			            </table>
+			          </div>
+			        </div>
+
+			        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
+			          <div class="grid gap-1">
+			            <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
+			              {{ 'adminUi.products.form.stockLedgerTitle' | translate }}
+		            </h3>
 	            <p class="text-xs text-slate-500 dark:text-slate-400">
 	              {{ 'adminUi.products.form.stockLedgerHint' | translate }}
 	            </p>
@@ -1683,6 +1755,9 @@ export class AdminProductsComponent implements OnInit {
   };
 
   editingProductId = signal<string | null>(null);
+  auditEntries = signal<AdminProductAuditEntry[]>([]);
+  auditBusy = signal(false);
+  auditError = signal<string | null>(null);
 
   variants = signal<VariantRow[]>([]);
   variantsBusy = signal(false);
@@ -2252,6 +2327,7 @@ export class AdminProductsComponent implements OnInit {
 		    this.editorMessage.set(null);
 		    this.resetDuplicateCheck();
 		    this.resetRelationships();
+		    this.resetAudit();
 		    this.images.set([]);
 	    this.resetDeletedImages();
 		    this.resetImageMeta();
@@ -2273,6 +2349,7 @@ export class AdminProductsComponent implements OnInit {
 		    this.editorMessage.set(null);
 		    this.resetDuplicateCheck();
 		    this.resetRelationships();
+		    this.resetAudit();
 		    this.images.set([]);
 	    this.resetDeletedImages();
 		    this.resetImageMeta();
@@ -2291,6 +2368,7 @@ export class AdminProductsComponent implements OnInit {
 		    this.editingProductId.set(null);
 		    this.resetDuplicateCheck();
 		    this.resetRelationships();
+		    this.resetAudit();
 		    this.basePriceError = '';
 		    this.saleValueError = '';
 		    this.resetTranslations();
@@ -2338,11 +2416,12 @@ export class AdminProductsComponent implements OnInit {
         this.images.set(Array.isArray(prod.images) ? prod.images : []);
         this.setVariantsFromProduct(prod);
 	        const productId = this.editingProductId();
-	        if (productId) this.loadStockAdjustments(productId);
-	        this.loadTranslations((prod.slug || slug).toString());
-	        this.loadRelationships((prod.slug || slug).toString());
-	        this.scheduleDuplicateCheck();
-	      },
+		        if (productId) this.loadStockAdjustments(productId);
+		        this.loadTranslations((prod.slug || slug).toString());
+		        this.loadRelationships((prod.slug || slug).toString());
+		        this.loadAudit((prod.slug || slug).toString());
+		        this.scheduleDuplicateCheck();
+		      },
 	      error: () => this.editorError.set(this.t('adminUi.products.errors.load'))
 		    });
 		  }
@@ -2363,6 +2442,12 @@ export class AdminProductsComponent implements OnInit {
 	        this.toast.error(this.t('adminUi.products.trash.errors.restore'));
 	      }
 	    });
+	  }
+
+	  refreshAudit(): void {
+	    const slug = this.editingSlug();
+	    if (!slug) return;
+	    this.loadAudit(slug);
 	  }
 
 	  onNameChange(next: string | number): void {
@@ -3247,6 +3332,18 @@ export class AdminProductsComponent implements OnInit {
     return `${rounded} ${units[idx]}`;
   }
 
+  formatAuditValue(value: unknown): string {
+    if (value === null || value === undefined) return '—';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return String(value);
+    if (value instanceof Date) return value.toISOString();
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '—';
+    }
+  }
+
   private load(): void {
     this.loading.set(true);
     this.error.set(null);
@@ -3401,6 +3498,12 @@ export class AdminProductsComponent implements OnInit {
     this.translations = { en: this.blankTranslationForm(), ro: this.blankTranslationForm() };
   }
 
+  private resetAudit(): void {
+    this.auditEntries.set([]);
+    this.auditBusy.set(false);
+    this.auditError.set(null);
+  }
+
   private blankImageMetaForm(): ImageMetaForm {
     return { alt_text: '', caption: '' };
   }
@@ -3471,6 +3574,21 @@ export class AdminProductsComponent implements OnInit {
       error: () => {
         this.imageMetaBusy.set(false);
         this.imageMetaError.set(this.t('adminUi.products.form.imageMetaLoadError'));
+      }
+    });
+  }
+
+  private loadAudit(slug: string): void {
+    this.auditBusy.set(true);
+    this.auditError.set(null);
+    this.admin.getProductAudit(slug, 50).subscribe({
+      next: (items) => {
+        this.auditEntries.set(Array.isArray(items) ? items : []);
+        this.auditBusy.set(false);
+      },
+      error: () => {
+        this.auditBusy.set(false);
+        this.auditError.set(this.t('adminUi.products.audit.errors.load'));
       }
     });
   }

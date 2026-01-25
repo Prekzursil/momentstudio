@@ -65,3 +65,12 @@ class AdminDeletedProductImage(BaseModel):
     alt_text: str | None = None
     caption: str | None = None
     deleted_at: datetime | None = None
+
+
+class AdminProductAuditEntry(BaseModel):
+    id: UUID
+    action: str
+    created_at: datetime
+    user_id: UUID | None = None
+    user_email: str | None = None
+    payload: dict | None = None

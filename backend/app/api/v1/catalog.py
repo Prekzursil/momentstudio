@@ -1,3 +1,4 @@
+import json
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, UploadFile, status
@@ -8,8 +9,16 @@ from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import require_admin, get_current_user_optional, require_complete_profile
 from app.db.session import get_session
-from app.models.catalog import Category, Product, ProductImage, ProductReview, ProductStatus, ProductRelationshipType
-from app.models.user import UserRole
+from app.models.catalog import (
+    Category,
+    Product,
+    ProductAuditLog,
+    ProductImage,
+    ProductReview,
+    ProductStatus,
+    ProductRelationshipType,
+)
+from app.models.user import User, UserRole
 from app.schemas.catalog import (
     CategoryCreate,
     CategoryRead,
@@ -43,7 +52,7 @@ from app.schemas.catalog import (
     ProductRelationshipsRead,
     ProductRelationshipsUpdate,
 )
-from app.schemas.catalog_admin import AdminDeletedProductImage
+from app.schemas.catalog_admin import AdminDeletedProductImage, AdminProductAuditEntry
 from app.services import catalog as catalog_service
 from app.services import storage
 
@@ -345,6 +354,46 @@ async def update_product_relationships(
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     return await catalog_service.update_product_relationships(session, product=product, payload=payload, user_id=current_user.id)
+
+
+@router.get("/products/{slug}/audit", response_model=list[AdminProductAuditEntry])
+async def list_product_audit(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> list[AdminProductAuditEntry]:
+    product = await catalog_service.get_product_by_slug(session, slug)
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    rows = (
+        await session.execute(
+            select(ProductAuditLog, User.email)
+            .join(User, ProductAuditLog.user_id == User.id, isouter=True)
+            .where(ProductAuditLog.product_id == product.id)
+            .order_by(ProductAuditLog.created_at.desc())
+            .limit(limit)
+        )
+    ).all()
+    entries: list[AdminProductAuditEntry] = []
+    for log, email in rows:
+        payload: dict | None = None
+        if log.payload:
+            try:
+                payload = json.loads(log.payload)
+            except json.JSONDecodeError:
+                payload = {"raw": log.payload}
+        entries.append(
+            AdminProductAuditEntry(
+                id=log.id,
+                action=log.action,
+                created_at=log.created_at,
+                user_id=log.user_id,
+                user_email=email,
+                payload=payload,
+            )
+        )
+    return entries
 
 
 @router.delete("/products/{slug}", status_code=status.HTTP_204_NO_CONTENT)

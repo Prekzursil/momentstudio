@@ -740,18 +740,63 @@ async def update_product(
     before_sale_type = getattr(product, "sale_type", None)
     before_sale_value = getattr(product, "sale_value", None)
     data = payload.model_dump(exclude_unset=True)
-    if "base_price" in data or "currency" in data:
-        _validate_price_currency(data.get("base_price", product.base_price), data.get("currency", product.currency))
     if "slug" in data:
         if data["slug"] and data["slug"] != product.slug:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Slug cannot be changed")
         data.pop("slug", None)
+    patch_snapshot = dict(data)
+    tracked_fields = (
+        "name",
+        "category_id",
+        "sku",
+        "base_price",
+        "currency",
+        "sale_type",
+        "sale_value",
+        "sale_start_at",
+        "sale_end_at",
+        "sale_auto_publish",
+        "stock_quantity",
+        "low_stock_threshold",
+        "allow_backorder",
+        "restock_at",
+        "weight_grams",
+        "width_cm",
+        "height_cm",
+        "depth_cm",
+        "meta_title",
+        "meta_description",
+        "short_description",
+        "long_description",
+        "status",
+        "publish_at",
+        "is_active",
+        "is_featured",
+        "publish_scheduled_for",
+        "unpublish_scheduled_for",
+    )
+    before_snapshot = {field: getattr(product, field, None) for field in tracked_fields}
+    before_tags = [getattr(tag, "slug", None) for tag in getattr(product, "tags", []) or []]
+    before_options = [
+        (getattr(opt, "option_name", None), getattr(opt, "option_value", None))
+        for opt in getattr(product, "options", []) or []
+    ]
+    if "base_price" in data or "currency" in data:
+        _validate_price_currency(data.get("base_price", product.base_price), data.get("currency", product.currency))
     if "sku" in data and data["sku"]:
         await _ensure_sku_unique(session, data["sku"], exclude_id=product.id)
-    if "tags" in data and data["tags"] is not None:
-        product.tags = await _get_or_create_tags(session, data["tags"])
-    if "options" in data and data["options"] is not None:
-        product.options = [ProductOption(**opt.model_dump()) for opt in data["options"]]
+    if "tags" in data:
+        tags_payload = data.pop("tags")
+        if tags_payload is None:
+            product.tags = []
+        else:
+            product.tags = await _get_or_create_tags(session, tags_payload)
+    if "options" in data:
+        options_payload = data.pop("options")
+        if options_payload is None:
+            product.options = []
+        else:
+            product.options = [ProductOption(**opt) for opt in options_payload]
     if "publish_scheduled_for" in data:
         data["publish_scheduled_for"] = _tz_aware(data.get("publish_scheduled_for"))
     if "unpublish_scheduled_for" in data:
@@ -792,13 +837,31 @@ async def update_product(
         if sale_changed and product.status == ProductStatus.published:
             product.status = ProductStatus.draft
     _set_publish_timestamp(product, product.status)
+
+    after_tags = [getattr(tag, "slug", None) for tag in getattr(product, "tags", []) or []]
+    after_options = [
+        (getattr(opt, "option_name", None), getattr(opt, "option_value", None))
+        for opt in getattr(product, "options", []) or []
+    ]
+    changes: dict[str, dict[str, object | None]] = {}
+    for field in tracked_fields:
+        before_value = before_snapshot.get(field)
+        after_value = getattr(product, field, None)
+        if before_value != after_value:
+            changes[field] = {"before": before_value, "after": after_value}
+    if before_tags != after_tags:
+        changes["tags"] = {"before": before_tags, "after": after_tags}
+    if before_options != after_options:
+        changes["options"] = {"before": before_options, "after": after_options}
+
     session.add(product)
     if commit:
         await session.commit()
         await session.refresh(product)
         if was_out_of_stock and not is_now_out_of_stock:
             await fulfill_back_in_stock_requests(session, product=product)
-        await _log_product_action(session, product.id, "update", user_id, data)
+        if changes:
+            await _log_product_action(session, product.id, "update", user_id, {"changes": changes, "patch": patch_snapshot})
         await _maybe_alert_low_stock(session, product)
     else:
         await session.flush()

@@ -2195,6 +2195,18 @@
         "cardTitle": "Storefront card",
         "snippetTitle": "Search snippet"
       },
+      "audit": {
+        "title": "Audit trail",
+        "hint": "Recent product changes with per-field history.",
+        "empty": "No audit entries yet.",
+        "when": "When",
+        "action": "Action",
+        "user": "User",
+        "details": "Details",
+        "errors": {
+          "load": "Could not load audit entries."
+        }
+      },
       "relationships": {
         "title": "Relationships",
         "hint": "Curate related products and upsells shown on the storefront.",

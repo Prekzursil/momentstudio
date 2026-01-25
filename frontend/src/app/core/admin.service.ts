@@ -235,6 +235,15 @@ export interface AdminDeletedProductImage {
   deleted_at?: string | null;
 }
 
+export interface AdminProductAuditEntry {
+  id: string;
+  action: string;
+  created_at: string;
+  user_id?: string | null;
+  user_email?: string | null;
+  payload?: any | null;
+}
+
 export interface AdminProductVariant {
   id: string;
   name: string;
@@ -624,6 +633,10 @@ export class AdminService {
 
   getProduct(slug: string): Observable<AdminProductDetail> {
     return this.api.get<AdminProductDetail>(`/catalog/products/${slug}`);
+  }
+
+  getProductAudit(slug: string, limit = 50): Observable<AdminProductAuditEntry[]> {
+    return this.api.get<AdminProductAuditEntry[]>(`/catalog/products/${slug}/audit`, { limit } as any);
   }
 
   getProductRelationships(slug: string): Observable<AdminProductRelationships> {

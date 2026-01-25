@@ -279,3 +279,38 @@ def test_product_trash_and_image_restore(test_app: Dict[str, object]) -> None:
     active_products = client.get("/api/v1/admin/dashboard/products/search", headers=headers)
     assert active_products.status_code == 200, active_products.text
     assert any(item["id"] == product_id for item in active_products.json().get("items", []))
+
+
+def test_product_audit_trail_records_field_changes(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    seeded = asyncio.run(seed(session_factory))
+    headers = auth_headers(client)
+
+    product_slug = seeded["product_slug"]
+
+    patched = client.patch(
+        f"/api/v1/catalog/products/{product_slug}",
+        headers=headers,
+        json={
+            "name": "Painting updated",
+            "tags": ["bestseller"],
+            "options": [{"option_name": "Size", "option_value": "Large"}],
+        },
+    )
+    assert patched.status_code == 200, patched.text
+
+    audit = client.get(f"/api/v1/catalog/products/{product_slug}/audit", headers=headers)
+    assert audit.status_code == 200, audit.text
+    entries = audit.json()
+    update_entry = next((e for e in entries if e.get("action") == "update"), None)
+    assert update_entry is not None
+    payload = update_entry.get("payload") or {}
+    changes = payload.get("changes") or {}
+    assert "name" in changes
+    assert "tags" in changes
+    assert changes["name"]["before"] == "Painting"
+    assert changes["name"]["after"] == "Painting updated"
+    assert changes["tags"]["after"] == ["bestseller"]

@@ -2195,6 +2195,18 @@
         "cardTitle": "Card magazin",
         "snippetTitle": "Fragment căutare"
       },
+      "audit": {
+        "title": "Istoric modificări",
+        "hint": "Modificări recente ale produsului cu istoric per câmp.",
+        "empty": "Nu există intrări de audit.",
+        "when": "Când",
+        "action": "Acțiune",
+        "user": "Utilizator",
+        "details": "Detalii",
+        "errors": {
+          "load": "Nu am putut încărca istoricul."
+        }
+      },
       "relationships": {
         "title": "Relații",
         "hint": "Alege produse similare și upsell-uri afișate în magazin.",
