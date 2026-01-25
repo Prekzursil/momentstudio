@@ -403,6 +403,7 @@ async def admin_update_promotion(
         "max_discount_amount",
         "min_subtotal",
         "allow_on_sale_items",
+        "first_order_only",
         "is_active",
         "starts_at",
         "ends_at",

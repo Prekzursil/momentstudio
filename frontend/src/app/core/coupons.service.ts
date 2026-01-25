@@ -16,6 +16,7 @@ export interface PromotionRead {
   amount_off?: string | null;
   max_discount_amount?: string | null;
   allow_on_sale_items: boolean;
+  first_order_only?: boolean;
   min_subtotal?: string | null;
   included_product_ids?: string[];
   excluded_product_ids?: string[];

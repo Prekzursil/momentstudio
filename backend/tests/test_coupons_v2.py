@@ -164,6 +164,7 @@ def create_promotion_and_coupon(
     amount_off: Decimal | None = None,
     min_subtotal: Decimal | None = None,
     allow_on_sale_items: bool = True,
+    first_order_only: bool = False,
     visibility: CouponVisibility = CouponVisibility.public,
     global_max_redemptions: int | None = None,
     per_customer_max_redemptions: int | None = None,
@@ -182,6 +183,7 @@ def create_promotion_and_coupon(
                 amount_off=amount_off,
                 min_subtotal=min_subtotal,
                 allow_on_sale_items=allow_on_sale_items,
+                first_order_only=first_order_only,
                 is_active=True,
                 is_automatic=False,
             )
@@ -334,6 +336,62 @@ def test_coupon_eligibility_and_validation() -> None:
             headers=auth_headers(token),
         )
         assert validate_missing.status_code == 404
+    finally:
+        client.close()
+        app.dependency_overrides.clear()
+
+
+def test_first_order_only_promotion_blocks_delivered_customers() -> None:
+    client, SessionLocal = make_test_client()
+    try:
+        token1, user1_id = create_user_token(SessionLocal, email="first-only-1@example.com", username="first_only_1")
+        token2, user2_id = create_user_token(SessionLocal, email="first-only-2@example.com", username="first_only_2")
+
+        product_id = seed_product(SessionLocal, slug="first-only", sku="SKU-FIRST", base_price=Decimal("100.00"))
+        assert (
+            client.post("/api/v1/cart/items", json={"product_id": product_id, "quantity": 1}, headers=auth_headers(token1)).status_code
+            == 201
+        )
+        assert (
+            client.post("/api/v1/cart/items", json={"product_id": product_id, "quantity": 1}, headers=auth_headers(token2)).status_code
+            == 201
+        )
+
+        code = create_promotion_and_coupon(
+            SessionLocal,
+            name="First order only",
+            discount_type=PromotionDiscountType.percent,
+            percentage_off=Decimal("10.00"),
+            code="FIRSTONLY10",
+            first_order_only=True,
+        )
+
+        async def _seed_delivered_order() -> None:
+            async with SessionLocal() as session:
+                user = await session.get(User, user2_id)
+                assert user
+                order = Order(
+                    user_id=user2_id,
+                    status=OrderStatus.delivered,
+                    customer_email=user.email,
+                    customer_name="Delivered",
+                    total_amount=Decimal("100.00"),
+                    payment_method="stripe",
+                    currency="RON",
+                )
+                session.add(order)
+                await session.commit()
+
+        asyncio.run(_seed_delivered_order())
+
+        validate1 = client.post("/api/v1/coupons/validate", json={"code": code}, headers=auth_headers(token1))
+        assert validate1.status_code == 200, validate1.text
+        assert validate1.json()["eligible"] is True
+
+        validate2 = client.post("/api/v1/coupons/validate", json={"code": code}, headers=auth_headers(token2))
+        assert validate2.status_code == 200, validate2.text
+        assert validate2.json()["eligible"] is False
+        assert "first_order_only" in set(validate2.json()["reasons"])
     finally:
         client.close()
         app.dependency_overrides.clear()

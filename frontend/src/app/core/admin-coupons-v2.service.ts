@@ -17,6 +17,7 @@ export interface PromotionCreatePayload {
   included_category_ids?: string[];
   excluded_category_ids?: string[];
   allow_on_sale_items: boolean;
+  first_order_only?: boolean;
   is_active: boolean;
   starts_at?: string | null;
   ends_at?: string | null;

@@ -26,6 +26,7 @@ class PromotionRead(BaseModel):
     included_category_ids: list[UUID] = Field(default_factory=list)
     excluded_category_ids: list[UUID] = Field(default_factory=list)
     allow_on_sale_items: bool
+    first_order_only: bool = False
     is_active: bool
     starts_at: datetime | None = None
     ends_at: datetime | None = None
@@ -48,6 +49,7 @@ class PromotionCreate(BaseModel):
     included_category_ids: list[UUID] = Field(default_factory=list)
     excluded_category_ids: list[UUID] = Field(default_factory=list)
     allow_on_sale_items: bool = True
+    first_order_only: bool = False
     is_active: bool = True
     starts_at: datetime | None = None
     ends_at: datetime | None = None
@@ -68,6 +70,7 @@ class PromotionUpdate(BaseModel):
     included_category_ids: list[UUID] | None = None
     excluded_category_ids: list[UUID] | None = None
     allow_on_sale_items: bool | None = None
+    first_order_only: bool | None = None
     is_active: bool | None = None
     starts_at: datetime | None = None
     ends_at: datetime | None = None

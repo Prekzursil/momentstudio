@@ -383,6 +383,24 @@ async def _count_user_active_reservations(session: AsyncSession, *, coupon_id: U
     )
 
 
+async def _user_has_delivered_orders(session: AsyncSession, *, user_id: UUID) -> bool:
+    return (
+        int(
+            (
+                await session.execute(
+                    select(func.count())
+                    .select_from(Order)
+                    .where(
+                        Order.user_id == user_id,
+                        Order.status == OrderStatus.delivered,
+                    )
+                )
+            ).scalar_one()
+        )
+        > 0
+    )
+
+
 async def get_coupon_by_code(session: AsyncSession, *, code: str) -> Coupon | None:
     cleaned = _normalize_code(code)
     if not cleaned:
@@ -437,6 +455,7 @@ async def evaluate_coupon_for_cart(
     checkout: CheckoutSettings,
     shipping_method_rate_flat: Decimal | None,
     shipping_method_rate_per_kg: Decimal | None,
+    user_has_delivered_orders: bool | None = None,
 ) -> CouponEligibility:
     now = _now()
     promotion = coupon.promotion
@@ -460,6 +479,13 @@ async def evaluate_coupon_for_cart(
         min_required = Decimal(promotion.min_subtotal)
         if subtotal < min_required:
             reasons.append("min_subtotal_not_met")
+
+    if getattr(promotion, "first_order_only", False):
+        has_delivered = user_has_delivered_orders
+        if has_delivered is None:
+            has_delivered = await _user_has_delivered_orders(session, user_id=user_id)
+        if has_delivered:
+            reasons.append("first_order_only")
 
     savings = compute_coupon_savings(
         promotion=promotion,
@@ -544,6 +570,9 @@ async def evaluate_coupons_for_user_cart(
     shipping_method_rate_per_kg: Decimal | None,
 ) -> list[CouponEligibility]:
     coupons = await get_user_visible_coupons(session, user_id=user.id)
+    delivered_flag: bool | None = None
+    if any(getattr(getattr(coupon, "promotion", None), "first_order_only", False) for coupon in coupons):
+        delivered_flag = await _user_has_delivered_orders(session, user_id=user.id)
     results: list[CouponEligibility] = []
     for coupon in coupons:
         results.append(
@@ -555,6 +584,7 @@ async def evaluate_coupons_for_user_cart(
                 checkout=checkout,
                 shipping_method_rate_flat=shipping_method_rate_flat,
                 shipping_method_rate_per_kg=shipping_method_rate_per_kg,
+                user_has_delivered_orders=delivered_flag,
             )
         )
     return results

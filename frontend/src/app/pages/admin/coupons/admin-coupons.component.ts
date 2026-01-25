@@ -30,6 +30,7 @@ type PromotionForm = {
   max_discount_amount: string | number;
   min_subtotal: string | number;
   allow_on_sale_items: boolean;
+  first_order_only: boolean;
   starts_at: string;
   ends_at: string;
   is_active: boolean;
@@ -191,7 +192,7 @@ type CouponForm = {
                 </div>
               </div>
 
-              <div class="grid gap-3 lg:grid-cols-3">
+              <div class="grid gap-3 lg:grid-cols-4">
                 <app-input
                   [label]="'adminUi.couponsV2.fields.maxDiscount' | translate"
                   type="number"
@@ -212,6 +213,14 @@ type CouponForm = {
                     type="checkbox"
                     class="h-5 w-5 accent-indigo-600"
                     [(ngModel)]="promotionForm.allow_on_sale_items"
+                  />
+                </label>
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.couponsV2.fields.firstOrderOnly' | translate }}
+                  <input
+                    type="checkbox"
+                    class="h-5 w-5 accent-indigo-600"
+                    [(ngModel)]="promotionForm.first_order_only"
                   />
                 </label>
               </div>
@@ -1490,6 +1499,7 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
       included_category_ids: this.uniqueIds(this.promotionForm.included_category_ids),
       excluded_category_ids: this.uniqueIds(this.promotionForm.excluded_category_ids),
       allow_on_sale_items: !!this.promotionForm.allow_on_sale_items,
+      first_order_only: !!this.promotionForm.first_order_only,
       is_active: !!this.promotionForm.is_active,
       starts_at: this.promotionForm.starts_at ? new Date(this.promotionForm.starts_at).toISOString() : null,
       ends_at: this.promotionForm.ends_at ? new Date(this.promotionForm.ends_at).toISOString() : null,
@@ -1508,6 +1518,7 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
       max_discount_amount: (promo.max_discount_amount ?? '').toString(),
       min_subtotal: (promo.min_subtotal ?? '').toString(),
       allow_on_sale_items: promo.allow_on_sale_items !== false,
+      first_order_only: promo.first_order_only === true,
       starts_at: promo.starts_at ? this.toLocalDateTime(promo.starts_at) : '',
       ends_at: promo.ends_at ? this.toLocalDateTime(promo.ends_at) : '',
       is_active: promo.is_active !== false,
@@ -1543,6 +1554,7 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
       max_discount_amount: '',
       min_subtotal: '',
       allow_on_sale_items: true,
+      first_order_only: false,
       starts_at: '',
       ends_at: '',
       is_active: true,

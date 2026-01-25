@@ -3020,6 +3020,7 @@
         "maxDiscount": "Max discount (RON)",
         "minSubtotal": "Min subtotal (RON)",
         "allowOnSale": "Allow on-sale items",
+        "firstOrderOnly": "First order only",
         "startsAt": "Starts at",
         "endsAt": "Ends at",
         "active": "Active",

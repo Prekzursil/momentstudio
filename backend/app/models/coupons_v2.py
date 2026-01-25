@@ -63,6 +63,7 @@ class Promotion(Base):
     max_discount_amount: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     min_subtotal: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     allow_on_sale_items: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    first_order_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
