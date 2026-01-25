@@ -2721,6 +2721,7 @@
       "title": "Utilizatori",
       "hint": "Caută după email, utilizator sau nume afișat.",
       "gdprQueue": "Coada GDPR",
+      "segments": "Segmente",
       "setRole": "Setează rol",
       "forceLogout": "Deconectează selectatul",
       "search": "Caută",
@@ -2884,6 +2885,33 @@
         "download": "Nu am putut descărca exportul.",
         "executeDeletion": "Nu am putut executa ștergerea.",
         "cancelDeletion": "Nu am putut anula ștergerea."
+      }
+    },
+    "segments": {
+      "title": "Segmente",
+      "hint": "Segmente rapide de clienți bazate pe istoricul comenzilor.",
+      "search": "Caută",
+      "pagination": "Pagina {{page}} din {{total_pages}} · {{total_items}} total",
+      "table": {
+        "user": "Utilizator",
+        "orders": "Comenzi",
+        "total": "Total cheltuit",
+        "aov": "Comandă medie"
+      },
+      "repeatBuyers": {
+        "title": "Cumpărători recurenți",
+        "minOrders": "Min comenzi",
+        "empty": "Nu există clienți pentru aceste filtre."
+      },
+      "highAov": {
+        "title": "AOV ridicat",
+        "minOrders": "Min comenzi",
+        "minAov": "Min medie (RON)",
+        "empty": "Nu există clienți pentru aceste filtre."
+      },
+      "errors": {
+        "repeatLoad": "Nu am putut încărca segmentul de cumpărători recurenți.",
+        "aovLoad": "Nu am putut încărca segmentul AOV ridicat."
       }
     },
     "content": {

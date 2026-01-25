@@ -2721,6 +2721,7 @@
       "title": "Users",
       "hint": "Search by email, username, or display name.",
       "gdprQueue": "GDPR queue",
+      "segments": "Segments",
       "setRole": "Set role",
       "forceLogout": "Force logout selected",
       "search": "Search",
@@ -2884,6 +2885,33 @@
         "download": "Could not download export.",
         "executeDeletion": "Could not execute deletion.",
         "cancelDeletion": "Could not cancel deletion."
+      }
+    },
+    "segments": {
+      "title": "Segments",
+      "hint": "Quick customer segments built from order history.",
+      "search": "Search",
+      "pagination": "Page {{page}} of {{total_pages}} · {{total_items}} total",
+      "table": {
+        "user": "User",
+        "orders": "Orders",
+        "total": "Total spent",
+        "aov": "Avg order"
+      },
+      "repeatBuyers": {
+        "title": "Repeat buyers",
+        "minOrders": "Min orders",
+        "empty": "No customers match these filters."
+      },
+      "highAov": {
+        "title": "High AOV",
+        "minOrders": "Min orders",
+        "minAov": "Min avg (RON)",
+        "empty": "No customers match these filters."
+      },
+      "errors": {
+        "repeatLoad": "Could not load repeat buyers segment.",
+        "aovLoad": "Could not load high AOV segment."
       }
     },
     "content": {

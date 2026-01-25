@@ -136,6 +136,18 @@ export interface AdminGdprDeletionRequestsResponse {
   meta: AdminPaginationMeta;
 }
 
+export interface AdminUserSegmentListItem {
+  user: AdminUserListItem;
+  orders_count: number;
+  total_spent: number;
+  avg_order_value: number;
+}
+
+export interface AdminUserSegmentResponse {
+  items: AdminUserSegmentListItem[];
+  meta: AdminPaginationMeta;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdminUsersService {
   constructor(private api: ApiService) {}
@@ -207,5 +219,19 @@ export class AdminUsersService {
 
   cancelGdprDeletion(userId: string): Observable<void> {
     return this.api.post<void>(`/admin/dashboard/gdpr/deletions/${userId}/cancel`, {});
+  }
+
+  listRepeatBuyersSegment(params: { q?: string; min_orders?: number; page?: number; limit?: number }): Observable<AdminUserSegmentResponse> {
+    return this.api.get<AdminUserSegmentResponse>('/admin/dashboard/users/segments/repeat-buyers', params as any);
+  }
+
+  listHighAovSegment(params: {
+    q?: string;
+    min_orders?: number;
+    min_aov?: number;
+    page?: number;
+    limit?: number;
+  }): Observable<AdminUserSegmentResponse> {
+    return this.api.get<AdminUserSegmentResponse>('/admin/dashboard/users/segments/high-aov', params as any);
   }
 }

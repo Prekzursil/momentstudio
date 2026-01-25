@@ -84,6 +84,7 @@ from app.schemas.gdpr_admin import (
     AdminGdprExportJobsResponse,
     AdminGdprUserRef,
 )
+from app.schemas.user_segments_admin import AdminUserSegmentListItem, AdminUserSegmentResponse
 
 router = APIRouter(prefix="/admin/dashboard", tags=["admin"])
 
@@ -881,6 +882,178 @@ async def search_users(
     ]
 
     return AdminUserListResponse(
+        items=items,
+        meta={
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "page": page,
+            "limit": limit,
+        },
+    )
+
+
+def _user_order_stats_subquery() -> object:
+    successful = (OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered)
+    return (
+        select(
+            Order.user_id.label("user_id"),
+            func.count(Order.id).label("orders_count"),
+            func.coalesce(func.sum(Order.total_amount), 0).label("total_spent"),
+            func.coalesce(func.avg(Order.total_amount), 0).label("avg_order_value"),
+        )
+        .where(Order.user_id.is_not(None), Order.status.in_(successful))
+        .group_by(Order.user_id)
+        .subquery()
+    )
+
+
+@router.get("/users/segments/repeat-buyers", response_model=AdminUserSegmentResponse)
+async def admin_user_segment_repeat_buyers(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("users")),
+    q: str | None = Query(default=None),
+    min_orders: int = Query(default=2, ge=1, le=100),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=25, ge=1, le=100),
+) -> AdminUserSegmentResponse:
+    offset = (page - 1) * limit
+    stats = _user_order_stats_subquery()
+
+    stmt = (
+        select(User, stats.c.orders_count, stats.c.total_spent, stats.c.avg_order_value)  # type: ignore[attr-defined]
+        .join(stats, stats.c.user_id == User.id)  # type: ignore[attr-defined]
+        .where(
+            User.deleted_at.is_(None),
+            User.role == UserRole.customer,
+            stats.c.orders_count >= min_orders,  # type: ignore[attr-defined]
+        )
+    )
+    if q:
+        like = f"%{q.strip().lower()}%"
+        stmt = stmt.where(
+            func.lower(User.email).ilike(like)
+            | func.lower(User.username).ilike(like)
+            | func.lower(User.name).ilike(like)
+        )
+
+    total_items = int(
+        await session.scalar(stmt.with_only_columns(func.count()).order_by(None)) or 0
+    )
+    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
+
+    rows = (
+        await session.execute(
+            stmt.order_by(
+                stats.c.orders_count.desc(),  # type: ignore[attr-defined]
+                stats.c.total_spent.desc(),  # type: ignore[attr-defined]
+                User.created_at.desc(),
+            )
+            .limit(limit)
+            .offset(offset)
+        )
+    ).all()
+
+    items: list[AdminUserSegmentListItem] = []
+    for user, orders_count, total_spent, avg_order_value in rows:
+        items.append(
+            AdminUserSegmentListItem(
+                user=AdminUserListItem(
+                    id=user.id,
+                    email=user.email,
+                    username=user.username,
+                    name=user.name,
+                    name_tag=user.name_tag,
+                    role=user.role,
+                    email_verified=bool(user.email_verified),
+                    created_at=user.created_at,
+                ),
+                orders_count=int(orders_count or 0),
+                total_spent=float(total_spent or 0),
+                avg_order_value=float(avg_order_value or 0),
+            )
+        )
+
+    return AdminUserSegmentResponse(
+        items=items,
+        meta={
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "page": page,
+            "limit": limit,
+        },
+    )
+
+
+@router.get("/users/segments/high-aov", response_model=AdminUserSegmentResponse)
+async def admin_user_segment_high_aov(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("users")),
+    q: str | None = Query(default=None),
+    min_orders: int = Query(default=1, ge=1, le=100),
+    min_aov: float = Query(default=0, ge=0),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=25, ge=1, le=100),
+) -> AdminUserSegmentResponse:
+    offset = (page - 1) * limit
+    stats = _user_order_stats_subquery()
+
+    stmt = (
+        select(User, stats.c.orders_count, stats.c.total_spent, stats.c.avg_order_value)  # type: ignore[attr-defined]
+        .join(stats, stats.c.user_id == User.id)  # type: ignore[attr-defined]
+        .where(
+            User.deleted_at.is_(None),
+            User.role == UserRole.customer,
+            stats.c.orders_count >= min_orders,  # type: ignore[attr-defined]
+            stats.c.avg_order_value >= min_aov,  # type: ignore[attr-defined]
+        )
+    )
+    if q:
+        like = f"%{q.strip().lower()}%"
+        stmt = stmt.where(
+            func.lower(User.email).ilike(like)
+            | func.lower(User.username).ilike(like)
+            | func.lower(User.name).ilike(like)
+        )
+
+    total_items = int(
+        await session.scalar(stmt.with_only_columns(func.count()).order_by(None)) or 0
+    )
+    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
+
+    rows = (
+        await session.execute(
+            stmt.order_by(
+                stats.c.avg_order_value.desc(),  # type: ignore[attr-defined]
+                stats.c.orders_count.desc(),  # type: ignore[attr-defined]
+                stats.c.total_spent.desc(),  # type: ignore[attr-defined]
+                User.created_at.desc(),
+            )
+            .limit(limit)
+            .offset(offset)
+        )
+    ).all()
+
+    items: list[AdminUserSegmentListItem] = []
+    for user, orders_count, total_spent, avg_order_value in rows:
+        items.append(
+            AdminUserSegmentListItem(
+                user=AdminUserListItem(
+                    id=user.id,
+                    email=user.email,
+                    username=user.username,
+                    name=user.name,
+                    name_tag=user.name_tag,
+                    role=user.role,
+                    email_verified=bool(user.email_verified),
+                    created_at=user.created_at,
+                ),
+                orders_count=int(orders_count or 0),
+                total_spent=float(total_spent or 0),
+                avg_order_value=float(avg_order_value or 0),
+            )
+        )
+
+    return AdminUserSegmentResponse(
         items=items,
         meta={
             "total_items": total_items,

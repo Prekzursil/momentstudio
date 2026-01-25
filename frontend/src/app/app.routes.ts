@@ -252,6 +252,11 @@ export const routes: Routes = [
             path: 'gdpr',
             loadComponent: () => import('./pages/admin/users/admin-gdpr.component').then((m) => m.AdminGdprComponent),
             title: 'GDPR | Admin | momentstudio'
+          },
+          {
+            path: 'segments',
+            loadComponent: () => import('./pages/admin/users/admin-segments.component').then((m) => m.AdminSegmentsComponent),
+            title: 'Segments | Admin | momentstudio'
           }
         ]
       },
