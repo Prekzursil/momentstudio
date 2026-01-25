@@ -27,6 +27,8 @@ from app.models.catalog import Product, ProductAuditLog, Category, ProductStatus
 from app.models.content import ContentBlock, ContentAuditLog
 from app.schemas.catalog_admin import (
     AdminProductByIdsRequest,
+    AdminProductDuplicateCheckResponse,
+    AdminProductDuplicateMatch,
     AdminProductListItem,
     AdminProductListResponse,
 )
@@ -535,6 +537,95 @@ async def search_products(
             "page": page,
             "limit": limit,
         },
+    )
+
+
+@router.get("/products/duplicate-check", response_model=AdminProductDuplicateCheckResponse)
+async def duplicate_check_products(
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+    name: str | None = Query(default=None),
+    sku: str | None = Query(default=None),
+    exclude_slug: str | None = Query(default=None),
+) -> AdminProductDuplicateCheckResponse:
+    name_value = (name or "").strip()
+    sku_value = (sku or "").strip()
+    exclude_slug_value = (exclude_slug or "").strip()
+
+    def to_match(product: Product) -> AdminProductDuplicateMatch:
+        return AdminProductDuplicateMatch(
+            id=product.id,
+            slug=product.slug,
+            sku=product.sku,
+            name=product.name,
+            status=product.status,
+            is_active=product.is_active,
+        )
+
+    slug_base = (catalog_service.slugify(name_value) or "")[:160] if name_value else None
+    slug_matches: list[AdminProductDuplicateMatch] = []
+    suggested_slug: str | None = None
+
+    if slug_base:
+        slug_stmt = select(Product).where(
+            Product.is_deleted.is_(False),
+            or_(Product.slug == slug_base, Product.slug.like(f"{slug_base}-%")),
+        )
+        if exclude_slug_value:
+            slug_stmt = slug_stmt.where(Product.slug != exclude_slug_value)
+
+        slug_rows = (await session.execute(slug_stmt.order_by(Product.updated_at.desc()).limit(10))).scalars().all()
+        slug_matches = [to_match(prod) for prod in slug_rows]
+
+        slug_values = set(
+            await session.scalars(
+                select(Product.slug).where(
+                    Product.is_deleted.is_(False),
+                    or_(Product.slug == slug_base, Product.slug.like(f"{slug_base}-%")),
+                )
+            )
+        )
+        if exclude_slug_value:
+            slug_values.discard(exclude_slug_value)
+
+        if slug_base not in slug_values:
+            suggested_slug = slug_base
+        else:
+            counter = 2
+            while True:
+                suffix = f"-{counter}"
+                candidate = f"{slug_base[: 160 - len(suffix)]}{suffix}"
+                if candidate not in slug_values:
+                    suggested_slug = candidate
+                    break
+                counter += 1
+
+    sku_matches: list[AdminProductDuplicateMatch] = []
+    if sku_value:
+        sku_stmt = select(Product).where(Product.is_deleted.is_(False), Product.sku == sku_value)
+        if exclude_slug_value:
+            sku_stmt = sku_stmt.where(Product.slug != exclude_slug_value)
+        sku_rows = (await session.execute(sku_stmt.order_by(Product.updated_at.desc()).limit(10))).scalars().all()
+        sku_matches = [to_match(prod) for prod in sku_rows]
+
+    name_matches: list[AdminProductDuplicateMatch] = []
+    if name_value:
+        name_norm = name_value.lower()
+        name_stmt = select(Product).where(
+            Product.is_deleted.is_(False),
+            func.lower(Product.name) == name_norm,
+        )
+        if exclude_slug_value:
+            name_stmt = name_stmt.where(Product.slug != exclude_slug_value)
+        name_rows = (await session.execute(name_stmt.order_by(Product.updated_at.desc()).limit(10))).scalars().all()
+        name_matches = [to_match(prod) for prod in name_rows]
+
+    return AdminProductDuplicateCheckResponse(
+        slug_base=slug_base,
+        suggested_slug=suggested_slug,
+        slug_matches=slug_matches,
+        sku_matches=sku_matches,
+        name_matches=name_matches,
     )
 
 

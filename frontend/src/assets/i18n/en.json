@@ -2154,6 +2154,21 @@
           "nameRequired": "Name is required for translations."
         }
       },
+      "duplicates": {
+        "title": "Potential duplicates",
+        "checking": "Checking…",
+        "slugTaken": "Slug '{{slug}}' is already used. This product will be created as '{{suggested}}'.",
+        "skuMatches": "SKU already used by:",
+        "nameMatches": "Same name found:",
+        "open": "Open",
+        "mergeHint": "If these refer to the same item, consider updating the existing product instead of creating a new one."
+      },
+      "seoPreview": {
+        "title": "SEO & preview",
+        "hint": "See how this product may appear in listings and search results per language.",
+        "cardTitle": "Storefront card",
+        "snippetTitle": "Search snippet"
+      },
       "actions": {
         "create": "Create",
         "update": "Update",

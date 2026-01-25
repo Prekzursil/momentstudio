@@ -29,6 +29,23 @@ export interface AdminProductListResponse {
   meta: AdminPaginationMeta;
 }
 
+export interface AdminProductDuplicateMatch {
+  id: string;
+  slug: string;
+  sku: string;
+  name: string;
+  status: string;
+  is_active: boolean;
+}
+
+export interface AdminProductDuplicateCheckResponse {
+  slug_base?: string | null;
+  suggested_slug?: string | null;
+  slug_matches: AdminProductDuplicateMatch[];
+  sku_matches: AdminProductDuplicateMatch[];
+  name_matches: AdminProductDuplicateMatch[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdminProductsService {
   constructor(private api: ApiService) {}
@@ -45,5 +62,13 @@ export class AdminProductsService {
 
   byIds(ids: string[]): Observable<AdminProductListItem[]> {
     return this.api.post<AdminProductListItem[]>('/admin/dashboard/products/by-ids', { ids });
+  }
+
+  duplicateCheck(params: {
+    name?: string;
+    sku?: string;
+    exclude_slug?: string;
+  }): Observable<AdminProductDuplicateCheckResponse> {
+    return this.api.get<AdminProductDuplicateCheckResponse>('/admin/dashboard/products/duplicate-check', params as any);
   }
 }

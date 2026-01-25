@@ -7,7 +7,12 @@ import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
 import { InputComponent } from '../../../shared/input.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
-import { AdminProductListItem, AdminProductListResponse, AdminProductsService } from '../../../core/admin-products.service';
+import {
+  AdminProductDuplicateCheckResponse,
+  AdminProductListItem,
+  AdminProductListResponse,
+  AdminProductsService,
+} from '../../../core/admin-products.service';
 import { CatalogService, Category } from '../../../core/catalog.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import {
@@ -571,22 +576,95 @@ type VariantRow = {
           {{ editorError() }}
         </div>
 
-        <div class="grid gap-3 md:grid-cols-2">
-          <app-input [label]="'adminUi.products.table.name' | translate" [(value)]="form.name"></app-input>
-          <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            <span>{{ 'adminUi.products.form.slug' | translate }}</span>
-            <div class="h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 shadow-sm flex items-center dark:border-slate-800 dark:bg-slate-950/20 dark:text-slate-100">
-              <span *ngIf="editingSlug(); else slugHint" class="font-mono truncate">{{ editingSlug() }}</span>
-              <ng-template #slugHint>
-                <span class="text-slate-500 dark:text-slate-400">{{ 'adminUi.products.form.slugAutoHint' | translate }}</span>
-              </ng-template>
-            </div>
-          </div>
+	        <div class="grid gap-3 md:grid-cols-2">
+	          <app-input
+              [label]="'adminUi.products.table.name' | translate"
+              [value]="form.name"
+              (valueChange)="onNameChange($event)"
+            ></app-input>
+	          <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	            <span>{{ 'adminUi.products.form.slug' | translate }}</span>
+	            <div class="h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 shadow-sm flex items-center dark:border-slate-800 dark:bg-slate-950/20 dark:text-slate-100">
+	              <span *ngIf="editingSlug(); else slugHint" class="font-mono truncate">{{ editingSlug() }}</span>
+	              <ng-template #slugHint>
+                  <span *ngIf="predictedSlug(); else slugAuto" class="font-mono truncate">{{ predictedSlug() }}</span>
+                  <ng-template #slugAuto>
+	                  <span class="text-slate-500 dark:text-slate-400">{{ 'adminUi.products.form.slugAutoHint' | translate }}</span>
+                  </ng-template>
+	              </ng-template>
+	            </div>
+	          </div>
 
-          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            {{ 'adminUi.products.table.category' | translate }}
-            <select
-              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            <div
+              *ngIf="duplicateBusy() || duplicateHasWarnings()"
+              class="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <p class="font-semibold">{{ 'adminUi.products.duplicates.title' | translate }}</p>
+                <span *ngIf="duplicateBusy()" class="text-xs text-amber-700 dark:text-amber-200">
+                  {{ 'adminUi.products.duplicates.checking' | translate }}
+                </span>
+              </div>
+
+              <ng-container *ngIf="duplicateCheck() as dup">
+                <div *ngIf="dup.slug_base && dup.suggested_slug && dup.slug_base !== dup.suggested_slug" class="mt-2">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <span>{{ 'adminUi.products.duplicates.slugTaken' | translate: { slug: dup.slug_base, suggested: dup.suggested_slug } }}</span>
+                    <app-button
+                      *ngIf="dup.slug_matches.length"
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.products.duplicates.open' | translate"
+                      (action)="edit(dup.slug_matches[0].slug)"
+                    ></app-button>
+                  </div>
+                </div>
+
+                <div *ngIf="dup.sku_matches.length" class="mt-2 grid gap-1">
+                  <p class="font-semibold">{{ 'adminUi.products.duplicates.skuMatches' | translate }}</p>
+                  <div class="grid gap-1">
+                    <div *ngFor="let match of dup.sku_matches" class="flex items-center justify-between gap-2">
+                      <span class="truncate">
+                        <span class="font-mono">{{ match.sku }}</span> · {{ match.name }}
+                        <span class="text-xs text-amber-700 dark:text-amber-200">({{ match.slug }})</span>
+                      </span>
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.products.duplicates.open' | translate"
+                        (action)="edit(match.slug)"
+                      ></app-button>
+                    </div>
+                  </div>
+                </div>
+
+                <div *ngIf="dup.name_matches.length" class="mt-2 grid gap-1">
+                  <p class="font-semibold">{{ 'adminUi.products.duplicates.nameMatches' | translate }}</p>
+                  <div class="grid gap-1">
+                    <div *ngFor="let match of dup.name_matches" class="flex items-center justify-between gap-2">
+                      <span class="truncate">
+                        {{ match.name }} <span class="text-xs text-amber-700 dark:text-amber-200">({{ match.slug }})</span>
+                      </span>
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.products.duplicates.open' | translate"
+                        (action)="edit(match.slug)"
+                      ></app-button>
+                    </div>
+                  </div>
+                </div>
+
+                <p *ngIf="duplicateHasWarnings()" class="mt-2 text-xs text-amber-800 dark:text-amber-200">
+                  {{ 'adminUi.products.duplicates.mergeHint' | translate }}
+                </p>
+              </ng-container>
+            </div>
+
+	          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	            {{ 'adminUi.products.table.category' | translate }}
+	            <select
+	              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               [(ngModel)]="form.category_id"
             >
               <option value="" disabled>{{ 'adminUi.products.selectCategory' | translate }}</option>
@@ -698,11 +776,15 @@ type VariantRow = {
             {{ 'adminUi.products.form.featured' | translate }}
           </label>
 
-          <app-input [label]="'adminUi.products.form.sku' | translate" [(value)]="form.sku"></app-input>
+	          <app-input
+              [label]="'adminUi.products.form.sku' | translate"
+              [value]="form.sku"
+              (valueChange)="onSkuChange($event)"
+            ></app-input>
 
-          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            {{ 'adminUi.products.form.publishAt' | translate }}
-            <input
+	          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	            {{ 'adminUi.products.form.publishAt' | translate }}
+	            <input
               class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               type="datetime-local"
               [(ngModel)]="form.publish_at"
@@ -1036,14 +1118,121 @@ type VariantRow = {
 	                  [(ngModel)]="translations.en.long_description"
 	                ></textarea>
 	              </label>
-	            </div>
-	          </div>
-	        </div>
+		            </div>
+		          </div>
+		        </div>
 
-	        <div class="flex items-center gap-2">
-	          <app-button [label]="'adminUi.products.form.save' | translate" (action)="save()"></app-button>
-	          <span *ngIf="editorMessage()" class="text-sm text-emerald-700 dark:text-emerald-300">{{ editorMessage() }}</span>
-	        </div>
+            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
+              <div class="grid gap-1">
+                <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.products.seoPreview.title' | translate }}
+                </h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.products.seoPreview.hint' | translate }}
+                </p>
+              </div>
+
+              <div class="grid gap-4 lg:grid-cols-2">
+                <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">RO</p>
+
+                  <div class="grid gap-2">
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.products.seoPreview.cardTitle' | translate }}
+                    </p>
+                    <div class="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/20">
+                      <div class="h-14 w-14 rounded bg-slate-100 overflow-hidden flex items-center justify-center dark:bg-slate-800">
+                        <img *ngIf="seoPreviewImageUrl() as url; else seoImgPlaceholder" [src]="url" alt="" class="h-full w-full object-cover" />
+                        <ng-template #seoImgPlaceholder>
+                          <span class="text-xs text-slate-500 dark:text-slate-400">—</span>
+                        </ng-template>
+                      </div>
+                      <div class="min-w-0 grid gap-1">
+                        <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ seoPreviewName('ro') }}</p>
+                        <p class="text-sm text-slate-700 dark:text-slate-200">
+                          <ng-container *ngIf="previewSalePrice() as sale; else seoBasePriceRo">
+                            <span class="font-semibold text-rose-700 dark:text-rose-300">{{ sale | localizedCurrency: 'RON' }}</span>
+                            <span class="ml-2 line-through text-slate-500 dark:text-slate-400">{{ previewBasePrice() | localizedCurrency: 'RON' }}</span>
+                          </ng-container>
+                          <ng-template #seoBasePriceRo>
+                            <span class="font-semibold">{{ previewBasePrice() | localizedCurrency: 'RON' }}</span>
+                          </ng-template>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="grid gap-2">
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.products.seoPreview.snippetTitle' | translate }}
+                    </p>
+                    <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/20">
+                      <p class="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+                        {{ seoPreviewTitle('ro') }}
+                      </p>
+                      <p class="text-xs text-emerald-700 dark:text-emerald-300">
+                        {{ seoPreviewUrl() }}
+                      </p>
+                      <p class="text-sm text-slate-700 dark:text-slate-200">
+                        {{ seoPreviewDescription('ro') }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">EN</p>
+
+                  <div class="grid gap-2">
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.products.seoPreview.cardTitle' | translate }}
+                    </p>
+                    <div class="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/20">
+                      <div class="h-14 w-14 rounded bg-slate-100 overflow-hidden flex items-center justify-center dark:bg-slate-800">
+                        <img *ngIf="seoPreviewImageUrl() as url; else seoImgPlaceholderEn" [src]="url" alt="" class="h-full w-full object-cover" />
+                        <ng-template #seoImgPlaceholderEn>
+                          <span class="text-xs text-slate-500 dark:text-slate-400">—</span>
+                        </ng-template>
+                      </div>
+                      <div class="min-w-0 grid gap-1">
+                        <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ seoPreviewName('en') }}</p>
+                        <p class="text-sm text-slate-700 dark:text-slate-200">
+                          <ng-container *ngIf="previewSalePrice() as sale; else seoBasePriceEn">
+                            <span class="font-semibold text-rose-700 dark:text-rose-300">{{ sale | localizedCurrency: 'RON' }}</span>
+                            <span class="ml-2 line-through text-slate-500 dark:text-slate-400">{{ previewBasePrice() | localizedCurrency: 'RON' }}</span>
+                          </ng-container>
+                          <ng-template #seoBasePriceEn>
+                            <span class="font-semibold">{{ previewBasePrice() | localizedCurrency: 'RON' }}</span>
+                          </ng-template>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="grid gap-2">
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.products.seoPreview.snippetTitle' | translate }}
+                    </p>
+                    <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/20">
+                      <p class="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+                        {{ seoPreviewTitle('en') }}
+                      </p>
+                      <p class="text-xs text-emerald-700 dark:text-emerald-300">
+                        {{ seoPreviewUrl() }}
+                      </p>
+                      <p class="text-sm text-slate-700 dark:text-slate-200">
+                        {{ seoPreviewDescription('en') }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+		        <div class="flex items-center gap-2">
+		          <app-button [label]="'adminUi.products.form.save' | translate" (action)="save()"></app-button>
+		          <span *ngIf="editorMessage()" class="text-sm text-emerald-700 dark:text-emerald-300">{{ editorMessage() }}</span>
+		        </div>
 
         <div class="grid gap-3">
           <div class="flex items-center justify-between">
@@ -1180,6 +1369,11 @@ export class AdminProductsComponent implements OnInit {
   form: ProductForm = this.blankForm();
   basePriceError = '';
   saleValueError = '';
+
+  duplicateCheck = signal<AdminProductDuplicateCheckResponse | null>(null);
+  duplicateBusy = signal(false);
+  private duplicateCheckSeq = 0;
+  private duplicateCheckTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   selected = new Set<string>();
   bulkSaleType: 'percent' | 'amount' = 'percent';
@@ -1765,6 +1959,7 @@ export class AdminProductsComponent implements OnInit {
     this.editingProductId.set(null);
     this.editorError.set(null);
     this.editorMessage.set(null);
+    this.resetDuplicateCheck();
     this.images.set([]);
     this.resetImageMeta();
     this.form = this.blankForm();
@@ -1783,6 +1978,7 @@ export class AdminProductsComponent implements OnInit {
     this.editingProductId.set(null);
     this.editorError.set(null);
     this.editorMessage.set(null);
+    this.resetDuplicateCheck();
     this.images.set([]);
     this.resetImageMeta();
     this.basePriceError = '';
@@ -1798,6 +1994,7 @@ export class AdminProductsComponent implements OnInit {
     this.editorMessage.set(null);
     this.editingSlug.set(slug);
     this.editingProductId.set(null);
+    this.resetDuplicateCheck();
     this.basePriceError = '';
     this.saleValueError = '';
     this.resetTranslations();
@@ -1846,9 +2043,151 @@ export class AdminProductsComponent implements OnInit {
         const productId = this.editingProductId();
         if (productId) this.loadStockAdjustments(productId);
         this.loadTranslations((prod.slug || slug).toString());
+        this.scheduleDuplicateCheck();
       },
       error: () => this.editorError.set(this.t('adminUi.products.errors.load'))
     });
+  }
+
+  onNameChange(next: string | number): void {
+    this.form.name = String(next ?? '');
+    this.scheduleDuplicateCheck();
+  }
+
+  onSkuChange(next: string | number): void {
+    this.form.sku = String(next ?? '');
+    this.scheduleDuplicateCheck();
+  }
+
+  predictedSlug(): string | null {
+    const existing = this.editingSlug();
+    if (existing) return existing;
+    const suggested = this.duplicateCheck()?.suggested_slug;
+    return suggested && suggested.trim() ? suggested : null;
+  }
+
+  duplicateHasWarnings(): boolean {
+    const dup = this.duplicateCheck();
+    if (!dup) return false;
+    const slugTaken = Boolean(dup.slug_base && dup.suggested_slug && dup.slug_base !== dup.suggested_slug);
+    return slugTaken || (dup.sku_matches?.length ?? 0) > 0 || (dup.name_matches?.length ?? 0) > 0;
+  }
+
+  private resetDuplicateCheck(): void {
+    this.duplicateCheckSeq += 1;
+    this.duplicateBusy.set(false);
+    this.duplicateCheck.set(null);
+    if (this.duplicateCheckTimeoutId) {
+      clearTimeout(this.duplicateCheckTimeoutId);
+      this.duplicateCheckTimeoutId = null;
+    }
+  }
+
+  private scheduleDuplicateCheck(): void {
+    if (!this.editorOpen()) return;
+    if (this.duplicateCheckTimeoutId) {
+      clearTimeout(this.duplicateCheckTimeoutId);
+      this.duplicateCheckTimeoutId = null;
+    }
+
+    const name = (this.form.name || '').trim();
+    const sku = (this.form.sku || '').trim();
+    if (!name && !sku) {
+      this.duplicateCheck.set(null);
+      return;
+    }
+
+    this.duplicateCheckTimeoutId = setTimeout(() => this.runDuplicateCheck(), 450);
+  }
+
+  private runDuplicateCheck(): void {
+    const name = (this.form.name || '').trim();
+    const sku = (this.form.sku || '').trim();
+    if (!name && !sku) {
+      this.duplicateCheck.set(null);
+      return;
+    }
+
+    const seq = (this.duplicateCheckSeq += 1);
+    this.duplicateBusy.set(true);
+    this.productsApi
+      .duplicateCheck({
+        name: name || undefined,
+        sku: sku || undefined,
+        exclude_slug: this.editingSlug() || undefined,
+      })
+      .subscribe({
+        next: (res) => {
+          if (seq !== this.duplicateCheckSeq) return;
+          this.duplicateCheck.set(res);
+        },
+        error: () => {
+          if (seq !== this.duplicateCheckSeq) return;
+          this.duplicateCheck.set(null);
+        },
+      })
+      .add(() => {
+        if (seq !== this.duplicateCheckSeq) return;
+        this.duplicateBusy.set(false);
+      });
+  }
+
+  seoPreviewImageUrl(): string | null {
+    const first = this.images()?.[0]?.url;
+    return typeof first === 'string' && first.trim() ? first : null;
+  }
+
+  seoPreviewName(lang: 'en' | 'ro'): string {
+    const translated = (this.translations?.[lang]?.name || '').trim();
+    if (translated) return translated;
+    const base = (this.form?.name || '').trim();
+    return base || '—';
+  }
+
+  seoPreviewTitle(lang: 'en' | 'ro'): string {
+    const name = this.seoPreviewName(lang);
+    if (name === '—') return name;
+    return `${name} | momentstudio`;
+  }
+
+  seoPreviewUrl(): string {
+    const slug = this.predictedSlug();
+    return `/products/${slug || '<slug>'}`;
+  }
+
+  seoPreviewDescription(lang: 'en' | 'ro'): string {
+    const translatedShort = (this.translations?.[lang]?.short_description || '').trim();
+    const translatedLong = (this.translations?.[lang]?.long_description || '').trim();
+    const baseShort = (this.form?.short_description || '').trim();
+    const baseLong = (this.form?.long_description || '').trim();
+
+    const raw = translatedShort || baseShort || translatedLong || baseLong;
+    const normalized = raw.replace(/\s+/g, ' ').trim();
+    if (!normalized) return '—';
+    if (normalized.length <= 160) return normalized;
+    return `${normalized.slice(0, 157)}…`;
+  }
+
+  previewBasePrice(): number {
+    const parsed = this.parseMoneyInput(this.form?.base_price || '');
+    return parsed === null ? 0 : parsed;
+  }
+
+  previewSalePrice(): number | null {
+    if (!this.form?.sale_enabled) return null;
+    const base = this.previewBasePrice();
+    if (!(base > 0)) return null;
+    const value = this.parseMoneyInput(this.form.sale_value || '');
+    if (value === null || value <= 0) return null;
+
+    if (this.form.sale_type === 'amount') {
+      const discounted = Math.max(0, Math.round((base - value) * 100) / 100);
+      return discounted < base ? discounted : null;
+    }
+
+    if (value > 100) return null;
+    const discounted = Math.max(0, Math.round((base * (1 - value / 100)) * 100) / 100);
+    return discounted < base ? discounted : null;
   }
 
   onBasePriceChange(next: string | number): void {

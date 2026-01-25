@@ -725,8 +725,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Inventory: stock adjustment ledger – Record stock changes with reason (“restock”, “damage”, “manual correction”).
 - [x] Admin Inventory: low-stock restock list – A “to restock” queue with supplier notes and export.
 - [x] Admin Inventory: reserved stock visibility – Show stock reserved in carts/orders vs available.
-- [ ] Admin Products: duplicate detection – Warn on duplicate slugs/SKUs/names; provide merge guidance.
-- [ ] Admin Products: SEO preview – Live preview of storefront card + meta snippet per language.
+- [x] Admin Products: duplicate detection – Warn on duplicate slugs/SKUs/names; provide merge guidance.
+- [x] Admin Products: SEO preview – Live preview of storefront card + meta snippet per language.
 - [ ] Admin Products: product relationships – Define “related products” and “upsells” used in storefront.
 - [ ] Admin Products: soft-delete recovery – View and restore deleted products/images.
 - [ ] Admin Products: audit trail for edits – Show per-field history for product changes.
