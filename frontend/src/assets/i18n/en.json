@@ -2737,6 +2737,18 @@
       "ownerLocked": "Owner role can only be transferred.",
       "aliasHistory": "Alias history",
       "loadingAliases": "Loading history…",
+      "customerProfile": "Customer profile",
+      "profileLoading": "Loading profile…",
+      "addressesTitle": "Addresses",
+      "addressesEmpty": "No saved addresses.",
+      "defaultShipping": "Default shipping",
+      "defaultBilling": "Default billing",
+      "ordersTitle": "Orders",
+      "ordersEmpty": "No orders yet.",
+      "ticketsTitle": "Tickets",
+      "ticketsEmpty": "No tickets yet.",
+      "activityTitle": "Recent activity",
+      "activityEmpty": "No recent activity.",
       "usernameHistory": "Username history",
       "displayNameHistory": "Display name history",
       "noHistory": "No history yet.",
@@ -2760,6 +2772,7 @@
       "errors": {
         "load": "Could not load users.",
         "aliases": "Could not load alias history.",
+        "profile": "Could not load customer profile.",
         "revoke": "Failed to revoke sessions",
         "role": "Failed to update role"
       }

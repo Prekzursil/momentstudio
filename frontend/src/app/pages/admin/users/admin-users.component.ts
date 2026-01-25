@@ -1,9 +1,10 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AdminUserAliasesResponse, AdminService } from '../../../core/admin.service';
-import { AdminUserListItem, AdminUserListResponse, AdminUsersService } from '../../../core/admin-users.service';
+import { AdminUserListItem, AdminUserListResponse, AdminUserProfileResponse, AdminUsersService } from '../../../core/admin-users.service';
 import { ToastService } from '../../../core/toast.service';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
@@ -16,7 +17,7 @@ type RoleFilter = 'all' | 'customer' | 'admin' | 'owner';
 @Component({
   selector: 'app-admin-users',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule, BreadcrumbComponent, ButtonComponent, InputComponent, SkeletonComponent],
+  imports: [CommonModule, FormsModule, RouterLink, TranslateModule, BreadcrumbComponent, ButtonComponent, InputComponent, SkeletonComponent],
   template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -207,6 +208,112 @@ type RoleFilter = 'all' | 'customer' | 'admin' | 'owner';
                 </div>
               </ng-container>
             </div>
+
+            <div class="grid gap-2">
+              <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.users.customerProfile' | translate }}
+              </div>
+
+              <div *ngIf="profileLoading()" class="text-sm text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.users.profileLoading' | translate }}
+              </div>
+              <div *ngIf="profileError()" class="text-sm text-rose-700 dark:text-rose-200">
+                {{ profileError() }}
+              </div>
+
+              <ng-container *ngIf="profile() as profile">
+                <div class="grid gap-3 text-sm text-slate-700 dark:text-slate-200">
+                  <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                    <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.users.addressesTitle' | translate }}
+                    </p>
+                    <p *ngIf="profile.addresses.length === 0" class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.users.addressesEmpty' | translate }}
+                    </p>
+                    <ul *ngIf="profile.addresses.length > 0" class="mt-2 grid gap-2">
+                      <li *ngFor="let addr of profile.addresses | slice: 0:5" class="rounded-lg border border-slate-200 p-2 dark:border-slate-800">
+                        <div class="flex items-center justify-between gap-2">
+                          <div class="font-medium text-slate-900 dark:text-slate-50 truncate">
+                            {{ addr.label || addr.line1 }}
+                          </div>
+                          <div class="flex items-center gap-1 text-[10px] font-semibold uppercase text-slate-600 dark:text-slate-300">
+                            <span *ngIf="addr.is_default_shipping" class="rounded-full bg-indigo-100 px-2 py-0.5 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100">
+                              {{ 'adminUi.users.defaultShipping' | translate }}
+                            </span>
+                            <span *ngIf="addr.is_default_billing" class="rounded-full bg-slate-100 px-2 py-0.5 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                              {{ 'adminUi.users.defaultBilling' | translate }}
+                            </span>
+                          </div>
+                        </div>
+                        <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                          {{ addr.city }}{{ addr.region ? ', ' + addr.region : '' }} · {{ addr.postal_code }} · {{ addr.country }}
+                        </div>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                    <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.users.ordersTitle' | translate }}
+                    </p>
+                    <p *ngIf="profile.orders.length === 0" class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.users.ordersEmpty' | translate }}
+                    </p>
+                    <ul *ngIf="profile.orders.length > 0" class="mt-2 grid gap-2">
+                      <li *ngFor="let order of profile.orders | slice: 0:5" class="flex items-center justify-between gap-2 rounded-lg border border-slate-200 p-2 dark:border-slate-800">
+                        <a [routerLink]="['/admin/orders', order.id]" class="font-medium text-indigo-700 hover:underline dark:text-indigo-200">
+                          {{ order.reference_code || order.id }}
+                        </a>
+                        <span class="text-xs text-slate-500 dark:text-slate-400">
+                          {{ order.status }} · {{ order.total_amount }} {{ order.currency }}
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                    <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.users.ticketsTitle' | translate }}
+                    </p>
+                    <p *ngIf="profile.tickets.length === 0" class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.users.ticketsEmpty' | translate }}
+                    </p>
+                    <ul *ngIf="profile.tickets.length > 0" class="mt-2 grid gap-2">
+                      <li *ngFor="let ticket of profile.tickets | slice: 0:5" class="rounded-lg border border-slate-200 p-2 dark:border-slate-800">
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="font-medium text-slate-900 dark:text-slate-50 truncate">
+                            {{ ticket.topic }} · {{ ticket.status }}
+                          </span>
+                          <span class="text-xs text-slate-500 dark:text-slate-400 shrink-0">{{ ticket.created_at | date: 'short' }}</span>
+                        </div>
+                        <div *ngIf="ticket.order_reference" class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                          {{ ticket.order_reference }}
+                        </div>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                    <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.users.activityTitle' | translate }}
+                    </p>
+                    <p *ngIf="profile.security_events.length === 0" class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.users.activityEmpty' | translate }}
+                    </p>
+                    <ul *ngIf="profile.security_events.length > 0" class="mt-2 grid gap-2">
+                      <li *ngFor="let ev of profile.security_events | slice: 0:5" class="flex items-center justify-between gap-2 rounded-lg border border-slate-200 p-2 dark:border-slate-800">
+                        <span class="font-medium text-slate-900 dark:text-slate-50 truncate">
+                          {{ ev.event_type }}
+                        </span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400 shrink-0">
+                          {{ ev.ip_address || '—' }} · {{ ev.created_at | date: 'short' }}
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </ng-container>
+            </div>
           </div>
         </section>
       </div>
@@ -236,6 +343,10 @@ export class AdminUsersComponent implements OnInit {
   aliases = signal<AdminUserAliasesResponse | null>(null);
   aliasesLoading = signal(false);
   aliasesError = signal<string | null>(null);
+
+  profile = signal<AdminUserProfileResponse | null>(null);
+  profileLoading = signal(false);
+  profileError = signal<string | null>(null);
 
   private pendingPrefillSearch: string | null = null;
   private autoSelectAfterLoad = false;
@@ -280,6 +391,7 @@ export class AdminUsersComponent implements OnInit {
     this.selectedUser.set(user);
     this.selectedRole = user.role;
     this.loadAliases(user.id);
+    this.loadProfile(user.id);
   }
 
   updateRole(): void {
@@ -360,6 +472,22 @@ export class AdminUsersComponent implements OnInit {
       error: () => {
         this.aliasesError.set(this.t('adminUi.users.errors.aliases'));
         this.aliasesLoading.set(false);
+      }
+    });
+  }
+
+  private loadProfile(userId: string): void {
+    this.profileLoading.set(true);
+    this.profileError.set(null);
+    this.profile.set(null);
+    this.usersApi.getProfile(userId).subscribe({
+      next: (res) => {
+        this.profile.set(res);
+        this.profileLoading.set(false);
+      },
+      error: () => {
+        this.profileError.set(this.t('adminUi.users.errors.profile'));
+        this.profileLoading.set(false);
       }
     });
   }

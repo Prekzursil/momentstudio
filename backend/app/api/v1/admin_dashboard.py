@@ -51,13 +51,15 @@ from app.schemas.inventory import (
 from app.services import exporter as exporter_service
 from app.services import inventory as inventory_service
 from app.services import catalog as catalog_service
+from app.models.address import Address
 from app.models.order import Order, OrderStatus
 from app.models.returns import ReturnRequest, ReturnRequestStatus
-from app.models.user import AdminAuditLog, User, RefreshSession, UserRole
+from app.models.support import ContactSubmission
+from app.models.user import AdminAuditLog, User, RefreshSession, UserRole, UserSecurityEvent
 from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.coupons_v2 import Promotion
 from app.services import auth as auth_service
-from app.schemas.user_admin import AdminUserListItem, AdminUserListResponse
+from app.schemas.user_admin import AdminUserListItem, AdminUserListResponse, AdminUserProfileResponse
 
 router = APIRouter(prefix="/admin/dashboard", tags=["admin"])
 
@@ -893,6 +895,73 @@ async def admin_user_aliases(
             for row in display_names
         ],
     }
+
+
+@router.get("/users/{user_id}/profile", response_model=AdminUserProfileResponse)
+async def admin_user_profile(
+    user_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> AdminUserProfileResponse:
+    user = await session.get(User, user_id)
+    if not user or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    addresses = (
+        (await session.execute(select(Address).where(Address.user_id == user_id).order_by(Address.created_at.desc())))
+        .scalars()
+        .all()
+    )
+    orders = (
+        (
+            await session.execute(
+                select(Order).where(Order.user_id == user_id).order_by(Order.created_at.desc()).limit(25)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    tickets = (
+        (
+            await session.execute(
+                select(ContactSubmission)
+                .where(ContactSubmission.user_id == user_id)
+                .order_by(ContactSubmission.created_at.desc())
+                .limit(25)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    security_events = (
+        (
+            await session.execute(
+                select(UserSecurityEvent)
+                .where(UserSecurityEvent.user_id == user_id)
+                .order_by(UserSecurityEvent.created_at.desc())
+                .limit(25)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    return AdminUserProfileResponse(
+        user=AdminUserListItem(
+            id=user.id,
+            email=user.email,
+            username=user.username,
+            name=user.name,
+            name_tag=user.name_tag,
+            role=user.role,
+            email_verified=bool(user.email_verified),
+            created_at=user.created_at,
+        ),
+        addresses=addresses,
+        orders=orders,
+        tickets=tickets,
+        security_events=security_events,
+    )
 
 
 @router.get("/content")

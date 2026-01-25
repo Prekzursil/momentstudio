@@ -15,8 +15,11 @@ from app.main import app
 from app.models.catalog import Category, Product, ProductImage, ProductStatus, ProductAuditLog, ProductTranslation
 from app.models.content import ContentBlock, ContentStatus, ContentAuditLog
 from app.models.order import Order, OrderStatus
+from app.models.address import Address
 from app.models.promo import PromoCode, StripeCouponMapping
+from app.models.support import ContactSubmission, ContactSubmissionTopic, ContactSubmissionStatus
 from app.models.user import User, UserRole
+from app.models.user import UserSecurityEvent
 
 
 @pytest.fixture(scope="module")
@@ -120,7 +123,12 @@ async def seed(session_factory):
         session.add(ContentAuditLog(content_block_id=block.id, action="publish", version=1, user_id=admin.id))
 
         await session.commit()
-        return {"product_slug": product.slug, "image_id": str(image.id), "category_slug": category.slug}
+        return {
+            "product_slug": product.slug,
+            "image_id": str(image.id),
+            "category_slug": category.slug,
+            "customer_id": customer.id,
+        }
 
 
 def auth_headers(client: TestClient) -> dict:
@@ -373,3 +381,66 @@ def test_product_audit_trail_records_field_changes(test_app: Dict[str, object]) 
     assert changes["name"]["before"] == "Painting"
     assert changes["name"]["after"] == "Painting updated"
     assert changes["tags"]["after"] == ["bestseller"]
+
+
+def test_admin_user_profile_endpoint(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    seeded = asyncio.run(seed(session_factory))
+    headers = auth_headers(client)
+
+    async def add_profile_data() -> None:
+        async with session_factory() as session:
+            customer = await session.get(User, seeded["customer_id"])
+            assert customer is not None
+            session.add(
+                Address(
+                    user_id=customer.id,
+                    label="Home",
+                    phone="+40700000000",
+                    line1="Street 1",
+                    line2=None,
+                    city="Cluj",
+                    region="CJ",
+                    postal_code="400000",
+                    country="RO",
+                    is_default_shipping=True,
+                    is_default_billing=False,
+                )
+            )
+            session.add(
+                ContactSubmission(
+                    topic=ContactSubmissionTopic.support,
+                    status=ContactSubmissionStatus.new,
+                    name=customer.name or "Customer",
+                    email=customer.email,
+                    message="Need help",
+                    order_reference=None,
+                    user_id=customer.id,
+                )
+            )
+            session.add(
+                UserSecurityEvent(
+                    user_id=customer.id,
+                    event_type="login",
+                    ip_address="127.0.0.1",
+                    user_agent="pytest",
+                )
+            )
+            await session.commit()
+
+    asyncio.run(add_profile_data())
+
+    resp = client.get(
+        f"/api/v1/admin/dashboard/users/{seeded['customer_id']}/profile",
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["user"]["email"] == "customer@example.com"
+    assert len(body["orders"]) == 1  # seeded order
+    assert len(body["addresses"]) == 1
+    assert len(body["tickets"]) == 1
+    assert len(body["security_events"]) == 1

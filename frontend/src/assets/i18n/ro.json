@@ -2737,6 +2737,18 @@
       "ownerLocked": "Rolul de proprietar poate fi doar transferat.",
       "aliasHistory": "Istoric alias-uri",
       "loadingAliases": "Se încarcă istoricul…",
+      "customerProfile": "Profil client",
+      "profileLoading": "Se încarcă profilul…",
+      "addressesTitle": "Adrese",
+      "addressesEmpty": "Nu există adrese salvate.",
+      "defaultShipping": "Livrare implicită",
+      "defaultBilling": "Facturare implicită",
+      "ordersTitle": "Comenzi",
+      "ordersEmpty": "Nu există comenzi încă.",
+      "ticketsTitle": "Tichete",
+      "ticketsEmpty": "Nu există tichete încă.",
+      "activityTitle": "Activitate recentă",
+      "activityEmpty": "Nu există activitate recentă.",
       "usernameHistory": "Istoric utilizatori",
       "displayNameHistory": "Istoric nume afișat",
       "noHistory": "Nu există istoric încă.",
@@ -2760,6 +2772,7 @@
       "errors": {
         "load": "Nu am putut încărca utilizatorii.",
         "aliases": "Nu am putut încărca istoricul.",
+        "profile": "Nu am putut încărca profilul clientului.",
         "revoke": "Nu am putut revoca sesiunile",
         "role": "Nu am putut actualiza rolul"
       }
