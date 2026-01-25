@@ -18,6 +18,7 @@ import { Subscription } from 'rxjs';
 import { WishlistService } from '../../core/wishlist.service';
 import { AuthService } from '../../core/auth.service';
 import { Router } from '@angular/router';
+import { MarkdownService } from '../../core/markdown.service';
 
 @Component({
   selector: 'app-product-detail',
@@ -122,9 +123,11 @@ import { Router } from '@angular/router';
                 </div>
               </div>
 
-              <p class="text-sm text-slate-700 dark:text-slate-200 leading-relaxed" *ngIf="product.long_description">
-                {{ product.long_description }}
-              </p>
+              <div
+                class="markdown text-sm text-slate-700 dark:text-slate-200 leading-relaxed"
+                *ngIf="descriptionHtml"
+                [innerHTML]="descriptionHtml"
+              ></div>
 
               <div class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:border-amber-900/40 dark:text-amber-100">
                 {{ 'product.uniqueness' | translate }}
@@ -351,6 +354,7 @@ export class ProductComponent implements OnInit, OnDestroy {
   product: Product | null = null;
   loading = true;
   loadError = false;
+  descriptionHtml = '';
   selectedVariantId: string | null = null;
   quantity = 1;
   activeImageIndex = 0;
@@ -383,6 +387,7 @@ export class ProductComponent implements OnInit, OnDestroy {
     private cartStore: CartStore,
     private recentlyViewedService: RecentlyViewedService,
     private translate: TranslateService,
+    private markdown: MarkdownService,
     private wishlist: WishlistService,
     private auth: AuthService,
     private router: Router
@@ -426,6 +431,7 @@ export class ProductComponent implements OnInit, OnDestroy {
     this.loading = true;
     this.loadError = false;
     this.product = null;
+    this.descriptionHtml = '';
     this.backInStockRequest = null;
     this.upsellProducts = [];
     this.relatedProducts = [];
@@ -444,6 +450,7 @@ export class ProductComponent implements OnInit, OnDestroy {
       next: (product) => {
         if (this.slug !== slug) return;
         this.product = product;
+        this.descriptionHtml = product.long_description ? this.markdown.render(product.long_description) : '';
         this.selectedVariantId = product.variants?.[0]?.id ?? null;
         this.loading = false;
         this.loadError = false;

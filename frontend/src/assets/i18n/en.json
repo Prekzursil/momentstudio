@@ -1420,7 +1420,9 @@
       "next": "Next",
       "open": "Open",
       "up": "Up",
-      "down": "Down"
+      "down": "Down",
+      "preview": "Preview",
+      "hide": "Hide"
     },
     "support": {
       "title": "Support inbox",
@@ -2216,6 +2218,10 @@
           "export": "Could not export products CSV.",
           "import": "Could not import products CSV."
         }
+      },
+      "markdownPreview": {
+        "title": "Preview",
+        "sanitizedWarning": "Some HTML was removed for safety. Review the preview output."
       },
       "audit": {
         "title": "Audit trail",

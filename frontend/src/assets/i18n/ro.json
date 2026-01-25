@@ -1420,7 +1420,9 @@
       "next": "Înainte",
       "open": "Deschide",
       "up": "Sus",
-      "down": "Jos"
+      "down": "Jos",
+      "preview": "Previzualizează",
+      "hide": "Ascunde"
     },
     "support": {
       "title": "Inbox suport",
@@ -2216,6 +2218,10 @@
           "export": "Nu am putut exporta CSV-ul produselor.",
           "import": "Nu am putut importa CSV-ul produselor."
         }
+      },
+      "markdownPreview": {
+        "title": "Previzualizare",
+        "sanitizedWarning": "Unele elemente HTML au fost eliminate pentru siguranță. Verifică previzualizarea."
       },
       "audit": {
         "title": "Istoric modificări",

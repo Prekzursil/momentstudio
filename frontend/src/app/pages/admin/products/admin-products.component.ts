@@ -15,6 +15,7 @@ import {
   AdminProductsService,
 } from '../../../core/admin-products.service';
 import { CatalogService, Category } from '../../../core/catalog.service';
+import { MarkdownService } from '../../../core/markdown.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import {
   AdminDeletedProductImage,
@@ -1381,8 +1382,33 @@ type VariantRow = {
 	            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
 	            rows="4"
 	            [(ngModel)]="form.long_description"
+              (ngModelChange)="onDescriptionChange()"
 	          ></textarea>
 	        </label>
+
+          <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.products.markdownPreview.title' | translate }}
+              </p>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="(descriptionPreviewOpen() ? 'adminUi.actions.hide' : 'adminUi.actions.preview') | translate"
+                (action)="toggleDescriptionPreview()"
+              ></app-button>
+            </div>
+
+            <div *ngIf="descriptionPreviewOpen()" class="grid gap-2">
+              <div
+                *ngIf="descriptionPreviewSanitized()"
+                class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+              >
+                {{ 'adminUi.products.markdownPreview.sanitizedWarning' | translate }}
+              </div>
+              <div class="markdown text-sm text-slate-700 dark:text-slate-200" [innerHTML]="descriptionPreviewHtml()"></div>
+            </div>
+          </div>
 
 	        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
 	          <div class="grid gap-1">
@@ -1435,8 +1461,33 @@ type VariantRow = {
 	                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
 	                  rows="4"
 	                  [(ngModel)]="translations.ro.long_description"
+                    (ngModelChange)="onTranslationDescriptionChange('ro')"
 	                ></textarea>
 	              </label>
+
+                <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+                  <div class="flex items-center justify-between gap-2">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.products.markdownPreview.title' | translate }}
+                    </p>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="(translationPreviewOpen.ro ? 'adminUi.actions.hide' : 'adminUi.actions.preview') | translate"
+                      (action)="toggleTranslationPreview('ro')"
+                    ></app-button>
+                  </div>
+
+                  <div *ngIf="translationPreviewOpen.ro" class="grid gap-2">
+                    <div
+                      *ngIf="translationPreviewSanitized.ro"
+                      class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+                    >
+                      {{ 'adminUi.products.markdownPreview.sanitizedWarning' | translate }}
+                    </div>
+                    <div class="markdown text-sm text-slate-700 dark:text-slate-200" [innerHTML]="translationPreviewHtml.ro"></div>
+                  </div>
+                </div>
 	            </div>
 
 	            <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -1472,8 +1523,33 @@ type VariantRow = {
 	                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
 	                  rows="4"
 	                  [(ngModel)]="translations.en.long_description"
+                    (ngModelChange)="onTranslationDescriptionChange('en')"
 	                ></textarea>
 	              </label>
+
+                <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+                  <div class="flex items-center justify-between gap-2">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.products.markdownPreview.title' | translate }}
+                    </p>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="(translationPreviewOpen.en ? 'adminUi.actions.hide' : 'adminUi.actions.preview') | translate"
+                      (action)="toggleTranslationPreview('en')"
+                    ></app-button>
+                  </div>
+
+                  <div *ngIf="translationPreviewOpen.en" class="grid gap-2">
+                    <div
+                      *ngIf="translationPreviewSanitized.en"
+                      class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+                    >
+                      {{ 'adminUi.products.markdownPreview.sanitizedWarning' | translate }}
+                    </div>
+                    <div class="markdown text-sm text-slate-700 dark:text-slate-200" [innerHTML]="translationPreviewHtml.en"></div>
+                  </div>
+                </div>
 		            </div>
 		          </div>
 		        </div>
@@ -1798,6 +1874,12 @@ export class AdminProductsComponent implements OnInit {
   form: ProductForm = this.blankForm();
   basePriceError = '';
   saleValueError = '';
+  descriptionPreviewOpen = signal(false);
+  descriptionPreviewHtml = signal('');
+  descriptionPreviewSanitized = signal(false);
+  translationPreviewOpen: Record<'en' | 'ro', boolean> = { en: false, ro: false };
+  translationPreviewHtml: Record<'en' | 'ro', string> = { en: '', ro: '' };
+  translationPreviewSanitized: Record<'en' | 'ro', boolean> = { en: false, ro: false };
 
   duplicateCheck = signal<AdminProductDuplicateCheckResponse | null>(null);
   duplicateBusy = signal(false);
@@ -1885,6 +1967,7 @@ export class AdminProductsComponent implements OnInit {
     private productsApi: AdminProductsService,
     private catalog: CatalogService,
     private admin: AdminService,
+    private markdown: MarkdownService,
     private toast: ToastService,
     private translate: TranslateService
   ) {}
@@ -2468,6 +2551,42 @@ export class AdminProductsComponent implements OnInit {
     });
   }
 
+  toggleDescriptionPreview(): void {
+    const next = !this.descriptionPreviewOpen();
+    this.descriptionPreviewOpen.set(next);
+    if (next) this.refreshDescriptionPreview();
+  }
+
+  onDescriptionChange(): void {
+    if (!this.descriptionPreviewOpen()) return;
+    this.refreshDescriptionPreview();
+  }
+
+  toggleTranslationPreview(lang: 'en' | 'ro'): void {
+    this.translationPreviewOpen[lang] = !this.translationPreviewOpen[lang];
+    if (this.translationPreviewOpen[lang]) {
+      this.refreshTranslationPreview(lang);
+    }
+  }
+
+  onTranslationDescriptionChange(lang: 'en' | 'ro'): void {
+    if (!this.translationPreviewOpen[lang]) return;
+    this.refreshTranslationPreview(lang);
+  }
+
+  private refreshDescriptionPreview(): void {
+    const { html, sanitized } = this.markdown.renderWithSanitizationReport(this.form.long_description || '');
+    this.descriptionPreviewHtml.set(html);
+    this.descriptionPreviewSanitized.set(sanitized);
+  }
+
+  private refreshTranslationPreview(lang: 'en' | 'ro'): void {
+    const text = (this.translations?.[lang]?.long_description || '').toString();
+    const { html, sanitized } = this.markdown.renderWithSanitizationReport(text);
+    this.translationPreviewHtml[lang] = html;
+    this.translationPreviewSanitized[lang] = sanitized;
+  }
+
 		  startNew(): void {
 		    this.editorOpen.set(true);
 		    this.editingSlug.set(null);
@@ -2477,6 +2596,7 @@ export class AdminProductsComponent implements OnInit {
 		    this.resetDuplicateCheck();
 		    this.resetRelationships();
 		    this.resetAudit();
+        this.resetMarkdownPreview();
 		    this.images.set([]);
 	    this.resetDeletedImages();
 		    this.resetImageMeta();
@@ -2499,6 +2619,7 @@ export class AdminProductsComponent implements OnInit {
 		    this.resetDuplicateCheck();
 		    this.resetRelationships();
 		    this.resetAudit();
+        this.resetMarkdownPreview();
 		    this.images.set([]);
 	    this.resetDeletedImages();
 		    this.resetImageMeta();
@@ -2518,6 +2639,7 @@ export class AdminProductsComponent implements OnInit {
 		    this.resetDuplicateCheck();
 		    this.resetRelationships();
 		    this.resetAudit();
+        this.resetMarkdownPreview();
 		    this.basePriceError = '';
 		    this.saleValueError = '';
 		    this.resetTranslations();
@@ -3653,6 +3775,15 @@ export class AdminProductsComponent implements OnInit {
     this.auditError.set(null);
   }
 
+  private resetMarkdownPreview(): void {
+    this.descriptionPreviewOpen.set(false);
+    this.descriptionPreviewHtml.set('');
+    this.descriptionPreviewSanitized.set(false);
+    this.translationPreviewOpen = { en: false, ro: false };
+    this.translationPreviewHtml = { en: '', ro: '' };
+    this.translationPreviewSanitized = { en: false, ro: false };
+  }
+
   private blankImageMetaForm(): ImageMetaForm {
     return { alt_text: '', caption: '' };
   }
@@ -3765,6 +3896,11 @@ export class AdminProductsComponent implements OnInit {
         }
         this.translationExists = exists;
         this.translations = mapped;
+        for (const lang of ['en', 'ro'] as const) {
+          if (this.translationPreviewOpen[lang]) {
+            this.refreshTranslationPreview(lang);
+          }
+        }
         this.translationLoading.set(false);
       },
       error: () => {
