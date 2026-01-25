@@ -475,3 +475,38 @@ def test_admin_user_internal_update_creates_audit(test_app: Dict[str, object]) -
     assert audit.status_code == 200, audit.text
     security_logs = audit.json().get("security", [])
     assert any(item.get("action") == "user.internal.update" for item in security_logs)
+
+
+def test_admin_user_impersonation_is_read_only(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    seeded = asyncio.run(seed(session_factory))
+    headers = auth_headers(client)
+
+    started = client.post(
+        f"/api/v1/admin/dashboard/users/{seeded['customer_id']}/impersonate",
+        headers=headers,
+    )
+    assert started.status_code == 200, started.text
+    token = started.json().get("access_token")
+    assert isinstance(token, str) and token
+
+    me = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert me.status_code == 200, me.text
+    assert me.json()["id"] == str(seeded["customer_id"])
+
+    read_only = client.post(
+        "/api/v1/auth/verify/request",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert read_only.status_code == 403, read_only.text
+
+    audit = client.get("/api/v1/admin/dashboard/audit", headers=headers)
+    assert audit.status_code == 200, audit.text
+    security_logs = audit.json().get("security", [])
+    assert any(item.get("action") == "user.impersonation.start" for item in security_logs)

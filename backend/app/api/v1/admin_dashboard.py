@@ -3,7 +3,7 @@ import io
 from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import (
     String,
     Text,
@@ -60,6 +60,7 @@ from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.coupons_v2 import Promotion
 from app.services import auth as auth_service
 from app.schemas.user_admin import (
+    AdminUserImpersonationResponse,
     AdminUserInternalUpdate,
     AdminUserListItem,
     AdminUserListResponse,
@@ -1672,6 +1673,44 @@ async def update_user_internal(
         vip=bool(getattr(user, "vip", False)),
         admin_note=getattr(user, "admin_note", None),
     )
+
+
+@router.post("/users/{user_id}/impersonate", response_model=AdminUserImpersonationResponse)
+async def impersonate_user(
+    user_id: UUID,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin),
+) -> AdminUserImpersonationResponse:
+    user = await session.get(User, user_id)
+    if not user or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user.role != UserRole.customer:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only customer accounts can be impersonated")
+
+    expires_minutes = max(1, int(settings.admin_impersonation_exp_minutes or 10))
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+    access_token = security.create_impersonation_access_token(
+        str(user.id),
+        impersonator_user_id=str(current_user.id),
+        expires_minutes=expires_minutes,
+    )
+
+    session.add(
+        AdminAuditLog(
+            action="user.impersonation.start",
+            actor_user_id=current_user.id,
+            subject_user_id=user.id,
+            data={
+                "expires_minutes": expires_minutes,
+                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+                "ip_address": (request.client.host if request.client else None),
+            },
+        )
+    )
+    await session.commit()
+
+    return AdminUserImpersonationResponse(access_token=access_token, expires_at=expires_at)
 
 
 @router.post("/owner/transfer")

@@ -166,6 +166,13 @@ type RoleFilter = 'all' | 'customer' | 'admin' | 'owner';
               <app-button
                 size="sm"
                 variant="ghost"
+                [label]="'adminUi.users.viewAsUser' | translate"
+                [disabled]="selectedUser()!.role !== 'customer' || impersonateBusy()"
+                (action)="impersonate()"
+              ></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
                 [label]="'adminUi.users.forceLogout' | translate"
                 (action)="forceLogout()"
               ></app-button>
@@ -383,6 +390,7 @@ export class AdminUsersComponent implements OnInit {
   vip = false;
   adminNote = '';
   internalBusy = signal(false);
+  impersonateBusy = signal(false);
 
   private pendingPrefillSearch: string | null = null;
   private autoSelectAfterLoad = false;
@@ -477,6 +485,30 @@ export class AdminUsersComponent implements OnInit {
           this.internalBusy.set(false);
         }
       });
+  }
+
+  impersonate(): void {
+    const user = this.selectedUser();
+    if (!user) return;
+    this.impersonateBusy.set(true);
+    this.usersApi.impersonate(user.id).subscribe({
+      next: (res) => {
+        const token = (res?.access_token || '').toString();
+        if (!token) {
+          this.toast.error(this.t('adminUi.users.errors.impersonate'));
+          this.impersonateBusy.set(false);
+          return;
+        }
+        const url = `${window.location.origin}/#impersonate=${encodeURIComponent(token)}`;
+        window.open(url, '_blank', 'noopener');
+        this.toast.success(this.t('adminUi.users.success.impersonate'));
+        this.impersonateBusy.set(false);
+      },
+      error: () => {
+        this.toast.error(this.t('adminUi.users.errors.impersonate'));
+        this.impersonateBusy.set(false);
+      }
+    });
   }
 
   identityLabel(user: AdminUserListItem): string {

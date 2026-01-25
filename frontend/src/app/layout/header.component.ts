@@ -158,7 +158,7 @@ import { NotificationsService, UserNotification } from '../core/notifications.se
 	                  class="w-full text-left rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
 	                  (click)="signOut()"
 	                >
-	                  {{ 'nav.signOut' | translate }}
+	                  {{ (isImpersonating() ? 'nav.exitImpersonation' : 'nav.signOut') | translate }}
 	                </button>
 	              </div>
             </div>
@@ -358,6 +358,7 @@ export class HeaderComponent implements OnDestroy {
   readonly isAuthenticated = computed(() => this.auth.isAuthenticated());
   readonly currentUser = computed(() => this.auth.user());
   readonly isAdmin = computed(() => this.auth.isAdmin());
+  readonly isImpersonating = computed(() => this.auth.isImpersonating());
   readonly notifications = computed(() => this.notificationsService.items());
   readonly notificationsLoading = computed(() => this.notificationsService.loading());
   readonly unreadCount = computed(() => this.notificationsService.unreadCount());

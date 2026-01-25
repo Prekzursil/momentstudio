@@ -47,6 +47,22 @@ def create_access_token(subject: str, jti: str | None = None) -> str:
     return _create_token_with_claims(subject, "access", timedelta(minutes=settings.access_token_exp_minutes), jti=jti)
 
 
+def create_impersonation_access_token(
+    subject: str,
+    *,
+    impersonator_user_id: str,
+    expires_minutes: int | None = None,
+) -> str:
+    minutes = int(expires_minutes if expires_minutes is not None else settings.admin_impersonation_exp_minutes)
+    minutes = max(1, minutes)
+    return _create_token_with_claims(
+        subject,
+        "access",
+        timedelta(minutes=minutes),
+        extra_claims={"impersonator": str(impersonator_user_id)},
+    )
+
+
 def create_refresh_token(subject: str, jti: str, expires_at: datetime | None = None) -> str:
     delta = expires_at - datetime.now(timezone.utc) if expires_at else timedelta(days=settings.refresh_token_exp_days)
     return _create_token_with_claims(subject, "refresh", delta, jti=jti)

@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -11,9 +11,11 @@ from app.services import self_service
 from uuid import UUID
 
 bearer_scheme = HTTPBearer(auto_error=False)
+_IMPERSONATION_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     session: AsyncSession = Depends(get_session),
 ) -> User:
@@ -31,6 +33,16 @@ async def get_current_user(
     if user_id is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
 
+    impersonator = payload.get("impersonator")
+    if impersonator:
+        try:
+            impersonator_id = UUID(str(impersonator))
+        except Exception:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+        if request.method.upper() not in _IMPERSONATION_SAFE_METHODS:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Impersonation is read-only")
+        request.state.impersonator_user_id = impersonator_id
+
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if user is None:
@@ -46,6 +58,7 @@ async def get_current_user(
 
 
 async def get_current_user_optional(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     session: AsyncSession = Depends(get_session),
 ) -> User | None:
@@ -59,6 +72,16 @@ async def get_current_user_optional(
         user_id = UUID(str(payload.get("sub")))
     except Exception:
         return None
+
+    impersonator = payload.get("impersonator")
+    if impersonator:
+        try:
+            impersonator_id = UUID(str(impersonator))
+        except Exception:
+            return None
+        if request.method.upper() not in _IMPERSONATION_SAFE_METHODS:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Impersonation is read-only")
+        request.state.impersonator_user_id = impersonator_id
 
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()

@@ -23,6 +23,7 @@
     "signIn": "Sign in",
     "register": "Register",
     "signOut": "Sign out",
+    "exitImpersonation": "Exit view",
     "menu": "Menu",
     "preferences": "Preferences",
     "theme": "Theme",
@@ -2753,6 +2754,7 @@
       "adminNote": "Internal note",
       "adminNoteHint": "Private admin-only notes (max 2000 characters).",
       "saveInternal": "Save note",
+      "viewAsUser": "View storefront as user",
       "usernameHistory": "Username history",
       "displayNameHistory": "Display name history",
       "noHistory": "No history yet.",
@@ -2772,13 +2774,15 @@
       "success": {
         "revoke": "Sessions revoked",
         "role": "Role updated",
-        "internal": "Saved"
+        "internal": "Saved",
+        "impersonate": "Opened in a new tab"
       },
       "errors": {
         "load": "Could not load users.",
         "aliases": "Could not load alias history.",
         "profile": "Could not load customer profile.",
         "internal": "Could not save internal notes.",
+        "impersonate": "Could not start impersonation.",
         "revoke": "Failed to revoke sessions",
         "role": "Failed to update role"
       }

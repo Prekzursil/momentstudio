@@ -90,6 +90,11 @@ class AdminUserInternalUpdate(BaseModel):
     admin_note: str | None = Field(default=None, max_length=2000)
 
 
+class AdminUserImpersonationResponse(BaseModel):
+    access_token: str
+    expires_at: datetime
+
+
 class AdminUserProfileResponse(BaseModel):
     user: AdminUserProfileUser
     addresses: list[AdminUserAddress] = []

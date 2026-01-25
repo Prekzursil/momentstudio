@@ -76,6 +76,11 @@ export interface AdminUserProfileUser extends AdminUserListItem {
   admin_note?: string | null;
 }
 
+export interface AdminUserImpersonationResponse {
+  access_token: string;
+  expires_at: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdminUsersService {
   constructor(private api: ApiService) {}
@@ -95,5 +100,9 @@ export class AdminUsersService {
 
   updateInternal(userId: string, payload: { vip?: boolean; admin_note?: string | null }): Observable<AdminUserProfileUser> {
     return this.api.patch<AdminUserProfileUser>(`/admin/dashboard/users/${userId}/internal`, payload as any);
+  }
+
+  impersonate(userId: string): Observable<AdminUserImpersonationResponse> {
+    return this.api.post<AdminUserImpersonationResponse>(`/admin/dashboard/users/${userId}/impersonate`, {});
   }
 }

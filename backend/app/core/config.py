@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     netopia_jwt_alg: str = "RS512"
     jwt_algorithm: str = "HS256"
     access_token_exp_minutes: int = 30
+    admin_impersonation_exp_minutes: int = 10
     refresh_token_exp_days: int = 7
     refresh_token_rotation: bool = True
     refresh_token_rotation_grace_seconds: int = 60

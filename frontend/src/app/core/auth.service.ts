@@ -158,6 +158,7 @@ type StorageMode = 'local' | 'session';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  private static readonly IMPERSONATION_TOKEN_KEY = 'impersonation_access_token';
   private storageMode: StorageMode = 'session';
   private userSignal = signal<AuthUser | null>(null);
   private tokens: AuthTokens | null = null;
@@ -183,6 +184,11 @@ export class AuthService {
   isAdmin(): boolean {
     const role = this.role();
     return role === 'admin' || role === 'owner';
+  }
+
+  isImpersonating(): boolean {
+    const token = this.tokens?.access_token;
+    return Boolean(token && this.isImpersonationToken(token));
   }
 
   getAccessToken(): string | null {
@@ -475,6 +481,9 @@ export class AuthService {
   }
 
   refresh(opts?: { silent?: boolean }): Observable<AuthTokens | null> {
+    if (this.isImpersonating()) {
+      return of(null);
+    }
     const silent = opts?.silent ?? false;
     const headers = silent ? { 'X-Silent': '1' } : undefined;
 
@@ -499,6 +508,10 @@ export class AuthService {
   }
 
   logout(): Observable<void> {
+    if (this.isImpersonating()) {
+      this.exitImpersonation({ redirectTo: '/' });
+      return of(void 0);
+    }
     const refreshToken = this.getRefreshToken();
     const accessToken = this.getAccessToken();
     this.clearSession({ redirectTo: '/' });
@@ -511,10 +524,15 @@ export class AuthService {
   }
 
   expireSession(): void {
+    if (this.isImpersonating()) {
+      this.exitImpersonation({ redirectTo: '/' });
+      return;
+    }
     this.clearSession({ redirectTo: '/login' });
   }
 
   clearSession(opts?: { redirectTo?: string }): void {
+    this.clearImpersonation();
     this.clearStorage();
     this.tokens = null;
     this.userSignal.set(null);
@@ -596,6 +614,8 @@ export class AuthService {
         this.clearSession();
       }
     }
+
+    this.bootstrapImpersonation();
   }
 
   private installRevalidationHooks(): void {
@@ -700,6 +720,24 @@ export class AuthService {
     }
   }
 
+  private parseJwtPayload(token: string): Record<string, unknown> | null {
+    const raw = (token || '').trim();
+    const parts = raw.split('.');
+    if (parts.length !== 3) return null;
+    try {
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))) as Record<string, unknown>;
+      return payload && typeof payload === 'object' ? payload : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private isImpersonationToken(token: string): boolean {
+    const payload = this.parseJwtPayload(token);
+    const impersonator = payload?.['impersonator'];
+    return typeof impersonator === 'string' && impersonator.trim().length > 0;
+  }
+
   private isJwtExpired(token: string, skewSeconds = 30): boolean {
     const exp = this.parseJwtExpiry(token);
     // If we can't parse expiry, treat as expired (invalid/stale token).
@@ -760,6 +798,71 @@ export class AuthService {
       } catch {
         // ignore
       }
+    }
+  }
+
+  private bootstrapImpersonation(): void {
+    if (typeof window === 'undefined') return;
+
+    const fromUrl = this.readImpersonationTokenFromUrl();
+    if (fromUrl) {
+      this.writeImpersonationToken(fromUrl);
+      this.clearImpersonationTokenFromUrl();
+    }
+
+    const token = fromUrl || this.readImpersonationTokenFromStorage();
+    if (!token) return;
+    if (this.isJwtExpired(token) || !this.isImpersonationToken(token)) {
+      this.clearImpersonation();
+      return;
+    }
+
+    this.tokens = { access_token: token, refresh_token: '', token_type: 'bearer' };
+  }
+
+  exitImpersonation(opts?: { redirectTo?: string }): void {
+    this.clearSession(opts);
+  }
+
+  private readImpersonationTokenFromUrl(): string | null {
+    if (typeof window === 'undefined') return null;
+    const hash = (window.location.hash || '').replace(/^#/, '').trim();
+    if (!hash) return null;
+    const params = new URLSearchParams(hash);
+    const token = (params.get('impersonate') || '').trim();
+    return token || null;
+  }
+
+  private clearImpersonationTokenFromUrl(): void {
+    try {
+      window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+    } catch {
+      // ignore
+    }
+  }
+
+  private writeImpersonationToken(token: string): void {
+    try {
+      window.sessionStorage.setItem(AuthService.IMPERSONATION_TOKEN_KEY, token);
+    } catch {
+      // ignore
+    }
+  }
+
+  private readImpersonationTokenFromStorage(): string | null {
+    try {
+      return window.sessionStorage.getItem(AuthService.IMPERSONATION_TOKEN_KEY);
+    } catch {
+      return null;
+    }
+  }
+
+  private clearImpersonation(): void {
+    if (typeof window === 'undefined') return;
+    try {
+      window.sessionStorage.removeItem(AuthService.IMPERSONATION_TOKEN_KEY);
+    } catch {
+      // ignore
     }
   }
 
