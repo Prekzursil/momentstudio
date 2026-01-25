@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import re
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
@@ -19,17 +20,22 @@ from app.models.coupons_v2 import (
     CouponBulkJob,
     CouponBulkJobAction,
     CouponBulkJobStatus,
+    CouponRedemption,
     CouponVisibility,
     Promotion,
     PromotionScope,
     PromotionScopeEntityType,
     PromotionScopeMode,
 )
-from app.models.order import ShippingMethod
+from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod
 from app.models.user import AdminAuditLog, User
 from app.schemas.coupons_v2 import (
     CouponAssignRequest,
     CouponAssignmentRead,
+    CouponAnalyticsDaily,
+    CouponAnalyticsResponse,
+    CouponAnalyticsSummary,
+    CouponAnalyticsTopProduct,
     CouponCreate,
     CouponBulkJobRead,
     CouponBulkAssignRequest,
@@ -52,6 +58,7 @@ from app.schemas.coupons_v2 import (
 from app.services import checkout_settings as checkout_settings_service
 from app.services import coupons_v2 as coupons_service
 from app.services import email as email_service
+from app.services import pricing
 from app.services import cart as cart_service
 from app.api.v1 import cart as cart_api
 
@@ -214,6 +221,15 @@ def _to_offer(result: coupons_service.CouponEligibility) -> CouponOffer:
 def _sanitize_coupon_prefix(value: str) -> str:
     cleaned = re.sub(r"[^A-Z0-9]+", "", (value or "").upper()).strip("-")
     return cleaned[:20]
+
+
+def _to_decimal(value: object) -> Decimal:
+    if value is None:
+        return Decimal("0.00")
+    try:
+        return Decimal(str(value))
+    except Exception:
+        return Decimal("0.00")
 
 
 @router.get("/eligibility", response_model=CouponEligibilityResponse)
@@ -658,6 +674,205 @@ async def admin_issue_coupon_to_user(
     coupon_read = CouponRead.model_validate(coupon, from_attributes=True)
     coupon_read.promotion = _to_promotion_read(coupon.promotion) if coupon.promotion else None
     return coupon_read
+
+
+@router.get("/admin/analytics", response_model=CouponAnalyticsResponse)
+async def admin_coupon_analytics(
+    promotion_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("coupons")),
+    coupon_id: UUID | None = Query(default=None),
+    days: int = Query(default=30, ge=1, le=365),
+    top_limit: int = Query(default=10, ge=1, le=50),
+) -> CouponAnalyticsResponse:
+    @dataclass
+    class _TopProductAgg:
+        product_id: UUID
+        slug: str | None
+        name: str
+        orders: set[UUID]
+        quantity: int
+        gross: Decimal
+        allocated: Decimal
+
+    promotion = await session.get(Promotion, promotion_id)
+    if not promotion:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found")
+
+    if coupon_id:
+        coupon = await session.get(Coupon, coupon_id)
+        if not coupon or coupon.promotion_id != promotion_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+
+    end = datetime.now(timezone.utc)
+    start = end - timedelta(days=int(days))
+
+    redemption_filters = [
+        CouponRedemption.voided_at.is_(None),
+        CouponRedemption.redeemed_at >= start,
+        CouponRedemption.redeemed_at <= end,
+        Coupon.promotion_id == promotion_id,
+        Order.status.notin_([OrderStatus.pending_payment, OrderStatus.cancelled, OrderStatus.refunded]),
+    ]
+    if coupon_id:
+        redemption_filters.append(Coupon.id == coupon_id)
+
+    summary_row = (
+        await session.execute(
+            select(
+                func.count(CouponRedemption.id),
+                func.coalesce(func.sum(CouponRedemption.discount_ron), 0),
+                func.coalesce(func.sum(CouponRedemption.shipping_discount_ron), 0),
+                func.avg(Order.total_amount),
+            )
+            .select_from(CouponRedemption)
+            .join(Coupon, CouponRedemption.coupon_id == Coupon.id)
+            .join(Order, CouponRedemption.order_id == Order.id)
+            .where(*redemption_filters)
+        )
+    ).one()
+
+    redemptions_count = int(summary_row[0] or 0)
+    total_discount = pricing.quantize_money(_to_decimal(summary_row[1]))
+    total_shipping_discount = pricing.quantize_money(_to_decimal(summary_row[2]))
+    avg_with_val = summary_row[3]
+    avg_with = pricing.quantize_money(_to_decimal(avg_with_val)) if avg_with_val is not None else None
+
+    baseline_avg_val = (
+        await session.execute(
+            select(func.avg(Order.total_amount)).where(
+                Order.created_at >= start,
+                Order.created_at <= end,
+                Order.status.notin_([OrderStatus.pending_payment, OrderStatus.cancelled, OrderStatus.refunded]),
+                or_(Order.promo_code.is_(None), func.length(func.trim(Order.promo_code)) == 0),
+            )
+        )
+    ).scalar_one()
+    avg_without = pricing.quantize_money(_to_decimal(baseline_avg_val)) if baseline_avg_val is not None else None
+    aov_lift = pricing.quantize_money(avg_with - avg_without) if avg_with is not None and avg_without is not None else None
+
+    daily_rows = (
+        await session.execute(
+            select(
+                func.date(CouponRedemption.redeemed_at).label("day"),
+                func.count(CouponRedemption.id),
+                func.coalesce(func.sum(CouponRedemption.discount_ron), 0),
+                func.coalesce(func.sum(CouponRedemption.shipping_discount_ron), 0),
+            )
+            .select_from(CouponRedemption)
+            .join(Coupon, CouponRedemption.coupon_id == Coupon.id)
+            .join(Order, CouponRedemption.order_id == Order.id)
+            .where(*redemption_filters)
+            .group_by("day")
+            .order_by("day")
+        )
+    ).all()
+
+    daily: list[CouponAnalyticsDaily] = []
+    for day_val, count_val, disc_val, ship_val in daily_rows:
+        daily.append(
+            CouponAnalyticsDaily(
+                date=str(day_val),
+                redemptions=int(count_val or 0),
+                discount_ron=pricing.quantize_money(_to_decimal(disc_val)),
+                shipping_discount_ron=pricing.quantize_money(_to_decimal(ship_val)),
+            )
+        )
+
+    redemption_orders = (
+        await session.execute(
+            select(CouponRedemption.order_id, CouponRedemption.discount_ron)
+            .select_from(CouponRedemption)
+            .join(Coupon, CouponRedemption.coupon_id == Coupon.id)
+            .join(Order, CouponRedemption.order_id == Order.id)
+            .where(*redemption_filters)
+        )
+    ).all()
+    order_discount_by_id: dict[UUID, Decimal] = {
+        order_id: _to_decimal(discount_val) for order_id, discount_val in redemption_orders if order_id
+    }
+    order_ids = list(order_discount_by_id.keys())
+
+    aggregates: dict[UUID, _TopProductAgg] = {}
+    if order_ids:
+        item_rows = (
+            await session.execute(
+                select(
+                    OrderItem.order_id,
+                    OrderItem.product_id,
+                    Product.slug,
+                    Product.name,
+                    OrderItem.quantity,
+                    OrderItem.subtotal,
+                )
+                .select_from(OrderItem)
+                .join(Product, OrderItem.product_id == Product.id)
+                .where(OrderItem.order_id.in_(order_ids))
+            )
+        ).all()
+
+        order_subtotals: dict[UUID, Decimal] = {}
+        for order_id, _, _, _, _, subtotal_val in item_rows:
+            if not order_id:
+                continue
+            order_subtotals[order_id] = order_subtotals.get(order_id, Decimal("0.00")) + _to_decimal(subtotal_val)
+
+        for order_id, product_id, slug, name, qty, subtotal_val in item_rows:
+            if not order_id or not product_id:
+                continue
+            subtotal = _to_decimal(subtotal_val)
+            order_subtotal = order_subtotals.get(order_id, Decimal("0.00"))
+            order_discount = order_discount_by_id.get(order_id, Decimal("0.00"))
+            allocated = Decimal("0.00")
+            if order_discount > 0 and subtotal > 0 and order_subtotal > 0:
+                allocated = order_discount * subtotal / order_subtotal
+
+            bucket = aggregates.get(product_id)
+            if bucket is None:
+                bucket = _TopProductAgg(
+                    product_id=product_id,
+                    slug=(slug or None),
+                    name=(name or str(product_id)),
+                    orders=set(),
+                    quantity=0,
+                    gross=Decimal("0.00"),
+                    allocated=Decimal("0.00"),
+                )
+                aggregates[product_id] = bucket
+
+            bucket.orders.add(order_id)
+            bucket.quantity += int(qty or 0)
+            bucket.gross += subtotal
+            bucket.allocated += allocated
+
+    top_products: list[CouponAnalyticsTopProduct] = []
+    if aggregates:
+        items_sorted = sorted(aggregates.values(), key=lambda item: item.allocated, reverse=True)
+        for bucket in items_sorted[: int(top_limit)]:
+            top_products.append(
+                CouponAnalyticsTopProduct(
+                    product_id=bucket.product_id,
+                    product_slug=bucket.slug,
+                    product_name=bucket.name,
+                    orders_count=len(bucket.orders),
+                    quantity=bucket.quantity,
+                    gross_sales_ron=pricing.quantize_money(bucket.gross),
+                    allocated_discount_ron=pricing.quantize_money(bucket.allocated),
+                )
+            )
+
+    return CouponAnalyticsResponse(
+        summary=CouponAnalyticsSummary(
+            redemptions=redemptions_count,
+            total_discount_ron=total_discount,
+            total_shipping_discount_ron=total_shipping_discount,
+            avg_order_total_with_coupon=avg_with,
+            avg_order_total_without_coupon=avg_without,
+            aov_lift=aov_lift,
+        ),
+        daily=daily,
+        top_products=top_products,
+    )
 
 
 async def _find_user(session: AsyncSession, *, user_id: UUID | None, email: str | None) -> User:

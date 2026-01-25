@@ -3039,6 +3039,42 @@
         "minSubtotalWarning": "Neeligibil la acest subtotal (subtotal minim este {{min}}).",
         "scopeNote": "Această previzualizare presupune că toate produsele sunt în aria de aplicare; regulile de includere/excludere pot reduce subtotalul eligibil."
       },
+      "analytics": {
+        "title": "Analitice",
+        "hint": "Utilizări în timp, impact AOV și produse cu cele mai mari reduceri.",
+        "window": "Perioadă",
+        "window7": "Ultimele 7 zile",
+        "window30": "Ultimele 30 zile",
+        "window90": "Ultimele 90 zile",
+        "onlySelectedCoupon": "Doar cuponul selectat",
+        "empty": "Nu există utilizări în această perioadă.",
+        "summary": {
+          "redemptions": "Utilizări",
+          "totalDiscount": "Reducere totală",
+          "shippingDiscount": "Reducere transport",
+          "avgWith": "Valoare medie comandă (cu cupon)",
+          "avgWithout": "Valoare medie comandă (fără cupon)",
+          "lift": "Diferență AOV"
+        },
+        "daily": {
+          "title": "Utilizări în timp",
+          "table": {
+            "date": "Data",
+            "redemptions": "Utilizări",
+            "discount": "Reducere"
+          }
+        },
+        "topProducts": {
+          "title": "Produse cu cele mai mari reduceri",
+          "table": {
+            "product": "Produs",
+            "orders": "Comenzi",
+            "quantity": "Cant.",
+            "gross": "Vânzări brute",
+            "allocated": "Reducere alocată"
+          }
+        }
+      },
       "scopes": {
         "title": "Reguli de aplicare",
         "includedCategories": "Categorii incluse",
@@ -3188,6 +3224,7 @@
         "loadCoupons": "Nu s-au putut încărca cupoanele",
         "saveCoupon": "Nu s-a putut salva cuponul",
         "loadAssignments": "Nu s-au putut încărca atribuiri",
+        "loadAnalytics": "Nu s-au putut încărca analiticele",
         "assign": "Nu s-a putut atribui cuponul",
         "revoke": "Nu s-a putut revoca cuponul",
         "searchProducts": "Nu s-au putut căuta produsele",

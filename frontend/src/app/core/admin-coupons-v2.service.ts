@@ -121,6 +121,38 @@ export interface CouponBulkJobRead {
   finished_at?: string | null;
 }
 
+export interface CouponAnalyticsSummary {
+  redemptions: number;
+  total_discount_ron: string;
+  total_shipping_discount_ron: string;
+  avg_order_total_with_coupon?: string | null;
+  avg_order_total_without_coupon?: string | null;
+  aov_lift?: string | null;
+}
+
+export interface CouponAnalyticsDaily {
+  date: string;
+  redemptions: number;
+  discount_ron: string;
+  shipping_discount_ron: string;
+}
+
+export interface CouponAnalyticsTopProduct {
+  product_id: string;
+  product_slug?: string | null;
+  product_name: string;
+  orders_count: number;
+  quantity: number;
+  gross_sales_ron: string;
+  allocated_discount_ron: string;
+}
+
+export interface CouponAnalyticsResponse {
+  summary: CouponAnalyticsSummary;
+  daily: CouponAnalyticsDaily[];
+  top_products: CouponAnalyticsTopProduct[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdminCouponsV2Service {
   constructor(private api: ApiService) {}
@@ -211,6 +243,10 @@ export class AdminCouponsV2Service {
 
   getBulkJob(jobId: string): Observable<CouponBulkJobRead> {
     return this.api.get<CouponBulkJobRead>(`/coupons/admin/coupons/bulk-jobs/${jobId}`);
+  }
+
+  getAnalytics(params: { promotion_id: string; coupon_id?: string | null; days?: number; top_limit?: number }): Observable<CouponAnalyticsResponse> {
+    return this.api.get<CouponAnalyticsResponse>('/coupons/admin/analytics', params as any);
   }
 
   listBulkJobs(couponId: string, params?: { limit?: number }): Observable<CouponBulkJobRead[]> {

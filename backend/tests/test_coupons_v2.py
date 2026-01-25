@@ -24,7 +24,7 @@ from app.models.coupons_v2 import (
     PromotionScopeEntityType,
     PromotionScopeMode,
 )
-from app.models.order import Order, OrderStatus
+from app.models.order import Order, OrderItem, OrderStatus
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate
 from app.services import cart as cart_service
@@ -964,6 +964,131 @@ def test_admin_issue_coupon_to_user() -> None:
                 assert assignment.revoked_at is None
 
         asyncio.run(_assert_assignment())
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_admin_coupon_analytics() -> None:
+    client, SessionLocal = make_test_client()
+    try:
+        admin_token, admin_id = create_user_token(SessionLocal, email="admin-analytics@example.com", username="admin_analytics")
+        promote_user(SessionLocal, user_id=admin_id, role=UserRole.admin)
+
+        _, user1_id = create_user_token(SessionLocal, email="analytics-u1@example.com", username="analytics_u1")
+        _, user2_id = create_user_token(SessionLocal, email="analytics-u2@example.com", username="analytics_u2")
+
+        product_id = seed_product(SessionLocal, slug="analytics-product", sku="SKU-ANALYTICS", base_price=Decimal("100.00"))
+
+        code = create_promotion_and_coupon(
+            SessionLocal,
+            name="Analytics promo",
+            discount_type=PromotionDiscountType.percent,
+            percentage_off=Decimal("10"),
+            code="ANALYTICS10",
+        )
+        coupon_id = get_coupon_id(SessionLocal, code)
+
+        async def _get_promotion_id() -> str:
+            async with SessionLocal() as session:
+                coupon = await session.get(Coupon, UUID(coupon_id))
+                assert coupon is not None
+                return str(coupon.promotion_id)
+
+        promotion_id = asyncio.run(_get_promotion_id())
+
+        async def _seed() -> None:
+            async with SessionLocal() as session:
+                user1 = await session.get(User, user1_id)
+                user2 = await session.get(User, user2_id)
+                assert user1 and user2
+
+                order1 = Order(
+                    user_id=user1_id,
+                    status=OrderStatus.paid,
+                    customer_email=user1.email,
+                    customer_name="U1",
+                    promo_code=code,
+                    total_amount=Decimal("90.00"),
+                    payment_method="stripe",
+                    currency="RON",
+                )
+                order2 = Order(
+                    user_id=user2_id,
+                    status=OrderStatus.paid,
+                    customer_email=user2.email,
+                    customer_name="U2",
+                    promo_code=code,
+                    total_amount=Decimal("180.00"),
+                    payment_method="stripe",
+                    currency="RON",
+                )
+                baseline = Order(
+                    user_id=user2_id,
+                    status=OrderStatus.paid,
+                    customer_email=user2.email,
+                    customer_name="U2",
+                    promo_code=None,
+                    total_amount=Decimal("120.00"),
+                    payment_method="stripe",
+                    currency="RON",
+                )
+                session.add_all([order1, order2, baseline])
+                await session.flush()
+
+                session.add_all(
+                    [
+                        OrderItem(
+                            order_id=order1.id,
+                            product_id=UUID(product_id),
+                            quantity=1,
+                            unit_price=Decimal("100.00"),
+                            subtotal=Decimal("100.00"),
+                        ),
+                        OrderItem(
+                            order_id=order2.id,
+                            product_id=UUID(product_id),
+                            quantity=2,
+                            unit_price=Decimal("100.00"),
+                            subtotal=Decimal("200.00"),
+                        ),
+                    ]
+                )
+                now = datetime.now(timezone.utc)
+                session.add_all(
+                    [
+                        CouponRedemption(
+                            coupon_id=UUID(coupon_id),
+                            user_id=user1_id,
+                            order_id=order1.id,
+                            redeemed_at=now,
+                            discount_ron=Decimal("10.00"),
+                            shipping_discount_ron=Decimal("0.00"),
+                        ),
+                        CouponRedemption(
+                            coupon_id=UUID(coupon_id),
+                            user_id=user2_id,
+                            order_id=order2.id,
+                            redeemed_at=now,
+                            discount_ron=Decimal("20.00"),
+                            shipping_discount_ron=Decimal("0.00"),
+                        ),
+                    ]
+                )
+                await session.commit()
+
+        asyncio.run(_seed())
+
+        res = client.get(
+            f"/api/v1/coupons/admin/analytics?promotion_id={promotion_id}&days=30&top_limit=5",
+            headers=auth_headers(admin_token),
+        )
+        assert res.status_code == 200, res.text
+        payload = res.json()
+        assert payload["summary"]["redemptions"] == 2
+        assert payload["summary"]["total_discount_ron"] == "30.00"
+        assert payload["top_products"][0]["product_id"] == product_id
+        assert payload["top_products"][0]["allocated_discount_ron"] == "30.00"
+        assert payload["daily"][0]["discount_ron"] == "30.00"
     finally:
         app.dependency_overrides.clear()
 

@@ -6,6 +6,7 @@ import { forkJoin } from 'rxjs';
 
 import {
   AdminCouponsV2Service,
+  type CouponAnalyticsResponse,
   type CouponAssignmentRead,
   type CouponBulkJobRead,
   type CouponBulkResult,
@@ -618,6 +619,165 @@ type CouponForm = {
             </div>
           </div>
 
+          <div *ngIf="selectedPromotion()" class="border-t border-slate-200 pt-4 grid gap-4 dark:border-slate-800">
+            <div class="flex items-start justify-between gap-3">
+              <div class="grid gap-1">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.couponsV2.analytics.title' | translate }}</h3>
+                <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.couponsV2.analytics.hint' | translate }}</p>
+              </div>
+              <div class="flex flex-wrap items-end gap-3 justify-end">
+                <label class="grid gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.couponsV2.analytics.window' | translate }}
+                  <select
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="analyticsDays"
+                    (ngModelChange)="loadAnalytics()"
+                  >
+                    <option [ngValue]="7">{{ 'adminUi.couponsV2.analytics.window7' | translate }}</option>
+                    <option [ngValue]="30">{{ 'adminUi.couponsV2.analytics.window30' | translate }}</option>
+                    <option [ngValue]="90">{{ 'adminUi.couponsV2.analytics.window90' | translate }}</option>
+                  </select>
+                </label>
+                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadAnalytics()"></app-button>
+              </div>
+            </div>
+
+            <label *ngIf="selectedCoupon()" class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+              <input
+                type="checkbox"
+                class="h-5 w-5 accent-indigo-600"
+                [(ngModel)]="analyticsOnlySelectedCoupon"
+                (ngModelChange)="loadAnalytics()"
+              />
+              {{ 'adminUi.couponsV2.analytics.onlySelectedCoupon' | translate }}
+            </label>
+
+            <div
+              *ngIf="analyticsError()"
+              class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+            >
+              {{ analyticsError() }}
+            </div>
+
+            <div *ngIf="analyticsLoading(); else analyticsTpl">
+              <app-skeleton [rows]="4"></app-skeleton>
+            </div>
+            <ng-template #analyticsTpl>
+              <div *ngIf="!analytics() || analytics()!.summary.redemptions === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.couponsV2.analytics.empty' | translate }}
+              </div>
+
+              <div *ngIf="analytics()" class="grid gap-4">
+                <div class="grid gap-3 lg:grid-cols-3">
+                  <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 grid gap-1 dark:border-slate-800 dark:bg-slate-950/40">
+                    <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.couponsV2.analytics.summary.redemptions' | translate }}
+                    </div>
+                    <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                      {{ analytics()!.summary.redemptions }}
+                    </div>
+                  </div>
+                  <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 grid gap-1 dark:border-slate-800 dark:bg-slate-950/40">
+                    <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.couponsV2.analytics.summary.totalDiscount' | translate }}
+                    </div>
+                    <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                      {{ formatRonString(analytics()!.summary.total_discount_ron) }}
+                    </div>
+                  </div>
+                  <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 grid gap-1 dark:border-slate-800 dark:bg-slate-950/40">
+                    <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.couponsV2.analytics.summary.shippingDiscount' | translate }}
+                    </div>
+                    <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                      {{ formatRonString(analytics()!.summary.total_shipping_discount_ron) }}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="grid gap-3 lg:grid-cols-3">
+                  <div class="rounded-xl border border-slate-200 p-3 grid gap-1 dark:border-slate-800">
+                    <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.couponsV2.analytics.summary.avgWith' | translate }}
+                    </div>
+                    <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                      {{ formatRonString(analytics()!.summary.avg_order_total_with_coupon) }}
+                    </div>
+                  </div>
+                  <div class="rounded-xl border border-slate-200 p-3 grid gap-1 dark:border-slate-800">
+                    <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.couponsV2.analytics.summary.avgWithout' | translate }}
+                    </div>
+                    <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                      {{ formatRonString(analytics()!.summary.avg_order_total_without_coupon) }}
+                    </div>
+                  </div>
+                  <div class="rounded-xl border border-slate-200 p-3 grid gap-1 dark:border-slate-800">
+                    <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.couponsV2.analytics.summary.lift' | translate }}
+                    </div>
+                    <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                      {{ formatRonString(analytics()!.summary.aov_lift) }}
+                    </div>
+                  </div>
+                </div>
+
+                <div *ngIf="analytics()!.daily.length" class="rounded-xl border border-slate-200 overflow-x-auto dark:border-slate-800">
+                  <div class="px-3 py-2 text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    {{ 'adminUi.couponsV2.analytics.daily.title' | translate }}
+                  </div>
+                  <table class="min-w-[520px] w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                      <tr>
+                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.couponsV2.analytics.daily.table.date' | translate }}</th>
+                        <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.couponsV2.analytics.daily.table.redemptions' | translate }}</th>
+                        <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.couponsV2.analytics.daily.table.discount' | translate }}</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+                      <tr *ngFor="let row of analytics()!.daily">
+                        <td class="px-3 py-2 text-slate-900 dark:text-slate-50">{{ row.date }}</td>
+                        <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-200">{{ row.redemptions }}</td>
+                        <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-200">{{ formatRonString(row.discount_ron) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div *ngIf="analytics()!.top_products.length" class="rounded-xl border border-slate-200 overflow-x-auto dark:border-slate-800">
+                  <div class="px-3 py-2 text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    {{ 'adminUi.couponsV2.analytics.topProducts.title' | translate }}
+                  </div>
+                  <table class="min-w-[720px] w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                      <tr>
+                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.couponsV2.analytics.topProducts.table.product' | translate }}</th>
+                        <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.couponsV2.analytics.topProducts.table.orders' | translate }}</th>
+                        <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.couponsV2.analytics.topProducts.table.quantity' | translate }}</th>
+                        <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.couponsV2.analytics.topProducts.table.gross' | translate }}</th>
+                        <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.couponsV2.analytics.topProducts.table.allocated' | translate }}</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+                      <tr *ngFor="let row of analytics()!.top_products">
+                        <td class="px-3 py-2 min-w-[240px]">
+                          <div class="font-medium text-slate-900 dark:text-slate-50">{{ row.product_name }}</div>
+                          <div *ngIf="row.product_slug" class="text-xs text-slate-500 dark:text-slate-400">{{ row.product_slug }}</div>
+                        </td>
+                        <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-200">{{ row.orders_count }}</td>
+                        <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-200">{{ row.quantity }}</td>
+                        <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-200">{{ formatRonString(row.gross_sales_ron) }}</td>
+                        <td class="px-3 py-2 text-right font-semibold text-slate-900 dark:text-slate-50">
+                          {{ formatRonString(row.allocated_discount_ron) }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </ng-template>
+          </div>
+
           <div *ngIf="selectedCoupon()" class="border-t border-slate-200 pt-4 grid gap-4 dark:border-slate-800">
             <div class="flex items-start justify-between gap-3">
               <div class="grid gap-1">
@@ -1042,6 +1202,13 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
   private segmentJobPollHandle: number | null = null;
   private segmentJobLastStatus: string | null = null;
 
+  analyticsLoading = signal(false);
+  analyticsError = signal<string | null>(null);
+  analytics = signal<CouponAnalyticsResponse | null>(null);
+  analyticsDays = 30;
+  analyticsTopLimit = 10;
+  analyticsOnlySelectedCoupon = false;
+
   promotionForm: PromotionForm = this.blankPromotionForm();
   couponForm: CouponForm = this.blankCouponForm();
   stackingSampleSubtotal: string | number = 200;
@@ -1130,6 +1297,7 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     this.loadScopedProducts();
     this.startNewCoupon();
     this.loadCoupons();
+    this.loadAnalytics();
   }
 
   startNewPromotion(): void {
@@ -1142,6 +1310,9 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     this.coupons.set([]);
     this.selectedCoupon.set(null);
     this.assignments.set([]);
+    this.analytics.set(null);
+    this.analyticsError.set(null);
+    this.analyticsLoading.set(false);
   }
 
   onDiscountTypeChange(): void {
@@ -1233,6 +1404,38 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     });
   }
 
+  loadAnalytics(): void {
+    const promoId = this.selectedPromotion()?.id || null;
+    if (!promoId) {
+      this.analytics.set(null);
+      this.analyticsError.set(null);
+      this.analyticsLoading.set(false);
+      return;
+    }
+
+    const couponId = this.analyticsOnlySelectedCoupon && this.selectedCoupon() ? this.selectedCoupon()!.id : null;
+    this.analyticsLoading.set(true);
+    this.analyticsError.set(null);
+    this.adminCoupons
+      .getAnalytics({
+        promotion_id: promoId,
+        coupon_id: couponId || undefined,
+        days: this.analyticsDays,
+        top_limit: this.analyticsTopLimit
+      })
+      .subscribe({
+        next: (data) => {
+          this.analyticsLoading.set(false);
+          this.analytics.set(data || null);
+        },
+        error: (err) => {
+          this.analyticsLoading.set(false);
+          this.analytics.set(null);
+          this.analyticsError.set(err?.error?.detail || this.t('adminUi.couponsV2.errors.loadAnalytics'));
+        }
+      });
+  }
+
   selectCoupon(coupon: CouponRead): void {
     this.selectedCoupon.set(coupon);
     this.couponForm = this.couponToForm(coupon);
@@ -1243,6 +1446,7 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     this.resetSegmentState();
     this.loadAssignments();
     this.loadSegmentJobs();
+    if (this.analyticsOnlySelectedCoupon) this.loadAnalytics();
   }
 
   startNewCoupon(): void {
@@ -1673,6 +1877,10 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     const num = Number(value);
     if (!Number.isFinite(num)) return '—';
     return `${num.toFixed(2)} RON`;
+  }
+
+  formatRonString(value: string | null | undefined): string {
+    return this.formatRon(this.optionalNumber(value));
   }
 
   private uniqueIds(ids: string[]): string[] {

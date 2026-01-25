@@ -240,3 +240,35 @@ class CouponBulkJobRead(BaseModel):
     created_at: datetime
     started_at: datetime | None = None
     finished_at: datetime | None = None
+
+
+class CouponAnalyticsSummary(BaseModel):
+    redemptions: int = 0
+    total_discount_ron: Decimal = Decimal("0.00")
+    total_shipping_discount_ron: Decimal = Decimal("0.00")
+    avg_order_total_with_coupon: Decimal | None = None
+    avg_order_total_without_coupon: Decimal | None = None
+    aov_lift: Decimal | None = None
+
+
+class CouponAnalyticsDaily(BaseModel):
+    date: str
+    redemptions: int = 0
+    discount_ron: Decimal = Decimal("0.00")
+    shipping_discount_ron: Decimal = Decimal("0.00")
+
+
+class CouponAnalyticsTopProduct(BaseModel):
+    product_id: UUID
+    product_slug: str | None = None
+    product_name: str
+    orders_count: int = 0
+    quantity: int = 0
+    gross_sales_ron: Decimal = Decimal("0.00")
+    allocated_discount_ron: Decimal = Decimal("0.00")
+
+
+class CouponAnalyticsResponse(BaseModel):
+    summary: CouponAnalyticsSummary
+    daily: list[CouponAnalyticsDaily] = Field(default_factory=list)
+    top_products: list[CouponAnalyticsTopProduct] = Field(default_factory=list)

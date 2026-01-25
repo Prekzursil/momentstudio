@@ -3039,6 +3039,42 @@
         "minSubtotalWarning": "Not eligible at this subtotal (min subtotal is {{min}}).",
         "scopeNote": "This preview assumes all items are in scope; included/excluded category/product rules can reduce the eligible subtotal."
       },
+      "analytics": {
+        "title": "Analytics",
+        "hint": "Usage over time, AOV lift, and top discounted products.",
+        "window": "Window",
+        "window7": "Last 7 days",
+        "window30": "Last 30 days",
+        "window90": "Last 90 days",
+        "onlySelectedCoupon": "Only selected coupon",
+        "empty": "No redemptions in this period yet.",
+        "summary": {
+          "redemptions": "Redemptions",
+          "totalDiscount": "Total discount",
+          "shippingDiscount": "Shipping discount",
+          "avgWith": "Avg order total (with coupon)",
+          "avgWithout": "Avg order total (no coupon)",
+          "lift": "AOV lift"
+        },
+        "daily": {
+          "title": "Usage over time",
+          "table": {
+            "date": "Date",
+            "redemptions": "Redemptions",
+            "discount": "Discount"
+          }
+        },
+        "topProducts": {
+          "title": "Top discounted products",
+          "table": {
+            "product": "Product",
+            "orders": "Orders",
+            "quantity": "Qty",
+            "gross": "Gross sales",
+            "allocated": "Allocated discount"
+          }
+        }
+      },
       "scopes": {
         "title": "Scope rules",
         "includedCategories": "Included categories",
@@ -3188,6 +3224,7 @@
         "loadCoupons": "Could not load coupons",
         "saveCoupon": "Could not save coupon",
         "loadAssignments": "Could not load assignments",
+        "loadAnalytics": "Could not load analytics",
         "assign": "Could not assign coupon",
         "revoke": "Could not revoke coupon",
         "searchProducts": "Could not search products",
