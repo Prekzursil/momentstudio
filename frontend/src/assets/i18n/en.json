@@ -1961,7 +1961,29 @@
       },
       "success": {
         "overrideSet": "FX override saved.",
-        "overrideCleared": "FX override cleared."
+        "overrideCleared": "FX override cleared.",
+        "overrideRestored": "FX override restored."
+      },
+      "audit": {
+        "title": "Override audit",
+        "hint": "Recent override changes with restore tooling.",
+        "empty": "No override changes yet.",
+        "confirmRestore": "Restore this FX override?",
+        "restore": "Restore",
+        "table": {
+          "when": "When",
+          "action": "Action",
+          "user": "User"
+        },
+        "actions": {
+          "set": "Set",
+          "clear": "Clear",
+          "restore": "Restore"
+        },
+        "errors": {
+          "load": "Could not load override audit.",
+          "restore": "Could not restore override."
+        }
       },
       "errors": {
         "load": "Could not load FX rates.",

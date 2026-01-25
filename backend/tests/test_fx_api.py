@@ -115,3 +115,46 @@ def test_fx_admin_override_takes_precedence(test_app: Dict[str, object], monkeyp
 
     clear = client.delete("/api/v1/fx/admin/override", headers=auth_headers(token))
     assert clear.status_code == 204, clear.text
+
+
+def test_fx_override_audit_and_restore(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    token = create_admin_token(SessionLocal)
+
+    set_first = client.put(
+        "/api/v1/fx/admin/override",
+        json={"eur_per_ron": 0.25, "usd_per_ron": 0.23, "as_of": "2026-01-02"},
+        headers=auth_headers(token),
+    )
+    assert set_first.status_code == 200, set_first.text
+
+    set_second = client.put(
+        "/api/v1/fx/admin/override",
+        json={"eur_per_ron": 0.3, "usd_per_ron": 0.28, "as_of": "2026-01-03"},
+        headers=auth_headers(token),
+    )
+    assert set_second.status_code == 200, set_second.text
+
+    audit = client.get("/api/v1/fx/admin/override/audit", headers=auth_headers(token))
+    assert audit.status_code == 200, audit.text
+    entries = audit.json()
+    assert len(entries) >= 2
+    assert any(e["action"] == "set" for e in entries)
+    assert any(e.get("user_email") == "admin@example.com" for e in entries)
+
+    restore_target = next(e for e in entries if e.get("eur_per_ron") == 0.25 and e.get("usd_per_ron") == 0.23)
+    restore = client.post(
+        f"/api/v1/fx/admin/override/audit/{restore_target['id']}/revert",
+        json={},
+        headers=auth_headers(token),
+    )
+    assert restore.status_code == 200, restore.text
+    restored = restore.json()
+    assert restored["override"]["eur_per_ron"] == 0.25
+    assert restored["override"]["usd_per_ron"] == 0.23
+
+    audit_after = client.get("/api/v1/fx/admin/override/audit", headers=auth_headers(token))
+    assert audit_after.status_code == 200, audit_after.text
+    after_entries = audit_after.json()
+    assert after_entries[0]["action"] == "restore"

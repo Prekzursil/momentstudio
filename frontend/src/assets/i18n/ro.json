@@ -1961,7 +1961,29 @@
       },
       "success": {
         "overrideSet": "Suprascrierea a fost salvată.",
-        "overrideCleared": "Suprascrierea a fost ștearsă."
+        "overrideCleared": "Suprascrierea a fost ștearsă.",
+        "overrideRestored": "Suprascrierea a fost restaurată."
+      },
+      "audit": {
+        "title": "Audit suprascriere",
+        "hint": "Schimbări recente ale suprascrierii, cu opțiune de restaurare.",
+        "empty": "Nu există schimbări de suprascriere.",
+        "confirmRestore": "Restaurezi această suprascriere?",
+        "restore": "Restaurează",
+        "table": {
+          "when": "Când",
+          "action": "Acțiune",
+          "user": "Utilizator"
+        },
+        "actions": {
+          "set": "Setat",
+          "clear": "Șters",
+          "restore": "Restaurat"
+        },
+        "errors": {
+          "load": "Nu s-a putut încărca auditul suprascrierilor.",
+          "restore": "Nu s-a putut restaura suprascrierea."
+        }
       },
       "errors": {
         "load": "Nu s-a putut încărca cursul valutar.",

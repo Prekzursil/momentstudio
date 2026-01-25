@@ -28,7 +28,7 @@ import {
   ContentRedirectRead
 } from '../../core/admin.service';
 import { AdminBlogComment, BlogService } from '../../core/blog.service';
-import { FxAdminService, FxAdminStatus } from '../../core/fx-admin.service';
+import { FxAdminService, FxAdminStatus, FxOverrideAuditEntry } from '../../core/fx-admin.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { firstValueFrom, Subscription } from 'rxjs';
@@ -1899,6 +1899,75 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
 	                </div>
 	              </div>
 	            </div>
+
+	            <div class="grid gap-3 rounded-xl border border-slate-200 p-3 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200">
+	              <div class="flex flex-wrap items-start justify-between gap-2">
+	                <div class="grid gap-0.5">
+	                  <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+	                    {{ 'adminUi.fx.audit.title' | translate }}
+	                  </p>
+	                  <p class="text-xs text-slate-500 dark:text-slate-400">
+	                    {{ 'adminUi.fx.audit.hint' | translate }}
+	                  </p>
+	                </div>
+	                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadFxAudit()"></app-button>
+	              </div>
+
+	              <div
+	                *ngIf="fxAuditError()"
+	                class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+	              >
+	                {{ fxAuditError() }}
+	              </div>
+
+	              <div *ngIf="fxAuditLoading()" class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.actions.loading' | translate }}</div>
+
+	              <div *ngIf="!fxAuditLoading() && fxAudit().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+	                {{ 'adminUi.fx.audit.empty' | translate }}
+	              </div>
+
+	              <div
+	                *ngIf="fxAudit().length > 0"
+	                class="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+	              >
+	                <table class="w-full text-left text-sm">
+	                  <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
+	                    <tr>
+	                      <th class="px-3 py-2">{{ 'adminUi.fx.audit.table.when' | translate }}</th>
+	                      <th class="px-3 py-2">{{ 'adminUi.fx.audit.table.action' | translate }}</th>
+	                      <th class="px-3 py-2">{{ 'adminUi.fx.audit.table.user' | translate }}</th>
+	                      <th class="px-3 py-2">{{ 'adminUi.fx.eurPerRon' | translate }}</th>
+	                      <th class="px-3 py-2">{{ 'adminUi.fx.usdPerRon' | translate }}</th>
+	                      <th class="px-3 py-2">{{ 'adminUi.fx.asOf' | translate }}</th>
+	                      <th class="px-3 py-2"></th>
+	                    </tr>
+	                  </thead>
+	                  <tbody>
+	                    <tr *ngFor="let entry of fxAudit()" class="border-t border-slate-200 dark:border-slate-800">
+	                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ entry.created_at | date: 'short' }}</td>
+	                      <td class="px-3 py-2 font-semibold text-slate-900 dark:text-slate-50">{{ fxAuditActionLabel(entry.action) }}</td>
+	                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ entry.user_email || entry.user_id || '—' }}</td>
+	                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+	                        {{ entry.eur_per_ron ? (entry.eur_per_ron | number: '1.4-6') : '—' }}
+	                      </td>
+	                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+	                        {{ entry.usd_per_ron ? (entry.usd_per_ron | number: '1.4-6') : '—' }}
+	                      </td>
+	                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ entry.as_of || '—' }}</td>
+	                      <td class="px-3 py-2">
+	                        <app-button
+	                          size="sm"
+	                          variant="ghost"
+	                          [label]="'adminUi.fx.audit.restore' | translate"
+	                          (action)="restoreFxOverrideFromAudit(entry)"
+	                          [disabled]="fxAuditRestoring() === entry.id || !entry.eur_per_ron || !entry.usd_per_ron || !entry.as_of"
+	                        ></app-button>
+	                      </td>
+	                    </tr>
+	                  </tbody>
+	                </table>
+	              </div>
+	            </div>
 	          </section>
 
           <section *ngIf="false" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -3078,6 +3147,10 @@ export class AdminComponent implements OnInit, OnDestroy {
   fxLoading = signal<boolean>(false);
   fxError = signal<string | null>(null);
   fxOverrideForm: { eur_per_ron: number; usd_per_ron: number; as_of: string } = { eur_per_ron: 0, usd_per_ron: 0, as_of: '' };
+  fxAudit = signal<FxOverrideAuditEntry[]>([]);
+  fxAuditLoading = signal(false);
+  fxAuditError = signal<string | null>(null);
+  fxAuditRestoring = signal<string | null>(null);
 
   productAudit: AdminAudit['products'] = [];
   contentAudit: AdminAudit['content'] = [];
@@ -3337,6 +3410,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   loadFxStatus(): void {
     this.fxLoading.set(true);
     this.fxError.set(null);
+    this.loadFxAudit();
     this.fxAdmin.getStatus().subscribe({
       next: (status) => {
         this.fxStatus.set(status);
@@ -3352,6 +3426,56 @@ export class AdminComponent implements OnInit, OnDestroy {
       },
       complete: () => {
         this.fxLoading.set(false);
+      }
+    });
+  }
+
+  loadFxAudit(): void {
+    this.fxAuditLoading.set(true);
+    this.fxAuditError.set(null);
+    this.fxAdmin.listOverrideAudit(50).subscribe({
+      next: (items) => {
+        this.fxAudit.set(Array.isArray(items) ? items : []);
+      },
+      error: () => {
+        this.fxAudit.set([]);
+        this.fxAuditError.set(this.t('adminUi.fx.audit.errors.load'));
+      },
+      complete: () => {
+        this.fxAuditLoading.set(false);
+      }
+    });
+  }
+
+  fxAuditActionLabel(action: string): string {
+    const normalized = (action || '').trim().toLowerCase();
+    const key = `adminUi.fx.audit.actions.${normalized}`;
+    const translated = this.t(key);
+    return translated === key ? action : translated;
+  }
+
+  restoreFxOverrideFromAudit(entry: FxOverrideAuditEntry): void {
+    const id = (entry?.id || '').toString().trim();
+    if (!id) return;
+    if (!confirm(this.t('adminUi.fx.audit.confirmRestore'))) return;
+    this.fxAuditRestoring.set(id);
+    this.fxAdmin.restoreOverrideFromAudit(id).subscribe({
+      next: (status) => {
+        this.fxStatus.set(status);
+        const current = status.override ?? status.effective;
+        this.fxOverrideForm = {
+          eur_per_ron: Number(current.eur_per_ron) || 0,
+          usd_per_ron: Number(current.usd_per_ron) || 0,
+          as_of: current.as_of || ''
+        };
+        this.toast.success(this.t('adminUi.fx.success.overrideRestored'));
+        this.loadFxAudit();
+      },
+      error: () => {
+        this.toast.error(this.t('adminUi.fx.audit.errors.restore'));
+      },
+      complete: () => {
+        this.fxAuditRestoring.set(null);
       }
     });
   }
