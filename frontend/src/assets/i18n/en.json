@@ -3075,6 +3075,18 @@
           }
         }
       },
+      "calendar": {
+        "title": "Scheduling calendar",
+        "hint": "Visualize promotion windows and overlaps.",
+        "window": "Window",
+        "window30": "Next 30 days",
+        "window90": "Next 90 days",
+        "window180": "Next 180 days",
+        "empty": "No promotions scheduled in this window.",
+        "conflicts": "{{count}} conflicts",
+        "startImmediate": "Now",
+        "noEnd": "No end date"
+      },
       "scopes": {
         "title": "Scope rules",
         "includedCategories": "Included categories",

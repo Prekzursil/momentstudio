@@ -748,7 +748,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Coupons: advanced rules UI – Minimum subtotal, category include/exclude, first-order only, etc.
 - [x] Admin Coupons: stacking preview – Show how coupons interact with sale pricing and shipping discounts.
 - [x] Admin Coupons: redemption analytics – Usage over time, conversion lift, and top discounted products.
-- [ ] Admin Promotions: scheduling calendar – Visual calendar for promo start/end and conflicts.
+- [x] Admin Promotions: scheduling calendar – Visual calendar for promo start/end and conflicts.
 - [ ] Admin Promotions: A/B promo testing – Optional randomized assignment and performance reporting.
 - [ ] Admin Pricing: price history charts – Track price changes per product (and sale periods).
 - [ ] Admin Pricing: FX override audit – Show who changed FX overrides and allow “revert” action.

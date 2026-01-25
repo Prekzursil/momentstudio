@@ -3075,6 +3075,18 @@
           }
         }
       },
+      "calendar": {
+        "title": "Calendar promoții",
+        "hint": "Vizualizează intervalele promoțiilor și suprapunerile.",
+        "window": "Perioadă",
+        "window30": "Următoarele 30 zile",
+        "window90": "Următoarele 90 zile",
+        "window180": "Următoarele 180 zile",
+        "empty": "Nu există promoții programate în această perioadă.",
+        "conflicts": "{{count}} conflicte",
+        "startImmediate": "Acum",
+        "noEnd": "Fără dată de final"
+      },
       "scopes": {
         "title": "Reguli de aplicare",
         "includedCategories": "Categorii incluse",

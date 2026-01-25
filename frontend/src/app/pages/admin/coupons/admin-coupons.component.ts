@@ -53,6 +53,14 @@ type CouponForm = {
   per_customer_max_redemptions: string | number;
 };
 
+type PromotionScheduleRow = {
+  promotion: PromotionRead;
+  leftPct: number;
+  widthPct: number;
+  conflictCount: number;
+  conflictNames: string;
+};
+
 @Component({
   selector: 'app-admin-coupons',
   standalone: true,
@@ -133,6 +141,93 @@ type CouponForm = {
               </button>
             </div>
           </ng-template>
+
+          <div class="border-t border-slate-200 pt-4 grid gap-4 dark:border-slate-800">
+            <div class="flex items-start justify-between gap-3">
+              <div class="grid gap-1">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.couponsV2.calendar.title' | translate }}
+                </h3>
+                <p class="text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.couponsV2.calendar.hint' | translate }}
+                </p>
+              </div>
+              <label class="grid gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.couponsV2.calendar.window' | translate }}
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="promotionCalendarDays"
+                >
+                  <option [ngValue]="30">{{ 'adminUi.couponsV2.calendar.window30' | translate }}</option>
+                  <option [ngValue]="90">{{ 'adminUi.couponsV2.calendar.window90' | translate }}</option>
+                  <option [ngValue]="180">{{ 'adminUi.couponsV2.calendar.window180' | translate }}</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="text-xs text-slate-500 dark:text-slate-400">
+              <span class="font-semibold">{{ promotionCalendarStartDate() | date: 'yyyy-MM-dd' }}</span>
+              <span class="px-1">→</span>
+              <span class="font-semibold">{{ promotionCalendarEndDate() | date: 'yyyy-MM-dd' }}</span>
+            </div>
+
+            <div *ngIf="promotionScheduleRows().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.couponsV2.calendar.empty' | translate }}
+            </div>
+
+            <div *ngIf="promotionScheduleRows().length" class="grid gap-3">
+              <div
+                *ngFor="let row of promotionScheduleRows()"
+                class="grid gap-2 lg:grid-cols-[240px_1fr] items-center"
+              >
+                <button
+                  type="button"
+                  class="text-left rounded-lg px-2 py-1 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                  (click)="selectPromotion(row.promotion)"
+                >
+                  <div class="flex items-center gap-2">
+                    <div class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                      {{ row.promotion.name }}
+                    </div>
+                    <span
+                      *ngIf="row.conflictCount"
+                      class="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+                      [title]="row.conflictNames"
+                    >
+                      {{ 'adminUi.couponsV2.calendar.conflicts' | translate:{ count: row.conflictCount } }}
+                    </span>
+                  </div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400 truncate">
+                    {{
+                      row.promotion.starts_at
+                        ? (row.promotion.starts_at | date: 'yyyy-MM-dd')
+                        : ('adminUi.couponsV2.calendar.startImmediate' | translate)
+                    }}
+                    <span class="px-1">→</span>
+                    {{
+                      row.promotion.ends_at ? (row.promotion.ends_at | date: 'yyyy-MM-dd') : ('adminUi.couponsV2.calendar.noEnd' | translate)
+                    }}
+                  </div>
+                </button>
+
+                <div class="relative h-10 rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                  <div class="absolute inset-y-2 left-0 right-0 border border-dashed border-slate-200 dark:border-slate-700 rounded-md"></div>
+                  <div
+                    class="absolute inset-y-2 rounded-md"
+                    [style.left.%]="row.leftPct"
+                    [style.width.%]="row.widthPct"
+                    [ngClass]="
+                      row.promotion.is_active
+                        ? row.conflictCount
+                          ? 'bg-indigo-600 ring-2 ring-rose-500/60'
+                          : 'bg-indigo-600'
+                        : 'bg-slate-400 dark:bg-slate-600'
+                    "
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <div class="border-t border-slate-200 pt-4 grid gap-4 dark:border-slate-800">
             <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
@@ -1158,6 +1253,8 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
   scopeProductsLoading = signal(false);
   scopeProductsError = signal<string | null>(null);
 
+  promotionCalendarDays = 90;
+
   couponsLoading = signal(false);
   couponsError = signal<string | null>(null);
   coupons = signal<CouponRead[]>([]);
@@ -1671,6 +1768,95 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     }
     const value = promo.percentage_off ?? '0';
     return this.t('adminUi.couponsV2.discountSummary.percentOff', { value });
+  }
+
+  promotionCalendarStartDate(): Date {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }
+
+  promotionCalendarEndDate(): Date {
+    const start = this.promotionCalendarStartDate();
+    return new Date(start.getTime() + this.promotionCalendarDays * 86_400_000);
+  }
+
+  promotionScheduleRows(): PromotionScheduleRow[] {
+    const promos = this.promotions();
+    if (!promos.length) return [];
+
+    const startDate = this.promotionCalendarStartDate();
+    const windowStart = startDate.getTime();
+    const windowEnd = windowStart + this.promotionCalendarDays * 86_400_000;
+    const duration = windowEnd - windowStart;
+
+    const parseEpoch = (value: string | null | undefined, fallback: number) => {
+      if (!value) return fallback;
+      const ms = Date.parse(value);
+      return Number.isNaN(ms) ? fallback : ms;
+    };
+
+    const visible: Array<{
+      promotion: PromotionRead;
+      startMs: number;
+      endMs: number;
+      visibleStartMs: number;
+      visibleEndMs: number;
+    }> = [];
+
+    for (const promo of promos) {
+      const startMs = parseEpoch(promo.starts_at ?? null, Number.NEGATIVE_INFINITY);
+      const endMs = parseEpoch(promo.ends_at ?? null, Number.POSITIVE_INFINITY);
+      const visibleStartMs = Math.max(startMs, windowStart);
+      const visibleEndMs = Math.min(endMs, windowEnd);
+      if (!(visibleEndMs > windowStart && visibleStartMs < windowEnd)) continue;
+      if (!(visibleEndMs > visibleStartMs)) continue;
+      visible.push({ promotion: promo, startMs, endMs, visibleStartMs, visibleEndMs });
+    }
+
+    if (!visible.length) return [];
+
+    const conflicts = new Map<string, { names: Set<string> }>();
+    for (const row of visible) {
+      conflicts.set(row.promotion.id, { names: new Set() });
+    }
+
+    for (let i = 0; i < visible.length; i += 1) {
+      const a = visible[i];
+      if (!a.promotion.is_active) continue;
+      for (let j = i + 1; j < visible.length; j += 1) {
+        const b = visible[j];
+        if (!b.promotion.is_active) continue;
+        const overlaps = a.visibleStartMs < b.visibleEndMs && b.visibleStartMs < a.visibleEndMs;
+        if (!overlaps) continue;
+        conflicts.get(a.promotion.id)?.names.add(b.promotion.name);
+        conflicts.get(b.promotion.id)?.names.add(a.promotion.name);
+      }
+    }
+
+    visible.sort((a, b) => a.visibleStartMs - b.visibleStartMs);
+
+    const rows: PromotionScheduleRow[] = [];
+    for (const row of visible) {
+      const leftPct = Math.max(0, Math.min(100, ((row.visibleStartMs - windowStart) / duration) * 100));
+      let widthPct = Math.max(0, ((row.visibleEndMs - row.visibleStartMs) / duration) * 100);
+      widthPct = Math.max(widthPct, 1);
+      widthPct = Math.min(widthPct, 100 - leftPct);
+
+      const conflictNames = Array.from(conflicts.get(row.promotion.id)?.names ?? []);
+      const preview = conflictNames.slice(0, 6);
+      const conflictNamesLabel =
+        conflictNames.length > preview.length ? `${preview.join(', ')} +${conflictNames.length - preview.length}` : preview.join(', ');
+
+      rows.push({
+        promotion: row.promotion,
+        leftPct,
+        widthPct,
+        conflictCount: conflictNames.length,
+        conflictNames: conflictNamesLabel
+      });
+    }
+
+    return rows;
   }
 
   productLabel(id: string): string {
