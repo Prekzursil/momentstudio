@@ -1,4 +1,5 @@
 import json
+from urllib.parse import quote_plus
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
@@ -25,6 +26,11 @@ from app.services import promo_usage
 from app.api.v1 import cart as cart_api
 
 router = APIRouter(prefix="/payments", tags=["payments"])
+
+
+def _account_orders_url(order: Order) -> str:
+    token = str(order.reference_code or order.id)
+    return f"/account/orders?q={quote_plus(token)}"
 
 
 @router.post("/intent", status_code=status.HTTP_200_OK)
@@ -151,7 +157,7 @@ async def stripe_webhook(
                         if (order.user.preferred_language or "en") != "ro"
                         else "Plată confirmată",
                         body=f"Reference {order.reference_code}" if order.reference_code else None,
-                        url="/account",
+                        url=_account_orders_url(order),
                     )
 
                 if captured_added:
@@ -240,7 +246,7 @@ async def stripe_webhook(
                         if (order.user.preferred_language or "en") != "ro"
                         else "Plată confirmată",
                         body=f"Reference {order.reference_code}" if order.reference_code else None,
-                        url="/account",
+                        url=_account_orders_url(order),
                     )
 
                 if captured_added:
@@ -373,7 +379,7 @@ async def paypal_webhook(
                             if (order.user.preferred_language or "en") != "ro"
                             else "Plată confirmată",
                             body=f"Reference {order.reference_code}" if order.reference_code else None,
-                            url="/account",
+                            url=_account_orders_url(order),
                         )
 
                     checkout_settings = await checkout_settings_service.get_checkout_settings(session)
@@ -520,7 +526,7 @@ async def netopia_webhook(
                     if (order.user.preferred_language or "en") != "ro"
                     else "Plată confirmată",
                     body=f"Reference {order.reference_code}" if order.reference_code else None,
-                    url="/account",
+                    url=_account_orders_url(order),
                 )
 
             checkout_settings = await checkout_settings_service.get_checkout_settings(session)

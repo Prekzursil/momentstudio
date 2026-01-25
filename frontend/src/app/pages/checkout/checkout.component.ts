@@ -248,6 +248,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
           <app-address-form
             *ngIf="editSavedAddressModel"
             [model]="editSavedAddressModel"
+            [stickyActions]="true"
             (cancel)="closeEditSavedAddress()"
             (save)="saveEditedSavedAddress($event)"
           ></app-address-form>

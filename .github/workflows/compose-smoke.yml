@@ -29,6 +29,8 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Build and start stack
+        env:
+          LOCKERS_USE_OVERPASS_FALLBACK: '0'
         run: |
           docker compose -f infra/docker-compose.yml up -d --build
 

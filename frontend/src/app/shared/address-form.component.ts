@@ -237,7 +237,7 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
           {{ 'addressForm.useAsBillingToo' | translate }}
         </button>
       </div>
-      <div class="flex justify-end gap-2 pt-2">
+      <div [ngClass]="stickyActions ? stickyActionsClass : normalActionsClass">
         <app-button type="button" variant="ghost" [label]="'addressForm.cancel' | translate" (action)="cancel.emit()"></app-button>
         <app-button type="submit" [label]="'addressForm.save' | translate"></app-button>
       </div>
@@ -251,6 +251,7 @@ export class AddressFormComponent implements OnChanges, OnDestroy {
     postal_code: '',
     country: 'RO'
   };
+  @Input() stickyActions = false;
   readonly roCounties = RO_COUNTIES;
   readonly roCities = RO_CITIES;
   readonly countries: PhoneCountryOption[];
@@ -265,6 +266,9 @@ export class AddressFormComponent implements OnChanges, OnDestroy {
   phoneNational = '';
   @Output() save = new EventEmitter<AddressCreateRequest>();
   @Output() cancel = new EventEmitter<void>();
+  readonly normalActionsClass = 'flex justify-end gap-2 pt-2';
+  readonly stickyActionsClass =
+    'sticky bottom-0 z-10 -mx-4 sm:-mx-6 mt-4 px-4 sm:px-6 py-3 flex justify-end gap-2 bg-white/95 backdrop-blur border-t border-slate-200 dark:bg-slate-900/95 dark:border-slate-700';
 
   constructor(translate: TranslateService) {
     this.countries = listPhoneCountries(translate.currentLang || 'en');

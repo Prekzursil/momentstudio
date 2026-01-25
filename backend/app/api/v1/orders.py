@@ -6,6 +6,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import quote_plus
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, UploadFile, File, Body, Response
@@ -85,6 +86,11 @@ router = APIRouter(prefix="/orders", tags=["orders"])
 
 def _normalize_email(email: str) -> str:
     return (email or "").strip().lower()
+
+
+def _account_orders_url(order: Order) -> str:
+    token = str(order.reference_code or order.id)
+    return f"/account/orders?q={quote_plus(token)}"
 
 
 def _generate_guest_email_token() -> str:
@@ -298,7 +304,7 @@ async def create_order(
         type="order",
         title="Order placed" if (current_user.preferred_language or "en") != "ro" else "Comandă plasată",
         body=f"Reference {order.reference_code}" if order.reference_code else None,
-        url="/account",
+        url=_account_orders_url(order),
     )
     background_tasks.add_task(
         email_service.send_order_confirmation,
@@ -532,7 +538,7 @@ async def checkout(
         type="order",
         title="Order placed" if (current_user.preferred_language or "en") != "ro" else "Comandă plasată",
         body=f"Reference {order.reference_code}" if order.reference_code else None,
-        url="/account",
+        url=_account_orders_url(order),
     )
     if (payment_method or "").strip().lower() == "cod":
         background_tasks.add_task(
@@ -661,7 +667,7 @@ async def capture_paypal_order(
             type="order",
             title="Payment received" if (order.user.preferred_language or "en") != "ro" else "Plată confirmată",
             body=f"Reference {order.reference_code}" if order.reference_code else None,
-            url="/account",
+            url=_account_orders_url(order),
         )
 
     return PayPalCaptureResponse(
@@ -788,7 +794,7 @@ async def confirm_stripe_checkout(
                 if (order.user.preferred_language or "en") != "ro"
                 else "Plată confirmată",
                 body=f"Reference {order.reference_code}" if order.reference_code else None,
-                url="/account",
+                url=_account_orders_url(order),
             )
 
     return StripeConfirmResponse(order_id=order.id, reference_code=order.reference_code, status=order.status)
@@ -1471,7 +1477,7 @@ async def admin_update_order(
                 type="order",
                 title=title,
                 body=f"Reference {updated.reference_code}" if updated.reference_code else None,
-                url="/account",
+                url=_account_orders_url(updated),
             )
     full = await order_service.get_order_by_id_admin(session, order_id)
     if not full:
@@ -1701,7 +1707,7 @@ async def admin_refund_order(
             type="order",
             title="Order refunded" if (updated.user.preferred_language or "en") != "ro" else "Comandă rambursată",
             body=f"Reference {updated.reference_code}" if updated.reference_code else None,
-            url="/account",
+            url=_account_orders_url(updated),
         )
     owner = await auth_service.get_owner_user(session)
     admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
@@ -1992,7 +1998,7 @@ async def admin_capture_payment(
             type="order",
             title="Order processing" if (updated.user.preferred_language or "en") != "ro" else "Comandă în procesare",
             body=f"Reference {updated.reference_code}" if updated.reference_code else None,
-            url="/account",
+            url=_account_orders_url(updated),
         )
     return updated
 
@@ -2021,7 +2027,7 @@ async def admin_void_payment(
             type="order",
             title="Order cancelled" if (updated.user.preferred_language or "en") != "ro" else "Comandă anulată",
             body=f"Reference {updated.reference_code}" if updated.reference_code else None,
-            url="/account",
+            url=_account_orders_url(updated),
         )
     return updated
 
@@ -2248,7 +2254,7 @@ async def request_order_cancellation(
         type="order",
         title="Cancel requested" if (current_user.preferred_language or "en") != "ro" else "Anulare solicitată",
         body=f"Reference {order.reference_code}" if order.reference_code else None,
-        url="/account",
+        url=_account_orders_url(order),
     )
 
     return order

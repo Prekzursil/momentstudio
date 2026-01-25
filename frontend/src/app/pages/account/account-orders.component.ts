@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 
 import { ButtonComponent } from '../../shared/button.component';
@@ -500,6 +500,14 @@ import { AccountComponent } from './account.component';
     </section>
   `
 })
-export class AccountOrdersComponent {
+export class AccountOrdersComponent implements OnInit {
   protected readonly account = inject(AccountComponent);
+  private readonly route = inject(ActivatedRoute);
+
+  ngOnInit(): void {
+    const q = (this.route.snapshot.queryParamMap.get('q') || '').trim();
+    if (!q) return;
+    this.account.ordersQuery = q;
+    this.account.applyOrderFilters();
+  }
 }

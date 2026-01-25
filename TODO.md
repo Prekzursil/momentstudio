@@ -828,9 +828,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Perf: fix account idle-timer event listener cleanup (avoid leaking listeners with `.bind(this)`).
 - [x] Follow-up: set `<meta name="theme-color">` dynamically based on selected theme (mobile address bar).
 - [x] Follow-up: add early theme bootstrap in `frontend/src/index.html` to avoid flash of incorrect theme on load.
-- [ ] Checkout: fix address modal overflow on smaller screens (prevent action buttons/inputs rendering off-screen).
-- [ ] Notifications: deep-link notification clicks to relevant page (avoid always landing on account settings).
-- [ ] Notifications: add archived/dismissed notifications view so hidden items remain discoverable.
-- [ ] Receipts: improve share link UX (explicit “Copy link” button + visible confirmation for copy action).
-- [ ] CI: make compose-smoke E2E resilient (mock locker lookup / disable Overpass fallback to reduce flakiness).
+- [x] Checkout: fix address modal overflow on smaller screens (prevent action buttons/inputs rendering off-screen).
+- [x] Notifications: deep-link notification clicks to relevant page (avoid always landing on account settings).
+- [x] Notifications: add archived/dismissed notifications view so hidden items remain discoverable.
+- [x] Receipts: improve share link UX (explicit “Copy link” button + visible confirmation for copy action).
+- [x] CI: make compose-smoke E2E resilient (mock locker lookup / disable Overpass fallback to reduce flakiness).
 - [ ] Catalog: investigate product detail page sometimes failing to load from listings (route/slug/API error).

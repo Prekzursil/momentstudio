@@ -24,20 +24,20 @@ import { ButtonComponent } from './button.component';
         role="dialog"
         aria-modal="true"
         [attr.aria-label]="title"
-        class="w-full max-w-lg min-w-0 max-h-[85vh] overflow-y-auto overflow-x-hidden rounded-2xl bg-white shadow-xl border border-slate-200 p-6 grid gap-4 outline-none dark:bg-slate-900 dark:border-slate-700 dark:shadow-none"
+        class="w-full max-w-lg min-w-0 max-h-[calc(100dvh-2rem)] sm:max-h-[85vh] overflow-hidden rounded-2xl bg-white shadow-xl border border-slate-200 outline-none dark:bg-slate-900 dark:border-slate-700 dark:shadow-none flex flex-col"
         tabindex="-1"
       >
-        <div class="flex items-start justify-between gap-4">
-          <div class="grid gap-1">
+        <div class="flex items-start justify-between gap-4 p-4 sm:p-6 pb-3 sm:pb-4 shrink-0">
+          <div class="grid gap-1 min-w-0">
             <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ title }}</div>
             <div class="text-slate-600 text-sm dark:text-slate-300" *ngIf="subtitle">{{ subtitle }}</div>
           </div>
           <app-button variant="ghost" size="sm" [label]="closeLabel" (action)="close()"></app-button>
         </div>
-        <div class="text-sm text-slate-700 dark:text-slate-200">
+        <div class="min-h-0 overflow-y-auto overflow-x-hidden px-4 sm:px-6 pb-4 sm:pb-6 text-sm text-slate-700 dark:text-slate-200">
           <ng-content></ng-content>
         </div>
-        <div class="flex justify-end gap-3" *ngIf="showActions">
+        <div class="flex justify-end gap-3 px-4 sm:px-6 py-3 sm:py-4 border-t border-slate-200 dark:border-slate-800 shrink-0" *ngIf="showActions">
           <app-button variant="ghost" [label]="cancelLabel" (action)="close()"></app-button>
           <app-button [label]="confirmLabel" (action)="confirm.emit()"></app-button>
         </div>
