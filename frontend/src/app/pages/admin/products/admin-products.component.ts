@@ -36,6 +36,13 @@ type ProductForm = {
   name: string;
   category_id: string;
   base_price: string;
+  weight_grams: string;
+  width_cm: string;
+  height_cm: string;
+  depth_cm: string;
+  shipping_class: 'standard' | 'bulky' | 'oversize';
+  shipping_allow_locker: boolean;
+  shipping_disallowed_couriers: { sameday: boolean; fan_courier: boolean };
   sale_enabled: boolean;
   sale_type: 'percent' | 'amount';
   sale_value: string;
@@ -918,6 +925,98 @@ type VariantRow = {
             <input type="checkbox" [(ngModel)]="form.is_bestseller" />
             {{ 'adminUi.products.form.bestseller' | translate }}
           </label>
+
+          <div class="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.products.shipping.title' | translate }}
+              </p>
+              <span class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.products.shipping.hint' | translate }}
+              </span>
+            </div>
+
+            <div class="mt-3 grid gap-3 md:grid-cols-4 items-end">
+              <app-input
+                [label]="'adminUi.products.shipping.weight' | translate"
+                type="number"
+                inputMode="numeric"
+                [value]="form.weight_grams"
+                (valueChange)="form.weight_grams = String($event ?? '')"
+                [min]="0"
+                [hint]="'adminUi.products.shipping.weightUnit' | translate"
+              ></app-input>
+
+              <app-input
+                [label]="'adminUi.products.shipping.width' | translate"
+                type="number"
+                inputMode="decimal"
+                [value]="form.width_cm"
+                (valueChange)="form.width_cm = String($event ?? '')"
+                [min]="0"
+                [step]="0.01"
+                [hint]="'adminUi.products.shipping.cm' | translate"
+              ></app-input>
+
+              <app-input
+                [label]="'adminUi.products.shipping.height' | translate"
+                type="number"
+                inputMode="decimal"
+                [value]="form.height_cm"
+                (valueChange)="form.height_cm = String($event ?? '')"
+                [min]="0"
+                [step]="0.01"
+                [hint]="'adminUi.products.shipping.cm' | translate"
+              ></app-input>
+
+              <app-input
+                [label]="'adminUi.products.shipping.depth' | translate"
+                type="number"
+                inputMode="decimal"
+                [value]="form.depth_cm"
+                (valueChange)="form.depth_cm = String($event ?? '')"
+                [min]="0"
+                [step]="0.01"
+                [hint]="'adminUi.products.shipping.cm' | translate"
+              ></app-input>
+            </div>
+
+            <div class="mt-3 grid gap-3 md:grid-cols-3 items-end">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.products.shipping.classLabel' | translate }}
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="form.shipping_class"
+                >
+                  <option value="standard">{{ 'adminUi.products.shipping.class.standard' | translate }}</option>
+                  <option value="bulky">{{ 'adminUi.products.shipping.class.bulky' | translate }}</option>
+                  <option value="oversize">{{ 'adminUi.products.shipping.class.oversize' | translate }}</option>
+                </select>
+              </label>
+
+              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
+                <input type="checkbox" [(ngModel)]="form.shipping_allow_locker" />
+                {{ 'adminUi.products.shipping.allowLocker' | translate }}
+              </label>
+
+              <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                <span>{{ 'adminUi.products.shipping.disallowedCouriers' | translate }}</span>
+                <div class="flex flex-wrap items-center gap-4 text-sm font-normal text-slate-700 dark:text-slate-200">
+                  <label class="inline-flex items-center gap-2">
+                    <input type="checkbox" [(ngModel)]="form.shipping_disallowed_couriers.sameday" />
+                    {{ 'adminUi.products.shipping.courier.sameday' | translate }}
+                  </label>
+                  <label class="inline-flex items-center gap-2">
+                    <input type="checkbox" [(ngModel)]="form.shipping_disallowed_couriers.fan_courier" />
+                    {{ 'adminUi.products.shipping.courier.fan_courier' | translate }}
+                  </label>
+                </div>
+                <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.products.shipping.disallowedHint' | translate }}
+                </span>
+              </div>
+            </div>
+          </div>
 	        </div>
 
 	        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
@@ -2651,6 +2750,17 @@ export class AdminProductsComponent implements OnInit {
       next: (prod: any) => {
         this.editingProductId.set(prod?.id ? String(prod.id) : null);
         const basePrice = typeof prod.base_price === 'number' ? prod.base_price : Number(prod.base_price || 0);
+        const weightGramsRaw = typeof prod.weight_grams === 'number' ? prod.weight_grams : Number(prod.weight_grams ?? NaN);
+        const widthRaw = typeof prod.width_cm === 'number' ? prod.width_cm : Number(prod.width_cm ?? NaN);
+        const heightRaw = typeof prod.height_cm === 'number' ? prod.height_cm : Number(prod.height_cm ?? NaN);
+        const depthRaw = typeof prod.depth_cm === 'number' ? prod.depth_cm : Number(prod.depth_cm ?? NaN);
+        const shippingClassRaw = (prod.shipping_class || '').toString();
+        const shippingClass: 'standard' | 'bulky' | 'oversize' =
+          shippingClassRaw === 'bulky' || shippingClassRaw === 'oversize' ? shippingClassRaw : 'standard';
+        const disallowedCouriers = Array.isArray(prod.shipping_disallowed_couriers)
+          ? prod.shipping_disallowed_couriers.map((c: any) => (c ?? '').toString().trim().toLowerCase()).filter(Boolean)
+          : [];
+        const disallowedSet = new Set(disallowedCouriers);
         const rawSaleType = (prod.sale_type || '').toString();
         const saleType: 'percent' | 'amount' = rawSaleType === 'amount' ? 'amount' : 'percent';
         const saleValueNum =
@@ -2662,6 +2772,16 @@ export class AdminProductsComponent implements OnInit {
           name: prod.name || '',
           category_id: prod.category_id || '',
           base_price: this.formatMoneyInput(Number.isFinite(basePrice) ? basePrice : 0),
+          weight_grams: Number.isFinite(weightGramsRaw) && weightGramsRaw >= 0 ? String(Math.round(weightGramsRaw)) : '',
+          width_cm: Number.isFinite(widthRaw) && widthRaw >= 0 ? String(widthRaw) : '',
+          height_cm: Number.isFinite(heightRaw) && heightRaw >= 0 ? String(heightRaw) : '',
+          depth_cm: Number.isFinite(depthRaw) && depthRaw >= 0 ? String(depthRaw) : '',
+          shipping_class: shippingClass,
+          shipping_allow_locker: prod.shipping_allow_locker !== false,
+          shipping_disallowed_couriers: {
+            sameday: disallowedSet.has('sameday'),
+            fan_courier: disallowedSet.has('fan_courier')
+          },
           sale_enabled: saleEnabled,
           sale_type: saleType,
           sale_value: saleEnabled
@@ -2945,10 +3065,48 @@ export class AdminProductsComponent implements OnInit {
       low_stock_threshold = parsed;
     }
 
+    const weightRaw = (this.form.weight_grams || '').trim();
+    let weight_grams: number | null = null;
+    if (weightRaw) {
+      const parsed = Number(weightRaw);
+      if (!Number.isFinite(parsed) || parsed < 0 || !Number.isInteger(parsed)) {
+        this.editorError.set(this.t('adminUi.products.shipping.weightHint'));
+        return;
+      }
+      weight_grams = parsed;
+    }
+
+    const parseDim = (raw: string): number | null => {
+      const trimmed = (raw || '').trim();
+      if (!trimmed) return null;
+      const parsed = Number(trimmed);
+      if (!Number.isFinite(parsed) || parsed < 0) return NaN;
+      return Math.round(parsed * 100) / 100;
+    };
+
+    const width_cm = parseDim(this.form.width_cm);
+    const height_cm = parseDim(this.form.height_cm);
+    const depth_cm = parseDim(this.form.depth_cm);
+    if ([width_cm, height_cm, depth_cm].some((val) => typeof val === 'number' && Number.isNaN(val))) {
+      this.editorError.set(this.t('adminUi.products.shipping.dimensionsHint'));
+      return;
+    }
+
+    const shipping_disallowed_couriers: string[] = [];
+    if (this.form.shipping_disallowed_couriers?.sameday) shipping_disallowed_couriers.push('sameday');
+    if (this.form.shipping_disallowed_couriers?.fan_courier) shipping_disallowed_couriers.push('fan_courier');
+
     const payload: any = {
       name: this.form.name,
       category_id: this.form.category_id,
       base_price: basePrice,
+      weight_grams,
+      width_cm,
+      height_cm,
+      depth_cm,
+      shipping_class: this.form.shipping_class,
+      shipping_allow_locker: this.form.shipping_allow_locker,
+      shipping_disallowed_couriers,
       sale_type,
       sale_value,
       sale_start_at: this.form.sale_enabled && this.form.sale_start_at ? new Date(this.form.sale_start_at).toISOString() : null,
@@ -3733,6 +3891,13 @@ export class AdminProductsComponent implements OnInit {
       name: '',
       category_id: '',
       base_price: '',
+      weight_grams: '',
+      width_cm: '',
+      height_cm: '',
+      depth_cm: '',
+      shipping_class: 'standard',
+      shipping_allow_locker: true,
+      shipping_disallowed_couriers: { sameday: false, fan_courier: false },
       sale_enabled: false,
       sale_type: 'percent',
       sale_value: '',

@@ -14,6 +14,8 @@ class Totals(BaseModel):
     free_shipping_threshold_ron: Decimal | None = None
     phone_required_home: bool = False
     phone_required_locker: bool = False
+    delivery_locker_allowed: bool = True
+    delivery_allowed_couriers: list[str] = Field(default_factory=list)
 
 
 class CartItemCreate(BaseModel):

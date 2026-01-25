@@ -5,7 +5,38 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic import field_validator
 
-from app.models.catalog import ProductStatus, StockAdjustmentReason
+from app.models.catalog import ProductStatus, ShippingClass, StockAdjustmentReason
+
+
+_ALLOWED_COURIERS: set[str] = {"sameday", "fan_courier"}
+
+
+def _normalize_courier(value: object) -> str:
+    return str(value or "").strip().lower()
+
+
+def _validate_disallowed_couriers(value: object | None) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError("Invalid couriers list")
+    cleaned: list[str] = []
+    for raw in value:
+        code = _normalize_courier(raw)
+        if not code:
+            continue
+        if code not in _ALLOWED_COURIERS:
+            raise ValueError("Invalid courier")
+        cleaned.append(code)
+    # Preserve the requested order as much as possible, but drop duplicates.
+    seen: set[str] = set()
+    unique: list[str] = []
+    for code in cleaned:
+        if code in seen:
+            continue
+        seen.add(code)
+        unique.append(code)
+    return unique
 
 
 class CategoryFields(BaseModel):
@@ -84,6 +115,9 @@ class ProductFields(BaseModel):
     width_cm: float | None = Field(default=None, ge=0)
     height_cm: float | None = Field(default=None, ge=0)
     depth_cm: float | None = Field(default=None, ge=0)
+    shipping_class: ShippingClass = ShippingClass.standard
+    shipping_allow_locker: bool = True
+    shipping_disallowed_couriers: list[str] = Field(default_factory=list)
     meta_title: str | None = Field(default=None, max_length=180)
     meta_description: str | None = Field(default=None, max_length=300)
 
@@ -93,6 +127,11 @@ class ProductFields(BaseModel):
         if value and "<script" in value.lower():
             raise ValueError("Invalid rich text content")
         return value
+
+    @field_validator("shipping_disallowed_couriers")
+    @classmethod
+    def validate_shipping_disallowed_couriers(cls, value: object):
+        return _validate_disallowed_couriers(value)
 
     @field_validator("currency")
     @classmethod
@@ -288,6 +327,9 @@ class ProductUpdate(BaseModel):
     width_cm: float | None = Field(default=None, ge=0)
     height_cm: float | None = Field(default=None, ge=0)
     depth_cm: float | None = Field(default=None, ge=0)
+    shipping_class: ShippingClass | None = None
+    shipping_allow_locker: bool | None = None
+    shipping_disallowed_couriers: list[str] | None = None
 
     @field_validator("currency")
     @classmethod
@@ -298,6 +340,13 @@ class ProductUpdate(BaseModel):
         if cleaned != "RON":
             raise ValueError("Only RON currency is supported")
         return cleaned
+
+    @field_validator("shipping_disallowed_couriers")
+    @classmethod
+    def validate_shipping_disallowed_couriers(cls, value: object | None):
+        if value is None:
+            return value
+        return _validate_disallowed_couriers(value)
     meta_title: str | None = Field(default=None, max_length=180)
     meta_description: str | None = Field(default=None, max_length=300)
 

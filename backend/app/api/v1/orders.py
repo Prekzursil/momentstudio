@@ -356,6 +356,13 @@ async def checkout(
         locker_lat=payload.locker_lat,
         locker_lng=payload.locker_lng,
     )
+    locker_allowed, allowed_couriers = cart_service.delivery_constraints(user_cart)
+    if not allowed_couriers:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No couriers available for cart items")
+    if courier not in allowed_couriers:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Selected courier is not available for cart items")
+    if delivery_type == "locker" and not locker_allowed:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Locker delivery is not available for cart items")
     phone_required = bool(
         checkout_settings.phone_required_locker if delivery_type == "locker" else checkout_settings.phone_required_home
     )
@@ -1190,6 +1197,13 @@ async def guest_checkout(
         locker_lat=payload.locker_lat,
         locker_lng=payload.locker_lng,
     )
+    locker_allowed, allowed_couriers = cart_service.delivery_constraints(cart)
+    if not allowed_couriers:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No couriers available for cart items")
+    if courier not in allowed_couriers:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Selected courier is not available for cart items")
+    if delivery_type == "locker" and not locker_allowed:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Locker delivery is not available for cart items")
     phone_required = bool(
         checkout_settings.phone_required_locker if delivery_type == "locker" else checkout_settings.phone_required_home
     )

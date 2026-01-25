@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer, Numeric, String, Table, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer, JSON, Numeric, String, Table, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -44,6 +44,12 @@ class ProductStatus(str, enum.Enum):
     draft = "draft"
     published = "published"
     archived = "archived"
+
+
+class ShippingClass(str, enum.Enum):
+    standard = "standard"
+    bulky = "bulky"
+    oversize = "oversize"
 
 
 class ProductRelationshipType(str, enum.Enum):
@@ -97,6 +103,11 @@ class Product(Base):
     width_cm: Mapped[float | None] = mapped_column(Numeric(7, 2), nullable=True)
     height_cm: Mapped[float | None] = mapped_column(Numeric(7, 2), nullable=True)
     depth_cm: Mapped[float | None] = mapped_column(Numeric(7, 2), nullable=True)
+    shipping_class: Mapped[ShippingClass] = mapped_column(
+        Enum(ShippingClass, native_enum=False), nullable=False, default=ShippingClass.standard
+    )
+    shipping_allow_locker: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    shipping_disallowed_couriers: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     meta_title: Mapped[str | None] = mapped_column(String(180), nullable=True)
     meta_description: Mapped[str | None] = mapped_column(String(300), nullable=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

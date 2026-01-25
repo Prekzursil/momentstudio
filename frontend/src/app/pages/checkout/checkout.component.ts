@@ -332,6 +332,8 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
   deliveryType: 'home' | 'locker' = 'home';
   locker: LockerRead | null = null;
   deliveryError = '';
+  deliveryLockerAllowed = true;
+  deliveryAllowedCouriers: LockerProvider[] = ['sameday', 'fan_courier'];
   private quote: CheckoutQuote | null = null;
   private phoneRequiredHome = true;
   private phoneRequiredLocker = true;
@@ -1247,8 +1249,17 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 	    this.quote = { subtotal, fee, tax, shipping, total, currency };
       this.phoneRequiredHome = parseBool((totals as any).phone_required_home, true);
       this.phoneRequiredLocker = parseBool((totals as any).phone_required_locker, true);
+      this.deliveryLockerAllowed = parseBool((totals as any).delivery_locker_allowed, true);
+      const allowedCouriersRaw = (totals as any).delivery_allowed_couriers;
+      const allowedCouriers = Array.isArray(allowedCouriersRaw)
+        ? allowedCouriersRaw
+            .map((item: any) => (item ?? '').toString().trim().toLowerCase())
+            .filter((item: string) => item === 'sameday' || item === 'fan_courier')
+        : [];
+      this.deliveryAllowedCouriers = (allowedCouriers.length ? allowedCouriers : ['sameday', 'fan_courier']) as LockerProvider[];
 	    this.currency = currency || 'RON';
 	    this.ensurePaymentMethodAvailable();
+      this.ensureDeliveryOptionsAvailable();
 	    this.loadCouponsEligibility();
 	    this.applyPendingPromoCode();
 	  }
@@ -1608,6 +1619,10 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
   }
 
   setDeliveryType(value: 'home' | 'locker'): void {
+    if (value === 'locker' && !this.deliveryLockerAllowed) {
+      this.deliveryError = this.translate.instant('checkout.deliveryLockerUnavailable');
+      return;
+    }
     this.deliveryType = value;
     this.deliveryError = '';
     if (value === 'home') {
@@ -1625,9 +1640,34 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 	  }
 
 	  setCourier(value: LockerProvider): void {
+      if (!this.courierAllowed(value)) {
+        this.deliveryError = this.translate.instant('checkout.courierUnavailable');
+        return;
+      }
 	    this.courier = value;
 	    this.onCourierChanged();
 	  }
+
+    courierAllowed(provider: LockerProvider): boolean {
+      return (this.deliveryAllowedCouriers || []).includes(provider);
+    }
+
+    private ensureDeliveryOptionsAvailable(): void {
+      if (!this.deliveryLockerAllowed && this.deliveryType === 'locker') {
+        this.deliveryType = 'home';
+        this.locker = null;
+      }
+      if (!this.courierAllowed(this.courier)) {
+        const fallback = this.deliveryAllowedCouriers?.[0];
+        if (fallback) {
+          this.courier = fallback;
+          this.deliveryError = '';
+          if (this.deliveryType === 'locker') {
+            this.locker = null;
+          }
+        }
+      }
+    }
 
 	  courierEstimate(provider: LockerProvider): { min: number; max: number } | null {
 	    const est: Record<LockerProvider, Record<'home' | 'locker', { min: number; max: number }>> = {

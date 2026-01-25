@@ -1031,9 +1031,11 @@
     "deliveryHome": "Livrare la adresă",
     "deliveryLocker": "Ridicare din locker",
     "deliveryLockerRequired": "Te rugăm să selectezi un locker pentru ridicare.",
+    "deliveryLockerUnavailable": "Ridicarea din locker nu este disponibilă pentru unul sau mai multe produse din coș.",
     "courier": "Curier",
     "courierSameday": "Sameday",
     "courierFanCourier": "Fan Courier",
+    "courierUnavailable": "Acest curier nu este disponibil pentru unul sau mai multe produse din coș.",
     "deliveryEstimateRange": "Livrare estimată: {{min}}–{{max}} zile lucrătoare",
     "deliveryEstimateSingle": "Livrare estimată: {{days}} zile lucrătoare",
     "locker": "Locker",
@@ -2222,6 +2224,31 @@
       "markdownPreview": {
         "title": "Previzualizare",
         "sanitizedWarning": "Unele elemente HTML au fost eliminate pentru siguranță. Verifică previzualizarea."
+      },
+      "shipping": {
+        "title": "Livrare",
+        "hint": "Clasă de livrare și excepții pentru acest produs.",
+        "weight": "Greutate",
+        "weightUnit": "Grame (g). Opțional.",
+        "width": "Lățime",
+        "height": "Înălțime",
+        "depth": "Adâncime",
+        "cm": "Centimetri (cm). Opțional.",
+        "classLabel": "Clasă livrare",
+        "class": {
+          "standard": "Standard",
+          "bulky": "Voluminos",
+          "oversize": "Supradimensionat"
+        },
+        "allowLocker": "Permite livrare la locker",
+        "disallowedCouriers": "Curieri interziși",
+        "courier": {
+          "sameday": "Sameday",
+          "fan_courier": "FAN Courier"
+        },
+        "disallowedHint": "Dacă interzici ambii curieri, clienții nu vor putea finaliza comanda pentru acest produs.",
+        "weightHint": "Greutatea trebuie să fie un număr întreg ≥ 0 (grame).",
+        "dimensionsHint": "Dimensiunile trebuie să fie numere ≥ 0 (cm)."
       },
       "audit": {
         "title": "Istoric modificări",

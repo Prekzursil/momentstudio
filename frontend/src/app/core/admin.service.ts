@@ -191,6 +191,13 @@ export interface AdminProductDetail extends AdminProduct {
   short_description?: string | null;
   long_description?: string | null;
   category_id?: string | null;
+  weight_grams?: number | null;
+  width_cm?: number | null;
+  height_cm?: number | null;
+  depth_cm?: number | null;
+  shipping_class?: 'standard' | 'bulky' | 'oversize';
+  shipping_allow_locker?: boolean;
+  shipping_disallowed_couriers?: string[];
   stock_quantity: number;
   images?: { id: string; url: string; alt_text?: string | null; caption?: string | null }[];
   variants?: AdminProductVariant[];

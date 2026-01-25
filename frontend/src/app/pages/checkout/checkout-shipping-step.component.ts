@@ -524,7 +524,7 @@ import { LockerPickerComponent } from '../../shared/locker-picker.component';
 	                    <div class="grid grid-cols-2 gap-2">
 	                      <button
 	                        type="button"
-	                        class="flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+	                        class="flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50"
 	                        [ngClass]="
 	                          deliveryType === 'home'
 	                            ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'
@@ -537,31 +537,36 @@ import { LockerPickerComponent } from '../../shared/locker-picker.component';
 	                      </button>
 	                      <button
 	                        type="button"
-	                        class="flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+	                        class="flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50"
 	                        [ngClass]="
 	                          deliveryType === 'locker'
 	                            ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'
 	                            : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800'
 	                        "
 	                        (click)="setDeliveryType('locker')"
+                          [disabled]="!deliveryLockerAllowed"
 	                        [attr.aria-pressed]="deliveryType === 'locker'"
 	                      >
 	                        {{ 'checkout.deliveryLocker' | translate }}
 	                      </button>
 	                    </div>
+                      <p *ngIf="!deliveryLockerAllowed" class="text-xs text-amber-700 dark:text-amber-300">
+                        {{ 'checkout.deliveryLockerUnavailable' | translate }}
+                      </p>
 	                  </div>
 	                  <div class="text-sm grid gap-2">
 	                    <span>{{ 'checkout.courier' | translate }}</span>
 	                    <div class="grid gap-2">
 	                      <button
 	                        type="button"
-	                        class="rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+	                        class="rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50"
 	                        [ngClass]="
 	                          courier === 'sameday'
 	                            ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'
 	                            : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800'
 	                        "
 	                        (click)="setCourier('sameday')"
+                          [disabled]="!courierAllowed('sameday')"
 	                        [attr.aria-pressed]="courier === 'sameday'"
 	                      >
 	                        <div class="flex items-start justify-between gap-3">
@@ -578,13 +583,14 @@ import { LockerPickerComponent } from '../../shared/locker-picker.component';
 	                      </button>
 	                      <button
 	                        type="button"
-	                        class="rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+	                        class="rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50"
 	                        [ngClass]="
 	                          courier === 'fan_courier'
 	                            ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'
 	                            : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800'
 	                        "
 	                        (click)="setCourier('fan_courier')"
+                          [disabled]="!courierAllowed('fan_courier')"
 	                        [attr.aria-pressed]="courier === 'fan_courier'"
 	                      >
 	                        <div class="flex items-start justify-between gap-3">
@@ -1137,6 +1143,10 @@ export class CheckoutShippingStepComponent {
     return this.vm.deliveryError;
   }
 
+  get deliveryLockerAllowed(): any {
+    return this.vm.deliveryLockerAllowed;
+  }
+
   get saveAddress(): any {
     return this.vm.saveAddress;
   }
@@ -1256,6 +1266,10 @@ export class CheckoutShippingStepComponent {
 
   setCourier(provider: any): void {
     this.vm.setCourier(provider);
+  }
+
+  courierAllowed(provider: any): any {
+    return this.vm.courierAllowed(provider);
   }
 
   courierEstimateKey(provider: any): any {

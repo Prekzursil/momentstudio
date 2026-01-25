@@ -1031,9 +1031,11 @@
     "deliveryHome": "Home delivery",
     "deliveryLocker": "Locker pickup",
     "deliveryLockerRequired": "Please select a locker for pickup.",
+    "deliveryLockerUnavailable": "Locker pickup is not available for one or more items in your cart.",
     "courier": "Courier",
     "courierSameday": "Sameday",
     "courierFanCourier": "Fan Courier",
+    "courierUnavailable": "This courier is not available for one or more items in your cart.",
     "deliveryEstimateRange": "Estimated delivery: {{min}}–{{max}} business days",
     "deliveryEstimateSingle": "Estimated delivery: {{days}} business days",
     "locker": "Locker",
@@ -2222,6 +2224,31 @@
       "markdownPreview": {
         "title": "Preview",
         "sanitizedWarning": "Some HTML was removed for safety. Review the preview output."
+      },
+      "shipping": {
+        "title": "Shipping",
+        "hint": "Shipping class and delivery exceptions for this product.",
+        "weight": "Weight",
+        "weightUnit": "Grams (g). Optional.",
+        "width": "Width",
+        "height": "Height",
+        "depth": "Depth",
+        "cm": "Centimeters (cm). Optional.",
+        "classLabel": "Shipping class",
+        "class": {
+          "standard": "Standard",
+          "bulky": "Bulky",
+          "oversize": "Oversize"
+        },
+        "allowLocker": "Allow locker pickup",
+        "disallowedCouriers": "Disallowed couriers",
+        "courier": {
+          "sameday": "Sameday",
+          "fan_courier": "FAN Courier"
+        },
+        "disallowedHint": "If you disallow both couriers, customers will not be able to checkout this product.",
+        "weightHint": "Weight must be a non-negative integer (grams).",
+        "dimensionsHint": "Dimensions must be non-negative numbers (cm)."
       },
       "audit": {
         "title": "Audit trail",

@@ -117,6 +117,38 @@ def _get_first_image(product: Product | None) -> str | None:
     return first[0].url if first else None
 
 
+SUPPORTED_COURIERS: set[str] = {"sameday", "fan_courier"}
+
+
+def delivery_constraints(cart: Cart) -> tuple[bool, list[str]]:
+    """Compute delivery constraints implied by products in the cart.
+
+    - Locker delivery is allowed only if all products allow it.
+    - Allowed couriers are the intersection of all product courier allowlists,
+      modeled as "disallowed couriers" per product.
+    """
+
+    locker_allowed = True
+    allowed_couriers = set(SUPPORTED_COURIERS)
+
+    for item in getattr(cart, "items", []) or []:
+        product = getattr(item, "product", None)
+        if not product:
+            continue
+        if getattr(product, "shipping_allow_locker", True) is False:
+            locker_allowed = False
+
+        disallowed = getattr(product, "shipping_disallowed_couriers", None) or []
+        if isinstance(disallowed, str):
+            disallowed = [disallowed]
+        for raw in disallowed:
+            code = str(raw or "").strip().lower()
+            if code in allowed_couriers:
+                allowed_couriers.remove(code)
+
+    return locker_allowed, sorted(allowed_couriers)
+
+
 def _calculate_shipping_amount(
     subtotal: Decimal,
     shipping_method: ShippingMethod | None,
@@ -274,6 +306,9 @@ async def serialize_cart(
         totals.free_shipping_threshold_ron = threshold
         totals.phone_required_home = bool(getattr(checkout, "phone_required_home", False))
         totals.phone_required_locker = bool(getattr(checkout, "phone_required_locker", False))
+        locker_allowed, allowed_couriers = delivery_constraints(hydrated)
+        totals.delivery_locker_allowed = locker_allowed
+        totals.delivery_allowed_couriers = allowed_couriers
     return CartRead(
         id=hydrated.id,
         user_id=hydrated.user_id,

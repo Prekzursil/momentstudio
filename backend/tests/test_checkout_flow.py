@@ -563,6 +563,121 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
     assert order.stripe_checkout_session_id == "cs_test"
 
 
+def test_checkout_respects_product_delivery_exceptions(checkout_app: Dict[str, object]) -> None:
+    client: TestClient = checkout_app["client"]  # type: ignore[assignment]
+    SessionLocal = checkout_app["session_factory"]  # type: ignore[assignment]
+
+    async def seed():
+        async with SessionLocal() as session:
+            category = Category(slug="shipping-exc", name="Shipping exceptions")
+            product = Product(
+                category=category,
+                slug="shipping-exc-prod",
+                sku="SHIP-EXC-1",
+                name="Shipping exception product",
+                base_price=Decimal("25.00"),
+                currency="RON",
+                stock_quantity=10,
+                status=ProductStatus.published,
+                shipping_allow_locker=False,
+                shipping_disallowed_couriers=["fan_courier"],
+                images=[ProductImage(url="/media/img1.png", alt_text="img")],
+            )
+            shipping_method = await order_service.create_shipping_method(
+                session, ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0)
+            )
+            session.add(product)
+            await session.commit()
+            await session.refresh(product)
+            return {"product_id": product.id, "shipping_method_id": shipping_method.id}
+
+    seeded = asyncio.run(seed())
+
+    register = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "buyer-exc@example.com",
+            "username": "buyerexc",
+            "password": "secret123",
+            "name": "Buyer",
+            "first_name": "Buyer",
+            "last_name": "User",
+            "date_of_birth": "2000-01-01",
+            "phone": "+40723204204",
+        },
+    )
+    assert register.status_code == 201, register.text
+    token = register.json()["tokens"]["access_token"]
+    user_id = register.json()["user"]["id"]
+
+    async def mark_verified() -> None:
+        async with SessionLocal() as session:
+            user = await session.get(User, UUID(user_id))
+            assert user is not None
+            user.email_verified = True
+            session.add(user)
+            await session.commit()
+
+    asyncio.run(mark_verified())
+
+    add_res = client.post(
+        "/api/v1/cart/items",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"product_id": str(seeded["product_id"]), "quantity": 1},
+    )
+    assert add_res.status_code in (200, 201), add_res.text
+
+    cart_res = client.get("/api/v1/cart", headers={"Authorization": f"Bearer {token}"})
+    assert cart_res.status_code == 200, cart_res.text
+    totals = cart_res.json().get("totals") or {}
+    assert totals.get("delivery_locker_allowed") is False
+    assert "sameday" in (totals.get("delivery_allowed_couriers") or [])
+    assert "fan_courier" not in (totals.get("delivery_allowed_couriers") or [])
+
+    blocked_locker = client.post(
+        "/api/v1/orders/checkout",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "line1": "123 Test St",
+            "line2": None,
+            "city": "Testville",
+            "region": "TS",
+            "postal_code": "12345",
+            "country": "US",
+            "shipping_method_id": str(seeded["shipping_method_id"]),
+            "courier": "sameday",
+            "delivery_type": "locker",
+            "locker_id": "osm:node:1",
+            "locker_name": "Locker",
+            "locker_address": "Somewhere",
+            "locker_lat": 44.0,
+            "locker_lng": 26.0,
+            "save_address": False,
+        },
+    )
+    assert blocked_locker.status_code == 400, blocked_locker.text
+    assert blocked_locker.json().get("detail") == "Locker delivery is not available for cart items"
+
+    blocked_courier = client.post(
+        "/api/v1/orders/checkout",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "line1": "123 Test St",
+            "line2": None,
+            "city": "Testville",
+            "region": "TS",
+            "postal_code": "12345",
+            "country": "US",
+            "shipping_method_id": str(seeded["shipping_method_id"]),
+            "courier": "fan_courier",
+            "delivery_type": "home",
+            "save_address": False,
+        },
+    )
+    assert blocked_courier.status_code == 400, blocked_courier.text
+    assert blocked_courier.json().get("detail") == "Selected courier is not available for cart items"
+
+
 def test_authenticated_checkout_creates_separate_billing_address(
     checkout_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
 ) -> None:

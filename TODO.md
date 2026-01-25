@@ -732,7 +732,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Products: audit trail for edits – Show per-field history for product changes.
 - [x] Admin Products: import/export CSV – Import products/stock/prices via CSV with validation + error report.
 - [x] Admin Products: markdown preview – Inline preview for descriptions with sanitation warnings.
-- [ ] Admin Products: per-product shipping overrides – Set weight/size shipping class and exceptions.
+- [x] Admin Products: per-product shipping overrides – Set weight/size shipping class and exceptions.
 - [ ] Admin Products: translation completeness – Dashboard for missing RO/EN fields (name/description/content).
 - [ ] Admin Products: feature flags per product – Toggle badges like “New”, “Limited”, “Handmade” with scheduling.
 - [ ] Admin Users: customer profile page – View user details, addresses, orders, tickets, and activity.
