@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, func, JSON, Integer
+from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, func, JSON, Integer, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -85,6 +85,23 @@ class ContentImage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     block: Mapped[ContentBlock] = relationship("ContentBlock", back_populates="images")
+    tags: Mapped[list["ContentImageTag"]] = relationship(
+        "ContentImageTag", back_populates="image", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class ContentImageTag(Base):
+    __tablename__ = "content_image_tags"
+    __table_args__ = (UniqueConstraint("content_image_id", "tag", name="uq_content_image_tags_image_tag"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    content_image_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("content_images.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    tag: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    image: Mapped[ContentImage] = relationship("ContentImage", back_populates="tags")
 
 
 class ContentAuditLog(Base):

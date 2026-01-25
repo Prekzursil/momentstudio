@@ -119,11 +119,29 @@ class ContentImageAssetRead(BaseModel):
     sort_order: int
     created_at: datetime
     content_key: str
+    tags: list[str] = Field(default_factory=list)
 
 
 class ContentImageAssetListResponse(BaseModel):
     items: list[ContentImageAssetRead]
     meta: PaginationMeta
+
+
+class ContentImageTagsUpdate(BaseModel):
+    tags: list[str] = Field(default_factory=list)
+
+
+class ContentLinkCheckIssue(BaseModel):
+    key: str
+    kind: str = Field(pattern="^(link|image)$")
+    source: str = Field(pattern="^(markdown|block)$")
+    field: str
+    url: str
+    reason: str
+
+
+class ContentLinkCheckResponse(BaseModel):
+    issues: list[ContentLinkCheckIssue]
 
 
 class ContentBlockVersionListItem(BaseModel):

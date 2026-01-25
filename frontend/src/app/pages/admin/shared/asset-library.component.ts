@@ -29,14 +29,14 @@ import { ToastService } from '../../../core/toast.service';
         </div>
       </div>
 
-      <div class="grid gap-2 md:grid-cols-3">
+      <div class="grid gap-2 md:grid-cols-4">
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
           {{ 'adminUi.site.assets.library.search' | translate }}
           <input
             class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
             [(ngModel)]="q"
             [placeholder]="'adminUi.site.assets.library.searchPlaceholder' | translate"
-            (keyup.enter)="reload()"
+            (keyup.enter)="reload(true)"
           />
         </label>
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -44,11 +44,20 @@ import { ToastService } from '../../../core/toast.service';
           <select
             class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             [(ngModel)]="key"
-            (ngModelChange)="reload()"
+            (ngModelChange)="reload(true)"
           >
             <option [ngValue]="''">{{ 'adminUi.site.assets.library.scopeAll' | translate }}</option>
             <option *ngFor="let opt of scopedKeys" [ngValue]="opt">{{ opt }}</option>
           </select>
+        </label>
+        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+          {{ 'adminUi.site.assets.library.tagFilter' | translate }}
+          <input
+            class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+            [(ngModel)]="tag"
+            [placeholder]="'adminUi.site.assets.library.tagFilterPlaceholder' | translate"
+            (keyup.enter)="reload(true)"
+          />
         </label>
       </div>
 
@@ -85,6 +94,9 @@ import { ToastService } from '../../../core/toast.service';
               <button type="button" class="text-xs text-indigo-600 hover:underline dark:text-indigo-300" (click)="copy(img.url)">
                 {{ 'adminUi.actions.copy' | translate }}
               </button>
+              <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="editTags(img)">
+                {{ 'adminUi.site.assets.library.tagsEdit' | translate }}
+              </button>
               <button
                 *ngIf="allowSelect"
                 type="button"
@@ -99,6 +111,16 @@ import { ToastService } from '../../../core/toast.service';
           <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
             {{ img.content_key }} · {{ img.created_at | date: 'short' }}
           </p>
+          <div *ngIf="img.tags?.length" class="mt-2 flex flex-wrap gap-1">
+            <button
+              *ngFor="let t of img.tags"
+              type="button"
+              class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200 dark:hover:bg-slate-800"
+              (click)="applyTagFilter(t)"
+            >
+              {{ t }}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -136,6 +158,7 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
 
   q = '';
   key = '';
+  tag = '';
   page = 1;
   limit = 24;
 
@@ -167,10 +190,13 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
     return this.totalPages();
   }
 
-  reload(): void {
+  reload(reset: boolean = false): void {
+    if (reset) this.page = 1;
     this.loading.set(true);
     this.error.set(null);
-    this.admin.listContentImages({ q: this.q || undefined, key: this.key || undefined, page: this.page, limit: this.limit }).subscribe({
+    this.admin
+      .listContentImages({ q: this.q || undefined, key: this.key || undefined, tag: this.tag || undefined, page: this.page, limit: this.limit })
+      .subscribe({
       next: (resp) => {
         this.images.set(resp.items || []);
         this.totalPages.set(resp.meta?.total_pages || 1);
@@ -222,6 +248,33 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
       .writeText(value)
       .then(() => this.toast.success(this.t('adminUi.site.assets.library.success.copied')))
       .catch(() => this.toast.error(this.t('adminUi.site.assets.library.errors.copy')));
+  }
+
+  applyTagFilter(tag: string): void {
+    const value = (tag || '').trim();
+    if (!value) return;
+    this.tag = value;
+    this.reload(true);
+  }
+
+  editTags(img: ContentImageAssetRead): void {
+    const id = (img?.id || '').trim();
+    if (!id) return;
+    const current = (img.tags || []).join(', ');
+    const entered = window.prompt(this.t('adminUi.site.assets.library.tagsPrompt'), current);
+    if (entered === null) return;
+    const tags = entered
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+    this.admin.updateContentImageTags(id, tags).subscribe({
+      next: (updated) => {
+        const updatedTags = updated?.tags || [];
+        this.images.set(this.images().map((item) => (item.id === id ? { ...item, tags: updatedTags } : item)));
+        this.toast.success(this.t('adminUi.site.assets.library.tagsSaved'));
+      },
+      error: () => this.toast.error(this.t('adminUi.site.assets.library.tagsErrorsSave'))
+    });
   }
 
   private t(key: string, params?: Record<string, unknown>): string {

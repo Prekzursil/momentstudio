@@ -486,11 +486,25 @@ export interface ContentImageAssetRead {
   sort_order: number;
   created_at: string;
   content_key: string;
+  tags?: string[];
 }
 
 export interface ContentImageAssetListResponse {
   items: ContentImageAssetRead[];
   meta: { total_items: number; total_pages: number; page: number; limit: number };
+}
+
+export interface ContentLinkCheckIssue {
+  key: string;
+  kind: 'link' | 'image';
+  source: 'markdown' | 'block';
+  field: string;
+  url: string;
+  reason: string;
+}
+
+export interface ContentLinkCheckResponse {
+  issues: ContentLinkCheckIssue[];
 }
 
 export interface ContentSavePayload {
@@ -501,6 +515,7 @@ export interface ContentSavePayload {
   lang?: string | null;
   sort_order?: number;
   published_at?: string | null;
+  published_until?: string | null;
   expected_version?: number;
 }
 
@@ -872,8 +887,16 @@ export class AdminService {
     return this.api.post<ContentBlock>(`/content/admin/${key}/versions/${version}/rollback`, {});
   }
 
-  listContentImages(params?: { key?: string; q?: string; page?: number; limit?: number }): Observable<ContentImageAssetListResponse> {
+  listContentImages(params?: { key?: string; q?: string; tag?: string; page?: number; limit?: number }): Observable<ContentImageAssetListResponse> {
     return this.api.get<ContentImageAssetListResponse>('/content/admin/assets/images', params as any);
+  }
+
+  updateContentImageTags(imageId: string, tags: string[]): Observable<ContentImageAssetRead> {
+    return this.api.patch<ContentImageAssetRead>(`/content/admin/assets/images/${encodeURIComponent(imageId)}/tags`, { tags });
+  }
+
+  linkCheckContent(key: string): Observable<ContentLinkCheckResponse> {
+    return this.api.get<ContentLinkCheckResponse>('/content/admin/tools/link-check', { key });
   }
 
   fetchSocialThumbnail(url: string): Observable<SocialThumbnailResponse> {

@@ -758,8 +758,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin CMS: content diff before publish – Side-by-side diff between draft and published versions.
 - [x] Admin CMS: scheduled publishing – Schedule page/blog publish/unpublish windows.
 - [x] Admin CMS: content rollback – Restore a previous version with one click (audit).
-- [ ] Admin CMS: broken link checker – Validate internal links/images and surface warnings.
-- [ ] Admin CMS: media library tags – Organize assets with tags and search filters.
+- [x] Admin CMS: broken link checker – Validate internal links/images and surface warnings.
+- [x] Admin CMS: media library tags – Organize assets with tags and search filters.
 - [ ] Admin CMS: image focal point – Set focal point for responsive crops (hero/cards).
 - [ ] Admin CMS: translation workflow – Mark items “needs translation” and track completion per language.
 - [ ] Admin SEO: redirects bulk tools – Bulk import/export redirects and detect redirect loops.

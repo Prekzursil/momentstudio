@@ -1575,6 +1575,12 @@
           "searchPlaceholder": "Caută după cheie, URL sau text alternativ…",
           "scope": "Cheie",
           "scopeAll": "Toate cheile",
+          "tagFilter": "Etichetă",
+          "tagFilterPlaceholder": "ex. hero, homepage",
+          "tagsEdit": "Etichete",
+          "tagsPrompt": "Etichete (separate prin virgulă)",
+          "tagsSaved": "Etichetele au fost actualizate.",
+          "tagsErrorsSave": "Nu am putut actualiza etichetele.",
           "upload": "Încarcă imagine",
           "uploadHint": "Încărcările sunt atașate la {{key}} pentru organizare.",
           "loading": "Se încarcă imaginile…",
@@ -3051,6 +3057,18 @@
           "load": "Nu am putut încărca reviziile",
           "loadVersion": "Nu am putut încărca versiunea",
           "rollback": "Nu am putut reveni"
+        }
+      },
+      "linkCheck": {
+        "title": "Verificare linkuri",
+        "hint": "Verifică linkurile interne și referințele media pentru cheia de conținut selectată.",
+        "key": "Cheie conținut",
+        "run": "Verifică",
+        "useSelectedPage": "Folosește pagina selectată",
+        "loading": "Se verifică…",
+        "empty": "Nu au fost găsite probleme.",
+        "errors": {
+          "load": "Nu am putut rula verificarea."
         }
       },
       "errors": {

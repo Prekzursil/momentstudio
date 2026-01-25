@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.dependencies import get_session, require_admin_section
-from app.models.content import ContentBlock, ContentBlockVersion, ContentImage, ContentRedirect
+from app.models.content import ContentBlock, ContentBlockVersion, ContentImage, ContentRedirect, ContentImageTag
 from app.models.user import User
 from app.schemas.content import (
     ContentAuditRead,
@@ -23,12 +23,35 @@ from app.schemas.content import (
     ContentRedirectRead,
     ContentBlockVersionListItem,
     ContentBlockVersionRead,
+    ContentImageTagsUpdate,
+    ContentLinkCheckResponse,
 )
 from app.schemas.social import SocialThumbnailRequest, SocialThumbnailResponse
 from app.services import content as content_service
 from app.services import social_thumbnails
 
 router = APIRouter(prefix="/content", tags=["content"])
+
+
+def _normalize_image_tags(tags: list[str]) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw in tags or []:
+        value = str(raw or "").strip().lower()
+        if not value:
+            continue
+        value = value.replace(" ", "-")
+        value = "".join(ch for ch in value if ch.isalnum() or ch in ("-", "_"))
+        value = value.strip("-_")
+        if not value or len(value) > 64:
+            continue
+        if value in seen:
+            continue
+        seen.add(value)
+        normalized.append(value)
+        if len(normalized) >= 10:
+            break
+    return normalized
 
 
 @router.get("/pages/{slug}", response_model=ContentBlockRead)
@@ -207,6 +230,7 @@ async def admin_list_content_images(
     session: AsyncSession = Depends(get_session),
     key: str | None = Query(default=None, description="Filter by content block key"),
     q: str | None = Query(default=None, description="Search content key, URL, or alt text"),
+    tag: str | None = Query(default=None, description="Filter by tag"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=24, ge=1, le=100),
     _: User = Depends(require_admin_section("content")),
@@ -223,13 +247,21 @@ async def admin_list_content_images(
                 ContentImage.alt_text.ilike(needle),
             )
         )
+    tag_value = (tag or "").strip().lower()
+    if tag_value:
+        filters.append(ContentImageTag.tag == tag_value)
 
-    total = await session.scalar(select(func.count()).select_from(ContentImage).join(ContentBlock).where(*filters))
+    count_query = select(func.count()).select_from(ContentImage).join(ContentBlock)
+    if tag_value:
+        count_query = select(func.count(func.distinct(ContentImage.id))).select_from(ContentImage).join(ContentBlock).join(
+            ContentImageTag
+        )
+    total = await session.scalar(count_query.where(*filters))
     total_items = int(total or 0)
     total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
     offset = (page - 1) * limit
 
-    result = await session.execute(
+    query = (
         select(ContentImage, ContentBlock.key)
         .join(ContentBlock)
         .where(*filters)
@@ -237,8 +269,22 @@ async def admin_list_content_images(
         .offset(offset)
         .limit(limit)
     )
+    if tag_value:
+        query = query.join(ContentImageTag)
+    result = await session.execute(query)
+    rows = result.all()
+    image_ids = [img.id for img, _ in rows]
+    tag_map: dict[UUID, list[str]] = {}
+    if image_ids:
+        tag_rows = await session.execute(
+            select(ContentImageTag.content_image_id, ContentImageTag.tag).where(ContentImageTag.content_image_id.in_(image_ids))
+        )
+        for image_id, tag_value_row in tag_rows.all():
+            tag_map.setdefault(image_id, []).append(tag_value_row)
+        for image_id in list(tag_map.keys()):
+            tag_map[image_id] = sorted(set(tag_map[image_id]))
     items: list[ContentImageAssetRead] = []
-    for img, block_key in result.all():
+    for img, block_key in rows:
         items.append(
             ContentImageAssetRead(
                 id=img.id,
@@ -247,12 +293,69 @@ async def admin_list_content_images(
                 sort_order=img.sort_order,
                 created_at=img.created_at,
                 content_key=block_key,
+                tags=tag_map.get(img.id, []),
             )
         )
     return ContentImageAssetListResponse(
         items=items,
         meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
     )
+
+
+@router.patch("/admin/assets/images/{image_id}/tags", response_model=ContentImageAssetRead)
+async def admin_update_content_image_tags(
+    image_id: UUID,
+    payload: ContentImageTagsUpdate,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentImageAssetRead:
+    image = await session.scalar(select(ContentImage).where(ContentImage.id == image_id))
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    tags = _normalize_image_tags(payload.tags)
+
+    existing = (
+        await session.execute(select(ContentImageTag).where(ContentImageTag.content_image_id == image_id))
+    ).scalars().all()
+    existing_by_value = {t.tag: t for t in existing}
+
+    want = set(tags)
+    have = set(existing_by_value.keys())
+
+    for value in have - want:
+        await session.delete(existing_by_value[value])
+
+    for value in want - have:
+        session.add(ContentImageTag(content_image_id=image_id, tag=value))
+
+    await session.commit()
+
+    content_key = ""
+    if getattr(image, "content_block_id", None):
+        content_key = (
+            await session.scalar(select(ContentBlock.key).where(ContentBlock.id == image.content_block_id))
+        ) or ""
+
+    return ContentImageAssetRead(
+        id=image.id,
+        url=image.url,
+        alt_text=image.alt_text,
+        sort_order=image.sort_order,
+        created_at=image.created_at,
+        content_key=content_key,
+        tags=tags,
+    )
+
+
+@router.get("/admin/tools/link-check", response_model=ContentLinkCheckResponse)
+async def admin_link_check(
+    key: str = Query(..., description="Content key to check"),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentLinkCheckResponse:
+    issues = await content_service.check_content_links(session, key=key)
+    return ContentLinkCheckResponse(issues=issues)
 
 
 @router.get("/admin/pages/list", response_model=list[ContentPageListItem])

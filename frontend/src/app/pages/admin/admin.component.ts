@@ -25,7 +25,8 @@ import {
   ContentBlockVersionListItem,
   ContentBlockVersionRead,
   ContentPageListItem,
-  ContentRedirectRead
+  ContentRedirectRead,
+  ContentLinkCheckIssue
 } from '../../core/admin.service';
 import { AdminBlogComment, BlogService } from '../../core/blog.service';
 import { FxAdminService, FxAdminStatus, FxOverrideAuditEntry } from '../../core/fx-admin.service';
@@ -1129,6 +1130,51 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     </select>
                   </label>
                   <app-content-revisions [contentKey]="pagesRevisionKey" [titleKey]="pagesRevisionTitleKey()"></app-content-revisions>
+                </div>
+              </details>
+
+              <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.content.linkCheck.title' | translate }}
+                </summary>
+                <div class="mt-3 grid gap-3">
+                  <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.content.linkCheck.hint' | translate }}</p>
+
+                  <div class="flex flex-wrap gap-2 items-end">
+                    <app-input [label]="'adminUi.content.linkCheck.key' | translate" [(value)]="linkCheckKey"></app-input>
+                    <app-button size="sm" [label]="'adminUi.content.linkCheck.run' | translate" (action)="runLinkCheck()"></app-button>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.content.linkCheck.useSelectedPage' | translate"
+                      (action)="runLinkCheck(pageBlocksKey)"
+                    ></app-button>
+                  </div>
+
+                  <div *ngIf="linkCheckError" class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+                    {{ linkCheckError }}
+                  </div>
+
+                  <div *ngIf="linkCheckLoading" class="text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.content.linkCheck.loading' | translate }}
+                  </div>
+
+                  <div *ngIf="!linkCheckLoading && !linkCheckError && linkCheckIssues.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.content.linkCheck.empty' | translate }}
+                  </div>
+
+                  <div *ngIf="!linkCheckLoading && linkCheckIssues.length" class="grid gap-2">
+                    <div
+                      *ngFor="let issue of linkCheckIssues"
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900"
+                    >
+                      <p class="text-sm font-medium text-slate-900 dark:text-slate-50">{{ issue.reason }}</p>
+                      <p class="mt-1 text-xs text-slate-600 dark:text-slate-300 font-mono break-all">{{ issue.url }}</p>
+                      <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                        {{ issue.kind }} · {{ issue.source }} · {{ issue.field }}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </details>
             </div>
@@ -3389,6 +3435,10 @@ export class AdminComponent implements OnInit, OnDestroy {
   redirectsLoading = false;
   redirectsError: string | null = null;
   redirectsQuery = '';
+  linkCheckKey = 'page.about';
+  linkCheckLoading = false;
+  linkCheckError: string | null = null;
+  linkCheckIssues: ContentLinkCheckIssue[] = [];
   newCustomPageTitle = '';
   newCustomPageStatus: 'draft' | 'published' = 'draft';
   newCustomPagePublishedAt = '';
@@ -5833,6 +5883,27 @@ export class AdminComponent implements OnInit, OnDestroy {
       error: (err) => {
         const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
         this.toast.error(detail || this.t('adminUi.site.pages.redirects.errors.delete'));
+      }
+    });
+  }
+
+  runLinkCheck(keyOverride?: string): void {
+    const key = (keyOverride ?? this.linkCheckKey ?? '').trim();
+    if (!key) return;
+    this.linkCheckKey = key;
+    this.linkCheckLoading = true;
+    this.linkCheckError = null;
+    this.linkCheckIssues = [];
+    this.admin.linkCheckContent(key).subscribe({
+      next: (resp) => {
+        this.linkCheckIssues = resp?.issues || [];
+        this.linkCheckLoading = false;
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.linkCheckError = detail || this.t('adminUi.content.linkCheck.errors.load');
+        this.linkCheckIssues = [];
+        this.linkCheckLoading = false;
       }
     });
   }

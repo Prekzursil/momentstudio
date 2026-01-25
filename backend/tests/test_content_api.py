@@ -188,6 +188,24 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     data = assets.json()
     assert data["meta"]["total_items"] >= 1
     assert any(item["content_key"] == "home.hero" for item in data["items"])
+    first_img = data["items"][0]
+
+    # Asset tags: set tags and filter by tag.
+    tag_set = client.patch(
+        f"/api/v1/content/admin/assets/images/{first_img['id']}/tags",
+        json={"tags": ["Hero", " Homepage ", "hero"]},
+        headers=auth_headers(admin_token),
+    )
+    assert tag_set.status_code == 200, tag_set.text
+    assert tag_set.json()["tags"] == ["hero", "homepage"]
+
+    tagged = client.get(
+        "/api/v1/content/admin/assets/images",
+        params={"tag": "hero"},
+        headers=auth_headers(admin_token),
+    )
+    assert tagged.status_code == 200, tagged.text
+    assert any("hero" in (item.get("tags") or []) for item in tagged.json()["items"])
 
     assets_filtered = client.get(
         "/api/v1/content/admin/assets/images",
@@ -212,6 +230,28 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     ro_public = client.get("/api/v1/content/home.hero?lang=ro")
     assert ro_public.status_code == 200
     assert ro_public.json()["title"] == "Erou"
+
+    # Broken link checker for internal URLs.
+    link_block = client.post(
+        "/api/v1/content/admin/site.linkcheck",
+        json={
+            "title": "Linkcheck",
+            "body_markdown": "![missing](/media/does-not-exist.png) [product](/products/missing) [page](/pages/missing-page)",
+            "status": "draft",
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert link_block.status_code == 201, link_block.text
+    check = client.get(
+        "/api/v1/content/admin/tools/link-check",
+        params={"key": "site.linkcheck"},
+        headers=auth_headers(admin_token),
+    )
+    assert check.status_code == 200, check.text
+    issues = check.json()["issues"]
+    assert any(i["reason"] == "Media file not found" for i in issues)
+    assert any(i["reason"] == "Product not found" for i in issues)
+    assert any(i["reason"] == "Content not found" for i in issues)
 
 
 def test_admin_fetch_social_thumbnail(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:

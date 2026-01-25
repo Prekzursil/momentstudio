@@ -1575,6 +1575,12 @@
           "searchPlaceholder": "Search by key, URL, or alt text…",
           "scope": "Scope",
           "scopeAll": "All keys",
+          "tagFilter": "Tag",
+          "tagFilterPlaceholder": "e.g. hero, homepage",
+          "tagsEdit": "Tags",
+          "tagsPrompt": "Tags (comma-separated)",
+          "tagsSaved": "Tags updated.",
+          "tagsErrorsSave": "Could not update tags.",
           "upload": "Upload image",
           "uploadHint": "Uploads are attached to {{key}} for easy organization.",
           "loading": "Loading assets…",
@@ -3051,6 +3057,18 @@
           "load": "Could not load revisions",
           "loadVersion": "Could not load version",
           "rollback": "Could not rollback"
+        }
+      },
+      "linkCheck": {
+        "title": "Link checker",
+        "hint": "Checks internal links and media references for the selected content key.",
+        "key": "Content key",
+        "run": "Run",
+        "useSelectedPage": "Use selected page",
+        "loading": "Checking…",
+        "empty": "No issues found.",
+        "errors": {
+          "load": "Could not run link checker."
         }
       },
       "errors": {
