@@ -2277,6 +2277,21 @@
         "weightHint": "Greutatea trebuie să fie un număr întreg ≥ 0 (grame).",
         "dimensionsHint": "Dimensiunile trebuie să fie numere ≥ 0 (cm)."
       },
+      "priceHistory": {
+        "title": "Istoric preț",
+        "hint": "Modificări ale prețului de bază în timp. Perioadele de reducere sunt evidențiate.",
+        "empty": "Nu există modificări de preț înregistrate.",
+        "latest": "Ultimul",
+        "min": "Minim",
+        "max": "Maxim",
+        "saleWindow": "Perioadă reducere",
+        "table": {
+          "when": "Când",
+          "user": "Utilizator",
+          "from": "De la",
+          "to": "La"
+        }
+      },
       "audit": {
         "title": "Istoric modificări",
         "hint": "Modificări recente ale produsului cu istoric per câmp.",

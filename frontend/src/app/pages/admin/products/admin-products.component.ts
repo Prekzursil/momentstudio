@@ -92,6 +92,26 @@ type VariantRow = {
   stock_quantity: number;
 };
 
+type PriceChangeEvent = {
+  at: string;
+  before: number;
+  after: number;
+  user: string | null;
+};
+
+type PriceHistoryChart = {
+  width: number;
+  height: number;
+  pad: number;
+  polyline: string;
+  dots: Array<{ x: number; y: number }>;
+  min: number;
+  max: number;
+  latest: number;
+  nowX: number | null;
+  saleRect: { x: number; width: number } | null;
+};
+
 @Component({
   selector: 'app-admin-products',
   standalone: true,
@@ -1410,6 +1430,113 @@ type VariantRow = {
 			        </div>
 
 			        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
+			          <div class="grid gap-1">
+			            <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
+			              {{ 'adminUi.products.priceHistory.title' | translate }}
+			            </h3>
+			            <p class="text-xs text-slate-500 dark:text-slate-400">
+			              {{ 'adminUi.products.priceHistory.hint' | translate }}
+			            </p>
+			          </div>
+
+			          <div *ngIf="priceHistoryChart() as chart; else priceHistoryEmpty" class="grid gap-3">
+			            <div class="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+			              <svg class="h-40 w-full" [attr.viewBox]="'0 0 ' + chart.width + ' ' + chart.height" preserveAspectRatio="none">
+			                <rect
+			                  *ngIf="chart.saleRect"
+			                  [attr.x]="chart.saleRect.x"
+			                  [attr.y]="chart.pad"
+			                  [attr.width]="chart.saleRect.width"
+			                  [attr.height]="chart.height - chart.pad * 2"
+			                  fill="rgba(99, 102, 241, 0.12)"
+			                ></rect>
+			                <line
+			                  *ngIf="chart.nowX !== null"
+			                  [attr.x1]="chart.nowX"
+			                  [attr.x2]="chart.nowX"
+			                  [attr.y1]="chart.pad"
+			                  [attr.y2]="chart.height - chart.pad"
+			                  stroke="rgba(100, 116, 139, 0.6)"
+			                  stroke-width="1"
+			                  stroke-dasharray="4 4"
+			                ></line>
+			                <polyline
+			                  [attr.points]="chart.polyline"
+			                  fill="none"
+			                  stroke="rgba(99, 102, 241, 0.9)"
+			                  stroke-width="2"
+			                  stroke-linejoin="round"
+			                  stroke-linecap="round"
+			                ></polyline>
+			                <circle
+			                  *ngFor="let dot of chart.dots"
+			                  [attr.cx]="dot.x"
+			                  [attr.cy]="dot.y"
+			                  r="2.5"
+			                  fill="rgba(99, 102, 241, 0.95)"
+			                ></circle>
+			              </svg>
+			            </div>
+
+			            <div class="flex flex-wrap gap-2 text-xs text-slate-600 dark:text-slate-300">
+			              <span class="rounded-full border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+			                {{ 'adminUi.products.priceHistory.latest' | translate }}:
+			                {{ chart.latest | localizedCurrency : editingCurrency() }}
+			              </span>
+			              <span class="rounded-full border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+			                {{ 'adminUi.products.priceHistory.min' | translate }}:
+			                {{ chart.min | localizedCurrency : editingCurrency() }}
+			              </span>
+			              <span class="rounded-full border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+			                {{ 'adminUi.products.priceHistory.max' | translate }}:
+			                {{ chart.max | localizedCurrency : editingCurrency() }}
+			              </span>
+			              <span
+			                *ngIf="form.sale_start_at && form.sale_end_at"
+			                class="rounded-full border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900"
+			              >
+			                {{ 'adminUi.products.priceHistory.saleWindow' | translate }}:
+			                {{ form.sale_start_at }} → {{ form.sale_end_at }}
+			              </span>
+			            </div>
+			          </div>
+
+			          <ng-template #priceHistoryEmpty>
+			            <div class="text-sm text-slate-600 dark:text-slate-300">
+			              {{ 'adminUi.products.priceHistory.empty' | translate }}
+			            </div>
+			          </ng-template>
+
+			          <div
+			            *ngIf="priceHistoryChanges().length > 0"
+			            class="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+			          >
+			            <table class="w-full text-left text-sm">
+			              <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
+			                <tr>
+			                  <th class="px-3 py-2">{{ 'adminUi.products.priceHistory.table.when' | translate }}</th>
+			                  <th class="px-3 py-2">{{ 'adminUi.products.priceHistory.table.user' | translate }}</th>
+			                  <th class="px-3 py-2">{{ 'adminUi.products.priceHistory.table.from' | translate }}</th>
+			                  <th class="px-3 py-2">{{ 'adminUi.products.priceHistory.table.to' | translate }}</th>
+			                </tr>
+			              </thead>
+			              <tbody>
+			                <tr *ngFor="let change of priceHistoryChanges()" class="border-t border-slate-200 dark:border-slate-800">
+			                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ change.at | date: 'short' }}</td>
+			                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ change.user || '—' }}</td>
+			                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+			                    {{ change.before | localizedCurrency : editingCurrency() }}
+			                  </td>
+			                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+			                    {{ change.after | localizedCurrency : editingCurrency() }}
+			                  </td>
+			                </tr>
+			              </tbody>
+			            </table>
+			          </div>
+			        </div>
+
+			        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
 			          <div class="flex flex-wrap items-start justify-between gap-3">
 			            <div class="grid gap-1">
 			              <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
@@ -2080,10 +2207,11 @@ export class AdminProductsComponent implements OnInit {
   page = 1;
   limit = 25;
 
-  editorOpen = signal(false);
-  editingSlug = signal<string | null>(null);
-  editorError = signal<string | null>(null);
-  editorMessage = signal<string | null>(null);
+	  editorOpen = signal(false);
+	  editingSlug = signal<string | null>(null);
+	  editingCurrency = signal('RON');
+	  editorError = signal<string | null>(null);
+	  editorMessage = signal<string | null>(null);
   images = signal<Array<{ id: string; url: string; alt_text?: string | null; caption?: string | null }>>([]);
   deletedImagesOpen = signal(false);
   deletedImages = signal<AdminDeletedProductImage[]>([]);
@@ -2149,10 +2277,12 @@ export class AdminProductsComponent implements OnInit {
     ro: this.blankTranslationForm()
   };
 
-  editingProductId = signal<string | null>(null);
-  auditEntries = signal<AdminProductAuditEntry[]>([]);
-  auditBusy = signal(false);
-  auditError = signal<string | null>(null);
+	  editingProductId = signal<string | null>(null);
+	  auditEntries = signal<AdminProductAuditEntry[]>([]);
+	  auditBusy = signal(false);
+	  auditError = signal<string | null>(null);
+	  priceHistoryChanges = signal<PriceChangeEvent[]>([]);
+	  priceHistoryChart = signal<PriceHistoryChart | null>(null);
 
   csvImportOpen = signal(false);
   csvImportFile = signal<File | null>(null);
@@ -2820,6 +2950,7 @@ export class AdminProductsComponent implements OnInit {
 		    this.editorOpen.set(true);
 		    this.editingSlug.set(null);
 		    this.editingProductId.set(null);
+		    this.editingCurrency.set('RON');
 		    this.editorError.set(null);
 		    this.editorMessage.set(null);
         this.loadedTagSlugs = [];
@@ -2844,6 +2975,7 @@ export class AdminProductsComponent implements OnInit {
 		    this.editorOpen.set(false);
 		    this.editingSlug.set(null);
 		    this.editingProductId.set(null);
+		    this.editingCurrency.set('RON');
 		    this.editorError.set(null);
 		    this.editorMessage.set(null);
         this.loadedTagSlugs = [];
@@ -2867,6 +2999,7 @@ export class AdminProductsComponent implements OnInit {
 		    this.editorMessage.set(null);
 		    this.editingSlug.set(slug);
 		    this.editingProductId.set(null);
+		    this.editingCurrency.set('RON');
 		    this.resetDuplicateCheck();
 		    this.resetRelationships();
 		    this.resetAudit();
@@ -2881,6 +3014,7 @@ export class AdminProductsComponent implements OnInit {
     this.admin.getProduct(slug).subscribe({
       next: (prod: any) => {
         this.editingProductId.set(prod?.id ? String(prod.id) : null);
+        this.editingCurrency.set((prod?.currency || 'RON').toString() || 'RON');
         const basePrice = typeof prod.base_price === 'number' ? prod.base_price : Number(prod.base_price || 0);
         const weightGramsRaw = typeof prod.weight_grams === 'number' ? prod.weight_grams : Number(prod.weight_grams ?? NaN);
         const widthRaw = typeof prod.width_cm === 'number' ? prod.width_cm : Number(prod.width_cm ?? NaN);
@@ -4122,6 +4256,147 @@ export class AdminProductsComponent implements OnInit {
     this.auditEntries.set([]);
     this.auditBusy.set(false);
     this.auditError.set(null);
+    this.priceHistoryChanges.set([]);
+    this.priceHistoryChart.set(null);
+  }
+
+  private rebuildPriceHistory(entries: AdminProductAuditEntry[]): void {
+    const changes = this.extractBasePriceChanges(entries);
+    this.priceHistoryChanges.set(changes);
+    this.priceHistoryChart.set(this.buildPriceHistoryChart(changes));
+  }
+
+  private extractBasePriceChanges(entries: AdminProductAuditEntry[]): PriceChangeEvent[] {
+    const out: PriceChangeEvent[] = [];
+    for (const entry of entries || []) {
+      const changes = entry?.payload?.changes;
+      const base = changes?.base_price;
+      if (!base) continue;
+      const before = this.parseAuditMoney(base?.before);
+      const after = this.parseAuditMoney(base?.after);
+      if (before === null || after === null) continue;
+      if (before === after) continue;
+      const user = (entry.user_email || entry.user_id || null) as string | null;
+      out.push({ at: entry.created_at, before, after, user });
+    }
+    out.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+    return out;
+  }
+
+  private buildPriceHistoryChart(changes: PriceChangeEvent[]): PriceHistoryChart | null {
+    const width = 640;
+    const height = 160;
+    const pad = 12;
+    const now = Date.now();
+
+    const currentBase = this.parseMoneyInput(this.form?.base_price || '');
+    const asc = [...changes].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+
+    const series: Array<{ t: number; v: number }> = [];
+    const dotsSource: Array<{ t: number; v: number }> = [];
+
+    if (asc.length === 0) {
+      if (currentBase === null) return null;
+      series.push({ t: now, v: currentBase }, { t: now + 1, v: currentBase });
+      dotsSource.push({ t: now, v: currentBase });
+    } else {
+      const firstAt = new Date(asc[0].at).getTime();
+      series.push({ t: firstAt, v: asc[0].before });
+      for (const ev of asc) {
+        const t = new Date(ev.at).getTime();
+        series.push({ t, v: ev.before }, { t, v: ev.after });
+        dotsSource.push({ t, v: ev.after });
+      }
+      const last = asc[asc.length - 1];
+      const lastAt = new Date(last.at).getTime();
+      const endAt = Math.max(now, lastAt);
+      series.push({ t: endAt, v: last.after });
+      if (endAt === now) dotsSource.push({ t: now, v: last.after });
+    }
+
+    const saleStart = this.parseLocalDateTime(this.form?.sale_start_at || '');
+    const saleEnd = this.parseLocalDateTime(this.form?.sale_end_at || '');
+
+    let minT = Math.min(...series.map((p) => p.t));
+    let maxT = Math.max(...series.map((p) => p.t));
+    if (saleStart !== null) minT = Math.min(minT, saleStart);
+    if (saleEnd !== null) maxT = Math.max(maxT, saleEnd);
+    minT = Math.min(minT, now);
+    maxT = Math.max(maxT, now);
+    const spanT = Math.max(1, maxT - minT);
+
+    let minV = Math.min(...series.map((p) => p.v));
+    let maxV = Math.max(...series.map((p) => p.v));
+    if (!Number.isFinite(minV) || !Number.isFinite(maxV)) return null;
+    if (minV === maxV) {
+      minV -= 1;
+      maxV += 1;
+    } else {
+      const padV = Math.max(0.01, (maxV - minV) * 0.1);
+      minV -= padV;
+      maxV += padV;
+    }
+    const spanV = Math.max(1e-9, maxV - minV);
+
+    const toX = (t: number) => pad + ((t - minT) / spanT) * (width - pad * 2);
+    const toY = (v: number) => height - pad - ((v - minV) / spanV) * (height - pad * 2);
+
+    const polyline = series
+      .map((p) => `${Math.round(toX(p.t) * 10) / 10},${Math.round(toY(p.v) * 10) / 10}`)
+      .join(' ');
+
+    const dots = dotsSource.map((p) => ({
+      x: Math.round(toX(p.t) * 10) / 10,
+      y: Math.round(toY(p.v) * 10) / 10
+    }));
+
+    const nowX = Math.round(toX(now) * 10) / 10;
+
+    let saleRect: { x: number; width: number } | null = null;
+    if (saleStart !== null && saleEnd !== null && saleEnd > saleStart) {
+      const left = Math.max(pad, Math.min(width - pad, toX(saleStart)));
+      const right = Math.max(pad, Math.min(width - pad, toX(saleEnd)));
+      if (right > left) saleRect = { x: Math.round(left * 10) / 10, width: Math.round((right - left) * 10) / 10 };
+    }
+
+    const latest = asc.length > 0 ? asc[asc.length - 1].after : (currentBase ?? 0);
+    const rawMin = Math.min(...series.map((p) => p.v));
+    const rawMax = Math.max(...series.map((p) => p.v));
+
+    return {
+      width,
+      height,
+      pad,
+      polyline,
+      dots,
+      min: rawMin,
+      max: rawMax,
+      latest,
+      nowX: Number.isFinite(nowX) ? nowX : null,
+      saleRect
+    };
+  }
+
+  private parseAuditMoney(value: unknown): number | null {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'number') return Number.isFinite(value) ? Math.round(value * 100) / 100 : null;
+    if (typeof value === 'string') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : null;
+    }
+    if (typeof value === 'bigint') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  }
+
+  private parseLocalDateTime(value: string): number | null {
+    const trimmed = (value || '').trim();
+    if (!trimmed) return null;
+    const d = new Date(trimmed);
+    const ms = d.getTime();
+    return Number.isNaN(ms) ? null : ms;
   }
 
   private resetMarkdownPreview(): void {
@@ -4212,7 +4487,9 @@ export class AdminProductsComponent implements OnInit {
     this.auditError.set(null);
     this.admin.getProductAudit(slug, 50).subscribe({
       next: (items) => {
-        this.auditEntries.set(Array.isArray(items) ? items : []);
+        const entries = Array.isArray(items) ? items : [];
+        this.auditEntries.set(entries);
+        this.rebuildPriceHistory(entries);
         this.auditBusy.set(false);
       },
       error: () => {

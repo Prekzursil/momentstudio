@@ -2277,6 +2277,21 @@
         "weightHint": "Weight must be a non-negative integer (grams).",
         "dimensionsHint": "Dimensions must be non-negative numbers (cm)."
       },
+      "priceHistory": {
+        "title": "Price history",
+        "hint": "Base price changes over time. Sale windows are highlighted.",
+        "empty": "No pricing changes recorded yet.",
+        "latest": "Latest",
+        "min": "Min",
+        "max": "Max",
+        "saleWindow": "Sale window",
+        "table": {
+          "when": "When",
+          "user": "User",
+          "from": "From",
+          "to": "To"
+        }
+      },
       "audit": {
         "title": "Audit trail",
         "hint": "Recent product changes with per-field history.",
