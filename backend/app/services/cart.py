@@ -223,6 +223,7 @@ def _calculate_totals(
         vat_rate_percent=checkout.vat_rate_percent,
         vat_apply_to_shipping=checkout.vat_apply_to_shipping,
         vat_apply_to_fee=checkout.vat_apply_to_fee,
+        rounding=checkout.money_rounding,
     )
 
     return Totals(

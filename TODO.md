@@ -752,7 +752,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Promotions: A/B promo testing – Optional randomized assignment and performance reporting.
 - [x] Admin Pricing: price history charts – Track price changes per product (and sale periods).
 - [x] Admin Pricing: FX override audit – Show who changed FX overrides and allow “revert” action.
-- [ ] Admin Pricing: rounding rules config – Configure rounding strategy for display/checkout.
+- [x] Admin Pricing: rounding rules config – Configure rounding strategy for display/checkout.
 - [ ] Admin Taxes: configurable tax groups – Manage VAT rates per country/category (future-proofing).
 - [ ] Admin Promotions: code generator upgrades – Generate codes with patterns/prefixes and collision checks.
 - [ ] Admin CMS: content diff before publish – Side-by-side diff between draft and published versions.

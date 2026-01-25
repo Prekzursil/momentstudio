@@ -139,6 +139,7 @@ async def build_order_from_cart(
             vat_rate_percent=checkout_settings.vat_rate_percent,
             vat_apply_to_shipping=checkout_settings.vat_apply_to_shipping,
             vat_apply_to_fee=checkout_settings.vat_apply_to_fee,
+            rounding=checkout_settings.money_rounding,
         )
         computed_fee = breakdown.fee
         computed_tax = breakdown.vat

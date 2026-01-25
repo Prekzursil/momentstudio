@@ -44,15 +44,15 @@ def _normalize_code(code: str) -> str:
     return (code or "").strip().upper()
 
 
-def _quantize_money(value: Decimal) -> Decimal:
+def _quantize_money(value: Decimal, *, rounding: pricing.MoneyRounding = "half_up") -> Decimal:
     if settings.enforce_decimal_prices:
-        return pricing.quantize_money(value)
+        return pricing.quantize_money(value, rounding=rounding)
     return Decimal(value)
 
 
-def cart_subtotal(cart: Cart) -> Decimal:
+def cart_subtotal(cart: Cart, *, rounding: pricing.MoneyRounding = "half_up") -> Decimal:
     subtotal = sum((Decimal(str(item.unit_price_at_add)) * int(item.quantity or 0) for item in cart.items), start=Decimal("0.00"))
-    return _quantize_money(subtotal)
+    return _quantize_money(subtotal, rounding=rounding)
 
 
 def _promotion_scope_sets(promotion: Promotion) -> tuple[set[UUID], set[UUID], set[UUID], set[UUID]]:
@@ -76,7 +76,9 @@ def _promotion_scope_sets(promotion: Promotion) -> tuple[set[UUID], set[UUID], s
     return include_products, exclude_products, include_categories, exclude_categories
 
 
-def cart_eligible_subtotals_for_promotion(cart: Cart, *, promotion: Promotion) -> tuple[Decimal, Decimal, bool, bool]:
+def cart_eligible_subtotals_for_promotion(
+    cart: Cart, *, promotion: Promotion, rounding: pricing.MoneyRounding = "half_up"
+) -> tuple[Decimal, Decimal, bool, bool]:
     include_products, exclude_products, include_categories, exclude_categories = _promotion_scope_sets(promotion)
     has_includes = bool(include_products or include_categories)
     has_excludes = bool(exclude_products or exclude_categories)
@@ -111,8 +113,8 @@ def cart_eligible_subtotals_for_promotion(cart: Cart, *, promotion: Promotion) -
         eligible_subtotal += line_total
 
     return (
-        _quantize_money(eligible_subtotal),
-        _quantize_money(scope_subtotal),
+        _quantize_money(eligible_subtotal, rounding=rounding),
+        _quantize_money(scope_subtotal, rounding=rounding),
         has_includes,
         has_excludes,
     )
@@ -124,12 +126,13 @@ def _calculate_shipping_amount(
     shipping_method_rate_flat: Decimal | None,
     shipping_method_rate_per_kg: Decimal | None,
     shipping_fee_ron: Decimal | None,
+    rounding: pricing.MoneyRounding = "half_up",
 ) -> Decimal:
     if shipping_fee_ron is not None:
-        return _quantize_money(shipping_fee_ron)
-    base = _quantize_money(Decimal(shipping_method_rate_flat or 0))
-    per = _quantize_money(Decimal(shipping_method_rate_per_kg or 0))
-    return _quantize_money(base + per * subtotal)
+        return _quantize_money(shipping_fee_ron, rounding=rounding)
+    base = _quantize_money(Decimal(shipping_method_rate_flat or 0), rounding=rounding)
+    per = _quantize_money(Decimal(shipping_method_rate_per_kg or 0), rounding=rounding)
+    return _quantize_money(base + per * subtotal, rounding=rounding)
 
 
 @dataclass(frozen=True)
@@ -147,8 +150,9 @@ def compute_coupon_savings(
     shipping_method_rate_flat: Decimal | None,
     shipping_method_rate_per_kg: Decimal | None,
 ) -> CouponComputation:
-    subtotal = cart_subtotal(cart)
-    eligible_subtotal, _, _, _ = cart_eligible_subtotals_for_promotion(cart, promotion=promotion)
+    rounding = checkout.money_rounding
+    subtotal = cart_subtotal(cart, rounding=rounding)
+    eligible_subtotal, _, _, _ = cart_eligible_subtotals_for_promotion(cart, promotion=promotion, rounding=rounding)
 
     # Compute shipping without this coupon (but with free-shipping threshold rules).
     shipping_fee = checkout.shipping_fee_ron
@@ -157,6 +161,7 @@ def compute_coupon_savings(
         shipping_method_rate_flat=shipping_method_rate_flat,
         shipping_method_rate_per_kg=shipping_method_rate_per_kg,
         shipping_fee_ron=shipping_fee,
+        rounding=rounding,
     )
 
     # Apply free-shipping threshold after discount (discount only affects products).
@@ -175,7 +180,7 @@ def compute_coupon_savings(
     if promotion.max_discount_amount is not None:
         discount_estimate = min(discount_estimate, Decimal(promotion.max_discount_amount))
 
-    discount_estimate = _quantize_money(min(discount_estimate, eligible_subtotal))
+    discount_estimate = _quantize_money(min(discount_estimate, eligible_subtotal), rounding=rounding)
 
     threshold = checkout.free_shipping_threshold_ron
     effective_shipping = base_shipping
@@ -184,7 +189,9 @@ def compute_coupon_savings(
 
     if promotion.discount_type == PromotionDiscountType.free_shipping:
         if effective_shipping > 0:
-            return CouponComputation(discount_ron=Decimal("0.00"), shipping_discount_ron=_quantize_money(effective_shipping))
+            return CouponComputation(
+                discount_ron=Decimal("0.00"), shipping_discount_ron=_quantize_money(effective_shipping, rounding=rounding)
+            )
         return CouponComputation(discount_ron=Decimal("0.00"), shipping_discount_ron=Decimal("0.00"))
 
     return CouponComputation(discount_ron=discount_estimate, shipping_discount_ron=Decimal("0.00"))
@@ -199,13 +206,15 @@ def compute_totals_with_coupon(
     discount_ron: Decimal,
     free_shipping: bool,
 ) -> Totals:
-    subtotal = cart_subtotal(cart)
+    rounding = checkout.money_rounding
+    subtotal = cart_subtotal(cart, rounding=rounding)
     shipping_fee = checkout.shipping_fee_ron
     base_shipping = _calculate_shipping_amount(
         subtotal,
         shipping_method_rate_flat=shipping_method_rate_flat,
         shipping_method_rate_per_kg=shipping_method_rate_per_kg,
         shipping_fee_ron=shipping_fee,
+        rounding=rounding,
     )
 
     threshold = checkout.free_shipping_threshold_ron
@@ -217,8 +226,8 @@ def compute_totals_with_coupon(
 
     breakdown = pricing.compute_totals(
         subtotal=subtotal,
-        discount=_quantize_money(discount_ron),
-        shipping=_quantize_money(shipping),
+        discount=_quantize_money(discount_ron, rounding=rounding),
+        shipping=_quantize_money(shipping, rounding=rounding),
         fee_enabled=checkout.fee_enabled,
         fee_type=checkout.fee_type,
         fee_value=checkout.fee_value,
@@ -226,6 +235,7 @@ def compute_totals_with_coupon(
         vat_rate_percent=checkout.vat_rate_percent,
         vat_apply_to_shipping=checkout.vat_apply_to_shipping,
         vat_apply_to_fee=checkout.vat_apply_to_fee,
+        rounding=checkout.money_rounding,
     )
 
     return Totals(
@@ -463,9 +473,10 @@ async def evaluate_coupon_for_cart(
     reasons.extend(_promotion_reasons(promotion, now))
     reasons.extend(_coupon_reasons(coupon, now))
 
-    subtotal = cart_subtotal(cart)
+    rounding = checkout.money_rounding
+    subtotal = cart_subtotal(cart, rounding=rounding)
     eligible_subtotal, scope_subtotal, has_includes, has_excludes = cart_eligible_subtotals_for_promotion(
-        cart, promotion=promotion
+        cart, promotion=promotion, rounding=rounding
     )
     if promotion.discount_type in {PromotionDiscountType.percent, PromotionDiscountType.amount} and eligible_subtotal <= 0:
         reasons.append("no_eligible_items")

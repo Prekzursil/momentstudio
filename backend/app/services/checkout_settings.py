@@ -21,6 +21,7 @@ DEFAULT_VAT_RATE_PERCENT = Decimal("10.00")
 DEFAULT_VAT_APPLY_TO_SHIPPING = False
 DEFAULT_VAT_APPLY_TO_FEE = False
 DEFAULT_RECEIPT_SHARE_DAYS = 365
+DEFAULT_MONEY_ROUNDING: Literal["half_up", "half_even", "up", "down"] = "half_up"
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,7 @@ class CheckoutSettings:
     vat_apply_to_shipping: bool = DEFAULT_VAT_APPLY_TO_SHIPPING
     vat_apply_to_fee: bool = DEFAULT_VAT_APPLY_TO_FEE
     receipt_share_days: int = DEFAULT_RECEIPT_SHARE_DAYS
+    money_rounding: Literal["half_up", "half_even", "up", "down"] = DEFAULT_MONEY_ROUNDING
 
 
 def _parse_decimal(value: object | None, *, fallback: Decimal) -> Decimal:
@@ -115,6 +117,10 @@ async def get_checkout_settings(session: AsyncSession) -> CheckoutSettings:
     vat_apply_to_shipping = _parse_bool(meta.get("vat_apply_to_shipping"), fallback=DEFAULT_VAT_APPLY_TO_SHIPPING)
     vat_apply_to_fee = _parse_bool(meta.get("vat_apply_to_fee"), fallback=DEFAULT_VAT_APPLY_TO_FEE)
     receipt_share_days = _parse_int(meta.get("receipt_share_days"), fallback=DEFAULT_RECEIPT_SHARE_DAYS)
+    rounding_raw = str(meta.get("money_rounding") or DEFAULT_MONEY_ROUNDING).strip().lower()
+    money_rounding: Literal["half_up", "half_even", "up", "down"] = (
+        rounding_raw if rounding_raw in {"half_up", "half_even", "up", "down"} else DEFAULT_MONEY_ROUNDING
+    )
     if threshold < 0:
         threshold = DEFAULT_FREE_SHIPPING_THRESHOLD_RON
     if shipping_fee < 0:
@@ -142,4 +148,5 @@ async def get_checkout_settings(session: AsyncSession) -> CheckoutSettings:
         vat_apply_to_shipping=vat_apply_to_shipping,
         vat_apply_to_fee=vat_apply_to_fee,
         receipt_share_days=receipt_share_days,
+        money_rounding=money_rounding,
     )

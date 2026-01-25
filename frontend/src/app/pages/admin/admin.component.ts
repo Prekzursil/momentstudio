@@ -282,6 +282,27 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
 
             <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950">
               <p class="text-xs font-semibold text-slate-600 uppercase tracking-[0.2em] dark:text-slate-300">
+                {{ 'adminUi.site.checkout.roundingTitle' | translate }}
+              </p>
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.site.checkout.roundingMode' | translate }}
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="checkoutSettingsForm.money_rounding"
+                >
+                  <option value="half_up">{{ 'adminUi.site.checkout.roundingModeHalfUp' | translate }}</option>
+                  <option value="half_even">{{ 'adminUi.site.checkout.roundingModeHalfEven' | translate }}</option>
+                  <option value="up">{{ 'adminUi.site.checkout.roundingModeUp' | translate }}</option>
+                  <option value="down">{{ 'adminUi.site.checkout.roundingModeDown' | translate }}</option>
+                </select>
+                <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.site.checkout.roundingHint' | translate }}
+                </span>
+              </label>
+            </div>
+
+            <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950">
+              <p class="text-xs font-semibold text-slate-600 uppercase tracking-[0.2em] dark:text-slate-300">
                 {{ 'adminUi.site.checkout.phoneRequirementsTitle' | translate }}
               </p>
               <label class="flex items-center gap-2">
@@ -3076,33 +3097,35 @@ export class AdminComponent implements OnInit, OnDestroy {
   socialError: string | null = null;
   socialThumbLoading: Record<string, boolean> = {};
   socialThumbErrors: Record<string, string> = {};
-  checkoutSettingsForm: {
-    shipping_fee_ron: number | string;
-    free_shipping_threshold_ron: number | string;
-    phone_required_home: boolean;
-    phone_required_locker: boolean;
-    fee_enabled: boolean;
-    fee_type: 'flat' | 'percent';
-    fee_value: number | string;
-    vat_enabled: boolean;
-    vat_rate_percent: number | string;
-    vat_apply_to_shipping: boolean;
-    vat_apply_to_fee: boolean;
-    receipt_share_days: number | string;
-  } = {
-    shipping_fee_ron: 20,
-    free_shipping_threshold_ron: 300,
-    phone_required_home: true,
-    phone_required_locker: true,
-    fee_enabled: false,
-    fee_type: 'flat',
-    fee_value: 0,
-    vat_enabled: true,
-    vat_rate_percent: 10,
-    vat_apply_to_shipping: false,
-    vat_apply_to_fee: false,
-    receipt_share_days: 365
-  };
+	  checkoutSettingsForm: {
+	    shipping_fee_ron: number | string;
+	    free_shipping_threshold_ron: number | string;
+	    phone_required_home: boolean;
+	    phone_required_locker: boolean;
+	    fee_enabled: boolean;
+	    fee_type: 'flat' | 'percent';
+	    fee_value: number | string;
+	    vat_enabled: boolean;
+	    vat_rate_percent: number | string;
+	    vat_apply_to_shipping: boolean;
+	    vat_apply_to_fee: boolean;
+	    receipt_share_days: number | string;
+	    money_rounding: 'half_up' | 'half_even' | 'up' | 'down';
+	  } = {
+	    shipping_fee_ron: 20,
+	    free_shipping_threshold_ron: 300,
+	    phone_required_home: true,
+	    phone_required_locker: true,
+	    fee_enabled: false,
+	    fee_type: 'flat',
+	    fee_value: 0,
+	    vat_enabled: true,
+	    vat_rate_percent: 10,
+	    vat_apply_to_shipping: false,
+	    vat_apply_to_fee: false,
+	    receipt_share_days: 365,
+	    money_rounding: 'half_up'
+	  };
   checkoutSettingsMessage: string | null = null;
   checkoutSettingsError: string | null = null;
   seoLang: 'en' | 'ro' = 'en';
@@ -4831,6 +4854,9 @@ export class AdminComponent implements OnInit, OnDestroy {
         const receiptDaysRaw = Number(meta['receipt_share_days']);
         const receiptShareDays =
           Number.isFinite(receiptDaysRaw) && receiptDaysRaw >= 1 && receiptDaysRaw <= 3650 ? Math.trunc(receiptDaysRaw) : 365;
+        const roundingRaw = String(meta['money_rounding'] ?? 'half_up').trim().toLowerCase();
+        const moneyRounding: 'half_up' | 'half_even' | 'up' | 'down' =
+          roundingRaw === 'half_even' || roundingRaw === 'up' || roundingRaw === 'down' ? roundingRaw : 'half_up';
         this.checkoutSettingsForm = {
           shipping_fee_ron: Number.isFinite(shipping) && shipping >= 0 ? shipping : 20,
           free_shipping_threshold_ron: Number.isFinite(threshold) && threshold >= 0 ? threshold : 300,
@@ -4843,7 +4869,8 @@ export class AdminComponent implements OnInit, OnDestroy {
           vat_rate_percent: vatRate,
           vat_apply_to_shipping: vatApplyToShipping,
           vat_apply_to_fee: vatApplyToFee,
-          receipt_share_days: receiptShareDays
+          receipt_share_days: receiptShareDays,
+          money_rounding: moneyRounding
         };
       },
       error: () => {
@@ -4860,7 +4887,8 @@ export class AdminComponent implements OnInit, OnDestroy {
           vat_rate_percent: 10,
           vat_apply_to_shipping: false,
           vat_apply_to_fee: false,
-          receipt_share_days: 365
+          receipt_share_days: 365,
+          money_rounding: 'half_up'
         };
       }
     });
@@ -4893,6 +4921,10 @@ export class AdminComponent implements OnInit, OnDestroy {
     const receiptShareDays =
       Number.isFinite(receiptDaysRaw) && receiptDaysRaw >= 1 && receiptDaysRaw <= 3650 ? Math.trunc(receiptDaysRaw) : 365;
 
+    const roundingRaw = String(this.checkoutSettingsForm.money_rounding || 'half_up').trim().toLowerCase();
+    const moneyRounding: 'half_up' | 'half_even' | 'up' | 'down' =
+      roundingRaw === 'half_even' || roundingRaw === 'up' || roundingRaw === 'down' ? roundingRaw : 'half_up';
+
     const payload = {
       title: 'Checkout settings',
       body_markdown:
@@ -4911,7 +4943,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         vat_rate_percent: vatRate,
         vat_apply_to_shipping: vatApplyToShipping,
         vat_apply_to_fee: vatApplyToFee,
-        receipt_share_days: receiptShareDays
+        receipt_share_days: receiptShareDays,
+        money_rounding: moneyRounding
       }
     };
 
