@@ -1848,7 +1848,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     this.pricesRefreshed = false;
     this.auth.ensureAuthenticated({ silent: true }).subscribe({
       next: () => {
-        this.cartApi.get().subscribe({
+        this.cartApi.get(this.cartQuoteParams(this.promo)).subscribe({
           next: (res) => {
             this.hydrateCartAndQuote(res);
             this.syncing = false;
@@ -1868,9 +1868,17 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     });
   }
 
+  private cartQuoteParams(promo: string | null): Record<string, string> | undefined {
+    const country = (this.address.country || 'RO').trim() || 'RO';
+    const code = (promo || '').trim();
+    const params: Record<string, string> = { country };
+    if (code) params['promo_code'] = code;
+    return params;
+  }
+
   private refreshQuote(promo: string | null): void {
     const code = (promo || '').trim();
-    const params = code ? { promo_code: code } : undefined;
+    const params = this.cartQuoteParams(code);
     this.cartApi.get(params).subscribe({
       next: (res) => {
         this.hydrateCartAndQuote(res);
@@ -1881,7 +1889,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
           this.promoStatus = 'warn';
           this.promoValid = false;
           this.promoMessage = err?.error?.detail || this.translate.instant('checkout.promoPending', { code });
-          this.cartApi.get().subscribe({
+          this.cartApi.get(this.cartQuoteParams(null)).subscribe({
             next: (res) => this.hydrateCartAndQuote(res),
             error: () => {}
           });
@@ -1891,7 +1899,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
   }
 
   private applyLegacyPromo(code: string): void {
-    this.cartApi.get({ promo_code: code }).subscribe({
+    this.cartApi.get(this.cartQuoteParams(code)).subscribe({
       next: (res) => {
         this.hydrateCartAndQuote(res);
         const savings = this.quotePromoSavings();
@@ -1909,7 +1917,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
         this.promoStatus = 'warn';
         this.promoValid = false;
         this.promoMessage = err?.error?.detail || this.translate.instant('checkout.promoPending', { code });
-        this.cartApi.get().subscribe({
+        this.cartApi.get(this.cartQuoteParams(null)).subscribe({
           next: (res) => this.hydrateCartAndQuote(res),
           error: () => {}
         });

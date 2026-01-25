@@ -1999,6 +1999,45 @@
         "overrideCleared": "Could not clear FX override."
       }
     },
+    "taxes": {
+      "groupsTitle": "VAT tax groups",
+      "groupsHint": "Configure VAT rates by country and assign tax groups to categories.",
+      "createTitle": "New tax group",
+      "code": "Code",
+      "name": "Name",
+      "description": "Description",
+      "default": "Default",
+      "create": "Create",
+      "setDefault": "Set default",
+      "ratesTitle": "VAT rates",
+      "country": "Country",
+      "vatRate": "VAT %",
+      "addRate": "Add / update rate",
+      "empty": "No tax groups yet.",
+      "categoryGroupLabel": "Tax group",
+      "categoryGroupDefault": "Use default group",
+      "success": {
+        "create": "Tax group created.",
+        "update": "Tax group updated.",
+        "delete": "Tax group deleted.",
+        "default": "Default group updated.",
+        "rate": "VAT rate saved.",
+        "rateDelete": "VAT rate deleted.",
+        "categoryAssign": "Category tax group updated."
+      },
+      "errors": {
+        "required": "Code and name are required.",
+        "load": "Could not load tax groups.",
+        "create": "Could not create tax group.",
+        "update": "Could not update tax group.",
+        "delete": "Could not delete tax group.",
+        "deleteDefault": "Cannot delete the default tax group.",
+        "rate": "Could not save VAT rate.",
+        "rateDelete": "Could not delete VAT rate.",
+        "rateInvalid": "Enter a valid country code and VAT rate.",
+        "categoryAssign": "Could not update category tax group."
+      }
+    },
     "status": {
       "draft": "Draft",
       "published": "Published",
@@ -3192,6 +3231,13 @@
           "globalMax": "Global max redemptions",
           "perCustomerMax": "Per-customer max redemptions"
         },
+        "generator": {
+          "prefix": "Prefix",
+          "pattern": "Pattern (optional)",
+          "patternHint": "Supports {RAND} and {RAND:n} tokens. Example: VIP-{RAND:8}",
+          "length": "Random length",
+          "generate": "Generate code"
+        },
         "visibility": {
           "public": "Public",
           "assigned": "Assigned"
@@ -3280,6 +3326,7 @@
       "success": {
         "savePromotion": "Promotion saved",
         "saveCoupon": "Coupon saved",
+        "codeGenerated": "Coupon code generated",
         "assign": "Coupon assigned",
         "revoke": "Coupon revoked"
       },
@@ -3296,6 +3343,7 @@
         "savePromotion": "Could not save promotion",
         "loadCoupons": "Could not load coupons",
         "saveCoupon": "Could not save coupon",
+        "codeGenerate": "Could not generate coupon code",
         "loadAssignments": "Could not load assignments",
         "loadAnalytics": "Could not load analytics",
         "assign": "Could not assign coupon",

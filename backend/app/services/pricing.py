@@ -89,6 +89,7 @@ def compute_totals(
     vat_apply_to_shipping: bool,
     vat_apply_to_fee: bool,
     rounding: MoneyRounding = "half_up",
+    vat_override: Decimal | None = None,
 ) -> PricingBreakdown:
     subtotal_q = quantize_money(subtotal, rounding=rounding)
     discount_q = quantize_money(discount, rounding=rounding) if discount > 0 else Decimal("0.00")
@@ -98,16 +99,21 @@ def compute_totals(
     taxable = quantize_money(taxable, rounding=rounding)
     shipping_q = quantize_money(shipping, rounding=rounding) if shipping > 0 else Decimal("0.00")
     fee = compute_fee(taxable_subtotal=taxable, enabled=fee_enabled, fee_type=fee_type, fee_value=fee_value, rounding=rounding)
-    vat = compute_vat(
-        taxable_subtotal=taxable,
-        shipping=shipping_q,
-        fee=fee,
-        enabled=vat_enabled,
-        vat_rate_percent=vat_rate_percent,
-        apply_to_shipping=vat_apply_to_shipping,
-        apply_to_fee=vat_apply_to_fee,
-        rounding=rounding,
-    )
+    if not vat_enabled:
+        vat = Decimal("0.00")
+    elif vat_override is not None:
+        vat = quantize_money(vat_override if vat_override > 0 else Decimal("0.00"), rounding=rounding)
+    else:
+        vat = compute_vat(
+            taxable_subtotal=taxable,
+            shipping=shipping_q,
+            fee=fee,
+            enabled=vat_enabled,
+            vat_rate_percent=vat_rate_percent,
+            apply_to_shipping=vat_apply_to_shipping,
+            apply_to_fee=vat_apply_to_fee,
+            rounding=rounding,
+        )
     total = taxable + shipping_q + fee + vat
     if total < 0:
         total = Decimal("0.00")

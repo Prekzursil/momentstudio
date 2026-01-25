@@ -66,6 +66,16 @@ export interface CouponIssueToUserPayload {
   send_email?: boolean;
 }
 
+export interface CouponCodeGeneratePayload {
+  prefix?: string | null;
+  pattern?: string | null;
+  length?: number | null;
+}
+
+export interface CouponCodeGenerateResponse {
+  code: string;
+}
+
 export interface CouponRevokePayload extends CouponAssignPayload {
   reason?: string | null;
 }
@@ -178,6 +188,10 @@ export class AdminCouponsV2Service {
 
   createCoupon(payload: CouponCreatePayload): Observable<CouponRead> {
     return this.api.post<CouponRead>('/coupons/admin/coupons', payload);
+  }
+
+  generateCouponCode(payload: CouponCodeGeneratePayload): Observable<CouponCodeGenerateResponse> {
+    return this.api.post<CouponCodeGenerateResponse>('/coupons/admin/coupons/generate-code', payload);
   }
 
   issueCouponToUser(payload: CouponIssueToUserPayload): Observable<CouponRead> {

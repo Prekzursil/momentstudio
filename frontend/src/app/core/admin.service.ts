@@ -189,6 +189,7 @@ export interface AdminCategory {
   description?: string | null;
   low_stock_threshold?: number | null;
   parent_id?: string | null;
+  tax_group_id?: string | null;
   sort_order?: number;
 }
 

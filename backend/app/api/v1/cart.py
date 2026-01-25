@@ -29,6 +29,7 @@ async def get_cart(
     session_id: str | None = Depends(session_header),
     shipping_method_id: UUID | None = Query(default=None),
     promo_code: str | None = Query(default=None),
+    country: str | None = Query(default=None),
 ):
     if not current_user and not session_id:
         session_id = f"guest-{uuid.uuid4()}"
@@ -57,6 +58,7 @@ async def get_cart(
                 shipping_method_rate_flat=rate_flat,
                 shipping_method_rate_per_kg=rate_per,
                 code=promo_code,
+                country_code=country,
             )
             totals_override = applied.totals
         except HTTPException as exc:
@@ -72,6 +74,7 @@ async def get_cart(
         promo=promo,
         checkout_settings=checkout_settings,
         totals_override=totals_override,
+        country_code=country,
     )
 
 

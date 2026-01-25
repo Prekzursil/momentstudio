@@ -659,6 +659,30 @@ type PromotionScheduleRow = {
                 </label>
               </div>
 
+              <div *ngIf="!selectedCoupon()" class="grid gap-3 lg:grid-cols-4 items-end">
+                <app-input [label]="'adminUi.couponsV2.coupons.generator.prefix' | translate" [(value)]="couponCodeGen.prefix"></app-input>
+                <app-input
+                  [label]="'adminUi.couponsV2.coupons.generator.pattern' | translate"
+                  [(value)]="couponCodeGen.pattern"
+                  [hint]="'adminUi.couponsV2.coupons.generator.patternHint' | translate"
+                ></app-input>
+                <app-input
+                  [label]="'adminUi.couponsV2.coupons.generator.length' | translate"
+                  type="number"
+                  [min]="4"
+                  [step]="1"
+                  [(value)]="couponCodeGen.length"
+                ></app-input>
+                <div class="flex justify-end">
+                  <app-button
+                    size="sm"
+                    [disabled]="couponCodeGenerating()"
+                    [label]="'adminUi.couponsV2.coupons.generator.generate' | translate"
+                    (action)="generateCouponCode()"
+                  ></app-button>
+                </div>
+              </div>
+
               <div class="grid gap-3 lg:grid-cols-2">
                 <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                   <input type="checkbox" class="h-5 w-5 accent-indigo-600" [(ngModel)]="couponForm.is_active" />
@@ -1458,6 +1482,8 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
 
   promotionForm: PromotionForm = this.blankPromotionForm();
   couponForm: CouponForm = this.blankCouponForm();
+  couponCodeGen = { prefix: '', pattern: '', length: 12 };
+  couponCodeGenerating = signal(false);
   stackingSampleSubtotal: string | number = 200;
 
   private autoStartNewPromotion = false;
@@ -1827,10 +1853,38 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     this.couponForm = this.blankCouponForm();
     const promoId = this.selectedPromotion()?.id;
     if (promoId) this.couponForm.promotion_id = promoId;
+    this.couponCodeGen = { prefix: this.suggestedCouponPrefix(), pattern: '', length: 12 };
     this.assignments.set([]);
     this.resetBulkState();
     this.resetSegmentState();
     this.resetAbState();
+  }
+
+  private suggestedCouponPrefix(): string {
+    const promo = this.selectedPromotion();
+    const candidate = (promo?.key || promo?.name || 'COUPON').trim();
+    return candidate || 'COUPON';
+  }
+
+  generateCouponCode(): void {
+    if (this.selectedCoupon()) return;
+    const prefix = (this.couponCodeGen.prefix || '').trim() || this.suggestedCouponPrefix();
+    const pattern = (this.couponCodeGen.pattern || '').trim() || null;
+    const lengthRaw = Number(this.couponCodeGen.length);
+    const length = Number.isFinite(lengthRaw) && lengthRaw > 0 ? lengthRaw : 12;
+
+    this.couponCodeGenerating.set(true);
+    this.adminCoupons.generateCouponCode({ prefix, pattern, length }).subscribe({
+      next: (res) => {
+        this.couponCodeGenerating.set(false);
+        this.couponForm.code = String(res?.code || '').trim().toUpperCase();
+        if (this.couponForm.code) this.toast.success(this.t('adminUi.couponsV2.success.codeGenerated'));
+      },
+      error: (err) => {
+        this.couponCodeGenerating.set(false);
+        this.toast.error(this.t('adminUi.couponsV2.errors.validation'), err?.error?.detail || this.t('adminUi.couponsV2.errors.codeGenerate'));
+      }
+    });
   }
 
   saveCoupon(): void {

@@ -114,6 +114,16 @@ class CouponIssueToUserRequest(BaseModel):
     send_email: bool = True
 
 
+class CouponCodeGenerateRequest(BaseModel):
+    prefix: str | None = Field(default=None, max_length=20)
+    pattern: str | None = Field(default=None, max_length=80)
+    length: int = Field(default=12, ge=4, le=32)
+
+
+class CouponCodeGenerateResponse(BaseModel):
+    code: str
+
+
 class CouponUpdate(BaseModel):
     is_active: bool | None = None
     starts_at: datetime | None = None

@@ -45,6 +45,7 @@ class CategoryFields(BaseModel):
     low_stock_threshold: int | None = Field(default=None, ge=0)
     sort_order: int = 0
     parent_id: UUID | None = None
+    tax_group_id: UUID | None = None
 
 
 class CategoryBase(CategoryFields):
@@ -65,6 +66,7 @@ class CategoryUpdate(BaseModel):
     low_stock_threshold: int | None = Field(default=None, ge=0)
     sort_order: int | None = None
     parent_id: UUID | None = None
+    tax_group_id: UUID | None = None
 
 
 class CategoryReorderItem(BaseModel):
@@ -79,6 +81,7 @@ class CategoryRead(CategoryBase):
     created_at: datetime
     updated_at: datetime
     sort_order: int
+    tax_group_id: UUID | None = None
 
 
 class CategoryTranslationUpsert(BaseModel):

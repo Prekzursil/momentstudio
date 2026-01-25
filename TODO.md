@@ -753,8 +753,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Pricing: price history charts – Track price changes per product (and sale periods).
 - [x] Admin Pricing: FX override audit – Show who changed FX overrides and allow “revert” action.
 - [x] Admin Pricing: rounding rules config – Configure rounding strategy for display/checkout.
-- [ ] Admin Taxes: configurable tax groups – Manage VAT rates per country/category (future-proofing).
-- [ ] Admin Promotions: code generator upgrades – Generate codes with patterns/prefixes and collision checks.
+- [x] Admin Taxes: configurable tax groups – Manage VAT rates per country/category (future-proofing).
+- [x] Admin Promotions: code generator upgrades – Generate codes with patterns/prefixes and collision checks.
 - [ ] Admin CMS: content diff before publish – Side-by-side diff between draft and published versions.
 - [ ] Admin CMS: scheduled publishing – Schedule page/blog publish/unpublish windows.
 - [ ] Admin CMS: content rollback – Restore a previous version with one click (audit).

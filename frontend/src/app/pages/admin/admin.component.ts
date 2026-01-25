@@ -29,6 +29,7 @@ import {
 } from '../../core/admin.service';
 import { AdminBlogComment, BlogService } from '../../core/blog.service';
 import { FxAdminService, FxAdminStatus, FxOverrideAuditEntry } from '../../core/fx-admin.service';
+import { TaxGroupRead, TaxesAdminService } from '../../core/taxes-admin.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { firstValueFrom, Subscription } from 'rxjs';
@@ -1850,6 +1851,18 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.lowStock.thresholdHint' | translate }}</span>
                   </label>
 
+                  <label class="mt-2 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                    <span class="font-semibold">{{ 'adminUi.taxes.categoryGroupLabel' | translate }}:</span>
+                    <select
+                      class="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [ngModel]="cat.tax_group_id || ''"
+                      (ngModelChange)="updateCategoryTaxGroup(cat, $event)"
+                    >
+                      <option value="">{{ 'adminUi.taxes.categoryGroupDefault' | translate }}</option>
+                      <option *ngFor="let tg of taxGroups" [value]="tg.id">{{ tg.name }} ({{ tg.code }})</option>
+                    </select>
+                  </label>
+
 	                <div *ngIf="categoryTranslationsSlug === cat.slug" class="mt-3 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/30">
 	                  <div class="flex items-center justify-between gap-3">
 	                    <p class="text-xs font-semibold tracking-wide uppercase text-slate-600 dark:text-slate-300">
@@ -1915,6 +1928,140 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
 	                          [(ngModel)]="categoryTranslations.en.description"
 	                        ></textarea>
 	                      </label>
+	                    </div>
+	                  </div>
+	                </div>
+	              </div>
+	            </div>
+
+	            <div class="grid gap-3 rounded-xl border border-slate-200 p-3 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200">
+	              <div class="flex flex-wrap items-start justify-between gap-2">
+	                <div class="grid gap-0.5">
+	                  <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+	                    {{ 'adminUi.taxes.groupsTitle' | translate }}
+	                  </p>
+	                  <p class="text-xs text-slate-500 dark:text-slate-400">
+	                    {{ 'adminUi.taxes.groupsHint' | translate }}
+	                  </p>
+	                </div>
+	                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadTaxGroups()"></app-button>
+	              </div>
+
+	              <div
+	                *ngIf="taxGroupsError"
+	                class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+	              >
+	                {{ taxGroupsError }}
+	              </div>
+
+	              <div *ngIf="taxGroupsLoading" class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.actions.loading' | translate }}</div>
+
+	              <div *ngIf="!taxGroupsLoading" class="grid gap-3">
+	                <div class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+	                  <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+	                    {{ 'adminUi.taxes.createTitle' | translate }}
+	                  </p>
+	                  <div class="grid gap-2 md:grid-cols-4">
+	                    <app-input [label]="'adminUi.taxes.code' | translate" [(value)]="taxGroupCreate.code"></app-input>
+	                    <app-input [label]="'adminUi.taxes.name' | translate" [(value)]="taxGroupCreate.name"></app-input>
+	                    <app-input [label]="'adminUi.taxes.description' | translate" [(value)]="taxGroupCreate.description"></app-input>
+	                    <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+	                      <input type="checkbox" [(ngModel)]="taxGroupCreate.is_default" />
+	                      {{ 'adminUi.taxes.default' | translate }}
+	                    </label>
+	                  </div>
+	                  <div class="flex justify-end">
+	                    <app-button size="sm" [label]="'adminUi.taxes.create' | translate" (action)="createTaxGroup()"></app-button>
+	                  </div>
+	                </div>
+
+	                <div *ngIf="taxGroups.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+	                  {{ 'adminUi.taxes.empty' | translate }}
+	                </div>
+
+	                <div
+	                  *ngFor="let group of taxGroups"
+	                  class="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+	                >
+	                  <div class="flex flex-wrap items-start justify-between gap-3">
+	                    <div class="grid gap-1">
+	                      <p class="text-xs text-slate-500 dark:text-slate-400">
+	                        <span class="font-semibold">{{ 'adminUi.taxes.code' | translate }}:</span>
+	                        <span class="font-mono">{{ group.code }}</span>
+	                        <span *ngIf="group.is_default" class="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">
+	                          {{ 'adminUi.taxes.default' | translate }}
+	                        </span>
+	                      </p>
+	                      <div class="grid gap-2 md:grid-cols-2">
+	                        <app-input [label]="'adminUi.taxes.name' | translate" [(value)]="group.name"></app-input>
+	                        <app-input [label]="'adminUi.taxes.description' | translate" [(value)]="group.description"></app-input>
+	                      </div>
+	                    </div>
+	                    <div class="flex flex-wrap items-center justify-end gap-2">
+	                      <app-button
+	                        *ngIf="!group.is_default"
+	                        size="sm"
+	                        variant="ghost"
+	                        [label]="'adminUi.taxes.setDefault' | translate"
+	                        (action)="setDefaultTaxGroup(group)"
+	                      ></app-button>
+	                      <app-button size="sm" variant="ghost" [label]="'adminUi.actions.save' | translate" (action)="saveTaxGroup(group)"></app-button>
+	                      <app-button
+	                        size="sm"
+	                        variant="ghost"
+	                        [label]="'adminUi.actions.delete' | translate"
+	                        [disabled]="group.is_default"
+	                        (action)="deleteTaxGroup(group)"
+	                      ></app-button>
+	                    </div>
+	                  </div>
+
+	                  <div class="grid gap-2">
+	                    <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+	                      {{ 'adminUi.taxes.ratesTitle' | translate }}
+	                    </p>
+
+	                    <div *ngIf="group.rates?.length" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+	                      <table class="w-full text-left text-sm">
+	                        <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
+	                          <tr>
+	                            <th class="px-3 py-2">{{ 'adminUi.taxes.country' | translate }}</th>
+	                            <th class="px-3 py-2">{{ 'adminUi.taxes.vatRate' | translate }}</th>
+	                            <th class="px-3 py-2"></th>
+	                          </tr>
+	                        </thead>
+	                        <tbody>
+	                          <tr *ngFor="let rate of group.rates" class="border-t border-slate-200 dark:border-slate-800">
+	                            <td class="px-3 py-2 font-mono text-slate-700 dark:text-slate-200">{{ rate.country_code }}</td>
+	                            <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ rate.vat_rate_percent }}%</td>
+	                            <td class="px-3 py-2 text-right">
+	                              <app-button
+	                                size="sm"
+	                                variant="ghost"
+	                                [label]="'adminUi.actions.delete' | translate"
+	                                (action)="deleteTaxRate(group, rate.country_code)"
+	                              ></app-button>
+	                            </td>
+	                          </tr>
+	                        </tbody>
+	                      </table>
+	                    </div>
+
+	                    <div class="grid gap-2 md:grid-cols-[140px_160px_auto] items-end">
+	                      <app-input
+	                        [label]="'adminUi.taxes.country' | translate"
+	                        [(value)]="taxRateCountry[group.id]"
+	                        placeholder="RO"
+	                      ></app-input>
+	                      <app-input
+	                        [label]="'adminUi.taxes.vatRate' | translate"
+	                        type="number"
+	                        [(value)]="taxRatePercent[group.id]"
+	                        placeholder="19"
+	                      ></app-input>
+	                      <div class="flex justify-end">
+	                        <app-button size="sm" [label]="'adminUi.taxes.addRate' | translate" (action)="upsertTaxRate(group)"></app-button>
+	                      </div>
 	                    </div>
 	                  </div>
 	                </div>
@@ -2961,6 +3108,12 @@ export class AdminComponent implements OnInit, OnDestroy {
     en: this.blankCategoryTranslation(),
     ro: this.blankCategoryTranslation()
   };
+  taxGroups: TaxGroupRead[] = [];
+  taxGroupsLoading = false;
+  taxGroupsError: string | null = null;
+  taxGroupCreate = { code: '', name: '', description: '', is_default: false };
+  taxRateCountry: Record<string, string> = {};
+  taxRatePercent: Record<string, string> = {};
   maintenanceEnabledValue = false;
   maintenanceEnabled = signal<boolean>(false);
   draggingSlug: string | null = null;
@@ -3191,6 +3344,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     private admin: AdminService,
     private blog: BlogService,
     private fxAdmin: FxAdminService,
+    private taxesAdmin: TaxesAdminService,
     private auth: AuthService,
     private toast: ToastService,
     private translate: TranslateService,
@@ -3372,6 +3526,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       },
       error: () => (this.categories = [])
     });
+    this.loadTaxGroups();
     this.loadAssets();
     this.loadSocial();
     this.loadCheckoutSettings();
@@ -3654,6 +3809,119 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
+  loadTaxGroups(): void {
+    this.taxGroupsLoading = true;
+    this.taxGroupsError = null;
+    this.taxesAdmin.listGroups().subscribe({
+      next: (groups) => {
+        this.taxGroups = Array.isArray(groups) ? groups : [];
+        this.taxGroupsLoading = false;
+      },
+      error: (err) => {
+        this.taxGroupsLoading = false;
+        this.taxGroups = [];
+        this.taxGroupsError = err?.error?.detail || this.t('adminUi.taxes.errors.load');
+      }
+    });
+  }
+
+  createTaxGroup(): void {
+    const code = (this.taxGroupCreate.code || '').trim();
+    const name = (this.taxGroupCreate.name || '').trim();
+    if (!code || !name) {
+      this.toast.error(this.t('adminUi.taxes.errors.required'));
+      return;
+    }
+    this.taxesAdmin
+      .createGroup({
+        code,
+        name,
+        description: (this.taxGroupCreate.description || '').trim() || null,
+        is_default: !!this.taxGroupCreate.is_default
+      })
+      .subscribe({
+        next: () => {
+          this.taxGroupCreate = { code: '', name: '', description: '', is_default: false };
+          this.toast.success(this.t('adminUi.taxes.success.create'));
+          this.loadTaxGroups();
+        },
+        error: (err) => this.toast.error(err?.error?.detail || this.t('adminUi.taxes.errors.create'))
+      });
+  }
+
+  saveTaxGroup(group: TaxGroupRead): void {
+    const name = (group.name || '').trim();
+    if (!name) {
+      this.toast.error(this.t('adminUi.taxes.errors.required'));
+      return;
+    }
+    this.taxesAdmin
+      .updateGroup(group.id, { name, description: (group.description || '').trim() || null })
+      .subscribe({
+        next: () => {
+          this.toast.success(this.t('adminUi.taxes.success.update'));
+          this.loadTaxGroups();
+        },
+        error: (err) => this.toast.error(err?.error?.detail || this.t('adminUi.taxes.errors.update'))
+      });
+  }
+
+  setDefaultTaxGroup(group: TaxGroupRead): void {
+    if (group.is_default) return;
+    this.taxesAdmin.updateGroup(group.id, { is_default: true }).subscribe({
+      next: () => {
+        this.toast.success(this.t('adminUi.taxes.success.default'));
+        this.loadTaxGroups();
+      },
+      error: (err) => this.toast.error(err?.error?.detail || this.t('adminUi.taxes.errors.update'))
+    });
+  }
+
+  deleteTaxGroup(group: TaxGroupRead): void {
+    if (group.is_default) {
+      this.toast.error(this.t('adminUi.taxes.errors.deleteDefault'));
+      return;
+    }
+    this.taxesAdmin.deleteGroup(group.id).subscribe({
+      next: () => {
+        this.toast.success(this.t('adminUi.taxes.success.delete'));
+        this.loadTaxGroups();
+      },
+      error: (err) => this.toast.error(err?.error?.detail || this.t('adminUi.taxes.errors.delete'))
+    });
+  }
+
+  upsertTaxRate(group: TaxGroupRead): void {
+    const rawCountry = (this.taxRateCountry[group.id] || '').trim();
+    const rawRate = String(this.taxRatePercent[group.id] || '').trim();
+    const vat = Number(rawRate);
+    if (!rawCountry || !Number.isFinite(vat)) {
+      this.toast.error(this.t('adminUi.taxes.errors.rateInvalid'));
+      return;
+    }
+    this.taxesAdmin.upsertRate(group.id, { country_code: rawCountry, vat_rate_percent: vat }).subscribe({
+      next: () => {
+        this.taxRateCountry[group.id] = '';
+        this.taxRatePercent[group.id] = '';
+        this.toast.success(this.t('adminUi.taxes.success.rate'));
+        this.loadTaxGroups();
+      },
+      error: (err) => this.toast.error(err?.error?.detail || this.t('adminUi.taxes.errors.rate'))
+    });
+  }
+
+  deleteTaxRate(group: TaxGroupRead, countryCode: string): void {
+    const code = (countryCode || '').trim();
+    if (!code) return;
+    this.taxesAdmin.deleteRate(group.id, code).subscribe({
+      next: () => {
+        this.toast.success(this.t('adminUi.taxes.success.rateDelete'));
+        this.loadTaxGroups();
+      },
+      error: (err) => this.toast.error(err?.error?.detail || this.t('adminUi.taxes.errors.rateDelete'))
+    });
+  }
+
   categoryParentLabel(cat: AdminCategory): string {
     const parentId = (cat.parent_id ?? '').trim();
     if (!parentId) return this.t('adminUi.categories.parentNone');
@@ -3729,6 +3997,23 @@ export class AdminComponent implements OnInit, OnDestroy {
       error: () => {
         cat.low_stock_threshold = prevThreshold;
         this.toast.error(this.t('adminUi.categories.errors.updateLowStockThreshold'));
+      }
+    });
+  }
+
+  updateCategoryTaxGroup(cat: AdminCategory, raw: string): void {
+    const nextGroupId = (raw ?? '').trim() || null;
+    const prevGroupId = (cat.tax_group_id ?? '').trim() || null;
+    if (nextGroupId === prevGroupId) return;
+    cat.tax_group_id = nextGroupId;
+    this.admin.updateCategory(cat.slug, { tax_group_id: nextGroupId }).subscribe({
+      next: (updated) => {
+        cat.tax_group_id = updated.tax_group_id ?? null;
+        this.toast.success(this.t('adminUi.taxes.success.categoryAssign'));
+      },
+      error: () => {
+        cat.tax_group_id = prevGroupId;
+        this.toast.error(this.t('adminUi.taxes.errors.categoryAssign'));
       }
     });
   }

@@ -37,6 +37,7 @@ from app.models.catalog import (
 )
 from app.models.cart import CartItem
 from app.models.order import OrderItem
+from app.models.taxes import TaxGroup
 from app.schemas.catalog import (
     CategoryCreate,
     CategoryTranslationUpsert,
@@ -644,12 +645,18 @@ async def create_category(session: AsyncSession, payload: CategoryCreate) -> Cat
         if not parent:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Parent category not found")
 
+    if payload.tax_group_id is not None:
+        tax_group = await session.get(TaxGroup, payload.tax_group_id)
+        if not tax_group:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tax group not found")
+
     category = Category(
         slug=candidate,
         name=payload.name,
         description=payload.description,
         sort_order=payload.sort_order,
         parent_id=payload.parent_id,
+        tax_group_id=payload.tax_group_id,
     )
     session.add(category)
     await session.commit()
@@ -666,6 +673,12 @@ async def update_category(session: AsyncSession, category: Category, payload: Ca
         data.pop("slug", None)
     if "parent_id" in data:
         await _validate_category_parent_assignment(session, category_id=category.id, parent_id=data.get("parent_id"))
+    if "tax_group_id" in data:
+        tax_group_id = data.get("tax_group_id")
+        if tax_group_id is not None:
+            tax_group = await session.get(TaxGroup, tax_group_id)
+            if not tax_group:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tax group not found")
     for field, value in data.items():
         setattr(category, field, value)
     session.add(category)
@@ -701,6 +714,7 @@ async def reorder_categories(session: AsyncSession, payload: list[CategoryReorde
             description=cat.description,
             sort_order=cat.sort_order,
             parent_id=cat.parent_id,
+            tax_group_id=getattr(cat, "tax_group_id", None),
             created_at=cat.created_at,
             updated_at=cat.updated_at,
         )

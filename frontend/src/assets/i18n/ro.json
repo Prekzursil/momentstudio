@@ -1999,6 +1999,45 @@
         "overrideCleared": "Nu s-a putut șterge suprascrierea."
       }
     },
+    "taxes": {
+      "groupsTitle": "Grupuri TVA",
+      "groupsHint": "Configurează TVA pe țări și atribuie grupuri de taxe categoriilor.",
+      "createTitle": "Grup nou",
+      "code": "Cod",
+      "name": "Nume",
+      "description": "Descriere",
+      "default": "Implicit",
+      "create": "Creează",
+      "setDefault": "Setează ca implicit",
+      "ratesTitle": "Cote TVA",
+      "country": "Țară",
+      "vatRate": "TVA %",
+      "addRate": "Adaugă / actualizează cota",
+      "empty": "Nu există grupuri de taxe.",
+      "categoryGroupLabel": "Grup taxe",
+      "categoryGroupDefault": "Folosește grupul implicit",
+      "success": {
+        "create": "Grupul a fost creat.",
+        "update": "Grupul a fost actualizat.",
+        "delete": "Grupul a fost șters.",
+        "default": "Grupul implicit a fost actualizat.",
+        "rate": "Cota TVA a fost salvată.",
+        "rateDelete": "Cota TVA a fost ștearsă.",
+        "categoryAssign": "Grupul de taxe al categoriei a fost actualizat."
+      },
+      "errors": {
+        "required": "Codul și numele sunt obligatorii.",
+        "load": "Nu s-au putut încărca grupurile de taxe.",
+        "create": "Nu s-a putut crea grupul.",
+        "update": "Nu s-a putut actualiza grupul.",
+        "delete": "Nu s-a putut șterge grupul.",
+        "deleteDefault": "Nu poți șterge grupul implicit.",
+        "rate": "Nu s-a putut salva cota TVA.",
+        "rateDelete": "Nu s-a putut șterge cota TVA.",
+        "rateInvalid": "Introdu un cod de țară și o cotă TVA valide.",
+        "categoryAssign": "Nu s-a putut actualiza grupul de taxe al categoriei."
+      }
+    },
     "status": {
       "draft": "Ciornă",
       "published": "Publicat",
@@ -3192,6 +3231,13 @@
           "globalMax": "Număr maxim global de utilizări",
           "perCustomerMax": "Număr maxim per client"
         },
+        "generator": {
+          "prefix": "Prefix",
+          "pattern": "Model (opțional)",
+          "patternHint": "Suportă token-uri {RAND} și {RAND:n}. Exemplu: VIP-{RAND:8}",
+          "length": "Lungime aleatorie",
+          "generate": "Generează cod"
+        },
         "visibility": {
           "public": "Public",
           "assigned": "Atribuit"
@@ -3280,6 +3326,7 @@
       "success": {
         "savePromotion": "Promoția a fost salvată",
         "saveCoupon": "Cuponul a fost salvat",
+        "codeGenerated": "Codul cuponului a fost generat",
         "assign": "Cupon atribuit",
         "revoke": "Cupon revocat"
       },
@@ -3296,6 +3343,7 @@
         "savePromotion": "Nu s-a putut salva promoția",
         "loadCoupons": "Nu s-au putut încărca cupoanele",
         "saveCoupon": "Nu s-a putut salva cuponul",
+        "codeGenerate": "Nu s-a putut genera codul cuponului",
         "loadAssignments": "Nu s-au putut încărca atribuiri",
         "loadAnalytics": "Nu s-au putut încărca analiticele",
         "assign": "Nu s-a putut atribui cuponul",

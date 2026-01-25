@@ -46,6 +46,8 @@ from app.schemas.coupons_v2 import (
     CouponBulkSegmentPreview,
     CouponBulkSegmentRevokeRequest,
     CouponIssueToUserRequest,
+    CouponCodeGenerateRequest,
+    CouponCodeGenerateResponse,
     CouponUpdate,
     CouponEligibilityResponse,
     CouponOffer,
@@ -590,6 +592,25 @@ async def admin_create_coupon(
     return coupon_read
 
 
+@router.post("/admin/coupons/generate-code", response_model=CouponCodeGenerateResponse)
+async def admin_generate_coupon_code(
+    payload: CouponCodeGenerateRequest,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("coupons")),
+) -> CouponCodeGenerateResponse:
+    prefix_source = payload.prefix or "COUPON"
+    prefix = _sanitize_coupon_prefix(prefix_source) or "COUPON"
+    pattern = (payload.pattern or "").strip() or None
+    code = await coupons_service.generate_unique_coupon_code(
+        session,
+        prefix=prefix,
+        length=int(payload.length or 12),
+        pattern=pattern,
+        attempts=50,
+    )
+    return CouponCodeGenerateResponse(code=code)
+
+
 @router.post("/admin/coupons/issue", response_model=CouponRead, status_code=status.HTTP_201_CREATED)
 async def admin_issue_coupon_to_user(
     payload: CouponIssueToUserRequest,
@@ -611,16 +632,7 @@ async def admin_issue_coupon_to_user(
 
     prefix_source = payload.prefix or promotion.key or promotion.name or "COUPON"
     prefix = _sanitize_coupon_prefix(prefix_source) or "COUPON"
-
-    code = ""
-    for _ in range(10):
-        candidate = coupons_service.generate_coupon_code(prefix=prefix, length=12)
-        exists = (await session.execute(select(func.count()).select_from(Coupon).where(Coupon.code == candidate))).scalar_one()
-        if int(exists) == 0:
-            code = candidate
-            break
-    if not code:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate coupon code")
+    code = await coupons_service.generate_unique_coupon_code(session, prefix=prefix, length=12)
 
     starts_at = datetime.now(timezone.utc)
     ends_at = payload.ends_at

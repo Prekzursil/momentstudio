@@ -34,6 +34,8 @@ from app.schemas.order_shipment import OrderShipmentCreate, OrderShipmentUpdate
 from app.services import address as address_service
 from app.services import checkout_settings as checkout_settings_service
 from app.services import pricing
+from app.services import taxes as taxes_service
+from app.services.taxes import TaxableProductLine
 from app.services import payments
 from app.services import paypal
 from app.services import promo_usage
@@ -605,29 +607,42 @@ async def _rerate_order_shipping(session: AsyncSession, order: Order) -> dict[st
     )
     if taxable_subtotal < 0:
         taxable_subtotal = Decimal("0.00")
-    taxable_subtotal = pricing.quantize_money(taxable_subtotal)
-
     checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+    taxable_subtotal = pricing.quantize_money(taxable_subtotal, rounding=checkout_settings.money_rounding)
     shipping_amount = Decimal(checkout_settings.shipping_fee_ron)
     threshold = checkout_settings.free_shipping_threshold_ron
     if threshold is not None and threshold >= 0 and taxable_subtotal >= threshold:
         shipping_amount = Decimal("0.00")
-    shipping_amount = pricing.quantize_money(shipping_amount)
+    shipping_amount = pricing.quantize_money(shipping_amount, rounding=checkout_settings.money_rounding)
 
-    fee_amount = pricing.quantize_money(Decimal(getattr(order, "fee_amount", 0) or 0))
-    vat_amount = pricing.compute_vat(
-        taxable_subtotal=taxable_subtotal,
+    fee_amount = pricing.quantize_money(Decimal(getattr(order, "fee_amount", 0) or 0), rounding=checkout_settings.money_rounding)
+    subtotal_items = sum((Decimal(getattr(item, "subtotal", 0) or 0) for item in getattr(order, "items", []) or []), start=Decimal("0.00"))
+    subtotal_items = pricing.quantize_money(subtotal_items, rounding=checkout_settings.money_rounding)
+    discount_val = subtotal_items - taxable_subtotal
+    if discount_val < 0:
+        discount_val = Decimal("0.00")
+    discount_val = pricing.quantize_money(discount_val, rounding=checkout_settings.money_rounding)
+    country_code = getattr(getattr(order, "shipping_address", None), "country", None)
+    lines: list[TaxableProductLine] = [
+        TaxableProductLine(product_id=item.product_id, subtotal=pricing.quantize_money(Decimal(item.subtotal), rounding=checkout_settings.money_rounding))
+        for item in getattr(order, "items", []) or []
+        if getattr(item, "product_id", None)
+    ]
+    vat_amount = await taxes_service.compute_cart_vat_amount(
+        session,
+        country_code=country_code,
+        lines=lines,
+        discount=discount_val,
         shipping=shipping_amount,
         fee=fee_amount,
-        enabled=checkout_settings.vat_enabled,
-        vat_rate_percent=checkout_settings.vat_rate_percent,
-        apply_to_shipping=checkout_settings.vat_apply_to_shipping,
-        apply_to_fee=checkout_settings.vat_apply_to_fee,
+        checkout=checkout_settings,
     )
 
     order.shipping_amount = shipping_amount
     order.tax_amount = vat_amount
-    order.total_amount = pricing.quantize_money(taxable_subtotal + fee_amount + shipping_amount + vat_amount)
+    order.total_amount = pricing.quantize_money(
+        taxable_subtotal + fee_amount + shipping_amount + vat_amount, rounding=checkout_settings.money_rounding
+    )
 
     return {
         "shipping_amount": {"from": str(previous_shipping), "to": str(order.shipping_amount)},
@@ -730,6 +745,8 @@ async def update_order(
                     },
                 )
             )
+        await session.refresh(order, attribute_names=["items", "shipping_address"])
+        checkout_settings = await checkout_settings_service.get_checkout_settings(session)
         taxable_subtotal = (
             Decimal(order.total_amount)
             - Decimal(order.shipping_amount)
@@ -738,29 +755,41 @@ async def update_order(
         )
         if taxable_subtotal < 0:
             taxable_subtotal = Decimal("0.00")
-        taxable_subtotal = pricing.quantize_money(taxable_subtotal)
-
-        checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+        taxable_subtotal = pricing.quantize_money(taxable_subtotal, rounding=checkout_settings.money_rounding)
         shipping_amount = Decimal(checkout_settings.shipping_fee_ron)
         threshold = checkout_settings.free_shipping_threshold_ron
         if threshold is not None and threshold >= 0 and taxable_subtotal >= threshold:
             shipping_amount = Decimal("0.00")
-        shipping_amount = pricing.quantize_money(shipping_amount)
+        shipping_amount = pricing.quantize_money(shipping_amount, rounding=checkout_settings.money_rounding)
 
-        fee_amount = pricing.quantize_money(Decimal(getattr(order, "fee_amount", 0) or 0))
-        vat_amount = pricing.compute_vat(
-            taxable_subtotal=taxable_subtotal,
+        fee_amount = pricing.quantize_money(Decimal(getattr(order, "fee_amount", 0) or 0), rounding=checkout_settings.money_rounding)
+        subtotal_items = sum((Decimal(getattr(item, "subtotal", 0) or 0) for item in getattr(order, "items", []) or []), start=Decimal("0.00"))
+        subtotal_items = pricing.quantize_money(subtotal_items, rounding=checkout_settings.money_rounding)
+        discount_val = subtotal_items - taxable_subtotal
+        if discount_val < 0:
+            discount_val = Decimal("0.00")
+        discount_val = pricing.quantize_money(discount_val, rounding=checkout_settings.money_rounding)
+        country_code = getattr(getattr(order, "shipping_address", None), "country", None)
+        lines: list[TaxableProductLine] = [
+            TaxableProductLine(product_id=item.product_id, subtotal=pricing.quantize_money(Decimal(item.subtotal), rounding=checkout_settings.money_rounding))
+            for item in getattr(order, "items", []) or []
+            if getattr(item, "product_id", None)
+        ]
+        vat_amount = await taxes_service.compute_cart_vat_amount(
+            session,
+            country_code=country_code,
+            lines=lines,
+            discount=discount_val,
             shipping=shipping_amount,
             fee=fee_amount,
-            enabled=checkout_settings.vat_enabled,
-            vat_rate_percent=checkout_settings.vat_rate_percent,
-            apply_to_shipping=checkout_settings.vat_apply_to_shipping,
-            apply_to_fee=checkout_settings.vat_apply_to_fee,
+            checkout=checkout_settings,
         )
 
         order.shipping_amount = shipping_amount
         order.tax_amount = vat_amount
-        order.total_amount = pricing.quantize_money(taxable_subtotal + fee_amount + shipping_amount + vat_amount)
+        order.total_amount = pricing.quantize_money(
+            taxable_subtotal + fee_amount + shipping_amount + vat_amount, rounding=checkout_settings.money_rounding
+        )
 
     for field, value in data.items():
         setattr(order, field, value)

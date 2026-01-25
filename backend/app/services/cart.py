@@ -22,6 +22,8 @@ from app.services import email as email_service
 from app.services.checkout_settings import CheckoutSettings
 from app.services.catalog import is_sale_active
 from app.services import pricing
+from app.services import taxes as taxes_service
+from app.services.taxes import TaxableProductLine
 from app.core.config import settings
 from app.core.logging_config import request_id_ctx_var
 
@@ -263,6 +265,104 @@ def calculate_totals(
     return totals, discount_val
 
 
+async def calculate_totals_async(
+    session: AsyncSession,
+    cart: Cart,
+    shipping_method: ShippingMethod | None = None,
+    promo: PromoCodeRead | None = None,
+    *,
+    checkout_settings: CheckoutSettings | None = None,
+    shipping_fee_ron: Decimal | None = None,
+    free_shipping_threshold_ron: Decimal | None = None,
+    country_code: str | None = None,
+) -> tuple[Totals, Decimal]:
+    checkout = checkout_settings or CheckoutSettings()
+    rounding = checkout.money_rounding
+
+    subtotal_raw = sum(_to_decimal(item.unit_price_at_add) * item.quantity for item in cart.items)
+    subtotal = _to_decimal(subtotal_raw)
+    discount_val = _compute_discount(subtotal, promo)
+
+    shipping_fee = shipping_fee_ron if shipping_fee_ron is not None else checkout.shipping_fee_ron
+    threshold = (
+        free_shipping_threshold_ron if free_shipping_threshold_ron is not None else checkout.free_shipping_threshold_ron
+    )
+    shipping_amount = _calculate_shipping_amount(subtotal, shipping_method, shipping_fee_ron=shipping_fee)
+    shipping = _to_decimal(shipping_amount)
+    if threshold is not None and threshold >= 0 and (subtotal - discount_val) >= threshold:
+        shipping = Decimal("0.00")
+
+    base_breakdown = pricing.compute_totals(
+        subtotal=subtotal,
+        discount=discount_val,
+        shipping=shipping,
+        fee_enabled=checkout.fee_enabled,
+        fee_type=checkout.fee_type,
+        fee_value=checkout.fee_value,
+        vat_enabled=False,
+        vat_rate_percent=checkout.vat_rate_percent,
+        vat_apply_to_shipping=checkout.vat_apply_to_shipping,
+        vat_apply_to_fee=checkout.vat_apply_to_fee,
+        rounding=rounding,
+    )
+
+    lines: list[TaxableProductLine] = []
+    for item in cart.items:
+        product_id = getattr(item, "product_id", None)
+        if not product_id:
+            continue
+        line_subtotal = pricing.quantize_money(_to_decimal(item.unit_price_at_add) * item.quantity, rounding=rounding)
+        lines.append(TaxableProductLine(product_id=product_id, subtotal=line_subtotal))
+
+    if lines:
+        line_sum = sum((line.subtotal for line in lines), start=Decimal("0.00"))
+        diff = pricing.quantize_money(base_breakdown.subtotal - line_sum, rounding=rounding)
+        if diff != 0:
+            idx = max(range(len(lines)), key=lambda i: lines[i].subtotal)
+            adjusted = lines[idx].subtotal + diff
+            if adjusted < 0:
+                adjusted = Decimal("0.00")
+            lines[idx] = TaxableProductLine(product_id=lines[idx].product_id, subtotal=adjusted)
+
+    vat_override = await taxes_service.compute_cart_vat_amount(
+        session,
+        country_code=country_code,
+        lines=lines,
+        discount=base_breakdown.discount,
+        shipping=base_breakdown.shipping,
+        fee=base_breakdown.fee,
+        checkout=checkout,
+    )
+
+    breakdown = pricing.compute_totals(
+        subtotal=subtotal,
+        discount=discount_val,
+        shipping=shipping,
+        fee_enabled=checkout.fee_enabled,
+        fee_type=checkout.fee_type,
+        fee_value=checkout.fee_value,
+        vat_enabled=checkout.vat_enabled,
+        vat_rate_percent=checkout.vat_rate_percent,
+        vat_apply_to_shipping=checkout.vat_apply_to_shipping,
+        vat_apply_to_fee=checkout.vat_apply_to_fee,
+        rounding=rounding,
+        vat_override=vat_override,
+    )
+
+    return (
+        Totals(
+            subtotal=breakdown.subtotal,
+            fee=breakdown.fee,
+            tax=breakdown.vat,
+            shipping=breakdown.shipping,
+            total=breakdown.total,
+            currency="RON",
+            free_shipping_threshold_ron=threshold,
+        ),
+        discount_val,
+    )
+
+
 async def serialize_cart(
     session: AsyncSession,
     cart: Cart,
@@ -273,6 +373,7 @@ async def serialize_cart(
     shipping_fee_ron: Decimal | None = None,
     free_shipping_threshold_ron: Decimal | None = None,
     totals_override: Totals | None = None,
+    country_code: str | None = None,
 ) -> CartRead:
     result = await session.execute(
         select(Cart)
@@ -292,15 +393,18 @@ async def serialize_cart(
     threshold = (
         free_shipping_threshold_ron if free_shipping_threshold_ron is not None else checkout.free_shipping_threshold_ron
     )
-    totals = totals_override or _calculate_totals(
-        hydrated,
-        shipping_method=shipping_method,
-        promo=promo,
-        checkout_settings=checkout,
-        shipping_fee_ron=shipping_fee_ron,
-        free_shipping_threshold_ron=free_shipping_threshold_ron,
-        currency=currency,
-    )
+    totals = totals_override
+    if not totals:
+        totals, _ = await calculate_totals_async(
+            session,
+            hydrated,
+            shipping_method=shipping_method,
+            promo=promo,
+            checkout_settings=checkout,
+            shipping_fee_ron=shipping_fee_ron,
+            free_shipping_threshold_ron=free_shipping_threshold_ron,
+            country_code=country_code,
+        )
     if totals_override and getattr(totals_override, "currency", None) is None:
         totals = Totals(**totals_override.model_dump(), currency=currency)
     if totals is not None:

@@ -269,11 +269,14 @@ async def create_order(
     if not cart or not cart.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
 
+    shipping_country: str | None = None
     for address_id in [payload.shipping_address_id, payload.billing_address_id]:
         if address_id:
             addr = await session.get(Address, address_id)
             if not addr or addr.user_id != current_user.id:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid address")
+            if address_id == payload.shipping_address_id:
+                shipping_country = addr.country
 
     shipping_method = None
     if payload.shipping_method_id:
@@ -282,11 +285,13 @@ async def create_order(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
 
     checkout_settings = await checkout_settings_service.get_checkout_settings(session)
-    totals, _ = cart_service.calculate_totals(
+    totals, _ = await cart_service.calculate_totals_async(
+        session,
         cart,
         shipping_method=shipping_method,
         promo=None,
         checkout_settings=checkout_settings,
+        country_code=shipping_country,
     )
 
     order = await order_service.build_order_from_cart(
@@ -394,6 +399,7 @@ async def checkout(
                 shipping_method_rate_flat=rate_flat,
                 shipping_method_rate_per_kg=rate_per,
                 code=payload.promo_code,
+                country_code=payload.country,
             )
             applied_coupon = applied_discount.coupon if applied_discount else None
             coupon_shipping_discount = applied_discount.shipping_discount_ron if applied_discount else Decimal("0.00")
@@ -460,11 +466,13 @@ async def checkout(
     if applied_coupon and applied_discount:
         totals, discount_val = applied_discount.totals, applied_discount.discount_ron
     else:
-        totals, discount_val = cart_service.calculate_totals(
+        totals, discount_val = await cart_service.calculate_totals_async(
+            session,
             user_cart,
             shipping_method=shipping_method,
             promo=promo,
             checkout_settings=checkout_settings,
+            country_code=shipping_addr.country,
         )
     payment_method = payload.payment_method or "stripe"
     stripe_session_id = None
@@ -1263,11 +1271,13 @@ async def guest_checkout(
             ),
         )
 
-    totals, discount_val = cart_service.calculate_totals(
+    totals, discount_val = await cart_service.calculate_totals_async(
+        session,
         cart,
         shipping_method=shipping_method,
         promo=promo,
         checkout_settings=checkout_settings,
+        country_code=shipping_addr.country,
     )
     payment_method = payload.payment_method or "stripe"
     stripe_session_id = None
