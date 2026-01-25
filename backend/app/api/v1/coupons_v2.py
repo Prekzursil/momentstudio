@@ -9,7 +9,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
-from app.core.dependencies import get_current_user, require_admin
+from app.core.dependencies import get_current_user, require_admin_section
 from app.db.session import get_session
 from app.models.catalog import Category, Product
 from app.models.coupons_v2 import (
@@ -279,7 +279,7 @@ async def my_coupons(
 @router.get("/admin/promotions", response_model=list[PromotionRead])
 async def admin_list_promotions(
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> list[PromotionRead]:
     result = await session.execute(
         select(Promotion).options(selectinload(Promotion.scopes)).order_by(Promotion.created_at.desc())
@@ -292,7 +292,7 @@ async def admin_list_promotions(
 async def admin_create_promotion(
     payload: PromotionCreate,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> PromotionRead:
     if payload.discount_type == "percent" and not payload.percentage_off:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="percentage_off is required for percent promotions")
@@ -347,7 +347,7 @@ async def admin_update_promotion(
     promotion_id: UUID,
     payload: PromotionUpdate,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> PromotionRead:
     promo = (
         (await session.execute(select(Promotion).options(selectinload(Promotion.scopes)).where(Promotion.id == promotion_id)))
@@ -434,7 +434,7 @@ async def admin_update_promotion(
 @router.get("/admin/coupons", response_model=list[CouponRead])
 async def admin_list_coupons(
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
     promotion_id: UUID | None = Query(default=None),
     q: str | None = Query(default=None),
 ) -> list[CouponRead]:
@@ -458,7 +458,7 @@ async def admin_update_coupon(
     coupon_id: UUID,
     payload: CouponUpdate,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> CouponRead:
     coupon = (
         (
@@ -497,7 +497,7 @@ async def admin_update_coupon(
 async def admin_list_coupon_assignments(
     coupon_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> list[CouponAssignmentRead]:
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
@@ -528,7 +528,7 @@ async def admin_list_coupon_assignments(
 async def admin_create_coupon(
     payload: CouponCreate,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> CouponRead:
     promotion = await session.get(Promotion, payload.promotion_id)
     if not promotion:
@@ -866,7 +866,7 @@ async def admin_assign_coupon(
     payload: CouponAssignRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> Response:
     coupon = (
         (
@@ -919,7 +919,7 @@ async def admin_bulk_assign_coupon(
     payload: CouponBulkAssignRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> CouponBulkResult:
     requested = len(payload.emails or [])
     emails, invalid = _normalize_bulk_emails(payload.emails or [])
@@ -1013,7 +1013,7 @@ async def admin_revoke_coupon(
     payload: CouponRevokeRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> Response:
     coupon = (
         (
@@ -1061,7 +1061,7 @@ async def admin_bulk_revoke_coupon(
     payload: CouponBulkRevokeRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> CouponBulkResult:
     requested = len(payload.emails or [])
     emails, invalid = _normalize_bulk_emails(payload.emails or [])
@@ -1152,7 +1152,7 @@ async def admin_preview_segment_assign(
     coupon_id: UUID,
     payload: CouponBulkSegmentAssignRequest,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> CouponBulkSegmentPreview:
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
@@ -1166,7 +1166,7 @@ async def admin_preview_segment_revoke(
     coupon_id: UUID,
     payload: CouponBulkSegmentRevokeRequest,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> CouponBulkSegmentPreview:
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
@@ -1181,7 +1181,7 @@ async def admin_start_segment_assign_job(
     payload: CouponBulkSegmentAssignRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_admin_section("coupons")),
 ) -> CouponBulkJobRead:
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
@@ -1217,7 +1217,7 @@ async def admin_start_segment_revoke_job(
     payload: CouponBulkSegmentRevokeRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_admin_section("coupons")),
 ) -> CouponBulkJobRead:
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
@@ -1252,7 +1252,7 @@ async def admin_start_segment_revoke_job(
 async def admin_get_bulk_job(
     job_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> CouponBulkJobRead:
     job = await session.get(CouponBulkJob, job_id)
     if not job:
@@ -1265,7 +1265,7 @@ async def admin_list_bulk_jobs(
     coupon_id: UUID,
     session: AsyncSession = Depends(get_session),
     limit: int = Query(default=10, ge=1, le=50),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> list[CouponBulkJobRead]:
     jobs = (
         (
@@ -1286,7 +1286,7 @@ async def admin_list_bulk_jobs(
 async def admin_cancel_bulk_job(
     job_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> CouponBulkJobRead:
     job = await session.get(CouponBulkJob, job_id)
     if not job:
@@ -1309,7 +1309,7 @@ async def admin_retry_bulk_job(
     job_id: UUID,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_admin_section("coupons")),
 ) -> CouponBulkJobRead:
     job = await session.get(CouponBulkJob, job_id)
     if not job:

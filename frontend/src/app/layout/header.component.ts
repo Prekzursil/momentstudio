@@ -292,7 +292,7 @@ import { NotificationsService, UserNotification } from '../core/notifications.se
           <a routerLink="/about" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.about' | translate }}</a>
           <a routerLink="/contact" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.contact' | translate }}</a>
           <a
-            *ngIf="isAdmin()"
+            *ngIf="isStaff()"
             routerLink="/admin"
             class="hover:text-slate-900 dark:hover:text-white"
           >
@@ -357,7 +357,7 @@ export class HeaderComponent implements OnDestroy {
 
   readonly isAuthenticated = computed(() => this.auth.isAuthenticated());
   readonly currentUser = computed(() => this.auth.user());
-  readonly isAdmin = computed(() => this.auth.isAdmin());
+  readonly isStaff = computed(() => this.auth.isStaff());
   readonly isImpersonating = computed(() => this.auth.isImpersonating());
   readonly notifications = computed(() => this.notificationsService.items());
   readonly notificationsLoading = computed(() => this.notificationsService.loading());
@@ -378,7 +378,7 @@ export class HeaderComponent implements OnDestroy {
       links.push({ label: 'nav.signIn', path: '/login' });
       links.push({ label: 'nav.register', path: '/register' });
     }
-    if (authenticated && this.auth.isAdmin()) {
+    if (authenticated && this.auth.isStaff()) {
       links.push({ label: 'nav.admin', path: '/admin' });
     }
     return links;

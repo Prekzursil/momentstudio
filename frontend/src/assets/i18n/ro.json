@@ -2767,6 +2767,15 @@
       "unlock": "Deblochează",
       "passwordResetRequired": "Cere resetarea parolei",
       "saveSecurity": "Salvează securitatea",
+      "sessionsTitle": "Sesiuni active",
+      "sessionsLoading": "Se încarcă sesiunile…",
+      "sessionsEmpty": "Nu există sesiuni active.",
+      "sessionPersistent": "Persistentă",
+      "sessionNonPersistent": "Sesiune",
+      "sessionCreated": "Creat",
+      "sessionExpires": "Expiră",
+      "revokeSession": "Revocă",
+      "unknownDevice": "Dispozitiv necunoscut",
       "emailVerificationTitle": "Verificare email",
       "resendVerification": "Retrimite verificarea",
       "loadVerificationHistory": "Încarcă istoricul",
@@ -2788,11 +2797,15 @@
       },
       "roles": {
         "customer": "Client",
+        "support": "Suport",
+        "fulfillment": "Fulfillment",
+        "content": "Conținut",
         "admin": "Administrator",
         "owner": "Proprietar"
       },
       "success": {
         "revoke": "Sesiuni revocate",
+        "sessionRevoked": "Sesiune revocată",
         "role": "Rol actualizat",
         "internal": "Salvat",
         "impersonate": "Deschis într-o filă nouă",
@@ -2810,6 +2823,8 @@
         "verificationHistory": "Nu am putut încărca istoricul verificării.",
         "verificationResent": "Nu am putut retrimite emailul de verificare.",
         "verificationOverridden": "Nu am putut suprascrie verificarea emailului.",
+        "sessionsLoad": "Nu am putut încărca sesiunile.",
+        "sessionRevoke": "Nu am putut revoca sesiunea.",
         "revoke": "Nu am putut revoca sesiunile",
         "role": "Nu am putut actualiza rolul"
       }

@@ -186,6 +186,23 @@ export class AuthService {
     return role === 'admin' || role === 'owner';
   }
 
+  isStaff(): boolean {
+    const role = this.role();
+    return role === 'owner' || role === 'admin' || role === 'support' || role === 'fulfillment' || role === 'content';
+  }
+
+  canAccessAdminSection(section: string): boolean {
+    const role = this.role();
+    if (!role) return false;
+    if (role === 'owner' || role === 'admin') return true;
+    const key = (section || '').toLowerCase().trim();
+    if (!key) return false;
+    if (role === 'support') return key === 'dashboard' || key === 'users' || key === 'support';
+    if (role === 'fulfillment') return key === 'dashboard' || key === 'orders' || key === 'returns' || key === 'inventory';
+    if (role === 'content') return key === 'dashboard' || key === 'content' || key === 'products' || key === 'coupons';
+    return false;
+  }
+
   isImpersonating(): boolean {
     const token = this.tokens?.access_token;
     return Boolean(token && this.isImpersonationToken(token));

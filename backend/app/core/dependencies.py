@@ -1,3 +1,6 @@
+from collections.abc import Awaitable, Callable
+from uuid import UUID
+
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,10 +11,33 @@ from app.db.session import get_session
 from app.models.user import User, UserRole
 from app.services import auth as auth_service
 from app.services import self_service
-from uuid import UUID
 
 bearer_scheme = HTTPBearer(auto_error=False)
 _IMPERSONATION_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+_STAFF_ROLES = {
+    UserRole.owner,
+    UserRole.admin,
+    UserRole.support,
+    UserRole.fulfillment,
+    UserRole.content,
+}
+_SECTION_ROLES: dict[str, set[UserRole]] = {
+    "dashboard": {
+        UserRole.owner,
+        UserRole.admin,
+        UserRole.support,
+        UserRole.fulfillment,
+        UserRole.content,
+    },
+    "content": {UserRole.owner, UserRole.admin, UserRole.content},
+    "products": {UserRole.owner, UserRole.admin, UserRole.content},
+    "inventory": {UserRole.owner, UserRole.admin, UserRole.fulfillment},
+    "orders": {UserRole.owner, UserRole.admin, UserRole.fulfillment},
+    "returns": {UserRole.owner, UserRole.admin, UserRole.fulfillment},
+    "coupons": {UserRole.owner, UserRole.admin, UserRole.content},
+    "users": {UserRole.owner, UserRole.admin, UserRole.support},
+    "support": {UserRole.owner, UserRole.admin, UserRole.support},
+}
 
 
 async def get_current_user(
@@ -134,6 +160,24 @@ async def require_admin(user: User = Depends(get_current_user)) -> User:
     if user.role not in (UserRole.admin, UserRole.owner):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return user
+
+
+async def require_staff(user: User = Depends(get_current_user)) -> User:
+    if user.role not in _STAFF_ROLES:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Staff access required")
+    return user
+
+
+def require_admin_section(section: str) -> Callable[..., Awaitable[User]]:
+    section_key = (section or "").strip().lower()
+    allowed = set(_SECTION_ROLES.get(section_key, set()))
+
+    async def _dep(user: User = Depends(get_current_user)) -> User:
+        if user.role not in allowed:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role for this section")
+        return user
+
+    return _dep
 
 
 async def require_owner(user: User = Depends(get_current_user)) -> User:

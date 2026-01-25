@@ -7,7 +7,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.dependencies import require_admin, get_current_user_optional, require_complete_profile
+from app.core.dependencies import (
+    get_current_user_optional,
+    require_admin_section,
+    require_complete_profile,
+)
 from app.db.session import get_session
 from app.models.catalog import (
     Category,
@@ -183,7 +187,7 @@ async def product_feed_csv(
 async def create_category(
     payload: CategoryCreate,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> Category:
     return await catalog_service.create_category(session, payload)
 
@@ -193,7 +197,7 @@ async def update_category(
     slug: str,
     payload: CategoryUpdate,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> Category:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
@@ -205,7 +209,7 @@ async def update_category(
 async def list_category_translations(
     slug: str,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> list[CategoryTranslationRead]:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
@@ -220,7 +224,7 @@ async def upsert_category_translation(
     lang: str = Path(..., pattern="^(en|ro)$"),
     payload: CategoryTranslationUpsert = ...,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> CategoryTranslationRead:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
@@ -234,7 +238,7 @@ async def delete_category_translation(
     slug: str,
     lang: str = Path(..., pattern="^(en|ro)$"),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> None:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
@@ -247,7 +251,7 @@ async def delete_category_translation(
 async def delete_category(
     slug: str,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> Category:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
@@ -261,7 +265,7 @@ async def delete_category(
 async def reorder_categories(
     payload: list[CategoryReorderItem],
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> list[CategoryRead]:
     updated = await catalog_service.reorder_categories(session, payload)
     return updated
@@ -271,7 +275,7 @@ async def reorder_categories(
 async def create_product(
     payload: ProductCreate,
     session: AsyncSession = Depends(get_session),
-    current_user=Depends(require_admin),
+    current_user=Depends(require_admin_section("products")),
 ) -> Product:
     return await catalog_service.create_product(session, payload, user_id=current_user.id)
 
@@ -281,7 +285,7 @@ async def update_product(
     slug: str,
     payload: ProductUpdate,
     session: AsyncSession = Depends(get_session),
-    current_user=Depends(require_admin),
+    current_user=Depends(require_admin_section("products")),
 ) -> Product:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
@@ -293,7 +297,7 @@ async def update_product(
 async def list_product_translations(
     slug: str,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> list[ProductTranslationRead]:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
@@ -308,7 +312,7 @@ async def upsert_product_translation(
     lang: str = Path(..., pattern="^(en|ro)$"),
     payload: ProductTranslationUpsert = ...,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> ProductTranslationRead:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
@@ -322,7 +326,7 @@ async def delete_product_translation(
     slug: str,
     lang: str = Path(..., pattern="^(en|ro)$"),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> None:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
@@ -335,7 +339,7 @@ async def delete_product_translation(
 async def get_product_relationships(
     slug: str,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> ProductRelationshipsRead:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product or product.is_deleted:
@@ -348,7 +352,7 @@ async def update_product_relationships(
     slug: str,
     payload: ProductRelationshipsUpdate,
     session: AsyncSession = Depends(get_session),
-    current_user=Depends(require_admin),
+    current_user=Depends(require_admin_section("products")),
 ) -> ProductRelationshipsRead:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product or product.is_deleted:
@@ -360,7 +364,7 @@ async def update_product_relationships(
 async def list_product_audit(
     slug: str,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
     limit: int = Query(default=50, ge=1, le=200),
 ) -> list[AdminProductAuditEntry]:
     product = await catalog_service.get_product_by_slug(session, slug)
@@ -400,7 +404,7 @@ async def list_product_audit(
 async def soft_delete_product(
     slug: str,
     session: AsyncSession = Depends(get_session),
-    current_user=Depends(require_admin),
+    current_user=Depends(require_admin_section("products")),
 ) -> None:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
@@ -414,7 +418,7 @@ async def upload_product_image(
     slug: str,
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> Product:
     product = await catalog_service.get_product_by_slug(
         session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
@@ -443,7 +447,7 @@ async def upload_product_image(
 async def bulk_update_products(
     payload: list[BulkProductUpdateItem],
     session: AsyncSession = Depends(get_session),
-    current_user=Depends(require_admin),
+    current_user=Depends(require_admin_section("products")),
 ) -> list[Product]:
     updated = await catalog_service.bulk_update_products(session, payload, user_id=current_user.id)
     return updated
@@ -454,7 +458,7 @@ async def update_product_variants(
     slug: str,
     payload: ProductVariantMatrixUpdate,
     session: AsyncSession = Depends(get_session),
-    current_user=Depends(require_admin),
+    current_user=Depends(require_admin_section("products")),
 ) -> list[ProductVariantRead]:
     product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.variants)])
     if not product or product.is_deleted:
@@ -492,7 +496,7 @@ async def list_featured_collections(session: AsyncSession = Depends(get_session)
 async def create_featured_collection(
     payload: FeaturedCollectionCreate,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> FeaturedCollectionRead:
     created = await catalog_service.create_featured_collection(session, payload)
     return FeaturedCollectionRead.model_validate(created)
@@ -503,7 +507,7 @@ async def update_featured_collection(
     slug: str,
     payload: FeaturedCollectionUpdate,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> FeaturedCollectionRead:
     collection = await catalog_service.get_featured_collection_by_slug(session, slug)
     if not collection:
@@ -516,7 +520,7 @@ async def update_featured_collection(
 async def duplicate_product(
     slug: str,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> Product:
     product = await catalog_service.get_product_by_slug(
         session, slug, options=[selectinload(Product.images), selectinload(Product.category), selectinload(Product.options)]
@@ -555,7 +559,7 @@ async def recently_viewed_products(
 @router.get("/products/export", response_class=StreamingResponse)
 async def export_products_csv(
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ):
     content = await catalog_service.export_products_csv(session)
     headers = {"Content-Disposition": 'attachment; filename="products.csv"'}
@@ -567,7 +571,7 @@ async def import_products_csv(
     file: UploadFile = File(...),
     dry_run: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> ImportResult:
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSV file required")
@@ -604,7 +608,7 @@ async def get_product(
     )
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) in (UserRole.admin, UserRole.owner)
+    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
     if not is_admin and (not product.is_active or product.status != ProductStatus.published):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     if product.is_active and product.status == ProductStatus.published:
@@ -626,7 +630,7 @@ async def get_back_in_stock_status(
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) in (UserRole.admin, UserRole.owner)
+    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
     if not is_admin and (not product.is_active or product.status != ProductStatus.published):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     request = await catalog_service.get_active_back_in_stock_request(session, user_id=current_user.id, product_id=product.id)
@@ -645,7 +649,7 @@ async def request_back_in_stock(
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) in (UserRole.admin, UserRole.owner)
+    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
     if not is_admin and (not product.is_active or product.status != ProductStatus.published):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     record = await catalog_service.create_back_in_stock_request(session, user_id=current_user.id, product=product)
@@ -661,7 +665,7 @@ async def cancel_back_in_stock(
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) in (UserRole.admin, UserRole.owner)
+    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
     if not is_admin and (not product.is_active or product.status != ProductStatus.published):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     await catalog_service.cancel_back_in_stock_request(session, user_id=current_user.id, product_id=product.id)
@@ -673,7 +677,7 @@ async def delete_product_image(
     slug: str,
     image_id: UUID,
     session: AsyncSession = Depends(get_session),
-    current_user=Depends(require_admin),
+    current_user=Depends(require_admin_section("products")),
 ) -> Product:
     product = await catalog_service.get_product_by_slug(
         session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
@@ -696,7 +700,7 @@ async def reorder_product_image(
     image_id: UUID,
     sort_order: int = Query(..., ge=0),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> Product:
     product = await catalog_service.get_product_by_slug(
         session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
@@ -716,7 +720,7 @@ async def reorder_product_image(
 async def list_deleted_product_images(
     slug: str,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> list[AdminDeletedProductImage]:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
@@ -739,7 +743,7 @@ async def restore_deleted_product_image(
     slug: str,
     image_id: UUID,
     session: AsyncSession = Depends(get_session),
-    current_user=Depends(require_admin),
+    current_user=Depends(require_admin_section("products")),
 ) -> ProductRead:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
@@ -758,7 +762,7 @@ async def list_product_image_translations(
     slug: str,
     image_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> list[ProductImageTranslationRead]:
     product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
     if not product or product.is_deleted:
@@ -776,7 +780,7 @@ async def upsert_product_image_translation(
     payload: ProductImageTranslationUpsert,
     lang: str = Path(..., pattern="^(en|ro)$"),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> ProductImageTranslationRead:
     product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
     if not product or product.is_deleted:
@@ -793,7 +797,7 @@ async def delete_product_image_translation(
     image_id: UUID,
     lang: str = Path(..., pattern="^(en|ro)$"),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> None:
     product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
     if not product or product.is_deleted:
@@ -810,7 +814,7 @@ async def get_product_image_stats(
     slug: str,
     image_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> ProductImageOptimizationStats:
     product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
     if not product or product.is_deleted:
@@ -826,7 +830,7 @@ async def reprocess_product_image(
     slug: str,
     image_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> ProductImageOptimizationStats:
     product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
     if not product or product.is_deleted:
@@ -847,7 +851,7 @@ async def create_review(
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) in (UserRole.admin, UserRole.owner)
+    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
     if not is_admin and (not product.is_active or product.status != ProductStatus.published):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     review = await catalog_service.add_review(session, product, payload, getattr(current_user, "id", None) if current_user else None)
@@ -859,7 +863,7 @@ async def approve_review(
     slug: str,
     review_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> ProductReviewRead:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
@@ -887,7 +891,7 @@ async def related_products(
     )
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) in (UserRole.admin, UserRole.owner)
+    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
     if not is_admin and (not product.is_active or product.status != ProductStatus.published):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     curated = await catalog_service.get_curated_relationship_products(
@@ -920,7 +924,7 @@ async def upsell_products(
     )
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) in (UserRole.admin, UserRole.owner)
+    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
     if not is_admin and (not product.is_active or product.status != ProductStatus.published):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 

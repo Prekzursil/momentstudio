@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
 from app.core.config import settings
-from app.core.dependencies import require_admin, require_owner
+from app.core.dependencies import require_admin, require_admin_section, require_owner
 from app.db.session import get_session
 from app.models.catalog import Product, ProductAuditLog, Category, ProductStatus, ProductTranslation
 from app.models.content import ContentBlock, ContentAuditLog
@@ -43,6 +43,7 @@ from app.schemas.admin_dashboard_scheduled import (
     ScheduledPublishItem,
     ScheduledPromoItem,
 )
+from app.schemas.auth import RefreshSessionResponse
 from app.schemas.inventory import (
     RestockListResponse,
     RestockNoteRead,
@@ -80,7 +81,7 @@ DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD = 5
 @router.get("/summary")
 async def admin_summary(
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("dashboard")),
     range_days: int = Query(default=30, ge=1, le=365),
     range_from: date | None = Query(default=None),
     range_to: date | None = Query(default=None),
@@ -306,7 +307,7 @@ async def admin_summary(
 @router.get("/search", response_model=AdminDashboardSearchResponse)
 async def admin_global_search(
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("dashboard")),
     q: str = Query(..., min_length=1, max_length=255),
 ) -> AdminDashboardSearchResponse:
     needle = (q or "").strip()
@@ -455,7 +456,8 @@ async def admin_global_search(
 
 @router.get("/products")
 async def admin_products(
-    session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("products")),
 ) -> list[dict]:
     stmt = (
         select(Product, Category.name)
@@ -484,7 +486,7 @@ async def admin_products(
 @router.get("/products/search", response_model=AdminProductListResponse)
 async def search_products(
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("products")),
     q: str | None = Query(default=None),
     status: ProductStatus | None = Query(default=None),
     category_slug: str | None = Query(default=None),
@@ -591,7 +593,7 @@ async def search_products(
 async def restore_product(
     product_id: UUID,
     session: AsyncSession = Depends(get_session),
-    current_user=Depends(require_admin),
+    current_user: User = Depends(require_admin_section("products")),
 ) -> AdminProductListItem:
     product = await session.get(Product, product_id)
     if not product or not getattr(product, "is_deleted", False):
@@ -632,7 +634,7 @@ async def restore_product(
 @router.get("/products/duplicate-check", response_model=AdminProductDuplicateCheckResponse)
 async def duplicate_check_products(
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("products")),
     name: str | None = Query(default=None),
     sku: str | None = Query(default=None),
     exclude_slug: str | None = Query(default=None),
@@ -722,7 +724,7 @@ async def duplicate_check_products(
 async def products_by_ids(
     payload: AdminProductByIdsRequest = Body(...),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("products")),
 ) -> list[AdminProductListItem]:
     ids = list(dict.fromkeys(payload.ids or []))
     if not ids:
@@ -767,7 +769,8 @@ async def products_by_ids(
 
 @router.get("/orders")
 async def admin_orders(
-    session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("dashboard")),
 ) -> list[dict]:
     stmt = (
         select(Order, User.email)
@@ -792,7 +795,8 @@ async def admin_orders(
 
 @router.get("/users")
 async def admin_users(
-    session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("dashboard")),
 ) -> list[dict]:
     result = await session.execute(
         select(User).order_by(User.created_at.desc()).limit(20)
@@ -815,7 +819,7 @@ async def admin_users(
 @router.get("/users/search", response_model=AdminUserListResponse)
 async def search_users(
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("users")),
     q: str | None = Query(default=None),
     role: UserRole | None = Query(default=None),
     page: int = Query(default=1, ge=1),
@@ -879,7 +883,7 @@ async def search_users(
 async def admin_user_aliases(
     user_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("users")),
 ) -> dict:
     user = await session.get(User, user_id)
     if not user:
@@ -912,7 +916,7 @@ async def admin_user_aliases(
 async def admin_user_profile(
     user_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("users")),
 ) -> AdminUserProfileResponse:
     user = await session.get(User, user_id)
     if not user or user.deleted_at is not None:
@@ -982,7 +986,8 @@ async def admin_user_profile(
 
 @router.get("/content")
 async def admin_content(
-    session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
 ) -> list[dict]:
     result = await session.execute(
         select(ContentBlock).order_by(ContentBlock.updated_at.desc()).limit(20)
@@ -1016,7 +1021,8 @@ async def _invalidate_stripe_coupon_mappings(
 
 @router.get("/coupons")
 async def admin_coupons(
-    session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> list[dict]:
     result = await session.execute(
         select(PromoCode).order_by(PromoCode.created_at.desc()).limit(20)
@@ -1043,7 +1049,7 @@ async def admin_coupons(
 @router.get("/scheduled-tasks", response_model=AdminDashboardScheduledTasksResponse)
 async def scheduled_tasks_overview(
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("dashboard")),
     limit: int = Query(default=10, ge=1, le=50),
 ) -> AdminDashboardScheduledTasksResponse:
     now = datetime.now(timezone.utc)
@@ -1132,7 +1138,7 @@ async def scheduled_tasks_overview(
 async def admin_invalidate_coupon_stripe(
     coupon_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> dict:
     promo = await session.get(PromoCode, coupon_id)
     if not promo:
@@ -1148,7 +1154,7 @@ async def admin_invalidate_coupon_stripe(
 async def admin_create_coupon(
     payload: dict,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> dict:
     code = payload.get("code")
     if not code:
@@ -1194,7 +1200,7 @@ async def admin_update_coupon(
     coupon_id: UUID,
     payload: dict,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> dict:
     promo = await session.get(PromoCode, coupon_id)
     if not promo:
@@ -1561,8 +1567,9 @@ async def admin_audit_export_csv(
 @router.post("/sessions/{user_id}/revoke", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke_sessions(
     user_id: UUID,
+    request: Request,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    current_user: User = Depends(require_admin_section("users")),
 ) -> None:
     user = await session.get(User, user_id)
     if not user:
@@ -1580,7 +1587,101 @@ async def revoke_sessions(
         s.revoked_reason = "admin-forced"
     if sessions:
         session.add_all(sessions)
+        session.add(
+            AdminAuditLog(
+                action="user.sessions.revoke_all",
+                actor_user_id=current_user.id,
+                subject_user_id=user.id,
+                data={
+                    "revoked_count": len(sessions),
+                    "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+                    "ip_address": (request.client.host if request.client else None),
+                },
+            )
+        )
         await session.commit()
+    return None
+
+
+@router.get("/sessions/{user_id}", response_model=list[RefreshSessionResponse])
+async def admin_list_user_sessions(
+    user_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("users")),
+) -> list[RefreshSessionResponse]:
+    user = await session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    rows = (
+        await session.execute(
+            select(RefreshSession)
+            .where(RefreshSession.user_id == user_id, RefreshSession.revoked.is_(False))
+            .order_by(RefreshSession.created_at.desc())
+        )
+    ).scalars().all()
+
+    now = datetime.now(timezone.utc)
+    sessions: list[RefreshSessionResponse] = []
+    for row in rows:
+        expires_at = row.expires_at
+        if expires_at and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if not expires_at or expires_at < now:
+            continue
+        created_at = row.created_at
+        if created_at and created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        sessions.append(
+            RefreshSessionResponse(
+                id=row.id,
+                created_at=created_at,
+                expires_at=expires_at,
+                persistent=bool(getattr(row, "persistent", True)),
+                is_current=False,
+                user_agent=getattr(row, "user_agent", None),
+                ip_address=getattr(row, "ip_address", None),
+                country_code=getattr(row, "country_code", None),
+            )
+        )
+
+    return sessions
+
+
+@router.post("/sessions/{user_id}/{session_id}/revoke", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_revoke_user_session(
+    user_id: UUID,
+    session_id: UUID,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("users")),
+) -> None:
+    user = await session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    row = await session.get(RefreshSession, session_id)
+    if not row or row.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+    if not row.revoked:
+        row.revoked = True
+        row.revoked_reason = "admin-forced"
+        session.add(row)
+        session.add(
+            AdminAuditLog(
+                action="user.sessions.revoke_one",
+                actor_user_id=current_user.id,
+                subject_user_id=user.id,
+                data={
+                    "refresh_session_id": str(row.id),
+                    "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+                    "ip_address": (request.client.host if request.client else None),
+                },
+            )
+        )
+        await session.commit()
+
     return None
 
 
@@ -1602,7 +1703,13 @@ async def update_user_role(
             detail="Owner role can only be transferred",
         )
     role = payload.get("role")
-    if role not in (UserRole.admin.value, UserRole.customer.value):
+    if role not in (
+        UserRole.customer.value,
+        UserRole.support.value,
+        UserRole.fulfillment.value,
+        UserRole.content.value,
+        UserRole.admin.value,
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role"
         )
@@ -1626,7 +1733,7 @@ async def update_user_internal(
     user_id: UUID,
     payload: AdminUserInternalUpdate,
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_admin_section("users")),
 ) -> AdminUserProfileUser:
     user = await session.get(User, user_id)
     if not user or user.deleted_at is not None:
@@ -1691,7 +1798,7 @@ async def update_user_security(
     payload: AdminUserSecurityUpdate,
     request: Request,
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_admin_section("users")),
 ) -> AdminUserProfileUser:
     user = await session.get(User, user_id)
     if not user or user.deleted_at is not None:
@@ -1783,7 +1890,7 @@ async def update_user_security(
 async def email_verification_history(
     user_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("users")),
 ) -> AdminEmailVerificationHistoryResponse:
     user = await session.get(User, user_id)
     if not user or user.deleted_at is not None:
@@ -1815,7 +1922,7 @@ async def resend_email_verification(
     request: Request,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_admin_section("users")),
 ) -> dict:
     user = await session.get(User, user_id)
     if not user or user.deleted_at is not None:
@@ -1913,7 +2020,7 @@ async def impersonate_user(
     user_id: UUID,
     request: Request,
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_admin_section("users")),
 ) -> AdminUserImpersonationResponse:
     user = await session.get(User, user_id)
     if not user or user.deleted_at is not None:
@@ -2039,7 +2146,8 @@ async def export_data(
 
 @router.get("/low-stock")
 async def low_stock_products(
-    session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("inventory")),
 ) -> list[dict]:
     threshold_expr = func.coalesce(
         Product.low_stock_threshold,
@@ -2082,7 +2190,7 @@ async def list_stock_adjustments(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("inventory")),
 ) -> list[StockAdjustmentRead]:
     return await catalog_service.list_stock_adjustments(
         session, product_id=product_id, limit=limit, offset=offset
@@ -2097,7 +2205,7 @@ async def list_stock_adjustments(
 async def apply_stock_adjustment(
     payload: StockAdjustmentCreate,
     session: AsyncSession = Depends(get_session),
-    current_user=Depends(require_admin),
+    current_user: User = Depends(require_admin_section("inventory")),
 ) -> StockAdjustmentRead:
     return await catalog_service.apply_stock_adjustment(
         session, payload=payload, user_id=current_user.id
@@ -2107,7 +2215,7 @@ async def apply_stock_adjustment(
 @router.get("/inventory/restock-list", response_model=RestockListResponse)
 async def inventory_restock_list(
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("inventory")),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=1, le=200),
     include_variants: bool = Query(default=True),
@@ -2128,7 +2236,7 @@ async def inventory_restock_list(
 async def upsert_inventory_restock_note(
     payload: RestockNoteUpsert,
     session: AsyncSession = Depends(get_session),
-    current_user=Depends(require_admin),
+    current_user: User = Depends(require_admin_section("inventory")),
 ) -> RestockNoteRead | None:
     return await inventory_service.upsert_restock_note(
         session, payload=payload, user_id=current_user.id
@@ -2138,7 +2246,7 @@ async def upsert_inventory_restock_note(
 @router.get("/inventory/restock-list/export")
 async def export_inventory_restock_list(
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("inventory")),
     include_variants: bool = Query(default=True),
     default_threshold: int = Query(
         default=DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD, ge=1, le=1000

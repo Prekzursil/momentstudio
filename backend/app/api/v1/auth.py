@@ -159,6 +159,26 @@ def _extract_refresh_session_jti(request: Request) -> str | None:
     return None
 
 
+def _extract_country_code(request: Request) -> str | None:
+    candidates = [
+        request.headers.get("cf-ipcountry"),
+        request.headers.get("cloudfront-viewer-country"),
+        request.headers.get("fastly-client-country"),
+        request.headers.get("x-country-code"),
+        request.headers.get("x-country"),
+    ]
+    for raw in candidates:
+        code = (raw or "").strip().upper()
+        if not code or code in ("XX", "ZZ"):
+            continue
+        if len(code) > 8:
+            code = code[:8]
+        if not code.isalnum():
+            continue
+        return code
+    return None
+
+
 async def _resolve_active_refresh_session_jti(
     session: AsyncSession,
     user_id: UUID,
@@ -448,6 +468,7 @@ async def register(
         persistent=False,
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
+        country_code=_extract_country_code(request),
     )
     if response:
         set_refresh_cookie(response, tokens["refresh_token"], persistent=False)
@@ -497,6 +518,7 @@ async def login(
         persistent=persistent,
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
+        country_code=_extract_country_code(request),
     )
     if response:
         set_refresh_cookie(response, tokens["refresh_token"], persistent=persistent)
@@ -550,6 +572,7 @@ async def login_two_factor(
         persistent=remember,
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
+        country_code=_extract_country_code(request),
     )
     if response:
         set_refresh_cookie(response, tokens["refresh_token"], persistent=remember)
@@ -649,6 +672,7 @@ async def passkey_login_verify(
         persistent=remember,
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
+        country_code=_extract_country_code(request),
     )
     if response:
         set_refresh_cookie(response, tokens["refresh_token"], persistent=remember)
@@ -864,6 +888,7 @@ async def refresh_tokens(
         persistent=persistent,
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
+        country_code=_extract_country_code(request),
     )
     stored.revoked = True
     stored.revoked_reason = "rotated"
@@ -1616,6 +1641,7 @@ async def list_my_sessions(
                 is_current=bool(current_jti and row.jti == current_jti),
                 user_agent=getattr(row, "user_agent", None),
                 ip_address=getattr(row, "ip_address", None),
+                country_code=getattr(row, "country_code", None),
             )
         )
 
@@ -1904,6 +1930,7 @@ async def google_callback(
                 existing_sub,
                 user_agent=request.headers.get("user-agent"),
                 ip_address=request.client.host if request.client else None,
+                country_code=_extract_country_code(request),
             )
             if response:
                 set_refresh_cookie(response, tokens["refresh_token"], persistent=True)
@@ -2035,6 +2062,7 @@ async def google_complete_registration(
         user,
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
+        country_code=_extract_country_code(request),
     )
     if response:
         set_refresh_cookie(response, tokens["refresh_token"], persistent=True)

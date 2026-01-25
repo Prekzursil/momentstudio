@@ -7,7 +7,7 @@ import { AboutComponent } from './pages/about/about.component';
 import { BlogListComponent } from './pages/blog/blog-list.component';
 import { BlogPostComponent } from './pages/blog/blog-post.component';
 import { ContactComponent } from './pages/contact/contact.component';
-import { adminGuard, authGuard } from './core/auth.guard';
+import { adminGuard, adminSectionGuard, authGuard } from './core/auth.guard';
 import { unsavedChangesGuard } from './core/unsaved-changes.guard';
 import { shopCategoriesResolver } from './core/shop.resolver';
 import { checkoutPricingSettingsResolver, checkoutShippingMethodsResolver } from './core/checkout.resolver';
@@ -162,14 +162,16 @@ export const routes: Routes = [
     canActivate: [adminGuard],
     loadComponent: () => import('./pages/admin/admin-layout.component').then((m) => m.AdminLayoutComponent),
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'orders' },
+      { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       {
         path: 'dashboard',
         loadComponent: () => import('./pages/admin/dashboard/admin-dashboard.component').then((m) => m.AdminDashboardComponent),
+        canActivate: [adminSectionGuard('dashboard')],
         title: 'Admin | momentstudio'
       },
       {
         path: 'content',
+        canActivate: [adminSectionGuard('content')],
         loadComponent: () =>
           import('./pages/admin/content/admin-content-layout.component').then((m) => m.AdminContentLayoutComponent),
         children: [
@@ -203,42 +205,50 @@ export const routes: Routes = [
       {
         path: 'orders',
         loadComponent: () => import('./pages/admin/orders/admin-orders.component').then((m) => m.AdminOrdersComponent),
+        canActivate: [adminSectionGuard('orders')],
         title: 'Orders | Admin | momentstudio'
       },
       {
         path: 'orders/:orderId',
         loadComponent: () =>
           import('./pages/admin/orders/admin-order-detail.component').then((m) => m.AdminOrderDetailComponent),
+        canActivate: [adminSectionGuard('orders')],
         title: 'Order | Admin | momentstudio'
       },
       {
         path: 'returns',
         loadComponent: () => import('./pages/admin/returns/admin-returns.component').then((m) => m.AdminReturnsComponent),
+        canActivate: [adminSectionGuard('returns')],
         title: 'Returns | Admin | momentstudio'
       },
       {
         path: 'coupons',
         loadComponent: () => import('./pages/admin/coupons/admin-coupons.component').then((m) => m.AdminCouponsComponent),
+        canActivate: [adminSectionGuard('coupons')],
         title: 'Coupons | Admin | momentstudio'
       },
       {
         path: 'products',
         loadComponent: () => import('./pages/admin/products/admin-products.component').then((m) => m.AdminProductsComponent),
+        canActivate: [adminSectionGuard('products')],
         title: 'Products | Admin | momentstudio'
       },
       {
         path: 'inventory',
         loadComponent: () => import('./pages/admin/inventory/admin-inventory.component').then((m) => m.AdminInventoryComponent),
+        canActivate: [adminSectionGuard('inventory')],
         title: 'Inventory | Admin | momentstudio'
       },
       {
         path: 'users',
         loadComponent: () => import('./pages/admin/users/admin-users.component').then((m) => m.AdminUsersComponent),
+        canActivate: [adminSectionGuard('users')],
         title: 'Users | Admin | momentstudio'
       },
       {
         path: 'support',
         loadComponent: () => import('./pages/admin/support/admin-support.component').then((m) => m.AdminSupportComponent),
+        canActivate: [adminSectionGuard('support')],
         title: 'Support | Admin | momentstudio'
       }
     ]

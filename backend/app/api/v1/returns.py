@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import require_admin, require_verified_email
+from app.core.dependencies import require_admin_section, require_verified_email
 from app.db.session import get_session
 from app.models.returns import ReturnRequestStatus
 from app.models.user import User
@@ -61,7 +61,7 @@ async def create_my_return_request(
 @router.get("/admin", response_model=ReturnRequestListResponse)
 async def admin_list_returns(
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("returns")),
     q: str | None = Query(default=None),
     status_filter: ReturnRequestStatus | None = Query(default=None),
     order_id: UUID | None = Query(default=None),
@@ -98,7 +98,7 @@ async def admin_list_returns(
 async def admin_get_return(
     return_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("returns")),
 ) -> ReturnRequestRead:
     record = await returns_service.get_return_request(session, return_id)
     if not record:
@@ -110,7 +110,7 @@ async def admin_get_return(
 async def admin_list_returns_for_order(
     order_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("returns")),
 ) -> list[ReturnRequestRead]:
     rows, _ = await returns_service.list_return_requests(session, order_id=order_id, page=1, limit=100)
     out: list[ReturnRequestRead] = []
@@ -127,7 +127,7 @@ async def admin_create_return(
     payload: ReturnRequestCreate,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin_section("returns")),
 ) -> ReturnRequestRead:
     created = await returns_service.create_return_request(session, payload=payload, actor=admin)
 
@@ -145,7 +145,7 @@ async def admin_update_return(
     payload: ReturnRequestUpdate,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin_section("returns")),
 ) -> ReturnRequestRead:
     record = await returns_service.get_return_request(session, return_id)
     if not record:

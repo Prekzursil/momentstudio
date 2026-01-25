@@ -2767,6 +2767,15 @@
       "unlock": "Unlock",
       "passwordResetRequired": "Require password reset",
       "saveSecurity": "Save security",
+      "sessionsTitle": "Active sessions",
+      "sessionsLoading": "Loading sessions…",
+      "sessionsEmpty": "No active sessions.",
+      "sessionPersistent": "Persistent",
+      "sessionNonPersistent": "Session",
+      "sessionCreated": "Created",
+      "sessionExpires": "Expires",
+      "revokeSession": "Revoke",
+      "unknownDevice": "Unknown device",
       "emailVerificationTitle": "Email verification",
       "resendVerification": "Resend verification",
       "loadVerificationHistory": "Load history",
@@ -2788,11 +2797,15 @@
       },
       "roles": {
         "customer": "Customer",
+        "support": "Support",
+        "fulfillment": "Fulfillment",
+        "content": "Content",
         "admin": "Admin",
         "owner": "Owner"
       },
       "success": {
         "revoke": "Sessions revoked",
+        "sessionRevoked": "Session revoked",
         "role": "Role updated",
         "internal": "Saved",
         "impersonate": "Opened in a new tab",
@@ -2810,6 +2823,8 @@
         "verificationHistory": "Could not load verification history.",
         "verificationResent": "Could not resend verification email.",
         "verificationOverridden": "Could not override email verification.",
+        "sessionsLoad": "Could not load sessions.",
+        "sessionRevoke": "Could not revoke session.",
         "revoke": "Failed to revoke sessions",
         "role": "Failed to update role"
       }

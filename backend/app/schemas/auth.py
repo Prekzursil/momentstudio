@@ -178,6 +178,7 @@ class RefreshSessionResponse(BaseModel):
     is_current: bool = False
     user_agent: str | None = None
     ip_address: str | None = None
+    country_code: str | None = None
 
 
 class RefreshSessionsRevokeResponse(BaseModel):

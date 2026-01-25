@@ -27,13 +27,36 @@ export const adminGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   return auth.ensureAuthenticated({ silent: true }).pipe(
     map((ok) => {
-      if (ok && auth.isAuthenticated() && auth.isAdmin()) return true;
-      toast.error(ok ? 'Admin access required.' : 'Please sign in to continue.');
+      if (ok && auth.isAuthenticated() && auth.isStaff()) return true;
+      toast.error(ok ? 'Staff access required.' : 'Please sign in to continue.');
       return router.parseUrl('/');
     }),
     catchError(() => {
-      toast.error('Admin access required.');
+      toast.error('Staff access required.');
       return of(router.parseUrl('/'));
     })
   );
 };
+
+export const adminSectionGuard =
+  (section: string): CanActivateFn =>
+  () => {
+    const router = inject(Router);
+    const toast = inject(ToastService);
+    const auth = inject(AuthService);
+    return auth.ensureAuthenticated({ silent: true }).pipe(
+      map((ok) => {
+        if (!ok || !auth.isAuthenticated() || !auth.isStaff()) {
+          toast.error(ok ? 'Staff access required.' : 'Please sign in to continue.');
+          return router.parseUrl('/');
+        }
+        if (auth.canAccessAdminSection(section)) return true;
+        toast.error('You do not have access to this section.');
+        return router.parseUrl('/admin/dashboard');
+      }),
+      catchError(() => {
+        toast.error('You do not have access to this section.');
+        return of(router.parseUrl('/admin/dashboard'));
+      })
+    );
+  };

@@ -6,8 +6,9 @@ from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.dependencies import get_session, require_admin
+from app.core.dependencies import get_session, require_admin_section
 from app.models.content import ContentBlock, ContentBlockVersion, ContentImage, ContentRedirect
+from app.models.user import User
 from app.schemas.content import (
     ContentAuditRead,
     ContentBlockCreate,
@@ -61,7 +62,7 @@ async def get_content(
 @router.post("/admin/social/thumbnail", response_model=SocialThumbnailResponse)
 async def admin_fetch_social_thumbnail(
     payload: SocialThumbnailRequest,
-    _: object = Depends(require_admin),
+    _: User = Depends(require_admin_section("content")),
 ) -> SocialThumbnailResponse:
     try:
         thumbnail_url = await social_thumbnails.fetch_social_thumbnail_url(payload.url)
@@ -78,7 +79,7 @@ async def admin_list_redirects(
     q: str | None = Query(default=None, description="Search from/to key"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("content")),
 ) -> ContentRedirectListResponse:
     filters = []
     if q:
@@ -129,7 +130,7 @@ async def admin_list_redirects(
 async def admin_delete_redirect(
     redirect_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("content")),
 ) -> Response:
     redirect = await session.scalar(select(ContentRedirect).where(ContentRedirect.id == redirect_id))
     if not redirect:
@@ -144,7 +145,7 @@ async def admin_get_content(
     key: str,
     session: AsyncSession = Depends(get_session),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("content")),
 ) -> ContentBlockRead:
     block = await content_service.get_block_by_key(session, key, lang=lang)
     if not block:
@@ -157,7 +158,7 @@ async def admin_update_content(
     key: str,
     payload: ContentBlockUpdate,
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    admin: User = Depends(require_admin_section("content")),
 ) -> ContentBlockRead:
     block = await content_service.upsert_block(session, key, payload, actor_id=admin.id)
     return block
@@ -168,7 +169,7 @@ async def admin_create_content(
     key: str,
     payload: ContentBlockCreate,
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    admin: User = Depends(require_admin_section("content")),
 ) -> ContentBlockRead:
     content_service.validate_page_key_for_create(key)
     existing = await content_service.get_block_by_key(session, key)
@@ -183,7 +184,7 @@ async def admin_upload_content_image(
     key: str,
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    admin: User = Depends(require_admin_section("content")),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
 ) -> ContentBlockRead:
     block = await content_service.get_block_by_key(session, key, lang=lang)
@@ -208,7 +209,7 @@ async def admin_list_content_images(
     q: str | None = Query(default=None, description="Search content key, URL, or alt text"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=24, ge=1, le=100),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("content")),
 ) -> ContentImageAssetListResponse:
     filters = []
     if key:
@@ -257,7 +258,7 @@ async def admin_list_content_images(
 @router.get("/admin/pages/list", response_model=list[ContentPageListItem])
 async def admin_list_pages(
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("content")),
 ) -> list[ContentPageListItem]:
     result = await session.execute(select(ContentBlock).where(ContentBlock.key.like("page.%")).order_by(ContentBlock.key))
     items: list[ContentPageListItem] = []
@@ -281,7 +282,7 @@ async def admin_rename_page(
     slug: str,
     payload: ContentPageRenameRequest,
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    admin: User = Depends(require_admin_section("content")),
 ) -> ContentPageRenameResponse:
     old_slug, new_slug, old_key, new_key = await content_service.rename_page_slug(
         session,
@@ -311,7 +312,7 @@ async def admin_preview_content(
 async def admin_list_content_audit(
     key: str,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("content")),
 ) -> list[ContentAuditRead]:
     block = await content_service.get_block_by_key(session, key)
     if not block:
@@ -323,7 +324,7 @@ async def admin_list_content_audit(
 async def admin_list_content_versions(
     key: str,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("content")),
 ) -> list[ContentBlockVersionListItem]:
     block = await content_service.get_block_by_key(session, key)
     if not block:
@@ -341,7 +342,7 @@ async def admin_get_content_version(
     key: str,
     version: int,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("content")),
 ) -> ContentBlockVersionRead:
     block = await content_service.get_block_by_key(session, key)
     if not block:
@@ -362,6 +363,6 @@ async def admin_rollback_content_version(
     key: str,
     version: int,
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    admin: User = Depends(require_admin_section("content")),
 ) -> ContentBlockRead:
     return await content_service.rollback_to_version(session, key=key, version=version, actor_id=admin.id)

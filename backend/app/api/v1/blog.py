@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
-from app.core.dependencies import require_complete_profile, require_admin
+from app.core.dependencies import require_admin_section, require_complete_profile
 from app.core.security import create_content_preview_token, decode_content_preview_token
 from app.db.session import get_session
 from app.models.blog import BlogComment
@@ -90,7 +90,7 @@ async def create_blog_preview_token(
     session: AsyncSession = Depends(get_session),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
     expires_minutes: int = Query(default=60, ge=5, le=7 * 24 * 60),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("content")),
 ) -> BlogPreviewTokenResponse:
     key = f"blog.{slug}"
     block = await content_service.get_block_by_key(session, key)
@@ -277,7 +277,7 @@ async def flag_blog_comment(
 
 @router.get("/admin/comments/flagged", response_model=BlogCommentAdminListResponse)
 async def list_flagged_blog_comments(
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("content")),
     session: AsyncSession = Depends(get_session),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=50),
@@ -294,7 +294,7 @@ async def list_flagged_blog_comments(
 async def hide_blog_comment(
     comment_id: uuid.UUID,
     payload: BlogCommentHideRequest,
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_admin_section("content")),
     session: AsyncSession = Depends(get_session),
 ) -> BlogCommentAdminRead:
     comment = await blog_service.set_comment_hidden(
@@ -307,7 +307,7 @@ async def hide_blog_comment(
 @router.post("/admin/comments/{comment_id}/unhide", response_model=BlogCommentAdminRead)
 async def unhide_blog_comment(
     comment_id: uuid.UUID,
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_admin_section("content")),
     session: AsyncSession = Depends(get_session),
 ) -> BlogCommentAdminRead:
     comment = await blog_service.set_comment_hidden(session, comment_id=comment_id, actor=admin_user, hidden=False)
@@ -318,7 +318,7 @@ async def unhide_blog_comment(
 @router.post("/admin/comments/{comment_id}/resolve-flags", response_model=dict[str, int])
 async def resolve_blog_comment_flags(
     comment_id: uuid.UUID,
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_admin_section("content")),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, int]:
     resolved = await blog_service.resolve_comment_flags(session, comment_id=comment_id, actor=admin_user)

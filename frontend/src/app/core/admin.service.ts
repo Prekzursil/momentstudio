@@ -115,6 +115,17 @@ export interface AdminUser {
   created_at: string;
 }
 
+export interface AdminUserSession {
+  id: string;
+  created_at: string;
+  expires_at: string;
+  persistent: boolean;
+  is_current: boolean;
+  user_agent?: string | null;
+  ip_address?: string | null;
+  country_code?: string | null;
+}
+
 export interface AdminUserAliasHistoryItem {
   created_at: string;
 }
@@ -571,6 +582,14 @@ export class AdminService {
 
   revokeSessions(userId: string): Observable<void> {
     return this.api.post<void>(`/admin/dashboard/sessions/${userId}/revoke`, {});
+  }
+
+  listUserSessions(userId: string): Observable<AdminUserSession[]> {
+    return this.api.get<AdminUserSession[]>(`/admin/dashboard/sessions/${userId}`);
+  }
+
+  revokeSession(userId: string, sessionId: string): Observable<void> {
+    return this.api.post<void>(`/admin/dashboard/sessions/${userId}/${sessionId}/revoke`, {});
   }
 
   lowStock(): Observable<LowStockItem[]> {

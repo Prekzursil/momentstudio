@@ -3,7 +3,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { AdminUserAliasesResponse, AdminService } from '../../../core/admin.service';
+import { AdminUserAliasesResponse, AdminUserSession, AdminService } from '../../../core/admin.service';
 import {
   AdminEmailVerificationHistoryResponse,
   AdminUserListItem,
@@ -19,7 +19,7 @@ import { InputComponent } from '../../../shared/input.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { formatIdentity } from '../../../shared/user-identity';
 
-type RoleFilter = 'all' | 'customer' | 'admin' | 'owner';
+type RoleFilter = 'all' | 'customer' | 'support' | 'fulfillment' | 'content' | 'admin' | 'owner';
 
 @Component({
   selector: 'app-admin-users',
@@ -47,6 +47,9 @@ type RoleFilter = 'all' | 'customer' | 'admin' | 'owner';
               >
                 <option value="all">{{ 'adminUi.users.all' | translate }}</option>
                 <option value="customer">{{ 'adminUi.users.roles.customer' | translate }}</option>
+                <option value="support">{{ 'adminUi.users.roles.support' | translate }}</option>
+                <option value="fulfillment">{{ 'adminUi.users.roles.fulfillment' | translate }}</option>
+                <option value="content">{{ 'adminUi.users.roles.content' | translate }}</option>
                 <option value="admin">{{ 'adminUi.users.roles.admin' | translate }}</option>
                 <option value="owner">{{ 'adminUi.users.roles.owner' | translate }}</option>
               </select>
@@ -152,9 +155,12 @@ type RoleFilter = 'all' | 'customer' | 'admin' | 'owner';
               <select
                 class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 [(ngModel)]="selectedRole"
-                [disabled]="selectedUser()!.role === 'owner'"
+                [disabled]="!canManageRoles() || selectedUser()!.role === 'owner'"
               >
                 <option value="customer">{{ 'adminUi.users.roles.customer' | translate }}</option>
+                <option value="support">{{ 'adminUi.users.roles.support' | translate }}</option>
+                <option value="fulfillment">{{ 'adminUi.users.roles.fulfillment' | translate }}</option>
+                <option value="content">{{ 'adminUi.users.roles.content' | translate }}</option>
                 <option value="admin">{{ 'adminUi.users.roles.admin' | translate }}</option>
               </select>
               <span *ngIf="selectedUser()!.role === 'owner'" class="text-xs font-normal text-slate-500 dark:text-slate-400">
@@ -167,7 +173,7 @@ type RoleFilter = 'all' | 'customer' | 'admin' | 'owner';
                 size="sm"
                 variant="ghost"
                 [label]="'adminUi.users.setRole' | translate"
-                [disabled]="selectedUser()!.role === 'owner' || selectedRole === selectedUser()!.role"
+                [disabled]="!canManageRoles() || selectedUser()!.role === 'owner' || selectedRole === selectedUser()!.role"
                 (action)="updateRole()"
               ></app-button>
               <app-button
@@ -285,6 +291,63 @@ type RoleFilter = 'all' | 'customer' | 'admin' | 'owner';
                   [disabled]="securityBusy()"
                   (action)="saveSecurity()"
                 ></app-button>
+              </div>
+            </div>
+
+            <div class="rounded-xl border border-slate-200 p-3 grid gap-3 dark:border-slate-800">
+              <div class="flex items-center justify-between gap-3">
+                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.users.sessionsTitle' | translate }}
+                </div>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.actions.refresh' | translate"
+                  [disabled]="sessionsLoading()"
+                  (action)="refreshSessions()"
+                ></app-button>
+              </div>
+
+              <div *ngIf="sessionsLoading()" class="text-sm text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.users.sessionsLoading' | translate }}
+              </div>
+              <div *ngIf="sessionsError()" class="text-sm text-rose-700 dark:text-rose-200">
+                {{ sessionsError() }}
+              </div>
+
+              <div *ngIf="sessions() && sessions()!.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.users.sessionsEmpty' | translate }}
+              </div>
+
+              <div *ngIf="sessions() && sessions()!.length > 0" class="grid gap-2">
+                <div
+                  *ngFor="let s of sessions()!"
+                  class="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="grid gap-1 min-w-0">
+                      <div class="font-medium text-slate-900 dark:text-slate-50 truncate">
+                        {{ sessionDeviceLabel(s) }}
+                      </div>
+                      <div class="text-xs text-slate-600 dark:text-slate-300">
+                        {{ s.ip_address || '—' }}{{ s.country_code ? ' · ' + s.country_code : '' }}
+                        ·
+                        {{ s.persistent ? ('adminUi.users.sessionPersistent' | translate) : ('adminUi.users.sessionNonPersistent' | translate) }}
+                      </div>
+                      <div class="text-xs text-slate-500 dark:text-slate-400">
+                        {{ 'adminUi.users.sessionCreated' | translate }}: {{ s.created_at | date: 'short' }} ·
+                        {{ 'adminUi.users.sessionExpires' | translate }}: {{ s.expires_at | date: 'short' }}
+                      </div>
+                    </div>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.users.revokeSession' | translate"
+                      [disabled]="revokingSessionId() === s.id"
+                      (action)="revokeOneSession(s.id)"
+                    ></app-button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -548,6 +611,11 @@ export class AdminUsersComponent implements OnInit {
   emailHistoryError = signal<string | null>(null);
   emailVerificationBusy = signal(false);
 
+  sessions = signal<AdminUserSession[] | null>(null);
+  sessionsLoading = signal(false);
+  sessionsError = signal<string | null>(null);
+  revokingSessionId = signal<string | null>(null);
+
   private pendingPrefillSearch: string | null = null;
   private autoSelectAfterLoad = false;
 
@@ -597,8 +665,11 @@ export class AdminUsersComponent implements OnInit {
     this.passwordResetRequired = false;
     this.emailHistory.set(null);
     this.emailHistoryError.set(null);
+    this.sessions.set(null);
+    this.sessionsError.set(null);
     this.loadAliases(user.id);
     this.loadProfile(user.id);
+    this.loadSessions(user.id);
   }
 
   updateRole(): void {
@@ -619,8 +690,37 @@ export class AdminUsersComponent implements OnInit {
     const user = this.selectedUser();
     if (!user) return;
     this.admin.revokeSessions(user.id).subscribe({
-      next: () => this.toast.success(this.t('adminUi.users.success.revoke')),
+      next: () => {
+        this.toast.success(this.t('adminUi.users.success.revoke'));
+        this.sessions.set([]);
+      },
       error: () => this.toast.error(this.t('adminUi.users.errors.revoke'))
+    });
+  }
+
+  refreshSessions(): void {
+    const user = this.selectedUser();
+    if (!user) return;
+    this.loadSessions(user.id);
+  }
+
+  revokeOneSession(sessionId: string): void {
+    const user = this.selectedUser();
+    if (!user) return;
+    this.revokingSessionId.set(sessionId);
+    this.admin.revokeSession(user.id, sessionId).subscribe({
+      next: () => {
+        this.toast.success(this.t('adminUi.users.success.sessionRevoked'));
+        const current = this.sessions();
+        if (current) {
+          this.sessions.set(current.filter((s) => s.id !== sessionId));
+        }
+        this.revokingSessionId.set(null);
+      },
+      error: () => {
+        this.toast.error(this.t('adminUi.users.errors.sessionRevoke'));
+        this.revokingSessionId.set(null);
+      }
     });
   }
 
@@ -657,6 +757,10 @@ export class AdminUsersComponent implements OnInit {
 
   isOwner(): boolean {
     return (this.auth.role() || '').toString() === 'owner';
+  }
+
+  canManageRoles(): boolean {
+    return this.auth.isAdmin();
   }
 
   lockForMinutes(minutes: number): void {
@@ -818,7 +922,16 @@ export class AdminUsersComponent implements OnInit {
   rolePillClass(role: string): string {
     if (role === 'owner') return 'bg-indigo-100 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100';
     if (role === 'admin') return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100';
+    if (role === 'support') return 'bg-sky-100 text-sky-900 dark:bg-sky-900/30 dark:text-sky-100';
+    if (role === 'fulfillment') return 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100';
+    if (role === 'content') return 'bg-fuchsia-100 text-fuchsia-900 dark:bg-fuchsia-900/30 dark:text-fuchsia-100';
     return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
+  }
+
+  sessionDeviceLabel(session: AdminUserSession): string {
+    const ua = (session.user_agent || '').toString().trim();
+    if (!ua) return this.t('adminUi.users.unknownDevice');
+    return ua.length > 140 ? `${ua.slice(0, 140)}…` : ua;
   }
 
   private load(): void {
@@ -892,5 +1005,21 @@ export class AdminUsersComponent implements OnInit {
 
   private t(key: string): string {
     return this.translate.instant(key) as string;
+  }
+
+  private loadSessions(userId: string): void {
+    this.sessionsLoading.set(true);
+    this.sessionsError.set(null);
+    this.sessions.set(null);
+    this.admin.listUserSessions(userId).subscribe({
+      next: (sessions) => {
+        this.sessions.set(sessions || []);
+        this.sessionsLoading.set(false);
+      },
+      error: () => {
+        this.sessionsError.set(this.t('adminUi.users.errors.sessionsLoad'));
+        this.sessionsLoading.set(false);
+      }
+    });
   }
 }

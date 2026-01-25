@@ -15,7 +15,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.core.dependencies import require_complete_profile, require_verified_email, require_admin, get_current_user_optional
+from app.core.dependencies import (
+    get_current_user_optional,
+    require_admin,
+    require_admin_section,
+    require_complete_profile,
+    require_verified_email,
+)
 from app.core.config import settings
 from app.core.security import create_receipt_token, decode_receipt_token
 from app.db.session import get_session
@@ -854,7 +860,7 @@ async def admin_list_orders(
     status: OrderStatus | None = Query(default=None),
     user_id: UUID | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("orders")),
 ):
     return await order_service.list_orders(session, status=status, user_id=user_id)
 
@@ -869,7 +875,7 @@ async def admin_search_orders(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("orders")),
 ) -> AdminOrderListResponse:
     status_clean = (status or "").strip().lower() if status else None
     pending_any = False
@@ -915,7 +921,7 @@ async def admin_search_orders(
 @router.get("/admin/tags", response_model=OrderTagsResponse)
 async def admin_list_order_tags(
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("orders")),
 ) -> OrderTagsResponse:
     tags = await order_service.list_order_tags(session)
     return OrderTagsResponse(items=tags)
@@ -924,7 +930,7 @@ async def admin_list_order_tags(
 @router.get("/admin/export")
 async def admin_export_orders(
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("orders")),
     columns: list[str] | None = Query(default=None),
 ):
     orders = await order_service.list_orders(session)
@@ -1008,7 +1014,7 @@ async def _serialize_admin_order(session: AsyncSession, order: Order) -> AdminOr
 async def admin_get_order(
     order_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
@@ -1369,7 +1375,7 @@ async def admin_update_order(
     order_id: UUID,
     payload: OrderUpdate,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("orders")),
 ):
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1504,7 +1510,7 @@ async def admin_update_order_addresses(
     order_id: UUID,
     payload: AdminOrderAddressesUpdate = Body(...),
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    admin=Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
@@ -1525,7 +1531,7 @@ async def admin_update_order_addresses(
 async def admin_list_order_shipments(
     order_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("orders")),
 ) -> list[OrderShipmentRead]:
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
@@ -1538,7 +1544,7 @@ async def admin_create_order_shipment(
     order_id: UUID,
     payload: OrderShipmentCreate = Body(...),
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    admin=Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
@@ -1560,7 +1566,7 @@ async def admin_update_order_shipment(
     shipment_id: UUID,
     payload: OrderShipmentUpdate = Body(...),
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    admin=Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
@@ -1582,7 +1588,7 @@ async def admin_delete_order_shipment(
     order_id: UUID,
     shipment_id: UUID,
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    admin=Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
@@ -1603,7 +1609,7 @@ async def admin_upload_shipping_label(
     order_id: UUID,
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1638,7 +1644,7 @@ async def admin_download_shipping_label(
     order_id: UUID,
     action: str | None = Query(default=None, max_length=20),
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    admin=Depends(require_admin_section("orders")),
 ) -> FileResponse:
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1666,7 +1672,7 @@ async def admin_download_shipping_label(
 async def admin_delete_shipping_label(
     order_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("orders")),
 ) -> None:
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1794,7 +1800,7 @@ async def admin_add_order_note(
     order_id: UUID,
     payload: OrderAdminNoteCreate = Body(...),
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    admin=Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1810,7 +1816,7 @@ async def admin_add_order_tag(
     order_id: UUID,
     payload: OrderTagCreate = Body(...),
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    admin=Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1828,7 +1834,7 @@ async def admin_remove_order_tag(
     order_id: UUID,
     tag: str,
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    admin=Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1847,7 +1853,7 @@ async def admin_send_delivery_email(
     order_id: UUID,
     payload: AdminOrderEmailResendRequest = Body(default=AdminOrderEmailResendRequest()),
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    admin=Depends(require_admin_section("orders")),
 ) -> OrderRead:
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1876,7 +1882,7 @@ async def admin_send_confirmation_email(
     order_id: UUID,
     payload: AdminOrderEmailResendRequest = Body(default=AdminOrderEmailResendRequest()),
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    admin=Depends(require_admin_section("orders")),
 ) -> OrderRead:
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1909,7 +1915,7 @@ async def admin_fulfill_item(
     item_id: UUID,
     shipped_quantity: int = 0,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("orders")),
 ):
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
@@ -1925,7 +1931,7 @@ async def admin_fulfill_item(
 async def admin_order_events(
     order_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("orders")),
 ):
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1937,7 +1943,7 @@ async def admin_order_events(
 async def admin_packing_slip(
     order_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("orders")),
 ):
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1952,7 +1958,7 @@ async def admin_packing_slip(
 async def admin_batch_packing_slips(
     payload: AdminOrderIdsRequest,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("orders")),
 ):
     ids = list(dict.fromkeys(payload.order_ids))
     if not ids:

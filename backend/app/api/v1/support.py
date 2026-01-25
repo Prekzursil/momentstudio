@@ -6,7 +6,11 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, s
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.dependencies import get_current_user, get_current_user_optional, require_admin
+from app.core.dependencies import (
+    get_current_user,
+    get_current_user_optional,
+    require_admin_section,
+)
 from app.db.session import get_session
 from app.models.support import ContactSubmissionStatus, ContactSubmissionTopic
 from app.models.user import User
@@ -167,7 +171,7 @@ async def reply_my_ticket(
 @router.get("/admin/submissions", response_model=ContactSubmissionListResponse)
 async def admin_list_contact_submissions(
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("support")),
     q: str | None = Query(default=None),
     status_filter: ContactSubmissionStatus | None = Query(default=None),
     topic_filter: ContactSubmissionTopic | None = Query(default=None),
@@ -204,7 +208,7 @@ async def admin_list_contact_submissions(
 async def admin_get_contact_submission(
     submission_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("support")),
 ) -> ContactSubmissionRead:
     record = await support_service.get_contact_submission_with_messages(session, submission_id)
     if not record:
@@ -217,7 +221,7 @@ async def admin_update_contact_submission(
     submission_id: UUID,
     payload: ContactSubmissionUpdate,
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin_section("support")),
 ) -> ContactSubmissionRead:
     record = await support_service.get_contact_submission_with_messages(session, submission_id)
     if not record:
@@ -240,7 +244,7 @@ async def admin_reply_contact_submission(
     submission_id: UUID,
     payload: TicketMessageCreate,
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin_section("support")),
 ) -> ContactSubmissionRead:
     record = await support_service.get_contact_submission_with_messages(session, submission_id)
     if not record:

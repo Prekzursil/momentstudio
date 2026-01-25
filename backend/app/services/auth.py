@@ -788,6 +788,7 @@ async def create_refresh_session(
     persistent: bool = True,
     user_agent: str | None = None,
     ip_address: str | None = None,
+    country_code: str | None = None,
 ) -> RefreshSession:
     jti = secrets.token_hex(16)
     expires_at = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_exp_days)
@@ -799,6 +800,7 @@ async def create_refresh_session(
         revoked=False,
         user_agent=_truncate(user_agent, 255),
         ip_address=_truncate(ip_address, 45),
+        country_code=_truncate(country_code, 8),
     )
     session.add(refresh_session)
     await session.flush()
@@ -812,6 +814,7 @@ async def issue_tokens_for_user(
     persistent: bool = True,
     user_agent: str | None = None,
     ip_address: str | None = None,
+    country_code: str | None = None,
 ) -> dict[str, str]:
     locked_until = getattr(user, "locked_until", None)
     if locked_until and locked_until.tzinfo is None:
@@ -821,7 +824,12 @@ async def issue_tokens_for_user(
     if bool(getattr(user, "password_reset_required", False)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Password reset required")
     refresh_session = await create_refresh_session(
-        session, user.id, persistent=persistent, user_agent=user_agent, ip_address=ip_address
+        session,
+        user.id,
+        persistent=persistent,
+        user_agent=user_agent,
+        ip_address=ip_address,
+        country_code=country_code,
     )
     access = security.create_access_token(str(user.id), refresh_session.jti)
     refresh = security.create_refresh_token(str(user.id), refresh_session.jti, refresh_session.expires_at)

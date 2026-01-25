@@ -2,11 +2,13 @@ import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
+import { AuthService } from '../../core/auth.service';
 import { ContainerComponent } from '../../layout/container.component';
 
 type AdminNavItem = {
   path: string;
   labelKey: string;
+  section: string;
   exact?: boolean;
 };
 
@@ -42,15 +44,21 @@ type AdminNavItem = {
   `
 })
 export class AdminLayoutComponent {
-  readonly navItems: AdminNavItem[] = [
-    { path: '/admin/dashboard', labelKey: 'adminUi.nav.dashboard', exact: true },
-    { path: '/admin/content', labelKey: 'adminUi.nav.content' },
-    { path: '/admin/products', labelKey: 'adminUi.nav.products' },
-    { path: '/admin/inventory', labelKey: 'adminUi.nav.inventory' },
-    { path: '/admin/orders', labelKey: 'adminUi.nav.orders' },
-    { path: '/admin/returns', labelKey: 'adminUi.nav.returns' },
-    { path: '/admin/coupons', labelKey: 'adminUi.nav.coupons' },
-    { path: '/admin/users', labelKey: 'adminUi.nav.users' },
-    { path: '/admin/support', labelKey: 'adminUi.nav.support' }
+  constructor(private auth: AuthService) {}
+
+  private readonly allNavItems: AdminNavItem[] = [
+    { path: '/admin/dashboard', labelKey: 'adminUi.nav.dashboard', section: 'dashboard', exact: true },
+    { path: '/admin/content', labelKey: 'adminUi.nav.content', section: 'content' },
+    { path: '/admin/products', labelKey: 'adminUi.nav.products', section: 'products' },
+    { path: '/admin/inventory', labelKey: 'adminUi.nav.inventory', section: 'inventory' },
+    { path: '/admin/orders', labelKey: 'adminUi.nav.orders', section: 'orders' },
+    { path: '/admin/returns', labelKey: 'adminUi.nav.returns', section: 'returns' },
+    { path: '/admin/coupons', labelKey: 'adminUi.nav.coupons', section: 'coupons' },
+    { path: '/admin/users', labelKey: 'adminUi.nav.users', section: 'users' },
+    { path: '/admin/support', labelKey: 'adminUi.nav.support', section: 'support' }
   ];
+
+  get navItems(): AdminNavItem[] {
+    return this.allNavItems.filter((item) => this.auth.canAccessAdminSection(item.section));
+  }
 }
