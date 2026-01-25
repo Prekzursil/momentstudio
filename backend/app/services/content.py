@@ -298,6 +298,7 @@ async def upsert_block(
             lang=lang,
             needs_translation_en=needs_translation_en,
             needs_translation_ro=needs_translation_ro,
+            author_id=actor_id,
         )
         session.add(block)
         await session.flush()
@@ -386,7 +387,7 @@ async def upsert_block(
                 block.published_at = published_at or now
             elif block.published_at is None:
                 block.published_at = now
-        elif block.status == ContentStatus.draft:
+        elif block.status in (ContentStatus.draft, ContentStatus.review):
             block.published_at = None
             block.published_until = None
     elif "published_at" in data:
@@ -402,7 +403,8 @@ async def upsert_block(
     effective_lang = (block.lang or lang) if isinstance(block.lang or lang, str) else None
     if content_changed and isinstance(effective_lang, str):
         _mark_other_needs_translation(block, effective_lang)
-    if block.status == ContentStatus.draft:
+    if block.status in (ContentStatus.draft, ContentStatus.review):
+        block.published_at = None
         block.published_until = None
     if block.status == ContentStatus.published:
         if block.published_until and block.published_at and block.published_until <= block.published_at:
@@ -513,7 +515,7 @@ async def rollback_to_version(
         block.published_at = snapshot.published_at
     if hasattr(snapshot, "published_until"):
         block.published_until = snapshot.published_until
-    if block.status == ContentStatus.draft:
+    if block.status in (ContentStatus.draft, ContentStatus.review):
         block.published_at = None
         block.published_until = None
     elif block.status == ContentStatus.published and block.published_at is None:

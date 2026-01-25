@@ -18,7 +18,7 @@ from sqlalchemy import (
     select,
     union_all,
 )
-from sqlalchemy.orm import aliased
+from sqlalchemy.orm import aliased, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
@@ -1175,7 +1175,10 @@ async def admin_content(
     _: User = Depends(require_admin_section("content")),
 ) -> list[dict]:
     result = await session.execute(
-        select(ContentBlock).order_by(ContentBlock.updated_at.desc()).limit(20)
+        select(ContentBlock)
+        .options(selectinload(ContentBlock.author))
+        .order_by(ContentBlock.updated_at.desc())
+        .limit(200)
     )
     blocks = result.scalars().all()
     return [
@@ -1185,6 +1188,22 @@ async def admin_content(
             "title": b.title,
             "updated_at": b.updated_at,
             "version": b.version,
+            "status": b.status,
+            "lang": b.lang,
+            "published_at": b.published_at,
+            "published_until": b.published_until,
+            "needs_translation_en": bool(getattr(b, "needs_translation_en", False)),
+            "needs_translation_ro": bool(getattr(b, "needs_translation_ro", False)),
+            "author": (
+                {
+                    "id": str(b.author.id),
+                    "username": b.author.username,
+                    "name": b.author.name,
+                    "name_tag": b.author.name_tag,
+                }
+                if getattr(b, "author", None)
+                else None
+            ),
         }
         for b in blocks
     ]

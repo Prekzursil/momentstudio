@@ -2094,6 +2094,7 @@
     },
     "status": {
       "draft": "Draft",
+      "review": "In review",
       "published": "Published",
       "archived": "Archived"
     },

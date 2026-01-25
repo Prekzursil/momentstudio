@@ -164,6 +164,10 @@ export interface AdminContent {
   lang?: string | null;
   sort_order?: number | null;
   published_at?: string | null;
+  published_until?: string | null;
+  needs_translation_en?: boolean;
+  needs_translation_ro?: boolean;
+  author?: { id: string; username: string; name?: string | null; name_tag?: number | null } | null;
 }
 
 export interface AdminCoupon {

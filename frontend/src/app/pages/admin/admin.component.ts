@@ -654,6 +654,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                         [(ngModel)]="newCustomPageStatus"
                       >
                         <option [ngValue]="'draft'">{{ 'adminUi.status.draft' | translate }}</option>
+                        <option [ngValue]="'review'">{{ 'adminUi.status.review' | translate }}</option>
                         <option [ngValue]="'published'">{{ 'adminUi.status.published' | translate }}</option>
                       </select>
                     </label>
@@ -1255,6 +1256,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                       [(ngModel)]="pageBlocksStatus[pageBlocksKey]"
                     >
                       <option [ngValue]="'draft'">{{ 'adminUi.status.draft' | translate }}</option>
+                      <option [ngValue]="'review'">{{ 'adminUi.status.review' | translate }}</option>
                       <option [ngValue]="'published'">{{ 'adminUi.status.published' | translate }}</option>
                     </select>
                   </label>
@@ -2765,7 +2767,8 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                 <div>
                   <p class="font-semibold text-slate-900 dark:text-slate-50">{{ post.title }}</p>
                   <p class="text-xs text-slate-500 dark:text-slate-400">
-                    {{ post.key }} · v{{ post.version }} · {{ post.updated_at | date: 'short' }}
+                    {{ post.key }} · {{ ('adminUi.status.' + (post.status || 'draft')) | translate }} ·
+                    {{ post.author ? commentAuthorLabel(post.author) : '—' }} · v{{ post.version }} · {{ post.updated_at | date: 'short' }}
                   </p>
                 </div>
                 <div class="flex items-center gap-3">
@@ -2812,6 +2815,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     [(ngModel)]="blogCreate.status"
                   >
                     <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+                    <option value="review">{{ 'adminUi.status.review' | translate }}</option>
                     <option value="published">{{ 'adminUi.status.published' | translate }}</option>
                   </select>
                 </label>
@@ -2943,6 +2947,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     [disabled]="blogEditLang !== blogBaseLang"
                   >
                     <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+                    <option value="review">{{ 'adminUi.status.review' | translate }}</option>
                     <option value="published">{{ 'adminUi.status.published' | translate }}</option>
                   </select>
                 </label>
@@ -3172,7 +3177,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                 <div *ngFor="let v of blogVersions" class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
                   <div>
                     <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">v{{ v.version }} · {{ v.created_at | date: 'short' }}</p>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ v.status }}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ ('adminUi.status.' + v.status) | translate }}</p>
                   </div>
                   <div class="flex items-center gap-2">
                     <app-button size="sm" variant="ghost" [label]="'adminUi.blog.revisions.diff' | translate" (action)="selectBlogVersion(v.version)"></app-button>
@@ -3274,6 +3279,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                 {{ 'adminUi.content.status' | translate }}
                 <select class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="contentForm.status">
                   <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+                  <option value="review">{{ 'adminUi.status.review' | translate }}</option>
                   <option value="published">{{ 'adminUi.status.published' | translate }}</option>
                 </select>
               </label>

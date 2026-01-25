@@ -11,6 +11,7 @@ from app.db.base import Base
 
 class ContentStatus(str, enum.Enum):
     draft = "draft"
+    review = "review"
     published = "published"
 
 
@@ -28,6 +29,12 @@ class ContentBlock(Base):
     lang: Mapped[str | None] = mapped_column(String(10), nullable=True, index=True)
     needs_translation_en: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     needs_translation_ro: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    author_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     published_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -52,6 +59,7 @@ class ContentBlock(Base):
         lazy="selectin",
         order_by="ContentAuditLog.created_at",
     )
+    author = relationship("User", foreign_keys=[author_id])
     translations: Mapped[list["ContentBlockTranslation"]] = relationship(
         "ContentBlockTranslation", back_populates="block", cascade="all, delete-orphan", lazy="selectin"
     )
