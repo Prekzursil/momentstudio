@@ -808,6 +808,13 @@ async def refresh_tokens(
     if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
         await self_service.execute_account_deletion(session, user)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+    locked_until = getattr(user, "locked_until", None)
+    if locked_until and locked_until.tzinfo is None:
+        locked_until = locked_until.replace(tzinfo=timezone.utc)
+    if locked_until and locked_until > now:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account temporarily locked")
+    if bool(getattr(user, "password_reset_required", False)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Password reset required")
 
     # If the token was already rotated very recently (multi-tab refresh), allow
     # reusing it by issuing tokens for the replacement session without rotating again.
@@ -901,6 +908,7 @@ async def change_password(
     if not security.verify_password(payload.current_password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
     current_user.hashed_password = security.hash_password(payload.new_password)
+    current_user.password_reset_required = False
     session.add(current_user)
     await session.commit()
     background_tasks.add_task(email_service.send_password_changed, current_user.email, lang=current_user.preferred_language)

@@ -4,7 +4,14 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AdminUserAliasesResponse, AdminService } from '../../../core/admin.service';
-import { AdminUserListItem, AdminUserListResponse, AdminUserProfileResponse, AdminUsersService } from '../../../core/admin-users.service';
+import {
+  AdminEmailVerificationHistoryResponse,
+  AdminUserListItem,
+  AdminUserListResponse,
+  AdminUserProfileResponse,
+  AdminUsersService
+} from '../../../core/admin-users.service';
+import { AuthService } from '../../../core/auth.service';
 import { ToastService } from '../../../core/toast.service';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
@@ -205,6 +212,147 @@ type RoleFilter = 'all' | 'customer' | 'admin' | 'owner';
               </div>
             </div>
 
+            <div class="rounded-xl border border-slate-200 p-3 grid gap-3 dark:border-slate-800">
+              <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.users.securityTitle' | translate }}
+              </div>
+
+              <div class="flex items-center justify-between gap-3 text-sm">
+                <div class="text-slate-700 dark:text-slate-200">{{ 'adminUi.users.lockStatus' | translate }}</div>
+                <span
+                  class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                  [ngClass]="isLocked() ? 'bg-rose-100 text-rose-900 dark:bg-rose-900/30 dark:text-rose-100' : 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'"
+                >
+                  {{ isLocked() ? ('adminUi.users.locked' | translate) : ('adminUi.users.unlocked' | translate) }}
+                </span>
+              </div>
+
+              <div *ngIf="profile()?.user?.locked_until" class="text-sm text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.users.lockedUntil' | translate }}:
+                <span class="font-medium text-slate-900 dark:text-slate-100">{{ profile()!.user.locked_until | date: 'short' }}</span>
+              </div>
+
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.users.lockReason' | translate }}
+                <input
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="lockedReason"
+                  [maxLength]="255"
+                />
+              </label>
+
+              <div class="flex flex-wrap items-center gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.users.lock1h' | translate"
+                  [disabled]="securityBusy()"
+                  (action)="lockForMinutes(60)"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.users.lock24h' | translate"
+                  [disabled]="securityBusy()"
+                  (action)="lockForMinutes(60 * 24)"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.users.lock7d' | translate"
+                  [disabled]="securityBusy()"
+                  (action)="lockForMinutes(60 * 24 * 7)"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.users.unlock' | translate"
+                  [disabled]="securityBusy() || !isLocked()"
+                  (action)="unlock()"
+                ></app-button>
+              </div>
+
+              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                <input type="checkbox" [(ngModel)]="passwordResetRequired" />
+                {{ 'adminUi.users.passwordResetRequired' | translate }}
+              </label>
+
+              <div class="flex gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.users.saveSecurity' | translate"
+                  [disabled]="securityBusy()"
+                  (action)="saveSecurity()"
+                ></app-button>
+              </div>
+            </div>
+
+            <div class="rounded-xl border border-slate-200 p-3 grid gap-3 dark:border-slate-800">
+              <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.users.emailVerificationTitle' | translate }}
+              </div>
+
+              <div class="flex items-center justify-between gap-3 text-sm">
+                <div class="text-slate-700 dark:text-slate-200">{{ selectedUser()!.email }}</div>
+                <span
+                  class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                  [ngClass]="selectedUser()!.email_verified ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100' : 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100'"
+                >
+                  {{ selectedUser()!.email_verified ? ('adminUi.users.verified' | translate) : ('adminUi.users.unverified' | translate) }}
+                </span>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.users.resendVerification' | translate"
+                  [disabled]="emailVerificationBusy() || selectedUser()!.email_verified"
+                  (action)="resendVerification()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.users.loadVerificationHistory' | translate"
+                  [disabled]="emailHistoryLoading()"
+                  (action)="loadEmailHistory()"
+                ></app-button>
+                <app-button
+                  *ngIf="isOwner() && !selectedUser()!.email_verified"
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.users.overrideVerification' | translate"
+                  [disabled]="emailVerificationBusy()"
+                  (action)="overrideVerification()"
+                ></app-button>
+              </div>
+
+              <div *ngIf="emailHistoryLoading()" class="text-sm text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.users.loadingVerificationHistory' | translate }}
+              </div>
+              <div *ngIf="emailHistoryError()" class="text-sm text-rose-700 dark:text-rose-200">
+                {{ emailHistoryError() }}
+              </div>
+
+              <div *ngIf="emailHistory() && emailHistory()!.tokens.length" class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
+                <div class="grid gap-1 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900" *ngFor="let tok of emailHistory()!.tokens">
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="font-medium">{{ tok.created_at | date: 'short' }}</div>
+                    <span
+                      class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                      [ngClass]="tok.used ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100' : 'bg-indigo-100 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100'"
+                    >
+                      {{ tok.used ? ('adminUi.users.verificationUsed' | translate) : ('adminUi.users.verificationPending' | translate) }}
+                    </span>
+                  </div>
+                  <div class="text-xs text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.users.verificationExpires' | translate }}: {{ tok.expires_at | date: 'short' }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="grid gap-2">
               <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
                 {{ 'adminUi.users.aliasHistory' | translate }}
@@ -391,6 +539,14 @@ export class AdminUsersComponent implements OnInit {
   adminNote = '';
   internalBusy = signal(false);
   impersonateBusy = signal(false);
+  lockedReason = '';
+  passwordResetRequired = false;
+  securityBusy = signal(false);
+
+  emailHistory = signal<AdminEmailVerificationHistoryResponse | null>(null);
+  emailHistoryLoading = signal(false);
+  emailHistoryError = signal<string | null>(null);
+  emailVerificationBusy = signal(false);
 
   private pendingPrefillSearch: string | null = null;
   private autoSelectAfterLoad = false;
@@ -398,6 +554,7 @@ export class AdminUsersComponent implements OnInit {
   constructor(
     private usersApi: AdminUsersService,
     private admin: AdminService,
+    private auth: AuthService,
     private toast: ToastService,
     private translate: TranslateService
   ) {}
@@ -436,6 +593,10 @@ export class AdminUsersComponent implements OnInit {
     this.selectedRole = user.role;
     this.vip = false;
     this.adminNote = '';
+    this.lockedReason = '';
+    this.passwordResetRequired = false;
+    this.emailHistory.set(null);
+    this.emailHistoryError.set(null);
     this.loadAliases(user.id);
     this.loadProfile(user.id);
   }
@@ -485,6 +646,145 @@ export class AdminUsersComponent implements OnInit {
           this.internalBusy.set(false);
         }
       });
+  }
+
+  isLocked(): boolean {
+    const until = this.profile()?.user?.locked_until;
+    if (!until) return false;
+    const ts = new Date(until).getTime();
+    return Number.isFinite(ts) && ts > Date.now();
+  }
+
+  isOwner(): boolean {
+    return (this.auth.role() || '').toString() === 'owner';
+  }
+
+  lockForMinutes(minutes: number): void {
+    const user = this.selectedUser();
+    if (!user) return;
+    const mins = Math.max(1, Number(minutes) || 0);
+    const untilIso = new Date(Date.now() + mins * 60_000).toISOString();
+    const reason = this.lockedReason.trim() ? this.lockedReason.trim() : null;
+    this.securityBusy.set(true);
+    this.usersApi.updateSecurity(user.id, { locked_until: untilIso, locked_reason: reason }).subscribe({
+      next: (updated) => {
+        const profile = this.profile();
+        if (profile) {
+          this.profile.set({ ...profile, user: { ...profile.user, ...updated } });
+        }
+        this.lockedReason = (updated?.locked_reason || '').toString();
+        this.passwordResetRequired = Boolean(updated?.password_reset_required);
+        this.toast.success(this.t('adminUi.users.success.security'));
+        this.securityBusy.set(false);
+      },
+      error: () => {
+        this.toast.error(this.t('adminUi.users.errors.security'));
+        this.securityBusy.set(false);
+      }
+    });
+  }
+
+  unlock(): void {
+    const user = this.selectedUser();
+    if (!user) return;
+    this.securityBusy.set(true);
+    this.usersApi.updateSecurity(user.id, { locked_until: null, locked_reason: null }).subscribe({
+      next: (updated) => {
+        const profile = this.profile();
+        if (profile) {
+          this.profile.set({ ...profile, user: { ...profile.user, ...updated } });
+        }
+        this.lockedReason = '';
+        this.passwordResetRequired = Boolean(updated?.password_reset_required);
+        this.toast.success(this.t('adminUi.users.success.security'));
+        this.securityBusy.set(false);
+      },
+      error: () => {
+        this.toast.error(this.t('adminUi.users.errors.security'));
+        this.securityBusy.set(false);
+      }
+    });
+  }
+
+  saveSecurity(): void {
+    const user = this.selectedUser();
+    if (!user) return;
+    const reason = this.lockedReason.trim() ? this.lockedReason.trim() : null;
+    this.securityBusy.set(true);
+    this.usersApi.updateSecurity(user.id, { password_reset_required: this.passwordResetRequired, locked_reason: reason }).subscribe({
+      next: (updated) => {
+        const profile = this.profile();
+        if (profile) {
+          this.profile.set({ ...profile, user: { ...profile.user, ...updated } });
+        }
+        this.lockedReason = (updated?.locked_reason || '').toString();
+        this.passwordResetRequired = Boolean(updated?.password_reset_required);
+        this.toast.success(this.t('adminUi.users.success.security'));
+        this.securityBusy.set(false);
+      },
+      error: () => {
+        this.toast.error(this.t('adminUi.users.errors.security'));
+        this.securityBusy.set(false);
+      }
+    });
+  }
+
+  loadEmailHistory(): void {
+    const user = this.selectedUser();
+    if (!user) return;
+    this.emailHistoryLoading.set(true);
+    this.emailHistoryError.set(null);
+    this.usersApi.getEmailVerificationHistory(user.id).subscribe({
+      next: (res) => {
+        this.emailHistory.set(res);
+        this.emailHistoryLoading.set(false);
+      },
+      error: () => {
+        this.emailHistoryError.set(this.t('adminUi.users.errors.verificationHistory'));
+        this.emailHistoryLoading.set(false);
+      }
+    });
+  }
+
+  resendVerification(): void {
+    const user = this.selectedUser();
+    if (!user) return;
+    this.emailVerificationBusy.set(true);
+    this.usersApi.resendEmailVerification(user.id).subscribe({
+      next: () => {
+        this.toast.success(this.t('adminUi.users.success.verificationResent'));
+        this.emailVerificationBusy.set(false);
+        this.loadEmailHistory();
+      },
+      error: () => {
+        this.toast.error(this.t('adminUi.users.errors.verificationResent'));
+        this.emailVerificationBusy.set(false);
+      }
+    });
+  }
+
+  overrideVerification(): void {
+    const user = this.selectedUser();
+    if (!user) return;
+    this.emailVerificationBusy.set(true);
+    this.usersApi.overrideEmailVerification(user.id).subscribe({
+      next: (updated) => {
+        const profile = this.profile();
+        if (profile) {
+          this.profile.set({ ...profile, user: { ...profile.user, ...updated } });
+        }
+        const nextVerified = Boolean(updated?.email_verified);
+        this.selectedUser.set({ ...user, email_verified: nextVerified });
+        this.users.set(this.users().map((u) => (u.id === user.id ? { ...u, email_verified: nextVerified } : u)));
+        this.toast.success(this.t('adminUi.users.success.verificationOverridden'));
+        this.emailVerificationBusy.set(false);
+        this.loadEmailHistory();
+      },
+      error: () => {
+        this.toast.error(this.t('adminUi.users.errors.verificationOverridden'));
+        this.emailVerificationBusy.set(false);
+      }
+    });
   }
 
   impersonate(): void {
@@ -579,6 +879,8 @@ export class AdminUsersComponent implements OnInit {
         this.profile.set(res);
         this.vip = Boolean(res?.user?.vip);
         this.adminNote = (res?.user?.admin_note || '').toString();
+        this.lockedReason = (res?.user?.locked_reason || '').toString();
+        this.passwordResetRequired = Boolean(res?.user?.password_reset_required);
         this.profileLoading.set(false);
       },
       error: () => {

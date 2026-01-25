@@ -270,6 +270,13 @@ async def authenticate_user(session: AsyncSession, identifier: str, password: st
     if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
         await self_service.execute_account_deletion(session, user)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+    locked_until = getattr(user, "locked_until", None)
+    if locked_until and locked_until.tzinfo is None:
+        locked_until = locked_until.replace(tzinfo=timezone.utc)
+    if locked_until and locked_until > datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account temporarily locked")
+    if bool(getattr(user, "password_reset_required", False)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Password reset required")
     return user
 
 
@@ -758,6 +765,7 @@ async def confirm_reset_token(session: AsyncSession, token: str, new_password: s
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     user.hashed_password = security.hash_password(new_password)
+    user.password_reset_required = False
     reset.used = True
     await _revoke_other_reset_tokens(session, user.id)
     session.add_all([user, reset])
@@ -805,6 +813,13 @@ async def issue_tokens_for_user(
     user_agent: str | None = None,
     ip_address: str | None = None,
 ) -> dict[str, str]:
+    locked_until = getattr(user, "locked_until", None)
+    if locked_until and locked_until.tzinfo is None:
+        locked_until = locked_until.replace(tzinfo=timezone.utc)
+    if locked_until and locked_until > datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account temporarily locked")
+    if bool(getattr(user, "password_reset_required", False)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Password reset required")
     refresh_session = await create_refresh_session(
         session, user.id, persistent=persistent, user_agent=user_agent, ip_address=ip_address
     )

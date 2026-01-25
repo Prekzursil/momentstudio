@@ -3,7 +3,7 @@ import io
 from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import (
     String,
     Text,
@@ -55,13 +55,17 @@ from app.models.address import Address
 from app.models.order import Order, OrderStatus
 from app.models.returns import ReturnRequest, ReturnRequestStatus
 from app.models.support import ContactSubmission
-from app.models.user import AdminAuditLog, User, RefreshSession, UserRole, UserSecurityEvent
+from app.models.user import AdminAuditLog, EmailVerificationToken, User, RefreshSession, UserRole, UserSecurityEvent
 from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.coupons_v2 import Promotion
 from app.services import auth as auth_service
+from app.services import email as email_service
 from app.schemas.user_admin import (
+    AdminEmailVerificationHistoryResponse,
+    AdminEmailVerificationTokenInfo,
     AdminUserImpersonationResponse,
     AdminUserInternalUpdate,
+    AdminUserSecurityUpdate,
     AdminUserListItem,
     AdminUserListResponse,
     AdminUserProfileResponse,
@@ -965,6 +969,9 @@ async def admin_user_profile(
             created_at=user.created_at,
             vip=bool(getattr(user, "vip", False)),
             admin_note=getattr(user, "admin_note", None),
+            locked_until=getattr(user, "locked_until", None),
+            locked_reason=getattr(user, "locked_reason", None),
+            password_reset_required=bool(getattr(user, "password_reset_required", False)),
         ),
         addresses=addresses,
         orders=orders,
@@ -1672,6 +1679,232 @@ async def update_user_internal(
         created_at=user.created_at,
         vip=bool(getattr(user, "vip", False)),
         admin_note=getattr(user, "admin_note", None),
+        locked_until=getattr(user, "locked_until", None),
+        locked_reason=getattr(user, "locked_reason", None),
+        password_reset_required=bool(getattr(user, "password_reset_required", False)),
+    )
+
+
+@router.patch("/users/{user_id}/security", response_model=AdminUserProfileUser)
+async def update_user_security(
+    user_id: UUID,
+    payload: AdminUserSecurityUpdate,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin),
+) -> AdminUserProfileUser:
+    user = await session.get(User, user_id)
+    if not user or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user.role == UserRole.owner:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot modify owner security settings")
+    if user.id == current_user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot modify your own security settings")
+
+    now = datetime.now(timezone.utc)
+    before_locked_until = getattr(user, "locked_until", None)
+    if before_locked_until and before_locked_until.tzinfo is None:
+        before_locked_until = before_locked_until.replace(tzinfo=timezone.utc)
+    before_locked_reason = getattr(user, "locked_reason", None)
+    before_password_reset_required = bool(getattr(user, "password_reset_required", False))
+
+    data = payload.model_dump(exclude_unset=True)
+    if "locked_until" in data:
+        locked_until = data.get("locked_until")
+        if locked_until and locked_until.tzinfo is None:
+            locked_until = locked_until.replace(tzinfo=timezone.utc)
+        if locked_until and locked_until <= now:
+            locked_until = None
+        user.locked_until = locked_until
+
+    if "locked_reason" in data:
+        raw_reason = data.get("locked_reason")
+        cleaned = (raw_reason or "").strip()[:255] or None
+        user.locked_reason = cleaned
+
+    if getattr(user, "locked_until", None) is None:
+        user.locked_reason = None
+
+    if "password_reset_required" in data and data.get("password_reset_required") is not None:
+        user.password_reset_required = bool(data["password_reset_required"])
+
+    after_locked_until = getattr(user, "locked_until", None)
+    if after_locked_until and after_locked_until.tzinfo is None:
+        after_locked_until = after_locked_until.replace(tzinfo=timezone.utc)
+    after_locked_reason = getattr(user, "locked_reason", None)
+    after_password_reset_required = bool(getattr(user, "password_reset_required", False))
+
+    changes: dict[str, object] = {}
+    if before_locked_until != after_locked_until:
+        changes["locked_until"] = {
+            "before": before_locked_until.isoformat() if before_locked_until else None,
+            "after": after_locked_until.isoformat() if after_locked_until else None,
+        }
+    if before_locked_reason != after_locked_reason:
+        changes["locked_reason"] = {"before_length": len(before_locked_reason or ""), "after_length": len(after_locked_reason or "")}
+    if before_password_reset_required != after_password_reset_required:
+        changes["password_reset_required"] = {"before": before_password_reset_required, "after": after_password_reset_required}
+
+    session.add(user)
+    await session.flush()
+    if changes:
+        session.add(
+            AdminAuditLog(
+                action="user.security.update",
+                actor_user_id=current_user.id,
+                subject_user_id=user.id,
+                data={
+                    "changes": changes,
+                    "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+                    "ip_address": (request.client.host if request.client else None),
+                },
+            )
+        )
+    await session.commit()
+
+    return AdminUserProfileUser(
+        id=user.id,
+        email=user.email,
+        username=user.username,
+        name=user.name,
+        name_tag=user.name_tag,
+        role=user.role,
+        email_verified=bool(user.email_verified),
+        created_at=user.created_at,
+        vip=bool(getattr(user, "vip", False)),
+        admin_note=getattr(user, "admin_note", None),
+        locked_until=getattr(user, "locked_until", None),
+        locked_reason=getattr(user, "locked_reason", None),
+        password_reset_required=bool(getattr(user, "password_reset_required", False)),
+    )
+
+
+@router.get("/users/{user_id}/email/verification", response_model=AdminEmailVerificationHistoryResponse)
+async def email_verification_history(
+    user_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> AdminEmailVerificationHistoryResponse:
+    user = await session.get(User, user_id)
+    if not user or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    rows = (
+        await session.execute(
+            select(EmailVerificationToken)
+            .where(EmailVerificationToken.user_id == user.id)
+            .order_by(EmailVerificationToken.created_at.desc())
+            .limit(50)
+        )
+    ).scalars().all()
+    tokens = [
+        AdminEmailVerificationTokenInfo(
+            id=row.id,
+            created_at=row.created_at,
+            expires_at=row.expires_at,
+            used=bool(row.used),
+        )
+        for row in rows
+    ]
+    return AdminEmailVerificationHistoryResponse(tokens=tokens)
+
+
+@router.post("/users/{user_id}/email/verification/resend", status_code=status.HTTP_202_ACCEPTED)
+async def resend_email_verification(
+    user_id: UUID,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin),
+) -> dict:
+    user = await session.get(User, user_id)
+    if not user or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if bool(user.email_verified):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already verified")
+
+    record = await auth_service.create_email_verification(session, user)
+    background_tasks.add_task(
+        email_service.send_verification_email,
+        user.email,
+        record.token,
+        user.preferred_language,
+    )
+    session.add(
+        AdminAuditLog(
+            action="user.email_verification.resend",
+            actor_user_id=current_user.id,
+            subject_user_id=user.id,
+            data={
+                "verification_token_id": str(record.id),
+                "expires_at": record.expires_at.isoformat() if record.expires_at else None,
+                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+                "ip_address": (request.client.host if request.client else None),
+            },
+        )
+    )
+    await session.commit()
+    return {"detail": "Verification email sent"}
+
+
+@router.post("/users/{user_id}/email/verification/override", response_model=AdminUserProfileUser)
+async def override_email_verification(
+    user_id: UUID,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_owner),
+) -> AdminUserProfileUser:
+    user = await session.get(User, user_id)
+    if not user or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    before_verified = bool(getattr(user, "email_verified", False))
+    if not before_verified:
+        user.email_verified = True
+        tokens = (
+            await session.execute(
+                select(EmailVerificationToken).where(
+                    EmailVerificationToken.user_id == user.id, EmailVerificationToken.used.is_(False)
+                )
+            )
+        ).scalars().all()
+        for tok in tokens:
+            tok.used = True
+        if tokens:
+            session.add_all(tokens)
+
+    session.add(user)
+    await session.flush()
+    if before_verified != bool(getattr(user, "email_verified", False)):
+        session.add(
+            AdminAuditLog(
+                action="user.email_verification.override",
+                actor_user_id=current_user.id,
+                subject_user_id=user.id,
+                data={
+                    "before": before_verified,
+                    "after": bool(getattr(user, "email_verified", False)),
+                    "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+                    "ip_address": (request.client.host if request.client else None),
+                },
+            )
+        )
+    await session.commit()
+
+    return AdminUserProfileUser(
+        id=user.id,
+        email=user.email,
+        username=user.username,
+        name=user.name,
+        name_tag=user.name_tag,
+        role=user.role,
+        email_verified=bool(user.email_verified),
+        created_at=user.created_at,
+        vip=bool(getattr(user, "vip", False)),
+        admin_note=getattr(user, "admin_note", None),
+        locked_until=getattr(user, "locked_until", None),
+        locked_reason=getattr(user, "locked_reason", None),
+        password_reset_required=bool(getattr(user, "password_reset_required", False)),
     )
 
 

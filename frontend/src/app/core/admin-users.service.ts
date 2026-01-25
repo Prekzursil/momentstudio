@@ -74,11 +74,25 @@ export interface AdminUserProfileResponse {
 export interface AdminUserProfileUser extends AdminUserListItem {
   vip: boolean;
   admin_note?: string | null;
+  locked_until?: string | null;
+  locked_reason?: string | null;
+  password_reset_required?: boolean;
 }
 
 export interface AdminUserImpersonationResponse {
   access_token: string;
   expires_at: string;
+}
+
+export interface AdminEmailVerificationTokenInfo {
+  id: string;
+  created_at: string;
+  expires_at: string;
+  used: boolean;
+}
+
+export interface AdminEmailVerificationHistoryResponse {
+  tokens: AdminEmailVerificationTokenInfo[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -104,5 +118,24 @@ export class AdminUsersService {
 
   impersonate(userId: string): Observable<AdminUserImpersonationResponse> {
     return this.api.post<AdminUserImpersonationResponse>(`/admin/dashboard/users/${userId}/impersonate`, {});
+  }
+
+  updateSecurity(
+    userId: string,
+    payload: { locked_until?: string | null; locked_reason?: string | null; password_reset_required?: boolean }
+  ): Observable<AdminUserProfileUser> {
+    return this.api.patch<AdminUserProfileUser>(`/admin/dashboard/users/${userId}/security`, payload as any);
+  }
+
+  getEmailVerificationHistory(userId: string): Observable<AdminEmailVerificationHistoryResponse> {
+    return this.api.get<AdminEmailVerificationHistoryResponse>(`/admin/dashboard/users/${userId}/email/verification`);
+  }
+
+  resendEmailVerification(userId: string): Observable<{ detail: string }> {
+    return this.api.post<{ detail: string }>(`/admin/dashboard/users/${userId}/email/verification/resend`, {});
+  }
+
+  overrideEmailVerification(userId: string): Observable<AdminUserProfileUser> {
+    return this.api.post<AdminUserProfileUser>(`/admin/dashboard/users/${userId}/email/verification/override`, {});
   }
 }

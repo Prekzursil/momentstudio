@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timedelta, timezone
 from typing import Dict
 from uuid import UUID
 
@@ -67,7 +68,7 @@ async def seed(session_factory):
             username="admin",
             hashed_password=security.hash_password("Password123"),
             name="Admin",
-            role=UserRole.admin,
+            role=UserRole.owner,
         )
         customer = User(
             email="customer@example.com",
@@ -510,3 +511,79 @@ def test_admin_user_impersonation_is_read_only(test_app: Dict[str, object]) -> N
     assert audit.status_code == 200, audit.text
     security_logs = audit.json().get("security", [])
     assert any(item.get("action") == "user.impersonation.start" for item in security_logs)
+
+
+def test_admin_user_security_update_blocks_login(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    seeded = asyncio.run(seed(session_factory))
+    headers = auth_headers(client)
+
+    locked_until = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
+    updated = client.patch(
+        f"/api/v1/admin/dashboard/users/{seeded['customer_id']}/security",
+        headers=headers,
+        json={"locked_until": locked_until, "locked_reason": "fraud review", "password_reset_required": True},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["password_reset_required"] is True
+    assert updated.json()["locked_until"]
+
+    blocked = client.post("/api/v1/auth/login", json={"email": "customer@example.com", "password": "Password123"})
+    assert blocked.status_code == 403, blocked.text
+
+    unlocked = client.patch(
+        f"/api/v1/admin/dashboard/users/{seeded['customer_id']}/security",
+        headers=headers,
+        json={"locked_until": None, "locked_reason": None, "password_reset_required": False},
+    )
+    assert unlocked.status_code == 200, unlocked.text
+    assert unlocked.json()["locked_until"] is None
+    assert unlocked.json()["locked_reason"] is None
+    assert unlocked.json()["password_reset_required"] is False
+
+    ok = client.post("/api/v1/auth/login", json={"email": "customer@example.com", "password": "Password123"})
+    assert ok.status_code == 200, ok.text
+
+    audit = client.get("/api/v1/admin/dashboard/audit", headers=headers)
+    assert audit.status_code == 200, audit.text
+    security_logs = audit.json().get("security", [])
+    assert any(item.get("action") == "user.security.update" for item in security_logs)
+
+
+def test_admin_user_email_verification_controls(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    seeded = asyncio.run(seed(session_factory))
+    headers = auth_headers(client)
+
+    before = client.get(f"/api/v1/admin/dashboard/users/{seeded['customer_id']}/email/verification", headers=headers)
+    assert before.status_code == 200, before.text
+    assert before.json()["tokens"] == []
+
+    resend = client.post(
+        f"/api/v1/admin/dashboard/users/{seeded['customer_id']}/email/verification/resend",
+        headers=headers,
+    )
+    assert resend.status_code == 202, resend.text
+
+    after = client.get(f"/api/v1/admin/dashboard/users/{seeded['customer_id']}/email/verification", headers=headers)
+    assert after.status_code == 200, after.text
+    assert len(after.json()["tokens"]) == 1
+
+    override = client.post(
+        f"/api/v1/admin/dashboard/users/{seeded['customer_id']}/email/verification/override",
+        headers=headers,
+    )
+    assert override.status_code == 200, override.text
+    assert override.json()["email_verified"] is True
+
+    audit = client.get("/api/v1/admin/dashboard/audit", headers=headers)
+    assert audit.status_code == 200, audit.text
+    security_logs = audit.json().get("security", [])
+    assert any(item.get("action") == "user.email_verification.resend" for item in security_logs)
+    assert any(item.get("action") == "user.email_verification.override" for item in security_logs)

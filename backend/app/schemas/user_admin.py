@@ -83,6 +83,9 @@ class AdminUserSecurityEventSummary(BaseModel):
 class AdminUserProfileUser(AdminUserListItem):
     vip: bool = False
     admin_note: str | None = None
+    locked_until: datetime | None = None
+    locked_reason: str | None = None
+    password_reset_required: bool = False
 
 
 class AdminUserInternalUpdate(BaseModel):
@@ -90,9 +93,26 @@ class AdminUserInternalUpdate(BaseModel):
     admin_note: str | None = Field(default=None, max_length=2000)
 
 
+class AdminUserSecurityUpdate(BaseModel):
+    locked_until: datetime | None = None
+    locked_reason: str | None = Field(default=None, max_length=255)
+    password_reset_required: bool | None = None
+
+
 class AdminUserImpersonationResponse(BaseModel):
     access_token: str
     expires_at: datetime
+
+
+class AdminEmailVerificationTokenInfo(BaseModel):
+    id: UUID
+    created_at: datetime
+    expires_at: datetime
+    used: bool
+
+
+class AdminEmailVerificationHistoryResponse(BaseModel):
+    tokens: list[AdminEmailVerificationTokenInfo] = []
 
 
 class AdminUserProfileResponse(BaseModel):
