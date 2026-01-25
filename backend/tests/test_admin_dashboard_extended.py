@@ -444,3 +444,34 @@ def test_admin_user_profile_endpoint(test_app: Dict[str, object]) -> None:
     assert len(body["addresses"]) == 1
     assert len(body["tickets"]) == 1
     assert len(body["security_events"]) == 1
+
+
+def test_admin_user_internal_update_creates_audit(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    seeded = asyncio.run(seed(session_factory))
+    headers = auth_headers(client)
+
+    updated = client.patch(
+        f"/api/v1/admin/dashboard/users/{seeded['customer_id']}/internal",
+        headers=headers,
+        json={"vip": True, "admin_note": "VIP customer"},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["vip"] is True
+    assert updated.json()["admin_note"] == "VIP customer"
+
+    profile = client.get(
+        f"/api/v1/admin/dashboard/users/{seeded['customer_id']}/profile",
+        headers=headers,
+    )
+    assert profile.status_code == 200, profile.text
+    assert profile.json()["user"]["vip"] is True
+    assert profile.json()["user"]["admin_note"] == "VIP customer"
+
+    audit = client.get("/api/v1/admin/dashboard/audit", headers=headers)
+    assert audit.status_code == 200, audit.text
+    security_logs = audit.json().get("security", [])
+    assert any(item.get("action") == "user.internal.update" for item in security_logs)

@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, date
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, String, func, ForeignKey, Integer, UniqueConstraint, JSON
+from sqlalchemy import Boolean, Date, DateTime, Enum, String, Text, func, ForeignKey, Integer, UniqueConstraint, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -42,6 +42,8 @@ class User(Base):
     notify_blog_comments: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     notify_blog_comment_replies: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     notify_marketing: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    vip: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    admin_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     two_factor_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     two_factor_totp_secret: Mapped[str | None] = mapped_column(String(512), nullable=True)
     two_factor_recovery_codes: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)

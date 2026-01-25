@@ -736,7 +736,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Products: translation completeness – Dashboard for missing RO/EN fields (name/description/content).
 - [x] Admin Products: feature flags per product – Toggle badges like “New”, “Limited”, “Handmade” with scheduling.
 - [x] Admin Users: customer profile page – View user details, addresses, orders, tickets, and activity.
-- [ ] Admin Users: internal customer notes – Add private notes + “VIP” flag with audit trail.
+- [x] Admin Users: internal customer notes – Add private notes + “VIP” flag with audit trail.
 - [ ] Admin Users: safe impersonation – View storefront as a user (read-only) with explicit audit + timeout.
 - [ ] Admin Users: account lock/ban tools – Temporarily lock account or require password reset (security workflow).
 - [ ] Admin Users: email verification controls – Resend verification, view history, and owner-only overrides.

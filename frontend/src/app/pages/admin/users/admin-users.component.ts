@@ -133,6 +133,11 @@ type RoleFilter = 'all' | 'customer' | 'admin' | 'owner';
             <div class="rounded-xl border border-slate-200 p-3 grid gap-1 dark:border-slate-800">
               <div class="font-semibold text-slate-900 dark:text-slate-50">{{ identityLabel(selectedUser()!) }}</div>
               <div class="text-sm text-slate-600 dark:text-slate-300">{{ selectedUser()!.email }}</div>
+              <div *ngIf="vip" class="mt-2">
+                <span class="inline-flex items-center rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100">
+                  {{ 'adminUi.users.vip' | translate }}
+                </span>
+              </div>
             </div>
 
             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -164,6 +169,33 @@ type RoleFilter = 'all' | 'customer' | 'admin' | 'owner';
                 [label]="'adminUi.users.forceLogout' | translate"
                 (action)="forceLogout()"
               ></app-button>
+            </div>
+
+            <div class="rounded-xl border border-slate-200 p-3 grid gap-3 dark:border-slate-800">
+              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                <input type="checkbox" [(ngModel)]="vip" />
+                {{ 'adminUi.users.vip' | translate }}
+              </label>
+
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.users.adminNote' | translate }}
+                <textarea
+                  class="min-h-[120px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="adminNote"
+                  [maxLength]="2000"
+                ></textarea>
+                <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{ 'adminUi.users.adminNoteHint' | translate }}</span>
+              </label>
+
+              <div class="flex gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.users.saveInternal' | translate"
+                  [disabled]="internalBusy()"
+                  (action)="saveInternal()"
+                ></app-button>
+              </div>
             </div>
 
             <div class="grid gap-2">
@@ -348,6 +380,10 @@ export class AdminUsersComponent implements OnInit {
   profileLoading = signal(false);
   profileError = signal<string | null>(null);
 
+  vip = false;
+  adminNote = '';
+  internalBusy = signal(false);
+
   private pendingPrefillSearch: string | null = null;
   private autoSelectAfterLoad = false;
 
@@ -390,6 +426,8 @@ export class AdminUsersComponent implements OnInit {
   select(user: AdminUserListItem): void {
     this.selectedUser.set(user);
     this.selectedRole = user.role;
+    this.vip = false;
+    this.adminNote = '';
     this.loadAliases(user.id);
     this.loadProfile(user.id);
   }
@@ -415,6 +453,30 @@ export class AdminUsersComponent implements OnInit {
       next: () => this.toast.success(this.t('adminUi.users.success.revoke')),
       error: () => this.toast.error(this.t('adminUi.users.errors.revoke'))
     });
+  }
+
+  saveInternal(): void {
+    const user = this.selectedUser();
+    if (!user) return;
+    this.internalBusy.set(true);
+    this.usersApi
+      .updateInternal(user.id, { vip: this.vip, admin_note: this.adminNote.trim() ? this.adminNote.trim() : null })
+      .subscribe({
+        next: (updated) => {
+          const profile = this.profile();
+          if (profile) {
+            this.profile.set({ ...profile, user: { ...profile.user, ...updated } });
+          }
+          this.vip = Boolean(updated?.vip);
+          this.adminNote = (updated?.admin_note || '').toString();
+          this.toast.success(this.t('adminUi.users.success.internal'));
+          this.internalBusy.set(false);
+        },
+        error: () => {
+          this.toast.error(this.t('adminUi.users.errors.internal'));
+          this.internalBusy.set(false);
+        }
+      });
   }
 
   identityLabel(user: AdminUserListItem): string {
@@ -483,6 +545,8 @@ export class AdminUsersComponent implements OnInit {
     this.usersApi.getProfile(userId).subscribe({
       next: (res) => {
         this.profile.set(res);
+        this.vip = Boolean(res?.user?.vip);
+        this.adminNote = (res?.user?.admin_note || '').toString();
         this.profileLoading.set(false);
       },
       error: () => {

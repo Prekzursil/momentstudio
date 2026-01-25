@@ -2749,6 +2749,10 @@
       "ticketsEmpty": "Nu există tichete încă.",
       "activityTitle": "Activitate recentă",
       "activityEmpty": "Nu există activitate recentă.",
+      "vip": "VIP",
+      "adminNote": "Notă internă",
+      "adminNoteHint": "Note private (doar pentru admin) (max 2000 caractere).",
+      "saveInternal": "Salvează nota",
       "usernameHistory": "Istoric utilizatori",
       "displayNameHistory": "Istoric nume afișat",
       "noHistory": "Nu există istoric încă.",
@@ -2767,12 +2771,14 @@
       },
       "success": {
         "revoke": "Sesiuni revocate",
-        "role": "Rol actualizat"
+        "role": "Rol actualizat",
+        "internal": "Salvat"
       },
       "errors": {
         "load": "Nu am putut încărca utilizatorii.",
         "aliases": "Nu am putut încărca istoricul.",
         "profile": "Nu am putut încărca profilul clientului.",
+        "internal": "Nu am putut salva notele interne.",
         "revoke": "Nu am putut revoca sesiunile",
         "role": "Nu am putut actualiza rolul"
       }

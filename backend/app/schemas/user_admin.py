@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.order import OrderStatus
 from app.models.support import ContactSubmissionStatus, ContactSubmissionTopic
@@ -80,8 +80,18 @@ class AdminUserSecurityEventSummary(BaseModel):
     created_at: datetime
 
 
+class AdminUserProfileUser(AdminUserListItem):
+    vip: bool = False
+    admin_note: str | None = None
+
+
+class AdminUserInternalUpdate(BaseModel):
+    vip: bool | None = None
+    admin_note: str | None = Field(default=None, max_length=2000)
+
+
 class AdminUserProfileResponse(BaseModel):
-    user: AdminUserListItem
+    user: AdminUserProfileUser
     addresses: list[AdminUserAddress] = []
     orders: list[AdminUserOrderSummary] = []
     tickets: list[AdminUserTicketSummary] = []

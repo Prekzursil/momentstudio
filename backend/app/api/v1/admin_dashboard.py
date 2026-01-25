@@ -59,7 +59,13 @@ from app.models.user import AdminAuditLog, User, RefreshSession, UserRole, UserS
 from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.coupons_v2 import Promotion
 from app.services import auth as auth_service
-from app.schemas.user_admin import AdminUserListItem, AdminUserListResponse, AdminUserProfileResponse
+from app.schemas.user_admin import (
+    AdminUserInternalUpdate,
+    AdminUserListItem,
+    AdminUserListResponse,
+    AdminUserProfileResponse,
+    AdminUserProfileUser,
+)
 
 router = APIRouter(prefix="/admin/dashboard", tags=["admin"])
 
@@ -947,7 +953,7 @@ async def admin_user_profile(
     )
 
     return AdminUserProfileResponse(
-        user=AdminUserListItem(
+        user=AdminUserProfileUser(
             id=user.id,
             email=user.email,
             username=user.username,
@@ -956,6 +962,8 @@ async def admin_user_profile(
             role=user.role,
             email_verified=bool(user.email_verified),
             created_at=user.created_at,
+            vip=bool(getattr(user, "vip", False)),
+            admin_note=getattr(user, "admin_note", None),
         ),
         addresses=addresses,
         orders=orders,
@@ -1603,6 +1611,67 @@ async def update_user_role(
         "role": user.role,
         "created_at": user.created_at,
     }
+
+
+@router.patch("/users/{user_id}/internal", response_model=AdminUserProfileUser)
+async def update_user_internal(
+    user_id: UUID,
+    payload: AdminUserInternalUpdate,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin),
+) -> AdminUserProfileUser:
+    user = await session.get(User, user_id)
+    if not user or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    before_vip = bool(getattr(user, "vip", False))
+    before_note = getattr(user, "admin_note", None)
+
+    data = payload.model_dump(exclude_unset=True)
+    if "vip" in data and data["vip"] is not None:
+        user.vip = bool(data["vip"])
+    if "admin_note" in data:
+        note = data.get("admin_note")
+        if note is None:
+            user.admin_note = None
+        else:
+            trimmed = str(note).strip()
+            user.admin_note = trimmed or None
+
+    changes: dict[str, object] = {}
+    if before_vip != bool(getattr(user, "vip", False)):
+        changes["vip"] = {"before": before_vip, "after": bool(getattr(user, "vip", False))}
+    if before_note != getattr(user, "admin_note", None):
+        changes["admin_note"] = {
+            "before_length": len(before_note or ""),
+            "after_length": len((getattr(user, "admin_note", None) or "")),
+        }
+
+    session.add(user)
+    await session.flush()
+    if changes:
+        session.add(
+            AdminAuditLog(
+                action="user.internal.update",
+                actor_user_id=current_user.id,
+                subject_user_id=user.id,
+                data={"changes": changes},
+            )
+        )
+    await session.commit()
+
+    return AdminUserProfileUser(
+        id=user.id,
+        email=user.email,
+        username=user.username,
+        name=user.name,
+        name_tag=user.name_tag,
+        role=user.role,
+        email_verified=bool(user.email_verified),
+        created_at=user.created_at,
+        vip=bool(getattr(user, "vip", False)),
+        admin_note=getattr(user, "admin_note", None),
+    )
 
 
 @router.post("/owner/transfer")

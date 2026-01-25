@@ -2749,6 +2749,10 @@
       "ticketsEmpty": "No tickets yet.",
       "activityTitle": "Recent activity",
       "activityEmpty": "No recent activity.",
+      "vip": "VIP",
+      "adminNote": "Internal note",
+      "adminNoteHint": "Private admin-only notes (max 2000 characters).",
+      "saveInternal": "Save note",
       "usernameHistory": "Username history",
       "displayNameHistory": "Display name history",
       "noHistory": "No history yet.",
@@ -2767,12 +2771,14 @@
       },
       "success": {
         "revoke": "Sessions revoked",
-        "role": "Role updated"
+        "role": "Role updated",
+        "internal": "Saved"
       },
       "errors": {
         "load": "Could not load users.",
         "aliases": "Could not load alias history.",
         "profile": "Could not load customer profile.",
+        "internal": "Could not save internal notes.",
         "revoke": "Failed to revoke sessions",
         "role": "Failed to update role"
       }

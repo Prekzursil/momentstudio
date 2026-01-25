@@ -64,11 +64,16 @@ export interface AdminUserSecurityEventSummary {
 }
 
 export interface AdminUserProfileResponse {
-  user: AdminUserListItem;
+  user: AdminUserProfileUser;
   addresses: AdminUserAddress[];
   orders: AdminUserOrderSummary[];
   tickets: AdminUserTicketSummary[];
   security_events: AdminUserSecurityEventSummary[];
+}
+
+export interface AdminUserProfileUser extends AdminUserListItem {
+  vip: boolean;
+  admin_note?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -86,5 +91,9 @@ export class AdminUsersService {
 
   getProfile(userId: string): Observable<AdminUserProfileResponse> {
     return this.api.get<AdminUserProfileResponse>(`/admin/dashboard/users/${userId}/profile`);
+  }
+
+  updateInternal(userId: string, payload: { vip?: boolean; admin_note?: string | null }): Observable<AdminUserProfileUser> {
+    return this.api.patch<AdminUserProfileUser>(`/admin/dashboard/users/${userId}/internal`, payload as any);
   }
 }
