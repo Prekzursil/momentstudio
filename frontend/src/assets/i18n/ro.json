@@ -3026,6 +3026,19 @@
         "active": "Activ",
         "automatic": "Automat"
       },
+      "stacking": {
+        "title": "Previzualizare combinare",
+        "hint": "Previzualizează cum se combină promoția cu prețurile reduse și regulile de livrare (regulile de aplicare se mențin).",
+        "sampleSubtotal": "Subtotal exemplu (RON)",
+        "regularItems": "Reducere (produse fără reducere)",
+        "saleItems": "Reducere (produse la reducere)",
+        "saleAllowed": "Reducerea se aplică peste prețul redus",
+        "saleBlocked": "Produsele la reducere sunt excluse din reducere",
+        "shippingFree": "Oferă livrare gratuită",
+        "shippingNone": "Nu reduce livrarea (pragul de livrare gratuită se aplică după reducere)",
+        "minSubtotalWarning": "Neeligibil la acest subtotal (subtotal minim este {{min}}).",
+        "scopeNote": "Această previzualizare presupune că toate produsele sunt în aria de aplicare; regulile de includere/excludere pot reduce subtotalul eligibil."
+      },
       "scopes": {
         "title": "Reguli de aplicare",
         "includedCategories": "Categorii incluse",

@@ -257,6 +257,56 @@ type CouponForm = {
 
               <div class="rounded-xl border border-slate-200 p-3 grid gap-3 dark:border-slate-800">
                 <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.couponsV2.stacking.title' | translate }}
+                </div>
+                <p class="text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.couponsV2.stacking.hint' | translate }}
+                </p>
+
+                <div class="grid gap-3 lg:grid-cols-3 items-end">
+                  <app-input
+                    [label]="'adminUi.couponsV2.stacking.sampleSubtotal' | translate"
+                    type="number"
+                    [min]="0"
+                    [step]="0.01"
+                    [(value)]="stackingSampleSubtotal"
+                  ></app-input>
+                  <div class="text-xs text-slate-600 dark:text-slate-300 lg:col-span-2">
+                    {{ promotionForm.allow_on_sale_items ? ('adminUi.couponsV2.stacking.saleAllowed' | translate) : ('adminUi.couponsV2.stacking.saleBlocked' | translate) }}
+                    ·
+                    {{
+                      promotionForm.discount_type === 'free_shipping'
+                        ? ('adminUi.couponsV2.stacking.shippingFree' | translate)
+                        : ('adminUi.couponsV2.stacking.shippingNone' | translate)
+                    }}
+                  </div>
+                </div>
+
+                <div *ngIf="promotionForm.discount_type !== 'free_shipping'" class="grid gap-2 text-sm">
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="text-slate-600 dark:text-slate-300">{{ 'adminUi.couponsV2.stacking.regularItems' | translate }}</span>
+                    <span class="font-semibold text-slate-900 dark:text-slate-50">{{ formatRon(stackingPreviewProductDiscount(false)) }}</span>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="text-slate-600 dark:text-slate-300">{{ 'adminUi.couponsV2.stacking.saleItems' | translate }}</span>
+                    <span class="font-semibold text-slate-900 dark:text-slate-50">{{ formatRon(stackingPreviewProductDiscount(true)) }}</span>
+                  </div>
+                </div>
+
+                <div
+                  *ngIf="stackingMinSubtotalBlocked()"
+                  class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 dark:bg-amber-950/30 dark:text-amber-100 dark:border-amber-900/40"
+                >
+                  {{ 'adminUi.couponsV2.stacking.minSubtotalWarning' | translate:{ min: promotionForm.min_subtotal } }}
+                </div>
+
+                <div class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.couponsV2.stacking.scopeNote' | translate }}
+                </div>
+              </div>
+
+              <div class="rounded-xl border border-slate-200 p-3 grid gap-3 dark:border-slate-800">
+                <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
                   {{ 'adminUi.couponsV2.scopes.title' | translate }}
                 </div>
 
@@ -994,6 +1044,7 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
 
   promotionForm: PromotionForm = this.blankPromotionForm();
   couponForm: CouponForm = this.blankCouponForm();
+  stackingSampleSubtotal: string | number = 200;
 
   private autoStartNewPromotion = false;
   private preselectPromotionId: string | null = null;
@@ -1577,6 +1628,51 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
       global_max_redemptions: '',
       per_customer_max_redemptions: ''
     };
+  }
+
+  stackingMinSubtotalBlocked(): boolean {
+    const min = this.optionalNumber(this.promotionForm.min_subtotal);
+    if (min === null || min <= 0) return false;
+    const subtotal = this.optionalNumber(this.stackingSampleSubtotal);
+    if (subtotal === null) return false;
+    return subtotal < min;
+  }
+
+  stackingPreviewProductDiscount(assumeAllItemsOnSale: boolean): number | null {
+    if (this.promotionForm.discount_type === 'free_shipping') return null;
+    const subtotal = this.optionalNumber(this.stackingSampleSubtotal);
+    if (subtotal === null || subtotal <= 0) return 0;
+
+    if (this.stackingMinSubtotalBlocked()) return 0;
+
+    const eligibleSubtotal = assumeAllItemsOnSale && !this.promotionForm.allow_on_sale_items ? 0 : subtotal;
+    if (eligibleSubtotal <= 0) return 0;
+
+    let discount = 0;
+    if (this.promotionForm.discount_type === 'percent') {
+      const pct = this.optionalNumber(this.promotionForm.percentage_off);
+      if (pct === null || pct <= 0) return 0;
+      discount = (eligibleSubtotal * pct) / 100;
+    } else if (this.promotionForm.discount_type === 'amount') {
+      const amount = this.optionalNumber(this.promotionForm.amount_off);
+      if (amount === null || amount <= 0) return 0;
+      discount = Math.min(amount, eligibleSubtotal);
+    }
+
+    const cap = this.optionalNumber(this.promotionForm.max_discount_amount);
+    if (cap !== null && cap >= 0) {
+      discount = Math.min(discount, cap);
+    }
+    discount = Math.min(discount, eligibleSubtotal);
+
+    return Math.round(discount * 100) / 100;
+  }
+
+  formatRon(value: number | null): string {
+    if (value === null) return '—';
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '—';
+    return `${num.toFixed(2)} RON`;
   }
 
   private uniqueIds(ids: string[]): string[] {

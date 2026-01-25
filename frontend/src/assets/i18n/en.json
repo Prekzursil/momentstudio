@@ -3026,6 +3026,19 @@
         "active": "Active",
         "automatic": "Automatic"
       },
+      "stacking": {
+        "title": "Stacking preview",
+        "hint": "Preview how this promotion stacks with sale prices and shipping rules (scope rules still apply).",
+        "sampleSubtotal": "Sample subtotal (RON)",
+        "regularItems": "Discount (regular items)",
+        "saleItems": "Discount (sale items)",
+        "saleAllowed": "Discount applies on top of sale prices",
+        "saleBlocked": "Sale items are excluded from the discount",
+        "shippingFree": "Provides free shipping",
+        "shippingNone": "Does not discount shipping (free shipping threshold applies after discount)",
+        "minSubtotalWarning": "Not eligible at this subtotal (min subtotal is {{min}}).",
+        "scopeNote": "This preview assumes all items are in scope; included/excluded category/product rules can reduce the eligible subtotal."
+      },
       "scopes": {
         "title": "Scope rules",
         "includedCategories": "Included categories",
