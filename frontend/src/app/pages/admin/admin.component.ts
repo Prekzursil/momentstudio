@@ -22,6 +22,7 @@ import {
   AdminCategory,
   AdminProductDetail,
   FeaturedCollection,
+  ContentImageAssetRead,
   ContentBlockVersionListItem,
   ContentBlockVersionRead,
   ContentPageListItem,
@@ -63,6 +64,8 @@ type HomeGalleryImageDraft = {
   url: string;
   alt: LocalizedText;
   caption: LocalizedText;
+  focal_x: number;
+  focal_y: number;
 };
 
 type SlideDraft = {
@@ -75,6 +78,8 @@ type SlideDraft = {
   variant: 'full' | 'split';
   size: 'S' | 'M' | 'L';
   text_style: 'light' | 'dark';
+  focal_x: number;
+  focal_y: number;
 };
 
 type CarouselSettingsDraft = {
@@ -93,6 +98,8 @@ type HomeBlockDraft = {
   body_markdown: LocalizedText;
   url: string;
   link_url: string;
+  focal_x: number;
+  focal_y: number;
   alt: LocalizedText;
   caption: LocalizedText;
   images: HomeGalleryImageDraft[];
@@ -583,7 +590,15 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                         (ngModelChange)="onPageBlocksKeyChange($event)"
                       >
                         <ng-container *ngIf="contentPages.length; else defaultPages">
-                          <option *ngFor="let p of contentPages" [ngValue]="p.key">{{ p.title || p.slug }} · {{ p.slug }}</option>
+                          <option *ngFor="let p of contentPages" [ngValue]="p.key">
+                            {{ p.title || p.slug }} · {{ p.slug }}
+                            <ng-container *ngIf="p.needs_translation_en || p.needs_translation_ro">
+                              ·
+                              <ng-container *ngIf="p.needs_translation_en">EN</ng-container>
+                              <ng-container *ngIf="p.needs_translation_en && p.needs_translation_ro">/</ng-container>
+                              <ng-container *ngIf="p.needs_translation_ro">RO</ng-container>
+                            </ng-container>
+                          </option>
                         </ng-container>
                         <ng-template #defaultPages>
                           <option [ngValue]="'page.about'">{{ 'adminUi.site.pages.aboutLabel' | translate }}</option>
@@ -615,6 +630,34 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                       </label>
                       <app-button size="sm" [label]="'adminUi.actions.add' | translate" (action)="addPageBlock(pageBlocksKey)"></app-button>
                     </div>
+                  </div>
+
+                  <div
+                    *ngIf="contentPages.length"
+                    class="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 bg-white/60 px-3 py-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200"
+                  >
+                    <span class="font-semibold">{{ 'adminUi.site.pages.builder.translation.title' | translate }}</span>
+                    <label class="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        [disabled]="pageBlocksTranslationSaving[pageBlocksKey]"
+                        [checked]="pageBlocksNeedsTranslationEn[pageBlocksKey]"
+                        (change)="togglePageNeedsTranslation(pageBlocksKey, 'en', $event)"
+                      />
+                      EN {{ 'adminUi.site.pages.builder.translation.needsLabel' | translate }}
+                    </label>
+                    <label class="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        [disabled]="pageBlocksTranslationSaving[pageBlocksKey]"
+                        [checked]="pageBlocksNeedsTranslationRo[pageBlocksKey]"
+                        (change)="togglePageNeedsTranslation(pageBlocksKey, 'ro', $event)"
+                      />
+                      RO {{ 'adminUi.site.pages.builder.translation.needsLabel' | translate }}
+                    </label>
+                    <span *ngIf="pageBlocksTranslationSaving[pageBlocksKey]" class="text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.site.pages.builder.translation.saving' | translate }}
+                    </span>
                   </div>
 
                   <div class="grid gap-2">
@@ -704,11 +747,34 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                 />
                               </label>
                             </div>
+                            <div class="grid gap-3 sm:grid-cols-2">
+                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                {{ 'adminUi.home.sections.fields.focalX' | translate }}
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  [(ngModel)]="block.focal_x"
+                                />
+                              </label>
+                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                {{ 'adminUi.home.sections.fields.focalY' | translate }}
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  [(ngModel)]="block.focal_y"
+                                />
+                              </label>
+                            </div>
                             <img
                               *ngIf="(block.url || '').trim()"
                               class="mt-2 w-full max-h-[260px] rounded-2xl border border-slate-200 object-cover dark:border-slate-800"
                               [src]="block.url"
                               [alt]="block.alt[infoLang] || block.title[infoLang] || ''"
+                              [style.object-position]="focalPosition(block.focal_x, block.focal_y)"
                               loading="lazy"
                             />
                             <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
@@ -721,7 +787,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                   [allowSelect]="true"
                                   [uploadKey]="pageBlocksKey"
                                   [initialKey]="pageBlocksKey"
-                                  (select)="setPageImageBlockUrl(pageBlocksKey, block.key, $event)"
+                                  (selectAsset)="setPageImageBlockUrl(pageBlocksKey, block.key, $event)"
                                 ></app-asset-library>
                               </div>
                             </details>
@@ -766,12 +832,35 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                     />
                                   </label>
                                 </div>
+                                <div class="grid gap-3 sm:grid-cols-2">
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.focalX' | translate }}
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="img.focal_x"
+                                    />
+                                  </label>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.focalY' | translate }}
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="img.focal_y"
+                                    />
+                                  </label>
+                                </div>
                                 <div class="flex items-center gap-3">
                                   <img
                                     *ngIf="(img.url || '').trim()"
                                     class="h-16 w-16 rounded-xl border border-slate-200 object-cover dark:border-slate-800"
                                     [src]="img.url"
                                     [alt]="img.alt[infoLang] || ''"
+                                    [style.object-position]="focalPosition(img.focal_x, img.focal_y)"
                                     loading="lazy"
                                   />
                                 </div>
@@ -787,7 +876,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                     [allowSelect]="true"
                                     [uploadKey]="pageBlocksKey"
                                     [initialKey]="pageBlocksKey"
-                                    (select)="addPageGalleryImageFromAsset(pageBlocksKey, block.key, $event)"
+                                    (selectAsset)="addPageGalleryImageFromAsset(pageBlocksKey, block.key, $event)"
                                   ></app-asset-library>
                                 </div>
                               </details>
@@ -839,6 +928,26 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                     [(ngModel)]="block.slide.cta_url"
                                   />
                                 </label>
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.sections.fields.focalX' | translate }}
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="block.slide.focal_x"
+                                  />
+                                </label>
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.sections.fields.focalY' | translate }}
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="block.slide.focal_y"
+                                  />
+                                </label>
                               </div>
 
                               <div class="grid gap-3 md:grid-cols-3">
@@ -885,7 +994,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                     [allowSelect]="true"
                                     [uploadKey]="pageBlocksKey"
                                     [initialKey]="pageBlocksKey"
-                                    (select)="setPageBannerSlideImage(pageBlocksKey, block.key, $event)"
+                                    (selectAsset)="setPageBannerSlideImage(pageBlocksKey, block.key, $event)"
                                   ></app-asset-library>
                                 </div>
                               </details>
@@ -946,6 +1055,26 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                         [(ngModel)]="slide.subheadline[infoLang]"
                                       />
                                     </label>
+                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                      {{ 'adminUi.home.sections.fields.focalX' | translate }}
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                        [(ngModel)]="slide.focal_x"
+                                      />
+                                    </label>
+                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                      {{ 'adminUi.home.sections.fields.focalY' | translate }}
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                        [(ngModel)]="slide.focal_y"
+                                      />
+                                    </label>
                                   </div>
                                   <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
                                     <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
@@ -957,7 +1086,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                         [allowSelect]="true"
                                         [uploadKey]="pageBlocksKey"
                                         [initialKey]="pageBlocksKey"
-                                        (select)="setPageCarouselSlideImage(pageBlocksKey, block.key, idx, $event)"
+                                        (selectAsset)="setPageCarouselSlideImage(pageBlocksKey, block.key, idx, $event)"
                                       ></app-asset-library>
                                     </div>
                                   </details>
@@ -1314,6 +1443,26 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                               [(ngModel)]="block.caption[homeBlocksLang]"
                             />
                           </label>
+                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                            {{ 'adminUi.home.sections.fields.focalX' | translate }}
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                              [(ngModel)]="block.focal_x"
+                            />
+                          </label>
+                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                            {{ 'adminUi.home.sections.fields.focalY' | translate }}
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                              [(ngModel)]="block.focal_y"
+                            />
+                          </label>
                         </div>
 
                         <details class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
@@ -1325,14 +1474,20 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                               [allowUpload]="true"
                               [allowSelect]="true"
                               [initialKey]="'site.assets'"
-                              (select)="setImageBlockUrl(block.key, $event)"
+                              (selectAsset)="setImageBlockUrl(block.key, $event)"
                             ></app-asset-library>
                           </div>
                         </details>
 
                         <div *ngIf="block.url" class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
                           <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.fields.preview' | translate }}</p>
-                          <img class="mt-3 w-full max-h-[260px] rounded-2xl object-cover" [src]="block.url" [alt]="block.alt[homeBlocksLang] || block.title[homeBlocksLang] || ''" loading="lazy" />
+                          <img
+                            class="mt-3 w-full max-h-[260px] rounded-2xl object-cover"
+                            [src]="block.url"
+                            [alt]="block.alt[homeBlocksLang] || block.title[homeBlocksLang] || ''"
+                            [style.object-position]="focalPosition(block.focal_x, block.focal_y)"
+                            loading="lazy"
+                          />
                         </div>
                       </ng-container>
 
@@ -1375,9 +1530,35 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                     [(ngModel)]="img.caption[homeBlocksLang]"
                                   />
                                 </label>
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.sections.fields.focalX' | translate }}
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="img.focal_x"
+                                  />
+                                </label>
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.sections.fields.focalY' | translate }}
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="img.focal_y"
+                                  />
+                                </label>
                               </div>
                               <div *ngIf="img.url" class="flex items-center gap-3">
-                                <img class="h-16 w-16 rounded-xl object-cover" [src]="img.url" [alt]="img.alt[homeBlocksLang] || ''" loading="lazy" />
+                                <img
+                                  class="h-16 w-16 rounded-xl object-cover"
+                                  [src]="img.url"
+                                  [alt]="img.alt[homeBlocksLang] || ''"
+                                  [style.object-position]="focalPosition(img.focal_x, img.focal_y)"
+                                  loading="lazy"
+                                />
                                 <span class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ img.url }}</span>
                               </div>
                             </div>
@@ -1392,7 +1573,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                 [allowUpload]="true"
                                 [allowSelect]="true"
                                 [initialKey]="'site.assets'"
-                                (select)="addGalleryImageFromAsset(block.key, $event)"
+                                (selectAsset)="addGalleryImageFromAsset(block.key, $event)"
                               ></app-asset-library>
                             </div>
                           </details>
@@ -1444,6 +1625,26 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                 [(ngModel)]="block.slide.cta_url"
                               />
                             </label>
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.home.sections.fields.focalX' | translate }}
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.slide.focal_x"
+                              />
+                            </label>
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.home.sections.fields.focalY' | translate }}
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.slide.focal_y"
+                              />
+                            </label>
                           </div>
 
                           <div class="grid gap-3 md:grid-cols-3">
@@ -1489,7 +1690,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                 [allowUpload]="true"
                                 [allowSelect]="true"
                                 [initialKey]="'site.assets'"
-                                (select)="setBannerSlideImage(block.key, $event)"
+                                (selectAsset)="setBannerSlideImage(block.key, $event)"
                               ></app-asset-library>
                             </div>
                           </details>
@@ -1568,6 +1769,26 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                       [(ngModel)]="slide.cta_url"
                                     />
                                   </label>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.focalX' | translate }}
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="slide.focal_x"
+                                    />
+                                  </label>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.focalY' | translate }}
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="slide.focal_y"
+                                    />
+                                  </label>
                                 </div>
 
                                 <div class="grid gap-3 md:grid-cols-3">
@@ -1613,7 +1834,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                       [allowUpload]="true"
                                       [allowSelect]="true"
                                       [initialKey]="'site.assets'"
-                                      (select)="setCarouselSlideImage(block.key, idx, $event)"
+                                      (selectAsset)="setCarouselSlideImage(block.key, idx, $event)"
                                     ></app-asset-library>
                                   </div>
                                 </details>
@@ -3453,6 +3674,9 @@ export class AdminComponent implements OnInit, OnDestroy {
   pageBlocksPublishedUntil: Record<string, string> = {};
   pageBlocksMessage: Record<string, string | null> = {};
   pageBlocksError: Record<string, string | null> = {};
+  pageBlocksNeedsTranslationEn: Record<string, boolean> = {};
+  pageBlocksNeedsTranslationRo: Record<string, boolean> = {};
+  pageBlocksTranslationSaving: Record<string, boolean> = {};
   draggingPageBlockKey: string | null = null;
   draggingPageBlocksKey: string | null = null;
   coupons: AdminCoupon[] = [];
@@ -5697,8 +5921,11 @@ export class AdminComponent implements OnInit, OnDestroy {
       title: key,
       ...payload
     };
-	    const onSuccess = (block?: { version?: number } | null) => {
+	    const onSuccess = (block?: any | null) => {
         this.rememberContentVersion(key, block);
+        this.pageBlocksNeedsTranslationEn[key] = Boolean(block?.needs_translation_en);
+        this.pageBlocksNeedsTranslationRo[key] = Boolean(block?.needs_translation_ro);
+        this.loadContentPages();
 	      this.infoMessage = this.t('adminUi.site.pages.success.save');
 	      this.infoError = null;
 	    };
@@ -5721,12 +5948,41 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    });
 	  }
 
+  togglePageNeedsTranslation(pageKey: PageBuilderKey, lang: UiLang, event: Event): void {
+    const key = (pageKey || '').trim();
+    if (!key) return;
+    const target = event.target as HTMLInputElement | null;
+    const checked = Boolean(target?.checked);
+    const payload = lang === 'en' ? { needs_translation_en: checked } : { needs_translation_ro: checked };
+    this.pageBlocksTranslationSaving[key] = true;
+    this.admin.updateContentTranslationStatus(key, payload).subscribe({
+      next: (block) => {
+        this.pageBlocksNeedsTranslationEn[key] = Boolean(block.needs_translation_en);
+        this.pageBlocksNeedsTranslationRo[key] = Boolean(block.needs_translation_ro);
+        this.pageBlocksTranslationSaving[key] = false;
+        this.toast.success(this.t('adminUi.site.pages.builder.translation.success'));
+        this.loadContentPages();
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.pageBlocksTranslationSaving[key] = false;
+        this.toast.error(detail || this.t('adminUi.site.pages.builder.translation.errors.save'));
+      }
+    });
+  }
+
   loadContentPages(): void {
     this.contentPagesLoading = true;
     this.contentPagesError = null;
     this.admin.listContentPages().subscribe({
       next: (pages) => {
         this.contentPages = [...(pages || [])].sort((a, b) => (a.slug || '').localeCompare(b.slug || ''));
+        this.pageBlocksNeedsTranslationEn = {};
+        this.pageBlocksNeedsTranslationRo = {};
+        for (const page of this.contentPages) {
+          this.pageBlocksNeedsTranslationEn[page.key] = Boolean(page.needs_translation_en);
+          this.pageBlocksNeedsTranslationRo[page.key] = Boolean(page.needs_translation_ro);
+        }
         this.contentPagesLoading = false;
         if (!this.contentPages.length) return;
         const exists = this.contentPages.some((p) => p.key === this.pageBlocksKey);
@@ -5755,6 +6011,8 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.admin.getContent(pageKey).subscribe({
       next: (block) => {
         this.rememberContentVersion(pageKey, block);
+        this.pageBlocksNeedsTranslationEn[pageKey] = Boolean(block.needs_translation_en);
+        this.pageBlocksNeedsTranslationRo[pageKey] = Boolean(block.needs_translation_ro);
         this.pageBlocksStatus[pageKey] = block.status === 'published' ? 'published' : 'draft';
         this.pageBlocksPublishedAt[pageKey] = block.published_at ? this.toLocalDateTime(block.published_at) : '';
         this.pageBlocksPublishedUntil[pageKey] = block.published_until ? this.toLocalDateTime(block.published_until) : '';
@@ -5765,6 +6023,8 @@ export class AdminComponent implements OnInit, OnDestroy {
       error: (err) => {
         if (err?.status === 404) {
           delete this.contentVersions[pageKey];
+          this.pageBlocksNeedsTranslationEn[pageKey] = false;
+          this.pageBlocksNeedsTranslationRo[pageKey] = false;
           this.pageBlocksStatus[pageKey] = 'draft';
           this.pageBlocksPublishedAt[pageKey] = '';
           this.pageBlocksPublishedUntil[pageKey] = '';
@@ -6032,6 +6292,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         body_markdown: this.emptyLocalizedText(),
         url: '',
         link_url: '',
+        focal_x: 50,
+        focal_y: 50,
         alt: this.emptyLocalizedText(),
         caption: this.emptyLocalizedText(),
         images: [],
@@ -6047,6 +6309,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         draft.link_url = typeof rec['link_url'] === 'string' ? String(rec['link_url']).trim() : '';
         draft.alt = this.toLocalizedText(rec['alt']);
         draft.caption = this.toLocalizedText(rec['caption']);
+        draft.focal_x = this.toFocalValue(rec['focal_x']);
+        draft.focal_y = this.toFocalValue(rec['focal_y']);
       } else if (typeRaw === 'gallery') {
         const imagesRaw = rec['images'];
         if (Array.isArray(imagesRaw)) {
@@ -6058,7 +6322,9 @@ export class AdminComponent implements OnInit, OnDestroy {
             draft.images.push({
               url,
               alt: this.toLocalizedText(imgRec['alt']),
-              caption: this.toLocalizedText(imgRec['caption'])
+              caption: this.toLocalizedText(imgRec['caption']),
+              focal_x: this.toFocalValue(imgRec['focal_x']),
+              focal_y: this.toFocalValue(imgRec['focal_y'])
             });
           }
         }
@@ -6098,6 +6364,8 @@ export class AdminComponent implements OnInit, OnDestroy {
       body_markdown: this.emptyLocalizedText(),
       url: '',
       link_url: '',
+      focal_x: 50,
+      focal_y: 50,
       alt: this.emptyLocalizedText(),
       caption: this.emptyLocalizedText(),
       images: [],
@@ -6144,19 +6412,25 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.draggingPageBlockKey = null;
   }
 
-  setPageImageBlockUrl(pageKey: PageBuilderKey, blockKey: string, url: string): void {
-    const value = (url || '').trim();
+  setPageImageBlockUrl(pageKey: PageBuilderKey, blockKey: string, asset: ContentImageAssetRead): void {
+    const value = (asset?.url || '').trim();
     if (!value) return;
-    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => (b.key === blockKey ? { ...b, url: value } : b));
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) =>
+      b.key === blockKey ? { ...b, url: value, focal_x: focalX, focal_y: focalY } : b
+    );
     this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
   }
 
-  setPageBannerSlideImage(pageKey: PageBuilderKey, blockKey: string, url: string): void {
-    const value = (url || '').trim();
+  setPageBannerSlideImage(pageKey: PageBuilderKey, blockKey: string, asset: ContentImageAssetRead): void {
+    const value = (asset?.url || '').trim();
     if (!value) return;
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
     this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'banner') return b;
-      return { ...b, slide: { ...b.slide, image_url: value } };
+      return { ...b, slide: { ...b.slide, image_url: value, focal_x: focalX, focal_y: focalY } };
     });
     this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
   }
@@ -6191,15 +6465,17 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  setPageCarouselSlideImage(pageKey: PageBuilderKey, blockKey: string, idx: number, url: string): void {
-    const value = (url || '').trim();
+  setPageCarouselSlideImage(pageKey: PageBuilderKey, blockKey: string, idx: number, asset: ContentImageAssetRead): void {
+    const value = (asset?.url || '').trim();
     if (!value) return;
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
     this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'carousel') return b;
       const slides = [...(b.slides || [])];
       const target = slides[idx];
       if (!target) return b;
-      slides[idx] = { ...target, image_url: value };
+      slides[idx] = { ...target, image_url: value, focal_x: focalX, focal_y: focalY };
       return { ...b, slides };
     });
     this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
@@ -6215,16 +6491,20 @@ export class AdminComponent implements OnInit, OnDestroy {
           {
             url: '',
             alt: this.emptyLocalizedText(),
-            caption: this.emptyLocalizedText()
+            caption: this.emptyLocalizedText(),
+            focal_x: 50,
+            focal_y: 50
           }
         ]
       };
     });
   }
 
-  addPageGalleryImageFromAsset(pageKey: PageBuilderKey, blockKey: string, url: string): void {
-    const value = (url || '').trim();
+  addPageGalleryImageFromAsset(pageKey: PageBuilderKey, blockKey: string, asset: ContentImageAssetRead): void {
+    const value = (asset?.url || '').trim();
     if (!value) return;
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
     this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'gallery') return b;
       return {
@@ -6234,7 +6514,9 @@ export class AdminComponent implements OnInit, OnDestroy {
           {
             url: value,
             alt: this.emptyLocalizedText(),
-            caption: this.emptyLocalizedText()
+            caption: this.emptyLocalizedText(),
+            focal_x: focalX,
+            focal_y: focalY
           }
         ]
       };
@@ -6264,8 +6546,16 @@ export class AdminComponent implements OnInit, OnDestroy {
         base['link_url'] = b.link_url;
         base['alt'] = b.alt;
         base['caption'] = b.caption;
+        base['focal_x'] = this.toFocalValue(b.focal_x);
+        base['focal_y'] = this.toFocalValue(b.focal_y);
       } else if (b.type === 'gallery') {
-        base['images'] = b.images.map((img) => ({ url: img.url, alt: img.alt, caption: img.caption }));
+        base['images'] = b.images.map((img) => ({
+          url: img.url,
+          alt: img.alt,
+          caption: img.caption,
+          focal_x: this.toFocalValue(img.focal_x),
+          focal_y: this.toFocalValue(img.focal_y)
+        }));
       } else if (b.type === 'banner') {
         base['slide'] = this.serializeSlideDraft(b.slide);
       } else if (b.type === 'carousel') {
@@ -6289,7 +6579,7 @@ export class AdminComponent implements OnInit, OnDestroy {
           ? new Date(this.pageBlocksPublishedUntil[pageKey]).toISOString()
           : null
         : null;
-    const payload: Record<string, unknown> = { meta, status, published_at, published_until };
+    const payload: Record<string, unknown> = { meta, status, published_at, published_until, lang: this.infoLang };
 
     const ok = this.t('adminUi.site.pages.builder.success.save');
     const errMsg = this.t('adminUi.site.pages.builder.errors.save');
@@ -6299,6 +6589,8 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.admin.updateContentBlock(pageKey, this.withExpectedVersion(pageKey, payload)).subscribe({
       next: (block) => {
         this.rememberContentVersion(pageKey, block);
+        this.pageBlocksNeedsTranslationEn[pageKey] = Boolean(block.needs_translation_en);
+        this.pageBlocksNeedsTranslationRo[pageKey] = Boolean(block.needs_translation_ro);
         this.pageBlocksStatus[pageKey] = block.status === 'published' ? 'published' : 'draft';
         this.pageBlocksPublishedAt[pageKey] = block.published_at ? this.toLocalDateTime(block.published_at) : '';
         this.pageBlocksPublishedUntil[pageKey] = block.published_until ? this.toLocalDateTime(block.published_until) : '';
@@ -6317,6 +6609,7 @@ export class AdminComponent implements OnInit, OnDestroy {
             title: this.contentPages.find((p) => p.key === pageKey)?.title || pageKey,
             body_markdown: 'Page builder',
             status,
+            lang: this.infoLang,
             published_at,
             published_until,
             meta
@@ -6324,6 +6617,8 @@ export class AdminComponent implements OnInit, OnDestroy {
           this.admin.createContent(pageKey, createPayload).subscribe({
             next: (created) => {
               this.rememberContentVersion(pageKey, created);
+              this.pageBlocksNeedsTranslationEn[pageKey] = Boolean(created.needs_translation_en);
+              this.pageBlocksNeedsTranslationRo[pageKey] = Boolean(created.needs_translation_ro);
               this.pageBlocksStatus[pageKey] = created.status === 'published' ? 'published' : 'draft';
               this.pageBlocksPublishedAt[pageKey] = created.published_at ? this.toLocalDateTime(created.published_at) : '';
               this.pageBlocksPublishedUntil[pageKey] = created.published_until ? this.toLocalDateTime(created.published_until) : '';
@@ -6368,6 +6663,16 @@ export class AdminComponent implements OnInit, OnDestroy {
     };
   }
 
+  private toFocalValue(value: unknown, fallback = 50): number {
+    const raw = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(raw)) return fallback;
+    return Math.max(0, Math.min(100, Math.round(raw)));
+  }
+
+  focalPosition(focalX: unknown, focalY: unknown): string {
+    return `${this.toFocalValue(focalX)}% ${this.toFocalValue(focalY)}%`;
+  }
+
   private emptySlideDraft(): SlideDraft {
     return {
       image_url: '',
@@ -6378,7 +6683,9 @@ export class AdminComponent implements OnInit, OnDestroy {
       cta_url: '',
       variant: 'split',
       size: 'M',
-      text_style: 'dark'
+      text_style: 'dark',
+      focal_x: 50,
+      focal_y: 50
     };
   }
 
@@ -6400,6 +6707,8 @@ export class AdminComponent implements OnInit, OnDestroy {
     draft.variant = rec['variant'] === 'full' ? 'full' : 'split';
     draft.size = rec['size'] === 'S' || rec['size'] === 'L' ? (rec['size'] as any) : 'M';
     draft.text_style = rec['text_style'] === 'light' ? 'light' : 'dark';
+    draft.focal_x = this.toFocalValue(rec['focal_x']);
+    draft.focal_y = this.toFocalValue(rec['focal_y']);
     return draft;
   }
 
@@ -6425,7 +6734,9 @@ export class AdminComponent implements OnInit, OnDestroy {
       cta_url: (slide.cta_url || '').trim(),
       variant: slide.variant,
       size: slide.size,
-      text_style: slide.text_style
+      text_style: slide.text_style,
+      focal_x: this.toFocalValue(slide.focal_x),
+      focal_y: this.toFocalValue(slide.focal_y)
     };
   }
 
@@ -6456,7 +6767,9 @@ export class AdminComponent implements OnInit, OnDestroy {
       cta_url: (slide.cta_url || '').trim() || null,
       variant: slide.variant,
       size: slide.size,
-      text_style: slide.text_style
+      text_style: slide.text_style,
+      focal_x: this.toFocalValue(slide.focal_x),
+      focal_y: this.toFocalValue(slide.focal_y)
     };
   }
 
@@ -6517,6 +6830,8 @@ export class AdminComponent implements OnInit, OnDestroy {
       body_markdown: this.emptyLocalizedText(),
       url: '',
       link_url: '',
+      focal_x: 50,
+      focal_y: 50,
       alt: this.emptyLocalizedText(),
       caption: this.emptyLocalizedText(),
       images: [],
@@ -6605,10 +6920,12 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.homeBlocks = this.homeBlocks.filter((b) => b.key !== key);
   }
 
-  setImageBlockUrl(blockKey: string, url: string): void {
-    const value = (url || '').trim();
+  setImageBlockUrl(blockKey: string, asset: ContentImageAssetRead): void {
+    const value = (asset?.url || '').trim();
     if (!value) return;
-    this.homeBlocks = this.homeBlocks.map((b) => (b.key === blockKey ? { ...b, url: value } : b));
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
+    this.homeBlocks = this.homeBlocks.map((b) => (b.key === blockKey ? { ...b, url: value, focal_x: focalX, focal_y: focalY } : b));
     this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
   }
 
@@ -6622,16 +6939,20 @@ export class AdminComponent implements OnInit, OnDestroy {
           {
             url: '',
             alt: this.emptyLocalizedText(),
-            caption: this.emptyLocalizedText()
+            caption: this.emptyLocalizedText(),
+            focal_x: 50,
+            focal_y: 50
           }
         ]
       };
     });
   }
 
-  addGalleryImageFromAsset(blockKey: string, url: string): void {
-    const value = (url || '').trim();
+  addGalleryImageFromAsset(blockKey: string, asset: ContentImageAssetRead): void {
+    const value = (asset?.url || '').trim();
     if (!value) return;
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
     this.homeBlocks = this.homeBlocks.map((b) => {
       if (b.key !== blockKey || b.type !== 'gallery') return b;
       return {
@@ -6641,7 +6962,9 @@ export class AdminComponent implements OnInit, OnDestroy {
           {
             url: value,
             alt: this.emptyLocalizedText(),
-            caption: this.emptyLocalizedText()
+            caption: this.emptyLocalizedText(),
+            focal_x: focalX,
+            focal_y: focalY
           }
         ]
       };
@@ -6658,12 +6981,14 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  setBannerSlideImage(blockKey: string, url: string): void {
-    const value = (url || '').trim();
+  setBannerSlideImage(blockKey: string, asset: ContentImageAssetRead): void {
+    const value = (asset?.url || '').trim();
     if (!value) return;
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
     this.homeBlocks = this.homeBlocks.map((b) => {
       if (b.key !== blockKey || b.type !== 'banner') return b;
-      return { ...b, slide: { ...b.slide, image_url: value } };
+      return { ...b, slide: { ...b.slide, image_url: value, focal_x: focalX, focal_y: focalY } };
     });
     this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
   }
@@ -6698,15 +7023,17 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  setCarouselSlideImage(blockKey: string, idx: number, url: string): void {
-    const value = (url || '').trim();
+  setCarouselSlideImage(blockKey: string, idx: number, asset: ContentImageAssetRead): void {
+    const value = (asset?.url || '').trim();
     if (!value) return;
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
     this.homeBlocks = this.homeBlocks.map((b) => {
       if (b.key !== blockKey || b.type !== 'carousel') return b;
       const slides = [...(b.slides || [])];
       const target = slides[idx];
       if (!target) return b;
-      slides[idx] = { ...target, image_url: value };
+      slides[idx] = { ...target, image_url: value, focal_x: focalX, focal_y: focalY };
       return { ...b, slides };
     });
     this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
@@ -6771,6 +7098,8 @@ export class AdminComponent implements OnInit, OnDestroy {
               draft.link_url = typeof rec['link_url'] === 'string' ? String(rec['link_url']).trim() : '';
               draft.alt = this.toLocalizedText(rec['alt']);
               draft.caption = this.toLocalizedText(rec['caption']);
+              draft.focal_x = this.toFocalValue(rec['focal_x']);
+              draft.focal_y = this.toFocalValue(rec['focal_y']);
             } else if (type === 'gallery') {
               const imagesRaw = rec['images'];
               if (Array.isArray(imagesRaw)) {
@@ -6782,7 +7111,9 @@ export class AdminComponent implements OnInit, OnDestroy {
                   draft.images.push({
                     url,
                     alt: this.toLocalizedText(imgRec['alt']),
-                    caption: this.toLocalizedText(imgRec['caption'])
+                    caption: this.toLocalizedText(imgRec['caption']),
+                    focal_x: this.toFocalValue(imgRec['focal_x']),
+                    focal_y: this.toFocalValue(imgRec['focal_y'])
                   });
                 }
               }
@@ -6859,9 +7190,17 @@ export class AdminComponent implements OnInit, OnDestroy {
         base['link_url'] = b.link_url;
         base['alt'] = b.alt;
         base['caption'] = b.caption;
+        base['focal_x'] = this.toFocalValue(b.focal_x);
+        base['focal_y'] = this.toFocalValue(b.focal_y);
       } else if (b.type === 'gallery') {
         base['title'] = b.title;
-        base['images'] = b.images.map((img) => ({ url: img.url, alt: img.alt, caption: img.caption }));
+        base['images'] = b.images.map((img) => ({
+          url: img.url,
+          alt: img.alt,
+          caption: img.caption,
+          focal_x: this.toFocalValue(img.focal_x),
+          focal_y: this.toFocalValue(img.focal_y)
+        }));
       } else if (b.type === 'banner') {
         base['title'] = b.title;
         base['slide'] = this.serializeSlideDraft(b.slide);

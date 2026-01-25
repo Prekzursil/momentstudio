@@ -46,12 +46,16 @@ interface HomeImageBlock extends HomeBlockBase {
   alt?: string | null;
   caption?: string | null;
   link_url?: string | null;
+  focal_x: number;
+  focal_y: number;
 }
 
 interface HomeGalleryImage {
   url: string;
   alt?: string | null;
   caption?: string | null;
+  focal_x: number;
+  focal_y: number;
 }
 
 interface HomeGalleryBlock extends HomeBlockBase {
@@ -306,10 +310,22 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
                 <h2 *ngIf="img.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ img.title }}</h2>
                 <app-card>
                   <a *ngIf="img.link_url; else imageOnly" [href]="img.link_url" class="block" target="_blank" rel="noopener noreferrer">
-                    <img class="w-full rounded-2xl object-cover" [src]="img.url" [alt]="img.alt || img.title || ''" loading="lazy" />
+                    <img
+                      class="w-full rounded-2xl object-cover"
+                      [src]="img.url"
+                      [alt]="img.alt || img.title || ''"
+                      [style.object-position]="focalPosition(img.focal_x, img.focal_y)"
+                      loading="lazy"
+                    />
                   </a>
                   <ng-template #imageOnly>
-                    <img class="w-full rounded-2xl object-cover" [src]="img.url" [alt]="img.alt || img.title || ''" loading="lazy" />
+                    <img
+                      class="w-full rounded-2xl object-cover"
+                      [src]="img.url"
+                      [alt]="img.alt || img.title || ''"
+                      [style.object-position]="focalPosition(img.focal_x, img.focal_y)"
+                      loading="lazy"
+                    />
                   </ng-template>
                   <p *ngIf="img.caption" class="mt-3 text-sm text-slate-600 dark:text-slate-300">{{ img.caption }}</p>
                 </app-card>
@@ -323,7 +339,13 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
                 <h2 *ngIf="gal.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ gal.title }}</h2>
                 <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <app-card *ngFor="let image of gal.images">
-                    <img class="w-full rounded-2xl object-cover" [src]="image.url" [alt]="image.alt || gal.title || ''" loading="lazy" />
+                    <img
+                      class="w-full rounded-2xl object-cover"
+                      [src]="image.url"
+                      [alt]="image.alt || gal.title || ''"
+                      [style.object-position]="focalPosition(image.focal_x, image.focal_y)"
+                      loading="lazy"
+                    />
                     <p *ngIf="image.caption" class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ image.caption }}</p>
                   </app-card>
                 </div>
@@ -422,6 +444,12 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.langSub?.unsubscribe();
   }
 
+  focalPosition(focalX?: number, focalY?: number): string {
+    const x = Math.max(0, Math.min(100, Math.round(Number(focalX ?? 50))));
+    const y = Math.max(0, Math.min(100, Math.round(Number(focalY ?? 50))));
+    return `${x}% ${y}%`;
+  }
+
   private load(): void {
     this.setMetaTags();
     this.recentlyViewed = this.recentlyViewedService.list().slice(0, 6);
@@ -516,7 +544,9 @@ export class HomeComponent implements OnInit, OnDestroy {
         cta_url: readString(rec['cta_url']),
         variant: normalizeVariant(rec['variant']),
         size: normalizeSize(rec['size']),
-        text_style: normalizeTextStyle(rec['text_style'])
+        text_style: normalizeTextStyle(rec['text_style']),
+        focal_x: Math.max(0, Math.min(100, Math.round(readNumber(rec['focal_x'], 50)))),
+        focal_y: Math.max(0, Math.min(100, Math.round(readNumber(rec['focal_y'], 50))))
       };
     };
 
@@ -572,7 +602,9 @@ export class HomeComponent implements OnInit, OnDestroy {
             url,
             alt: readLocalized(rec['alt']),
             caption: readLocalized(rec['caption']),
-            link_url: typeof rec['link_url'] === 'string' ? rec['link_url'].trim() : null
+            link_url: typeof rec['link_url'] === 'string' ? rec['link_url'].trim() : null,
+            focal_x: Math.max(0, Math.min(100, Math.round(readNumber(rec['focal_x'], 50)))),
+            focal_y: Math.max(0, Math.min(100, Math.round(readNumber(rec['focal_y'], 50))))
           });
           continue;
         }
@@ -585,7 +617,13 @@ export class HomeComponent implements OnInit, OnDestroy {
               const imgRec = imgRaw as Record<string, unknown>;
               const url = typeof imgRec['url'] === 'string' ? imgRec['url'].trim() : '';
               if (!url) continue;
-              images.push({ url, alt: readLocalized(imgRec['alt']), caption: readLocalized(imgRec['caption']) });
+              images.push({
+                url,
+                alt: readLocalized(imgRec['alt']),
+                caption: readLocalized(imgRec['caption']),
+                focal_x: Math.max(0, Math.min(100, Math.round(readNumber(imgRec['focal_x'], 50)))),
+                focal_y: Math.max(0, Math.min(100, Math.round(readNumber(imgRec['focal_y'], 50))))
+              });
             }
           }
           if (!images.length) continue;

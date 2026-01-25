@@ -422,6 +422,8 @@ export interface ContentBlock {
   sort_order?: number;
   published_at?: string | null;
   published_until?: string | null;
+  needs_translation_en?: boolean;
+  needs_translation_ro?: boolean;
   images?: { id: string; url: string; alt_text?: string | null; sort_order?: number }[];
 }
 
@@ -456,6 +458,8 @@ export interface ContentPageListItem {
   updated_at: string;
   published_at?: string | null;
   published_until?: string | null;
+  needs_translation_en?: boolean;
+  needs_translation_ro?: boolean;
 }
 
 export interface ContentPageRenameResponse {
@@ -484,6 +488,8 @@ export interface ContentImageAssetRead {
   url: string;
   alt_text?: string | null;
   sort_order: number;
+  focal_x: number;
+  focal_y: number;
   created_at: string;
   content_key: string;
   tags?: string[];
@@ -887,12 +893,20 @@ export class AdminService {
     return this.api.post<ContentBlock>(`/content/admin/${key}/versions/${version}/rollback`, {});
   }
 
+  updateContentTranslationStatus(key: string, payload: { needs_translation_en?: boolean | null; needs_translation_ro?: boolean | null }): Observable<ContentBlock> {
+    return this.api.patch<ContentBlock>(`/content/admin/${encodeURIComponent(key)}/translation-status`, payload);
+  }
+
   listContentImages(params?: { key?: string; q?: string; tag?: string; page?: number; limit?: number }): Observable<ContentImageAssetListResponse> {
     return this.api.get<ContentImageAssetListResponse>('/content/admin/assets/images', params as any);
   }
 
   updateContentImageTags(imageId: string, tags: string[]): Observable<ContentImageAssetRead> {
     return this.api.patch<ContentImageAssetRead>(`/content/admin/assets/images/${encodeURIComponent(imageId)}/tags`, { tags });
+  }
+
+  updateContentImageFocalPoint(imageId: string, focal_x: number, focal_y: number): Observable<ContentImageAssetRead> {
+    return this.api.patch<ContentImageAssetRead>(`/content/admin/assets/images/${encodeURIComponent(imageId)}/focal`, { focal_x, focal_y });
   }
 
   linkCheckContent(key: string): Observable<ContentLinkCheckResponse> {

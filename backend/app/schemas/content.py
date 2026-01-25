@@ -60,6 +60,8 @@ class ContentBlockRead(BaseModel):
     meta: dict[str, Any] | None = None
     sort_order: int
     lang: str | None = None
+    needs_translation_en: bool = False
+    needs_translation_ro: bool = False
     published_at: datetime | None = None
     published_until: datetime | None = None
     created_at: datetime
@@ -76,6 +78,8 @@ class ContentPageListItem(BaseModel):
     updated_at: datetime
     published_at: datetime | None = None
     published_until: datetime | None = None
+    needs_translation_en: bool = False
+    needs_translation_ro: bool = False
 
 
 class ContentPageRenameRequest(BaseModel):
@@ -110,6 +114,8 @@ class ContentImageRead(BaseModel):
     url: str
     alt_text: str | None = None
     sort_order: int
+    focal_x: int = 50
+    focal_y: int = 50
 
 
 class ContentImageAssetRead(BaseModel):
@@ -120,6 +126,8 @@ class ContentImageAssetRead(BaseModel):
     created_at: datetime
     content_key: str
     tags: list[str] = Field(default_factory=list)
+    focal_x: int = 50
+    focal_y: int = 50
 
 
 class ContentImageAssetListResponse(BaseModel):
@@ -129,6 +137,16 @@ class ContentImageAssetListResponse(BaseModel):
 
 class ContentImageTagsUpdate(BaseModel):
     tags: list[str] = Field(default_factory=list)
+
+
+class ContentImageFocalPointUpdate(BaseModel):
+    focal_x: int = Field(default=50, ge=0, le=100)
+    focal_y: int = Field(default=50, ge=0, le=100)
+
+
+class ContentTranslationStatusUpdate(BaseModel):
+    needs_translation_en: bool | None = None
+    needs_translation_ro: bool | None = None
 
 
 class ContentLinkCheckIssue(BaseModel):

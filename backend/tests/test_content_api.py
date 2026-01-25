@@ -76,6 +76,8 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert create.status_code == 201, create.text
     assert create.json()["version"] == 1
     assert create.json()["meta"]["headline"] == "Hero"
+    assert create.json()["needs_translation_en"] is False
+    assert create.json()["needs_translation_ro"] is True
 
     public = client.get("/api/v1/content/home.hero")
     assert public.status_code == 200
@@ -189,6 +191,8 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert data["meta"]["total_items"] >= 1
     assert any(item["content_key"] == "home.hero" for item in data["items"])
     first_img = data["items"][0]
+    assert "focal_x" in first_img
+    assert "focal_y" in first_img
 
     # Asset tags: set tags and filter by tag.
     tag_set = client.patch(
@@ -198,6 +202,15 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     )
     assert tag_set.status_code == 200, tag_set.text
     assert tag_set.json()["tags"] == ["hero", "homepage"]
+
+    focal_set = client.patch(
+        f"/api/v1/content/admin/assets/images/{first_img['id']}/focal",
+        json={"focal_x": 25, "focal_y": 80},
+        headers=auth_headers(admin_token),
+    )
+    assert focal_set.status_code == 200, focal_set.text
+    assert focal_set.json()["focal_x"] == 25
+    assert focal_set.json()["focal_y"] == 80
 
     tagged = client.get(
         "/api/v1/content/admin/assets/images",
@@ -227,9 +240,19 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
         headers=auth_headers(admin_token),
     )
     assert tr.status_code == 200
+    assert tr.json()["needs_translation_ro"] is False
     ro_public = client.get("/api/v1/content/home.hero?lang=ro")
     assert ro_public.status_code == 200
     assert ro_public.json()["title"] == "Erou"
+
+    status_toggle = client.patch(
+        "/api/v1/content/admin/home.hero/translation-status",
+        json={"needs_translation_en": True, "needs_translation_ro": False},
+        headers=auth_headers(admin_token),
+    )
+    assert status_toggle.status_code == 200, status_toggle.text
+    assert status_toggle.json()["needs_translation_en"] is True
+    assert status_toggle.json()["needs_translation_ro"] is False
 
     # Broken link checker for internal URLs.
     link_block = client.post(

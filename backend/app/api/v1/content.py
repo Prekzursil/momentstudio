@@ -16,6 +16,7 @@ from app.schemas.content import (
     ContentBlockUpdate,
     ContentImageAssetListResponse,
     ContentImageAssetRead,
+    ContentImageFocalPointUpdate,
     ContentPageListItem,
     ContentPageRenameRequest,
     ContentPageRenameResponse,
@@ -25,6 +26,7 @@ from app.schemas.content import (
     ContentBlockVersionRead,
     ContentImageTagsUpdate,
     ContentLinkCheckResponse,
+    ContentTranslationStatusUpdate,
 )
 from app.schemas.social import SocialThumbnailRequest, SocialThumbnailResponse
 from app.services import content as content_service
@@ -291,6 +293,8 @@ async def admin_list_content_images(
                 url=img.url,
                 alt_text=img.alt_text,
                 sort_order=img.sort_order,
+                focal_x=getattr(img, "focal_x", 50),
+                focal_y=getattr(img, "focal_y", 50),
                 created_at=img.created_at,
                 content_key=block_key,
                 tags=tag_map.get(img.id, []),
@@ -342,9 +346,49 @@ async def admin_update_content_image_tags(
         url=image.url,
         alt_text=image.alt_text,
         sort_order=image.sort_order,
+        focal_x=getattr(image, "focal_x", 50),
+        focal_y=getattr(image, "focal_y", 50),
         created_at=image.created_at,
         content_key=content_key,
         tags=tags,
+    )
+
+
+@router.patch("/admin/assets/images/{image_id}/focal", response_model=ContentImageAssetRead)
+async def admin_update_content_image_focal_point(
+    image_id: UUID,
+    payload: ContentImageFocalPointUpdate,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentImageAssetRead:
+    image = await session.scalar(select(ContentImage).where(ContentImage.id == image_id))
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    image.focal_x = int(payload.focal_x)
+    image.focal_y = int(payload.focal_y)
+    session.add(image)
+    await session.commit()
+
+    tags = (
+        await session.execute(select(ContentImageTag.tag).where(ContentImageTag.content_image_id == image_id))
+    ).scalars().all()
+    tags_sorted = sorted(set(tags))
+
+    content_key = ""
+    if getattr(image, "content_block_id", None):
+        content_key = (await session.scalar(select(ContentBlock.key).where(ContentBlock.id == image.content_block_id))) or ""
+
+    return ContentImageAssetRead(
+        id=image.id,
+        url=image.url,
+        alt_text=image.alt_text,
+        sort_order=image.sort_order,
+        focal_x=getattr(image, "focal_x", 50),
+        focal_y=getattr(image, "focal_y", 50),
+        created_at=image.created_at,
+        content_key=content_key,
+        tags=tags_sorted,
     )
 
 
@@ -376,9 +420,22 @@ async def admin_list_pages(
                 updated_at=block.updated_at,
                 published_at=block.published_at,
                 published_until=block.published_until,
+                needs_translation_en=getattr(block, "needs_translation_en", False),
+                needs_translation_ro=getattr(block, "needs_translation_ro", False),
             )
         )
     return items
+
+
+@router.patch("/admin/{key}/translation-status", response_model=ContentBlockRead)
+async def admin_update_translation_status(
+    key: str,
+    payload: ContentTranslationStatusUpdate,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> ContentBlockRead:
+    block = await content_service.set_translation_status(session, key=key, payload=payload, actor_id=admin.id)
+    return block
 
 
 @router.post("/admin/pages/{slug}/rename", response_model=ContentPageRenameResponse)

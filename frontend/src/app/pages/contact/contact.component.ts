@@ -81,6 +81,7 @@ interface ContentBlock {
                           [src]="b.url"
                           [alt]="b.alt || b.title || ''"
                           class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+                          [style.object-position]="focalPosition(b.focal_x, b.focal_y)"
                           loading="lazy"
                         />
                       </a>
@@ -89,6 +90,7 @@ interface ContentBlock {
                           [src]="b.url"
                           [alt]="b.alt || b.title || ''"
                           class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+                          [style.object-position]="focalPosition(b.focal_x, b.focal_y)"
                           loading="lazy"
                         />
                       </ng-template>
@@ -105,6 +107,7 @@ interface ContentBlock {
                             [src]="img.url"
                             [alt]="img.alt || b.title || ''"
                             class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+                            [style.object-position]="focalPosition(img.focal_x, img.focal_y)"
                             loading="lazy"
                           />
                           <p *ngIf="img.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ img.caption }}</p>
@@ -426,6 +429,12 @@ export class ContactComponent implements OnInit, OnDestroy {
     const first = parts[0]?.[0] ?? cleaned[0] ?? 'M';
     const second = parts[1]?.[0] ?? parts[0]?.[1] ?? 'S';
     return `${first}${second}`.toUpperCase();
+  }
+
+  focalPosition(focalX?: number, focalY?: number): string {
+    const x = Math.max(0, Math.min(100, Math.round(Number(focalX ?? 50))));
+    const y = Math.max(0, Math.min(100, Math.round(Number(focalY ?? 50))));
+    return `${x}% ${y}%`;
   }
 
   submit(): void {

@@ -15,6 +15,8 @@ import { CarouselBlockComponent } from '../../shared/carousel-block.component';
 interface ContentImage {
   url: string;
   alt_text?: string | null;
+  focal_x?: number;
+  focal_y?: number;
 }
 
 interface ContentBlock {
@@ -70,6 +72,7 @@ interface ContentBlock {
                         [src]="b.url"
                         [alt]="b.alt || b.title || ''"
                         class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+                        [style.object-position]="focalPosition(b.focal_x, b.focal_y)"
                         loading="lazy"
                       />
                     </a>
@@ -78,6 +81,7 @@ interface ContentBlock {
                         [src]="b.url"
                         [alt]="b.alt || b.title || ''"
                         class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+                        [style.object-position]="focalPosition(b.focal_x, b.focal_y)"
                         loading="lazy"
                       />
                     </ng-template>
@@ -94,6 +98,7 @@ interface ContentBlock {
                           [src]="img.url"
                           [alt]="img.alt || b.title || ''"
                           class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+                          [style.object-position]="focalPosition(img.focal_x, img.focal_y)"
                           loading="lazy"
                         />
                         <p *ngIf="img.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ img.caption }}</p>
@@ -125,6 +130,7 @@ interface ContentBlock {
               [src]="block()!.images[0].url"
               [alt]="block()!.images[0].alt_text || block()!.title"
               class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+              [style.object-position]="focalPosition(block()!.images[0].focal_x, block()!.images[0].focal_y)"
               loading="lazy"
             />
             <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
@@ -163,6 +169,12 @@ export class AboutComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.langSub?.unsubscribe();
+  }
+
+  focalPosition(focalX?: number, focalY?: number): string {
+    const x = Math.max(0, Math.min(100, Math.round(Number(focalX ?? 50))));
+    const y = Math.max(0, Math.min(100, Math.round(Number(focalY ?? 50))));
+    return `${x}% ${y}%`;
   }
 
   private load(): void {

@@ -21,7 +21,7 @@ from app.models.content import (
     ContentStatus,
 )
 from app.models.catalog import Category, Product, ProductStatus
-from app.schemas.content import ContentLinkCheckIssue
+from app.schemas.content import ContentLinkCheckIssue, ContentTranslationStatusUpdate
 from app.schemas.content import ContentBlockCreate, ContentBlockUpdate
 from app.services import storage
 
@@ -55,6 +55,24 @@ _LOCKED_PAGE_SLUGS = {
     "faq",
     "shipping",
 }
+
+_SUPPORTED_LANGS = {"en", "ro"}
+
+
+def _clear_needs_translation(block: ContentBlock, lang: str) -> None:
+    if lang == "en":
+        block.needs_translation_en = False
+    elif lang == "ro":
+        block.needs_translation_ro = False
+
+
+def _mark_other_needs_translation(block: ContentBlock, lang: str) -> None:
+    if lang == "en":
+        block.needs_translation_en = False
+        block.needs_translation_ro = True
+    elif lang == "ro":
+        block.needs_translation_ro = False
+        block.needs_translation_en = True
 
 
 def slugify_page_slug(value: str) -> str:
@@ -246,6 +264,7 @@ async def upsert_block(
     if "body_markdown" in data and data["body_markdown"] is not None:
         _sanitize_markdown(data["body_markdown"])
     lang = data.get("lang")
+    content_changed = any(field in data for field in ("title", "body_markdown", "meta"))
     published_at = _ensure_utc(data.get("published_at"))
     published_until = _ensure_utc(data.get("published_until"))
     if not block:
@@ -260,6 +279,12 @@ async def upsert_block(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Unpublish time must be after publish time",
                 )
+        needs_translation_en = False
+        needs_translation_ro = False
+        if lang == "en":
+            needs_translation_ro = True
+        elif lang == "ro":
+            needs_translation_en = True
         block = ContentBlock(
             key=key,
             title=data.get("title") or "",
@@ -271,6 +296,8 @@ async def upsert_block(
             meta=data.get("meta"),
             sort_order=data.get("sort_order", 0),
             lang=lang,
+            needs_translation_en=needs_translation_en,
+            needs_translation_ro=needs_translation_ro,
         )
         session.add(block)
         await session.flush()
@@ -302,6 +329,9 @@ async def upsert_block(
     # If lang is provided and differs from the base language, upsert a translation instead of touching base content.
     # Admin UI often sends lang for base edits (e.g. en), so we treat lang==block.lang (or unset base lang) as base update.
     if lang and block.lang and lang != block.lang:
+        translation_changed = (
+            ("title" in data and data["title"] is not None) or ("body_markdown" in data and data["body_markdown"] is not None)
+        )
         await session.refresh(block, attribute_names=["translations"])
         translation = next((t for t in block.translations if t.lang == lang), None)
         if translation:
@@ -320,6 +350,8 @@ async def upsert_block(
             block.translations.append(translation)
 
         block.version += 1
+        if translation_changed:
+            _clear_needs_translation(block, lang)
         session.add(block)
         translations_snapshot = _snapshot_translations(block)
         version_row = ContentBlockVersion(
@@ -367,6 +399,9 @@ async def upsert_block(
         block.sort_order = data["sort_order"]
     if "lang" in data and data["lang"] is not None:
         block.lang = data["lang"]
+    effective_lang = (block.lang or lang) if isinstance(block.lang or lang, str) else None
+    if content_changed and isinstance(effective_lang, str):
+        _mark_other_needs_translation(block, effective_lang)
     if block.status == ContentStatus.draft:
         block.published_until = None
     if block.status == ContentStatus.published:
@@ -406,6 +441,42 @@ async def add_image(session: AsyncSession, block: ContentBlock, file, actor_id: 
     audit = ContentAuditLog(content_block_id=block.id, action="image_upload", version=block.version, user_id=actor_id)
     session.add_all([image, audit])
     await session.commit()
+    await session.refresh(block, attribute_names=["images", "audits"])
+    return block
+
+
+async def set_translation_status(
+    session: AsyncSession,
+    *,
+    key: str,
+    payload: ContentTranslationStatusUpdate,
+    actor_id: UUID | None = None,
+) -> ContentBlock:
+    block = await get_block_by_key(session, key)
+    if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+    changed = False
+    if payload.needs_translation_en is not None:
+        block.needs_translation_en = bool(payload.needs_translation_en)
+        changed = True
+    if payload.needs_translation_ro is not None:
+        block.needs_translation_ro = bool(payload.needs_translation_ro)
+        changed = True
+    if not changed:
+        return block
+
+    session.add(block)
+    if actor_id is not None:
+        session.add(
+            ContentAuditLog(
+                content_block_id=block.id,
+                action="translation_status",
+                version=block.version,
+                user_id=actor_id,
+            )
+        )
+    await session.commit()
+    await session.refresh(block)
     await session.refresh(block, attribute_names=["images", "audits"])
     return block
 
@@ -530,8 +601,8 @@ def _normalize_md_url(raw: str) -> str:
     return value.strip()
 
 
-def _extract_markdown_refs(body: str) -> list[tuple[str, str, str]]:
-    refs: list[tuple[str, str, str]] = []
+def _extract_markdown_refs(body: str) -> list[tuple[str, str, str, str]]:
+    refs: list[tuple[str, str, str, str]] = []
     for match in _MD_IMAGE_RE.finditer(body or ""):
         url = _normalize_md_url(match.group(1))
         if url:
@@ -543,13 +614,13 @@ def _extract_markdown_refs(body: str) -> list[tuple[str, str, str]]:
     return refs
 
 
-def _extract_block_refs(meta: dict | None) -> list[tuple[str, str, str]]:
+def _extract_block_refs(meta: dict | None) -> list[tuple[str, str, str, str]]:
     if not isinstance(meta, dict):
         return []
     blocks = meta.get("blocks")
     if not isinstance(blocks, list):
         return []
-    refs: list[tuple[str, str, str]] = []
+    refs: list[tuple[str, str, str, str]] = []
 
     for idx, block in enumerate(blocks):
         if not isinstance(block, dict):
@@ -689,12 +760,12 @@ async def check_content_links(session: AsyncSession, *, key: str) -> list[Conten
 
     products_by_slug: dict[str, tuple[ProductStatus, bool]] = {}
     if product_slugs:
-        rows = (
+        product_rows = (
             await session.execute(
                 select(Product.slug, Product.status, Product.is_deleted).where(Product.slug.in_(product_slugs))
             )
         ).all()
-        products_by_slug = {slug: (status, bool(is_deleted)) for slug, status, is_deleted in rows}
+        products_by_slug = {slug: (status, bool(is_deleted)) for slug, status, is_deleted in product_rows}
 
     existing_categories: set[str] = set()
     if category_slugs:
@@ -716,7 +787,7 @@ async def check_content_links(session: AsyncSession, *, key: str) -> list[Conten
 
     blocks_by_key: dict[str, tuple[ContentStatus, datetime | None, datetime | None]] = {}
     if resolved_targets:
-        rows = (
+        block_rows = (
             await session.execute(
                 select(ContentBlock.key, ContentBlock.status, ContentBlock.published_at, ContentBlock.published_until).where(
                     ContentBlock.key.in_(resolved_targets)
@@ -724,7 +795,7 @@ async def check_content_links(session: AsyncSession, *, key: str) -> list[Conten
             )
         ).all()
         blocks_by_key = {
-            key: (status, published_at, published_until) for key, status, published_at, published_until in rows
+            key: (status, published_at, published_until) for key, status, published_at, published_until in block_rows
         }
 
     def is_public(status: ContentStatus, published_at: datetime | None, published_until: datetime | None) -> bool:
@@ -776,8 +847,8 @@ async def check_content_links(session: AsyncSession, *, key: str) -> list[Conten
                     )
                 )
                 continue
-            status_value, is_deleted = row
-            if is_deleted or status_value != ProductStatus.published:
+            product_status, is_deleted = row
+            if is_deleted or product_status != ProductStatus.published:
                 issues.append(
                     ContentLinkCheckIssue(
                         key=block.key,
@@ -854,8 +925,8 @@ async def check_content_links(session: AsyncSession, *, key: str) -> list[Conten
                     )
                 )
                 continue
-            status_value, published_at, published_until = target
-            if not is_public(status_value, published_at, published_until):
+            content_status, published_at, published_until = target
+            if not is_public(content_status, published_at, published_until):
                 issues.append(
                     ContentLinkCheckIssue(
                         key=block.key,

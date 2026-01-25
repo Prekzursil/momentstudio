@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import Literal
+from typing import Literal, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -118,9 +118,9 @@ async def get_checkout_settings(session: AsyncSession) -> CheckoutSettings:
     vat_apply_to_fee = _parse_bool(meta.get("vat_apply_to_fee"), fallback=DEFAULT_VAT_APPLY_TO_FEE)
     receipt_share_days = _parse_int(meta.get("receipt_share_days"), fallback=DEFAULT_RECEIPT_SHARE_DAYS)
     rounding_raw = str(meta.get("money_rounding") or DEFAULT_MONEY_ROUNDING).strip().lower()
-    money_rounding: Literal["half_up", "half_even", "up", "down"] = (
-        rounding_raw if rounding_raw in {"half_up", "half_even", "up", "down"} else DEFAULT_MONEY_ROUNDING
-    )
+    money_rounding: Literal["half_up", "half_even", "up", "down"] = DEFAULT_MONEY_ROUNDING
+    if rounding_raw in {"half_up", "half_even", "up", "down"}:
+        money_rounding = cast(Literal["half_up", "half_even", "up", "down"], rounding_raw)
     if threshold < 0:
         threshold = DEFAULT_FREE_SHIPPING_THRESHOLD_RON
     if shipping_fee < 0:

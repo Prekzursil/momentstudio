@@ -83,35 +83,41 @@ import { ToastService } from '../../../core/toast.service';
 
       <div *ngIf="!loading() && images().length" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div *ngFor="let img of images()" class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-          <div class="flex items-center justify-between gap-3">
-            <img
-              [src]="img.url"
-              [alt]="img.alt_text || 'asset'"
-              class="h-16 w-16 rounded-lg border border-slate-200 object-cover dark:border-slate-800"
-              loading="lazy"
-            />
-            <div class="flex items-center gap-2">
-              <button type="button" class="text-xs text-indigo-600 hover:underline dark:text-indigo-300" (click)="copy(img.url)">
-                {{ 'adminUi.actions.copy' | translate }}
-              </button>
-              <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="editTags(img)">
-                {{ 'adminUi.site.assets.library.tagsEdit' | translate }}
-              </button>
-              <button
-                *ngIf="allowSelect"
-                type="button"
-                class="text-xs text-emerald-700 hover:underline dark:text-emerald-300"
-                (click)="select.emit(img.url)"
-              >
-                {{ 'adminUi.actions.use' | translate }}
-              </button>
-            </div>
-          </div>
+	          <div class="flex items-center justify-between gap-3">
+	            <img
+	              [src]="img.url"
+	              [alt]="img.alt_text || 'asset'"
+	              class="h-16 w-16 rounded-lg border border-slate-200 object-cover dark:border-slate-800"
+	              loading="lazy"
+	            />
+	            <div class="flex items-center gap-2">
+	              <button type="button" class="text-xs text-indigo-600 hover:underline dark:text-indigo-300" (click)="copy(img.url)">
+	                {{ 'adminUi.actions.copy' | translate }}
+	              </button>
+	              <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="editTags(img)">
+	                {{ 'adminUi.site.assets.library.tagsEdit' | translate }}
+	              </button>
+	              <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="editFocalPoint(img)">
+	                {{ 'adminUi.site.assets.library.focalEdit' | translate }}
+	              </button>
+	              <button
+	                *ngIf="allowSelect"
+	                type="button"
+	                class="text-xs text-emerald-700 hover:underline dark:text-emerald-300"
+	                (click)="useAsset(img)"
+	              >
+	                {{ 'adminUi.actions.use' | translate }}
+	              </button>
+	            </div>
+	          </div>
           <p class="mt-2 text-xs text-slate-600 dark:text-slate-300 truncate">{{ img.url }}</p>
-          <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-            {{ img.content_key }} · {{ img.created_at | date: 'short' }}
-          </p>
-          <div *ngIf="img.tags?.length" class="mt-2 flex flex-wrap gap-1">
+	          <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+	            {{ img.content_key }} · {{ img.created_at | date: 'short' }}
+	          </p>
+	          <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+	            {{ 'adminUi.site.assets.library.focalLabel' | translate: { x: img.focal_x, y: img.focal_y } }}
+	          </p>
+	          <div *ngIf="img.tags?.length" class="mt-2 flex flex-wrap gap-1">
             <button
               *ngFor="let t of img.tags"
               type="button"
@@ -155,6 +161,7 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
   @Input() initialKey = '';
 
   @Output() select = new EventEmitter<string>();
+  @Output() selectAsset = new EventEmitter<ContentImageAssetRead>();
 
   q = '';
   key = '';
@@ -275,6 +282,43 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
       },
       error: () => this.toast.error(this.t('adminUi.site.assets.library.tagsErrorsSave'))
     });
+  }
+
+  editFocalPoint(img: ContentImageAssetRead): void {
+    const id = (img?.id || '').trim();
+    if (!id) return;
+    const currentX = Number.isFinite(img.focal_x as any) ? Number(img.focal_x) : 50;
+    const currentY = Number.isFinite(img.focal_y as any) ? Number(img.focal_y) : 50;
+    const entered = window.prompt(this.t('adminUi.site.assets.library.focalPrompt'), `${currentX}, ${currentY}`);
+    if (entered === null) return;
+    const parts = entered
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (parts.length < 2) {
+      this.toast.error(this.t('adminUi.site.assets.library.focalErrorsFormat'));
+      return;
+    }
+    const focalX = Math.max(0, Math.min(100, Math.round(Number(parts[0]))));
+    const focalY = Math.max(0, Math.min(100, Math.round(Number(parts[1]))));
+    if (!Number.isFinite(focalX) || !Number.isFinite(focalY)) {
+      this.toast.error(this.t('adminUi.site.assets.library.focalErrorsFormat'));
+      return;
+    }
+    this.admin.updateContentImageFocalPoint(id, focalX, focalY).subscribe({
+      next: (updated) => {
+        this.images.set(this.images().map((item) => (item.id === id ? { ...item, focal_x: updated.focal_x, focal_y: updated.focal_y } : item)));
+        this.toast.success(this.t('adminUi.site.assets.library.focalSaved'));
+      },
+      error: () => this.toast.error(this.t('adminUi.site.assets.library.focalErrorsSave'))
+    });
+  }
+
+  useAsset(img: ContentImageAssetRead): void {
+    const url = (img?.url || '').trim();
+    if (!url) return;
+    this.select.emit(url);
+    this.selectAsset.emit(img);
   }
 
   private t(key: string, params?: Record<string, unknown>): string {
