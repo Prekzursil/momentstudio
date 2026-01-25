@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic import field_validator
 
-from app.models.catalog import ProductStatus, ShippingClass, StockAdjustmentReason
+from app.models.catalog import ProductBadgeType, ProductStatus, ShippingClass, StockAdjustmentReason
 
 
 _ALLOWED_COURIERS: set[str] = {"sameday", "fan_courier"}
@@ -235,6 +235,18 @@ class TagRead(BaseModel):
     slug: str
 
 
+class ProductBadgeUpsert(BaseModel):
+    badge: ProductBadgeType
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+
+
+class ProductBadgeRead(ProductBadgeUpsert):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+
+
 class FeaturedCollectionBase(BaseModel):
     slug: str = Field(min_length=1, max_length=120)
     name: str = Field(min_length=1, max_length=160)
@@ -293,6 +305,7 @@ class ProductCreate(ProductFields):
     images: list[ProductImageCreate] = []
     variants: list[ProductVariantCreate] = []
     tags: list[str] = []
+    badges: list[ProductBadgeUpsert] = []
     options: list[ProductOptionCreate] = []
     status: ProductStatus = ProductStatus.draft
 
@@ -320,6 +333,7 @@ class ProductUpdate(BaseModel):
     publish_scheduled_for: datetime | None = None
     unpublish_scheduled_for: datetime | None = None
     tags: list[str] | None = None
+    badges: list[ProductBadgeUpsert] | None = None
     options: list[ProductOptionCreate] | None = None
     allow_backorder: bool | None = None
     restock_at: datetime | None = None
@@ -458,6 +472,7 @@ class ProductRead(ProductBase):
     variants: list[ProductVariantRead] = []
     options: list[ProductOptionRead] = []
     tags: list[TagRead] = []
+    badges: list[ProductBadgeRead] = []
     reviews: list[ProductReviewRead] = []
     featured_collections: list[FeaturedCollectionBase] = []
 
@@ -474,6 +489,7 @@ class ProductReadBrief(BaseModel):
     is_featured: bool
     status: ProductStatus
     tags: list[TagRead] = []
+    badges: list[ProductBadgeRead] = []
 
 
 class ProductFeedItem(BaseModel):

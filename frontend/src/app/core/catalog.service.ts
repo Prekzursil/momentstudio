@@ -25,6 +25,15 @@ export interface ProductVariant {
   stock_quantity: number | null;
 }
 
+export type ProductBadgeType = 'new' | 'limited' | 'handmade';
+
+export interface ProductBadge {
+  id: string;
+  badge: ProductBadgeType;
+  start_at?: string | null;
+  end_at?: string | null;
+}
+
 export interface Product {
   id: string;
   slug: string;
@@ -42,6 +51,7 @@ export interface Product {
   rating_count?: number;
   images?: ProductImage[];
   tags?: { slug: string; name: string }[];
+  badges?: ProductBadge[];
   variants?: ProductVariant[];
 }
 

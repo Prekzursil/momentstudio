@@ -899,6 +899,11 @@
     "reviews": "{{count}} review-uri",
     "soldOut": "Stoc epuizat",
     "lowStock": "Stoc redus",
+    "badges": {
+      "new": "Nou",
+      "limited": "Limitat",
+      "handmade": "Făcut manual"
+    },
     "notifyBackInStock": "Anunță-mă când revine în stoc",
     "notifyRequested": "Solicitat",
     "notifyCancel": "Anulează solicitarea",
@@ -2232,6 +2237,19 @@
       "markdownPreview": {
         "title": "Previzualizare",
         "sanitizedWarning": "Unele elemente HTML au fost eliminate pentru siguranță. Verifică previzualizarea."
+      },
+      "badges": {
+        "title": "Badge-uri",
+        "hint": "Badge-uri opționale afișate în magazin, cu programare.",
+        "new": "Nou",
+        "limited": "Limitat",
+        "handmade": "Făcut manual",
+        "startAt": "Începe la",
+        "endAt": "Se termină la",
+        "errors": {
+          "invalidDate": "Introdu o dată validă pentru început/sfârșit.",
+          "endBeforeStart": "Sfârșitul trebuie să fie după început."
+        }
       },
       "shipping": {
         "title": "Livrare",

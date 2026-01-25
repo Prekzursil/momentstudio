@@ -103,6 +103,8 @@ export class ProductCardComponent {
   get badge(): string | null {
     if (this.tag) return this.tag;
     if (this.isOnSale) return this.translate.instant('shop.sale');
+    const promoBadge = this.activeProductBadge;
+    if (promoBadge) return this.translate.instant(`product.badges.${promoBadge}`);
     const tagName = this.product.tags?.[0]?.name;
     if (tagName) return tagName;
     return this.stockBadge;
@@ -125,6 +127,25 @@ export class ProductCardComponent {
     if (this.product.stock_quantity === 0) return this.translate.instant('product.soldOut');
     if ((this.product.stock_quantity ?? 0) < 5) return this.translate.instant('product.lowStock');
     return null;
+  }
+
+  private get activeProductBadge(): string | null {
+    const badges = Array.isArray(this.product?.badges) ? this.product.badges : [];
+    if (!badges.length) return null;
+    const now = Date.now();
+    const isActive = (badge: any): boolean => {
+      const startMs = badge?.start_at ? new Date(badge.start_at).getTime() : null;
+      const endMs = badge?.end_at ? new Date(badge.end_at).getTime() : null;
+      if (typeof startMs === 'number' && Number.isFinite(startMs) && now < startMs) return false;
+      if (typeof endMs === 'number' && Number.isFinite(endMs) && now >= endMs) return false;
+      return true;
+    };
+    const active = badges.filter(isActive).map((b: any) => String(b?.badge || '').trim()).filter(Boolean);
+    const priority = ['limited', 'new', 'handmade'];
+    for (const key of priority) {
+      if (active.includes(key)) return key;
+    }
+    return active[0] ?? null;
   }
 
   toggleWishlist(event: MouseEvent): void {

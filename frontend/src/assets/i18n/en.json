@@ -899,6 +899,11 @@
     "reviews": "{{count}} review(s)",
     "soldOut": "Sold out",
     "lowStock": "Low stock",
+    "badges": {
+      "new": "New",
+      "limited": "Limited",
+      "handmade": "Handmade"
+    },
     "notifyBackInStock": "Notify me when back in stock",
     "notifyRequested": "Requested",
     "notifyCancel": "Cancel request",
@@ -2232,6 +2237,19 @@
       "markdownPreview": {
         "title": "Preview",
         "sanitizedWarning": "Some HTML was removed for safety. Review the preview output."
+      },
+      "badges": {
+        "title": "Badges",
+        "hint": "Optional storefront badges with scheduling.",
+        "new": "New",
+        "limited": "Limited",
+        "handmade": "Handmade",
+        "startAt": "Start at",
+        "endAt": "End at",
+        "errors": {
+          "invalidDate": "Enter a valid start/end date.",
+          "endBeforeStart": "Badge end must be after badge start."
+        }
       },
       "shipping": {
         "title": "Shipping",

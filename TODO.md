@@ -734,7 +734,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Products: markdown preview – Inline preview for descriptions with sanitation warnings.
 - [x] Admin Products: per-product shipping overrides – Set weight/size shipping class and exceptions.
 - [x] Admin Products: translation completeness – Dashboard for missing RO/EN fields (name/description/content).
-- [ ] Admin Products: feature flags per product – Toggle badges like “New”, “Limited”, “Handmade” with scheduling.
+- [x] Admin Products: feature flags per product – Toggle badges like “New”, “Limited”, “Handmade” with scheduling.
 - [ ] Admin Users: customer profile page – View user details, addresses, orders, tickets, and activity.
 - [ ] Admin Users: internal customer notes – Add private notes + “VIP” flag with audit trail.
 - [ ] Admin Users: safe impersonation – View storefront as a user (read-only) with explicit audit + timeout.

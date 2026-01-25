@@ -57,6 +57,12 @@ class ProductRelationshipType(str, enum.Enum):
     upsell = "upsell"
 
 
+class ProductBadgeType(str, enum.Enum):
+    new = "new"
+    limited = "limited"
+    handmade = "handmade"
+
+
 product_tags = Table(
     "product_tags",
     Base.metadata,
@@ -143,6 +149,9 @@ class Product(Base):
         "ProductVariant", back_populates="product", cascade="all, delete-orphan", lazy="selectin"
     )
     tags: Mapped[list["Tag"]] = relationship("Tag", secondary=product_tags, back_populates="products", lazy="selectin")
+    badges: Mapped[list["ProductBadge"]] = relationship(
+        "ProductBadge", back_populates="product", cascade="all, delete-orphan", lazy="selectin"
+    )
     options: Mapped[list["ProductOption"]] = relationship(
         "ProductOption", back_populates="product", cascade="all, delete-orphan", lazy="selectin"
     )
@@ -174,6 +183,35 @@ class Product(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+
+
+class ProductBadge(Base):
+    __tablename__ = "product_badges"
+    __table_args__ = (UniqueConstraint("product_id", "badge", name="uq_product_badges_unique"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("products.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    badge: Mapped[ProductBadgeType] = mapped_column(
+        Enum(ProductBadgeType, name="productbadgetype", native_enum=False),
+        nullable=False,
+        index=True,
+    )
+    start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    end_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    product: Mapped["Product"] = relationship("Product", back_populates="badges")
 
 
 class ProductRelationship(Base):

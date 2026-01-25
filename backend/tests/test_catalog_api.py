@@ -132,12 +132,27 @@ def test_catalog_admin_and_public_flows(test_app: Dict[str, object]) -> None:
     assert second.status_code == 201, second.text
     assert second.json()["status"] == "published"
 
+    badge_update = client.patch(
+        "/api/v1/catalog/products/blue-cup",
+        json={
+            "badges": [
+                {"badge": "new", "start_at": None, "end_at": None},
+                {"badge": "limited", "start_at": datetime.now(timezone.utc).isoformat(), "end_at": None},
+            ]
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert badge_update.status_code == 200, badge_update.text
+    badge_payload = badge_update.json()["badges"]
+    assert {b["badge"] for b in badge_payload} == {"new", "limited"}
+
     # Public list should only include published + active products
     res = client.get("/api/v1/catalog/products?sort=name_asc")
     assert res.status_code == 200
     body = res.json()
     assert body["meta"]["total_items"] == 1
     assert len(body["items"]) == 1
+    assert {b["badge"] for b in body["items"][0].get("badges", [])} == {"new", "limited"}
     assert body["bounds"]["min_price"] == 25.0
     assert body["bounds"]["max_price"] == 25.0
     assert body["bounds"]["currency"] == "RON"

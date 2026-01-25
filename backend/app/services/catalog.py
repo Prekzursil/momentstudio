@@ -17,6 +17,7 @@ from app.models.catalog import (
     Category,
     CategoryTranslation,
     Product,
+    ProductBadge,
     ProductRelationship,
     ProductRelationshipType,
     ProductImage,
@@ -446,6 +447,26 @@ def _validate_sale_schedule(*, sale_start_at: datetime | None, sale_end_at: date
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sale start is required for auto-publish")
 
 
+def _build_product_badges(payload: list[dict[str, object]]) -> list[ProductBadge]:
+    seen: set[object] = set()
+    badges: list[ProductBadge] = []
+    for item in payload:
+        badge = item.get("badge")
+        if not badge:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Badge is required")
+        if badge in seen:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Duplicate badge")
+        seen.add(badge)
+        start_at_raw = item.get("start_at")
+        end_at_raw = item.get("end_at")
+        start_at = _tz_aware(start_at_raw) if isinstance(start_at_raw, datetime) else None
+        end_at = _tz_aware(end_at_raw) if isinstance(end_at_raw, datetime) else None
+        if start_at and end_at and end_at < start_at:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Badge end must be after badge start")
+        badges.append(ProductBadge(badge=badge, start_at=start_at, end_at=end_at))
+    return badges
+
+
 def is_sale_active(product: Product, *, now: datetime | None = None) -> bool:
     sale_price = getattr(product, "sale_price", None)
     if sale_price is None:
@@ -709,7 +730,7 @@ async def create_product(
 
     images_payload = payload.images or []
     variants_payload: list[ProductVariantCreate] = getattr(payload, "variants", []) or []
-    product_data = payload.model_dump(exclude={"images", "variants", "tags", "options"})
+    product_data = payload.model_dump(exclude={"images", "variants", "tags", "badges", "options"})
     product_data["slug"] = candidate_slug
     product_data["sku"] = sku
     product_data["currency"] = payload.currency.upper()
@@ -720,6 +741,8 @@ async def create_product(
     product.variants = [ProductVariant(**variant.model_dump()) for variant in variants_payload]
     if payload.tags:
         product.tags = await _get_or_create_tags(session, payload.tags)
+    if payload.badges:
+        product.badges = _build_product_badges([b.model_dump() for b in payload.badges])
     if payload.options:
         product.options = [ProductOption(**opt.model_dump()) for opt in payload.options]
     session.add(product)
@@ -780,6 +803,14 @@ async def update_product(
     )
     before_snapshot = {field: getattr(product, field, None) for field in tracked_fields}
     before_tags = [getattr(tag, "slug", None) for tag in getattr(product, "tags", []) or []]
+    before_badges = [
+        (
+            getattr(badge, "badge", None),
+            _tz_aware(getattr(badge, "start_at", None)),
+            _tz_aware(getattr(badge, "end_at", None)),
+        )
+        for badge in getattr(product, "badges", []) or []
+    ]
     before_options = [
         (getattr(opt, "option_name", None), getattr(opt, "option_value", None))
         for opt in getattr(product, "options", []) or []
@@ -794,6 +825,12 @@ async def update_product(
             product.tags = []
         else:
             product.tags = await _get_or_create_tags(session, tags_payload)
+    if "badges" in data:
+        badges_payload = data.pop("badges")
+        if badges_payload is None:
+            product.badges = []
+        else:
+            product.badges = _build_product_badges(badges_payload)
     if "options" in data:
         options_payload = data.pop("options")
         if options_payload is None:
@@ -842,6 +879,14 @@ async def update_product(
     _set_publish_timestamp(product, product.status)
 
     after_tags = [getattr(tag, "slug", None) for tag in getattr(product, "tags", []) or []]
+    after_badges = [
+        (
+            getattr(badge, "badge", None),
+            _tz_aware(getattr(badge, "start_at", None)),
+            _tz_aware(getattr(badge, "end_at", None)),
+        )
+        for badge in getattr(product, "badges", []) or []
+    ]
     after_options = [
         (getattr(opt, "option_name", None), getattr(opt, "option_value", None))
         for opt in getattr(product, "options", []) or []
@@ -854,6 +899,8 @@ async def update_product(
             changes[field] = {"before": before_value, "after": after_value}
     if before_tags != after_tags:
         changes["tags"] = {"before": before_tags, "after": after_tags}
+    if before_badges != after_badges:
+        changes["badges"] = {"before": before_badges, "after": after_badges}
     if before_options != after_options:
         changes["options"] = {"before": before_options, "after": after_options}
 
@@ -1658,6 +1705,9 @@ async def duplicate_product(session: AsyncSession, product: Product) -> Product:
         width_cm=product.width_cm,
         height_cm=product.height_cm,
         depth_cm=product.depth_cm,
+        shipping_class=product.shipping_class,
+        shipping_allow_locker=product.shipping_allow_locker,
+        shipping_disallowed_couriers=list(getattr(product, "shipping_disallowed_couriers", []) or []),
         meta_title=product.meta_title,
         meta_description=product.meta_description,
     )
@@ -1668,6 +1718,7 @@ async def duplicate_product(session: AsyncSession, product: Product) -> Product:
     ]
     clone.options = [ProductOption(option_name=opt.option_name, option_value=opt.option_value) for opt in product.options]
     clone.tags = product.tags.copy()
+    clone.badges = [ProductBadge(badge=badge.badge, start_at=badge.start_at, end_at=badge.end_at) for badge in product.badges]
     session.add(clone)
     await session.commit()
     await session.refresh(clone)

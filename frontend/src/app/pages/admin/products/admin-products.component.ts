@@ -32,6 +32,14 @@ import { ToastService } from '../../../core/toast.service';
 
 type ProductStatusFilter = 'all' | 'draft' | 'published' | 'archived';
 
+type ProductBadgeKey = 'new' | 'limited' | 'handmade';
+
+type BadgeForm = {
+  enabled: boolean;
+  start_at: string;
+  end_at: string;
+};
+
 type ProductForm = {
   name: string;
   category_id: string;
@@ -59,6 +67,7 @@ type ProductForm = {
   long_description: string;
   publish_at: string;
   is_bestseller: boolean;
+  badges: Record<ProductBadgeKey, BadgeForm>;
 };
 
 type ProductTranslationForm = {
@@ -949,6 +958,100 @@ type VariantRow = {
             <input type="checkbox" [(ngModel)]="form.is_bestseller" />
             {{ 'adminUi.products.form.bestseller' | translate }}
           </label>
+
+          <div class="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.products.badges.title' | translate }}
+              </p>
+              <span class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.products.badges.hint' | translate }}
+              </span>
+            </div>
+
+            <div class="mt-3 grid gap-4">
+              <div class="grid gap-3 md:grid-cols-3 items-end">
+                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
+                  <input type="checkbox" [(ngModel)]="form.badges.new.enabled" />
+                  {{ 'adminUi.products.badges.new' | translate }}
+                </label>
+
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.products.badges.startAt' | translate }}
+                  <input
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    type="datetime-local"
+                    [(ngModel)]="form.badges.new.start_at"
+                    [disabled]="!form.badges.new.enabled"
+                  />
+                </label>
+
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.products.badges.endAt' | translate }}
+                  <input
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    type="datetime-local"
+                    [(ngModel)]="form.badges.new.end_at"
+                    [disabled]="!form.badges.new.enabled"
+                  />
+                </label>
+              </div>
+
+              <div class="grid gap-3 md:grid-cols-3 items-end">
+                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
+                  <input type="checkbox" [(ngModel)]="form.badges.limited.enabled" />
+                  {{ 'adminUi.products.badges.limited' | translate }}
+                </label>
+
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.products.badges.startAt' | translate }}
+                  <input
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    type="datetime-local"
+                    [(ngModel)]="form.badges.limited.start_at"
+                    [disabled]="!form.badges.limited.enabled"
+                  />
+                </label>
+
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.products.badges.endAt' | translate }}
+                  <input
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    type="datetime-local"
+                    [(ngModel)]="form.badges.limited.end_at"
+                    [disabled]="!form.badges.limited.enabled"
+                  />
+                </label>
+              </div>
+
+              <div class="grid gap-3 md:grid-cols-3 items-end">
+                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
+                  <input type="checkbox" [(ngModel)]="form.badges.handmade.enabled" />
+                  {{ 'adminUi.products.badges.handmade' | translate }}
+                </label>
+
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.products.badges.startAt' | translate }}
+                  <input
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    type="datetime-local"
+                    [(ngModel)]="form.badges.handmade.start_at"
+                    [disabled]="!form.badges.handmade.enabled"
+                  />
+                </label>
+
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.products.badges.endAt' | translate }}
+                  <input
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    type="datetime-local"
+                    [(ngModel)]="form.badges.handmade.end_at"
+                    [disabled]="!form.badges.handmade.enabled"
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
 
           <div class="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
             <div class="flex flex-wrap items-center justify-between gap-3">
@@ -1996,6 +2099,7 @@ export class AdminProductsComponent implements OnInit {
   adminCategories = signal<Array<{ id: string; name: string }>>([]);
 
   form: ProductForm = this.blankForm();
+  private loadedTagSlugs: string[] = [];
   basePriceError = '';
   saleValueError = '';
   descriptionPreviewOpen = signal(false);
@@ -2718,6 +2822,7 @@ export class AdminProductsComponent implements OnInit {
 		    this.editingProductId.set(null);
 		    this.editorError.set(null);
 		    this.editorMessage.set(null);
+        this.loadedTagSlugs = [];
 		    this.resetDuplicateCheck();
 		    this.resetRelationships();
 		    this.resetAudit();
@@ -2741,6 +2846,7 @@ export class AdminProductsComponent implements OnInit {
 		    this.editingProductId.set(null);
 		    this.editorError.set(null);
 		    this.editorMessage.set(null);
+        this.loadedTagSlugs = [];
 		    this.resetDuplicateCheck();
 		    this.resetRelationships();
 		    this.resetAudit();
@@ -2794,6 +2900,22 @@ export class AdminProductsComponent implements OnInit {
         const saleEnabled =
           (typeof prod.sale_price === 'number' && Number.isFinite(prod.sale_price)) ||
           (rawSaleType && Number.isFinite(saleValueNum) && saleValueNum > 0);
+        const tagSlugs = this.parseTagSlugs(prod.tags);
+        this.loadedTagSlugs = tagSlugs;
+        const badgesState: Record<ProductBadgeKey, BadgeForm> = {
+          new: { enabled: false, start_at: '', end_at: '' },
+          limited: { enabled: false, start_at: '', end_at: '' },
+          handmade: { enabled: false, start_at: '', end_at: '' }
+        };
+        const rawBadges = Array.isArray(prod.badges) ? prod.badges : [];
+        for (const raw of rawBadges) {
+          const badgeKey = String(raw?.badge ?? '').trim();
+          if (badgeKey !== 'new' && badgeKey !== 'limited' && badgeKey !== 'handmade') continue;
+          const key = badgeKey as ProductBadgeKey;
+          badgesState[key].enabled = true;
+          badgesState[key].start_at = raw?.start_at ? this.toLocalDateTime(raw.start_at) : '';
+          badgesState[key].end_at = raw?.end_at ? this.toLocalDateTime(raw.end_at) : '';
+        }
         this.form = {
           name: prod.name || '',
           category_id: prod.category_id || '',
@@ -2828,7 +2950,8 @@ export class AdminProductsComponent implements OnInit {
           short_description: (prod.short_description || '').toString(),
           long_description: (prod.long_description || '').toString(),
           publish_at: prod.publish_at ? this.toLocalDateTime(prod.publish_at) : '',
-          is_bestseller: Array.isArray(prod.tags) ? prod.tags.includes('bestseller') : false
+          is_bestseller: tagSlugs.includes('bestseller'),
+          badges: badgesState
         };
         this.images.set(Array.isArray(prod.images) ? prod.images : []);
         this.setVariantsFromProduct(prod);
@@ -3122,6 +3245,31 @@ export class AdminProductsComponent implements OnInit {
     if (this.form.shipping_disallowed_couriers?.sameday) shipping_disallowed_couriers.push('sameday');
     if (this.form.shipping_disallowed_couriers?.fan_courier) shipping_disallowed_couriers.push('fan_courier');
 
+    const badges: Array<{ badge: ProductBadgeKey; start_at: string | null; end_at: string | null }> = [];
+    for (const badge of ['new', 'limited', 'handmade'] as const) {
+      const state = this.form.badges?.[badge];
+      if (!state?.enabled) continue;
+      const startDate = state.start_at ? new Date(state.start_at) : null;
+      const endDate = state.end_at ? new Date(state.end_at) : null;
+      if (startDate && Number.isNaN(startDate.getTime())) {
+        this.editorError.set(this.t('adminUi.products.badges.errors.invalidDate'));
+        return;
+      }
+      if (endDate && Number.isNaN(endDate.getTime())) {
+        this.editorError.set(this.t('adminUi.products.badges.errors.invalidDate'));
+        return;
+      }
+      if (startDate && endDate && endDate.getTime() < startDate.getTime()) {
+        this.editorError.set(this.t('adminUi.products.badges.errors.endBeforeStart'));
+        return;
+      }
+      badges.push({
+        badge,
+        start_at: startDate ? startDate.toISOString() : null,
+        end_at: endDate ? endDate.toISOString() : null
+      });
+    }
+
     const payload: any = {
       name: this.form.name,
       category_id: this.form.category_id,
@@ -3147,7 +3295,8 @@ export class AdminProductsComponent implements OnInit {
       long_description: this.form.long_description || null,
       short_description: this.form.short_description.trim() ? this.form.short_description.trim().slice(0, 280) : null,
       publish_at: this.form.publish_at ? new Date(this.form.publish_at).toISOString() : null,
-      tags: this.buildTags()
+      tags: this.buildTags(),
+      badges
     };
 
     const slug = this.editingSlug();
@@ -3158,6 +3307,7 @@ export class AdminProductsComponent implements OnInit {
         this.editorMessage.set(this.t('adminUi.products.success.save'));
         const newSlug = (prod?.slug as string | undefined) || slug || null;
         this.editingSlug.set(newSlug);
+        this.loadedTagSlugs = this.parseTagSlugs(prod?.tags);
         if (!this.editingProductId() && prod?.id) {
           this.editingProductId.set(String(prod.id));
           this.loadStockAdjustments(String(prod.id));
@@ -3942,7 +4092,12 @@ export class AdminProductsComponent implements OnInit {
       short_description: '',
       long_description: '',
       publish_at: '',
-      is_bestseller: false
+      is_bestseller: false,
+      badges: {
+        new: { enabled: false, start_at: '', end_at: '' },
+        limited: { enabled: false, start_at: '', end_at: '' },
+        handmade: { enabled: false, start_at: '', end_at: '' }
+      }
     };
   }
 
@@ -4104,10 +4259,31 @@ export class AdminProductsComponent implements OnInit {
     });
   }
 
+  private parseTagSlugs(raw: unknown): string[] {
+    if (!Array.isArray(raw)) return [];
+    const slugs = raw
+      .map((tag: any) => (typeof tag === 'string' ? tag : tag?.slug))
+      .map((slug: any) => (slug ?? '').toString().trim())
+      .filter(Boolean);
+    const seen = new Set<string>();
+    const unique: string[] = [];
+    for (const slug of slugs) {
+      const normalized = slug.toLowerCase();
+      if (seen.has(normalized)) continue;
+      seen.add(normalized);
+      unique.push(normalized);
+    }
+    return unique;
+  }
+
   private buildTags(): string[] {
-    const tags: string[] = [];
-    if (this.form.is_bestseller) tags.push('bestseller');
-    return tags;
+    const seen = new Set<string>(this.loadedTagSlugs.map((t) => (t ?? '').toString().trim().toLowerCase()).filter(Boolean));
+    if (this.form.is_bestseller) {
+      seen.add('bestseller');
+    } else {
+      seen.delete('bestseller');
+    }
+    return Array.from(seen);
   }
 
   private toLocalDateTime(value: string): string {
