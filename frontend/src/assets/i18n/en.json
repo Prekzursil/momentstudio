@@ -1668,6 +1668,12 @@
         "metaTitle": "Meta title",
         "metaDescription": "Meta description",
         "save": "Save SEO",
+        "sitemapPreview": {
+          "title": "Sitemap preview",
+          "hint": "Shows the exact URLs included in sitemap.xml per language.",
+          "load": "Load preview",
+          "errors": { "load": "Could not load sitemap preview." }
+        },
         "success": { "save": "SEO saved." },
         "errors": { "save": "Could not save SEO." }
       },
@@ -1709,11 +1715,22 @@
           "title": "Redirects",
           "hint": "Created automatically when changing a page URL. Stale redirects point to missing content.",
           "search": "Search redirects",
+          "export": "Export CSV",
+          "import": "Import CSV",
+          "importResult": "{{created}} created, {{updated}} updated, {{skipped}} unchanged.",
+          "importErrors": "Some rows were skipped:",
           "empty": "No redirects found.",
           "stale": "Stale redirect: target page no longer exists.",
+          "loop": "Redirect loop detected.",
+          "tooDeep": "Redirect chain too deep.",
           "deleteConfirm": "Delete this redirect?",
-          "success": { "deleted": "Redirect deleted." },
-          "errors": { "load": "Could not load redirects.", "delete": "Could not delete redirect." }
+          "success": { "deleted": "Redirect deleted.", "export": "Redirects exported.", "import": "Redirects imported." },
+          "errors": {
+            "load": "Could not load redirects.",
+            "delete": "Could not delete redirect.",
+            "export": "Could not export redirects.",
+            "import": "Could not import redirects."
+          }
         },
         "success": { "save": "Content saved.", "created": "Page created." },
         "errors": {

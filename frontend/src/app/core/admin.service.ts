@@ -476,11 +476,30 @@ export interface ContentRedirectRead {
   created_at: string;
   updated_at: string;
   target_exists: boolean;
+  chain_error?: 'loop' | 'too_deep' | null;
 }
 
 export interface ContentRedirectListResponse {
   items: ContentRedirectRead[];
   meta: { total_items: number; total_pages: number; page: number; limit: number };
+}
+
+export interface ContentRedirectImportError {
+  line: number;
+  from_value?: string | null;
+  to_value?: string | null;
+  error: string;
+}
+
+export interface ContentRedirectImportResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  errors?: ContentRedirectImportError[];
+}
+
+export interface SitemapPreviewResponse {
+  by_lang: Record<string, string[]>;
 }
 
 export interface ContentImageAssetRead {
@@ -931,5 +950,19 @@ export class AdminService {
 
   deleteContentRedirect(id: string): Observable<void> {
     return this.api.delete<void>(`/content/admin/redirects/${encodeURIComponent(id)}`);
+  }
+
+  exportContentRedirects(params?: { q?: string }): Observable<Blob> {
+    return this.api.getBlob('/content/admin/redirects/export', params as any);
+  }
+
+  importContentRedirects(file: File): Observable<ContentRedirectImportResult> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.api.post<ContentRedirectImportResult>('/content/admin/redirects/import', form);
+  }
+
+  getSitemapPreview(): Observable<SitemapPreviewResponse> {
+    return this.api.get<SitemapPreviewResponse>('/content/admin/seo/sitemap-preview');
   }
 }

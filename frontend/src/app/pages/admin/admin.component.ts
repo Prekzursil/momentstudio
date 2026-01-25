@@ -27,6 +27,7 @@ import {
   ContentBlockVersionRead,
   ContentPageListItem,
   ContentRedirectRead,
+  ContentRedirectImportResult,
   ContentLinkCheckIssue
 } from '../../core/admin.service';
 import { AdminBlogComment, BlogService } from '../../core/blog.service';
@@ -444,12 +445,68 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                 ></textarea>
               </label>
             </div>
-            <div class="flex items-center gap-2 text-sm">
-              <app-button size="sm" [label]="'adminUi.site.seo.save' | translate" (action)="saveSeo()"></app-button>
-              <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="seoMessage">{{ seoMessage }}</span>
-              <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="seoError">{{ seoError }}</span>
-            </div>
-          </section>
+	            <div class="flex items-center gap-2 text-sm">
+	              <app-button size="sm" [label]="'adminUi.site.seo.save' | translate" (action)="saveSeo()"></app-button>
+	              <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="seoMessage">{{ seoMessage }}</span>
+	              <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="seoError">{{ seoError }}</span>
+	            </div>
+
+	            <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+	              <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+	                {{ 'adminUi.site.seo.sitemapPreview.title' | translate }}
+	              </summary>
+	              <div class="mt-3 grid gap-3">
+	                <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.site.seo.sitemapPreview.hint' | translate }}</p>
+	                <div class="flex flex-wrap items-center gap-2">
+	                  <app-button
+	                    size="sm"
+	                    variant="ghost"
+	                    [disabled]="sitemapPreviewLoading"
+	                    [label]="'adminUi.site.seo.sitemapPreview.load' | translate"
+	                    (action)="loadSitemapPreview()"
+	                  ></app-button>
+	                  <span *ngIf="sitemapPreviewError" class="text-xs text-rose-700 dark:text-rose-300">{{ sitemapPreviewError }}</span>
+	                </div>
+	                <div *ngIf="sitemapPreviewLoading" class="text-sm text-slate-600 dark:text-slate-300">
+	                  {{ 'notifications.loading' | translate }}
+	                </div>
+	                <div *ngIf="!sitemapPreviewLoading && sitemapPreviewByLang" class="grid gap-3 md:grid-cols-2">
+	                  <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+	                    <h3 class="font-semibold text-slate-900 dark:text-slate-50">
+	                      EN ({{ sitemapPreviewByLang['en']?.length || 0 }})
+	                    </h3>
+	                    <div class="mt-2 grid gap-1 text-[11px]">
+	                      <a
+	                        *ngFor="let url of (sitemapPreviewByLang['en'] || [])"
+	                        [href]="url"
+	                        target="_blank"
+	                        rel="noopener noreferrer"
+	                        class="truncate text-indigo-600 hover:underline dark:text-indigo-300"
+	                      >
+	                        {{ url }}
+	                      </a>
+	                    </div>
+	                  </div>
+	                  <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+	                    <h3 class="font-semibold text-slate-900 dark:text-slate-50">
+	                      RO ({{ sitemapPreviewByLang['ro']?.length || 0 }})
+	                    </h3>
+	                    <div class="mt-2 grid gap-1 text-[11px]">
+	                      <a
+	                        *ngFor="let url of (sitemapPreviewByLang['ro'] || [])"
+	                        [href]="url"
+	                        target="_blank"
+	                        rel="noopener noreferrer"
+	                        class="truncate text-indigo-600 hover:underline dark:text-indigo-300"
+	                      >
+	                        {{ url }}
+	                      </a>
+	                    </div>
+	                  </div>
+	                </div>
+	              </div>
+	            </details>
+	          </section>
 
           <section *ngIf="section() === 'pages'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
@@ -1185,6 +1242,32 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                   <div class="flex flex-wrap gap-2 items-end">
                     <app-input [label]="'adminUi.site.pages.redirects.search' | translate" [(value)]="redirectsQuery"></app-input>
                     <app-button size="sm" variant="ghost" [label]="'adminUi.actions.search' | translate" (action)="loadContentRedirects(true)"></app-button>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.site.pages.redirects.export' | translate"
+                      [disabled]="redirectsExporting"
+                      (action)="exportContentRedirects()"
+                    ></app-button>
+                    <label class="grid gap-1 text-xs font-medium text-slate-700 dark:text-slate-200">
+                      {{ 'adminUi.site.pages.redirects.import' | translate }}
+                      <input
+                        type="file"
+                        accept=".csv,text/csv"
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:file:bg-slate-700 dark:file:text-slate-100"
+                        [disabled]="redirectsImporting"
+                        (change)="importContentRedirects($event)"
+                      />
+                    </label>
+                  </div>
+                  <div *ngIf="redirectsImportResult" class="rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+                    <p class="font-semibold">{{ 'adminUi.site.pages.redirects.importResult' | translate:{ created: redirectsImportResult.created, updated: redirectsImportResult.updated, skipped: redirectsImportResult.skipped } }}</p>
+                    <div *ngIf="redirectsImportResult.errors?.length" class="mt-1 grid gap-1">
+                      <p class="text-rose-700 dark:text-rose-300">{{ 'adminUi.site.pages.redirects.importErrors' | translate }}</p>
+                      <p *ngFor="let e of redirectsImportResult.errors" class="text-[11px] text-rose-700 dark:text-rose-300">
+                        #{{ e.line }}: {{ e.error }}
+                      </p>
+                    </div>
                   </div>
 
                   <div *ngIf="redirectsError" class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
@@ -1212,6 +1295,12 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                         </p>
                         <p *ngIf="!r.target_exists" class="text-xs text-rose-700 dark:text-rose-300">
                           {{ 'adminUi.site.pages.redirects.stale' | translate }}
+                        </p>
+                        <p *ngIf="r.chain_error === 'loop'" class="text-xs text-rose-700 dark:text-rose-300">
+                          {{ 'adminUi.site.pages.redirects.loop' | translate }}
+                        </p>
+                        <p *ngIf="r.chain_error === 'too_deep'" class="text-xs text-amber-800 dark:text-amber-200">
+                          {{ 'adminUi.site.pages.redirects.tooDeep' | translate }}
                         </p>
                         <p class="text-[11px] text-slate-500 dark:text-slate-400">{{ r.created_at | date: 'short' }}</p>
                       </div>
@@ -3639,6 +3728,9 @@ export class AdminComponent implements OnInit, OnDestroy {
   seoForm = { title: '', description: '' };
   seoMessage: string | null = null;
   seoError: string | null = null;
+  sitemapPreviewLoading = false;
+  sitemapPreviewError: string | null = null;
+  sitemapPreviewByLang: Record<string, string[]> | null = null;
   infoLang: UiLang = 'en';
   infoForm: { about: LocalizedText; faq: LocalizedText; shipping: LocalizedText; contact: LocalizedText } = {
     about: { en: '', ro: '' },
@@ -3656,6 +3748,9 @@ export class AdminComponent implements OnInit, OnDestroy {
   redirectsLoading = false;
   redirectsError: string | null = null;
   redirectsQuery = '';
+  redirectsExporting = false;
+  redirectsImporting = false;
+  redirectsImportResult: ContentRedirectImportResult | null = null;
   linkCheckKey = 'page.about';
   linkCheckLoading = false;
   linkCheckError: string | null = null;
@@ -5868,12 +5963,30 @@ export class AdminComponent implements OnInit, OnDestroy {
 	          }
 	        })
         }
-	    });
-	  }
+		    });
+		  }
 
-  selectInfoLang(lang: UiLang): void {
-    this.infoLang = lang;
+  loadSitemapPreview(): void {
+    this.sitemapPreviewLoading = true;
+    this.sitemapPreviewError = null;
+    this.sitemapPreviewByLang = null;
+    this.admin.getSitemapPreview().subscribe({
+      next: (res) => {
+        this.sitemapPreviewByLang = (res && typeof res === 'object' ? res.by_lang : null) || {};
+        this.sitemapPreviewLoading = false;
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.sitemapPreviewLoading = false;
+        this.sitemapPreviewByLang = null;
+        this.sitemapPreviewError = detail || this.t('adminUi.site.seo.sitemapPreview.errors.load');
+      }
+    });
   }
+
+	  selectInfoLang(lang: UiLang): void {
+	    this.infoLang = lang;
+	  }
 
   loadInfo(): void {
     const loadKey = async (key: string, target: 'about' | 'faq' | 'shipping' | 'contact'): Promise<void> => {
@@ -6143,6 +6256,55 @@ export class AdminComponent implements OnInit, OnDestroy {
       error: (err) => {
         const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
         this.toast.error(detail || this.t('adminUi.site.pages.redirects.errors.delete'));
+      }
+    });
+  }
+
+  exportContentRedirects(): void {
+    if (this.redirectsExporting) return;
+    this.redirectsExporting = true;
+    const q = (this.redirectsQuery || '').trim();
+    this.admin.exportContentRedirects({ q: q || undefined }).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const stamp = new Date().toISOString().slice(0, 10);
+        a.download = `content-redirects-${stamp}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        this.redirectsExporting = false;
+        this.toast.success(this.t('adminUi.site.pages.redirects.success.export'));
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.redirectsExporting = false;
+        this.toast.error(detail || this.t('adminUi.site.pages.redirects.errors.export'));
+      }
+    });
+  }
+
+  importContentRedirects(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.[0] || null;
+    if (input) input.value = '';
+    if (!file) return;
+    if (this.redirectsImporting) return;
+    this.redirectsImporting = true;
+    this.redirectsImportResult = null;
+    this.admin.importContentRedirects(file).subscribe({
+      next: (res) => {
+        this.redirectsImportResult = res || null;
+        this.redirectsImporting = false;
+        this.toast.success(this.t('adminUi.site.pages.redirects.success.import'));
+        this.loadContentRedirects(true);
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.redirectsImporting = false;
+        this.toast.error(detail || this.t('adminUi.site.pages.redirects.errors.import'));
       }
     });
   }

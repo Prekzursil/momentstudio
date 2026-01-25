@@ -762,8 +762,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin CMS: media library tags – Organize assets with tags and search filters.
 - [x] Admin CMS: image focal point – Set focal point for responsive crops (hero/cards).
 - [x] Admin CMS: translation workflow – Mark items “needs translation” and track completion per language.
-- [ ] Admin SEO: redirects bulk tools – Bulk import/export redirects and detect redirect loops.
-- [ ] Admin SEO: sitemap preview – Show which URLs appear in sitemap by language.
+- [x] Admin SEO: redirects bulk tools – Bulk import/export redirects and detect redirect loops.
+- [x] Admin SEO: sitemap preview – Show which URLs appear in sitemap by language.
 - [ ] Admin SEO: structured data validator – Validate JSON-LD for products/pages and show errors.
 - [ ] Admin Blog: editorial workflow – Draft/review/publish states with author attribution.
 - [ ] Admin Blog: social preview tooling – Generate social preview images per post per language.

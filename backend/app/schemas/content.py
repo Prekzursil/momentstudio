@@ -100,11 +100,30 @@ class ContentRedirectRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     target_exists: bool = True
+    chain_error: str | None = None
 
 
 class ContentRedirectListResponse(BaseModel):
     items: list[ContentRedirectRead]
     meta: PaginationMeta
+
+
+class ContentRedirectImportError(BaseModel):
+    line: int
+    from_value: str | None = None
+    to_value: str | None = None
+    error: str
+
+
+class ContentRedirectImportResult(BaseModel):
+    created: int = 0
+    updated: int = 0
+    skipped: int = 0
+    errors: list[ContentRedirectImportError] = Field(default_factory=list)
+
+
+class SitemapPreviewResponse(BaseModel):
+    by_lang: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class ContentImageRead(BaseModel):

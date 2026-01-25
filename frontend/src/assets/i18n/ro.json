@@ -1668,6 +1668,12 @@
         "metaTitle": "Titlu meta",
         "metaDescription": "Descriere meta",
         "save": "Salvează SEO",
+        "sitemapPreview": {
+          "title": "Previzualizare sitemap",
+          "hint": "Afișează URL-urile exacte incluse în sitemap.xml pentru fiecare limbă.",
+          "load": "Încarcă previzualizarea",
+          "errors": { "load": "Nu am putut încărca previzualizarea sitemap-ului." }
+        },
         "success": { "save": "SEO salvat." },
         "errors": { "save": "Nu am putut salva SEO." }
       },
@@ -1709,11 +1715,22 @@
           "title": "Redirecționări",
           "hint": "Create automat când schimbi URL-ul unei pagini. Redirecționările expirate indică către conținut lipsă.",
           "search": "Caută redirecționări",
+          "export": "Export CSV",
+          "import": "Import CSV",
+          "importResult": "{{created}} create, {{updated}} actualizate, {{skipped}} neschimbate.",
+          "importErrors": "Unele rânduri au fost omise:",
           "empty": "Nu există redirecționări.",
           "stale": "Redirecționare expirată: pagina țintă nu mai există.",
+          "loop": "A fost detectată o buclă de redirecționare.",
+          "tooDeep": "Lanțul de redirecționare este prea lung.",
           "deleteConfirm": "Ștergi această redirecționare?",
-          "success": { "deleted": "Redirecționare ștearsă." },
-          "errors": { "load": "Nu am putut încărca redirecționările.", "delete": "Nu am putut șterge redirecționarea." }
+          "success": { "deleted": "Redirecționare ștearsă.", "export": "Redirecționări exportate.", "import": "Redirecționări importate." },
+          "errors": {
+            "load": "Nu am putut încărca redirecționările.",
+            "delete": "Nu am putut șterge redirecționarea.",
+            "export": "Nu am putut exporta redirecționările.",
+            "import": "Nu am putut importa redirecționările."
+          }
         },
         "success": { "save": "Conținut salvat.", "created": "Pagina a fost creată." },
         "errors": {

@@ -18,15 +18,14 @@ from app.api.v1 import returns
 from app.api.v1 import shipping
 from app.api.v1 import coupons_v2
 from app.api.v1 import taxes
-from app.models.catalog import Product, Category
-from app.models.content import ContentBlock, ContentStatus
-from datetime import datetime, timezone
+from app.models.catalog import Product
 from fastapi import Response, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from app.db.session import get_session
 from app.core.config import settings
 from app.core.metrics import snapshot as metrics_snapshot
+from app.services import sitemap as sitemap_service
 
 api_router = APIRouter()
 
@@ -74,36 +73,17 @@ def metrics() -> dict:
 
 @api_router.get("/sitemap.xml", tags=["sitemap"])
 async def sitemap(session: AsyncSession = Depends(get_session)) -> Response:
-    now = datetime.now(timezone.utc)
-    products = (await session.execute(select(Product.slug))).scalars().all()
-    categories = (await session.execute(select(Category.slug))).scalars().all()
-    blog_keys = (
-        await session.execute(
-            select(ContentBlock.key).where(
-                ContentBlock.key.like("blog.%"),
-                ContentBlock.status == ContentStatus.published,
-                or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
-                or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
-            )
-        )
-    ).scalars().all()
-    urls = []
-    base = settings.frontend_origin.rstrip("/")
-    langs = ["en", "ro"]
-    for lang in langs:
-        urls.append(f"<url><loc>{base}/?lang={lang}</loc></url>")
-        urls.append(f"<url><loc>{base}/blog?lang={lang}</loc></url>")
-    for slug in categories:
-        for lang in langs:
-            urls.append(f"<url><loc>{base}/shop?category={slug}&lang={lang}</loc></url>")
-    for slug in products:
-        for lang in langs:
-            urls.append(f"<url><loc>{base}/products/{slug}?lang={lang}</loc></url>")
-    for key in blog_keys:
-        slug = key.split(".", 1)[1] if key.startswith("blog.") else key
-        for lang in langs:
-            urls.append(f"<url><loc>{base}/blog/{slug}?lang={lang}</loc></url>")
-    body = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">" + "".join(urls) + "</urlset>"
+    by_lang = await sitemap_service.build_sitemap_urls(session)
+    urls: list[str] = []
+    for lang in ["en", "ro"]:
+        for url in by_lang.get(lang, []):
+            urls.append(f"<url><loc>{url}</loc></url>")
+    body = (
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+        "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">"
+        + "".join(urls)
+        + "</urlset>"
+    )
     return Response(content=body, media_type="application/xml")
 
 

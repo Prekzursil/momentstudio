@@ -1,4 +1,6 @@
+import csv
 import httpx
+from io import StringIO
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Query, Response
@@ -22,14 +24,18 @@ from app.schemas.content import (
     ContentPageRenameResponse,
     ContentRedirectListResponse,
     ContentRedirectRead,
+    ContentRedirectImportResult,
+    ContentRedirectImportError,
     ContentBlockVersionListItem,
     ContentBlockVersionRead,
     ContentImageTagsUpdate,
     ContentLinkCheckResponse,
     ContentTranslationStatusUpdate,
+    SitemapPreviewResponse,
 )
 from app.schemas.social import SocialThumbnailRequest, SocialThumbnailResponse
 from app.services import content as content_service
+from app.services import sitemap as sitemap_service
 from app.services import social_thumbnails
 
 router = APIRouter(prefix="/content", tags=["content"])
@@ -54,6 +60,41 @@ def _normalize_image_tags(tags: list[str]) -> list[str]:
         if len(normalized) >= 10:
             break
     return normalized
+
+
+def _redirect_key_to_display_value(key: str) -> str:
+    value = (key or "").strip()
+    if value.startswith("page."):
+        slug = value.split(".", 1)[1] if "." in value else ""
+        return f"/pages/{slug}"
+    return value
+
+
+def _redirect_display_value_to_key(value: str) -> str:
+    raw = (value or "").strip()
+    if raw.startswith("/"):
+        raw = raw[1:]
+    if raw.startswith("pages/"):
+        slug = raw.split("/", 1)[1] if "/" in raw else ""
+        slug_norm = content_service.slugify_page_slug(slug)
+        return f"page.{slug_norm}" if slug_norm else ""
+    return (value or "").strip()
+
+
+def _redirect_chain_error(from_key: str, redirects: dict[str, str], *, max_hops: int = 50) -> str | None:
+    current = (from_key or "").strip()
+    if not current:
+        return None
+    seen: set[str] = set()
+    for _ in range(max_hops):
+        if current in seen:
+            return "loop"
+        seen.add(current)
+        nxt = redirects.get(current)
+        if not nxt:
+            return None
+        current = nxt
+    return "too_deep"
 
 
 @router.get("/pages/{slug}", response_model=ContentBlockRead)
@@ -132,8 +173,12 @@ async def admin_list_redirects(
             (await session.execute(select(ContentBlock.key).where(ContentBlock.key.in_(to_keys)))).scalars().all()
         )
 
+    redirect_map_rows = (await session.execute(select(ContentRedirect.from_key, ContentRedirect.to_key))).all()
+    redirect_map = {from_key: to_key for from_key, to_key in redirect_map_rows if from_key and to_key}
+
     items: list[ContentRedirectRead] = []
     for r in redirects:
+        chain_error = _redirect_chain_error(r.from_key, redirect_map)
         items.append(
             ContentRedirectRead(
                 id=r.id,
@@ -142,6 +187,7 @@ async def admin_list_redirects(
                 created_at=r.created_at,
                 updated_at=r.updated_at,
                 target_exists=r.to_key in existing_targets,
+                chain_error=chain_error,
             )
         )
 
@@ -149,6 +195,154 @@ async def admin_list_redirects(
         items=items,
         meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
     )
+
+
+@router.get("/admin/redirects/export")
+async def admin_export_redirects(
+    session: AsyncSession = Depends(get_session),
+    q: str | None = Query(default=None, description="Search from/to key"),
+    _: User = Depends(require_admin_section("content")),
+) -> Response:
+    filters = []
+    if q:
+        needle = f"%{q.strip()}%"
+        filters.append(or_(ContentRedirect.from_key.ilike(needle), ContentRedirect.to_key.ilike(needle)))
+
+    result = await session.execute(
+        select(ContentRedirect.from_key, ContentRedirect.to_key).where(*filters).order_by(ContentRedirect.from_key)
+    )
+    rows = result.all()
+
+    buf = StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["from", "to", "from_key", "to_key"])
+    for from_key, to_key in rows:
+        writer.writerow(
+            [
+                _redirect_key_to_display_value(from_key),
+                _redirect_key_to_display_value(to_key),
+                from_key,
+                to_key,
+            ]
+        )
+
+    filename = "content-redirects.csv"
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/admin/redirects/import", response_model=ContentRedirectImportResult)
+async def admin_import_redirects(
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentRedirectImportResult:
+    raw = await file.read()
+    text = raw.decode("utf-8-sig", errors="replace")
+
+    rows: list[tuple[int, str, str]] = []
+    errors: list[ContentRedirectImportError] = []
+
+    reader = csv.reader(StringIO(text))
+    line = 0
+    for row in reader:
+        line += 1
+        if not row or all(not str(cell or "").strip() for cell in row):
+            continue
+        if row and str(row[0] or "").lstrip().startswith("#"):
+            continue
+        if line == 1 and len(row) >= 2:
+            first = str(row[0] or "").strip().lower()
+            second = str(row[1] or "").strip().lower()
+            if first in {"from", "from_key"} and second in {"to", "to_key"}:
+                continue
+        if len(row) < 2:
+            errors.append(ContentRedirectImportError(line=line, from_value=row[0] if row else None, error="Missing columns"))
+            continue
+        from_value = str(row[0] or "").strip()
+        to_value = str(row[1] or "").strip()
+        if not from_value or not to_value:
+            errors.append(ContentRedirectImportError(line=line, from_value=from_value or None, to_value=to_value or None, error="Missing from/to"))
+            continue
+        from_key = _redirect_display_value_to_key(from_value)
+        to_key = _redirect_display_value_to_key(to_value)
+        if not from_key or not to_key:
+            errors.append(ContentRedirectImportError(line=line, from_value=from_value, to_value=to_value, error="Invalid redirect value"))
+            continue
+        if len(from_key) > 120 or len(to_key) > 120:
+            errors.append(ContentRedirectImportError(line=line, from_value=from_value, to_value=to_value, error="Key too long"))
+            continue
+        if from_key == to_key:
+            errors.append(ContentRedirectImportError(line=line, from_value=from_value, to_value=to_value, error="from and to must differ"))
+            continue
+        rows.append((line, from_key, to_key))
+
+    if not rows:
+        return ContentRedirectImportResult(created=0, updated=0, skipped=0, errors=errors)
+
+    existing_rows = (await session.execute(select(ContentRedirect.from_key, ContentRedirect.to_key))).all()
+    redirect_map = {from_key: to_key for from_key, to_key in existing_rows if from_key and to_key}
+    for _, from_key, to_key in rows:
+        redirect_map[from_key] = to_key
+
+    loop_keys: set[str] = set()
+    too_deep_keys: set[str] = set()
+    for from_key in redirect_map.keys():
+        err = _redirect_chain_error(from_key, redirect_map)
+        if err == "loop":
+            loop_keys.add(from_key)
+        elif err == "too_deep":
+            too_deep_keys.add(from_key)
+    if loop_keys or too_deep_keys:
+        details: list[str] = []
+        if loop_keys:
+            sample = ", ".join(sorted(loop_keys)[:5])
+            details.append(f"Redirect loop detected (e.g. {sample})")
+        if too_deep_keys:
+            sample = ", ".join(sorted(too_deep_keys)[:5])
+            details.append(f"Redirect chain too deep (e.g. {sample})")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="; ".join(details))
+
+    created = 0
+    updated = 0
+    skipped = 0
+
+    unique_rows: dict[str, tuple[int, str]] = {}
+    for line_no, from_key, to_key in rows:
+        unique_rows[from_key] = (line_no, to_key)
+
+    existing = (
+        await session.execute(select(ContentRedirect).where(ContentRedirect.from_key.in_(list(unique_rows.keys()))))
+    ).scalars().all()
+    existing_by_key = {r.from_key: r for r in existing}
+
+    for from_key, (_, to_key) in unique_rows.items():
+        row = existing_by_key.get(from_key)
+        if row:
+            if row.to_key == to_key:
+                skipped += 1
+                continue
+            row.to_key = to_key
+            session.add(row)
+            updated += 1
+            continue
+        session.add(ContentRedirect(from_key=from_key, to_key=to_key))
+        created += 1
+
+    await session.commit()
+    return ContentRedirectImportResult(created=created, updated=updated, skipped=skipped, errors=errors)
+
+
+@router.get("/admin/seo/sitemap-preview", response_model=SitemapPreviewResponse)
+async def admin_sitemap_preview(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> SitemapPreviewResponse:
+    by_lang = await sitemap_service.build_sitemap_urls(session)
+    return SitemapPreviewResponse(by_lang=by_lang)
 
 
 @router.delete("/admin/redirects/{redirect_id}", status_code=status.HTTP_204_NO_CONTENT)

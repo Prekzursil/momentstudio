@@ -16,6 +16,7 @@ from app.services.auth import create_user, issue_tokens_for_user
 from app.models.user import UserRole
 from app.services import social_thumbnails
 import httpx
+from app.models.content import ContentRedirect
 
 
 @pytest.fixture
@@ -253,6 +254,61 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert status_toggle.status_code == 200, status_toggle.text
     assert status_toggle.json()["needs_translation_en"] is True
     assert status_toggle.json()["needs_translation_ro"] is False
+
+    # Redirects: import/export + loop detection.
+    client.post(
+        "/api/v1/content/admin/page.new",
+        json={"title": "New", "body_markdown": "New body", "status": "published"},
+        headers=auth_headers(admin_token),
+    )
+    redirect_import = client.post(
+        "/api/v1/content/admin/redirects/import",
+        files={"file": ("redirects.csv", b"from,to\n/pages/old,/pages/new\n", "text/csv")},
+        headers=auth_headers(admin_token),
+    )
+    assert redirect_import.status_code == 200, redirect_import.text
+    assert redirect_import.json()["created"] == 1
+
+    redirect_list = client.get("/api/v1/content/admin/redirects", headers=auth_headers(admin_token))
+    assert redirect_list.status_code == 200, redirect_list.text
+    items = redirect_list.json()["items"]
+    assert any(item["from_key"] == "page.old" and item["to_key"] == "page.new" for item in items)
+    imported = next(item for item in items if item["from_key"] == "page.old")
+    assert imported["target_exists"] is True
+    assert imported["chain_error"] is None
+
+    redirect_export = client.get("/api/v1/content/admin/redirects/export", headers=auth_headers(admin_token))
+    assert redirect_export.status_code == 200, redirect_export.text
+    assert "text/csv" in (redirect_export.headers.get("content-type") or "")
+    assert "from,to,from_key,to_key" in redirect_export.text
+    assert "/pages/old" in redirect_export.text
+    assert "page.old" in redirect_export.text
+
+    loop = client.post(
+        "/api/v1/content/admin/redirects/import",
+        files={"file": ("redirects.csv", b"from,to\n/pages/a,/pages/b\n/pages/b,/pages/a\n", "text/csv")},
+        headers=auth_headers(admin_token),
+    )
+    assert loop.status_code == 400
+
+    async def seed_loop() -> None:
+        async with SessionLocal() as session:
+            session.add(ContentRedirect(from_key="page.loop1", to_key="page.loop2"))
+            session.add(ContentRedirect(from_key="page.loop2", to_key="page.loop1"))
+            await session.commit()
+
+    asyncio.run(seed_loop())
+    loop_list = client.get("/api/v1/content/admin/redirects", headers=auth_headers(admin_token))
+    assert loop_list.status_code == 200, loop_list.text
+    loop_items = [item for item in loop_list.json()["items"] if item["from_key"] in {"page.loop1", "page.loop2"}]
+    assert loop_items
+    assert all(item["chain_error"] == "loop" for item in loop_items)
+
+    sitemap_preview = client.get("/api/v1/content/admin/seo/sitemap-preview", headers=auth_headers(admin_token))
+    assert sitemap_preview.status_code == 200, sitemap_preview.text
+    by_lang = sitemap_preview.json()["by_lang"]
+    assert "en" in by_lang and "ro" in by_lang
+    assert any("/pages/new" in url for url in by_lang["en"])
 
     # Broken link checker for internal URLs.
     link_block = client.post(
