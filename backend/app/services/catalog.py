@@ -17,6 +17,8 @@ from app.models.catalog import (
     Category,
     CategoryTranslation,
     Product,
+    ProductRelationship,
+    ProductRelationshipType,
     ProductImage,
     ProductImageTranslation,
     ProductOption,
@@ -53,6 +55,7 @@ from app.schemas.catalog import (
     FeaturedCollectionCreate,
     FeaturedCollectionUpdate,
     ProductFeedItem,
+    ProductRelationshipsUpdate,
 )
 from app.services.storage import delete_file, get_media_image_stats, regenerate_media_thumbnails
 from app.services import email as email_service
@@ -1595,6 +1598,141 @@ async def get_related_products(session: AsyncSession, product: Product, limit: i
         .limit(limit)
     )
     return result.scalars().unique().all()
+
+
+def _dedupe_uuid_list(values: list[uuid.UUID]) -> list[uuid.UUID]:
+    seen: set[uuid.UUID] = set()
+    out: list[uuid.UUID] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        out.append(value)
+    return out
+
+
+async def get_curated_relationship_products(
+    session: AsyncSession,
+    *,
+    product_id: uuid.UUID,
+    relationship_type: ProductRelationshipType,
+    limit: int,
+    include_inactive: bool,
+) -> list[Product]:
+    stmt = (
+        select(Product)
+        .join(ProductRelationship, ProductRelationship.related_product_id == Product.id)
+        .where(
+            ProductRelationship.product_id == product_id,
+            ProductRelationship.relationship_type == relationship_type,
+            Product.id != product_id,
+            Product.is_deleted.is_(False),
+        )
+        .order_by(ProductRelationship.sort_order.asc(), ProductRelationship.created_at.asc())
+        .limit(limit)
+        .options(
+            selectinload(Product.images),
+            selectinload(Product.category),
+            selectinload(Product.tags),
+        )
+    )
+    if not include_inactive:
+        stmt = stmt.where(Product.is_active.is_(True), Product.status == ProductStatus.published)
+    result = await session.execute(stmt)
+    return list(result.scalars().unique().all())
+
+
+async def get_product_relationships(session: AsyncSession, product_id: uuid.UUID) -> ProductRelationshipsUpdate:
+    related = list(
+        await session.scalars(
+            select(ProductRelationship.related_product_id)
+            .where(
+                ProductRelationship.product_id == product_id,
+                ProductRelationship.relationship_type == ProductRelationshipType.related,
+            )
+            .order_by(ProductRelationship.sort_order.asc(), ProductRelationship.created_at.asc())
+        )
+    )
+    upsells = list(
+        await session.scalars(
+            select(ProductRelationship.related_product_id)
+            .where(
+                ProductRelationship.product_id == product_id,
+                ProductRelationship.relationship_type == ProductRelationshipType.upsell,
+            )
+            .order_by(ProductRelationship.sort_order.asc(), ProductRelationship.created_at.asc())
+        )
+    )
+    return ProductRelationshipsUpdate(
+        related_product_ids=related,
+        upsell_product_ids=upsells,
+    )
+
+
+async def update_product_relationships(
+    session: AsyncSession,
+    *,
+    product: Product,
+    payload: ProductRelationshipsUpdate,
+    user_id: uuid.UUID | None = None,
+) -> ProductRelationshipsUpdate:
+    related_ids = _dedupe_uuid_list(list(payload.related_product_ids or []))
+    upsell_ids = _dedupe_uuid_list(list(payload.upsell_product_ids or []))
+
+    if product.id in related_ids or product.id in upsell_ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Product cannot reference itself")
+
+    # Prevent overlap: if an id appears in related, drop it from upsells.
+    related_set = set(related_ids)
+    upsell_ids = [pid for pid in upsell_ids if pid not in related_set]
+
+    candidate_ids = _dedupe_uuid_list([*related_ids, *upsell_ids])
+    if candidate_ids:
+        found = set(
+            await session.scalars(
+                select(Product.id).where(Product.id.in_(candidate_ids), Product.is_deleted.is_(False))
+            )
+        )
+        missing = set(candidate_ids) - found
+        if missing:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more related products not found")
+
+    await session.execute(delete(ProductRelationship).where(ProductRelationship.product_id == product.id))
+
+    rows: list[ProductRelationship] = []
+    for idx, pid in enumerate(related_ids):
+        rows.append(
+            ProductRelationship(
+                product_id=product.id,
+                related_product_id=pid,
+                relationship_type=ProductRelationshipType.related,
+                sort_order=idx,
+            )
+        )
+    for idx, pid in enumerate(upsell_ids):
+        rows.append(
+            ProductRelationship(
+                product_id=product.id,
+                related_product_id=pid,
+                relationship_type=ProductRelationshipType.upsell,
+                sort_order=idx,
+            )
+        )
+    if rows:
+        session.add_all(rows)
+
+    await session.commit()
+    await _log_product_action(
+        session,
+        product.id,
+        "relationships_update",
+        user_id,
+        {
+            "related_product_ids": [str(pid) for pid in related_ids],
+            "upsell_product_ids": [str(pid) for pid in upsell_ids],
+        },
+    )
+    return ProductRelationshipsUpdate(related_product_ids=related_ids, upsell_product_ids=upsell_ids)
 
 
 async def record_recently_viewed(

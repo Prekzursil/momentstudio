@@ -893,14 +893,177 @@ type VariantRow = {
 	                  </td>
 	                </tr>
 	              </tbody>
-	            </table>
-	          </div>
-	        </div>
+		            </table>
+		          </div>
+		        </div>
 
-	        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
-	          <div class="grid gap-1">
-	            <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
-	              {{ 'adminUi.products.form.stockLedgerTitle' | translate }}
+		        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
+		          <div class="grid gap-1">
+		            <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
+		              {{ 'adminUi.products.relationships.title' | translate }}
+		            </h3>
+		            <p class="text-xs text-slate-500 dark:text-slate-400">
+		              {{ 'adminUi.products.relationships.hint' | translate }}
+		            </p>
+		          </div>
+
+              <div
+                *ngIf="!editingSlug()"
+                class="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-100"
+              >
+                {{ 'adminUi.products.relationships.saveFirst' | translate }}
+              </div>
+
+		          <div
+		            *ngIf="relationshipsError()"
+		            class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+		          >
+		            {{ relationshipsError() }}
+		          </div>
+
+		          <div
+		            *ngIf="relationshipsMessage()"
+		            class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-100"
+		          >
+		            {{ relationshipsMessage() }}
+		          </div>
+
+              <div class="grid gap-2">
+                <app-input
+                  [label]="'adminUi.products.relationships.searchLabel' | translate"
+                  [value]="relationshipSearch"
+                  (valueChange)="onRelationshipSearchChange($event)"
+                  [disabled]="relationshipSearchLoading() || relationshipsLoading()"
+                ></app-input>
+
+                <div *ngIf="relationshipSearchLoading()" class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.products.relationships.searchLoading' | translate }}
+                </div>
+
+                <div
+                  *ngIf="relationshipSearchResults().length"
+                  class="rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <div
+                    *ngFor="let p of relationshipSearchResults()"
+                    class="flex flex-wrap items-center justify-between gap-2 rounded-md px-2 py-2 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  >
+                    <div class="min-w-0">
+                      <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ p.name }}</p>
+                      <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ p.slug }} · {{ p.sku }}</p>
+                    </div>
+                    <div class="flex items-center gap-1">
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.products.relationships.addRelated' | translate"
+                        (action)="addRelationship(p, 'related')"
+                        [disabled]="!editingSlug()"
+                      ></app-button>
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.products.relationships.addUpsell' | translate"
+                        (action)="addRelationship(p, 'upsell')"
+                        [disabled]="!editingSlug()"
+                      ></app-button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="grid gap-4 lg:grid-cols-2">
+                  <div class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                    <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                      {{ 'adminUi.products.relationships.related' | translate }}
+                    </p>
+                    <div *ngIf="relationshipsRelated().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.products.relationships.empty' | translate }}
+                    </div>
+                    <div *ngFor="let p of relationshipsRelated(); let idx = index" class="flex items-center justify-between gap-2">
+                      <div class="min-w-0">
+                        <p class="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate">{{ p.name }}</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ p.slug }}</p>
+                      </div>
+                      <div class="flex items-center gap-1">
+                        <app-button
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.actions.up' | translate"
+                          (action)="moveRelationship('related', idx, -1)"
+                          [disabled]="idx === 0 || relationshipsSaving()"
+                        ></app-button>
+                        <app-button
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.actions.down' | translate"
+                          (action)="moveRelationship('related', idx, 1)"
+                          [disabled]="idx >= relationshipsRelated().length - 1 || relationshipsSaving()"
+                        ></app-button>
+                        <app-button
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.actions.remove' | translate"
+                          (action)="removeRelationship(p.id, 'related')"
+                          [disabled]="relationshipsSaving()"
+                        ></app-button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                    <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                      {{ 'adminUi.products.relationships.upsells' | translate }}
+                    </p>
+                    <div *ngIf="relationshipsUpsells().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.products.relationships.empty' | translate }}
+                    </div>
+                    <div *ngFor="let p of relationshipsUpsells(); let idx = index" class="flex items-center justify-between gap-2">
+                      <div class="min-w-0">
+                        <p class="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate">{{ p.name }}</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ p.slug }}</p>
+                      </div>
+                      <div class="flex items-center gap-1">
+                        <app-button
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.actions.up' | translate"
+                          (action)="moveRelationship('upsell', idx, -1)"
+                          [disabled]="idx === 0 || relationshipsSaving()"
+                        ></app-button>
+                        <app-button
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.actions.down' | translate"
+                          (action)="moveRelationship('upsell', idx, 1)"
+                          [disabled]="idx >= relationshipsUpsells().length - 1 || relationshipsSaving()"
+                        ></app-button>
+                        <app-button
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.actions.remove' | translate"
+                          (action)="removeRelationship(p.id, 'upsell')"
+                          [disabled]="relationshipsSaving()"
+                        ></app-button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-end">
+                  <app-button
+                    size="sm"
+                    [label]="'adminUi.products.relationships.save' | translate"
+                    (action)="saveRelationships()"
+                    [disabled]="relationshipsSaving() || !editingSlug()"
+                  ></app-button>
+                </div>
+              </div>
+		        </div>
+
+		        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
+		          <div class="grid gap-1">
+		            <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
+		              {{ 'adminUi.products.form.stockLedgerTitle' | translate }}
 	            </h3>
 	            <p class="text-xs text-slate-500 dark:text-slate-400">
 	              {{ 'adminUi.products.form.stockLedgerHint' | translate }}
@@ -1415,6 +1578,21 @@ export class AdminProductsComponent implements OnInit {
   variantsBusy = signal(false);
   variantsError = signal<string | null>(null);
   private pendingVariantDeletes = new Set<string>();
+
+  relationshipsRelatedIds = signal<string[]>([]);
+  relationshipsUpsellIds = signal<string[]>([]);
+  relationshipsRelated = signal<AdminProductListItem[]>([]);
+  relationshipsUpsells = signal<AdminProductListItem[]>([]);
+  relationshipsLoading = signal(false);
+  relationshipsSaving = signal(false);
+  relationshipsError = signal<string | null>(null);
+  relationshipsMessage = signal<string | null>(null);
+
+  relationshipSearch = '';
+  relationshipSearchResults = signal<AdminProductListItem[]>([]);
+  relationshipSearchLoading = signal(false);
+  private relationshipSearchTimeout: ReturnType<typeof setTimeout> | null = null;
+  private relationshipSearchRequestId = 0;
 
   stockAdjustments = signal<StockAdjustment[]>([]);
   stockAdjustmentsError = signal<string | null>(null);
@@ -1953,18 +2131,19 @@ export class AdminProductsComponent implements OnInit {
     };
   }
 
-  startNew(): void {
-    this.editorOpen.set(true);
-    this.editingSlug.set(null);
-    this.editingProductId.set(null);
-    this.editorError.set(null);
-    this.editorMessage.set(null);
-    this.resetDuplicateCheck();
-    this.images.set([]);
-    this.resetImageMeta();
-    this.form = this.blankForm();
-    this.basePriceError = '';
-    this.saleValueError = '';
+	  startNew(): void {
+	    this.editorOpen.set(true);
+	    this.editingSlug.set(null);
+	    this.editingProductId.set(null);
+	    this.editorError.set(null);
+	    this.editorMessage.set(null);
+	    this.resetDuplicateCheck();
+	    this.resetRelationships();
+	    this.images.set([]);
+	    this.resetImageMeta();
+	    this.form = this.blankForm();
+	    this.basePriceError = '';
+	    this.saleValueError = '';
     this.resetTranslations();
     this.resetVariants();
     this.resetStockLedger();
@@ -1972,34 +2151,36 @@ export class AdminProductsComponent implements OnInit {
     if (first) this.form.category_id = first.id;
   }
 
-  closeEditor(): void {
-    this.editorOpen.set(false);
-    this.editingSlug.set(null);
-    this.editingProductId.set(null);
-    this.editorError.set(null);
-    this.editorMessage.set(null);
-    this.resetDuplicateCheck();
-    this.images.set([]);
-    this.resetImageMeta();
-    this.basePriceError = '';
-    this.saleValueError = '';
+	  closeEditor(): void {
+	    this.editorOpen.set(false);
+	    this.editingSlug.set(null);
+	    this.editingProductId.set(null);
+	    this.editorError.set(null);
+	    this.editorMessage.set(null);
+	    this.resetDuplicateCheck();
+	    this.resetRelationships();
+	    this.images.set([]);
+	    this.resetImageMeta();
+	    this.basePriceError = '';
+	    this.saleValueError = '';
     this.resetTranslations();
     this.resetVariants();
     this.resetStockLedger();
   }
 
-  edit(slug: string): void {
-    this.editorOpen.set(true);
-    this.editorError.set(null);
-    this.editorMessage.set(null);
-    this.editingSlug.set(slug);
-    this.editingProductId.set(null);
-    this.resetDuplicateCheck();
-    this.basePriceError = '';
-    this.saleValueError = '';
-    this.resetTranslations();
-    this.resetImageMeta();
-    this.resetVariants();
+	  edit(slug: string): void {
+	    this.editorOpen.set(true);
+	    this.editorError.set(null);
+	    this.editorMessage.set(null);
+	    this.editingSlug.set(slug);
+	    this.editingProductId.set(null);
+	    this.resetDuplicateCheck();
+	    this.resetRelationships();
+	    this.basePriceError = '';
+	    this.saleValueError = '';
+	    this.resetTranslations();
+	    this.resetImageMeta();
+	    this.resetVariants();
     this.resetStockLedger();
     this.admin.getProduct(slug).subscribe({
       next: (prod: any) => {
@@ -2040,14 +2221,15 @@ export class AdminProductsComponent implements OnInit {
         };
         this.images.set(Array.isArray(prod.images) ? prod.images : []);
         this.setVariantsFromProduct(prod);
-        const productId = this.editingProductId();
-        if (productId) this.loadStockAdjustments(productId);
-        this.loadTranslations((prod.slug || slug).toString());
-        this.scheduleDuplicateCheck();
-      },
-      error: () => this.editorError.set(this.t('adminUi.products.errors.load'))
-    });
-  }
+	        const productId = this.editingProductId();
+	        if (productId) this.loadStockAdjustments(productId);
+	        this.loadTranslations((prod.slug || slug).toString());
+	        this.loadRelationships((prod.slug || slug).toString());
+	        this.scheduleDuplicateCheck();
+	      },
+	      error: () => this.editorError.set(this.t('adminUi.products.errors.load'))
+	    });
+	  }
 
   onNameChange(next: string | number): void {
     this.form.name = String(next ?? '');
@@ -2307,13 +2489,14 @@ export class AdminProductsComponent implements OnInit {
           this.loadStockAdjustments(String(prod.id));
         }
         this.images.set(Array.isArray(prod?.images) ? prod.images : this.images());
-        if (prod?.status) this.form.status = prod.status;
-        if (newSlug) this.loadTranslations(newSlug);
-        this.load();
-      },
-      error: () => this.editorError.set(this.t('adminUi.products.errors.save'))
-    });
-  }
+	        if (prod?.status) this.form.status = prod.status;
+	        if (newSlug) this.loadTranslations(newSlug);
+	        if (newSlug) this.loadRelationships(newSlug);
+	        this.load();
+	      },
+	      error: () => this.editorError.set(this.t('adminUi.products.errors.save'))
+	    });
+	  }
 
   variantsWithIds(): VariantRow[] {
     return this.variants().filter((v) => Boolean(v.id));
@@ -2532,6 +2715,186 @@ export class AdminProductsComponent implements OnInit {
     this.variantsError.set(null);
     this.variantsBusy.set(false);
     this.pendingVariantDeletes = new Set<string>();
+  }
+
+  private resetRelationships(): void {
+    this.relationshipsRelatedIds.set([]);
+    this.relationshipsUpsellIds.set([]);
+    this.relationshipsRelated.set([]);
+    this.relationshipsUpsells.set([]);
+    this.relationshipsLoading.set(false);
+    this.relationshipsSaving.set(false);
+    this.relationshipsError.set(null);
+    this.relationshipsMessage.set(null);
+    this.relationshipSearch = '';
+    this.relationshipSearchResults.set([]);
+    this.relationshipSearchLoading.set(false);
+    if (this.relationshipSearchTimeout) {
+      clearTimeout(this.relationshipSearchTimeout);
+      this.relationshipSearchTimeout = null;
+    }
+    this.relationshipSearchRequestId += 1;
+  }
+
+  private loadRelationships(slug: string): void {
+    if (!slug) return;
+    this.relationshipsLoading.set(true);
+    this.relationshipsError.set(null);
+    this.relationshipsMessage.set(null);
+    this.admin.getProductRelationships(slug).subscribe({
+      next: (res) => {
+        const relatedIds = (res?.related_product_ids ?? []).map((id) => String(id));
+        const upsellIds = (res?.upsell_product_ids ?? []).map((id) => String(id));
+        this.relationshipsRelatedIds.set(relatedIds);
+        this.relationshipsUpsellIds.set(upsellIds);
+        const allIds = Array.from(new Set([...relatedIds, ...upsellIds]));
+        if (!allIds.length) {
+          this.relationshipsRelated.set([]);
+          this.relationshipsUpsells.set([]);
+          this.relationshipsLoading.set(false);
+          return;
+        }
+        this.productsApi.byIds(allIds).subscribe({
+          next: (rows) => {
+            const items = Array.isArray(rows) ? rows : [];
+            const byId = new Map(items.map((p) => [String(p.id), p]));
+            const filteredRelatedIds = relatedIds.filter((id) => byId.has(id));
+            const filteredUpsellIds = upsellIds.filter((id) => byId.has(id) && !filteredRelatedIds.includes(id));
+            if (filteredRelatedIds.length !== relatedIds.length) this.relationshipsRelatedIds.set(filteredRelatedIds);
+            if (filteredUpsellIds.length !== upsellIds.length) this.relationshipsUpsellIds.set(filteredUpsellIds);
+            this.relationshipsRelated.set(filteredRelatedIds.map((id) => byId.get(id)!).filter(Boolean));
+            this.relationshipsUpsells.set(filteredUpsellIds.map((id) => byId.get(id)!).filter(Boolean));
+            this.relationshipsLoading.set(false);
+          },
+          error: () => {
+            this.relationshipsLoading.set(false);
+            this.relationshipsError.set(this.t('adminUi.products.relationships.errors.load'));
+          }
+        });
+      },
+      error: () => {
+        this.relationshipsLoading.set(false);
+        this.relationshipsError.set(this.t('adminUi.products.relationships.errors.load'));
+      }
+    });
+  }
+
+  onRelationshipSearchChange(next: string | number): void {
+    this.relationshipSearch = String(next ?? '');
+    if (this.relationshipSearchTimeout) {
+      clearTimeout(this.relationshipSearchTimeout);
+      this.relationshipSearchTimeout = null;
+    }
+    const needle = this.relationshipSearch.trim();
+    if (needle.length < 2) {
+      this.relationshipSearchResults.set([]);
+      this.relationshipSearchLoading.set(false);
+      return;
+    }
+    this.relationshipSearchTimeout = setTimeout(() => {
+      this.relationshipSearchTimeout = null;
+      this.runRelationshipSearch(needle);
+    }, 250);
+  }
+
+  private runRelationshipSearch(needle: string): void {
+    const requestId = ++this.relationshipSearchRequestId;
+    this.relationshipSearchLoading.set(true);
+    this.productsApi.search({ q: needle, page: 1, limit: 10 }).subscribe({
+      next: (res) => {
+        if (requestId !== this.relationshipSearchRequestId) return;
+        const rows = Array.isArray(res?.items) ? res.items : [];
+        const currentProductId = this.editingProductId();
+        const selected = new Set([...this.relationshipsRelatedIds(), ...this.relationshipsUpsellIds()]);
+        this.relationshipSearchResults.set(
+          rows.filter((p) => String(p.id) !== currentProductId && !selected.has(String(p.id)))
+        );
+        this.relationshipSearchLoading.set(false);
+      },
+      error: () => {
+        if (requestId !== this.relationshipSearchRequestId) return;
+        this.relationshipSearchResults.set([]);
+        this.relationshipSearchLoading.set(false);
+      }
+    });
+  }
+
+  addRelationship(item: AdminProductListItem, kind: 'related' | 'upsell'): void {
+    const id = String(item?.id ?? '');
+    if (!id) return;
+    if (id === this.editingProductId()) return;
+
+    const relatedIds = this.relationshipsRelatedIds();
+    const upsellIds = this.relationshipsUpsellIds();
+    if (relatedIds.includes(id) || upsellIds.includes(id)) return;
+
+    if (kind === 'related') {
+      this.relationshipsRelatedIds.set([...relatedIds, id]);
+      this.relationshipsRelated.set([...this.relationshipsRelated(), item]);
+    } else {
+      this.relationshipsUpsellIds.set([...upsellIds, id]);
+      this.relationshipsUpsells.set([...this.relationshipsUpsells(), item]);
+    }
+    this.relationshipSearchResults.set(this.relationshipSearchResults().filter((p) => String(p.id) !== id));
+  }
+
+  removeRelationship(id: string, kind: 'related' | 'upsell'): void {
+    if (kind === 'related') {
+      this.relationshipsRelatedIds.set(this.relationshipsRelatedIds().filter((pid) => pid !== id));
+      this.relationshipsRelated.set(this.relationshipsRelated().filter((p) => String(p.id) !== id));
+    } else {
+      this.relationshipsUpsellIds.set(this.relationshipsUpsellIds().filter((pid) => pid !== id));
+      this.relationshipsUpsells.set(this.relationshipsUpsells().filter((p) => String(p.id) !== id));
+    }
+  }
+
+  moveRelationship(kind: 'related' | 'upsell', index: number, direction: -1 | 1): void {
+    const ids = kind === 'related' ? this.relationshipsRelatedIds() : this.relationshipsUpsellIds();
+    const items = kind === 'related' ? this.relationshipsRelated() : this.relationshipsUpsells();
+    const nextIndex = index + direction;
+    if (index < 0 || index >= ids.length) return;
+    if (nextIndex < 0 || nextIndex >= ids.length) return;
+    const idsNext = ids.slice();
+    const itemsNext = items.slice();
+    const [id] = idsNext.splice(index, 1);
+    const [item] = itemsNext.splice(index, 1);
+    idsNext.splice(nextIndex, 0, id);
+    itemsNext.splice(nextIndex, 0, item);
+    if (kind === 'related') {
+      this.relationshipsRelatedIds.set(idsNext);
+      this.relationshipsRelated.set(itemsNext);
+    } else {
+      this.relationshipsUpsellIds.set(idsNext);
+      this.relationshipsUpsells.set(itemsNext);
+    }
+  }
+
+  saveRelationships(): void {
+    const slug = this.editingSlug();
+    if (!slug) {
+      this.toast.error(this.t('adminUi.products.relationships.saveFirst'));
+      return;
+    }
+    this.relationshipsSaving.set(true);
+    this.relationshipsError.set(null);
+    this.relationshipsMessage.set(null);
+    this.admin
+      .updateProductRelationships(slug, {
+        related_product_ids: this.relationshipsRelatedIds(),
+        upsell_product_ids: this.relationshipsUpsellIds(),
+      })
+      .subscribe({
+        next: () => {
+          this.relationshipsSaving.set(false);
+          this.relationshipsMessage.set(this.t('adminUi.products.relationships.success.save'));
+          this.toast.success(this.t('adminUi.products.relationships.success.save'));
+          this.loadRelationships(slug);
+        },
+        error: () => {
+          this.relationshipsSaving.set(false);
+          this.relationshipsError.set(this.t('adminUi.products.relationships.errors.save'));
+        }
+      });
   }
 
   private resetStockLedger(): void {

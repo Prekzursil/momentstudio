@@ -46,6 +46,11 @@ class ProductStatus(str, enum.Enum):
     archived = "archived"
 
 
+class ProductRelationshipType(str, enum.Enum):
+    related = "related"
+    upsell = "upsell"
+
+
 product_tags = Table(
     "product_tags",
     Base.metadata,
@@ -146,6 +151,53 @@ class Product(Base):
     translations: Mapped[list["ProductTranslation"]] = relationship(
         "ProductTranslation", back_populates="product", cascade="all, delete-orphan", lazy="selectin"
     )
+    relationships: Mapped[list["ProductRelationship"]] = relationship(
+        "ProductRelationship",
+        foreign_keys="ProductRelationship.product_id",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+
+class ProductRelationship(Base):
+    __tablename__ = "product_relationships"
+    __table_args__ = (
+        UniqueConstraint(
+            "product_id",
+            "related_product_id",
+            "relationship_type",
+            name="uq_product_relationship_unique",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("products.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    related_product_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("products.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    relationship_type: Mapped[ProductRelationshipType] = mapped_column(
+        Enum(ProductRelationshipType, name="productrelationshiptype", native_enum=False),
+        nullable=False,
+        index=True,
+    )
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    product: Mapped["Product"] = relationship(
+        "Product",
+        foreign_keys=[product_id],
+        back_populates="relationships",
+    )
+    related_product: Mapped["Product"] = relationship("Product", foreign_keys=[related_product_id], lazy="joined")
 
 
 class CategoryTranslation(Base):

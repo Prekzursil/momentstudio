@@ -914,6 +914,8 @@
     "quantity": "Quantity",
     "addToCart": "Add to cart",
     "backToShop": "Back to shop",
+    "upsells": "Recommended add-ons",
+    "relatedProducts": "Related products",
     "recentlyViewed": "Recently viewed",
     "notFound": "Product not found",
     "loadErrorTitle": "Could not load product.",
@@ -2168,6 +2170,26 @@
         "hint": "See how this product may appear in listings and search results per language.",
         "cardTitle": "Storefront card",
         "snippetTitle": "Search snippet"
+      },
+      "relationships": {
+        "title": "Relationships",
+        "hint": "Curate related products and upsells shown on the storefront.",
+        "saveFirst": "Save the product first to manage relationships.",
+        "searchLabel": "Search products to add",
+        "searchLoading": "Searching…",
+        "addRelated": "Add related",
+        "addUpsell": "Add upsell",
+        "related": "Related products",
+        "upsells": "Upsells",
+        "empty": "No products added yet.",
+        "save": "Save relationships",
+        "success": {
+          "save": "Relationships saved"
+        },
+        "errors": {
+          "load": "Could not load relationships.",
+          "save": "Could not save relationships."
+        }
       },
       "actions": {
         "create": "Create",

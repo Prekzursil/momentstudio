@@ -843,6 +843,104 @@ def test_product_reviews_and_related(test_app: Dict[str, object]) -> None:
     assert len(related.json()) >= 1
 
 
+def test_product_relationships_curate_related_and_upsells(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal, email="relsadmin@example.com")
+
+    cat1 = client.post(
+        "/api/v1/catalog/categories",
+        json={"name": "Base"},
+        headers=auth_headers(admin_token),
+    ).json()["id"]
+    cat2 = client.post(
+        "/api/v1/catalog/categories",
+        json={"name": "Cross"},
+        headers=auth_headers(admin_token),
+    ).json()["id"]
+
+    base_res = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": cat1,
+            "slug": "base-prod",
+            "name": "Base product",
+            "base_price": 40,
+            "currency": "RON",
+            "stock_quantity": 2,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert base_res.status_code == 201, base_res.text
+
+    client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": cat1,
+            "slug": "same-cat",
+            "name": "Same category",
+            "base_price": 45,
+            "currency": "RON",
+            "stock_quantity": 2,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    )
+
+    related = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": cat2,
+            "slug": "cross-related",
+            "name": "Cross related",
+            "base_price": 50,
+            "currency": "RON",
+            "stock_quantity": 2,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    ).json()
+
+    upsell = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": cat2,
+            "slug": "cross-upsell",
+            "name": "Cross upsell",
+            "base_price": 60,
+            "currency": "RON",
+            "stock_quantity": 2,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    ).json()
+
+    update = client.put(
+        "/api/v1/catalog/products/base-prod/relationships",
+        json={
+            "related_product_ids": [related["id"]],
+            "upsell_product_ids": [upsell["id"]],
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert update.status_code == 200, update.text
+    assert update.json()["related_product_ids"] == [related["id"]]
+    assert update.json()["upsell_product_ids"] == [upsell["id"]]
+
+    read_admin = client.get("/api/v1/catalog/products/base-prod/relationships", headers=auth_headers(admin_token))
+    assert read_admin.status_code == 200
+    assert read_admin.json()["related_product_ids"] == [related["id"]]
+
+    related_public = client.get("/api/v1/catalog/products/base-prod/related")
+    assert related_public.status_code == 200, related_public.text
+    assert [p["slug"] for p in related_public.json()] == ["cross-related"]
+
+    upsells_public = client.get("/api/v1/catalog/products/base-prod/upsells")
+    assert upsells_public.status_code == 200, upsells_public.text
+    assert [p["slug"] for p in upsells_public.json()] == ["cross-upsell"]
+
+
 def test_slug_history_recently_viewed_and_csv(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]

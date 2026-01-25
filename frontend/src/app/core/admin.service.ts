@@ -197,6 +197,11 @@ export interface AdminProductDetail extends AdminProduct {
   tags?: string[];
 }
 
+export interface AdminProductRelationships {
+  related_product_ids: string[];
+  upsell_product_ids: string[];
+}
+
 export interface AdminProductTranslation {
   lang: 'en' | 'ro';
   name: string;
@@ -611,6 +616,14 @@ export class AdminService {
 
   getProduct(slug: string): Observable<AdminProductDetail> {
     return this.api.get<AdminProductDetail>(`/catalog/products/${slug}`);
+  }
+
+  getProductRelationships(slug: string): Observable<AdminProductRelationships> {
+    return this.api.get<AdminProductRelationships>(`/catalog/products/${slug}/relationships`);
+  }
+
+  updateProductRelationships(slug: string, payload: AdminProductRelationships): Observable<AdminProductRelationships> {
+    return this.api.put<AdminProductRelationships>(`/catalog/products/${slug}/relationships`, payload);
   }
 
   getProductTranslations(slug: string): Observable<AdminProductTranslation[]> {

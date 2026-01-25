@@ -914,6 +914,8 @@
     "quantity": "Cantitate",
     "addToCart": "Adaugă în coș",
     "backToShop": "Înapoi la magazin",
+    "upsells": "Recomandări",
+    "relatedProducts": "Produse similare",
     "recentlyViewed": "Văzute recent",
     "notFound": "Produsul nu a fost găsit",
     "loadErrorTitle": "Nu am putut încărca produsul.",
@@ -2168,6 +2170,26 @@
         "hint": "Vezi cum poate apărea produsul în listări și rezultate de căutare pentru fiecare limbă.",
         "cardTitle": "Card magazin",
         "snippetTitle": "Fragment căutare"
+      },
+      "relationships": {
+        "title": "Relații",
+        "hint": "Alege produse similare și upsell-uri afișate în magazin.",
+        "saveFirst": "Salvează produsul pentru a gestiona relațiile.",
+        "searchLabel": "Caută produse de adăugat",
+        "searchLoading": "Caut…",
+        "addRelated": "Adaugă similar",
+        "addUpsell": "Adaugă upsell",
+        "related": "Produse similare",
+        "upsells": "Upsell-uri",
+        "empty": "Nu ai adăugat produse încă.",
+        "save": "Salvează relațiile",
+        "success": {
+          "save": "Relațiile au fost salvate"
+        },
+        "errors": {
+          "load": "Nu am putut încărca relațiile.",
+          "save": "Nu am putut salva relațiile."
+        }
       },
       "actions": {
         "create": "Creează",

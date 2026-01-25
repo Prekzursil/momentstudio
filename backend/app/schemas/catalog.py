@@ -368,6 +368,15 @@ class StockAdjustmentCreate(BaseModel):
     note: str | None = Field(default=None, max_length=500)
 
 
+class ProductRelationshipsUpdate(BaseModel):
+    related_product_ids: list[UUID] = Field(default_factory=list, max_length=30)
+    upsell_product_ids: list[UUID] = Field(default_factory=list, max_length=30)
+
+
+class ProductRelationshipsRead(ProductRelationshipsUpdate):
+    pass
+
+
 class StockAdjustmentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

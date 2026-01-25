@@ -202,13 +202,81 @@ import { Router } from '@angular/router';
                 >
                   {{ tag.name ?? tag }}
                 </span>
-              </div>
-            </div>
-          </div>
-	      <div *ngIf="recentlyViewed.length" class="mt-12 grid gap-4">
-	        <div class="flex items-center justify-between">
-	          <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.recentlyViewed' | translate }}</h3>
-	          <a routerLink="/shop" class="text-sm font-medium text-indigo-600 dark:text-indigo-300">{{ 'product.backToShop' | translate }}</a>
+	              </div>
+	            </div>
+	          </div>
+		      <div *ngIf="upsellProducts.length" class="mt-12 grid gap-4">
+		        <div class="flex items-center justify-between">
+		          <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.upsells' | translate }}</h3>
+		          <a routerLink="/shop" class="text-sm font-medium text-indigo-600 dark:text-indigo-300">{{ 'product.backToShop' | translate }}</a>
+		        </div>
+		        <div class="flex gap-4 overflow-x-auto pb-2">
+	          <app-button
+	            *ngFor="let item of upsellProducts"
+	            class="min-w-[220px]"
+	            variant="ghost"
+	            [routerLink]="['/products', item.slug]"
+	          >
+	            <div class="flex items-center gap-3 text-left">
+	              <img
+	                [ngSrc]="item.images?.[0]?.url ?? 'assets/placeholder/product-placeholder.svg'"
+	                [alt]="item.name"
+	                class="h-14 w-14 rounded-xl object-cover"
+		                width="96"
+		                height="96"
+		                loading="lazy"
+		                decoding="async"
+		                [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
+		              />
+	                <div class="grid gap-1">
+	                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ item.name }}</p>
+	                <p class="text-sm text-slate-600 dark:text-slate-300">
+	                  {{ displayPrice(item) | localizedCurrency : item.currency }}
+	                </p>
+	              </div>
+	            </div>
+	          </app-button>
+		        </div>
+		      </div>
+
+		      <div *ngIf="relatedProducts.length" class="mt-12 grid gap-4">
+		        <div class="flex items-center justify-between">
+		          <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.relatedProducts' | translate }}</h3>
+		          <a routerLink="/shop" class="text-sm font-medium text-indigo-600 dark:text-indigo-300">{{ 'product.backToShop' | translate }}</a>
+		        </div>
+		        <div class="flex gap-4 overflow-x-auto pb-2">
+	          <app-button
+	            *ngFor="let item of relatedProducts"
+	            class="min-w-[220px]"
+	            variant="ghost"
+	            [routerLink]="['/products', item.slug]"
+	          >
+	            <div class="flex items-center gap-3 text-left">
+	              <img
+	                [ngSrc]="item.images?.[0]?.url ?? 'assets/placeholder/product-placeholder.svg'"
+	                [alt]="item.name"
+	                class="h-14 w-14 rounded-xl object-cover"
+		                width="96"
+		                height="96"
+		                loading="lazy"
+		                decoding="async"
+		                [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
+		              />
+	                <div class="grid gap-1">
+	                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ item.name }}</p>
+	                <p class="text-sm text-slate-600 dark:text-slate-300">
+	                  {{ displayPrice(item) | localizedCurrency : item.currency }}
+	                </p>
+	              </div>
+	            </div>
+	          </app-button>
+		        </div>
+		      </div>
+
+		      <div *ngIf="recentlyViewed.length" class="mt-12 grid gap-4">
+		        <div class="flex items-center justify-between">
+		          <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.recentlyViewed' | translate }}</h3>
+		          <a routerLink="/shop" class="text-sm font-medium text-indigo-600 dark:text-indigo-300">{{ 'product.backToShop' | translate }}</a>
 	        </div>
 	        <div class="flex gap-4 overflow-x-auto pb-2">
           <app-button
@@ -289,11 +357,15 @@ export class ProductComponent implements OnInit, OnDestroy {
   previewOpen = false;
   backInStockLoading = false;
   backInStockRequest: BackInStockRequest | null = null;
+  upsellProducts: Product[] = [];
+  relatedProducts: Product[] = [];
   recentlyViewed: Product[] = [];
   private ldScript?: HTMLScriptElement;
   private langSub?: Subscription;
   private routeSub?: Subscription;
   private productLoadSub?: Subscription;
+  private upsellsLoadSub?: Subscription;
+  private relatedLoadSub?: Subscription;
   private canonicalEl?: HTMLLinkElement;
   private document: Document = inject(DOCUMENT);
   private slug: string | null = null;
@@ -323,6 +395,8 @@ export class ProductComponent implements OnInit, OnDestroy {
     this.langSub?.unsubscribe();
     this.routeSub?.unsubscribe();
     this.productLoadSub?.unsubscribe();
+    this.upsellsLoadSub?.unsubscribe();
+    this.relatedLoadSub?.unsubscribe();
   }
 
   ngOnInit(): void {
@@ -353,9 +427,15 @@ export class ProductComponent implements OnInit, OnDestroy {
     this.loadError = false;
     this.product = null;
     this.backInStockRequest = null;
+    this.upsellProducts = [];
+    this.relatedProducts = [];
     const slug = this.slug;
     this.productLoadSub?.unsubscribe();
     this.productLoadSub = undefined;
+    this.upsellsLoadSub?.unsubscribe();
+    this.upsellsLoadSub = undefined;
+    this.relatedLoadSub?.unsubscribe();
+    this.relatedLoadSub = undefined;
     if (!slug) {
       this.loading = false;
       return;
@@ -377,6 +457,8 @@ export class ProductComponent implements OnInit, OnDestroy {
         const updated = this.recentlyViewedService.add(product);
         this.recentlyViewed = updated.filter((p) => p.slug !== product.slug).slice(0, 8);
         this.loadBackInStockStatus();
+        this.loadUpsells(product.slug);
+        this.loadRelated(product.slug);
       },
       error: (err) => {
         if (this.slug !== slug) return;
@@ -384,6 +466,34 @@ export class ProductComponent implements OnInit, OnDestroy {
         this.loading = false;
         const status = typeof err?.status === 'number' ? err.status : 0;
         this.loadError = status !== 404;
+      }
+    });
+  }
+
+  private loadUpsells(slug: string): void {
+    this.upsellsLoadSub?.unsubscribe();
+    this.upsellsLoadSub = this.catalog.getUpsellProducts(slug).subscribe({
+      next: (items) => {
+        if (!this.product || this.product.slug !== slug) return;
+        this.upsellProducts = (items || []).filter((p) => p.slug !== slug).slice(0, 8);
+      },
+      error: () => {
+        if (!this.product || this.product.slug !== slug) return;
+        this.upsellProducts = [];
+      }
+    });
+  }
+
+  private loadRelated(slug: string): void {
+    this.relatedLoadSub?.unsubscribe();
+    this.relatedLoadSub = this.catalog.getRelatedProducts(slug).subscribe({
+      next: (items) => {
+        if (!this.product || this.product.slug !== slug) return;
+        this.relatedProducts = (items || []).filter((p) => p.slug !== slug).slice(0, 8);
+      },
+      error: () => {
+        if (!this.product || this.product.slug !== slug) return;
+        this.relatedProducts = [];
       }
     });
   }

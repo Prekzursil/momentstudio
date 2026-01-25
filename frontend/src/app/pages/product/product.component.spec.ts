@@ -24,11 +24,18 @@ describe('ProductComponent', () => {
   beforeEach(() => {
     toast = jasmine.createSpyObj<ToastService>('ToastService', ['success', 'error', 'info']);
     cart = jasmine.createSpyObj<CartStore>('CartStore', ['addFromProduct']);
-    catalog = jasmine.createSpyObj<CatalogService>('CatalogService', ['requestBackInStock', 'getProduct']);
+    catalog = jasmine.createSpyObj<CatalogService>('CatalogService', [
+      'requestBackInStock',
+      'getProduct',
+      'getUpsellProducts',
+      'getRelatedProducts',
+    ]);
     auth = jasmine.createSpyObj<AuthService>('AuthService', ['isAuthenticated']);
     router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
     routeParam$ = new ReplaySubject(1);
     routeParam$.next(convertToParamMap({ slug: 'prod' }));
+    catalog.getUpsellProducts.and.returnValue(of([] as any));
+    catalog.getRelatedProducts.and.returnValue(of([] as any));
 
     TestBed.configureTestingModule({
       imports: [ProductComponent, TranslateModule.forRoot()],

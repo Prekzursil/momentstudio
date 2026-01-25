@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import require_admin, get_current_user_optional, require_complete_profile
 from app.db.session import get_session
-from app.models.catalog import Category, Product, ProductImage, ProductReview, ProductStatus
+from app.models.catalog import Category, Product, ProductImage, ProductReview, ProductStatus, ProductRelationshipType
 from app.models.user import UserRole
 from app.schemas.catalog import (
     CategoryCreate,
@@ -40,6 +40,8 @@ from app.schemas.catalog import (
     ProductImageOptimizationStats,
     ProductVariantMatrixUpdate,
     ProductVariantRead,
+    ProductRelationshipsRead,
+    ProductRelationshipsUpdate,
 )
 from app.services import catalog as catalog_service
 from app.services import storage
@@ -317,6 +319,31 @@ async def delete_product_translation(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     await catalog_service.delete_product_translation(session, product=product, lang=lang)
     return None
+
+
+@router.get("/products/{slug}/relationships", response_model=ProductRelationshipsRead)
+async def get_product_relationships(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> ProductRelationshipsRead:
+    product = await catalog_service.get_product_by_slug(session, slug)
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    return await catalog_service.get_product_relationships(session, product.id)
+
+
+@router.put("/products/{slug}/relationships", response_model=ProductRelationshipsRead)
+async def update_product_relationships(
+    slug: str,
+    payload: ProductRelationshipsUpdate,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(require_admin),
+) -> ProductRelationshipsRead:
+    product = await catalog_service.get_product_by_slug(session, slug)
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    return await catalog_service.update_product_relationships(session, product=product, payload=payload, user_id=current_user.id)
 
 
 @router.delete("/products/{slug}", status_code=status.HTTP_204_NO_CONTENT)
@@ -759,9 +786,49 @@ async def related_products(
     is_admin = current_user is not None and getattr(current_user, "role", None) in (UserRole.admin, UserRole.owner)
     if not is_admin and (not product.is_active or product.status != ProductStatus.published):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    related = await catalog_service.get_related_products(session, product, limit=4)
+    curated = await catalog_service.get_curated_relationship_products(
+        session,
+        product_id=product.id,
+        relationship_type=ProductRelationshipType.related,
+        limit=4,
+        include_inactive=is_admin,
+    )
+    related = curated or await catalog_service.get_related_products(session, product, limit=4)
     payload_items = []
     for p in related:
+        model = ProductRead.model_validate(p)
+        if not catalog_service.is_sale_active(p):
+            model.sale_price = None
+        payload_items.append(model)
+    return payload_items
+
+
+@router.get("/products/{slug}/upsells", response_model=list[ProductRead])
+async def upsell_products(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user_optional),
+) -> list[Product]:
+    await catalog_service.auto_publish_due_sales(session)
+    await catalog_service.apply_due_product_schedules(session)
+    product = await catalog_service.get_product_by_slug(
+        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+    )
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    is_admin = current_user is not None and getattr(current_user, "role", None) in (UserRole.admin, UserRole.owner)
+    if not is_admin and (not product.is_active or product.status != ProductStatus.published):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    upsells = await catalog_service.get_curated_relationship_products(
+        session,
+        product_id=product.id,
+        relationship_type=ProductRelationshipType.upsell,
+        limit=4,
+        include_inactive=is_admin,
+    )
+    payload_items = []
+    for p in upsells:
         model = ProductRead.model_validate(p)
         if not catalog_service.is_sale_active(p):
             model.sale_price = None

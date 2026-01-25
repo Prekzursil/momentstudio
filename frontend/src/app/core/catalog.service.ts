@@ -142,6 +142,14 @@ export class CatalogService {
     return this.api.get<Product>(`/catalog/products/${slug}`).pipe(map((p: any) => this.normalizeProduct(p)));
   }
 
+  getRelatedProducts(slug: string): Observable<Product[]> {
+    return this.api.get<Product[]>(`/catalog/products/${slug}/related`).pipe(map((rows: any) => (rows ?? []).map((p: any) => this.normalizeProduct(p))));
+  }
+
+  getUpsellProducts(slug: string): Observable<Product[]> {
+    return this.api.get<Product[]>(`/catalog/products/${slug}/upsells`).pipe(map((rows: any) => (rows ?? []).map((p: any) => this.normalizeProduct(p))));
+  }
+
   getBackInStockStatus(slug: string): Observable<BackInStockStatus> {
     return this.api.get<BackInStockStatus>(`/catalog/products/${slug}/back-in-stock`);
   }
