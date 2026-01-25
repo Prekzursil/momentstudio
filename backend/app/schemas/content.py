@@ -126,6 +126,21 @@ class SitemapPreviewResponse(BaseModel):
     by_lang: dict[str, list[str]] = Field(default_factory=dict)
 
 
+class StructuredDataValidationIssue(BaseModel):
+    entity_type: str
+    entity_key: str
+    severity: str = Field(pattern="^(error|warning)$")
+    message: str
+
+
+class StructuredDataValidationResponse(BaseModel):
+    checked_products: int = 0
+    checked_pages: int = 0
+    errors: int = 0
+    warnings: int = 0
+    issues: list[StructuredDataValidationIssue] = Field(default_factory=list)
+
+
 class ContentImageRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

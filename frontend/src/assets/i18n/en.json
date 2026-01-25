@@ -1674,6 +1674,14 @@
           "load": "Load preview",
           "errors": { "load": "Could not load sitemap preview." }
         },
+        "structuredData": {
+          "title": "Structured data validator",
+          "hint": "Checks product/page JSON-LD prerequisites and flags common issues.",
+          "run": "Run validator",
+          "summary": "{{errors}} errors, {{warnings}} warnings across {{products}} products and {{pages}} pages.",
+          "ok": "No issues found.",
+          "errors": { "load": "Could not run structured data validation." }
+        },
         "success": { "save": "SEO saved." },
         "errors": { "save": "Could not save SEO." }
       },

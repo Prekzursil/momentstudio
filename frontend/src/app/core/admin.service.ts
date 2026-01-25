@@ -502,6 +502,21 @@ export interface SitemapPreviewResponse {
   by_lang: Record<string, string[]>;
 }
 
+export interface StructuredDataValidationIssue {
+  entity_type: 'product' | 'page';
+  entity_key: string;
+  severity: 'error' | 'warning';
+  message: string;
+}
+
+export interface StructuredDataValidationResponse {
+  checked_products: number;
+  checked_pages: number;
+  errors: number;
+  warnings: number;
+  issues: StructuredDataValidationIssue[];
+}
+
 export interface ContentImageAssetRead {
   id: string;
   url: string;
@@ -964,5 +979,9 @@ export class AdminService {
 
   getSitemapPreview(): Observable<SitemapPreviewResponse> {
     return this.api.get<SitemapPreviewResponse>('/content/admin/seo/sitemap-preview');
+  }
+
+  validateStructuredData(): Observable<StructuredDataValidationResponse> {
+    return this.api.get<StructuredDataValidationResponse>('/content/admin/seo/structured-data/validate');
   }
 }

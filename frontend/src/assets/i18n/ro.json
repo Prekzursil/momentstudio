@@ -1674,6 +1674,14 @@
           "load": "Încarcă previzualizarea",
           "errors": { "load": "Nu am putut încărca previzualizarea sitemap-ului." }
         },
+        "structuredData": {
+          "title": "Validator date structurate",
+          "hint": "Verifică cerințele pentru JSON-LD la produse/pagini și semnalează problemele comune.",
+          "run": "Rulează validatorul",
+          "summary": "{{errors}} erori, {{warnings}} avertismente pentru {{products}} produse și {{pages}} pagini.",
+          "ok": "Nu au fost găsite probleme.",
+          "errors": { "load": "Nu am putut rula validarea datelor structurate." }
+        },
         "success": { "save": "SEO salvat." },
         "errors": { "save": "Nu am putut salva SEO." }
       },

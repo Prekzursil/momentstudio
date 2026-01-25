@@ -28,6 +28,7 @@ import {
   ContentPageListItem,
   ContentRedirectRead,
   ContentRedirectImportResult,
+  StructuredDataValidationResponse,
   ContentLinkCheckIssue
 } from '../../core/admin.service';
 import { AdminBlogComment, BlogService } from '../../core/blog.service';
@@ -503,6 +504,63 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
 	                      </a>
 	                    </div>
 	                  </div>
+	                </div>
+	              </div>
+	            </details>
+
+	            <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+	              <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+	                {{ 'adminUi.site.seo.structuredData.title' | translate }}
+	              </summary>
+	              <div class="mt-3 grid gap-3">
+	                <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.site.seo.structuredData.hint' | translate }}</p>
+	                <div class="flex flex-wrap items-center gap-2">
+	                  <app-button
+	                    size="sm"
+	                    variant="ghost"
+	                    [disabled]="structuredDataLoading"
+	                    [label]="'adminUi.site.seo.structuredData.run' | translate"
+	                    (action)="runStructuredDataValidation()"
+	                  ></app-button>
+	                  <span *ngIf="structuredDataError" class="text-xs text-rose-700 dark:text-rose-300">{{ structuredDataError }}</span>
+	                </div>
+	                <div *ngIf="structuredDataLoading" class="text-sm text-slate-600 dark:text-slate-300">
+	                  {{ 'notifications.loading' | translate }}
+	                </div>
+	                <div *ngIf="!structuredDataLoading && structuredDataResult" class="grid gap-3">
+	                  <p class="text-xs text-slate-700 dark:text-slate-200">
+	                    {{ 'adminUi.site.seo.structuredData.summary' | translate:{ products: structuredDataResult.checked_products, pages: structuredDataResult.checked_pages, errors: structuredDataResult.errors, warnings: structuredDataResult.warnings } }}
+	                  </p>
+	                  <div *ngIf="structuredDataResult.issues?.length; else noStructuredDataIssues" class="grid gap-2">
+	                    <div
+	                      *ngFor="let issue of structuredDataResult.issues"
+	                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-800 dark:bg-slate-900"
+	                    >
+	                      <div class="flex flex-wrap items-center justify-between gap-2">
+	                        <span
+	                          class="font-semibold"
+	                          [class.text-rose-700]="issue.severity === 'error'"
+	                          [class.dark:text-rose-300]="issue.severity === 'error'"
+	                          [class.text-amber-800]="issue.severity === 'warning'"
+	                          [class.dark:text-amber-200]="issue.severity === 'warning'"
+	                        >
+	                          {{ issue.severity.toUpperCase() }}
+	                        </span>
+	                        <a
+	                          class="font-mono text-indigo-600 hover:underline dark:text-indigo-300"
+	                          [href]="structuredDataIssueUrl(issue)"
+	                          target="_blank"
+	                          rel="noopener noreferrer"
+	                        >
+	                          {{ issue.entity_type }} · {{ issue.entity_key }}
+	                        </a>
+	                      </div>
+	                      <p class="mt-1 text-slate-700 dark:text-slate-200">{{ issue.message }}</p>
+	                    </div>
+	                  </div>
+	                  <ng-template #noStructuredDataIssues>
+	                    <p class="text-sm text-emerald-700 dark:text-emerald-300">{{ 'adminUi.site.seo.structuredData.ok' | translate }}</p>
+	                  </ng-template>
 	                </div>
 	              </div>
 	            </details>
@@ -3731,6 +3789,9 @@ export class AdminComponent implements OnInit, OnDestroy {
   sitemapPreviewLoading = false;
   sitemapPreviewError: string | null = null;
   sitemapPreviewByLang: Record<string, string[]> | null = null;
+  structuredDataLoading = false;
+  structuredDataError: string | null = null;
+  structuredDataResult: StructuredDataValidationResponse | null = null;
   infoLang: UiLang = 'en';
   infoForm: { about: LocalizedText; faq: LocalizedText; shipping: LocalizedText; contact: LocalizedText } = {
     about: { en: '', ro: '' },
@@ -5980,6 +6041,40 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.sitemapPreviewLoading = false;
         this.sitemapPreviewByLang = null;
         this.sitemapPreviewError = detail || this.t('adminUi.site.seo.sitemapPreview.errors.load');
+      }
+    });
+  }
+
+  structuredDataIssueUrl(issue: { entity_type: string; entity_key: string }): string {
+    const type = String(issue?.entity_type || '').trim().toLowerCase();
+    const key = String(issue?.entity_key || '').trim();
+    if (type === 'product') {
+      return `/products/${encodeURIComponent(key)}`;
+    }
+    if (type === 'page') {
+      const raw = key.startsWith('page.') ? key.slice('page.'.length) : key;
+      if (raw === 'about') return '/about';
+      if (raw === 'contact') return '/contact';
+      if (!raw) return '/pages';
+      return `/pages/${encodeURIComponent(raw)}`;
+    }
+    return '/';
+  }
+
+  runStructuredDataValidation(): void {
+    this.structuredDataLoading = true;
+    this.structuredDataError = null;
+    this.structuredDataResult = null;
+    this.admin.validateStructuredData().subscribe({
+      next: (res) => {
+        this.structuredDataLoading = false;
+        this.structuredDataResult = res || null;
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.structuredDataLoading = false;
+        this.structuredDataResult = null;
+        this.structuredDataError = detail || this.t('adminUi.site.seo.structuredData.errors.load');
       }
     });
   }

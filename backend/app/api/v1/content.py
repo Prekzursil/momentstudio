@@ -32,10 +32,12 @@ from app.schemas.content import (
     ContentLinkCheckResponse,
     ContentTranslationStatusUpdate,
     SitemapPreviewResponse,
+    StructuredDataValidationResponse,
 )
 from app.schemas.social import SocialThumbnailRequest, SocialThumbnailResponse
 from app.services import content as content_service
 from app.services import sitemap as sitemap_service
+from app.services import structured_data as structured_data_service
 from app.services import social_thumbnails
 
 router = APIRouter(prefix="/content", tags=["content"])
@@ -343,6 +345,15 @@ async def admin_sitemap_preview(
 ) -> SitemapPreviewResponse:
     by_lang = await sitemap_service.build_sitemap_urls(session)
     return SitemapPreviewResponse(by_lang=by_lang)
+
+
+@router.get("/admin/seo/structured-data/validate", response_model=StructuredDataValidationResponse)
+async def admin_validate_structured_data(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> StructuredDataValidationResponse:
+    payload = await structured_data_service.validate_structured_data(session)
+    return StructuredDataValidationResponse(**payload)
 
 
 @router.delete("/admin/redirects/{redirect_id}", status_code=status.HTTP_204_NO_CONTENT)

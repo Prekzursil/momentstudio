@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from io import BytesIO
 from typing import Dict
 
@@ -17,6 +18,7 @@ from app.models.user import UserRole
 from app.services import social_thumbnails
 import httpx
 from app.models.content import ContentRedirect
+from app.models.catalog import Category, Product, ProductStatus
 
 
 @pytest.fixture
@@ -309,6 +311,31 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     by_lang = sitemap_preview.json()["by_lang"]
     assert "en" in by_lang and "ro" in by_lang
     assert any("/pages/new" in url for url in by_lang["en"])
+
+    async def seed_product() -> None:
+        async with SessionLocal() as session:
+            cat = Category(slug="mugs", name="Mugs")
+            session.add(cat)
+            await session.flush()
+            session.add(
+                Product(
+                    category_id=cat.id,
+                    slug="test-product",
+                    name="Test product",
+                    base_price=Decimal("10.00"),
+                    currency="RON",
+                    status=ProductStatus.published,
+                )
+            )
+            await session.commit()
+
+    asyncio.run(seed_product())
+
+    structured = client.get("/api/v1/content/admin/seo/structured-data/validate", headers=auth_headers(admin_token))
+    assert structured.status_code == 200, structured.text
+    payload = structured.json()
+    assert payload["checked_products"] >= 1
+    assert any(i["entity_type"] == "product" and i["severity"] == "warning" for i in payload["issues"])
 
     # Broken link checker for internal URLs.
     link_block = client.post(
