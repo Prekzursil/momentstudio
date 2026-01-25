@@ -307,7 +307,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Search bar hitting /products.
 - [x] Product card component (image, name, price, stock badge).
 - [x] Product detail page with gallery, variants, quantity/add-to-cart.
-- [ ] Storefront: product page add-to-cart respects selected variant (currently always sends `variant_id: null`).
+- [x] Storefront: product page add-to-cart respects selected variant (currently always sends `variant_id: null`).
 - [x] Handmade uniqueness note.
 - [x] Sort controls (price/name/newest).
 - [x] Price range slider.

@@ -2,7 +2,7 @@ import { CommonModule, NgOptimizedImage, DOCUMENT } from '@angular/common';
 import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { BackInStockRequest, CatalogService, Product } from '../../core/catalog.service';
+import { BackInStockRequest, CatalogService, Product, ProductVariant } from '../../core/catalog.service';
 import { CartStore } from '../../core/cart.store';
 import { RecentlyViewedService } from '../../core/recently-viewed.service';
 import { ContainerComponent } from '../../layout/container.component';
@@ -413,16 +413,17 @@ export class ProductComponent implements OnInit, OnDestroy {
       this.toast.error(this.translate.instant('product.soldOut'), this.translate.instant('product.notifyBackInStock'));
       return;
     }
+    const variant = this.selectedVariant(this.product);
     this.cartStore.addFromProduct({
       product_id: this.product.id,
-      variant_id: null,
+      variant_id: variant?.id ?? null,
       quantity: this.quantity,
       name: this.product.name,
       slug: this.product.slug,
       image: this.product.images?.[0]?.url,
       price: Number(this.displayPrice(this.product)),
       currency: this.product.currency,
-      stock: this.product.stock_quantity ?? 99
+      stock: (variant?.stock_quantity ?? this.product.stock_quantity ?? 99) || 0
     });
     this.toast.success(
       this.translate.instant('product.addedTitle'),
@@ -546,9 +547,18 @@ export class ProductComponent implements OnInit, OnDestroy {
   isOutOfStock(): boolean {
     const product = this.product;
     if (!product) return false;
-    const stock = product.stock_quantity ?? 0;
+    const variant = this.selectedVariant(product);
+    const stock = variant?.stock_quantity ?? product.stock_quantity ?? 0;
     const allowBackorder = !!product.allow_backorder;
+    if (variant && variant.stock_quantity == null) return false;
     return stock <= 0 && !allowBackorder;
+  }
+
+  private selectedVariant(product: Product): ProductVariant | null {
+    const variants = product.variants ?? [];
+    if (!variants.length) return null;
+    const desired = this.selectedVariantId;
+    return variants.find((v) => v.id === desired) ?? variants[0] ?? null;
   }
 
   isOnSale(product: Product): boolean {

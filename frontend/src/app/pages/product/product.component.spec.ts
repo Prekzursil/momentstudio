@@ -94,6 +94,25 @@ describe('ProductComponent', () => {
     expect(toast.success).toHaveBeenCalled();
   });
 
+  it('includes selected variant when adding to cart', () => {
+    const cmp = TestBed.createComponent(ProductComponent).componentInstance;
+    cmp.product = {
+      id: 'p1',
+      slug: 'p1',
+      name: 'Product',
+      base_price: 25,
+      currency: 'RON',
+      stock_quantity: 5,
+      variants: [{ id: 'v1', name: 'Small', stock_quantity: 3 }],
+      images: [{ url: '/img.png' }],
+    } as any;
+    cmp.selectedVariantId = 'v1';
+
+    cmp.addToCart();
+
+    expect(cart.addFromProduct).toHaveBeenCalledWith(jasmine.objectContaining({ variant_id: 'v1' }));
+  });
+
   it('requests back-in-stock when out of stock and signed in', () => {
     auth.isAuthenticated.and.returnValue(true);
     catalog.requestBackInStock.and.returnValue(of({ id: 'r1', created_at: '2000-01-01T00:00:00+00:00' } as any));
