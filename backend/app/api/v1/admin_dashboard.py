@@ -474,6 +474,7 @@ async def search_products(
     q: str | None = Query(default=None),
     status: ProductStatus | None = Query(default=None),
     category_slug: str | None = Query(default=None),
+    deleted: bool = Query(default=False),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
 ) -> AdminProductListResponse:
@@ -481,7 +482,7 @@ async def search_products(
     stmt = (
         select(Product, Category)
         .join(Category, Product.category_id == Category.id)
-        .where(Product.is_deleted.is_(False))
+        .where(Product.is_deleted.is_(deleted))
     )
     if q:
         like = f"%{q.strip().lower()}%"
@@ -510,6 +511,7 @@ async def search_products(
         AdminProductListItem(
             id=prod.id,
             slug=prod.slug,
+            deleted_slug=getattr(prod, "deleted_slug", None),
             sku=prod.sku,
             name=prod.name,
             base_price=float(prod.base_price),
@@ -523,6 +525,7 @@ async def search_products(
             category_slug=cat.slug,
             category_name=cat.name,
             updated_at=prod.updated_at,
+            deleted_at=getattr(prod, "deleted_at", None),
             publish_at=prod.publish_at,
             publish_scheduled_for=getattr(prod, "publish_scheduled_for", None),
             unpublish_scheduled_for=getattr(prod, "unpublish_scheduled_for", None),
@@ -537,6 +540,48 @@ async def search_products(
             "page": page,
             "limit": limit,
         },
+    )
+
+
+@router.post("/products/{product_id}/restore", response_model=AdminProductListItem)
+async def restore_product(
+    product_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(require_admin),
+) -> AdminProductListItem:
+    product = await session.get(Product, product_id)
+    if not product or not getattr(product, "is_deleted", False):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    await catalog_service.restore_soft_deleted_product(session, product, user_id=current_user.id)
+    row = (
+        await session.execute(
+            select(Product, Category)
+            .join(Category, Product.category_id == Category.id)
+            .where(Product.id == product_id)
+        )
+    ).one()
+    prod, cat = row
+    return AdminProductListItem(
+        id=prod.id,
+        slug=prod.slug,
+        deleted_slug=getattr(prod, "deleted_slug", None),
+        sku=prod.sku,
+        name=prod.name,
+        base_price=float(prod.base_price),
+        sale_type=prod.sale_type,
+        sale_value=float(prod.sale_value) if prod.sale_value is not None else None,
+        currency=prod.currency,
+        status=prod.status,
+        is_active=prod.is_active,
+        is_featured=prod.is_featured,
+        stock_quantity=prod.stock_quantity,
+        category_slug=cat.slug,
+        category_name=cat.name,
+        updated_at=prod.updated_at,
+        deleted_at=getattr(prod, "deleted_at", None),
+        publish_at=prod.publish_at,
+        publish_scheduled_for=getattr(prod, "publish_scheduled_for", None),
+        unpublish_scheduled_for=getattr(prod, "unpublish_scheduled_for", None),
     )
 
 

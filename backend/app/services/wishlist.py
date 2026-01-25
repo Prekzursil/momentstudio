@@ -1,17 +1,20 @@
 import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, with_loader_criteria
 from fastapi import HTTPException, status
 
 from app.models.wishlist import WishlistItem
-from app.models.catalog import Product, ProductStatus
+from app.models.catalog import Product, ProductImage, ProductStatus
 
 
 async def list_wishlist(session: AsyncSession, user_id: uuid.UUID):
     result = await session.execute(
         select(WishlistItem)
-        .options(selectinload(WishlistItem.product).selectinload(Product.images))
+        .options(
+            selectinload(WishlistItem.product).selectinload(Product.images),
+            with_loader_criteria(ProductImage, ProductImage.is_deleted.is_(False), include_aliases=True),
+        )
         .where(WishlistItem.user_id == user_id)
     )
     items = result.scalars().all()

@@ -13,6 +13,7 @@ from app.schemas.admin_common import AdminPaginationMeta
 class AdminProductListItem(BaseModel):
     id: UUID
     slug: str
+    deleted_slug: str | None = None
     sku: str
     name: str
     base_price: Decimal
@@ -26,6 +27,7 @@ class AdminProductListItem(BaseModel):
     category_slug: str
     category_name: str
     updated_at: datetime
+    deleted_at: datetime | None = None
     publish_at: datetime | None = None
     publish_scheduled_for: datetime | None = None
     unpublish_scheduled_for: datetime | None = None
@@ -55,3 +57,11 @@ class AdminProductDuplicateCheckResponse(BaseModel):
     slug_matches: list[AdminProductDuplicateMatch] = Field(default_factory=list)
     sku_matches: list[AdminProductDuplicateMatch] = Field(default_factory=list)
     name_matches: list[AdminProductDuplicateMatch] = Field(default_factory=list)
+
+
+class AdminDeletedProductImage(BaseModel):
+    id: UUID
+    url: str
+    alt_text: str | None = None
+    caption: str | None = None
+    deleted_at: datetime | None = None

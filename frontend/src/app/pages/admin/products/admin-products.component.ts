@@ -16,6 +16,7 @@ import {
 import { CatalogService, Category } from '../../../core/catalog.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import {
+  AdminDeletedProductImage,
   AdminProductImageOptimizationStats,
   AdminProductImageTranslation,
   AdminProductVariant,
@@ -96,14 +97,25 @@ type VariantRow = {
         <app-button size="sm" [label]="'adminUi.products.new' | translate" (action)="startNew()"></app-button>
       </div>
 
-      <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
-	        <div class="grid gap-3 lg:grid-cols-[1fr_240px_240px_auto] items-end">
-	          <app-input [label]="'adminUi.products.search' | translate" [(value)]="q"></app-input>
+	      <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+		        <div class="grid gap-3 lg:grid-cols-[1fr_180px_220px_240px_auto] items-end">
+		          <app-input [label]="'adminUi.products.search' | translate" [(value)]="q"></app-input>
 
-          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            {{ 'adminUi.products.table.status' | translate }}
-            <select
-              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	            {{ 'adminUi.products.table.view' | translate }}
+	            <select
+	              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	              [(ngModel)]="view"
+	            >
+	              <option value="active">{{ 'adminUi.products.view.active' | translate }}</option>
+	              <option value="deleted">{{ 'adminUi.products.view.deleted' | translate }}</option>
+	            </select>
+	          </label>
+
+	          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	            {{ 'adminUi.products.table.status' | translate }}
+	            <select
+	              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               [(ngModel)]="status"
             >
               <option value="all">{{ 'adminUi.products.all' | translate }}</option>
@@ -130,10 +142,10 @@ type VariantRow = {
 	          </div>
 	        </div>
 
-          <div
-            *ngIf="selected.size > 0"
-            class="rounded-xl border border-slate-200 bg-slate-50 p-3 grid gap-3 dark:border-slate-800 dark:bg-slate-950/20"
-          >
+	          <div
+	            *ngIf="selected.size > 0 && view === 'active'"
+	            class="rounded-xl border border-slate-200 bg-slate-50 p-3 grid gap-3 dark:border-slate-800 dark:bg-slate-950/20"
+	          >
             <div class="flex flex-wrap items-center justify-between gap-3">
               <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
                 {{ 'adminUi.products.bulk.selected' | translate: { count: selected.size } }}
@@ -344,45 +356,53 @@ type VariantRow = {
             <table class="min-w-[980px] w-full text-sm">
               <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
                 <tr>
-                  <th class="text-left font-semibold px-3 py-2 w-10">
-                    <input
-                      type="checkbox"
-                      [checked]="allSelectedOnPage()"
-                      (change)="toggleSelectAll($event)"
-                      [disabled]="bulkBusy() || inlineBusy()"
-                      aria-label="Select all"
-                    />
-                  </th>
+	                  <th class="text-left font-semibold px-3 py-2 w-10">
+	                    <input
+	                      type="checkbox"
+	                      [checked]="allSelectedOnPage()"
+	                      (change)="toggleSelectAll($event)"
+	                      [disabled]="bulkBusy() || inlineBusy() || view === 'deleted'"
+	                      aria-label="Select all"
+	                    />
+	                  </th>
                   <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.name' | translate }}</th>
                   <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.price' | translate }}</th>
                   <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.status' | translate }}</th>
                   <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.category' | translate }}</th>
-                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.stock' | translate }}</th>
-                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.active' | translate }}</th>
-                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.updated' | translate }}</th>
-                  <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.products.table.actions' | translate }}</th>
-                </tr>
-              </thead>
+	                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.stock' | translate }}</th>
+	                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.active' | translate }}</th>
+	                  <th class="text-left font-semibold px-3 py-2">
+	                    {{
+	                      view === 'deleted'
+	                        ? ('adminUi.products.table.deletedAt' | translate)
+	                        : ('adminUi.products.table.updated' | translate)
+	                    }}
+	                  </th>
+	                  <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.products.table.actions' | translate }}</th>
+	                </tr>
+	              </thead>
               <tbody>
                 <tr
                   *ngFor="let product of products()"
                   class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
                 >
-                  <td class="px-3 py-2">
-                    <input
-                      type="checkbox"
-                      [checked]="selected.has(product.id)"
-                      (change)="toggleSelected(product.id, $event)"
-                      [disabled]="bulkBusy() || inlineBusy()"
-                      aria-label="Select"
-                    />
-                  </td>
-                  <td class="px-3 py-2 font-medium text-slate-900 dark:text-slate-50">
-                    <div class="grid">
-                      <span class="truncate">{{ product.name }}</span>
-                      <span class="text-xs text-slate-500 dark:text-slate-400">{{ product.slug }} · {{ product.sku }}</span>
-                    </div>
-                  </td>
+	                  <td class="px-3 py-2">
+	                    <input
+	                      type="checkbox"
+	                      [checked]="selected.has(product.id)"
+	                      (change)="toggleSelected(product.id, $event)"
+	                      [disabled]="bulkBusy() || inlineBusy() || view === 'deleted'"
+	                      aria-label="Select"
+	                    />
+	                  </td>
+	                  <td class="px-3 py-2 font-medium text-slate-900 dark:text-slate-50">
+	                    <div class="grid">
+	                      <span class="truncate">{{ product.name }}</span>
+	                      <span class="text-xs text-slate-500 dark:text-slate-400">
+	                        {{ product.deleted_slug || product.slug }} · {{ product.sku }}
+	                      </span>
+	                    </div>
+	                  </td>
                   <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
                     <ng-container *ngIf="inlineEditId === product.id; else priceRead">
                       <div class="grid gap-2 min-w-[240px]">
@@ -520,34 +540,50 @@ type VariantRow = {
                   </td>
                   <td class="px-3 py-2 text-right">
                     <div class="flex items-center justify-end gap-2">
-                      <ng-container *ngIf="inlineEditId === product.id; else rowActions">
-                        <app-button
-                          size="sm"
-                          [label]="'adminUi.actions.save' | translate"
-                          (action)="saveInlineEdit()"
-                          [disabled]="inlineBusy()"
-                        ></app-button>
-                        <app-button
-                          size="sm"
-                          variant="ghost"
-                          [label]="'adminUi.actions.cancel' | translate"
-                          (action)="cancelInlineEdit()"
-                          [disabled]="inlineBusy()"
-                        ></app-button>
-                      </ng-container>
-                      <ng-template #rowActions>
-                        <app-button
-                          size="sm"
-                          variant="ghost"
-                          [label]="'adminUi.products.inlineEdit' | translate"
-                          (action)="startInlineEdit(product)"
-                          [disabled]="bulkBusy() || inlineBusy()"
-                        ></app-button>
-                        <app-button size="sm" variant="ghost" [label]="'adminUi.products.edit' | translate" (action)="edit(product.slug)"></app-button>
-                      </ng-template>
-                    </div>
-                  </td>
-                </tr>
+	                      <ng-container *ngIf="inlineEditId === product.id; else rowActions">
+	                        <app-button
+	                          size="sm"
+	                          [label]="'adminUi.actions.save' | translate"
+	                          (action)="saveInlineEdit()"
+	                          [disabled]="inlineBusy()"
+	                        ></app-button>
+	                        <app-button
+	                          size="sm"
+	                          variant="ghost"
+	                          [label]="'adminUi.actions.cancel' | translate"
+	                          (action)="cancelInlineEdit()"
+	                          [disabled]="inlineBusy()"
+	                        ></app-button>
+	                      </ng-container>
+	                      <ng-template #rowActions>
+	                        <ng-container *ngIf="view === 'deleted'; else activeRowActions">
+	                          <app-button
+	                            size="sm"
+	                            variant="ghost"
+	                            [label]="'adminUi.actions.restore' | translate"
+	                            (action)="restoreProduct(product)"
+	                            [disabled]="restoringProductId() === product.id"
+	                          ></app-button>
+	                        </ng-container>
+	                        <ng-template #activeRowActions>
+	                          <app-button
+	                            size="sm"
+	                            variant="ghost"
+	                            [label]="'adminUi.products.inlineEdit' | translate"
+	                            (action)="startInlineEdit(product)"
+	                            [disabled]="bulkBusy() || inlineBusy()"
+	                          ></app-button>
+	                          <app-button
+	                            size="sm"
+	                            variant="ghost"
+	                            [label]="'adminUi.products.edit' | translate"
+	                            (action)="edit(product.slug)"
+	                          ></app-button>
+	                        </ng-template>
+	                      </ng-template>
+	                    </div>
+	                  </td>
+	                </tr>
               </tbody>
             </table>
           </div>
@@ -1397,23 +1433,36 @@ type VariantRow = {
 		          <span *ngIf="editorMessage()" class="text-sm text-emerald-700 dark:text-emerald-300">{{ editorMessage() }}</span>
 		        </div>
 
-        <div class="grid gap-3">
-          <div class="flex items-center justify-between">
-            <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.products.form.images' | translate }}</p>
-            <label class="text-sm text-slate-700 dark:text-slate-200">
-              {{ 'adminUi.products.form.upload' | translate }}
-              <input type="file" accept="image/*" class="block mt-1" (change)="onUpload($event)" />
-            </label>
-          </div>
+	        <div class="grid gap-3">
+	          <div class="flex items-center justify-between">
+	            <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.products.form.images' | translate }}</p>
+	            <div class="flex flex-wrap items-center gap-2">
+	              <app-button
+	                size="sm"
+	                variant="ghost"
+	                [label]="
+	                  deletedImagesOpen()
+	                    ? ('adminUi.products.form.hideDeletedImages' | translate)
+	                    : ('adminUi.products.form.showDeletedImages' | translate)
+	                "
+	                (action)="toggleDeletedImages()"
+	                [disabled]="deletedImagesBusy() || !editingSlug()"
+	              ></app-button>
+	              <label class="text-sm text-slate-700 dark:text-slate-200">
+	                {{ 'adminUi.products.form.upload' | translate }}
+	                <input type="file" accept="image/*" class="block mt-1" (change)="onUpload($event)" />
+	              </label>
+	            </div>
+	          </div>
 
           <div *ngIf="images().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
             {{ 'adminUi.products.form.noImages' | translate }}
           </div>
 
-	          <div *ngIf="images().length > 0" class="grid gap-2">
-	            <div *ngFor="let img of images()" class="rounded-lg border border-slate-200 dark:border-slate-700">
-	              <div class="flex items-center gap-3 p-2">
-	                <img [src]="img.url" [alt]="img.alt_text || 'image'" class="h-12 w-12 rounded object-cover" />
+		          <div *ngIf="images().length > 0" class="grid gap-2">
+		            <div *ngFor="let img of images()" class="rounded-lg border border-slate-200 dark:border-slate-700">
+		              <div class="flex items-center gap-3 p-2">
+		                <img [src]="img.url" [alt]="img.alt_text || 'image'" class="h-12 w-12 rounded object-cover" />
 	                <div class="flex-1 min-w-0">
 	                  <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ img.alt_text || ('adminUi.products.form.image' | translate) }}</p>
 	                  <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ img.url }}</p>
@@ -1487,10 +1536,64 @@ type VariantRow = {
 	                        [(ngModel)]="imageMeta.en.caption"
 	                      ></textarea>
 	                    </label>
-	                  </div>
+		              </div>
+		            </div>
+		          </div>
+
+	          <div
+	            *ngIf="deletedImagesOpen()"
+	            class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/20"
+	          >
+	            <div class="flex items-center justify-between gap-3">
+	              <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+	                {{ 'adminUi.products.form.deletedImages' | translate }}
+	              </p>
+	              <span class="text-xs text-slate-500 dark:text-slate-400">
+	                {{ deletedImages().length }}
+	              </span>
+	            </div>
+
+	            <div *ngIf="deletedImagesBusy()" class="text-sm text-slate-600 dark:text-slate-300">
+	              {{ 'adminUi.actions.loading' | translate }}
+	            </div>
+
+	            <div
+	              *ngIf="deletedImagesError()"
+	              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+	            >
+	              {{ deletedImagesError() }}
+	            </div>
+
+	            <div *ngIf="!deletedImagesBusy() && deletedImages().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+	              {{ 'adminUi.products.form.noDeletedImages' | translate }}
+	            </div>
+
+	            <div *ngIf="!deletedImagesBusy() && deletedImages().length > 0" class="grid gap-2">
+	              <div
+	                *ngFor="let img of deletedImages()"
+	                class="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900"
+	              >
+	                <img [src]="img.url" [alt]="img.alt_text || 'image'" class="h-12 w-12 rounded object-cover" />
+	                <div class="flex-1 min-w-0">
+	                  <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+	                    {{ img.alt_text || ('adminUi.products.form.image' | translate) }}
+	                  </p>
+	                  <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ img.url }}</p>
+	                  <p *ngIf="img.deleted_at" class="text-xs text-slate-500 dark:text-slate-400">
+	                    {{ 'adminUi.products.form.deletedAt' | translate }}: {{ img.deleted_at | date: 'short' }}
+	                  </p>
 	                </div>
+	                <app-button
+	                  size="sm"
+	                  variant="ghost"
+	                  [label]="'adminUi.actions.restore' | translate"
+	                  (action)="restoreDeletedImage(img.id)"
+	                  [disabled]="restoringDeletedImage() === img.id"
+	                ></app-button>
 	              </div>
 	            </div>
+	          </div>
+	        </div>
 	          </div>
 	        </div>
 	      </section>
@@ -1513,6 +1616,7 @@ export class AdminProductsComponent implements OnInit {
   q = '';
   status: ProductStatusFilter = 'all';
   categorySlug = '';
+  view: 'active' | 'deleted' = 'active';
   page = 1;
   limit = 25;
 
@@ -1521,6 +1625,11 @@ export class AdminProductsComponent implements OnInit {
   editorError = signal<string | null>(null);
   editorMessage = signal<string | null>(null);
   images = signal<Array<{ id: string; url: string; alt_text?: string | null; caption?: string | null }>>([]);
+  deletedImagesOpen = signal(false);
+  deletedImages = signal<AdminDeletedProductImage[]>([]);
+  deletedImagesBusy = signal(false);
+  deletedImagesError = signal<string | null>(null);
+  restoringDeletedImage = signal<string | null>(null);
   editingImageId = signal<string | null>(null);
   imageMetaBusy = signal(false);
   imageMetaError = signal<string | null>(null);
@@ -1546,6 +1655,7 @@ export class AdminProductsComponent implements OnInit {
   bulkUnpublishScheduledFor = '';
   bulkBusy = signal(false);
   bulkError = signal<string | null>(null);
+  restoringProductId = signal<string | null>(null);
 
   inlineEditId: string | null = null;
   inlineBasePrice = '';
@@ -1654,6 +1764,7 @@ export class AdminProductsComponent implements OnInit {
   }
 
   toggleSelected(productId: string, event: Event): void {
+    if (this.view === 'deleted') return;
     const target = event.target as HTMLInputElement | null;
     const checked = target?.checked !== false;
     if (checked) {
@@ -1668,12 +1779,14 @@ export class AdminProductsComponent implements OnInit {
   }
 
   allSelectedOnPage(): boolean {
+    if (this.view === 'deleted') return false;
     const items = this.products();
     if (!items.length) return false;
     return items.every((p) => this.selected.has(p.id));
   }
 
   toggleSelectAll(event: Event): void {
+    if (this.view === 'deleted') return;
     const target = event.target as HTMLInputElement | null;
     const checked = target?.checked !== false;
     const ids = this.products().map((p) => p.id);
@@ -2131,57 +2244,60 @@ export class AdminProductsComponent implements OnInit {
     };
   }
 
-	  startNew(): void {
-	    this.editorOpen.set(true);
-	    this.editingSlug.set(null);
-	    this.editingProductId.set(null);
-	    this.editorError.set(null);
-	    this.editorMessage.set(null);
-	    this.resetDuplicateCheck();
-	    this.resetRelationships();
-	    this.images.set([]);
-	    this.resetImageMeta();
-	    this.form = this.blankForm();
-	    this.basePriceError = '';
-	    this.saleValueError = '';
-    this.resetTranslations();
+		  startNew(): void {
+		    this.editorOpen.set(true);
+		    this.editingSlug.set(null);
+		    this.editingProductId.set(null);
+		    this.editorError.set(null);
+		    this.editorMessage.set(null);
+		    this.resetDuplicateCheck();
+		    this.resetRelationships();
+		    this.images.set([]);
+	    this.resetDeletedImages();
+		    this.resetImageMeta();
+		    this.form = this.blankForm();
+		    this.basePriceError = '';
+		    this.saleValueError = '';
+	    this.resetTranslations();
     this.resetVariants();
     this.resetStockLedger();
     const first = this.adminCategories()[0];
     if (first) this.form.category_id = first.id;
   }
 
-	  closeEditor(): void {
-	    this.editorOpen.set(false);
-	    this.editingSlug.set(null);
-	    this.editingProductId.set(null);
-	    this.editorError.set(null);
-	    this.editorMessage.set(null);
-	    this.resetDuplicateCheck();
-	    this.resetRelationships();
-	    this.images.set([]);
-	    this.resetImageMeta();
-	    this.basePriceError = '';
-	    this.saleValueError = '';
-    this.resetTranslations();
+		  closeEditor(): void {
+		    this.editorOpen.set(false);
+		    this.editingSlug.set(null);
+		    this.editingProductId.set(null);
+		    this.editorError.set(null);
+		    this.editorMessage.set(null);
+		    this.resetDuplicateCheck();
+		    this.resetRelationships();
+		    this.images.set([]);
+	    this.resetDeletedImages();
+		    this.resetImageMeta();
+		    this.basePriceError = '';
+		    this.saleValueError = '';
+	    this.resetTranslations();
     this.resetVariants();
     this.resetStockLedger();
   }
 
-	  edit(slug: string): void {
-	    this.editorOpen.set(true);
-	    this.editorError.set(null);
-	    this.editorMessage.set(null);
-	    this.editingSlug.set(slug);
-	    this.editingProductId.set(null);
-	    this.resetDuplicateCheck();
-	    this.resetRelationships();
-	    this.basePriceError = '';
-	    this.saleValueError = '';
-	    this.resetTranslations();
-	    this.resetImageMeta();
-	    this.resetVariants();
-    this.resetStockLedger();
+		  edit(slug: string): void {
+		    this.editorOpen.set(true);
+		    this.editorError.set(null);
+		    this.editorMessage.set(null);
+		    this.editingSlug.set(slug);
+		    this.editingProductId.set(null);
+		    this.resetDuplicateCheck();
+		    this.resetRelationships();
+		    this.basePriceError = '';
+		    this.saleValueError = '';
+		    this.resetTranslations();
+		    this.resetDeletedImages();
+		    this.resetImageMeta();
+		    this.resetVariants();
+	    this.resetStockLedger();
     this.admin.getProduct(slug).subscribe({
       next: (prod: any) => {
         this.editingProductId.set(prod?.id ? String(prod.id) : null);
@@ -2228,13 +2344,31 @@ export class AdminProductsComponent implements OnInit {
 	        this.scheduleDuplicateCheck();
 	      },
 	      error: () => this.editorError.set(this.t('adminUi.products.errors.load'))
+		    });
+		  }
+
+	  restoreProduct(product: AdminProductListItem): void {
+	    const id = (product?.id || '').toString();
+	    if (!id) return;
+	    this.restoringProductId.set(id);
+	    this.productsApi.restore(id).subscribe({
+	      next: () => {
+	        this.toast.success(this.t('adminUi.products.trash.success.restore'));
+	        this.restoringProductId.set(null);
+	        this.clearSelection();
+	        this.load();
+	      },
+	      error: () => {
+	        this.restoringProductId.set(null);
+	        this.toast.error(this.t('adminUi.products.trash.errors.restore'));
+	      }
 	    });
 	  }
 
-  onNameChange(next: string | number): void {
-    this.form.name = String(next ?? '');
-    this.scheduleDuplicateCheck();
-  }
+	  onNameChange(next: string | number): void {
+	    this.form.name = String(next ?? '');
+	    this.scheduleDuplicateCheck();
+	  }
 
   onSkuChange(next: string | number): void {
     this.form.sku = String(next ?? '');
@@ -2986,8 +3120,41 @@ export class AdminProductsComponent implements OnInit {
           this.resetImageMeta();
         }
         this.images.set(Array.isArray(prod.images) ? prod.images : []);
+        if (this.deletedImagesOpen()) {
+          this.loadDeletedImages(slug);
+        }
       },
       error: () => this.toast.error(this.t('adminUi.products.errors.deleteImage'))
+    });
+  }
+
+  toggleDeletedImages(): void {
+    const slug = this.editingSlug();
+    if (!slug) return;
+    if (this.deletedImagesOpen()) {
+      this.resetDeletedImages();
+      return;
+    }
+    this.deletedImagesOpen.set(true);
+    this.loadDeletedImages(slug);
+  }
+
+  restoreDeletedImage(imageId: string): void {
+    const slug = this.editingSlug();
+    if (!slug) return;
+    this.deletedImagesError.set(null);
+    this.restoringDeletedImage.set(imageId);
+    this.admin.restoreProductImage(slug, imageId).subscribe({
+      next: (prod: any) => {
+        this.toast.success(this.t('adminUi.products.success.imageRestore'));
+        this.images.set(Array.isArray(prod.images) ? prod.images : []);
+        this.restoringDeletedImage.set(null);
+        this.loadDeletedImages(slug);
+      },
+      error: () => {
+        this.restoringDeletedImage.set(null);
+        this.deletedImagesError.set(this.t('adminUi.products.errors.restoreImage'));
+      }
     });
   }
 
@@ -3088,6 +3255,7 @@ export class AdminProductsComponent implements OnInit {
         q: this.q.trim() ? this.q.trim() : undefined,
         status: this.status === 'all' ? undefined : this.status,
         category_slug: this.categorySlug || undefined,
+        deleted: this.view === 'deleted' ? true : undefined,
         page: this.page,
         limit: this.limit
       })
@@ -3239,6 +3407,29 @@ export class AdminProductsComponent implements OnInit {
 
   private blankImageMetaByLang(): ImageMetaByLang {
     return { en: this.blankImageMetaForm(), ro: this.blankImageMetaForm() };
+  }
+
+  private resetDeletedImages(): void {
+    this.deletedImagesOpen.set(false);
+    this.deletedImages.set([]);
+    this.deletedImagesBusy.set(false);
+    this.deletedImagesError.set(null);
+    this.restoringDeletedImage.set(null);
+  }
+
+  private loadDeletedImages(slug: string): void {
+    this.deletedImagesBusy.set(true);
+    this.deletedImagesError.set(null);
+    this.admin.listDeletedProductImages(slug).subscribe({
+      next: (items) => {
+        this.deletedImages.set(Array.isArray(items) ? items : []);
+        this.deletedImagesBusy.set(false);
+      },
+      error: () => {
+        this.deletedImagesBusy.set(false);
+        this.deletedImagesError.set(this.t('adminUi.products.errors.loadDeletedImages'));
+      }
+    });
   }
 
   private resetImageMeta(): void {

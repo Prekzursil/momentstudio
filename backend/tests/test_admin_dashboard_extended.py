@@ -238,3 +238,44 @@ def test_image_reorder(test_app: Dict[str, object]) -> None:
     )
     assert resp.status_code == 200
     assert any(img["sort_order"] == 5 for img in resp.json()["images"])
+
+
+def test_product_trash_and_image_restore(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    seeded = asyncio.run(seed(session_factory))
+    headers = auth_headers(client)
+
+    product_slug = seeded["product_slug"]
+    image_id = seeded["image_id"]
+
+    deleted_image = client.delete(f"/api/v1/catalog/products/{product_slug}/images/{image_id}", headers=headers)
+    assert deleted_image.status_code == 200, deleted_image.text
+    assert all(img["id"] != image_id for img in deleted_image.json().get("images", []))
+
+    deleted_list = client.get(f"/api/v1/catalog/products/{product_slug}/images/deleted", headers=headers)
+    assert deleted_list.status_code == 200, deleted_list.text
+    assert any(img["id"] == image_id for img in deleted_list.json())
+
+    restored_image = client.post(f"/api/v1/catalog/products/{product_slug}/images/{image_id}/restore", headers=headers)
+    assert restored_image.status_code == 200, restored_image.text
+    assert any(img["id"] == image_id for img in restored_image.json().get("images", []))
+
+    delete_product = client.delete(f"/api/v1/catalog/products/{product_slug}", headers=headers)
+    assert delete_product.status_code == 204, delete_product.text
+
+    deleted_products = client.get("/api/v1/admin/dashboard/products/search", params={"deleted": True}, headers=headers)
+    assert deleted_products.status_code == 200, deleted_products.text
+    match = next((item for item in deleted_products.json().get("items", []) if item["deleted_slug"] == product_slug), None)
+    assert match is not None
+    product_id = match["id"]
+
+    restored_product = client.post(f"/api/v1/admin/dashboard/products/{product_id}/restore", headers=headers)
+    assert restored_product.status_code == 200, restored_product.text
+    assert restored_product.json()["slug"] == product_slug
+
+    active_products = client.get("/api/v1/admin/dashboard/products/search", headers=headers)
+    assert active_products.status_code == 200, active_products.text
+    assert any(item["id"] == product_id for item in active_products.json().get("items", []))

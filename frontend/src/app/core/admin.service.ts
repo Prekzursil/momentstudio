@@ -227,6 +227,14 @@ export interface AdminProductImageOptimizationStats {
   height?: number | null;
 }
 
+export interface AdminDeletedProductImage {
+  id: string;
+  url: string;
+  alt_text?: string | null;
+  caption?: string | null;
+  deleted_at?: string | null;
+}
+
 export interface AdminProductVariant {
   id: string;
   name: string;
@@ -684,6 +692,14 @@ export class AdminService {
 
   deleteProductImage(slug: string, imageId: string): Observable<AdminProductDetail> {
     return this.api.delete<AdminProductDetail>(`/catalog/products/${slug}/images/${imageId}`);
+  }
+
+  listDeletedProductImages(slug: string): Observable<AdminDeletedProductImage[]> {
+    return this.api.get<AdminDeletedProductImage[]>(`/catalog/products/${slug}/images/deleted`);
+  }
+
+  restoreProductImage(slug: string, imageId: string): Observable<AdminProductDetail> {
+    return this.api.post<AdminProductDetail>(`/catalog/products/${slug}/images/${imageId}/restore`, {});
   }
 
   reorderProductImage(slug: string, imageId: string, sortOrder: number): Observable<AdminProductDetail> {

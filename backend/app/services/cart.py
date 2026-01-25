@@ -7,10 +7,10 @@ from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, with_loader_criteria
 
 from app.models.cart import Cart, CartItem
-from app.models.catalog import Product, ProductVariant, ProductStatus
+from app.models.catalog import Product, ProductImage, ProductVariant, ProductStatus
 from app.schemas.cart import CartItemCreate, CartItemUpdate, CartRead, CartItemRead, Totals
 from app.schemas.promo import PromoCodeRead, PromoCodeCreate
 from app.schemas.cart_sync import CartSyncItem
@@ -48,7 +48,8 @@ async def _get_or_create_cart(session: AsyncSession, user_id: UUID | None, sessi
             .options(
                 selectinload(Cart.items)
                 .selectinload(CartItem.product)
-                .selectinload(Product.images)
+                .selectinload(Product.images),
+                with_loader_criteria(ProductImage, ProductImage.is_deleted.is_(False), include_aliases=True),
             )
             .where(Cart.session_id == sid)
         )
@@ -60,7 +61,8 @@ async def _get_or_create_cart(session: AsyncSession, user_id: UUID | None, sessi
             .options(
                 selectinload(Cart.items)
                 .selectinload(CartItem.product)
-                .selectinload(Product.images)
+                .selectinload(Product.images),
+                with_loader_criteria(ProductImage, ProductImage.is_deleted.is_(False), include_aliases=True),
             )
             .where(Cart.user_id == user_id)
         )
@@ -244,7 +246,8 @@ async def serialize_cart(
             .options(
                 selectinload(Cart.items)
                 .selectinload(CartItem.product)
-                .selectinload(Product.images)
+                .selectinload(Product.images),
+                with_loader_criteria(ProductImage, ProductImage.is_deleted.is_(False), include_aliases=True),
             )
             .where(Cart.id == cart.id)
     )

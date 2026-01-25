@@ -6,6 +6,7 @@ import { AdminPaginationMeta } from './admin-orders.service';
 export interface AdminProductListItem {
   id: string;
   slug: string;
+  deleted_slug?: string | null;
   sku: string;
   name: string;
   base_price: number;
@@ -19,6 +20,7 @@ export interface AdminProductListItem {
   category_slug: string;
   category_name: string;
   updated_at: string;
+  deleted_at?: string | null;
   publish_at?: string | null;
   publish_scheduled_for?: string | null;
   unpublish_scheduled_for?: string | null;
@@ -54,10 +56,15 @@ export class AdminProductsService {
     q?: string;
     status?: string;
     category_slug?: string;
+    deleted?: boolean;
     page?: number;
     limit?: number;
   }): Observable<AdminProductListResponse> {
     return this.api.get<AdminProductListResponse>('/admin/dashboard/products/search', params as any);
+  }
+
+  restore(productId: string): Observable<AdminProductListItem> {
+    return this.api.post<AdminProductListItem>(`/admin/dashboard/products/${productId}/restore`, {});
   }
 
   byIds(ids: string[]): Observable<AdminProductListItem[]> {

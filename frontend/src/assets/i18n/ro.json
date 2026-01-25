@@ -1408,6 +1408,8 @@
       "save": "Salvează",
       "cancel": "Anulează",
       "retry": "Reîncearcă",
+      "restore": "Restabilește",
+      "loading": "Se încarcă…",
       "edit": "Editează",
       "changeUrl": "Schimbă URL-ul",
       "refresh": "Reîncarcă",
@@ -1985,11 +1987,17 @@
         "name": "Nume",
         "price": "Preț",
         "status": "Status",
+        "view": "Vizualizare",
         "category": "Categorie",
         "stock": "Stoc",
         "active": "Activ",
         "updated": "Actualizat",
+        "deletedAt": "Șters",
         "actions": "Acțiuni"
+      },
+      "view": {
+        "active": "Active",
+        "deleted": "Șterse"
       },
       "form": {
         "slug": "Slug",
@@ -2002,7 +2010,12 @@
         "description": "Descriere",
         "save": "Salvează produsul",
         "upload": "Încarcă imagine",
+        "showDeletedImages": "Arată șterse",
+        "hideDeletedImages": "Ascunde șterse",
         "images": "Imagini",
+        "deletedImages": "Imagini șterse",
+        "noDeletedImages": "Nu există imagini șterse.",
+        "deletedAt": "Șters",
         "image": "Imagine",
         "active": "Activ",
         "featured": "Recomandat",
@@ -2129,7 +2142,8 @@
         "delete": "Produs șters",
         "duplicate": "Produs duplicat ca ciornă",
         "imageUpload": "Imagine încărcată",
-        "imageDelete": "Imagine ștearsă"
+        "imageDelete": "Imagine ștearsă",
+        "imageRestore": "Imagine restabilită"
       },
       "errors": {
         "loadList": "Nu am putut încărca produsele.",
@@ -2139,8 +2153,18 @@
         "required": "Numele categoriei este obligatoriu",
         "image": "Încărcarea imaginii a eșuat",
         "deleteImage": "Nu am putut șterge imaginea",
+        "loadDeletedImages": "Nu am putut încărca imaginile șterse.",
+        "restoreImage": "Nu am putut restabili imaginea",
         "duplicate": "Nu am putut duplica produsul",
         "saveFirst": "Salvează produsul înainte de a încărca imagini"
+      },
+      "trash": {
+        "success": {
+          "restore": "Produs restabilit"
+        },
+        "errors": {
+          "restore": "Nu am putut restabili produsul"
+        }
       },
       "translations": {
         "title": "Traduceri",

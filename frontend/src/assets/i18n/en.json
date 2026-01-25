@@ -1408,6 +1408,8 @@
       "save": "Save",
       "cancel": "Cancel",
       "retry": "Retry",
+      "restore": "Restore",
+      "loading": "Loading…",
       "edit": "Edit",
       "changeUrl": "Change URL",
       "refresh": "Refresh",
@@ -1985,11 +1987,17 @@
         "name": "Name",
         "price": "Price",
         "status": "Status",
+        "view": "View",
         "category": "Category",
         "stock": "Stock",
         "active": "Active",
         "updated": "Updated",
+        "deletedAt": "Deleted",
         "actions": "Actions"
+      },
+      "view": {
+        "active": "Active",
+        "deleted": "Deleted"
       },
       "form": {
         "slug": "Slug",
@@ -2002,7 +2010,12 @@
         "description": "Description",
         "save": "Save product",
         "upload": "Upload image",
+        "showDeletedImages": "Show deleted",
+        "hideDeletedImages": "Hide deleted",
         "images": "Images",
+        "deletedImages": "Deleted images",
+        "noDeletedImages": "No deleted images.",
+        "deletedAt": "Deleted",
         "image": "Image",
         "active": "Active",
         "featured": "Featured",
@@ -2129,7 +2142,8 @@
         "delete": "Product deleted",
         "duplicate": "Product duplicated as draft",
         "imageUpload": "Image uploaded",
-        "imageDelete": "Image deleted"
+        "imageDelete": "Image deleted",
+        "imageRestore": "Image restored"
       },
       "errors": {
         "loadList": "Could not load products.",
@@ -2139,8 +2153,18 @@
         "required": "Category name is required",
         "image": "Image upload failed",
         "deleteImage": "Failed to delete image",
+        "loadDeletedImages": "Could not load deleted images.",
+        "restoreImage": "Failed to restore image",
         "duplicate": "Could not duplicate product",
         "saveFirst": "Save product before uploading images"
+      },
+      "trash": {
+        "success": {
+          "restore": "Product restored"
+        },
+        "errors": {
+          "restore": "Failed to restore product"
+        }
       },
       "translations": {
         "title": "Translations",

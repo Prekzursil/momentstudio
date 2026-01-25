@@ -43,6 +43,7 @@ from app.schemas.catalog import (
     ProductRelationshipsRead,
     ProductRelationshipsUpdate,
 )
+from app.schemas.catalog_admin import AdminDeletedProductImage
 from app.services import catalog as catalog_service
 from app.services import storage
 
@@ -381,8 +382,12 @@ async def upload_product_image(
     await catalog_service.add_product_image_from_path(
         session, product, url=path, alt_text=filename, sort_order=len(product.images) + 1
     )
-    await session.refresh(product)
-    return product
+    refreshed = await catalog_service.get_product_by_slug(
+        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+    )
+    if not refreshed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    return ProductRead.model_validate(refreshed)
 
 
 @router.post("/products/bulk-update", response_model=list[ProductRead])
@@ -628,8 +633,12 @@ async def delete_product_image(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
     await catalog_service.delete_product_image(session, product, str(image_id), user_id=current_user.id)
-    await session.refresh(product)
-    return product
+    refreshed = await catalog_service.get_product_by_slug(
+        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+    )
+    if not refreshed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    return ProductRead.model_validate(refreshed)
 
 
 @router.patch("/products/{slug}/images/{image_id}/sort", response_model=ProductRead)
@@ -645,8 +654,54 @@ async def reorder_product_image(
     )
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    updated = await catalog_service.update_product_image_sort(session, product, str(image_id), sort_order)
-    return updated
+    await catalog_service.update_product_image_sort(session, product, str(image_id), sort_order)
+    refreshed = await catalog_service.get_product_by_slug(
+        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+    )
+    if not refreshed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    return ProductRead.model_validate(refreshed)
+
+
+@router.get("/products/{slug}/images/deleted", response_model=list[AdminDeletedProductImage])
+async def list_deleted_product_images(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_admin),
+) -> list[AdminDeletedProductImage]:
+    product = await catalog_service.get_product_by_slug(session, slug)
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    images = await catalog_service.list_deleted_product_images(session, product.id)
+    return [
+        AdminDeletedProductImage(
+            id=image.id,
+            url=image.url,
+            alt_text=image.alt_text,
+            caption=image.caption,
+            deleted_at=getattr(image, "deleted_at", None),
+        )
+        for image in images
+    ]
+
+
+@router.post("/products/{slug}/images/{image_id}/restore", response_model=ProductRead)
+async def restore_deleted_product_image(
+    slug: str,
+    image_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(require_admin),
+) -> ProductRead:
+    product = await catalog_service.get_product_by_slug(session, slug)
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    await catalog_service.restore_product_image(session, product, str(image_id), user_id=current_user.id)
+    refreshed = await catalog_service.get_product_by_slug(
+        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+    )
+    if not refreshed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    return ProductRead.model_validate(refreshed)
 
 
 @router.get("/products/{slug}/images/{image_id}/translations", response_model=list[ProductImageTranslationRead])

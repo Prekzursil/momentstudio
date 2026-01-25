@@ -10,7 +10,7 @@ import uuid
 from fastapi import HTTPException, status
 from sqlalchemy import and_, delete, func, select, update, or_, case, false
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, with_loader_criteria
 
 from app.models.catalog import (
     BackInStockRequest,
@@ -57,7 +57,7 @@ from app.schemas.catalog import (
     ProductFeedItem,
     ProductRelationshipsUpdate,
 )
-from app.services.storage import delete_file, get_media_image_stats, regenerate_media_thumbnails
+from app.services.storage import get_media_image_stats, regenerate_media_thumbnails
 from app.services import email as email_service
 from app.services import auth as auth_service
 from app.services import notifications as notifications_service
@@ -344,7 +344,9 @@ def reprocess_product_image_thumbnails(image: ProductImage) -> dict[str, int | N
 async def get_product_by_slug(
     session: AsyncSession, slug: str, options: list | None = None, follow_history: bool = True, lang: str | None = None
 ) -> Product | None:
-    query = select(Product)
+    query = select(Product).execution_options(populate_existing=True).options(
+        with_loader_criteria(ProductImage, ProductImage.is_deleted.is_(False), include_aliases=True)
+    )
     final_options = options[:] if options else []
     if lang:
         final_options.append(selectinload(Product.translations))
@@ -361,7 +363,13 @@ async def get_product_by_slug(
     hist_result = await session.execute(select(ProductSlugHistory).where(ProductSlugHistory.slug == slug))
     history = hist_result.scalar_one_or_none()
     if history:
-        product = await session.get(Product, history.product_id)
+        hist_query = select(Product).execution_options(populate_existing=True).where(Product.id == history.product_id).options(
+            with_loader_criteria(ProductImage, ProductImage.is_deleted.is_(False), include_aliases=True)
+        )
+        if final_options:
+            for opt in final_options:
+                hist_query = hist_query.options(opt)
+        product = (await session.execute(hist_query)).scalar_one_or_none()
         if product:
             apply_product_translation(product, lang)
     return product
@@ -961,10 +969,43 @@ async def delete_product_image(session: AsyncSession, product: Product, image_id
     image = next((img for img in product.images if str(img.id) == str(image_id)), None)
     if not image:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
-    delete_file(image.url)
-    await session.delete(image)
+    image.is_deleted = True
+    image.deleted_at = datetime.now(timezone.utc)
+    image.deleted_by = user_id
+    session.add(image)
     await session.commit()
     await _log_product_action(session, product.id, "image_deleted", user_id, {"image_id": image_id, "url": image.url})
+
+
+async def list_deleted_product_images(session: AsyncSession, product_id: uuid.UUID) -> list[ProductImage]:
+    result = await session.execute(
+        select(ProductImage)
+        .where(ProductImage.product_id == product_id, ProductImage.is_deleted.is_(True))
+        .order_by(ProductImage.deleted_at.desc(), ProductImage.created_at.desc())
+    )
+    return list(result.scalars())
+
+
+async def restore_product_image(session: AsyncSession, product: Product, image_id: str, user_id: uuid.UUID | None = None) -> None:
+    try:
+        image_uuid = uuid.UUID(str(image_id))
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid image id")
+    image = (
+        await session.execute(
+            select(ProductImage).where(ProductImage.id == image_uuid, ProductImage.product_id == product.id)
+        )
+    ).scalar_one_or_none()
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    if not getattr(image, "is_deleted", False):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image is not deleted")
+    image.is_deleted = False
+    image.deleted_at = None
+    image.deleted_by = None
+    session.add(image)
+    await session.commit()
+    await _log_product_action(session, product.id, "image_restored", user_id, {"image_id": image_id, "url": image.url})
 
 
 async def update_product_image_sort(session: AsyncSession, product: Product, image_id: str, sort_order: int) -> Product:
@@ -981,6 +1022,9 @@ async def update_product_image_sort(session: AsyncSession, product: Product, ima
 async def soft_delete_product(session: AsyncSession, product: Product, user_id: uuid.UUID | None = None) -> None:
     original_slug = product.slug
     product.is_deleted = True
+    product.deleted_at = datetime.now(timezone.utc)
+    product.deleted_by = user_id
+    product.deleted_slug = original_slug
     # Free the slug for reuse by moving deleted products to a stable tombstone slug.
     product.slug = f"deleted-{product.id}"
     session.add(product)
@@ -989,6 +1033,37 @@ async def soft_delete_product(session: AsyncSession, product: Product, user_id: 
     await _log_product_action(
         session, product.id, "soft_delete", user_id, {"slug": original_slug, "tombstone_slug": product.slug}
     )
+
+
+async def restore_soft_deleted_product(
+    session: AsyncSession, product: Product, user_id: uuid.UUID | None = None
+) -> Product:
+    if not getattr(product, "is_deleted", False):
+        return product
+
+    base_slug = (getattr(product, "deleted_slug", None) or "").strip() or (slugify(product.name or "") or "product")
+    base_slug = base_slug[:160]
+    candidate = base_slug
+    counter = 2
+    while True:
+        try:
+            await _ensure_slug_unique(session, candidate, exclude_id=product.id)
+            break
+        except HTTPException:
+            suffix = f"-{counter}"
+            candidate = f"{base_slug[: 160 - len(suffix)]}{suffix}"
+            counter += 1
+
+    product.is_deleted = False
+    product.slug = candidate
+    product.deleted_at = None
+    product.deleted_by = None
+    product.deleted_slug = None
+    session.add(product)
+    await session.execute(delete(ProductSlugHistory).where(ProductSlugHistory.product_id == product.id))
+    await session.commit()
+    await _log_product_action(session, product.id, "restore", user_id, {"slug": product.slug})
+    return product
 
 
 async def bulk_update_products(
@@ -1407,6 +1482,7 @@ async def list_products_with_filters(
     if lang:
         image_loader = image_loader.selectinload(ProductImage.translations)
     options = [
+        with_loader_criteria(ProductImage, ProductImage.is_deleted.is_(False), include_aliases=True),
         image_loader,
         selectinload(Product.tags),
     ]
@@ -1779,7 +1855,10 @@ async def get_recently_viewed(
         return []
     query = (
         select(RecentlyViewedProduct)
-        .options(selectinload(RecentlyViewedProduct.product).selectinload(Product.images))
+        .options(
+            selectinload(RecentlyViewedProduct.product).selectinload(Product.images),
+            with_loader_criteria(ProductImage, ProductImage.is_deleted.is_(False), include_aliases=True),
+        )
         .where(
             RecentlyViewedProduct.product.has(
                 and_(
