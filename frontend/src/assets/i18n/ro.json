@@ -1497,6 +1497,26 @@
         "user": "Utilizator"
       }
     },
+    "favorites": {
+      "title": "Favorite",
+      "hint": "Fixează pagini și elemente pentru acces rapid.",
+      "empty": "Nu există favorite încă.",
+      "clear": "Șterge",
+      "pin": "Adaugă la favorite",
+      "unpin": "Elimină din favorite",
+      "types": {
+        "page": "Pagină",
+        "content": "Conținut",
+        "order": "Comandă",
+        "product": "Produs",
+        "user": "Utilizator",
+        "filter": "Vizualizare salvată"
+      },
+      "errors": {
+        "load": "Nu am putut încărca favoritele.",
+        "save": "Nu am putut salva favoritele."
+      }
+    },
     "tableLayout": {
       "title": "Aspect tabel",
       "subtitle": "Alege coloanele vizibile și densitatea.",

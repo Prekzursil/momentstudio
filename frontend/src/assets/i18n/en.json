@@ -1497,6 +1497,26 @@
         "user": "User"
       }
     },
+    "favorites": {
+      "title": "Favorites",
+      "hint": "Pin pages and items for quick access.",
+      "empty": "No favorites yet.",
+      "clear": "Clear",
+      "pin": "Pin to favorites",
+      "unpin": "Unpin from favorites",
+      "types": {
+        "page": "Page",
+        "content": "Content",
+        "order": "Order",
+        "product": "Product",
+        "user": "User",
+        "filter": "Saved view"
+      },
+      "errors": {
+        "load": "Could not load favorites.",
+        "save": "Could not save favorites."
+      }
+    },
     "tableLayout": {
       "title": "Table layout",
       "subtitle": "Choose visible columns and density.",

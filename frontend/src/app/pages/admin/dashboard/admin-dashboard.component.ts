@@ -30,6 +30,7 @@ import { ToastService } from '../../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { extractRequestId } from '../../../shared/http-error';
 import { AdminRecentItem, AdminRecentService } from '../../../core/admin-recent.service';
+import { AdminFavoriteItem, AdminFavoritesService } from '../../../core/admin-favorites.service';
 
 type MetricWidgetId = 'kpis' | 'counts' | 'range';
 type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: string | null };
@@ -189,6 +190,52 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
             <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
               <div class="flex items-start justify-between gap-3">
                 <div class="grid gap-1">
+                  <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.favorites.title' | translate }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.favorites.hint' | translate }}</div>
+                </div>
+                <app-button
+                  *ngIf="favorites.items().length"
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.favorites.clear' | translate"
+                  [disabled]="favorites.loading()"
+                  (action)="clearFavorites()"
+                ></app-button>
+              </div>
+
+              <div *ngIf="favorites.items().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.favorites.empty' | translate }}
+              </div>
+
+              <div *ngIf="favorites.items().length" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <div
+                  *ngFor="let item of favorites.items()"
+                  class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/40"
+                >
+                  <button type="button" class="min-w-0 text-left" (click)="openFavorite(item)">
+                    <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                      {{ ('adminUi.favorites.types.' + item.type) | translate }}
+                    </div>
+                    <div class="mt-1 font-semibold text-slate-900 dark:text-slate-50 truncate">{{ item.label }}</div>
+                    <div *ngIf="item.subtitle" class="text-xs text-slate-600 dark:text-slate-300 truncate">{{ item.subtitle }}</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="shrink-0 h-9 w-9 rounded-lg border border-transparent text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                    [attr.aria-label]="'adminUi.favorites.unpin' | translate"
+                    [disabled]="favorites.loading()"
+                    (click)="toggleFavorite(item, $event)"
+                  >
+                    <span aria-hidden="true" class="text-base leading-none">★</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
+              <div class="flex items-start justify-between gap-3">
+                <div class="grid gap-1">
                   <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.recent.title' | translate }}</div>
                   <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.recent.hint' | translate }}</div>
                 </div>
@@ -206,18 +253,30 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
               </div>
 
               <div *ngIf="recent.items().length" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                <button
+                <div
                   *ngFor="let item of recent.items()"
-                  type="button"
-                  class="rounded-xl border border-slate-200 bg-white p-3 text-left hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/40"
-                  (click)="openRecent(item)"
+                  class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/40"
                 >
-                  <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                    {{ ('adminUi.recent.types.' + item.type) | translate }}
-                  </div>
-                  <div class="mt-1 font-semibold text-slate-900 dark:text-slate-50 truncate">{{ item.label }}</div>
-                  <div *ngIf="item.subtitle" class="text-xs text-slate-600 dark:text-slate-300 truncate">{{ item.subtitle }}</div>
-                </button>
+                  <button type="button" class="min-w-0 text-left" (click)="openRecent(item)">
+                    <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                      {{ ('adminUi.recent.types.' + item.type) | translate }}
+                    </div>
+                    <div class="mt-1 font-semibold text-slate-900 dark:text-slate-50 truncate">{{ item.label }}</div>
+                    <div *ngIf="item.subtitle" class="text-xs text-slate-600 dark:text-slate-300 truncate">{{ item.subtitle }}</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="shrink-0 h-9 w-9 rounded-lg border border-transparent text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-800/60 dark:hover:text-slate-200"
+                    [attr.aria-label]="(favorites.isFavorite(item.key) ? 'adminUi.favorites.unpin' : 'adminUi.favorites.pin') | translate"
+                    [disabled]="favorites.loading()"
+                    (click)="toggleFavorite(item, $event)"
+                  >
+                    <span aria-hidden="true" class="text-base leading-none" [class.text-amber-500]="favorites.isFavorite(item.key)">
+                      {{ favorites.isFavorite(item.key) ? '★' : '☆' }}
+                    </span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -982,6 +1041,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
     private admin: AdminService,
     private ordersApi: AdminOrdersService,
     private auth: AuthService,
+    public favorites: AdminFavoritesService,
     public recent: AdminRecentService,
     private router: Router,
     private toast: ToastService,
@@ -1024,6 +1084,23 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
     if (!url) return;
     const state = item?.state && typeof item.state === 'object' ? item.state : null;
     void this.router.navigateByUrl(url, state ? { state } : undefined);
+  }
+
+  clearFavorites(): void {
+    this.favorites.clear();
+  }
+
+  openFavorite(item: AdminFavoriteItem): void {
+    const url = (item?.url || '').trim();
+    if (!url) return;
+    const state = item?.state && typeof item.state === 'object' ? item.state : null;
+    void this.router.navigateByUrl(url, state ? { state } : undefined);
+  }
+
+  toggleFavorite(item: AdminFavoriteItem, event?: MouseEvent): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+    this.favorites.toggle(item);
   }
 
   isOwner(): boolean {

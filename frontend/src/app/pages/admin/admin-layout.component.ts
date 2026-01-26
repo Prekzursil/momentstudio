@@ -6,6 +6,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import { AuthService } from '../../core/auth.service';
+import { AdminFavoritesService } from '../../core/admin-favorites.service';
 import { AdminRecentService } from '../../core/admin-recent.service';
 import { ContainerComponent } from '../../layout/container.component';
 
@@ -56,22 +57,51 @@ type AdminNavItem = {
             {{ 'adminUi.nav.searchEmpty' | translate }}
           </div>
 
-          <a
-            *ngFor="let item of filteredNavItems()"
-            [routerLink]="item.path"
-            routerLinkActive="bg-slate-100 text-slate-900 dark:bg-slate-800/70 dark:text-white"
-            [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
-            class="rounded-lg px-3 py-2 hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
-          >
-            <ng-container *ngIf="navQuery.trim(); else fullLabel">
-              <ng-container *ngIf="navLabelParts(item) as parts">
-                <span>{{ parts.before }}</span>
-                <span class="font-semibold text-slate-900 dark:text-slate-50">{{ parts.match }}</span>
-                <span>{{ parts.after }}</span>
+          <div *ngIf="!navQuery.trim() && favoriteNavItems().length" class="pb-2">
+            <div class="px-3 pb-1 text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+              {{ 'adminUi.favorites.title' | translate }}
+            </div>
+            <div class="grid gap-1">
+              <a
+                *ngFor="let item of favoriteNavItems()"
+                [routerLink]="item.path"
+                routerLinkActive="bg-slate-100 text-slate-900 dark:bg-slate-800/70 dark:text-white"
+                [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
+                class="rounded-lg px-3 py-2 hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
+              >
+                {{ item.labelKey | translate }}
+              </a>
+            </div>
+            <div class="my-2 h-px bg-slate-200 dark:bg-slate-800/70"></div>
+          </div>
+
+          <div *ngFor="let item of filteredNavItems()" class="flex items-center gap-1">
+            <a
+              [routerLink]="item.path"
+              routerLinkActive="bg-slate-100 text-slate-900 dark:bg-slate-800/70 dark:text-white"
+              [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
+              class="flex-1 min-w-0 rounded-lg px-3 py-2 hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
+            >
+              <ng-container *ngIf="navQuery.trim(); else fullLabel">
+                <ng-container *ngIf="navLabelParts(item) as parts">
+                  <span>{{ parts.before }}</span>
+                  <span class="font-semibold text-slate-900 dark:text-slate-50">{{ parts.match }}</span>
+                  <span>{{ parts.after }}</span>
+                </ng-container>
               </ng-container>
-            </ng-container>
-            <ng-template #fullLabel>{{ item.labelKey | translate }}</ng-template>
-          </a>
+              <ng-template #fullLabel>{{ item.labelKey | translate }}</ng-template>
+            </a>
+            <button
+              type="button"
+              class="h-9 w-9 rounded-lg border border-transparent text-slate-400 hover:bg-slate-50 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-800/60 dark:hover:text-slate-200"
+              [attr.aria-label]="(isNavFavorite(item) ? 'adminUi.favorites.unpin' : 'adminUi.favorites.pin') | translate"
+              (click)="toggleNavFavorite(item, $event)"
+            >
+              <span aria-hidden="true" class="text-base leading-none" [class.text-amber-500]="isNavFavorite(item)">
+                {{ isNavFavorite(item) ? '★' : '☆' }}
+              </span>
+            </button>
+          </div>
         </aside>
 
         <main class="min-w-0">
@@ -86,6 +116,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     private auth: AuthService,
     private router: Router,
     private translate: TranslateService,
+    public favorites: AdminFavoritesService,
     private recent: AdminRecentService
   ) {}
 
@@ -111,6 +142,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.favorites.init();
     this.recordRecent(this.router.url);
     this.navSub = this.router.events
       .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
@@ -128,6 +160,34 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     return items.filter((item) => {
       const label = this.navLabel(item).toLowerCase();
       return label.includes(query) || item.section.includes(query);
+    });
+  }
+
+  favoriteNavItems(): AdminNavItem[] {
+    const urls = this.favorites.items()
+      .filter((item) => item?.type === 'page')
+      .map((item) => (item?.url || '').trim())
+      .filter(Boolean);
+    const byPath = new Map(this.navItems.map((item) => [item.path, item]));
+    return urls.map((url) => byPath.get(url)).filter((item): item is AdminNavItem => Boolean(item));
+  }
+
+  isNavFavorite(item: AdminNavItem): boolean {
+    return this.favorites.isFavorite(this.favoriteKey(item));
+  }
+
+  toggleNavFavorite(item: AdminNavItem, event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    const key = this.favoriteKey(item);
+    const label = this.navLabel(item);
+    this.favorites.toggle({
+      key,
+      type: 'page',
+      label,
+      subtitle: '',
+      url: item.path,
+      state: null
     });
   }
 
@@ -221,6 +281,10 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
   private navLabel(item: AdminNavItem): string {
     const value = this.translate.instant(item.labelKey);
     return typeof value === 'string' && value.trim() ? value : item.labelKey;
+  }
+
+  private favoriteKey(item: AdminNavItem): string {
+    return `page:${item.path}`;
   }
 
   private recordRecent(url: string): void {
