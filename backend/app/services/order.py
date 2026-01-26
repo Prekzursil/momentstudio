@@ -330,8 +330,10 @@ async def admin_search_orders(
     *,
     q: str | None = None,
     status: OrderStatus | None = None,
+    statuses: list[OrderStatus] | None = None,
     pending_any: bool = False,
     tag: str | None = None,
+    include_test: bool = True,
     from_dt=None,
     to_dt=None,
     page: int = 1,
@@ -354,8 +356,14 @@ async def admin_search_orders(
         filters.append(
             exists(select(OrderTag.id).where(OrderTag.order_id == Order.id, OrderTag.tag == tag_clean))
         )
+    if not include_test and tag_clean != "test":
+        filters.append(
+            ~exists(select(OrderTag.id).where(OrderTag.order_id == Order.id, OrderTag.tag == "test"))
+        )
     if pending_any:
         filters.append(Order.status.in_([OrderStatus.pending_payment, OrderStatus.pending_acceptance]))
+    elif statuses:
+        filters.append(Order.status.in_(statuses))
     elif status:
         filters.append(Order.status == status)
     if from_dt:

@@ -32,6 +32,7 @@ import { adminFilterFavoriteKey } from '../shared/admin-filter-favorites';
 
 type OrderStatusFilter =
   | 'all'
+  | 'sales'
   | 'pending'
   | 'pending_payment'
   | 'pending_acceptance'
@@ -51,6 +52,7 @@ type AdminOrdersFilterPreset = {
     tag: string;
     fromDate: string;
     toDate: string;
+    includeTestOrders: boolean;
     limit: number;
   };
 };
@@ -124,6 +126,7 @@ const ORDERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
 	              [(ngModel)]="status"
 	            >
 	              <option value="all">{{ 'adminUi.orders.all' | translate }}</option>
+	              <option value="sales">{{ 'adminUi.orders.sales' | translate }}</option>
 	              <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
 	              <option value="pending_payment">{{ 'adminUi.orders.pending_payment' | translate }}</option>
 	              <option value="pending_acceptance">{{ 'adminUi.orders.pending_acceptance' | translate }}</option>
@@ -143,6 +146,17 @@ const ORDERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
             >
               <option value="">{{ 'adminUi.orders.tags.all' | translate }}</option>
               <option *ngFor="let tagOption of tagOptions()" [value]="tagOption">{{ tagLabel(tagOption) }}</option>
+            </select>
+          </label>
+
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.orders.testOrdersFilter' | translate }}
+            <select
+              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              [(ngModel)]="includeTestOrders"
+            >
+              <option [ngValue]="true">{{ 'adminUi.orders.testOrders.include' | translate }}</option>
+              <option [ngValue]="false">{{ 'adminUi.orders.testOrders.exclude' | translate }}</option>
             </select>
           </label>
 
@@ -628,6 +642,7 @@ export class AdminOrdersComponent implements OnInit {
   tag = '';
   fromDate = '';
   toDate = '';
+  includeTestOrders = true;
   page = 1;
   limit = 20;
 
@@ -690,7 +705,7 @@ export class AdminOrdersComponent implements OnInit {
     this.maybeApplyFiltersFromState();
     this.ordersApi.listOrderTags().subscribe({
       next: (tags) => {
-        const merged = new Set<string>(['vip', 'fraud_risk', 'gift']);
+        const merged = new Set<string>(['vip', 'fraud_risk', 'gift', 'test']);
         for (const t of tags) merged.add(t);
         this.tagOptions.set(Array.from(merged).sort());
       },
@@ -765,6 +780,7 @@ export class AdminOrdersComponent implements OnInit {
     this.tag = '';
     this.fromDate = '';
     this.toDate = '';
+    this.includeTestOrders = true;
     this.page = 1;
     this.selectedPresetId = '';
     this.selectedSavedViewKey = '';
@@ -783,6 +799,7 @@ export class AdminOrdersComponent implements OnInit {
     this.tag = preset.filters.tag;
     this.fromDate = preset.filters.fromDate;
     this.toDate = preset.filters.toDate;
+    this.includeTestOrders = Boolean(preset.filters.includeTestOrders);
     this.limit = preset.filters.limit;
     this.page = 1;
     this.selectedSavedViewKey = '';
@@ -808,6 +825,7 @@ export class AdminOrdersComponent implements OnInit {
     this.tag = String(filters.tag ?? '');
     this.fromDate = String(filters.fromDate ?? '');
     this.toDate = String(filters.toDate ?? '');
+    this.includeTestOrders = Boolean(filters.includeTestOrders ?? true);
     const nextLimit = typeof filters.limit === 'number' && Number.isFinite(filters.limit) ? filters.limit : 20;
     this.limit = nextLimit;
     this.page = 1;
@@ -858,6 +876,7 @@ export class AdminOrdersComponent implements OnInit {
     this.tag = String(filters.tag ?? '');
     this.fromDate = String(filters.fromDate ?? '');
     this.toDate = String(filters.toDate ?? '');
+    this.includeTestOrders = Boolean(filters.includeTestOrders ?? true);
     const nextLimit = typeof filters.limit === 'number' && Number.isFinite(filters.limit) ? filters.limit : this.limit;
     this.limit = nextLimit;
     this.page = 1;
@@ -872,6 +891,7 @@ export class AdminOrdersComponent implements OnInit {
       tag: this.tag,
       fromDate: this.fromDate,
       toDate: this.toDate,
+      includeTestOrders: this.includeTestOrders,
       limit: this.limit
     };
   }
@@ -899,6 +919,7 @@ export class AdminOrdersComponent implements OnInit {
         tag: this.tag,
         fromDate: this.fromDate,
         toDate: this.toDate,
+        includeTestOrders: this.includeTestOrders,
         limit: this.limit
       }
     };
@@ -1219,6 +1240,7 @@ export class AdminOrdersComponent implements OnInit {
     if (this.status !== 'all') params.status = this.status;
     const tag = this.tag.trim();
     if (tag) params.tag = tag;
+    if (!this.includeTestOrders) params.include_test = false;
     if (this.fromDate) params.from = `${this.fromDate}T00:00:00Z`;
     if (this.toDate) params.to = `${this.toDate}T23:59:59Z`;
 
@@ -1319,6 +1341,8 @@ export class AdminOrdersComponent implements OnInit {
             tag: String(candidate?.filters?.tag ?? ''),
             fromDate: String(candidate?.filters?.fromDate ?? ''),
             toDate: String(candidate?.filters?.toDate ?? ''),
+            includeTestOrders:
+              typeof candidate?.filters?.includeTestOrders === 'boolean' ? candidate.filters.includeTestOrders : true,
             limit:
               typeof candidate?.filters?.limit === 'number' && Number.isFinite(candidate.filters.limit)
                 ? candidate.filters.limit

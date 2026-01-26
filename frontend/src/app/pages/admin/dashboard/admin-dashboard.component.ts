@@ -516,14 +516,14 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
             <ng-container *ngIf="!isMetricWidgetHidden(widget)">
               <ng-container [ngSwitch]="widget">
                 <div *ngSwitchCase="'kpis'" class="grid md:grid-cols-3 gap-4">
-                  <app-card [title]="'adminUi.cards.ordersToday' | translate">
+                  <app-card [title]="'adminUi.cards.ordersToday' | translate" [clickable]="true" (action)="openOrdersToday()">
                     <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ summary()?.today_orders || 0 }}</div>
                     <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
                       {{ 'adminUi.cards.vsYesterday' | translate }}: {{ summary()?.yesterday_orders || 0 }} ·
                       {{ deltaLabel(summary()?.orders_delta_pct) }}
                     </div>
                   </app-card>
-                  <app-card [title]="'adminUi.cards.salesToday' | translate">
+                  <app-card [title]="'adminUi.cards.salesToday' | translate" [clickable]="true" (action)="openSalesToday()">
                     <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
                       {{ (todaySales() || 0) | localizedCurrency : 'RON' }}
                     </div>
@@ -532,7 +532,7 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
                       {{ deltaLabel(salesDeltaPct()) }}
                     </div>
                   </app-card>
-                  <app-card [title]="'adminUi.cards.refundsToday' | translate">
+                  <app-card [title]="'adminUi.cards.refundsToday' | translate" [clickable]="true" (action)="openRefunds()">
                     <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ summary()?.today_refunds || 0 }}</div>
                     <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
                       {{ 'adminUi.cards.vsYesterday' | translate }}: {{ summary()?.yesterday_refunds || 0 }} ·
@@ -545,14 +545,20 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
                   <app-card
                     [title]="'adminUi.cards.products' | translate"
                     [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.products || 0 }"
+                    [clickable]="true"
+                    (action)="openProducts()"
                   ></app-card>
                   <app-card
                     [title]="'adminUi.cards.orders' | translate"
                     [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.orders || 0 }"
+                    [clickable]="true"
+                    (action)="openOrders()"
                   ></app-card>
                   <app-card
                     [title]="'adminUi.cards.users' | translate"
                     [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.users || 0 }"
+                    [clickable]="true"
+                    (action)="openUsers()"
                   ></app-card>
                 </div>
 
@@ -614,14 +620,20 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
                     <app-card
                       [title]="'adminUi.cards.lowStock' | translate"
                       [subtitle]="'adminUi.cards.countItems' | translate: { count: summary()?.low_stock || 0 }"
+                      [clickable]="true"
+                      (action)="openInventory()"
                     ></app-card>
                     <app-card
                       [title]="'adminUi.cards.salesRange' | translate: { days: summary()?.range_days || 30 }"
                       [subtitle]="(rangeSales() || 0) | localizedCurrency : 'RON'"
+                      [clickable]="true"
+                      (action)="openSalesRange()"
                     ></app-card>
                     <app-card
                       [title]="'adminUi.cards.ordersRange' | translate: { days: summary()?.range_days || 30 }"
                       [subtitle]="'adminUi.cards.countOrders' | translate: { count: summary()?.orders_range || 0 }"
+                      [clickable]="true"
+                      (action)="openOrdersRange()"
                     ></app-card>
                   </div>
                 </div>
@@ -1316,6 +1328,58 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     return this.auth.role() === 'owner';
   }
 
+  openProducts(): void {
+    void this.router.navigateByUrl('/admin/products');
+  }
+
+  openOrders(): void {
+    void this.router.navigateByUrl('/admin/orders');
+  }
+
+  openUsers(): void {
+    void this.router.navigateByUrl('/admin/users');
+  }
+
+  openInventory(): void {
+    void this.router.navigateByUrl('/admin/inventory');
+  }
+
+  openOrdersToday(): void {
+    const today = new Date().toISOString().slice(0, 10);
+    this.openOrdersWithFilters({ q: '', status: 'all', tag: '', fromDate: today, toDate: today, includeTestOrders: false, limit: 20 });
+  }
+
+  openSalesToday(): void {
+    const today = new Date().toISOString().slice(0, 10);
+    this.openOrdersWithFilters({ q: '', status: 'sales', tag: '', fromDate: today, toDate: today, includeTestOrders: false, limit: 20 });
+  }
+
+  openRefunds(): void {
+    this.openOrdersWithFilters({ q: '', status: 'refunded', tag: '', fromDate: '', toDate: '', includeTestOrders: false, limit: 20 });
+  }
+
+  openOrdersRange(): void {
+    const sum = this.summary();
+    const fromDate = sum?.range_from || '';
+    const toDate = sum?.range_to || '';
+    if (!fromDate || !toDate) {
+      this.openOrders();
+      return;
+    }
+    this.openOrdersWithFilters({ q: '', status: 'all', tag: '', fromDate, toDate, includeTestOrders: false, limit: 20 });
+  }
+
+  openSalesRange(): void {
+    const sum = this.summary();
+    const fromDate = sum?.range_from || '';
+    const toDate = sum?.range_to || '';
+    if (!fromDate || !toDate) {
+      this.openOrders();
+      return;
+    }
+    this.openOrdersWithFilters({ q: '', status: 'sales', tag: '', fromDate, toDate, includeTestOrders: false, limit: 20 });
+  }
+
   refreshNow(): void {
     if (this.loading()) return;
     this.refreshSummarySilent();
@@ -1329,6 +1393,12 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     this.persistLiveRefreshPreference(next);
     if (next) this.startLiveRefresh();
     else this.stopLiveRefresh();
+  }
+
+  private openOrdersWithFilters(filters: any): void {
+    void this.router.navigateByUrl('/admin/orders', {
+      state: { adminFilterScope: 'orders', adminFilters: filters }
+    });
   }
 
   setSalesMetric(metric: 'gross' | 'net'): void {

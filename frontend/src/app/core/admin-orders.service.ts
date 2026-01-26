@@ -108,6 +108,7 @@ export class AdminOrdersService {
     page?: number;
     limit?: number;
     include_pii?: boolean;
+    include_test?: boolean;
   }): Observable<AdminOrderListResponse> {
     return this.api.get<AdminOrderListResponse>('/orders/admin/search', params as any).pipe(
       map((res: any) => ({

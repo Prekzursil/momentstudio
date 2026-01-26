@@ -907,7 +907,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin dashboard: live refresh – Optional auto-refresh with “last updated” timestamp and pause control.
 - [x] Admin analytics: revenue definitions – Toggle/tooltip for “Gross sales” vs “Net sales (after refunds)” with clear definitions.
 - [x] Admin analytics: exclude test orders – Add “Mark as test” on orders and exclude test orders from KPIs by default.
-- [ ] Admin analytics: drilldowns – Click KPIs to open the relevant list pre-filtered to the metric (orders/products/users).
+- [x] Admin analytics: drilldowns – Click KPIs to open the relevant list pre-filtered to the metric (orders/products/users).
 - [ ] Admin analytics: channel breakdown – Break sales/orders down by payment method, courier, and delivery type with filters.
 - [ ] Admin reports: scheduled email – Weekly/monthly email summary (sales, top products, low stock) configurable in admin.
 - [ ] Admin UX: safe training mode – Optional read-only “Training mode” to prevent destructive actions for new staff.

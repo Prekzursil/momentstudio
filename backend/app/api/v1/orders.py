@@ -886,6 +886,7 @@ async def admin_search_orders(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
     include_pii: bool = Query(default=False),
+    include_test: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderListResponse:
@@ -894,9 +895,17 @@ async def admin_search_orders(
     status_clean = (status or "").strip().lower() if status else None
     pending_any = False
     parsed_status = None
+    parsed_statuses: list[OrderStatus] | None = None
     if status_clean:
         if status_clean == "pending":
             pending_any = True
+        elif status_clean == "sales":
+            parsed_statuses = [
+                OrderStatus.paid,
+                OrderStatus.shipped,
+                OrderStatus.delivered,
+                OrderStatus.refunded,
+            ]
         else:
             try:
                 parsed_status = OrderStatus(status_clean)
@@ -906,12 +915,14 @@ async def admin_search_orders(
         session,
         q=q,
         status=parsed_status,
+        statuses=parsed_statuses,
         pending_any=pending_any,
         tag=tag,
         from_dt=from_dt,
         to_dt=to_dt,
         page=page,
         limit=limit,
+        include_test=include_test,
     )
     items = [
         AdminOrderListItem(

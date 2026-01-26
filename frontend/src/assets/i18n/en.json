@@ -2927,7 +2927,13 @@
       },
       "search": "Search",
       "statusFilter": "Status",
+      "sales": "Sales",
       "tagFilter": "Tag",
+      "testOrdersFilter": "Test orders",
+      "testOrders": {
+        "include": "Include",
+        "exclude": "Exclude"
+      },
       "from": "From",
       "to": "To",
       "presets": {

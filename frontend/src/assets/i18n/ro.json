@@ -2927,7 +2927,13 @@
       },
       "search": "Caută",
       "statusFilter": "Status",
+      "sales": "Vânzări",
       "tagFilter": "Etichetă",
+      "testOrdersFilter": "Comenzi test",
+      "testOrders": {
+        "include": "Include",
+        "exclude": "Exclude"
+      },
       "from": "De la",
       "to": "Până la",
       "presets": {
