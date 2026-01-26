@@ -17,6 +17,16 @@ import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { AdminOrderListItem, AdminOrderListResponse, AdminOrdersService } from '../../../core/admin-orders.service';
 import { orderStatusChipClass } from '../../../shared/order-status';
 import { AuthService } from '../../../core/auth.service';
+import {
+  AdminTableLayoutV1,
+  adminTableCellPaddingClass,
+  adminTableLayoutStorageKey,
+  defaultAdminTableLayout,
+  loadAdminTableLayout,
+  saveAdminTableLayout,
+  visibleAdminTableColumnIds
+} from '../shared/admin-table-layout';
+import { AdminTableLayoutColumnDef, TableLayoutModalComponent } from '../shared/table-layout-modal.component';
 
 type OrderStatusFilter =
   | 'all'
@@ -50,6 +60,17 @@ type AdminOrdersExportTemplate = {
   columns: string[];
 };
 
+const ORDERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
+  { id: 'select', labelKey: 'adminUi.orders.table.select', required: true },
+  { id: 'reference', labelKey: 'adminUi.orders.table.reference', required: true },
+  { id: 'customer', labelKey: 'adminUi.orders.table.customer' },
+  { id: 'status', labelKey: 'adminUi.orders.table.status' },
+  { id: 'tags', labelKey: 'adminUi.orders.table.tags' },
+  { id: 'total', labelKey: 'adminUi.orders.table.total' },
+  { id: 'created', labelKey: 'adminUi.orders.table.created' },
+  { id: 'actions', labelKey: 'adminUi.orders.table.actions', required: true }
+];
+
 @Component({
   selector: 'app-admin-orders',
   standalone: true,
@@ -63,7 +84,8 @@ type AdminOrdersExportTemplate = {
     ErrorStateComponent,
     InputComponent,
     SkeletonComponent,
-    LocalizedCurrencyPipe
+    LocalizedCurrencyPipe,
+    TableLayoutModalComponent
   ],
   template: `
     <div class="grid gap-6">
@@ -74,8 +96,19 @@ type AdminOrdersExportTemplate = {
           <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.title' | translate }}</h1>
           <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.orders.hint' | translate }}</p>
         </div>
-        <app-button size="sm" variant="ghost" [label]="'adminUi.orders.export' | translate" (action)="openExportModal()"></app-button>
+        <div class="flex items-center gap-2">
+          <app-button size="sm" variant="ghost" [label]="'adminUi.orders.export' | translate" (action)="openExportModal()"></app-button>
+          <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
+        </div>
       </div>
+
+      <app-table-layout-modal
+        [open]="layoutModalOpen()"
+        [columns]="tableColumns"
+        [layout]="tableLayout()"
+        (closed)="closeLayoutModal()"
+        (applied)="applyTableLayout($event)"
+      ></app-table-layout-modal>
 
       <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
 	        <div class="grid gap-3 lg:grid-cols-[1fr_220px_220px_220px_220px_auto] items-end">
@@ -270,6 +303,94 @@ type AdminOrdersExportTemplate = {
             </div>
 
           <div *ngIf="orders().length > 0" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+            <ng-template #ordersTableHeader>
+              <tr>
+                <ng-container *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId" [ngSwitch]="colId">
+                  <th *ngSwitchCase="'select'" class="text-left font-semibold w-10" [ngClass]="cellPaddingClass()">
+                    <input
+                      type="checkbox"
+                      [checked]="allSelectedOnPage()"
+                      [indeterminate]="someSelectedOnPage()"
+                      (change)="toggleSelectAllOnPage($any($event.target).checked)"
+                      [disabled]="bulkBusy"
+                      aria-label="Select all orders on page"
+                    />
+                  </th>
+                  <th *ngSwitchCase="'reference'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.orders.table.reference' | translate }}
+                  </th>
+                  <th *ngSwitchCase="'customer'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.orders.table.customer' | translate }}
+                  </th>
+                  <th *ngSwitchCase="'status'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.orders.table.status' | translate }}
+                  </th>
+                  <th *ngSwitchCase="'tags'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.orders.table.tags' | translate }}
+                  </th>
+                  <th *ngSwitchCase="'total'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.orders.table.total' | translate }}
+                  </th>
+                  <th *ngSwitchCase="'created'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.orders.table.created' | translate }}
+                  </th>
+                  <th *ngSwitchCase="'actions'" class="text-right font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.orders.table.actions' | translate }}
+                  </th>
+                </ng-container>
+              </tr>
+            </ng-template>
+
+            <ng-template #ordersTableRow let-order>
+              <tr class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40">
+                <ng-container *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId" [ngSwitch]="colId">
+                  <td *ngSwitchCase="'select'" [ngClass]="cellPaddingClass()">
+                    <input
+                      type="checkbox"
+                      [checked]="selectedIds.has(order.id)"
+                      (change)="toggleSelected(order.id, $any($event.target).checked)"
+                      [disabled]="bulkBusy"
+                      [attr.aria-label]="'Select order ' + (order.reference_code || (order.id | slice: 0:8))"
+                    />
+                  </td>
+                  <td
+                    *ngSwitchCase="'reference'"
+                    class="font-medium text-slate-900 dark:text-slate-50"
+                    [ngClass]="cellPaddingClass()"
+                  >
+                    {{ order.reference_code || (order.id | slice: 0:8) }}
+                  </td>
+                  <td *ngSwitchCase="'customer'" class="text-slate-700 dark:text-slate-200" [ngClass]="cellPaddingClass()">
+                    {{ customerLabel(order) }}
+                  </td>
+                  <td *ngSwitchCase="'status'" [ngClass]="cellPaddingClass()">
+                    <span [ngClass]="statusPillClass(order.status)" class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold">
+                      {{ ('adminUi.orders.' + order.status) | translate }}
+                    </span>
+                  </td>
+                  <td *ngSwitchCase="'tags'" [ngClass]="cellPaddingClass()">
+                    <div class="flex flex-wrap gap-1">
+                      <ng-container *ngFor="let tagValue of order.tags || []">
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                          {{ tagLabel(tagValue) }}
+                        </span>
+                      </ng-container>
+                      <span *ngIf="(order.tags || []).length === 0" class="text-xs text-slate-400">—</span>
+                    </div>
+                  </td>
+                  <td *ngSwitchCase="'total'" class="text-slate-700 dark:text-slate-200" [ngClass]="cellPaddingClass()">
+                    {{ order.total_amount | localizedCurrency : order.currency }}
+                  </td>
+                  <td *ngSwitchCase="'created'" class="text-slate-600 dark:text-slate-300" [ngClass]="cellPaddingClass()">
+                    {{ order.created_at | date: 'short' }}
+                  </td>
+                  <td *ngSwitchCase="'actions'" class="text-right" [ngClass]="cellPaddingClass()">
+                    <app-button size="sm" variant="ghost" [label]="'adminUi.orders.view' | translate" (action)="open(order.id)"></app-button>
+                  </td>
+                </ng-container>
+              </tr>
+            </ng-template>
+
             <ng-container *ngIf="orders().length > 100; else ordersTableStandard">
               <cdk-virtual-scroll-viewport
                 class="block h-[min(70vh,720px)]"
@@ -279,76 +400,15 @@ type AdminOrdersExportTemplate = {
               >
                 <table class="min-w-[1050px] w-full text-sm">
                   <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
-                    <tr>
-                      <th class="text-left font-semibold px-3 py-2">
-                        <input
-                          type="checkbox"
-                          [checked]="allSelectedOnPage()"
-                          [indeterminate]="someSelectedOnPage()"
-                          (change)="toggleSelectAllOnPage($any($event.target).checked)"
-                          [disabled]="bulkBusy"
-                          aria-label="Select all orders on page"
-                        />
-                      </th>
-                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.reference' | translate }}</th>
-                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.customer' | translate }}</th>
-                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.status' | translate }}</th>
-                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.tags' | translate }}</th>
-                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.total' | translate }}</th>
-                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.created' | translate }}</th>
-                      <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.table.actions' | translate }}</th>
-                    </tr>
+                    <ng-container [ngTemplateOutlet]="ordersTableHeader"></ng-container>
                   </thead>
                   <tbody>
-                    <tr
-                      *cdkVirtualFor="let order of orders(); trackBy: trackOrderId"
-                      class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
-                    >
-                      <td class="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          [checked]="selectedIds.has(order.id)"
-                          (change)="toggleSelected(order.id, $any($event.target).checked)"
-                          [disabled]="bulkBusy"
-                          [attr.aria-label]="'Select order ' + (order.reference_code || (order.id | slice: 0:8))"
-                        />
-                      </td>
-                      <td class="px-3 py-2 font-medium text-slate-900 dark:text-slate-50">
-                        {{ order.reference_code || (order.id | slice: 0:8) }}
-                      </td>
-                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
-                        {{ customerLabel(order) }}
-                      </td>
-                      <td class="px-3 py-2">
-                        <span [ngClass]="statusPillClass(order.status)" class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold">
-                          {{ ('adminUi.orders.' + order.status) | translate }}
-                        </span>
-                      </td>
-                      <td class="px-3 py-2">
-                        <div class="flex flex-wrap gap-1">
-                          <ng-container *ngFor="let tagValue of order.tags || []">
-                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200">
-                              {{ tagLabel(tagValue) }}
-                            </span>
-                          </ng-container>
-                          <span *ngIf="(order.tags || []).length === 0" class="text-xs text-slate-400">—</span>
-                        </div>
-                      </td>
-                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
-                        {{ order.total_amount | localizedCurrency : order.currency }}
-                      </td>
-                      <td class="px-3 py-2 text-slate-600 dark:text-slate-300">
-                        {{ order.created_at | date: 'short' }}
-                      </td>
-                      <td class="px-3 py-2 text-right">
-                        <app-button
-                          size="sm"
-                          variant="ghost"
-                          [label]="'adminUi.orders.view' | translate"
-                          (action)="open(order.id)"
-                        ></app-button>
-                      </td>
-                    </tr>
+                    <ng-container *cdkVirtualFor="let order of orders(); trackBy: trackOrderId">
+                      <ng-container
+                        [ngTemplateOutlet]="ordersTableRow"
+                        [ngTemplateOutletContext]="{ $implicit: order }"
+                      ></ng-container>
+                    </ng-container>
                   </tbody>
                 </table>
               </cdk-virtual-scroll-viewport>
@@ -356,76 +416,15 @@ type AdminOrdersExportTemplate = {
             <ng-template #ordersTableStandard>
               <table class="min-w-[1050px] w-full text-sm">
                 <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
-                  <tr>
-                    <th class="text-left font-semibold px-3 py-2">
-                      <input
-                        type="checkbox"
-                        [checked]="allSelectedOnPage()"
-                        [indeterminate]="someSelectedOnPage()"
-                        (change)="toggleSelectAllOnPage($any($event.target).checked)"
-                        [disabled]="bulkBusy"
-                        aria-label="Select all orders on page"
-                      />
-                    </th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.reference' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.customer' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.status' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.tags' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.total' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.created' | translate }}</th>
-                    <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.table.actions' | translate }}</th>
-                  </tr>
+                  <ng-container [ngTemplateOutlet]="ordersTableHeader"></ng-container>
                 </thead>
                 <tbody>
-                  <tr
-                    *ngFor="let order of orders(); trackBy: trackOrderId"
-                    class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
-                  >
-                    <td class="px-3 py-2">
-                      <input
-                        type="checkbox"
-                        [checked]="selectedIds.has(order.id)"
-                        (change)="toggleSelected(order.id, $any($event.target).checked)"
-                        [disabled]="bulkBusy"
-                        [attr.aria-label]="'Select order ' + (order.reference_code || (order.id | slice: 0:8))"
-                      />
-                    </td>
-                    <td class="px-3 py-2 font-medium text-slate-900 dark:text-slate-50">
-                      {{ order.reference_code || (order.id | slice: 0:8) }}
-                    </td>
-                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
-                      {{ customerLabel(order) }}
-                    </td>
-                    <td class="px-3 py-2">
-                      <span [ngClass]="statusPillClass(order.status)" class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold">
-                        {{ ('adminUi.orders.' + order.status) | translate }}
-                      </span>
-                    </td>
-                    <td class="px-3 py-2">
-                      <div class="flex flex-wrap gap-1">
-                        <ng-container *ngFor="let tagValue of order.tags || []">
-                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200">
-                            {{ tagLabel(tagValue) }}
-                          </span>
-                        </ng-container>
-                        <span *ngIf="(order.tags || []).length === 0" class="text-xs text-slate-400">—</span>
-                      </div>
-                    </td>
-                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
-                      {{ order.total_amount | localizedCurrency : order.currency }}
-                    </td>
-                    <td class="px-3 py-2 text-slate-600 dark:text-slate-300">
-                      {{ order.created_at | date: 'short' }}
-                    </td>
-                    <td class="px-3 py-2 text-right">
-                      <app-button
-                        size="sm"
-                        variant="ghost"
-                        [label]="'adminUi.orders.view' | translate"
-                        (action)="open(order.id)"
-                      ></app-button>
-                    </td>
-                  </tr>
+                  <ng-container *ngFor="let order of orders(); trackBy: trackOrderId">
+                    <ng-container
+                      [ngTemplateOutlet]="ordersTableRow"
+                      [ngTemplateOutletContext]="{ $implicit: order }"
+                    ></ng-container>
+                  </ng-container>
                 </tbody>
               </table>
             </ng-template>
@@ -561,6 +560,10 @@ export class AdminOrdersComponent implements OnInit {
   ];
 
   readonly orderRowHeight = 44;
+  readonly tableColumns = ORDERS_TABLE_COLUMNS;
+
+  layoutModalOpen = signal(false);
+  tableLayout = signal<AdminTableLayoutV1>(defaultAdminTableLayout(ORDERS_TABLE_COLUMNS));
 
   loading = signal(true);
   error = signal<string | null>(null);
@@ -626,6 +629,7 @@ export class AdminOrdersComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns));
     this.presets = this.loadPresets();
     this.loadExportState();
     this.ordersApi.listOrderTags().subscribe({
@@ -639,6 +643,31 @@ export class AdminOrdersComponent implements OnInit {
       }
     });
     this.load();
+  }
+
+  openLayoutModal(): void {
+    this.layoutModalOpen.set(true);
+  }
+
+  closeLayoutModal(): void {
+    this.layoutModalOpen.set(false);
+  }
+
+  applyTableLayout(layout: AdminTableLayoutV1): void {
+    this.tableLayout.set(layout);
+    saveAdminTableLayout(this.tableLayoutStorageKey(), layout);
+  }
+
+  visibleColumnIds(): string[] {
+    return visibleAdminTableColumnIds(this.tableLayout(), this.tableColumns);
+  }
+
+  trackColumnId(_: number, colId: string): string {
+    return colId;
+  }
+
+  cellPaddingClass(): string {
+    return adminTableCellPaddingClass(this.tableLayout().density);
   }
 
   applyFilters(): void {
@@ -1035,6 +1064,10 @@ export class AdminOrdersComponent implements OnInit {
 
   retryLoad(): void {
     this.load();
+  }
+
+  private tableLayoutStorageKey(): string {
+    return adminTableLayoutStorageKey('orders', this.auth.user()?.id);
   }
 
   private storageKey(): string {

@@ -1481,6 +1481,18 @@
       "preview": "Previzualizează",
       "hide": "Ascunde"
     },
+    "tableLayout": {
+      "title": "Aspect tabel",
+      "subtitle": "Alege coloanele vizibile și densitatea.",
+      "densityLabel": "Densitate",
+      "density": {
+        "comfortable": "Confortabil",
+        "compact": "Compact"
+      },
+      "columnsLabel": "Coloane",
+      "required": "Obligatoriu",
+      "reset": "Resetează la implicit"
+    },
     "support": {
       "title": "Inbox suport",
       "subtitle": "Mesaje trimise din formularul de contact.",
@@ -2354,6 +2366,7 @@
       "prev": "Anterior",
       "next": "Înainte",
       "table": {
+        "select": "Selectează",
         "name": "Nume",
         "price": "Preț",
         "status": "Status",
@@ -3034,12 +3047,14 @@
       },
       "notFound": "Comanda nu a fost găsită.",
       "table": {
+        "select": "Selectează",
         "reference": "Referință",
         "customer": "Client",
         "status": "Status",
         "tags": "Etichete",
         "total": "Total",
-        "created": "Creată"
+        "created": "Creată",
+        "actions": "Acțiuni"
       },
       "items": {
         "product": "Produs",

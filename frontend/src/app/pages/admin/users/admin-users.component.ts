@@ -23,8 +23,27 @@ import { extractRequestId } from '../../../shared/http-error';
 import { InputComponent } from '../../../shared/input.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { formatIdentity } from '../../../shared/user-identity';
+import {
+  AdminTableLayoutV1,
+  adminTableCellPaddingClass,
+  adminTableLayoutStorageKey,
+  defaultAdminTableLayout,
+  loadAdminTableLayout,
+  saveAdminTableLayout,
+  visibleAdminTableColumnIds
+} from '../shared/admin-table-layout';
+import { AdminTableLayoutColumnDef, TableLayoutModalComponent } from '../shared/table-layout-modal.component';
 
 type RoleFilter = 'all' | 'customer' | 'support' | 'fulfillment' | 'content' | 'admin' | 'owner';
+
+const USERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
+  { id: 'identity', labelKey: 'adminUi.users.table.identity', required: true },
+  { id: 'email', labelKey: 'adminUi.users.table.email' },
+  { id: 'role', labelKey: 'adminUi.users.table.role' },
+  { id: 'verified', labelKey: 'adminUi.users.table.verified' },
+  { id: 'created', labelKey: 'adminUi.users.table.created' },
+  { id: 'actions', labelKey: 'adminUi.users.table.actions', required: true }
+];
 
 @Component({
   selector: 'app-admin-users',
@@ -39,7 +58,8 @@ type RoleFilter = 'all' | 'customer' | 'support' | 'fulfillment' | 'content' | '
     ButtonComponent,
     ErrorStateComponent,
     InputComponent,
-    SkeletonComponent
+    SkeletonComponent,
+    TableLayoutModalComponent
   ],
   template: `
     <div class="grid gap-6">
@@ -60,8 +80,17 @@ type RoleFilter = 'all' | 'customer' | 'support' | 'fulfillment' | 'content' | '
 	          ></app-button>
 	          <app-button size="sm" variant="ghost" routerLink="/admin/users/segments" [label]="'adminUi.users.segments' | translate"></app-button>
 	          <app-button size="sm" variant="ghost" routerLink="/admin/users/gdpr" [label]="'adminUi.users.gdprQueue' | translate"></app-button>
+            <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
 	        </div>
 	      </div>
+
+      <app-table-layout-modal
+        [open]="layoutModalOpen()"
+        [columns]="tableColumns"
+        [layout]="tableLayout()"
+        (closed)="closeLayoutModal()"
+        (applied)="applyTableLayout($event)"
+      ></app-table-layout-modal>
 
       <div class="grid gap-6 lg:grid-cols-[1.25fr_0.75fr] items-start">
         <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
@@ -106,93 +135,51 @@ type RoleFilter = 'all' | 'customer' | 'support' | 'fulfillment' | 'content' | '
               {{ 'adminUi.users.empty' | translate }}
             </div>
 
-            <div *ngIf="users().length > 0" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-              <ng-container *ngIf="users().length > 100; else usersTableStandard">
-                <cdk-virtual-scroll-viewport
-                  class="block h-[min(70vh,720px)]"
-                  [itemSize]="userRowHeight"
-                  [minBufferPx]="userRowHeight * 10"
-                  [maxBufferPx]="userRowHeight * 20"
-                >
-                  <table class="min-w-[880px] w-full text-sm">
-                    <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
-                      <tr>
-                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.identity' | translate }}</th>
-                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.email' | translate }}</th>
-                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.role' | translate }}</th>
-                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.verified' | translate }}</th>
-                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.created' | translate }}</th>
-                        <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.users.table.actions' | translate }}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr
-                        *cdkVirtualFor="let user of users(); trackBy: trackUserId"
-                        class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
+	            <div *ngIf="users().length > 0" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                <ng-template #usersTableHeader>
+                  <tr>
+                    <ng-container *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId" [ngSwitch]="colId">
+                      <th *ngSwitchCase="'identity'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                        {{ 'adminUi.users.table.identity' | translate }}
+                      </th>
+                      <th *ngSwitchCase="'email'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                        {{ 'adminUi.users.table.email' | translate }}
+                      </th>
+                      <th *ngSwitchCase="'role'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                        {{ 'adminUi.users.table.role' | translate }}
+                      </th>
+                      <th *ngSwitchCase="'verified'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                        {{ 'adminUi.users.table.verified' | translate }}
+                      </th>
+                      <th *ngSwitchCase="'created'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                        {{ 'adminUi.users.table.created' | translate }}
+                      </th>
+                      <th *ngSwitchCase="'actions'" class="text-right font-semibold" [ngClass]="cellPaddingClass()">
+                        {{ 'adminUi.users.table.actions' | translate }}
+                      </th>
+                    </ng-container>
+                  </tr>
+                </ng-template>
+
+                <ng-template #usersTableRow let-user>
+                  <tr class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40">
+                    <ng-container *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId" [ngSwitch]="colId">
+                      <td
+                        *ngSwitchCase="'identity'"
+                        class="font-medium text-slate-900 dark:text-slate-50"
+                        [ngClass]="cellPaddingClass()"
                       >
-                        <td class="px-3 py-2 font-medium text-slate-900 dark:text-slate-50">
-                          {{ identityLabel(user) }}
-                        </td>
-                        <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
-                          {{ user.email }}
-                        </td>
-                        <td class="px-3 py-2">
-                          <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="rolePillClass(user.role)">
-                            {{ ('adminUi.users.roles.' + user.role) | translate }}
-                          </span>
-                        </td>
-                        <td class="px-3 py-2">
-                          <span
-                            class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
-                            [ngClass]="
-                              user.email_verified
-                                ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100'
-                                : 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100'
-                            "
-                          >
-                            {{ user.email_verified ? ('adminUi.users.verified' | translate) : ('adminUi.users.unverified' | translate) }}
-                          </span>
-                        </td>
-                        <td class="px-3 py-2 text-slate-600 dark:text-slate-300">
-                          {{ user.created_at | date: 'short' }}
-                        </td>
-                        <td class="px-3 py-2 text-right">
-                          <app-button size="sm" variant="ghost" [label]="'adminUi.users.manage' | translate" (action)="select(user)"></app-button>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </cdk-virtual-scroll-viewport>
-              </ng-container>
-              <ng-template #usersTableStandard>
-                <table class="min-w-[880px] w-full text-sm">
-                  <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
-                    <tr>
-                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.identity' | translate }}</th>
-                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.email' | translate }}</th>
-                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.role' | translate }}</th>
-                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.verified' | translate }}</th>
-                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.created' | translate }}</th>
-                      <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.users.table.actions' | translate }}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      *ngFor="let user of users(); trackBy: trackUserId"
-                      class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
-                    >
-                      <td class="px-3 py-2 font-medium text-slate-900 dark:text-slate-50">
                         {{ identityLabel(user) }}
                       </td>
-                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                      <td *ngSwitchCase="'email'" class="text-slate-700 dark:text-slate-200" [ngClass]="cellPaddingClass()">
                         {{ user.email }}
                       </td>
-                      <td class="px-3 py-2">
+                      <td *ngSwitchCase="'role'" [ngClass]="cellPaddingClass()">
                         <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="rolePillClass(user.role)">
                           {{ ('adminUi.users.roles.' + user.role) | translate }}
                         </span>
                       </td>
-                      <td class="px-3 py-2">
+                      <td *ngSwitchCase="'verified'" [ngClass]="cellPaddingClass()">
                         <span
                           class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
                           [ngClass]="
@@ -204,17 +191,54 @@ type RoleFilter = 'all' | 'customer' | 'support' | 'fulfillment' | 'content' | '
                           {{ user.email_verified ? ('adminUi.users.verified' | translate) : ('adminUi.users.unverified' | translate) }}
                         </span>
                       </td>
-                      <td class="px-3 py-2 text-slate-600 dark:text-slate-300">
+                      <td *ngSwitchCase="'created'" class="text-slate-600 dark:text-slate-300" [ngClass]="cellPaddingClass()">
                         {{ user.created_at | date: 'short' }}
                       </td>
-                      <td class="px-3 py-2 text-right">
+                      <td *ngSwitchCase="'actions'" class="text-right" [ngClass]="cellPaddingClass()">
                         <app-button size="sm" variant="ghost" [label]="'adminUi.users.manage' | translate" (action)="select(user)"></app-button>
                       </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </ng-template>
-            </div>
+                    </ng-container>
+                  </tr>
+                </ng-template>
+
+	              <ng-container *ngIf="users().length > 100; else usersTableStandard">
+	                <cdk-virtual-scroll-viewport
+	                  class="block h-[min(70vh,720px)]"
+                  [itemSize]="userRowHeight"
+                  [minBufferPx]="userRowHeight * 10"
+                  [maxBufferPx]="userRowHeight * 20"
+	                >
+	                  <table class="min-w-[880px] w-full text-sm">
+	                    <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+	                      <ng-container [ngTemplateOutlet]="usersTableHeader"></ng-container>
+	                    </thead>
+	                    <tbody>
+                        <ng-container *cdkVirtualFor="let user of users(); trackBy: trackUserId">
+                          <ng-container
+                            [ngTemplateOutlet]="usersTableRow"
+                            [ngTemplateOutletContext]="{ $implicit: user }"
+                          ></ng-container>
+                        </ng-container>
+	                    </tbody>
+	                  </table>
+	                </cdk-virtual-scroll-viewport>
+	              </ng-container>
+	              <ng-template #usersTableStandard>
+	                <table class="min-w-[880px] w-full text-sm">
+	                  <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+	                    <ng-container [ngTemplateOutlet]="usersTableHeader"></ng-container>
+	                  </thead>
+	                  <tbody>
+                      <ng-container *ngFor="let user of users(); trackBy: trackUserId">
+                        <ng-container
+                          [ngTemplateOutlet]="usersTableRow"
+                          [ngTemplateOutletContext]="{ $implicit: user }"
+                        ></ng-container>
+                      </ng-container>
+	                  </tbody>
+	                </table>
+	              </ng-template>
+	            </div>
 
             <div *ngIf="meta()" class="flex items-center justify-between gap-3 pt-2 text-sm text-slate-700 dark:text-slate-200">
               <div>
@@ -811,6 +835,10 @@ export class AdminUsersComponent implements OnInit {
   ];
 
   readonly userRowHeight = 44;
+  readonly tableColumns = USERS_TABLE_COLUMNS;
+
+  layoutModalOpen = signal(false);
+  tableLayout = signal<AdminTableLayoutV1>(defaultAdminTableLayout(USERS_TABLE_COLUMNS));
 
   loading = signal(true);
   error = signal<string | null>(null);
@@ -881,6 +909,7 @@ export class AdminUsersComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns));
     const state = history.state as any;
     const prefill = typeof state?.prefillUserSearch === 'string' ? state.prefillUserSearch : '';
     this.pendingPrefillSearch = prefill.trim() ? prefill.trim() : null;
@@ -890,6 +919,35 @@ export class AdminUsersComponent implements OnInit {
       this.page = 1;
     }
     this.load();
+  }
+
+  openLayoutModal(): void {
+    this.layoutModalOpen.set(true);
+  }
+
+  closeLayoutModal(): void {
+    this.layoutModalOpen.set(false);
+  }
+
+  applyTableLayout(layout: AdminTableLayoutV1): void {
+    this.tableLayout.set(layout);
+    saveAdminTableLayout(this.tableLayoutStorageKey(), layout);
+  }
+
+  visibleColumnIds(): string[] {
+    return visibleAdminTableColumnIds(this.tableLayout(), this.tableColumns);
+  }
+
+  trackColumnId(_: number, colId: string): string {
+    return colId;
+  }
+
+  cellPaddingClass(): string {
+    return adminTableCellPaddingClass(this.tableLayout().density);
+  }
+
+  private tableLayoutStorageKey(): string {
+    return adminTableLayoutStorageKey('users', this.auth.user()?.id);
   }
 
   applyFilters(): void {

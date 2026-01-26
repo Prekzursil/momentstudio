@@ -1481,6 +1481,18 @@
       "preview": "Preview",
       "hide": "Hide"
     },
+    "tableLayout": {
+      "title": "Table layout",
+      "subtitle": "Choose visible columns and density.",
+      "densityLabel": "Density",
+      "density": {
+        "comfortable": "Comfortable",
+        "compact": "Compact"
+      },
+      "columnsLabel": "Columns",
+      "required": "Required",
+      "reset": "Reset to defaults"
+    },
     "support": {
       "title": "Support inbox",
       "subtitle": "Contact form submissions from customers.",
@@ -2354,6 +2366,7 @@
       "prev": "Prev",
       "next": "Next",
       "table": {
+        "select": "Select",
         "name": "Name",
         "price": "Price",
         "status": "Status",
@@ -3034,12 +3047,14 @@
       },
       "notFound": "Order not found.",
       "table": {
+        "select": "Select",
         "reference": "Reference",
         "customer": "Customer",
         "status": "Status",
         "tags": "Tags",
         "total": "Total",
-        "created": "Created"
+        "created": "Created",
+        "actions": "Actions"
       },
       "items": {
         "product": "Product",

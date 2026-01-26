@@ -32,8 +32,31 @@ import {
   StockAdjustmentReason,
 } from '../../../core/admin.service';
 import { ToastService } from '../../../core/toast.service';
+import { AuthService } from '../../../core/auth.service';
+import {
+  AdminTableLayoutV1,
+  adminTableCellPaddingClass,
+  adminTableLayoutStorageKey,
+  defaultAdminTableLayout,
+  loadAdminTableLayout,
+  saveAdminTableLayout,
+  visibleAdminTableColumnIds
+} from '../shared/admin-table-layout';
+import { AdminTableLayoutColumnDef, TableLayoutModalComponent } from '../shared/table-layout-modal.component';
 
 type ProductStatusFilter = 'all' | 'draft' | 'published' | 'archived';
+
+const PRODUCTS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
+  { id: 'select', labelKey: 'adminUi.products.table.select', required: true },
+  { id: 'name', labelKey: 'adminUi.products.table.name', required: true },
+  { id: 'price', labelKey: 'adminUi.products.table.price' },
+  { id: 'status', labelKey: 'adminUi.products.table.status' },
+  { id: 'category', labelKey: 'adminUi.products.table.category' },
+  { id: 'stock', labelKey: 'adminUi.products.table.stock' },
+  { id: 'active', labelKey: 'adminUi.products.table.active' },
+  { id: 'updated', labelKey: 'adminUi.products.table.updated' },
+  { id: 'actions', labelKey: 'adminUi.products.table.actions', required: true }
+];
 
 type ProductBadgeKey = 'new' | 'limited' | 'handmade';
 
@@ -129,7 +152,8 @@ type PriceHistoryChart = {
     InputComponent,
     ModalComponent,
     SkeletonComponent,
-    LocalizedCurrencyPipe
+    LocalizedCurrencyPipe,
+    TableLayoutModalComponent
   ],
   template: `
     <div class="grid gap-6">
@@ -143,9 +167,18 @@ type PriceHistoryChart = {
         <div class="flex flex-wrap items-center justify-end gap-2">
           <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.export' | translate" (action)="exportProductsCsv()"></app-button>
           <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.import' | translate" (action)="openCsvImport()"></app-button>
+          <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
           <app-button size="sm" [label]="'adminUi.products.new' | translate" (action)="startNew()"></app-button>
         </div>
       </div>
+
+      <app-table-layout-modal
+        [open]="layoutModalOpen()"
+        [columns]="tableColumns"
+        [layout]="tableLayout()"
+        (closed)="closeLayoutModal()"
+        (applied)="applyTableLayout($event)"
+      ></app-table-layout-modal>
 
       <app-modal
         [open]="csvImportOpen()"
@@ -498,6 +531,50 @@ type PriceHistoryChart = {
           </div>
 
           <div *ngIf="products().length > 0" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+            <ng-template #productsTableHeader>
+              <tr>
+                <ng-container *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId" [ngSwitch]="colId">
+                  <th *ngSwitchCase="'select'" class="text-left font-semibold w-10" [ngClass]="cellPaddingClass()">
+                    <input
+                      type="checkbox"
+                      [checked]="allSelectedOnPage()"
+                      (change)="toggleSelectAll($event)"
+                      [disabled]="bulkBusy() || inlineBusy() || view === 'deleted'"
+                      aria-label="Select all products on page"
+                    />
+                  </th>
+                  <th *ngSwitchCase="'name'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.products.table.name' | translate }}
+                  </th>
+                  <th *ngSwitchCase="'price'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.products.table.price' | translate }}
+                  </th>
+                  <th *ngSwitchCase="'status'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.products.table.status' | translate }}
+                  </th>
+                  <th *ngSwitchCase="'category'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.products.table.category' | translate }}
+                  </th>
+                  <th *ngSwitchCase="'stock'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.products.table.stock' | translate }}
+                  </th>
+                  <th *ngSwitchCase="'active'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.products.table.active' | translate }}
+                  </th>
+                  <th *ngSwitchCase="'updated'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                    {{
+                      view === 'deleted'
+                        ? ('adminUi.products.table.deletedAt' | translate)
+                        : ('adminUi.products.table.updated' | translate)
+                    }}
+                  </th>
+                  <th *ngSwitchCase="'actions'" class="text-right font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.products.table.actions' | translate }}
+                  </th>
+                </ng-container>
+              </tr>
+            </ng-template>
+
             <cdk-virtual-scroll-viewport
               *ngIf="useVirtualProductsTable()"
               class="block h-[min(70vh,720px)]"
@@ -507,31 +584,7 @@ type PriceHistoryChart = {
             >
               <table class="min-w-[980px] w-full text-sm">
                 <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
-                  <tr>
-                    <th class="text-left font-semibold px-3 py-2 w-10">
-                      <input
-                        type="checkbox"
-                        [checked]="allSelectedOnPage()"
-                        (change)="toggleSelectAll($event)"
-                        [disabled]="bulkBusy() || inlineBusy() || view === 'deleted'"
-                        aria-label="Select all products on page"
-                      />
-                    </th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.name' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.price' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.status' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.category' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.stock' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.active' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">
-                      {{
-                        view === 'deleted'
-                          ? ('adminUi.products.table.deletedAt' | translate)
-                          : ('adminUi.products.table.updated' | translate)
-                      }}
-                    </th>
-                    <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.products.table.actions' | translate }}</th>
-                  </tr>
+                  <ng-container [ngTemplateOutlet]="productsTableHeader"></ng-container>
                 </thead>
                 <tbody>
                   <ng-container *cdkVirtualFor="let product of products(); trackBy: trackProductId">
@@ -546,36 +599,13 @@ type PriceHistoryChart = {
 
             <table class="min-w-[980px] w-full text-sm" [class.hidden]="useVirtualProductsTable()">
               <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
-                <tr>
-	                  <th class="text-left font-semibold px-3 py-2 w-10">
-	                    <input
-	                      type="checkbox"
-	                      [checked]="allSelectedOnPage()"
-	                      (change)="toggleSelectAll($event)"
-	                      [disabled]="bulkBusy() || inlineBusy() || view === 'deleted'"
-	                      aria-label="Select all products on page"
-	                    />
-	                  </th>
-                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.name' | translate }}</th>
-                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.price' | translate }}</th>
-                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.status' | translate }}</th>
-                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.category' | translate }}</th>
-	                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.stock' | translate }}</th>
-	                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.active' | translate }}</th>
-	                  <th class="text-left font-semibold px-3 py-2">
-	                    {{
-	                      view === 'deleted'
-	                        ? ('adminUi.products.table.deletedAt' | translate)
-	                        : ('adminUi.products.table.updated' | translate)
-	                    }}
-	                  </th>
-	                  <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.products.table.actions' | translate }}</th>
-	                </tr>
+                <ng-container [ngTemplateOutlet]="productsTableHeader"></ng-container>
 	              </thead>
               <tbody>
                 <ng-template #productRow let-product>
                   <tr class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40">
-	                  <td class="px-3 py-2">
+                    <ng-container *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId" [ngSwitch]="colId">
+	                  <td *ngSwitchCase="'select'" class="w-10" [ngClass]="cellPaddingClass()">
 	                    <input
 	                      type="checkbox"
 	                      [checked]="selected.has(product.id)"
@@ -584,7 +614,7 @@ type PriceHistoryChart = {
 	                      [attr.aria-label]="'Select product ' + (product.name || product.slug)"
 	                    />
 	                  </td>
-	                  <td class="px-3 py-2 font-medium text-slate-900 dark:text-slate-50">
+	                  <td *ngSwitchCase="'name'" class="font-medium text-slate-900 dark:text-slate-50" [ngClass]="cellPaddingClass()">
 	                    <div class="grid">
 	                      <span class="truncate">{{ product.name }}</span>
 	                      <span class="text-xs text-slate-500 dark:text-slate-400">
@@ -603,7 +633,7 @@ type PriceHistoryChart = {
                         </div>
 	                    </div>
 	                  </td>
-                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                  <td *ngSwitchCase="'price'" class="text-slate-700 dark:text-slate-200" [ngClass]="cellPaddingClass()">
                     <ng-container *ngIf="inlineEditId === product.id; else priceRead">
                       <div class="grid gap-2 min-w-[240px]">
                         <div class="grid gap-1">
@@ -683,7 +713,7 @@ type PriceHistoryChart = {
                       </div>
                     </ng-template>
                   </td>
-                  <td class="px-3 py-2">
+                  <td *ngSwitchCase="'status'" [ngClass]="cellPaddingClass()">
                     <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="statusPillClass(product.status)">
                       {{ ('adminUi.status.' + product.status) | translate }}
                     </span>
@@ -701,10 +731,10 @@ type PriceHistoryChart = {
                       </div>
                     </div>
                   </td>
-                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                  <td *ngSwitchCase="'category'" class="text-slate-700 dark:text-slate-200" [ngClass]="cellPaddingClass()">
                     {{ product.category_name }}
                   </td>
-                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                  <td *ngSwitchCase="'stock'" class="text-slate-700 dark:text-slate-200" [ngClass]="cellPaddingClass()">
                     <ng-container *ngIf="inlineEditId === product.id; else stockRead">
                       <div class="grid gap-1 min-w-[120px]">
                         <input
@@ -727,7 +757,7 @@ type PriceHistoryChart = {
                       {{ product.stock_quantity }}
                     </ng-template>
                   </td>
-                  <td class="px-3 py-2">
+                  <td *ngSwitchCase="'active'" [ngClass]="cellPaddingClass()">
                     <span
                       class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
                       [ngClass]="product.is_active ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'"
@@ -735,10 +765,12 @@ type PriceHistoryChart = {
                       {{ product.is_active ? ('adminUi.products.active' | translate) : ('adminUi.products.inactive' | translate) }}
                     </span>
                   </td>
-                  <td class="px-3 py-2 text-slate-600 dark:text-slate-300">
-                    {{ product.updated_at | date: 'short' }}
+                  <td *ngSwitchCase="'updated'" class="text-slate-600 dark:text-slate-300" [ngClass]="cellPaddingClass()">
+                    {{
+                      (view === 'deleted' ? (product.deleted_at || product.updated_at) : product.updated_at) | date: 'short'
+                    }}
                   </td>
-                  <td class="px-3 py-2 text-right">
+                  <td *ngSwitchCase="'actions'" class="text-right" [ngClass]="cellPaddingClass()">
                     <div class="flex items-center justify-end gap-2">
 	                      <ng-container *ngIf="inlineEditId === product.id; else rowActions">
 	                        <app-button
@@ -783,6 +815,7 @@ type PriceHistoryChart = {
 	                      </ng-template>
 	                    </div>
 	                  </td>
+                    </ng-container>
 	                </tr>
                 </ng-template>
 
@@ -2257,6 +2290,10 @@ export class AdminProductsComponent implements OnInit {
   ];
 
   readonly productRowHeight = 96;
+  readonly tableColumns = PRODUCTS_TABLE_COLUMNS;
+
+  layoutModalOpen = signal(false);
+  tableLayout = signal<AdminTableLayoutV1>(defaultAdminTableLayout(PRODUCTS_TABLE_COLUMNS));
 
   loading = signal(true);
   error = signal<string | null>(null);
@@ -2391,12 +2428,14 @@ export class AdminProductsComponent implements OnInit {
     private productsApi: AdminProductsService,
     private catalog: CatalogService,
     private admin: AdminService,
+    private auth: AuthService,
     private markdown: MarkdownService,
     private toast: ToastService,
     private translate: TranslateService
   ) {}
 
   ngOnInit(): void {
+    this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns));
     const state = history.state as any;
     const editSlug = typeof state?.editProductSlug === 'string' ? state.editProductSlug : '';
     this.pendingEditProductSlug = editSlug.trim() ? editSlug.trim() : null;
@@ -2404,6 +2443,35 @@ export class AdminProductsComponent implements OnInit {
     this.loadCategories();
     this.loadAdminCategories();
     this.load();
+  }
+
+  openLayoutModal(): void {
+    this.layoutModalOpen.set(true);
+  }
+
+  closeLayoutModal(): void {
+    this.layoutModalOpen.set(false);
+  }
+
+  applyTableLayout(layout: AdminTableLayoutV1): void {
+    this.tableLayout.set(layout);
+    saveAdminTableLayout(this.tableLayoutStorageKey(), layout);
+  }
+
+  visibleColumnIds(): string[] {
+    return visibleAdminTableColumnIds(this.tableLayout(), this.tableColumns);
+  }
+
+  trackColumnId(_: number, colId: string): string {
+    return colId;
+  }
+
+  cellPaddingClass(): string {
+    return adminTableCellPaddingClass(this.tableLayout().density);
+  }
+
+  private tableLayoutStorageKey(): string {
+    return adminTableLayoutStorageKey('products', this.auth.user()?.id);
   }
 
   applyFilters(): void {
