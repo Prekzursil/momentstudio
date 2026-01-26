@@ -1339,6 +1339,7 @@
       "empty": "No recent activity found.",
       "errors": { "load": "Could not load customer timeline." },
       "kinds": { "order": "Order", "ticket": "Ticket", "email": "Email" },
+      "emailStatus": { "sent": "Sent", "failed": "Failed" },
       "emailGated": "Reveal PII to load email activity.",
       "noCustomer": "Customer details unavailable for timeline.",
       "openOps": "Open in Ops"
@@ -1837,8 +1838,13 @@
       },
       "emailFailures": {
         "title": "Email failures",
-        "hint": "Track failed outgoing email deliveries (last 24h).",
+        "hint": "Track failed outgoing email deliveries.",
         "refresh": "Refresh",
+        "filters": {
+          "to": "Recipient email",
+          "toPlaceholder": "customer@example.com",
+          "sinceHours": "Since (hours)"
+        },
         "empty": "No email failures.",
         "view": "View",
         "close": "Close",
@@ -3570,6 +3576,13 @@
     "content": {
       "title": "Content",
       "subtitle": "Edit the homepage, pages, blog, and site settings.",
+      "editorMode": {
+        "label": "Editor mode",
+        "simple": "Simple",
+        "advanced": "Advanced",
+        "simpleHint": "Simple mode hides SEO and scheduling.",
+        "advancedHint": "Advanced mode shows SEO, scheduling, and extra controls."
+      },
       "nav": {
         "home": "Home",
         "pages": "Pages",

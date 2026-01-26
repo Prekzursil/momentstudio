@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import {
   OpsService,
@@ -326,12 +327,49 @@ import { SkeletonComponent } from '../../../shared/skeleton.component';
               <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ops.emailFailures.title' | translate }}</div>
               <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.ops.emailFailures.hint' | translate }}</div>
             </div>
+            <div class="flex items-center gap-2">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.ops.emailFailures.refresh' | translate"
+                [disabled]="emailFailuresLoading()"
+                (action)="loadEmailFailures()"
+              ></app-button>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-end gap-2">
+            <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+              {{ 'adminUi.ops.emailFailures.filters.to' | translate }}
+              <input
+                class="h-10 w-[min(360px,100%)] rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                [(ngModel)]="emailFailuresTo"
+                [placeholder]="'adminUi.ops.emailFailures.filters.toPlaceholder' | translate"
+              />
+            </label>
+            <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+              {{ 'adminUi.ops.emailFailures.filters.sinceHours' | translate }}
+              <input
+                type="number"
+                min="1"
+                max="168"
+                class="h-10 w-28 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                [(ngModel)]="emailFailuresSinceHours"
+              />
+            </label>
             <app-button
               size="sm"
               variant="ghost"
-              [label]="'adminUi.ops.emailFailures.refresh' | translate"
+              [label]="'adminUi.actions.apply' | translate"
               [disabled]="emailFailuresLoading()"
               (action)="loadEmailFailures()"
+            ></app-button>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.actions.reset' | translate"
+              [disabled]="emailFailuresLoading()"
+              (action)="resetEmailFailureFilters()"
             ></app-button>
           </div>
 
@@ -541,6 +579,8 @@ export class AdminOpsComponent implements OnInit {
   emailFailuresError = signal<string | null>(null);
   emailFailures = signal<EmailFailureRead[]>([]);
   selectedEmailFailure = signal<EmailFailureRead | null>(null);
+  emailFailuresTo = '';
+  emailFailuresSinceHours = 24;
 
   webhooksLoading = signal(true);
   webhooksError = signal<string | null>(null);
@@ -548,12 +588,18 @@ export class AdminOpsComponent implements OnInit {
   selectedWebhook = signal<WebhookEventDetail | null>(null);
   webhookRetrying = signal<string | null>(null);
 
-  constructor(private ops: OpsService, private toast: ToastService, private translate: TranslateService) {}
+  constructor(
+    private ops: OpsService,
+    private toast: ToastService,
+    private translate: TranslateService,
+    private route: ActivatedRoute
+  ) {}
 
   ngOnInit(): void {
     this.resetBannerForm();
     this.loadBanners();
     this.loadShippingMethods();
+    this.applyEmailFailuresDeepLink();
     this.loadEmailFailures();
     this.loadWebhooks();
     this.maybeFocusSection();
@@ -784,9 +830,18 @@ export class AdminOpsComponent implements OnInit {
   }
 
   loadEmailFailures(): void {
+    this.selectedEmailFailure.set(null);
     this.emailFailuresLoading.set(true);
     this.emailFailuresError.set(null);
-    this.ops.listEmailFailures({ limit: 50, since_hours: 24 }).subscribe({
+    const toEmail = (this.emailFailuresTo || '').trim();
+    const sinceHours = Number(this.emailFailuresSinceHours || 24);
+    this.ops
+      .listEmailFailures({
+        limit: 50,
+        since_hours: Number.isFinite(sinceHours) ? Math.max(1, Math.min(168, sinceHours)) : 24,
+        to_email: toEmail ? toEmail : undefined
+      })
+      .subscribe({
       next: (rows) => {
         this.emailFailures.set(rows || []);
         this.emailFailuresLoading.set(false);
@@ -796,6 +851,12 @@ export class AdminOpsComponent implements OnInit {
         this.emailFailuresLoading.set(false);
       }
     });
+  }
+
+  resetEmailFailureFilters(): void {
+    this.emailFailuresTo = '';
+    this.emailFailuresSinceHours = 24;
+    this.loadEmailFailures();
   }
 
   viewEmailFailure(row: EmailFailureRead): void {
@@ -823,6 +884,17 @@ export class AdminOpsComponent implements OnInit {
         // Ignore history state write failures.
       }
     }, 0);
+  }
+
+  private applyEmailFailuresDeepLink(): void {
+    const qp = this.route.snapshot.queryParamMap;
+    const toEmail = (qp.get('to_email') || qp.get('email') || '').trim();
+    if (toEmail) this.emailFailuresTo = toEmail;
+    const sinceRaw = (qp.get('since_hours') || '').trim();
+    if (sinceRaw) {
+      const parsed = Number.parseInt(sinceRaw, 10);
+      if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 168) this.emailFailuresSinceHours = parsed;
+    }
   }
 
   private nowLocalInput(): string {

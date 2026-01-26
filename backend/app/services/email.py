@@ -18,6 +18,7 @@ from app.core.config import settings
 from app.core.security import create_receipt_token
 from app.db.session import SessionLocal
 from app.models.email_failure import EmailDeliveryFailure
+from app.models.email_event import EmailDeliveryEvent
 from app.services import receipts as receipt_service
 
 logger = logging.getLogger(__name__)
@@ -109,11 +110,29 @@ async def send_email(
                 smtp.login(settings.smtp_username, settings.smtp_password)
             smtp.send_message(msg)
         _record_send(now, to_email)
+        await _record_email_event(to_email=to_email, subject=subject, status="sent", error_message=None)
         return True
     except Exception as exc:
         logger.warning("Email send failed: %s", exc)
+        await _record_email_event(to_email=to_email, subject=subject, status="failed", error_message=str(exc))
         await _record_email_failure(to_email=to_email, subject=subject, error_message=str(exc))
         return False
+
+
+async def _record_email_event(*, to_email: str, subject: str, status: str, error_message: str | None) -> None:
+    try:
+        async with SessionLocal() as session:
+            session.add(
+                EmailDeliveryEvent(
+                    to_email=(to_email or "")[:255],
+                    subject=(subject or "")[:255],
+                    status=(status or "")[:16] or "sent",
+                    error_message=(error_message or "").strip()[:5000] or None,
+                )
+            )
+            await session.commit()
+    except Exception:
+        logger.exception("Failed to persist email delivery event")
 
 
 async def _record_email_failure(*, to_email: str, subject: str, error_message: str) -> None:

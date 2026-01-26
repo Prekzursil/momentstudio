@@ -70,6 +70,7 @@ from app.models.fx import FxRate  # noqa: F401
 from app.models.taxes import TaxGroup, TaxRate  # noqa: F401
 from app.models.notification import UserNotification  # noqa: F401
 from app.models.email_failure import EmailDeliveryFailure  # noqa: F401
+from app.models.email_event import EmailDeliveryEvent  # noqa: F401
 from app.models.user_export import UserDataExportJob, UserDataExportStatus  # noqa: F401
 from app.models.support import ContactSubmission, ContactSubmissionMessage, ContactSubmissionStatus, ContactSubmissionTopic  # noqa: F401
 from app.models.returns import ReturnRequest, ReturnRequestItem, ReturnRequestStatus  # noqa: F401
@@ -141,6 +142,7 @@ __all__ = [
     "TaxRate",
     "UserNotification",
     "EmailDeliveryFailure",
+    "EmailDeliveryEvent",
     "UserDataExportJob",
     "UserDataExportStatus",
     "ContactSubmission",

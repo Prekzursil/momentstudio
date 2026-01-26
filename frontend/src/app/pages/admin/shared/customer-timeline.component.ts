@@ -7,13 +7,13 @@ import { catchError, map } from 'rxjs/operators';
 import { AdminOrderListItem, AdminOrdersService } from '../../../core/admin-orders.service';
 import { AdminContactSubmissionListItem, AdminSupportService } from '../../../core/admin-support.service';
 import { AuthService } from '../../../core/auth.service';
-import { EmailFailureRead, OpsService } from '../../../core/ops.service';
+import { EmailEventRead, OpsService } from '../../../core/ops.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 
 type CustomerTimelineEvent =
   | { kind: 'order'; created_at: string; order: AdminOrderListItem }
   | { kind: 'ticket'; created_at: string; ticket: AdminContactSubmissionListItem }
-  | { kind: 'email'; created_at: string; failure: EmailFailureRead };
+  | { kind: 'email'; created_at: string; email: EmailEventRead };
 
 @Component({
   selector: 'app-customer-timeline',
@@ -84,7 +84,7 @@ type CustomerTimelineEvent =
                     {{ ticketTitle(ev.ticket) }}
                   </a>
                   <div *ngSwitchCase="'email'" class="min-w-0 truncate font-medium text-slate-900 dark:text-slate-50">
-                    {{ ev.failure.subject || ('adminUi.customerTimeline.kinds.email' | translate) }}
+                    {{ ev.email.subject || ('adminUi.customerTimeline.kinds.email' | translate) }}
                   </div>
                 </ng-container>
               </div>
@@ -100,7 +100,8 @@ type CustomerTimelineEvent =
                     {{ ('adminUi.support.status.' + ev.ticket.status) | translate }}
                   </div>
                   <div *ngSwitchCase="'email'">
-                    <span class="break-words">{{ ev.failure.error_message || '—' }}</span>
+                    <span class="font-semibold">{{ ('adminUi.customerTimeline.emailStatus.' + ev.email.status) | translate }}</span>
+                    <span *ngIf="ev.email.status === 'failed'" class="break-words"> · {{ ev.email.error_message || '—' }}</span>
                   </div>
                 </ng-container>
               </div>
@@ -154,7 +155,11 @@ export class CustomerTimelineComponent implements OnChanges, OnDestroy {
   }
 
   openOpsEmails(): void {
-    void this.router.navigateByUrl('/admin/ops', { state: { focusOpsSection: 'emails' } as any });
+    const email = (this.customerEmail || '').trim();
+    void this.router.navigate(['/admin/ops'], {
+      queryParams: { to_email: email || undefined, since_hours: 168 },
+      state: { focusOpsSection: 'emails' } as any
+    });
   }
 
   kindBadgeClass(kind: CustomerTimelineEvent['kind']): string {
@@ -241,14 +246,14 @@ export class CustomerTimelineComponent implements OnChanges, OnDestroy {
     }
 
     if (canOps && includePii && email) {
-      requests['emails'] = this.opsApi.listEmailFailures({ limit: 10, since_hours: 168, to_email: email }).pipe(
+      requests['emails'] = this.opsApi.listEmailEvents({ limit: 10, since_hours: 168, to_email: email }).pipe(
         catchError(() => {
           hadError = true;
-          return of([] as EmailFailureRead[]);
+          return of([] as EmailEventRead[]);
         })
       );
     } else {
-      requests['emails'] = of([] as EmailFailureRead[]);
+      requests['emails'] = of([] as EmailEventRead[]);
     }
 
     this.loading.set(true);
@@ -258,7 +263,7 @@ export class CustomerTimelineComponent implements OnChanges, OnDestroy {
           const events: CustomerTimelineEvent[] = [
             ...(res?.orders || []).map((o: AdminOrderListItem) => ({ kind: 'order' as const, created_at: o.created_at, order: o })),
             ...(res?.tickets || []).map((t: AdminContactSubmissionListItem) => ({ kind: 'ticket' as const, created_at: t.created_at, ticket: t })),
-            ...(res?.emails || []).map((f: EmailFailureRead) => ({ kind: 'email' as const, created_at: f.created_at, failure: f }))
+            ...(res?.emails || []).map((e: EmailEventRead) => ({ kind: 'email' as const, created_at: e.created_at, email: e }))
           ];
 
           events.sort((a, b) => {
@@ -284,4 +289,3 @@ export class CustomerTimelineComponent implements OnChanges, OnDestroy {
     );
   }
 }
-

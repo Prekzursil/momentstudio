@@ -914,11 +914,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin permissions: role presets – “Owner basic / Support / Content / Fulfillment” presets that reduce visible complexity.
 - [x] Admin support: SLA timers – Add SLA timers and overdue highlighting for tickets/contacts (configurable thresholds).
 - [x] Admin support: unified timeline – Show customer timeline (orders + tickets + emails) inside order/user views.
-- [ ] Admin support: unified timeline – Include successful email sends (not just failures) via an email audit log.
-- [ ] Admin ops: email failures – Add recipient filter UI + deep-link support (uses `to_email` filter).
+- [x] Admin support: unified timeline – Include successful email sends (not just failures) via an email audit log.
+- [x] Admin ops: email failures – Add recipient filter UI + deep-link support (uses `to_email` filter).
 
 ### Admin CMS – Visual & Intuitive Editing (Backlog)
-- [ ] CMS editor: simple/advanced toggle – Default to Simple mode and hide SEO/meta/scheduling behind Advanced.
+- [x] CMS editor: simple/advanced toggle – Default to Simple mode and hide SEO/meta/scheduling behind Advanced.
 - [ ] CMS editor: device preview frames – Desktop/tablet/mobile preview with quick toggles and responsive breakpoints.
 - [ ] CMS editor: split-view editing – Edit on the left, live preview on the right (with scroll sync).
 - [ ] CMS editor: block library gallery – Visual block picker with thumbnails, descriptions, and “starter” templates.

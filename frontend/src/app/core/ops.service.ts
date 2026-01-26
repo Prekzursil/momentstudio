@@ -115,6 +115,17 @@ export interface EmailFailureRead {
   created_at: string;
 }
 
+export type EmailEventStatus = 'sent' | 'failed';
+
+export interface EmailEventRead {
+  id: string;
+  to_email: string;
+  subject: string;
+  status: EmailEventStatus;
+  error_message?: string | null;
+  created_at: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class OpsService {
   constructor(private api: ApiService) {}
@@ -178,5 +189,14 @@ export class OpsService {
 
   listEmailFailures(params?: { limit?: number; since_hours?: number; to_email?: string }): Observable<EmailFailureRead[]> {
     return this.api.get<EmailFailureRead[]>('/ops/admin/email-failures', params as any);
+  }
+
+  listEmailEvents(params?: {
+    limit?: number;
+    since_hours?: number;
+    to_email?: string;
+    status?: EmailEventStatus;
+  }): Observable<EmailEventRead[]> {
+    return this.api.get<EmailEventRead[]>('/ops/admin/email-events', params as any);
   }
 }

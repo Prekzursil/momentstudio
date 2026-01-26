@@ -8,6 +8,7 @@ from fastapi import BackgroundTasks, HTTPException, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.email_event import EmailDeliveryEvent
 from app.models.email_failure import EmailDeliveryFailure
 from app.models.ops import MaintenanceBanner
 from app.models.webhook import PayPalWebhookEvent, StripeWebhookEvent
@@ -306,6 +307,37 @@ async def list_email_failures(
     )
     if cleaned_email:
         stmt = stmt.where(func.lower(EmailDeliveryFailure.to_email) == cleaned_email)
+    rows = (await session.execute(stmt)).scalars().all()
+    return list(rows)
+
+
+async def list_email_events(
+    session: AsyncSession,
+    *,
+    limit: int = 50,
+    since_hours: int = 24,
+    to_email: str | None = None,
+    status: str | None = None,
+) -> list[EmailDeliveryEvent]:
+    now = datetime.now(timezone.utc)
+    hours = max(1, int(since_hours or 0))
+    since = now - timedelta(hours=hours)
+
+    limit_clean = max(1, min(int(limit or 0), 200))
+    cleaned_email = (to_email or "").strip().lower()
+    cleaned_status = (status or "").strip().lower()
+
+    stmt = (
+        select(EmailDeliveryEvent)
+        .where(EmailDeliveryEvent.created_at >= since)
+        .order_by(EmailDeliveryEvent.created_at.desc())
+        .limit(limit_clean)
+    )
+    if cleaned_email:
+        stmt = stmt.where(func.lower(EmailDeliveryEvent.to_email) == cleaned_email)
+    if cleaned_status in {"sent", "failed"}:
+        stmt = stmt.where(EmailDeliveryEvent.status == cleaned_status)
+
     rows = (await session.execute(stmt)).scalars().all()
     return list(rows)
 

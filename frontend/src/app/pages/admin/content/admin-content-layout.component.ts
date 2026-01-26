@@ -3,6 +3,7 @@ import { Component } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
+import { CmsEditorPrefsService } from '../shared/cms-editor-prefs.service';
 
 type ContentNavItem = {
   path: string;
@@ -20,16 +21,54 @@ type ContentNavItem = {
       <div class="grid gap-2">
         <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.content.title' | translate }}</h1>
         <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.content.subtitle' | translate }}</p>
-        <nav class="flex flex-wrap gap-2" aria-label="Content sections">
-          <a
-            *ngFor="let item of nav"
-            [routerLink]="item.path"
-            routerLinkActive="bg-slate-100 text-slate-900 dark:bg-slate-800/70 dark:text-white"
-            class="rounded-full px-3 py-1.5 text-sm border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-800/60 dark:hover:text-white"
-          >
-            {{ item.labelKey | translate }}
-          </a>
-        </nav>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <nav class="flex flex-wrap gap-2" aria-label="Content sections">
+            <a
+              *ngFor="let item of nav"
+              [routerLink]="item.path"
+              routerLinkActive="bg-slate-100 text-slate-900 dark:bg-slate-800/70 dark:text-white"
+              class="rounded-full px-3 py-1.5 text-sm border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-800/60 dark:hover:text-white"
+            >
+              {{ item.labelKey | translate }}
+            </a>
+          </nav>
+
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.content.editorMode.label' | translate }}</span>
+            <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <button
+                type="button"
+                class="px-3 py-1.5 text-xs font-semibold"
+                [class.bg-slate-900]="prefs.mode() === 'simple'"
+                [class.text-white]="prefs.mode() === 'simple'"
+                [class.text-slate-700]="prefs.mode() !== 'simple'"
+                [class.dark:text-slate-200]="prefs.mode() !== 'simple'"
+                (click)="prefs.setMode('simple')"
+              >
+                {{ 'adminUi.content.editorMode.simple' | translate }}
+              </button>
+              <button
+                type="button"
+                class="px-3 py-1.5 text-xs font-semibold"
+                [class.bg-slate-900]="prefs.mode() === 'advanced'"
+                [class.text-white]="prefs.mode() === 'advanced'"
+                [class.text-slate-700]="prefs.mode() !== 'advanced'"
+                [class.dark:text-slate-200]="prefs.mode() !== 'advanced'"
+                (click)="prefs.setMode('advanced')"
+              >
+                {{ 'adminUi.content.editorMode.advanced' | translate }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <p class="text-xs text-slate-500 dark:text-slate-400">
+          {{
+            (prefs.mode() === 'simple'
+              ? 'adminUi.content.editorMode.simpleHint'
+              : 'adminUi.content.editorMode.advancedHint') | translate
+          }}
+        </p>
       </div>
 
       <router-outlet></router-outlet>
@@ -37,6 +76,8 @@ type ContentNavItem = {
   `
 })
 export class AdminContentLayoutComponent {
+  constructor(public prefs: CmsEditorPrefsService) {}
+
   readonly crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'nav.admin', url: '/admin/dashboard' },

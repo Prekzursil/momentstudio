@@ -11,6 +11,7 @@ from app.db.session import get_session
 from app.models.ops import MaintenanceBanner
 from app.models.user import User
 from app.schemas.ops import (
+    EmailEventRead,
     EmailFailureRead,
     FailureCount,
     MaintenanceBannerCreate,
@@ -169,3 +170,22 @@ async def admin_list_email_failures(
 ) -> list[EmailFailureRead]:
     rows = await ops_service.list_email_failures(session, limit=limit, since_hours=since_hours, to_email=to_email)
     return [EmailFailureRead.model_validate(row) for row in rows]
+
+
+@router.get("/admin/email-events", response_model=list[EmailEventRead])
+async def admin_list_email_events(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("ops")),
+    limit: int = Query(default=50, ge=1, le=200),
+    since_hours: int = Query(default=24, ge=1, le=168),
+    to_email: str | None = Query(default=None, max_length=255),
+    status_filter: str | None = Query(default=None, alias="status", max_length=16),
+) -> list[EmailEventRead]:
+    rows = await ops_service.list_email_events(
+        session,
+        limit=limit,
+        since_hours=since_hours,
+        to_email=to_email,
+        status=status_filter,
+    )
+    return [EmailEventRead.model_validate(row) for row in rows]

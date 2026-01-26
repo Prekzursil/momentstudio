@@ -1339,6 +1339,7 @@
       "empty": "Nu există activitate recentă.",
       "errors": { "load": "Nu s-a putut încărca cronologia clientului." },
       "kinds": { "order": "Comandă", "ticket": "Tichet", "email": "Email" },
+      "emailStatus": { "sent": "Trimis", "failed": "Eșuat" },
       "emailGated": "Afișează PII pentru a încărca activitatea emailurilor.",
       "noCustomer": "Detaliile clientului nu sunt disponibile pentru cronologie.",
       "openOps": "Deschide în Ops"
@@ -1837,8 +1838,13 @@
       },
       "emailFailures": {
         "title": "Erori email",
-        "hint": "Urmărește trimiterile de email eșuate (ultimele 24h).",
+        "hint": "Urmărește trimiterile de email eșuate.",
         "refresh": "Reîmprospătează",
+        "filters": {
+          "to": "Email destinatar",
+          "toPlaceholder": "customer@example.com",
+          "sinceHours": "De acum (ore)"
+        },
         "empty": "Nu există erori email.",
         "view": "Vezi",
         "close": "Închide",
@@ -3570,6 +3576,13 @@
     "content": {
       "title": "Conținut",
       "subtitle": "Editează pagina de acasă, paginile, blogul și setările.",
+      "editorMode": {
+        "label": "Mod editor",
+        "simple": "Simplu",
+        "advanced": "Avansat",
+        "simpleHint": "Modul Simplu ascunde SEO și programarea.",
+        "advancedHint": "Modul Avansat arată SEO, programarea și controale suplimentare."
+      },
       "nav": {
         "home": "Acasă",
         "pages": "Pagini",
