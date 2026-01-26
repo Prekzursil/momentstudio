@@ -213,6 +213,7 @@ type OrderAction =
                       <option value="vip">{{ 'adminUi.orders.tags.vip' | translate }}</option>
                       <option value="fraud_risk">{{ 'adminUi.orders.tags.fraud_risk' | translate }}</option>
                       <option value="gift">{{ 'adminUi.orders.tags.gift' | translate }}</option>
+                      <option value="test">{{ 'adminUi.orders.tags.test' | translate }}</option>
                     </select>
                   </label>
                   <app-button
@@ -221,6 +222,13 @@ type OrderAction =
                     [label]="'adminUi.orders.tags.add' | translate"
                     [disabled]="action() !== null || !tagToAdd"
                     (action)="addTag()"
+                  ></app-button>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="(isTestOrder() ? 'adminUi.orders.tags.unmarkTest' : 'adminUi.orders.tags.markTest') | translate"
+                    [disabled]="action() !== null"
+                    (action)="toggleTestTag()"
                   ></app-button>
                 </div>
               </div>
@@ -1975,6 +1983,38 @@ export class AdminOrderDetailComponent implements OnInit {
       },
       error: (err) => {
         const msg = err?.error?.detail || this.translate.instant('adminUi.orders.tags.errors.add');
+        this.toast.error(msg);
+        this.action.set(null);
+      }
+    });
+  }
+
+  isTestOrder(): boolean {
+    return Boolean((this.order()?.tags || []).includes('test'));
+  }
+
+  toggleTestTag(): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    if (this.action() !== null) return;
+
+    const isTest = this.isTestOrder();
+    this.action.set(isTest ? 'tagRemove' : 'tagAdd');
+    const request = isTest
+      ? this.api.removeOrderTag(orderId, 'test', { include_pii: this.piiReveal() })
+      : this.api.addOrderTag(orderId, 'test', { include_pii: this.piiReveal() });
+    request.subscribe({
+      next: (updated) => {
+        this.order.set(updated);
+        this.toast.success(
+          this.translate.instant(
+            isTest ? 'adminUi.orders.tags.success.remove' : 'adminUi.orders.tags.success.add'
+          )
+        );
+        this.action.set(null);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant(isTest ? 'adminUi.orders.tags.errors.remove' : 'adminUi.orders.tags.errors.add');
         this.toast.error(msg);
         this.action.set(null);
       }
