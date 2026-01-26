@@ -167,6 +167,7 @@ type PriceHistoryChart = {
         <div class="flex flex-wrap items-center justify-end gap-2">
           <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.export' | translate" (action)="exportProductsCsv()"></app-button>
           <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.import' | translate" (action)="openCsvImport()"></app-button>
+          <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
           <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
           <app-button size="sm" [label]="'adminUi.products.new' | translate" (action)="startNew()"></app-button>
         </div>
@@ -2456,6 +2457,21 @@ export class AdminProductsComponent implements OnInit {
   applyTableLayout(layout: AdminTableLayoutV1): void {
     this.tableLayout.set(layout);
     saveAdminTableLayout(this.tableLayoutStorageKey(), layout);
+  }
+
+  toggleDensity(): void {
+    const current = this.tableLayout();
+    const next: AdminTableLayoutV1 = {
+      ...current,
+      density: current.density === 'compact' ? 'comfortable' : 'compact',
+    };
+    this.applyTableLayout(next);
+  }
+
+  densityToggleLabelKey(): string {
+    return this.tableLayout().density === 'compact'
+      ? 'adminUi.tableLayout.densityToggle.toComfortable'
+      : 'adminUi.tableLayout.densityToggle.toCompact';
   }
 
   visibleColumnIds(): string[] {

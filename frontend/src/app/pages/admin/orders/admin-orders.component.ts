@@ -91,13 +91,14 @@ const ORDERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
-      <div class="flex items-start justify-between gap-4">
-        <div class="grid gap-1">
+        <div class="flex items-start justify-between gap-4">
+          <div class="grid gap-1">
           <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.title' | translate }}</h1>
           <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.orders.hint' | translate }}</p>
         </div>
         <div class="flex items-center gap-2">
           <app-button size="sm" variant="ghost" [label]="'adminUi.orders.export' | translate" (action)="openExportModal()"></app-button>
+          <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
           <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
         </div>
       </div>
@@ -656,6 +657,21 @@ export class AdminOrdersComponent implements OnInit {
   applyTableLayout(layout: AdminTableLayoutV1): void {
     this.tableLayout.set(layout);
     saveAdminTableLayout(this.tableLayoutStorageKey(), layout);
+  }
+
+  toggleDensity(): void {
+    const current = this.tableLayout();
+    const next: AdminTableLayoutV1 = {
+      ...current,
+      density: current.density === 'compact' ? 'comfortable' : 'compact',
+    };
+    this.applyTableLayout(next);
+  }
+
+  densityToggleLabelKey(): string {
+    return this.tableLayout().density === 'compact'
+      ? 'adminUi.tableLayout.densityToggle.toComfortable'
+      : 'adminUi.tableLayout.densityToggle.toCompact';
   }
 
   visibleColumnIds(): string[] {

@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, HostListener } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthService } from '../../core/auth.service';
 import { ContainerComponent } from '../../layout/container.component';
 
@@ -15,7 +16,7 @@ type AdminNavItem = {
 @Component({
   selector: 'app-admin-layout',
   standalone: true,
-  imports: [CommonModule, RouterLink, RouterLinkActive, RouterOutlet, TranslateModule, ContainerComponent],
+  imports: [CommonModule, FormsModule, RouterLink, RouterLinkActive, RouterOutlet, TranslateModule, ContainerComponent],
   template: `
     <app-container classes="py-8">
       <div class="grid lg:grid-cols-[260px_1fr] gap-6">
@@ -25,14 +26,48 @@ type AdminNavItem = {
           <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400 pb-2">
             {{ 'adminUi.nav.title' | translate }}
           </div>
+
+          <label class="grid gap-1 pb-2">
+            <span class="sr-only">{{ 'adminUi.actions.search' | translate }}</span>
+            <div class="relative">
+              <input
+                class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 pr-10 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                [(ngModel)]="navQuery"
+                [placeholder]="'adminUi.nav.searchPlaceholder' | translate"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button
+                *ngIf="navQuery.trim()"
+                type="button"
+                class="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700/50 dark:hover:text-white"
+                [attr.aria-label]="'adminUi.actions.reset' | translate"
+                (click)="clearNavQuery()"
+              >
+                ×
+              </button>
+            </div>
+          </label>
+
+          <div *ngIf="navQuery.trim() && filteredNavItems().length === 0" class="px-3 pb-2 text-xs text-slate-500 dark:text-slate-400">
+            {{ 'adminUi.nav.searchEmpty' | translate }}
+          </div>
+
           <a
-            *ngFor="let item of navItems"
+            *ngFor="let item of filteredNavItems()"
             [routerLink]="item.path"
             routerLinkActive="bg-slate-100 text-slate-900 dark:bg-slate-800/70 dark:text-white"
             [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
             class="rounded-lg px-3 py-2 hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
           >
-            {{ item.labelKey | translate }}
+            <ng-container *ngIf="navQuery.trim(); else fullLabel">
+              <ng-container *ngIf="navLabelParts(item) as parts">
+                <span>{{ parts.before }}</span>
+                <span class="font-semibold text-slate-900 dark:text-slate-50">{{ parts.match }}</span>
+                <span>{{ parts.after }}</span>
+              </ng-container>
+            </ng-container>
+            <ng-template #fullLabel>{{ item.labelKey | translate }}</ng-template>
           </a>
         </aside>
 
@@ -46,10 +81,12 @@ type AdminNavItem = {
 export class AdminLayoutComponent {
   constructor(
     private auth: AuthService,
-    private router: Router
+    private router: Router,
+    private translate: TranslateService
   ) {}
 
   private pendingGoAt: number | null = null;
+  navQuery = '';
 
   private readonly allNavItems: AdminNavItem[] = [
     { path: '/admin/dashboard', labelKey: 'adminUi.nav.dashboard', section: 'dashboard', exact: true },
@@ -66,6 +103,33 @@ export class AdminLayoutComponent {
 
   get navItems(): AdminNavItem[] {
     return this.allNavItems.filter((item) => this.auth.canAccessAdminSection(item.section));
+  }
+
+  filteredNavItems(): AdminNavItem[] {
+    const items = this.navItems;
+    const query = this.navQuery.trim().toLowerCase();
+    if (!query) return items;
+    return items.filter((item) => {
+      const label = this.navLabel(item).toLowerCase();
+      return label.includes(query) || item.section.includes(query);
+    });
+  }
+
+  clearNavQuery(): void {
+    this.navQuery = '';
+  }
+
+  navLabelParts(item: AdminNavItem): { before: string; match: string; after: string } {
+    const label = this.navLabel(item);
+    const query = this.navQuery.trim().toLowerCase();
+    if (!query) return { before: label, match: '', after: '' };
+    const idx = label.toLowerCase().indexOf(query);
+    if (idx === -1) return { before: label, match: '', after: '' };
+    return {
+      before: label.slice(0, idx),
+      match: label.slice(idx, idx + query.length),
+      after: label.slice(idx + query.length),
+    };
   }
 
   @HostListener('document:keydown', ['$event'])
@@ -136,5 +200,10 @@ export class AdminLayoutComponent {
     if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
     if (target.isContentEditable) return true;
     return false;
+  }
+
+  private navLabel(item: AdminNavItem): string {
+    const value = this.translate.instant(item.labelKey);
+    return typeof value === 'string' && value.trim() ? value : item.labelKey;
   }
 }

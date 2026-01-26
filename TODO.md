@@ -892,11 +892,11 @@ Below is a structured checklist you can turn into issues.
 - [ ] Admin Products: bulk category create+assign – Create a new category and immediately apply it to selected products.
 
 ### Admin Dashboard – UX & Workflow (Backlog)
-- [ ] Admin UI: command palette – Add Ctrl/Cmd+K quick launcher for navigation + common actions.
-- [ ] Admin sidebar: nav search – Filter sidebar entries and highlight matches (keyboard friendly).
-- [ ] Admin navigation: breadcrumbs – Add a breadcrumb bar across admin pages with quick back/parent links.
-- [ ] Admin headers: page intro – Add short “what you can do here” copy + primary CTA per page (non-technical friendly).
-- [ ] Admin tables: quick density toggle – One-click Compact/Comfortable toggle without opening layout settings.
+- [x] Admin UI: command palette – Add Ctrl/Cmd+K quick launcher for navigation + common actions.
+- [x] Admin sidebar: nav search – Filter sidebar entries and highlight matches (keyboard friendly).
+- [x] Admin navigation: breadcrumbs – Add a breadcrumb bar across admin pages with quick back/parent links.
+- [x] Admin headers: page intro – Add short “what you can do here” copy + primary CTA per page (non-technical friendly).
+- [x] Admin tables: quick density toggle – One-click Compact/Comfortable toggle without opening layout settings.
 - [ ] Admin tables: sticky bulk bar – Show a sticky bulk-actions bar when rows are selected (consistent across pages).
 - [ ] Admin: recent items – “Recently viewed” (orders/products/users/pages) with one-click reopen.
 - [ ] Admin: favorites – Pin frequently used pages, filters, and entities (saved in profile).

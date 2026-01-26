@@ -80,6 +80,7 @@ const USERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
 	          ></app-button>
 	          <app-button size="sm" variant="ghost" routerLink="/admin/users/segments" [label]="'adminUi.users.segments' | translate"></app-button>
 	          <app-button size="sm" variant="ghost" routerLink="/admin/users/gdpr" [label]="'adminUi.users.gdprQueue' | translate"></app-button>
+            <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
             <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
 	        </div>
 	      </div>
@@ -932,6 +933,21 @@ export class AdminUsersComponent implements OnInit {
   applyTableLayout(layout: AdminTableLayoutV1): void {
     this.tableLayout.set(layout);
     saveAdminTableLayout(this.tableLayoutStorageKey(), layout);
+  }
+
+  toggleDensity(): void {
+    const current = this.tableLayout();
+    const next: AdminTableLayoutV1 = {
+      ...current,
+      density: current.density === 'compact' ? 'comfortable' : 'compact',
+    };
+    this.applyTableLayout(next);
+  }
+
+  densityToggleLabelKey(): string {
+    return this.tableLayout().density === 'compact'
+      ? 'adminUi.tableLayout.densityToggle.toComfortable'
+      : 'adminUi.tableLayout.densityToggle.toCompact';
   }
 
   visibleColumnIds(): string[] {
