@@ -58,8 +58,8 @@ SEED_PRODUCTS: list[SeedProduct] = [
             {"url": "https://example.com/images/white-cup-2.jpg", "alt_text": "White cup angle", "sort_order": 2},
         ],
         "variants": [
-            {"name": "8oz", "additional_price_delta": Decimal("0.00"), "stock_quantity": 5},
-            {"name": "12oz", "additional_price_delta": Decimal("4.00"), "stock_quantity": 5},
+            {"name": "250 ml", "additional_price_delta": Decimal("0.00"), "stock_quantity": 5},
+            {"name": "350 ml", "additional_price_delta": Decimal("4.00"), "stock_quantity": 5},
         ],
     },
     {
