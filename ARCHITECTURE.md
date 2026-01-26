@@ -11,7 +11,7 @@ momentstudio is a monorepo with a FastAPI backend, Angular frontend, and lightwe
 ## Backend (FastAPI + PostgreSQL)
 
 - Entrypoint: `app.main:app` will mount a versioned `/api/v1` router.
-- Configuration: `pydantic-settings` reads environment variables like `DATABASE_URL`, `SECRET_KEY`, `STRIPE_SECRET_KEY`, `SMTP_*`, `FRONTEND_ORIGIN`.
+- Configuration: `pydantic-settings` reads environment variables like `DATABASE_URL`, `SECRET_KEY`, `STRIPE_ENV` + Stripe keys, `SMTP_*`, `FRONTEND_ORIGIN`.
 - Persistence: SQLAlchemy engine/session factory; Alembic migrations track schema.
 - Auth:
   - Users stored with salted password hashes.

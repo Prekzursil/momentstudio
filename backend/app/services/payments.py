@@ -16,9 +16,45 @@ from app.core import metrics
 
 stripe = cast(Any, stripe)
 
+_STRIPE_PLACEHOLDER_SUFFIX = "_placeholder"
+
+
+def _stripe_env() -> Literal["test", "live"]:
+    raw = (settings.stripe_env or "test").strip().lower()
+    if raw in {"live", "production", "prod"}:
+        return "live"
+    return "test"
+
+
+def _looks_configured(value: str | None) -> bool:
+    cleaned = (value or "").strip()
+    if not cleaned:
+        return False
+    return not cleaned.endswith(_STRIPE_PLACEHOLDER_SUFFIX)
+
+
+def stripe_secret_key() -> str:
+    if _stripe_env() == "live":
+        return (settings.stripe_secret_key_live or settings.stripe_secret_key or "").strip()
+    return (settings.stripe_secret_key_test or settings.stripe_secret_key or "").strip()
+
+
+def stripe_webhook_secret() -> str:
+    if _stripe_env() == "live":
+        return (settings.stripe_webhook_secret_live or settings.stripe_webhook_secret or "").strip()
+    return (settings.stripe_webhook_secret_test or settings.stripe_webhook_secret or "").strip()
+
+
+def is_stripe_configured() -> bool:
+    return _looks_configured(stripe_secret_key())
+
+
+def is_stripe_webhook_configured() -> bool:
+    return _looks_configured(stripe_webhook_secret())
+
 
 def init_stripe() -> None:
-    stripe.api_key = settings.stripe_secret_key
+    stripe.api_key = stripe_secret_key()
 
 
 async def _get_or_create_cached_amount_off_coupon(
@@ -90,7 +126,7 @@ async def _get_or_create_cached_amount_off_coupon(
 
 
 async def create_payment_intent(session: AsyncSession, cart: Cart, amount_cents: int | None = None) -> dict:
-    if not settings.stripe_secret_key:
+    if not is_stripe_configured():
         metrics.record_payment_failure()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
     if not cart.items:
@@ -141,7 +177,7 @@ async def create_checkout_session(
     metadata includes our provided metadata so webhooks/confirm endpoints can map
     back to internal entities.
     """
-    if not settings.stripe_secret_key:
+    if not is_stripe_configured():
         metrics.record_payment_failure()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
     if amount_cents <= 0:
@@ -245,11 +281,12 @@ def _stripe_event_payload_summary(event: Any) -> dict[str, Any]:
 
 
 async def handle_webhook_event(session: AsyncSession, payload: bytes, sig_header: str | None) -> tuple[dict, StripeWebhookEvent]:
-    if not settings.stripe_webhook_secret:
+    secret = stripe_webhook_secret()
+    if not _looks_configured(secret):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Webhook secret not set")
     init_stripe()
     try:
-        event = stripe.Webhook.construct_event(payload, sig_header, settings.stripe_webhook_secret)
+        event = stripe.Webhook.construct_event(payload, sig_header, secret)
     except Exception as exc:  # broad for Stripe signature errors
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload") from exc
 
@@ -289,7 +326,7 @@ async def handle_webhook_event(session: AsyncSession, payload: bytes, sig_header
 
 async def capture_payment_intent(intent_id: str) -> dict:
     """Capture an authorized PaymentIntent."""
-    if not settings.stripe_secret_key:
+    if not is_stripe_configured():
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
     init_stripe()
     try:
@@ -300,7 +337,7 @@ async def capture_payment_intent(intent_id: str) -> dict:
 
 async def void_payment_intent(intent_id: str) -> dict:
     """Cancel/void a PaymentIntent that has not been captured."""
-    if not settings.stripe_secret_key:
+    if not is_stripe_configured():
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
     init_stripe()
     try:
@@ -311,7 +348,7 @@ async def void_payment_intent(intent_id: str) -> dict:
 
 async def refund_payment_intent(intent_id: str, *, amount_cents: int | None = None) -> dict:
     """Refund a captured PaymentIntent (supports partial refunds via `amount_cents`)."""
-    if not settings.stripe_secret_key:
+    if not is_stripe_configured():
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
     init_stripe()
     try:

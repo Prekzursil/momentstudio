@@ -713,7 +713,7 @@ async def confirm_stripe_checkout(
     if not session_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Session id is required")
 
-    if not settings.stripe_secret_key:
+    if not payments.is_stripe_configured():
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
 
     payments.init_stripe()
