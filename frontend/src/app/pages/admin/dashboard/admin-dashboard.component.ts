@@ -8,6 +8,7 @@ import { ButtonComponent } from '../../../shared/button.component';
 import { CardComponent } from '../../../shared/card.component';
 import { ErrorStateComponent } from '../../../shared/error-state.component';
 import { InputComponent } from '../../../shared/input.component';
+import { ModalComponent } from '../../../shared/modal.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { AuthService } from '../../../core/auth.service';
 import {
@@ -30,6 +31,7 @@ import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { extractRequestId } from '../../../shared/http-error';
 
 type MetricWidgetId = 'kpis' | 'counts' | 'range';
+type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: string | null };
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -44,6 +46,7 @@ type MetricWidgetId = 'kpis' | 'counts' | 'range';
     InputComponent,
     SkeletonComponent,
     ErrorStateComponent,
+    ModalComponent,
     LocalizedCurrencyPipe
   ],
   template: `
@@ -66,12 +69,21 @@ type MetricWidgetId = 'kpis' | 'counts' | 'range';
 	        <section class="grid gap-3">
 	          <div class="flex items-center justify-between gap-3 flex-wrap">
 	            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboardTitle' | translate }}</h1>
-	            <app-button
-	              size="sm"
-	              variant="ghost"
-	              [label]="'adminUi.dashboard.customizeWidgets' | translate"
-	              (action)="toggleCustomizeWidgets()"
-	            ></app-button>
+              <div class="flex items-center gap-2">
+	              <app-button
+	                *ngIf="isOwner()"
+	                size="sm"
+	                variant="ghost"
+	                [label]="'adminUi.onboarding.open' | translate"
+	                (action)="openOnboarding()"
+	              ></app-button>
+	              <app-button
+	                size="sm"
+	                variant="ghost"
+	                [label]="'adminUi.dashboard.customizeWidgets' | translate"
+	                (action)="toggleCustomizeWidgets()"
+	              ></app-button>
+              </div>
 	          </div>
 
 	          <div class="grid gap-3">
@@ -779,8 +791,99 @@ type MetricWidgetId = 'kpis' | 'counts' | 'range';
               (action)="submitOwnerTransfer()"
             ></app-button>
           </div>
-        </section>
-      </ng-template>
+	        </section>
+
+          <app-modal
+            [open]="onboardingOpen()"
+            [title]="'adminUi.onboarding.title' | translate"
+            [subtitle]="'adminUi.onboarding.subtitle' | translate"
+            [showActions]="false"
+            [closeLabel]="'adminUi.actions.cancel' | translate"
+            (closed)="dismissOnboarding()"
+          >
+            <div class="grid gap-4">
+              <p class="text-sm text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.onboarding.intro' | translate }}
+              </p>
+
+              <div class="grid gap-2">
+                <div class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="grid gap-0.5 min-w-0">
+                      <div class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.onboarding.steps.contentTitle' | translate }}</div>
+                      <div class="text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.onboarding.steps.contentCopy' | translate }}</div>
+                    </div>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.actions.open' | translate"
+                      (action)="goToOnboarding('/admin/content/home')"
+                    ></app-button>
+                  </div>
+                </div>
+
+                <div class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="grid gap-0.5 min-w-0">
+                      <div class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.onboarding.steps.shippingTitle' | translate }}</div>
+                      <div class="text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.onboarding.steps.shippingCopy' | translate }}</div>
+                    </div>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.actions.open' | translate"
+                      (action)="goToOnboarding('/admin/ops')"
+                    ></app-button>
+                  </div>
+                </div>
+
+                <div class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="grid gap-0.5 min-w-0">
+                      <div class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.onboarding.steps.paymentsTitle' | translate }}</div>
+                      <div class="text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.onboarding.steps.paymentsCopy' | translate }}</div>
+                    </div>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.actions.open' | translate"
+                      (action)="goToOnboarding('/admin/ops')"
+                    ></app-button>
+                  </div>
+                </div>
+
+                <div class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="grid gap-0.5 min-w-0">
+                      <div class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.onboarding.steps.taxesTitle' | translate }}</div>
+                      <div class="text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.onboarding.steps.taxesCopy' | translate }}</div>
+                    </div>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.actions.open' | translate"
+                      (action)="goToOnboarding('/admin/content/settings')"
+                    ></app-button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-1">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.onboarding.actions.later' | translate"
+                  (action)="dismissOnboarding()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  [label]="'adminUi.onboarding.actions.done' | translate"
+                  (action)="completeOnboarding()"
+                ></app-button>
+              </div>
+            </div>
+          </app-modal>
+	      </ng-template>
     </div>
   `
 })
@@ -872,11 +975,15 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
     this.loadScheduledTasks();
     this.loadAudit(1);
     this.loadAuditRetention();
+    this.maybeShowOnboarding();
   }
 
   isOwner(): boolean {
     return this.auth.role() === 'owner';
   }
+
+  onboardingOpen = signal(false);
+  private readonly onboardingStorageKey = 'admin.onboarding.v1';
 
   private loadSummary(): void {
     this.loading.set(true);
@@ -898,6 +1005,61 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
 
   retryDashboard(): void {
     this.loadSummary();
+  }
+
+  openOnboarding(): void {
+    this.onboardingOpen.set(true);
+  }
+
+  dismissOnboarding(): void {
+    this.saveOnboardingState({ dismissed_at: new Date().toISOString() });
+    this.onboardingOpen.set(false);
+  }
+
+  completeOnboarding(): void {
+    this.saveOnboardingState({ completed_at: new Date().toISOString() });
+    this.onboardingOpen.set(false);
+  }
+
+  goToOnboarding(url: string): void {
+    this.onboardingOpen.set(false);
+    void this.router.navigateByUrl(url);
+  }
+
+  private maybeShowOnboarding(): void {
+    if (!this.isOwner()) return;
+    const state = this.loadOnboardingState();
+    if (state.completed_at) return;
+    const dismissedAt = (state.dismissed_at || '').trim();
+    if (dismissedAt) {
+      const dismissedMs = Date.parse(dismissedAt);
+      if (Number.isFinite(dismissedMs)) {
+        const ageMs = Date.now() - dismissedMs;
+        if (ageMs < 7 * 24 * 60 * 60 * 1000) return;
+      }
+    }
+    this.onboardingOpen.set(true);
+  }
+
+  private loadOnboardingState(): AdminOnboardingState {
+    try {
+      const raw = localStorage.getItem(this.onboardingStorageKey);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return typeof parsed === 'object' && parsed ? (parsed as AdminOnboardingState) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  private saveOnboardingState(update: AdminOnboardingState): void {
+    try {
+      const current = this.loadOnboardingState();
+      const next: AdminOnboardingState = { ...current, ...update };
+      localStorage.setItem(this.onboardingStorageKey, JSON.stringify(next));
+    } catch {
+      // Ignore storage errors (e.g. private mode / disabled storage).
+    }
   }
 
   loadScheduledTasks(): void {

@@ -1296,6 +1296,26 @@
     "security": {
       "mfaRequired": "Autentificarea cu doi factori sau o passkey este necesară pentru accesul de administrare."
     },
+    "onboarding": {
+      "open": "Tur de configurare",
+      "title": "Bun venit",
+      "subtitle": "O listă scurtă pentru a pregăti magazinul.",
+      "intro": "Folosește aceste scurtături pentru a configura elementele esențiale. Poți redeschide turul oricând din panou.",
+      "steps": {
+        "contentTitle": "Conținut",
+        "contentCopy": "Actualizează pagina principală și paginile de conținut.",
+        "shippingTitle": "Livrare",
+        "shippingCopy": "Verifică regulile de livrare și încearcă simulatorul.",
+        "paymentsTitle": "Plăți",
+        "paymentsCopy": "Verifică webhook-urile și testează un flux de checkout.",
+        "taxesTitle": "Taxe & TVA",
+        "taxesCopy": "Configurează TVA/grupuri de taxe și prețurile la checkout."
+      },
+      "actions": {
+        "later": "Amintește-mi mai târziu",
+        "done": "Marchează ca făcut"
+      }
+    },
     "pii": {
       "reveal": "Afișează PII",
       "hide": "Ascunde PII",

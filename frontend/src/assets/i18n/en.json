@@ -1296,6 +1296,26 @@
     "security": {
       "mfaRequired": "Two-factor authentication or a passkey is required for admin access."
     },
+    "onboarding": {
+      "open": "Setup tour",
+      "title": "Welcome",
+      "subtitle": "A quick checklist to get your store ready.",
+      "intro": "Use these shortcuts to configure the essentials. You can reopen this tour anytime from the dashboard.",
+      "steps": {
+        "contentTitle": "Content",
+        "contentCopy": "Update the homepage and content pages.",
+        "shippingTitle": "Shipping",
+        "shippingCopy": "Review shipping rules and try the shipping simulator.",
+        "paymentsTitle": "Payments",
+        "paymentsCopy": "Check provider webhooks and test a checkout flow.",
+        "taxesTitle": "Taxes & VAT",
+        "taxesCopy": "Configure VAT/tax groups and checkout pricing."
+      },
+      "actions": {
+        "later": "Remind me later",
+        "done": "Mark as done"
+      }
+    },
     "pii": {
       "reveal": "Reveal PII",
       "hide": "Hide PII",

@@ -789,7 +789,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin UX: accessibility audit – Ensure focus management, ARIA labels, and keyboard navigation.
 - [x] Admin UX: standardized error UI – Unified error state with retry and copyable correlation ID.
 - [x] Admin Observability: client error logging – Capture admin UI errors to a backend log endpoint.
-- [ ] Admin UX: onboarding tour – First-run guided tour for owner (shipping, payments, content, taxes).
+- [x] Admin UX: onboarding tour – First-run guided tour for owner (shipping, payments, content, taxes).
 - [ ] Admin UX: saved table layouts – Persist column visibility/order/density per admin table (orders/products/users).
 
 ## Data Portability & Backups (Extended)
