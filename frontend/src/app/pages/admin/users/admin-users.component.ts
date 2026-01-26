@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
+import { ScrollingModule } from '@angular/cdk/scrolling';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -26,7 +27,7 @@ type RoleFilter = 'all' | 'customer' | 'support' | 'fulfillment' | 'content' | '
 @Component({
   selector: 'app-admin-users',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, TranslateModule, BreadcrumbComponent, ButtonComponent, InputComponent, SkeletonComponent],
+  imports: [CommonModule, FormsModule, RouterLink, ScrollingModule, TranslateModule, BreadcrumbComponent, ButtonComponent, InputComponent, SkeletonComponent],
   template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -89,50 +90,113 @@ type RoleFilter = 'all' | 'customer' | 'support' | 'fulfillment' | 'content' | '
             </div>
 
             <div *ngIf="users().length > 0" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-              <table class="min-w-[880px] w-full text-sm">
-                <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
-                  <tr>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.identity' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.email' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.role' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.verified' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.created' | translate }}</th>
-                    <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.users.table.actions' | translate }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    *ngFor="let user of users()"
-                    class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
-                  >
-                    <td class="px-3 py-2 font-medium text-slate-900 dark:text-slate-50">
-                      {{ identityLabel(user) }}
-                    </td>
-                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
-                      {{ user.email }}
-                    </td>
-                    <td class="px-3 py-2">
-                      <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="rolePillClass(user.role)">
-                        {{ ('adminUi.users.roles.' + user.role) | translate }}
-                      </span>
-                    </td>
-                    <td class="px-3 py-2">
-                      <span
-                        class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
-                        [ngClass]="user.email_verified ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100' : 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100'"
+              <ng-container *ngIf="users().length > 100; else usersTableStandard">
+                <cdk-virtual-scroll-viewport
+                  class="block h-[min(70vh,720px)]"
+                  [itemSize]="userRowHeight"
+                  [minBufferPx]="userRowHeight * 10"
+                  [maxBufferPx]="userRowHeight * 20"
+                >
+                  <table class="min-w-[880px] w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                      <tr>
+                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.identity' | translate }}</th>
+                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.email' | translate }}</th>
+                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.role' | translate }}</th>
+                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.verified' | translate }}</th>
+                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.created' | translate }}</th>
+                        <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.users.table.actions' | translate }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr
+                        *cdkVirtualFor="let user of users(); trackBy: trackUserId"
+                        class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
                       >
-                        {{ user.email_verified ? ('adminUi.users.verified' | translate) : ('adminUi.users.unverified' | translate) }}
-                      </span>
-                    </td>
-                    <td class="px-3 py-2 text-slate-600 dark:text-slate-300">
-                      {{ user.created_at | date: 'short' }}
-                    </td>
-                    <td class="px-3 py-2 text-right">
-                      <app-button size="sm" variant="ghost" [label]="'adminUi.users.manage' | translate" (action)="select(user)"></app-button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                        <td class="px-3 py-2 font-medium text-slate-900 dark:text-slate-50">
+                          {{ identityLabel(user) }}
+                        </td>
+                        <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                          {{ user.email }}
+                        </td>
+                        <td class="px-3 py-2">
+                          <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="rolePillClass(user.role)">
+                            {{ ('adminUi.users.roles.' + user.role) | translate }}
+                          </span>
+                        </td>
+                        <td class="px-3 py-2">
+                          <span
+                            class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                            [ngClass]="
+                              user.email_verified
+                                ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100'
+                                : 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100'
+                            "
+                          >
+                            {{ user.email_verified ? ('adminUi.users.verified' | translate) : ('adminUi.users.unverified' | translate) }}
+                          </span>
+                        </td>
+                        <td class="px-3 py-2 text-slate-600 dark:text-slate-300">
+                          {{ user.created_at | date: 'short' }}
+                        </td>
+                        <td class="px-3 py-2 text-right">
+                          <app-button size="sm" variant="ghost" [label]="'adminUi.users.manage' | translate" (action)="select(user)"></app-button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </cdk-virtual-scroll-viewport>
+              </ng-container>
+              <ng-template #usersTableStandard>
+                <table class="min-w-[880px] w-full text-sm">
+                  <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                    <tr>
+                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.identity' | translate }}</th>
+                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.email' | translate }}</th>
+                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.role' | translate }}</th>
+                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.verified' | translate }}</th>
+                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.users.table.created' | translate }}</th>
+                      <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.users.table.actions' | translate }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      *ngFor="let user of users(); trackBy: trackUserId"
+                      class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
+                    >
+                      <td class="px-3 py-2 font-medium text-slate-900 dark:text-slate-50">
+                        {{ identityLabel(user) }}
+                      </td>
+                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                        {{ user.email }}
+                      </td>
+                      <td class="px-3 py-2">
+                        <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="rolePillClass(user.role)">
+                          {{ ('adminUi.users.roles.' + user.role) | translate }}
+                        </span>
+                      </td>
+                      <td class="px-3 py-2">
+                        <span
+                          class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                          [ngClass]="
+                            user.email_verified
+                              ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100'
+                              : 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100'
+                          "
+                        >
+                          {{ user.email_verified ? ('adminUi.users.verified' | translate) : ('adminUi.users.unverified' | translate) }}
+                        </span>
+                      </td>
+                      <td class="px-3 py-2 text-slate-600 dark:text-slate-300">
+                        {{ user.created_at | date: 'short' }}
+                      </td>
+                      <td class="px-3 py-2 text-right">
+                        <app-button size="sm" variant="ghost" [label]="'adminUi.users.manage' | translate" (action)="select(user)"></app-button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </ng-template>
             </div>
 
             <div *ngIf="meta()" class="flex items-center justify-between gap-3 pt-2 text-sm text-slate-700 dark:text-slate-200">
@@ -729,6 +793,8 @@ export class AdminUsersComponent implements OnInit {
     { label: 'adminUi.users.title' }
   ];
 
+  readonly userRowHeight = 44;
+
   loading = signal(true);
   error = signal<string | null>(null);
   users = signal<AdminUserListItem[]>([]);
@@ -823,6 +889,10 @@ export class AdminUsersComponent implements OnInit {
   goToPage(page: number): void {
     this.page = page;
     this.load();
+  }
+
+  trackUserId(_: number, user: AdminUserListItem): string {
+    return user.id;
   }
 
   select(user: AdminUserListItem): void {

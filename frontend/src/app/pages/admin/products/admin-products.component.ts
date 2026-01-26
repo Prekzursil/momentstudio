@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
+import { ScrollingModule } from '@angular/cdk/scrolling';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { forkJoin } from 'rxjs';
@@ -118,6 +119,7 @@ type PriceHistoryChart = {
   imports: [
     CommonModule,
     FormsModule,
+    ScrollingModule,
     TranslateModule,
     BreadcrumbComponent,
     ButtonComponent,
@@ -489,7 +491,53 @@ type PriceHistoryChart = {
           </div>
 
           <div *ngIf="products().length > 0" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-            <table class="min-w-[980px] w-full text-sm">
+            <cdk-virtual-scroll-viewport
+              *ngIf="useVirtualProductsTable()"
+              class="block h-[min(70vh,720px)]"
+              [itemSize]="productRowHeight"
+              [minBufferPx]="productRowHeight * 8"
+              [maxBufferPx]="productRowHeight * 16"
+            >
+              <table class="min-w-[980px] w-full text-sm">
+                <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                  <tr>
+                    <th class="text-left font-semibold px-3 py-2 w-10">
+                      <input
+                        type="checkbox"
+                        [checked]="allSelectedOnPage()"
+                        (change)="toggleSelectAll($event)"
+                        [disabled]="bulkBusy() || inlineBusy() || view === 'deleted'"
+                        aria-label="Select all"
+                      />
+                    </th>
+                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.name' | translate }}</th>
+                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.price' | translate }}</th>
+                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.status' | translate }}</th>
+                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.category' | translate }}</th>
+                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.stock' | translate }}</th>
+                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.active' | translate }}</th>
+                    <th class="text-left font-semibold px-3 py-2">
+                      {{
+                        view === 'deleted'
+                          ? ('adminUi.products.table.deletedAt' | translate)
+                          : ('adminUi.products.table.updated' | translate)
+                      }}
+                    </th>
+                    <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.products.table.actions' | translate }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <ng-container *cdkVirtualFor="let product of products(); trackBy: trackProductId">
+                    <ng-container
+                      [ngTemplateOutlet]="productRow"
+                      [ngTemplateOutletContext]="{ $implicit: product }"
+                    ></ng-container>
+                  </ng-container>
+                </tbody>
+              </table>
+            </cdk-virtual-scroll-viewport>
+
+            <table class="min-w-[980px] w-full text-sm" [class.hidden]="useVirtualProductsTable()">
               <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
                 <tr>
 	                  <th class="text-left font-semibold px-3 py-2 w-10">
@@ -518,10 +566,8 @@ type PriceHistoryChart = {
 	                </tr>
 	              </thead>
               <tbody>
-                <tr
-                  *ngFor="let product of products()"
-                  class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
-                >
+                <ng-template #productRow let-product>
+                  <tr class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40">
 	                  <td class="px-3 py-2">
 	                    <input
 	                      type="checkbox"
@@ -731,6 +777,16 @@ type PriceHistoryChart = {
 	                    </div>
 	                  </td>
 	                </tr>
+                </ng-template>
+
+                <ng-container *ngIf="!useVirtualProductsTable()">
+                  <ng-container *ngFor="let product of products(); trackBy: trackProductId">
+                    <ng-container
+                      [ngTemplateOutlet]="productRow"
+                      [ngTemplateOutletContext]="{ $implicit: product }"
+                    ></ng-container>
+                  </ng-container>
+                </ng-container>
               </tbody>
             </table>
           </div>
@@ -2193,6 +2249,8 @@ export class AdminProductsComponent implements OnInit {
     { label: 'adminUi.products.title' }
   ];
 
+  readonly productRowHeight = 96;
+
   loading = signal(true);
   error = signal<string | null>(null);
   products = signal<AdminProductListItem[]>([]);
@@ -2363,6 +2421,14 @@ export class AdminProductsComponent implements OnInit {
     this.clearSelection();
     this.cancelInlineEdit();
     this.load();
+  }
+
+  useVirtualProductsTable(): boolean {
+    return this.inlineEditId === null && this.products().length > 100;
+  }
+
+  trackProductId(_: number, product: AdminProductListItem): string {
+    return product.id;
   }
 
   clearSelection(): void {

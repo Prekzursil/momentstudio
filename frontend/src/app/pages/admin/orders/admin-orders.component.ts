@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
+import { ScrollingModule } from '@angular/cdk/scrolling';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -53,6 +54,7 @@ type AdminOrdersExportTemplate = {
   imports: [
     CommonModule,
     FormsModule,
+    ScrollingModule,
     TranslateModule,
     BreadcrumbComponent,
     ButtonComponent,
@@ -260,10 +262,94 @@ type AdminOrdersExportTemplate = {
               </div>
             </div>
 
-	          <div *ngIf="orders().length > 0" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-	            <table class="min-w-[1050px] w-full text-sm">
-	              <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
-	                <tr>
+          <div *ngIf="orders().length > 0" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+            <ng-container *ngIf="orders().length > 100; else ordersTableStandard">
+              <cdk-virtual-scroll-viewport
+                class="block h-[min(70vh,720px)]"
+                [itemSize]="orderRowHeight"
+                [minBufferPx]="orderRowHeight * 10"
+                [maxBufferPx]="orderRowHeight * 20"
+              >
+                <table class="min-w-[1050px] w-full text-sm">
+                  <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                    <tr>
+                      <th class="text-left font-semibold px-3 py-2">
+                        <input
+                          type="checkbox"
+                          [checked]="allSelectedOnPage()"
+                          [indeterminate]="someSelectedOnPage()"
+                          (change)="toggleSelectAllOnPage($any($event.target).checked)"
+                          [disabled]="bulkBusy"
+                          aria-label="Select all orders on page"
+                        />
+                      </th>
+                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.reference' | translate }}</th>
+                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.customer' | translate }}</th>
+                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.status' | translate }}</th>
+                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.tags' | translate }}</th>
+                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.total' | translate }}</th>
+                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.created' | translate }}</th>
+                      <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.table.actions' | translate }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      *cdkVirtualFor="let order of orders(); trackBy: trackOrderId"
+                      class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
+                    >
+                      <td class="px-3 py-2">
+                        <input
+                          type="checkbox"
+                          [checked]="selectedIds.has(order.id)"
+                          (change)="toggleSelected(order.id, $any($event.target).checked)"
+                          [disabled]="bulkBusy"
+                          [attr.aria-label]="'Select order ' + (order.reference_code || (order.id | slice: 0:8))"
+                        />
+                      </td>
+                      <td class="px-3 py-2 font-medium text-slate-900 dark:text-slate-50">
+                        {{ order.reference_code || (order.id | slice: 0:8) }}
+                      </td>
+                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                        {{ customerLabel(order) }}
+                      </td>
+                      <td class="px-3 py-2">
+                        <span [ngClass]="statusPillClass(order.status)" class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold">
+                          {{ ('adminUi.orders.' + order.status) | translate }}
+                        </span>
+                      </td>
+                      <td class="px-3 py-2">
+                        <div class="flex flex-wrap gap-1">
+                          <ng-container *ngFor="let tagValue of order.tags || []">
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                              {{ tagLabel(tagValue) }}
+                            </span>
+                          </ng-container>
+                          <span *ngIf="(order.tags || []).length === 0" class="text-xs text-slate-400">—</span>
+                        </div>
+                      </td>
+                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                        {{ order.total_amount | localizedCurrency : order.currency }}
+                      </td>
+                      <td class="px-3 py-2 text-slate-600 dark:text-slate-300">
+                        {{ order.created_at | date: 'short' }}
+                      </td>
+                      <td class="px-3 py-2 text-right">
+                        <app-button
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.orders.view' | translate"
+                          (action)="open(order.id)"
+                        ></app-button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </cdk-virtual-scroll-viewport>
+            </ng-container>
+            <ng-template #ordersTableStandard>
+              <table class="min-w-[1050px] w-full text-sm">
+                <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                  <tr>
                     <th class="text-left font-semibold px-3 py-2">
                       <input
                         type="checkbox"
@@ -271,68 +357,71 @@ type AdminOrdersExportTemplate = {
                         [indeterminate]="someSelectedOnPage()"
                         (change)="toggleSelectAllOnPage($any($event.target).checked)"
                         [disabled]="bulkBusy"
+                        aria-label="Select all orders on page"
                       />
                     </th>
-	                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.reference' | translate }}</th>
-	                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.customer' | translate }}</th>
-	                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.status' | translate }}</th>
-	                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.tags' | translate }}</th>
-	                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.total' | translate }}</th>
-	                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.created' | translate }}</th>
-	                  <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.table.actions' | translate }}</th>
-	                </tr>
-	              </thead>
-	              <tbody>
-                <tr
-                  *ngFor="let order of orders()"
-                  class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
-                >
+                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.reference' | translate }}</th>
+                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.customer' | translate }}</th>
+                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.status' | translate }}</th>
+                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.tags' | translate }}</th>
+                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.total' | translate }}</th>
+                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.table.created' | translate }}</th>
+                    <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.table.actions' | translate }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    *ngFor="let order of orders(); trackBy: trackOrderId"
+                    class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
+                  >
                     <td class="px-3 py-2">
                       <input
                         type="checkbox"
                         [checked]="selectedIds.has(order.id)"
                         (change)="toggleSelected(order.id, $any($event.target).checked)"
                         [disabled]="bulkBusy"
+                        [attr.aria-label]="'Select order ' + (order.reference_code || (order.id | slice: 0:8))"
                       />
                     </td>
-	                  <td class="px-3 py-2 font-medium text-slate-900 dark:text-slate-50">
-	                    {{ order.reference_code || (order.id | slice: 0:8) }}
-	                  </td>
-                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
-                    {{ customerLabel(order) }}
-                  </td>
-                  <td class="px-3 py-2">
-                    <span [ngClass]="statusPillClass(order.status)" class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold">
-                      {{ ('adminUi.orders.' + order.status) | translate }}
-                    </span>
-                  </td>
-                  <td class="px-3 py-2">
-                    <div class="flex flex-wrap gap-1">
-                      <ng-container *ngFor="let tagValue of order.tags || []">
-                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200">
-                          {{ tagLabel(tagValue) }}
-                        </span>
-                      </ng-container>
-                      <span *ngIf="(order.tags || []).length === 0" class="text-xs text-slate-400">—</span>
-                    </div>
-                  </td>
-                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
-                    {{ order.total_amount | localizedCurrency : order.currency }}
-                  </td>
-                  <td class="px-3 py-2 text-slate-600 dark:text-slate-300">
-                    {{ order.created_at | date: 'short' }}
-                  </td>
-                  <td class="px-3 py-2 text-right">
-                    <app-button
-                      size="sm"
-                      variant="ghost"
-                      [label]="'adminUi.orders.view' | translate"
-                      (action)="open(order.id)"
-                    ></app-button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                    <td class="px-3 py-2 font-medium text-slate-900 dark:text-slate-50">
+                      {{ order.reference_code || (order.id | slice: 0:8) }}
+                    </td>
+                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                      {{ customerLabel(order) }}
+                    </td>
+                    <td class="px-3 py-2">
+                      <span [ngClass]="statusPillClass(order.status)" class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold">
+                        {{ ('adminUi.orders.' + order.status) | translate }}
+                      </span>
+                    </td>
+                    <td class="px-3 py-2">
+                      <div class="flex flex-wrap gap-1">
+                        <ng-container *ngFor="let tagValue of order.tags || []">
+                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                            {{ tagLabel(tagValue) }}
+                          </span>
+                        </ng-container>
+                        <span *ngIf="(order.tags || []).length === 0" class="text-xs text-slate-400">—</span>
+                      </div>
+                    </td>
+                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                      {{ order.total_amount | localizedCurrency : order.currency }}
+                    </td>
+                    <td class="px-3 py-2 text-slate-600 dark:text-slate-300">
+                      {{ order.created_at | date: 'short' }}
+                    </td>
+                    <td class="px-3 py-2 text-right">
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.orders.view' | translate"
+                        (action)="open(order.id)"
+                      ></app-button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </ng-template>
           </div>
 
 	          <div *ngIf="meta()" class="flex items-center justify-between gap-3 pt-2 text-sm text-slate-700 dark:text-slate-200">
@@ -463,6 +552,8 @@ export class AdminOrdersComponent implements OnInit {
     { label: 'nav.admin', url: '/admin/dashboard' },
     { label: 'adminUi.orders.title' }
   ];
+
+  readonly orderRowHeight = 44;
 
   loading = signal(true);
   error = signal<string | null>(null);
@@ -782,6 +873,10 @@ export class AdminOrdersComponent implements OnInit {
   goToPage(page: number): void {
     this.page = page;
     this.load();
+  }
+
+  trackOrderId(_: number, order: AdminOrderListItem): string {
+    return order.id;
   }
 
   open(orderId: string): void {
