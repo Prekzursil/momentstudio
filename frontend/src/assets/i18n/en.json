@@ -1397,6 +1397,12 @@
         "pause": "Pause",
         "resume": "Live refresh"
       },
+      "salesMetric": {
+        "aria": "Sales metric",
+        "net": "Net",
+        "gross": "Gross",
+        "tooltip": "Gross sales includes paid/shipped/delivered/refunded orders. Net sales subtracts refunds (including partial refunds)."
+      },
       "widgetsTitle": "Dashboard widgets",
       "widgets": {
         "kpis": "Today KPIs",

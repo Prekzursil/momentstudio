@@ -1,3 +1,4 @@
+from decimal import Decimal
 import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Dict
@@ -15,7 +16,7 @@ from app.db.session import get_session
 from app.main import app
 from app.models.catalog import Category, Product, ProductImage, ProductStatus, ProductAuditLog, ProductTranslation
 from app.models.content import ContentBlock, ContentStatus, ContentAuditLog
-from app.models.order import Order, OrderStatus
+from app.models.order import Order, OrderRefund, OrderStatus
 from app.models.address import Address
 from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.support import ContactSubmission, ContactSubmissionTopic, ContactSubmissionStatus
@@ -275,8 +276,66 @@ def test_admin_summary_sales_excludes_cancelled_and_pending(test_app: Dict[str, 
     data = resp.json()
 
     assert data["sales_30d"] == pytest.approx(175.0)
+    assert data["gross_sales_30d"] == pytest.approx(210.0)
+    assert data["net_sales_30d"] == pytest.approx(175.0)
     assert data["sales_range"] == pytest.approx(175.0)
+    assert data["gross_sales_range"] == pytest.approx(210.0)
+    assert data["net_sales_range"] == pytest.approx(175.0)
     assert data["today_sales"] == pytest.approx(175.0)
+    assert data["gross_today_sales"] == pytest.approx(210.0)
+    assert data["net_today_sales"] == pytest.approx(175.0)
+
+
+def test_admin_summary_net_sales_subtracts_partial_refunds(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    asyncio.run(seed(session_factory))
+    headers = auth_headers(client)
+
+    async def add_order_and_refund() -> None:
+        async with session_factory() as session:
+            customer = (
+                await session.execute(select(User).where(User.email == "customer@example.com"))
+            ).scalar_one()
+            now = datetime.now(timezone.utc)
+            email = customer.email
+            name = customer.name or customer.email
+
+            order = Order(
+                user_id=customer.id,
+                status=OrderStatus.paid,
+                total_amount=Decimal("100.00"),
+                currency="RON",
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                customer_email=email,
+                customer_name=name,
+                created_at=now,
+                updated_at=now,
+            )
+            session.add(order)
+            await session.flush()
+            session.add(
+                OrderRefund(
+                    order_id=order.id,
+                    amount=Decimal("30.00"),
+                    currency="RON",
+                    provider="manual",
+                    note="test partial refund",
+                    created_at=now,
+                )
+            )
+            await session.commit()
+
+    asyncio.run(add_order_and_refund())
+
+    resp = client.get("/api/v1/admin/dashboard/summary", headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["gross_today_sales"] == pytest.approx(100.0)
+    assert data["net_today_sales"] == pytest.approx(70.0)
 
 
 def test_coupon_lifecycle_and_audit(test_app: Dict[str, object]) -> None:

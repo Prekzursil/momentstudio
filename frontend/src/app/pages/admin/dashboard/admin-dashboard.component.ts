@@ -77,6 +77,43 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
                 <span *ngIf="lastUpdatedAt()" class="text-xs text-slate-500 dark:text-slate-400">
                   {{ 'adminUi.dashboard.liveRefresh.lastUpdated' | translate }}: {{ lastUpdatedAt() | date: 'shortTime' }}
                 </span>
+                <div
+                  role="radiogroup"
+                  class="inline-flex items-center gap-0.5 rounded-full border border-slate-200 bg-white/70 p-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/70"
+                  [attr.aria-label]="'adminUi.dashboard.salesMetric.aria' | translate"
+                  [attr.title]="'adminUi.dashboard.salesMetric.tooltip' | translate"
+                >
+                  <button
+                    type="button"
+                    role="radio"
+                    [attr.aria-checked]="salesMetric() === 'net'"
+                    [attr.tabindex]="salesMetric() === 'net' ? 0 : -1"
+                    class="min-h-9 rounded-full px-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                    [ngClass]="
+                      salesMetric() === 'net'
+                        ? 'bg-slate-900 text-white hover:bg-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-50'
+                        : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/50'
+                    "
+                    (click)="setSalesMetric('net')"
+                  >
+                    {{ 'adminUi.dashboard.salesMetric.net' | translate }}
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    [attr.aria-checked]="salesMetric() === 'gross'"
+                    [attr.tabindex]="salesMetric() === 'gross' ? 0 : -1"
+                    class="min-h-9 rounded-full px-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                    [ngClass]="
+                      salesMetric() === 'gross'
+                        ? 'bg-slate-900 text-white hover:bg-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-50'
+                        : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/50'
+                    "
+                    (click)="setSalesMetric('gross')"
+                  >
+                    {{ 'adminUi.dashboard.salesMetric.gross' | translate }}
+                  </button>
+                </div>
                 <app-button
                   size="sm"
                   variant="ghost"
@@ -488,11 +525,11 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
                   </app-card>
                   <app-card [title]="'adminUi.cards.salesToday' | translate">
                     <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
-                      {{ (summary()?.today_sales || 0) | localizedCurrency : 'RON' }}
+                      {{ (todaySales() || 0) | localizedCurrency : 'RON' }}
                     </div>
                     <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                      {{ 'adminUi.cards.vsYesterday' | translate }}: {{ (summary()?.yesterday_sales || 0) | localizedCurrency : 'RON' }} ·
-                      {{ deltaLabel(summary()?.sales_delta_pct) }}
+                      {{ 'adminUi.cards.vsYesterday' | translate }}: {{ (yesterdaySales() || 0) | localizedCurrency : 'RON' }} ·
+                      {{ deltaLabel(salesDeltaPct()) }}
                     </div>
                   </app-card>
                   <app-card [title]="'adminUi.cards.refundsToday' | translate">
@@ -580,7 +617,7 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
                     ></app-card>
                     <app-card
                       [title]="'adminUi.cards.salesRange' | translate: { days: summary()?.range_days || 30 }"
-                      [subtitle]="(summary()?.sales_range || 0) | localizedCurrency : 'RON'"
+                      [subtitle]="(rangeSales() || 0) | localizedCurrency : 'RON'"
                     ></app-card>
                     <app-card
                       [title]="'adminUi.cards.ordersRange' | translate: { days: summary()?.range_days || 30 }"
@@ -1148,8 +1185,10 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   summary = signal<AdminSummary | null>(null);
   lastUpdatedAt = signal<string | null>(null);
   liveRefreshEnabled = signal(false);
+  salesMetric = signal<'gross' | 'net'>('net');
   private liveRefreshTimerId: number | null = null;
   private readonly liveRefreshStorageKey = 'admin.dashboard.liveRefresh.v1';
+  private readonly salesMetricStorageKey = 'admin.dashboard.salesMetric.v1';
 
   customizeWidgetsOpen = signal(false);
   metricWidgetOrder = signal<MetricWidgetId[]>(['kpis', 'counts', 'range']);
@@ -1236,6 +1275,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   ngOnInit(): void {
     this.loadWidgetPrefs();
     this.loadLiveRefreshPreference();
+    this.loadSalesMetricPreference();
     this.loadSummary();
     this.loadScheduledTasks();
     this.loadBackgroundJobs();
@@ -1289,6 +1329,35 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     this.persistLiveRefreshPreference(next);
     if (next) this.startLiveRefresh();
     else this.stopLiveRefresh();
+  }
+
+  setSalesMetric(metric: 'gross' | 'net'): void {
+    this.salesMetric.set(metric);
+    this.persistSalesMetricPreference(metric);
+  }
+
+  todaySales(): number {
+    const sum = this.summary();
+    if (!sum) return 0;
+    return this.salesMetric() === 'gross' ? sum.gross_today_sales : sum.net_today_sales;
+  }
+
+  yesterdaySales(): number {
+    const sum = this.summary();
+    if (!sum) return 0;
+    return this.salesMetric() === 'gross' ? sum.gross_yesterday_sales : sum.net_yesterday_sales;
+  }
+
+  salesDeltaPct(): number | null {
+    const sum = this.summary();
+    if (!sum) return null;
+    return this.salesMetric() === 'gross' ? sum.gross_sales_delta_pct : sum.net_sales_delta_pct;
+  }
+
+  rangeSales(): number {
+    const sum = this.summary();
+    if (!sum) return 0;
+    return this.salesMetric() === 'gross' ? sum.gross_sales_range : sum.net_sales_range;
   }
 
   ngOnDestroy(): void {
@@ -1518,10 +1587,32 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     }
   }
 
+  private loadSalesMetricPreference(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(this.salesMetricStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      const metric = (parsed as any)?.metric;
+      if (metric === 'gross' || metric === 'net') this.salesMetric.set(metric);
+    } catch {
+      // ignore
+    }
+  }
+
   private persistLiveRefreshPreference(enabled: boolean): void {
     if (typeof localStorage === 'undefined') return;
     try {
       localStorage.setItem(this.liveRefreshStorageKey, JSON.stringify({ enabled }));
+    } catch {
+      // ignore
+    }
+  }
+
+  private persistSalesMetricPreference(metric: 'gross' | 'net'): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem(this.salesMetricStorageKey, JSON.stringify({ metric }));
     } catch {
       // ignore
     }

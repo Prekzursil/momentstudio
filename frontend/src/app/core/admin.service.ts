@@ -8,8 +8,12 @@ export interface AdminSummary {
   users: number;
   low_stock: number;
   sales_30d: number;
+  gross_sales_30d: number;
+  net_sales_30d: number;
   orders_30d: number;
   sales_range: number;
+  gross_sales_range: number;
+  net_sales_range: number;
   orders_range: number;
   range_days: number;
   range_from: string;
@@ -20,6 +24,12 @@ export interface AdminSummary {
   today_sales: number;
   yesterday_sales: number;
   sales_delta_pct: number | null;
+  gross_today_sales: number;
+  gross_yesterday_sales: number;
+  gross_sales_delta_pct: number | null;
+  net_today_sales: number;
+  net_yesterday_sales: number;
+  net_sales_delta_pct: number | null;
   today_refunds: number;
   yesterday_refunds: number;
   refunds_delta_pct: number | null;

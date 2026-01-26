@@ -1397,6 +1397,12 @@
         "pause": "Pauză",
         "resume": "Actualizare live"
       },
+      "salesMetric": {
+        "aria": "Metrică vânzări",
+        "net": "Net",
+        "gross": "Brut",
+        "tooltip": "Vânzări brute: comenzi plătite/expediate/livrate/rambursate. Vânzări nete: scade rambursările (inclusiv rambursări parțiale)."
+      },
       "widgetsTitle": "Widgeturi panou",
       "widgets": {
         "kpis": "KPI astăzi",

@@ -905,7 +905,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin: background jobs center – Show long-running tasks (exports/imports/emails) with progress + retry/cancel.
 - [x] Admin: global notifications – Surface important admin-only alerts (failed webhooks, email failures, low stock) with deep links.
 - [x] Admin dashboard: live refresh – Optional auto-refresh with “last updated” timestamp and pause control.
-- [ ] Admin analytics: revenue definitions – Toggle/tooltip for “Gross sales” vs “Net sales (after refunds)” with clear definitions.
+- [x] Admin analytics: revenue definitions – Toggle/tooltip for “Gross sales” vs “Net sales (after refunds)” with clear definitions.
 - [ ] Admin analytics: exclude test orders – Add “Mark as test” on orders and exclude test orders from KPIs by default.
 - [ ] Admin analytics: drilldowns – Click KPIs to open the relevant list pre-filtered to the metric (orders/products/users).
 - [ ] Admin analytics: channel breakdown – Break sales/orders down by payment method, courier, and delivery type with filters.

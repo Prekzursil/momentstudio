@@ -56,7 +56,7 @@ from app.services import exporter as exporter_service
 from app.services import inventory as inventory_service
 from app.services import catalog as catalog_service
 from app.models.address import Address
-from app.models.order import Order, OrderStatus
+from app.models.order import Order, OrderRefund, OrderStatus
 from app.models.returns import ReturnRequest, ReturnRequestStatus
 from app.models.support import ContactSubmission
 from app.models.user import AdminAuditLog, EmailVerificationToken, User, RefreshSession, UserRole, UserSecurityEvent
@@ -105,6 +105,7 @@ async def admin_summary(
 ) -> dict:
     now = datetime.now(timezone.utc)
     successful_statuses = (OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered)
+    sales_statuses = (*successful_statuses, OrderStatus.refunded)
 
     if (range_from is None) != (range_to is None):
         raise HTTPException(
@@ -157,6 +158,36 @@ async def admin_summary(
             Order.status.in_(successful_statuses),
         )
     )
+    gross_sales_30d = await session.scalar(
+        select(func.coalesce(func.sum(Order.total_amount), 0)).where(
+            Order.created_at >= since,
+            Order.status.in_(sales_statuses),
+        )
+    )
+    refunds_30d = await session.scalar(
+        select(func.coalesce(func.sum(OrderRefund.amount), 0))
+        .select_from(OrderRefund)
+        .join(Order, OrderRefund.order_id == Order.id)
+        .where(
+            Order.created_at >= since,
+            Order.status.in_(sales_statuses),
+        )
+    )
+    missing_refunds_30d = await session.scalar(
+        select(func.coalesce(func.sum(Order.total_amount), 0))
+        .select_from(Order)
+        .outerjoin(OrderRefund, OrderRefund.order_id == Order.id)
+        .where(
+            Order.created_at >= since,
+            Order.status == OrderStatus.refunded,
+            OrderRefund.id.is_(None),
+        )
+    )
+    net_sales_30d = (
+        (gross_sales_30d or 0)
+        - (refunds_30d or 0)
+        - (missing_refunds_30d or 0)
+    )
     orders_30d = await session.scalar(
         select(func.count()).select_from(Order).where(Order.created_at >= since)
     )
@@ -167,6 +198,39 @@ async def admin_summary(
             Order.created_at < end,
             Order.status.in_(successful_statuses),
         )
+    )
+    gross_sales_range = await session.scalar(
+        select(func.coalesce(func.sum(Order.total_amount), 0)).where(
+            Order.created_at >= start,
+            Order.created_at < end,
+            Order.status.in_(sales_statuses),
+        )
+    )
+    refunds_range = await session.scalar(
+        select(func.coalesce(func.sum(OrderRefund.amount), 0))
+        .select_from(OrderRefund)
+        .join(Order, OrderRefund.order_id == Order.id)
+        .where(
+            Order.created_at >= start,
+            Order.created_at < end,
+            Order.status.in_(sales_statuses),
+        )
+    )
+    missing_refunds_range = await session.scalar(
+        select(func.coalesce(func.sum(Order.total_amount), 0))
+        .select_from(Order)
+        .outerjoin(OrderRefund, OrderRefund.order_id == Order.id)
+        .where(
+            Order.created_at >= start,
+            Order.created_at < end,
+            Order.status == OrderStatus.refunded,
+            OrderRefund.id.is_(None),
+        )
+    )
+    net_sales_range = (
+        (gross_sales_range or 0)
+        - (refunds_range or 0)
+        - (missing_refunds_range or 0)
     )
     orders_range = await session.scalar(
         select(func.count())
@@ -200,6 +264,72 @@ async def admin_summary(
             Order.created_at < today_start,
             Order.status.in_(successful_statuses),
         )
+    )
+    gross_today_sales = await session.scalar(
+        select(func.coalesce(func.sum(Order.total_amount), 0)).where(
+            Order.created_at >= today_start,
+            Order.created_at < now,
+            Order.status.in_(sales_statuses),
+        )
+    )
+    gross_yesterday_sales = await session.scalar(
+        select(func.coalesce(func.sum(Order.total_amount), 0)).where(
+            Order.created_at >= yesterday_start,
+            Order.created_at < today_start,
+            Order.status.in_(sales_statuses),
+        )
+    )
+    refunds_today = await session.scalar(
+        select(func.coalesce(func.sum(OrderRefund.amount), 0))
+        .select_from(OrderRefund)
+        .join(Order, OrderRefund.order_id == Order.id)
+        .where(
+            Order.created_at >= today_start,
+            Order.created_at < now,
+            Order.status.in_(sales_statuses),
+        )
+    )
+    refunds_yesterday = await session.scalar(
+        select(func.coalesce(func.sum(OrderRefund.amount), 0))
+        .select_from(OrderRefund)
+        .join(Order, OrderRefund.order_id == Order.id)
+        .where(
+            Order.created_at >= yesterday_start,
+            Order.created_at < today_start,
+            Order.status.in_(sales_statuses),
+        )
+    )
+    missing_refunds_today = await session.scalar(
+        select(func.coalesce(func.sum(Order.total_amount), 0))
+        .select_from(Order)
+        .outerjoin(OrderRefund, OrderRefund.order_id == Order.id)
+        .where(
+            Order.created_at >= today_start,
+            Order.created_at < now,
+            Order.status == OrderStatus.refunded,
+            OrderRefund.id.is_(None),
+        )
+    )
+    missing_refunds_yesterday = await session.scalar(
+        select(func.coalesce(func.sum(Order.total_amount), 0))
+        .select_from(Order)
+        .outerjoin(OrderRefund, OrderRefund.order_id == Order.id)
+        .where(
+            Order.created_at >= yesterday_start,
+            Order.created_at < today_start,
+            Order.status == OrderStatus.refunded,
+            OrderRefund.id.is_(None),
+        )
+    )
+    net_today_sales = (
+        (gross_today_sales or 0)
+        - (refunds_today or 0)
+        - (missing_refunds_today or 0)
+    )
+    net_yesterday_sales = (
+        (gross_yesterday_sales or 0)
+        - (refunds_yesterday or 0)
+        - (missing_refunds_yesterday or 0)
     )
     today_refunds = await session.scalar(
         select(func.count())
@@ -285,8 +415,12 @@ async def admin_summary(
         "users": users_total or 0,
         "low_stock": low_stock or 0,
         "sales_30d": float(sales_30d or 0),
+        "gross_sales_30d": float(gross_sales_30d or 0),
+        "net_sales_30d": float(net_sales_30d or 0),
         "orders_30d": orders_30d or 0,
         "sales_range": float(sales_range or 0),
+        "gross_sales_range": float(gross_sales_range or 0),
+        "net_sales_range": float(net_sales_range or 0),
         "orders_range": int(orders_range or 0),
         "range_days": int(effective_range_days),
         "range_from": start.date().isoformat(),
@@ -300,6 +434,16 @@ async def admin_summary(
         "yesterday_sales": float(yesterday_sales or 0),
         "sales_delta_pct": _delta_pct(
             float(today_sales or 0), float(yesterday_sales or 0)
+        ),
+        "gross_today_sales": float(gross_today_sales or 0),
+        "gross_yesterday_sales": float(gross_yesterday_sales or 0),
+        "gross_sales_delta_pct": _delta_pct(
+            float(gross_today_sales or 0), float(gross_yesterday_sales or 0)
+        ),
+        "net_today_sales": float(net_today_sales or 0),
+        "net_yesterday_sales": float(net_yesterday_sales or 0),
+        "net_sales_delta_pct": _delta_pct(
+            float(net_today_sales or 0), float(net_yesterday_sales or 0)
         ),
         "today_refunds": int(today_refunds or 0),
         "yesterday_refunds": int(yesterday_refunds or 0),
