@@ -1392,6 +1392,11 @@
         "exportOrders": "Export orders"
       },
       "customizeWidgets": "Customize widgets",
+      "liveRefresh": {
+        "lastUpdated": "Last updated",
+        "pause": "Pause",
+        "resume": "Live refresh"
+      },
       "widgetsTitle": "Dashboard widgets",
       "widgets": {
         "kpis": "Today KPIs",
@@ -1525,6 +1530,16 @@
       "errors": {
         "load": "Could not load favorites.",
         "save": "Could not save favorites."
+      }
+    },
+    "alerts": {
+      "title": "Alerts",
+      "loading": "Loading alerts…",
+      "lowStock": "Low stock",
+      "failedWebhooks": "Webhook failures (24h)",
+      "failedEmails": "Email failures (24h)",
+      "errors": {
+        "load": "Could not load alerts."
       }
     },
     "jobs": {
@@ -1763,6 +1778,25 @@
         "errors": {
           "subtotalRequired": "Subtotal is required.",
           "run": "Could not run simulation."
+        }
+      },
+      "emailFailures": {
+        "title": "Email failures",
+        "hint": "Track failed outgoing email deliveries (last 24h).",
+        "refresh": "Refresh",
+        "empty": "No email failures.",
+        "view": "View",
+        "close": "Close",
+        "detailTitle": "Email failure",
+        "table": {
+          "to": "To",
+          "subject": "Subject",
+          "at": "Time",
+          "error": "Error",
+          "actions": "Actions"
+        },
+        "errors": {
+          "load": "Could not load email failures."
         }
       },
       "webhooks": {

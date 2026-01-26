@@ -8,6 +8,8 @@ import { filter } from 'rxjs/operators';
 import { AuthService } from '../../core/auth.service';
 import { AdminFavoritesService } from '../../core/admin-favorites.service';
 import { AdminRecentService } from '../../core/admin-recent.service';
+import { AdminService } from '../../core/admin.service';
+import { OpsService } from '../../core/ops.service';
 import { ContainerComponent } from '../../layout/container.component';
 
 type AdminNavItem = {
@@ -55,6 +57,69 @@ type AdminNavItem = {
 
           <div *ngIf="navQuery.trim() && filteredNavItems().length === 0" class="px-3 pb-2 text-xs text-slate-500 dark:text-slate-400">
             {{ 'adminUi.nav.searchEmpty' | translate }}
+          </div>
+
+          <div *ngIf="shouldShowAlerts()" class="pb-2">
+            <div class="flex items-center justify-between px-3 pb-1 text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+              <span>{{ 'adminUi.alerts.title' | translate }}</span>
+              <button
+                type="button"
+                class="h-7 w-7 rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700/50 dark:hover:text-white"
+                [attr.aria-label]="'adminUi.actions.refresh' | translate"
+                [disabled]="alertsLoading"
+                (click)="refreshAlerts()"
+              >
+                ⟳
+              </button>
+            </div>
+
+            <div *ngIf="alertsLoading" class="px-3 pb-2 text-xs text-slate-500 dark:text-slate-400">
+              {{ 'adminUi.alerts.loading' | translate }}
+            </div>
+
+            <div *ngIf="alertsError" class="px-3 pb-2 text-xs text-rose-700 dark:text-rose-200">
+              {{ alertsError }}
+            </div>
+
+            <div class="grid gap-1">
+              <button
+                *ngIf="lowStockCount > 0 && auth.canAccessAdminSection('inventory')"
+                type="button"
+                class="w-full flex items-center justify-between gap-3 rounded-lg px-3 py-2 hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
+                (click)="goToInventory()"
+              >
+                <span class="truncate">{{ 'adminUi.alerts.lowStock' | translate }}</span>
+                <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900 dark:bg-amber-900/30 dark:text-amber-100">
+                  {{ lowStockCount }}
+                </span>
+              </button>
+
+              <button
+                *ngIf="failedWebhooksCount > 0 && auth.canAccessAdminSection('ops')"
+                type="button"
+                class="w-full flex items-center justify-between gap-3 rounded-lg px-3 py-2 hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
+                (click)="goToOps('webhooks')"
+              >
+                <span class="truncate">{{ 'adminUi.alerts.failedWebhooks' | translate }}</span>
+                <span class="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-900 dark:bg-rose-900/30 dark:text-rose-100">
+                  {{ failedWebhooksCount }}
+                </span>
+              </button>
+
+              <button
+                *ngIf="failedEmailsCount > 0 && auth.canAccessAdminSection('ops')"
+                type="button"
+                class="w-full flex items-center justify-between gap-3 rounded-lg px-3 py-2 hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
+                (click)="goToOps('emails')"
+              >
+                <span class="truncate">{{ 'adminUi.alerts.failedEmails' | translate }}</span>
+                <span class="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-900 dark:bg-rose-900/30 dark:text-rose-100">
+                  {{ failedEmailsCount }}
+                </span>
+              </button>
+            </div>
+
+            <div class="my-2 h-px bg-slate-200 dark:bg-slate-800/70"></div>
           </div>
 
           <div *ngIf="!navQuery.trim() && favoriteNavItems().length" class="pb-2">
@@ -113,16 +178,25 @@ type AdminNavItem = {
 })
 export class AdminLayoutComponent implements OnInit, OnDestroy {
   constructor(
-    private auth: AuthService,
+    public auth: AuthService,
     private router: Router,
     private translate: TranslateService,
     public favorites: AdminFavoritesService,
-    private recent: AdminRecentService
+    private recent: AdminRecentService,
+    private admin: AdminService,
+    private ops: OpsService
   ) {}
 
   private pendingGoAt: number | null = null;
   navQuery = '';
   private navSub?: Subscription;
+  private alertsIntervalId: number | null = null;
+
+  alertsLoading = false;
+  alertsError: string | null = null;
+  lowStockCount = 0;
+  failedWebhooksCount = 0;
+  failedEmailsCount = 0;
 
   private readonly allNavItems: AdminNavItem[] = [
     { path: '/admin/dashboard', labelKey: 'adminUi.nav.dashboard', section: 'dashboard', exact: true },
@@ -144,6 +218,8 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.favorites.init();
     this.recordRecent(this.router.url);
+    this.loadAlerts();
+    this.alertsIntervalId = window.setInterval(() => this.loadAlerts(), 5 * 60 * 1000);
     this.navSub = this.router.events
       .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
       .subscribe((event) => this.recordRecent(event.urlAfterRedirects || event.url));
@@ -151,6 +227,10 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.navSub?.unsubscribe();
+    if (this.alertsIntervalId !== null) {
+      window.clearInterval(this.alertsIntervalId);
+      this.alertsIntervalId = null;
+    }
   }
 
   filteredNavItems(): AdminNavItem[] {
@@ -193,6 +273,27 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
 
   clearNavQuery(): void {
     this.navQuery = '';
+  }
+
+  refreshAlerts(): void {
+    this.loadAlerts();
+  }
+
+  goToInventory(): void {
+    void this.router.navigateByUrl('/admin/inventory');
+  }
+
+  goToOps(section: 'webhooks' | 'emails'): void {
+    void this.router.navigateByUrl('/admin/ops', { state: { focusOpsSection: section } });
+  }
+
+  shouldShowAlerts(): boolean {
+    if (this.alertsLoading) return true;
+    if (this.alertsError) return true;
+    if (this.lowStockCount > 0 && this.auth.canAccessAdminSection('inventory')) return true;
+    if (this.failedWebhooksCount > 0 && this.auth.canAccessAdminSection('ops')) return true;
+    if (this.failedEmailsCount > 0 && this.auth.canAccessAdminSection('ops')) return true;
+    return false;
   }
 
   navLabelParts(item: AdminNavItem): { before: string; match: string; after: string } {
@@ -285,6 +386,74 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
 
   private favoriteKey(item: AdminNavItem): string {
     return `page:${item.path}`;
+  }
+
+  private loadAlerts(): void {
+    this.alertsLoading = true;
+    this.alertsError = null;
+
+    let pending = 0;
+    const done = (): void => {
+      pending -= 1;
+      if (pending <= 0) {
+        this.alertsLoading = false;
+      }
+    };
+
+    if (this.auth.canAccessAdminSection('inventory')) {
+      pending += 1;
+      this.admin.summary({ range_days: 30 }).subscribe({
+        next: (res) => {
+          const count = Number((res as any)?.low_stock ?? 0);
+          this.lowStockCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+        },
+        error: () => {
+          this.lowStockCount = 0;
+          this.alertsError = this.translate.instant('adminUi.alerts.errors.load');
+          done();
+        },
+        complete: done
+      });
+    } else {
+      this.lowStockCount = 0;
+    }
+
+    if (this.auth.canAccessAdminSection('ops')) {
+      pending += 1;
+      this.ops.getWebhookFailureStats({ since_hours: 24 }).subscribe({
+        next: (res) => {
+          const count = Number((res as any)?.failed ?? 0);
+          this.failedWebhooksCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+        },
+        error: () => {
+          this.failedWebhooksCount = 0;
+          this.alertsError = this.translate.instant('adminUi.alerts.errors.load');
+          done();
+        },
+        complete: done
+      });
+
+      pending += 1;
+      this.ops.getEmailFailureStats({ since_hours: 24 }).subscribe({
+        next: (res) => {
+          const count = Number((res as any)?.failed ?? 0);
+          this.failedEmailsCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+        },
+        error: () => {
+          this.failedEmailsCount = 0;
+          this.alertsError = this.translate.instant('adminUi.alerts.errors.load');
+          done();
+        },
+        complete: done
+      });
+    } else {
+      this.failedWebhooksCount = 0;
+      this.failedEmailsCount = 0;
+    }
+
+    if (pending === 0) {
+      this.alertsLoading = false;
+    }
   }
 
   private recordRecent(url: string): void {

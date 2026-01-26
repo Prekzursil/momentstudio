@@ -86,6 +86,11 @@ export interface ShippingSimulationResult {
 export type WebhookProvider = 'stripe' | 'paypal';
 export type WebhookStatus = 'received' | 'processed' | 'failed';
 
+export interface FailureCount {
+  failed: number;
+  since_hours: number;
+}
+
 export interface WebhookEventRead {
   provider: WebhookProvider;
   event_id: string;
@@ -100,6 +105,14 @@ export interface WebhookEventRead {
 
 export interface WebhookEventDetail extends WebhookEventRead {
   payload?: any | null;
+}
+
+export interface EmailFailureRead {
+  id: string;
+  to_email: string;
+  subject: string;
+  error_message?: string | null;
+  created_at: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -147,11 +160,23 @@ export class OpsService {
     return this.api.get<WebhookEventRead[]>('/ops/admin/webhooks', { limit });
   }
 
+  getWebhookFailureStats(params?: { since_hours?: number }): Observable<FailureCount> {
+    return this.api.get<FailureCount>('/ops/admin/webhooks/stats', params as any);
+  }
+
   getWebhookDetail(provider: WebhookProvider, eventId: string): Observable<WebhookEventDetail> {
     return this.api.get<WebhookEventDetail>(`/ops/admin/webhooks/${provider}/${encodeURIComponent(eventId)}`);
   }
 
   retryWebhook(provider: WebhookProvider, eventId: string): Observable<WebhookEventRead> {
     return this.api.post<WebhookEventRead>(`/ops/admin/webhooks/${provider}/${encodeURIComponent(eventId)}/retry`, {});
+  }
+
+  getEmailFailureStats(params?: { since_hours?: number }): Observable<FailureCount> {
+    return this.api.get<FailureCount>('/ops/admin/email-failures/stats', params as any);
+  }
+
+  listEmailFailures(params?: { limit?: number; since_hours?: number }): Observable<EmailFailureRead[]> {
+    return this.api.get<EmailFailureRead[]>('/ops/admin/email-failures', params as any);
   }
 }

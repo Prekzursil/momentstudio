@@ -8,6 +8,7 @@ import {
   MaintenanceBannerRead,
   ShippingMethodRead,
   ShippingSimulationResult,
+  EmailFailureRead,
   WebhookEventRead,
   WebhookEventDetail
 } from '../../../core/ops.service';
@@ -316,7 +317,100 @@ import { SkeletonComponent } from '../../../shared/skeleton.component';
 	          </div>
 	        </div>
 
-        <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+        <div
+          id="admin-ops-email-failures"
+          class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ops.emailFailures.title' | translate }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.ops.emailFailures.hint' | translate }}</div>
+            </div>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.ops.emailFailures.refresh' | translate"
+              [disabled]="emailFailuresLoading()"
+              (action)="loadEmailFailures()"
+            ></app-button>
+          </div>
+
+          <div *ngIf="emailFailuresLoading()" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+            <app-skeleton [rows]="4"></app-skeleton>
+          </div>
+
+          <div
+            *ngIf="!emailFailuresLoading() && emailFailuresError()"
+            class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+          >
+            {{ emailFailuresError() }}
+          </div>
+
+          <div
+            *ngIf="!emailFailuresLoading() && !emailFailuresError() && !emailFailures().length"
+            class="text-sm text-slate-600 dark:text-slate-300"
+          >
+            {{ 'adminUi.ops.emailFailures.empty' | translate }}
+          </div>
+
+          <div
+            *ngIf="!emailFailuresLoading() && emailFailures().length"
+            class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800"
+          >
+            <table class="min-w-[980px] w-full text-sm">
+              <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                <tr>
+                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.emailFailures.table.to' | translate }}</th>
+                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.emailFailures.table.subject' | translate }}</th>
+                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.emailFailures.table.at' | translate }}</th>
+                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.emailFailures.table.error' | translate }}</th>
+                  <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.ops.emailFailures.table.actions' | translate }}</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+                <tr *ngFor="let row of emailFailures()">
+                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ row.to_email }}</td>
+                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200 max-w-[360px] truncate">{{ row.subject }}</td>
+                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ row.created_at | date: 'short' }}</td>
+                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200 max-w-[360px] truncate">{{ row.error_message || '—' }}</td>
+                  <td class="px-3 py-2">
+                    <div class="flex justify-end items-center gap-2">
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.ops.emailFailures.view' | translate"
+                        (action)="viewEmailFailure(row)"
+                      ></app-button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div *ngIf="selectedEmailFailure()" class="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-800">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.ops.emailFailures.detailTitle' | translate }} · {{ selectedEmailFailure()!.to_email }}
+              </div>
+              <app-button size="sm" variant="ghost" [label]="'adminUi.ops.emailFailures.close' | translate" (action)="closeEmailFailureDetail()"></app-button>
+            </div>
+
+            <div class="mt-2 text-xs text-slate-600 dark:text-slate-300">
+              {{ selectedEmailFailure()!.subject }}
+            </div>
+
+            <pre
+              *ngIf="selectedEmailFailure()!.error_message"
+              class="mt-3 max-h-[220px] overflow-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-700 dark:bg-slate-950/30 dark:text-slate-200"
+            >{{ selectedEmailFailure()!.error_message }}</pre>
+          </div>
+        </div>
+
+        <div
+          id="admin-ops-webhooks"
+          class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+        >
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ops.webhooks.title' | translate }}</div>
@@ -443,6 +537,11 @@ export class AdminOpsComponent implements OnInit {
   simError = signal<string | null>(null);
   simResult = signal<ShippingSimulationResult | null>(null);
 
+  emailFailuresLoading = signal(true);
+  emailFailuresError = signal<string | null>(null);
+  emailFailures = signal<EmailFailureRead[]>([]);
+  selectedEmailFailure = signal<EmailFailureRead | null>(null);
+
   webhooksLoading = signal(true);
   webhooksError = signal<string | null>(null);
   webhooks = signal<WebhookEventRead[]>([]);
@@ -455,7 +554,9 @@ export class AdminOpsComponent implements OnInit {
     this.resetBannerForm();
     this.loadBanners();
     this.loadShippingMethods();
+    this.loadEmailFailures();
     this.loadWebhooks();
+    this.maybeFocusSection();
   }
 
   crumbs(): { label: string; url?: string }[] {
@@ -680,6 +781,48 @@ export class AdminOpsComponent implements OnInit {
         this.webhooksLoading.set(false);
       }
     });
+  }
+
+  loadEmailFailures(): void {
+    this.emailFailuresLoading.set(true);
+    this.emailFailuresError.set(null);
+    this.ops.listEmailFailures({ limit: 50, since_hours: 24 }).subscribe({
+      next: (rows) => {
+        this.emailFailures.set(rows || []);
+        this.emailFailuresLoading.set(false);
+      },
+      error: () => {
+        this.emailFailuresError.set(this.translate.instant('adminUi.ops.emailFailures.errors.load'));
+        this.emailFailuresLoading.set(false);
+      }
+    });
+  }
+
+  viewEmailFailure(row: EmailFailureRead): void {
+    this.selectedEmailFailure.set(row);
+  }
+
+  closeEmailFailureDetail(): void {
+    this.selectedEmailFailure.set(null);
+  }
+
+  private maybeFocusSection(): void {
+    const state = history.state as any;
+    const focus = (state?.focusOpsSection || '').toString();
+    const id =
+      focus === 'emails' ? 'admin-ops-email-failures' : focus === 'webhooks' ? 'admin-ops-webhooks' : '';
+    if (!id) return;
+    window.setTimeout(() => {
+      if (typeof document === 'undefined') return;
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      try {
+        const nextState = { ...(history.state as any) };
+        delete nextState.focusOpsSection;
+        history.replaceState(nextState, '');
+      } catch {
+        // Ignore history state write failures.
+      }
+    }, 0);
   }
 
   private nowLocalInput(): string {

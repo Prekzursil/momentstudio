@@ -16,6 +16,8 @@ except ImportError:
 
 from app.core.config import settings
 from app.core.security import create_receipt_token
+from app.db.session import SessionLocal
+from app.models.email_failure import EmailDeliveryFailure
 from app.services import receipts as receipt_service
 
 logger = logging.getLogger(__name__)
@@ -110,7 +112,23 @@ async def send_email(
         return True
     except Exception as exc:
         logger.warning("Email send failed: %s", exc)
+        await _record_email_failure(to_email=to_email, subject=subject, error_message=str(exc))
         return False
+
+
+async def _record_email_failure(*, to_email: str, subject: str, error_message: str) -> None:
+    try:
+        async with SessionLocal() as session:
+            session.add(
+                EmailDeliveryFailure(
+                    to_email=(to_email or "")[:255],
+                    subject=(subject or "")[:255],
+                    error_message=(error_message or "").strip()[:5000] or None,
+                )
+            )
+            await session.commit()
+    except Exception:
+        logger.exception("Failed to persist email failure")
 
 
 def _lang_or_default(lang: str | None) -> str:

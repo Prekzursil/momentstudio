@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID
 
 from fastapi import BackgroundTasks, HTTPException, status
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.email_failure import EmailDeliveryFailure
 from app.models.ops import MaintenanceBanner
 from app.models.webhook import PayPalWebhookEvent, StripeWebhookEvent
 from app.schemas.ops import ShippingSimulationResult, WebhookEventDetail, WebhookEventRead, WebhookStatus
@@ -258,6 +259,58 @@ async def get_webhook_detail(session: AsyncSession, *, provider: str, event_id: 
         ),
         payload=getattr(paypal_row, "payload", None),
     )
+
+
+async def count_failed_webhooks(session: AsyncSession, *, since_hours: int = 24) -> int:
+    now = datetime.now(timezone.utc)
+    hours = max(1, int(since_hours or 0))
+    since = now - timedelta(hours=hours)
+
+    stripe_failed = await session.scalar(
+        select(func.count())
+        .select_from(StripeWebhookEvent)
+        .where(
+            StripeWebhookEvent.last_error.is_not(None),
+            StripeWebhookEvent.last_attempt_at >= since,
+        )
+    )
+    paypal_failed = await session.scalar(
+        select(func.count())
+        .select_from(PayPalWebhookEvent)
+        .where(
+            PayPalWebhookEvent.last_error.is_not(None),
+            PayPalWebhookEvent.last_attempt_at >= since,
+        )
+    )
+    return int(stripe_failed or 0) + int(paypal_failed or 0)
+
+
+async def list_email_failures(session: AsyncSession, *, limit: int = 50, since_hours: int = 24) -> list[EmailDeliveryFailure]:
+    now = datetime.now(timezone.utc)
+    hours = max(1, int(since_hours or 0))
+    since = now - timedelta(hours=hours)
+
+    limit_clean = max(1, min(int(limit or 0), 200))
+    stmt = (
+        select(EmailDeliveryFailure)
+        .where(EmailDeliveryFailure.created_at >= since)
+        .order_by(EmailDeliveryFailure.created_at.desc())
+        .limit(limit_clean)
+    )
+    rows = (await session.execute(stmt)).scalars().all()
+    return list(rows)
+
+
+async def count_email_failures(session: AsyncSession, *, since_hours: int = 24) -> int:
+    now = datetime.now(timezone.utc)
+    hours = max(1, int(since_hours or 0))
+    since = now - timedelta(hours=hours)
+    total = await session.scalar(
+        select(func.count())
+        .select_from(EmailDeliveryFailure)
+        .where(EmailDeliveryFailure.created_at >= since)
+    )
+    return int(total or 0)
 
 
 async def retry_webhook(

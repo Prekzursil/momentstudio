@@ -1392,6 +1392,11 @@
         "exportOrders": "Exportă comenzi"
       },
       "customizeWidgets": "Personalizează widgeturile",
+      "liveRefresh": {
+        "lastUpdated": "Ultima actualizare",
+        "pause": "Pauză",
+        "resume": "Actualizare live"
+      },
       "widgetsTitle": "Widgeturi panou",
       "widgets": {
         "kpis": "KPI astăzi",
@@ -1525,6 +1530,16 @@
       "errors": {
         "load": "Nu am putut încărca favoritele.",
         "save": "Nu am putut salva favoritele."
+      }
+    },
+    "alerts": {
+      "title": "Alerte",
+      "loading": "Se încarcă alertele…",
+      "lowStock": "Stoc scăzut",
+      "failedWebhooks": "Webhook-uri eșuate (24h)",
+      "failedEmails": "Email-uri eșuate (24h)",
+      "errors": {
+        "load": "Nu am putut încărca alertele."
       }
     },
     "jobs": {
@@ -1763,6 +1778,25 @@
         "errors": {
           "subtotalRequired": "Subtotalul este obligatoriu.",
           "run": "Nu am putut rula simularea."
+        }
+      },
+      "emailFailures": {
+        "title": "Erori email",
+        "hint": "Urmărește trimiterile de email eșuate (ultimele 24h).",
+        "refresh": "Reîmprospătează",
+        "empty": "Nu există erori email.",
+        "view": "Vezi",
+        "close": "Închide",
+        "detailTitle": "Eroare email",
+        "table": {
+          "to": "Către",
+          "subject": "Subiect",
+          "at": "Timp",
+          "error": "Eroare",
+          "actions": "Acțiuni"
+        },
+        "errors": {
+          "load": "Nu am putut încărca erorile email."
         }
       },
       "webhooks": {

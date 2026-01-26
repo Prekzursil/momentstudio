@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, OnInit, ViewChild, signal } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Router } from '@angular/router';
@@ -74,6 +74,16 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
 	          <div class="flex items-center justify-between gap-3 flex-wrap">
 	            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboardTitle' | translate }}</h1>
               <div class="flex items-center gap-2">
+                <span *ngIf="lastUpdatedAt()" class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.dashboard.liveRefresh.lastUpdated' | translate }}: {{ lastUpdatedAt() | date: 'shortTime' }}
+                </span>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="(liveRefreshEnabled() ? 'adminUi.dashboard.liveRefresh.pause' : 'adminUi.dashboard.liveRefresh.resume') | translate"
+                  (action)="toggleLiveRefresh()"
+                ></app-button>
+                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="refreshNow()"></app-button>
 	              <app-button
 	                *ngIf="isOwner()"
 	                size="sm"
@@ -1126,7 +1136,7 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
     </div>
   `
 })
-export class AdminDashboardComponent implements OnInit, AfterViewInit {
+export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('globalSearchInput') globalSearchInput?: ElementRef<HTMLInputElement>;
   readonly crumbs: Crumb[] = [
     { label: 'adminUi.nav.dashboard', url: '/admin/dashboard' }
@@ -1136,6 +1146,10 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
   error = signal<string | null>(null);
   errorRequestId = signal<string | null>(null);
   summary = signal<AdminSummary | null>(null);
+  lastUpdatedAt = signal<string | null>(null);
+  liveRefreshEnabled = signal(false);
+  private liveRefreshTimerId: number | null = null;
+  private readonly liveRefreshStorageKey = 'admin.dashboard.liveRefresh.v1';
 
   customizeWidgetsOpen = signal(false);
   metricWidgetOrder = signal<MetricWidgetId[]>(['kpis', 'counts', 'range']);
@@ -1221,6 +1235,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
 
   ngOnInit(): void {
     this.loadWidgetPrefs();
+    this.loadLiveRefreshPreference();
     this.loadSummary();
     this.loadScheduledTasks();
     this.loadBackgroundJobs();
@@ -1259,6 +1274,25 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
 
   isOwner(): boolean {
     return this.auth.role() === 'owner';
+  }
+
+  refreshNow(): void {
+    if (this.loading()) return;
+    this.refreshSummarySilent();
+    this.loadScheduledTasks();
+    this.loadBackgroundJobs();
+  }
+
+  toggleLiveRefresh(): void {
+    const next = !this.liveRefreshEnabled();
+    this.liveRefreshEnabled.set(next);
+    this.persistLiveRefreshPreference(next);
+    if (next) this.startLiveRefresh();
+    else this.stopLiveRefresh();
+  }
+
+  ngOnDestroy(): void {
+    this.stopLiveRefresh();
   }
 
   shouldShowJobsPanel(): boolean {
@@ -1435,6 +1469,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
     this.admin.summary(this.buildSummaryParams()).subscribe({
       next: (data) => {
         this.summary.set(data);
+        this.lastUpdatedAt.set(new Date().toISOString());
         this.loading.set(false);
       },
       error: (err) => {
@@ -1443,6 +1478,53 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
         this.loading.set(false);
       }
     });
+  }
+
+  private refreshSummarySilent(): void {
+    this.admin.summary(this.buildSummaryParams()).subscribe({
+      next: (data) => {
+        this.summary.set(data);
+        this.lastUpdatedAt.set(new Date().toISOString());
+      },
+      error: () => {
+        // ignore background refresh failures
+      }
+    });
+  }
+
+  private startLiveRefresh(): void {
+    this.stopLiveRefresh();
+    this.refreshNow();
+    this.liveRefreshTimerId = window.setInterval(() => this.refreshNow(), 60 * 1000);
+  }
+
+  private stopLiveRefresh(): void {
+    if (this.liveRefreshTimerId === null) return;
+    window.clearInterval(this.liveRefreshTimerId);
+    this.liveRefreshTimerId = null;
+  }
+
+  private loadLiveRefreshPreference(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(this.liveRefreshStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      const enabled = Boolean((parsed as any)?.enabled);
+      this.liveRefreshEnabled.set(enabled);
+      if (enabled) this.startLiveRefresh();
+    } catch {
+      // ignore
+    }
+  }
+
+  private persistLiveRefreshPreference(enabled: boolean): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem(this.liveRefreshStorageKey, JSON.stringify({ enabled }));
+    } catch {
+      // ignore
+    }
   }
 
   retryDashboard(): void {
