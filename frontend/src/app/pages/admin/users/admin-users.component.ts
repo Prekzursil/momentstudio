@@ -310,9 +310,13 @@ const USERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
                 <option value="fulfillment">{{ 'adminUi.users.roles.fulfillment' | translate }}</option>
                 <option value="content">{{ 'adminUi.users.roles.content' | translate }}</option>
                 <option value="admin">{{ 'adminUi.users.roles.admin' | translate }}</option>
+                <option value="owner" disabled>{{ 'adminUi.users.roles.owner' | translate }}</option>
               </select>
               <span *ngIf="selectedUser()!.role === 'owner'" class="text-xs font-normal text-slate-500 dark:text-slate-400">
                 {{ 'adminUi.users.ownerLocked' | translate }}
+              </span>
+              <span *ngIf="selectedRole" class="text-xs font-normal text-slate-500 dark:text-slate-400">
+                {{ ('adminUi.users.roleHints.' + selectedRole) | translate }}
               </span>
             </label>
 
