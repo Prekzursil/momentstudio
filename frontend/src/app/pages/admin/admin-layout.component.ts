@@ -1,9 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, HostListener } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { Subscription } from 'rxjs';
+import { filter } from 'rxjs/operators';
 import { AuthService } from '../../core/auth.service';
+import { AdminRecentService } from '../../core/admin-recent.service';
 import { ContainerComponent } from '../../layout/container.component';
 
 type AdminNavItem = {
@@ -78,15 +81,17 @@ type AdminNavItem = {
     </app-container>
   `
 })
-export class AdminLayoutComponent {
+export class AdminLayoutComponent implements OnInit, OnDestroy {
   constructor(
     private auth: AuthService,
     private router: Router,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private recent: AdminRecentService
   ) {}
 
   private pendingGoAt: number | null = null;
   navQuery = '';
+  private navSub?: Subscription;
 
   private readonly allNavItems: AdminNavItem[] = [
     { path: '/admin/dashboard', labelKey: 'adminUi.nav.dashboard', section: 'dashboard', exact: true },
@@ -103,6 +108,17 @@ export class AdminLayoutComponent {
 
   get navItems(): AdminNavItem[] {
     return this.allNavItems.filter((item) => this.auth.canAccessAdminSection(item.section));
+  }
+
+  ngOnInit(): void {
+    this.recordRecent(this.router.url);
+    this.navSub = this.router.events
+      .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
+      .subscribe((event) => this.recordRecent(event.urlAfterRedirects || event.url));
+  }
+
+  ngOnDestroy(): void {
+    this.navSub?.unsubscribe();
   }
 
   filteredNavItems(): AdminNavItem[] {
@@ -205,5 +221,41 @@ export class AdminLayoutComponent {
   private navLabel(item: AdminNavItem): string {
     const value = this.translate.instant(item.labelKey);
     return typeof value === 'string' && value.trim() ? value : item.labelKey;
+  }
+
+  private recordRecent(url: string): void {
+    const raw = (url || '').trim();
+    if (!raw.startsWith('/admin')) return;
+    const normalized = raw.split('?')[0].split('#')[0];
+    if (!normalized) return;
+    if (/^\/admin\/orders\/[^/]+$/.test(normalized)) return;
+
+    const candidates = this.navItems.filter((item) => normalized === item.path || normalized.startsWith(`${item.path}/`));
+    if (!candidates.length) return;
+    const match = candidates.sort((a, b) => b.path.length - a.path.length)[0];
+    if (!match) return;
+
+    const label = this.navLabel(match);
+    let subtitle = '';
+    let type: 'page' | 'content' = 'page';
+
+    if (normalized.startsWith('/admin/content')) {
+      type = 'content';
+      const section = (normalized.split('/')[3] || '').trim();
+      if (section) {
+        const key = `adminUi.content.nav.${section}`;
+        const translated = this.translate.instant(key);
+        subtitle = translated === key ? section : translated;
+      }
+    }
+
+    this.recent.add({
+      key: `page:${normalized}`,
+      type,
+      label,
+      subtitle,
+      url: normalized,
+      state: null
+    });
   }
 }

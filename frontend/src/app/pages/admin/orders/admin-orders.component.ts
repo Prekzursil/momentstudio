@@ -221,6 +221,7 @@ const ORDERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
 
             <div
               *ngIf="selectedIds.size"
+              id="admin-orders-bulk-actions"
               class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
             >
               <div class="font-medium">
@@ -550,6 +551,30 @@ const ORDERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
           </div>
         </div>
       </ng-container>
+
+      <div *ngIf="selectedIds.size" class="h-24"></div>
+
+      <div *ngIf="selectedIds.size" class="fixed inset-x-0 bottom-4 z-40 px-4 sm:px-6">
+        <div class="max-w-6xl mx-auto">
+          <div
+            class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 text-sm text-slate-700 shadow-lg backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-200 dark:shadow-none"
+          >
+            <div class="font-medium">
+              {{ 'adminUi.orders.bulk.selected' | translate: { count: selectedIds.size } }}
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.bulkActions' | translate" (action)="scrollToBulkActions()"></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.orders.bulk.clearSelection' | translate"
+                [disabled]="bulkBusy"
+                (action)="clearSelection()"
+              ></app-button>
+            </div>
+          </div>
+        </div>
+      </div>
 	    </div>
 	  `
 })
@@ -672,6 +697,17 @@ export class AdminOrdersComponent implements OnInit {
     return this.tableLayout().density === 'compact'
       ? 'adminUi.tableLayout.densityToggle.toComfortable'
       : 'adminUi.tableLayout.densityToggle.toCompact';
+  }
+
+  scrollToBulkActions(): void {
+    if (typeof document === 'undefined') return;
+    const el = document.getElementById('admin-orders-bulk-actions');
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => {
+      const focusable = el.querySelector<HTMLElement>('select, input, button, [href], [tabindex]:not([tabindex="-1"])');
+      focusable?.focus();
+    }, 0);
   }
 
   visibleColumnIds(): string[] {

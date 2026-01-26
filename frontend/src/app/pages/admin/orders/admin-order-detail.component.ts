@@ -14,6 +14,7 @@ import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { ReceiptShareToken } from '../../../core/account.service';
 import { AdminOrderDetail, AdminOrderEvent, AdminOrderFraudSignal, AdminOrderShipment, AdminOrdersService } from '../../../core/admin-orders.service';
 import { AdminReturnsService, ReturnRequestRead } from '../../../core/admin-returns.service';
+import { AdminRecentService } from '../../../core/admin-recent.service';
 import { orderStatusChipClass } from '../../../shared/order-status';
 
 type OrderStatus =
@@ -1399,7 +1400,8 @@ export class AdminOrderDetailComponent implements OnInit {
     private api: AdminOrdersService,
     private returnsApi: AdminReturnsService,
     private toast: ToastService,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private recent: AdminRecentService
   ) {}
 
   statusChipClass(status: string): string {
@@ -2501,6 +2503,16 @@ export class AdminOrderDetailComponent implements OnInit {
     this.api.get(orderId, { include_pii: this.piiReveal() }).subscribe({
       next: (o) => {
         this.order.set(o);
+        const ref = o.reference_code || o.id.slice(0, 8);
+        const email = (o.customer_email || '').toString().trim();
+        this.recent.add({
+          key: `order:${o.id}`,
+          type: 'order',
+          label: ref,
+          subtitle: email,
+          url: `/admin/orders/${o.id}`,
+          state: null
+        });
         this.statusValue = (o.status as OrderStatus) || 'pending_acceptance';
         this.trackingNumber = o.tracking_number ?? '';
         this.trackingUrl = o.tracking_url ?? '';

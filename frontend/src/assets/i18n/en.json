@@ -1481,7 +1481,21 @@
       "up": "Up",
       "down": "Down",
       "preview": "Preview",
-      "hide": "Hide"
+      "hide": "Hide",
+      "bulkActions": "Bulk actions"
+    },
+    "recent": {
+      "title": "Recently viewed",
+      "hint": "Quickly reopen pages and items you visited.",
+      "empty": "No recent items yet.",
+      "clear": "Clear",
+      "types": {
+        "page": "Page",
+        "content": "Content",
+        "order": "Order",
+        "product": "Product",
+        "user": "User"
+      }
     },
     "tableLayout": {
       "title": "Table layout",

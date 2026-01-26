@@ -1481,7 +1481,21 @@
       "up": "Sus",
       "down": "Jos",
       "preview": "Previzualizează",
-      "hide": "Ascunde"
+      "hide": "Ascunde",
+      "bulkActions": "Acțiuni în masă"
+    },
+    "recent": {
+      "title": "Vizualizate recent",
+      "hint": "Redeschide rapid pagini și elemente vizitate.",
+      "empty": "Nu există elemente recente.",
+      "clear": "Șterge",
+      "types": {
+        "page": "Pagină",
+        "content": "Conținut",
+        "order": "Comandă",
+        "product": "Produs",
+        "user": "Utilizator"
+      }
     },
     "tableLayout": {
       "title": "Aspect tabel",

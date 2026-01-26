@@ -31,6 +31,7 @@ import {
   StockAdjustment,
   StockAdjustmentReason,
 } from '../../../core/admin.service';
+import { AdminRecentService } from '../../../core/admin-recent.service';
 import { ToastService } from '../../../core/toast.service';
 import { AuthService } from '../../../core/auth.service';
 import {
@@ -319,6 +320,7 @@ type PriceHistoryChart = {
 
 	          <div
 	            *ngIf="selected.size > 0 && view === 'active'"
+              id="admin-products-bulk-actions"
 	            class="rounded-xl border border-slate-200 bg-slate-50 p-3 grid gap-3 dark:border-slate-800 dark:bg-slate-950/20"
 	          >
             <div class="flex flex-wrap items-center justify-between gap-3">
@@ -2280,6 +2282,35 @@ type PriceHistoryChart = {
 	          </div>
 	        </div>
 	      </section>
+
+        <div *ngIf="selected.size > 0 && view === 'active'" class="h-24"></div>
+
+        <div *ngIf="selected.size > 0 && view === 'active'" class="fixed inset-x-0 bottom-4 z-40 px-4 sm:px-6">
+          <div class="max-w-6xl mx-auto">
+            <div
+              class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 text-sm text-slate-700 shadow-lg backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-200 dark:shadow-none"
+            >
+              <div class="font-medium">
+                {{ 'adminUi.products.bulk.selected' | translate: { count: selected.size } }}
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.actions.bulkActions' | translate"
+                  (action)="scrollToBulkActions()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.products.bulk.clearSelection' | translate"
+                  [disabled]="bulkBusy() || inlineBusy()"
+                  (action)="clearSelection()"
+                ></app-button>
+              </div>
+            </div>
+          </div>
+        </div>
 	    </div>
 	  `
 })
@@ -2430,6 +2461,7 @@ export class AdminProductsComponent implements OnInit {
     private catalog: CatalogService,
     private admin: AdminService,
     private auth: AuthService,
+    private recent: AdminRecentService,
     private markdown: MarkdownService,
     private toast: ToastService,
     private translate: TranslateService
@@ -2472,6 +2504,17 @@ export class AdminProductsComponent implements OnInit {
     return this.tableLayout().density === 'compact'
       ? 'adminUi.tableLayout.densityToggle.toComfortable'
       : 'adminUi.tableLayout.densityToggle.toCompact';
+  }
+
+  scrollToBulkActions(): void {
+    if (typeof document === 'undefined') return;
+    const el = document.getElementById('admin-products-bulk-actions');
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => {
+      const focusable = el.querySelector<HTMLElement>('select, input, button, [href], [tabindex]:not([tabindex="-1"])');
+      focusable?.focus();
+    }, 0);
   }
 
   visibleColumnIds(): string[] {
@@ -3171,6 +3214,15 @@ export class AdminProductsComponent implements OnInit {
 	    this.resetStockLedger();
     this.admin.getProduct(slug).subscribe({
       next: (prod: any) => {
+        const name = (prod?.name || '').toString().trim();
+        this.recent.add({
+          key: `product:${slug}`,
+          type: 'product',
+          label: name || slug,
+          subtitle: slug,
+          url: '/admin/products',
+          state: { editProductSlug: slug }
+        });
         this.editingProductId.set(prod?.id ? String(prod.id) : null);
         this.editingCurrency.set((prod?.currency || 'RON').toString() || 'RON');
         const basePrice = typeof prod.base_price === 'number' ? prod.base_price : Number(prod.base_price || 0);

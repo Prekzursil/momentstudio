@@ -15,6 +15,7 @@ import {
 } from '../../../core/admin-users.service';
 import { AuthService } from '../../../core/auth.service';
 import type { PromotionRead } from '../../../core/coupons.service';
+import { AdminRecentService } from '../../../core/admin-recent.service';
 import { ToastService } from '../../../core/toast.service';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
@@ -905,6 +906,7 @@ export class AdminUsersComponent implements OnInit {
     private couponsApi: AdminCouponsV2Service,
     private admin: AdminService,
     private auth: AuthService,
+    private recent: AdminRecentService,
     private toast: ToastService,
     private translate: TranslateService
   ) {}
@@ -988,6 +990,15 @@ export class AdminUsersComponent implements OnInit {
   }
 
   select(user: AdminUserListItem): void {
+    const email = (user.email || '').toString().trim();
+    this.recent.add({
+      key: `user:${user.id}`,
+      type: 'user',
+      label: this.identityLabel(user),
+      subtitle: email,
+      url: '/admin/users',
+      state: email ? { prefillUserSearch: email, autoSelectFirst: true } : null
+    });
     this.selectedUser.set(user);
     this.selectedRole = user.role;
     this.vip = false;
