@@ -30,6 +30,9 @@ export interface ReturnRequestRead {
   customer_email?: string | null;
   customer_name?: string | null;
   user_id?: string | null;
+  return_label_filename?: string | null;
+  return_label_uploaded_at?: string | null;
+  has_return_label?: boolean;
   status: ReturnRequestStatus;
   reason: string;
   customer_message?: string | null;
@@ -74,6 +77,20 @@ export class AdminReturnsService {
     return this.api.patch<ReturnRequestRead>(`/returns/admin/${returnId}`, payload);
   }
 
+  uploadReturnLabel(returnId: string, file: File): Observable<ReturnRequestRead> {
+    const data = new FormData();
+    data.append('file', file);
+    return this.api.post<ReturnRequestRead>(`/returns/admin/${returnId}/label`, data);
+  }
+
+  downloadReturnLabel(returnId: string): Observable<Blob> {
+    return this.api.getBlob(`/returns/admin/${returnId}/label`);
+  }
+
+  deleteReturnLabel(returnId: string): Observable<void> {
+    return this.api.delete<void>(`/returns/admin/${returnId}/label`);
+  }
+
   listByOrder(orderId: string): Observable<ReturnRequestRead[]> {
     return this.api.get<ReturnRequestRead[]>(`/returns/admin/by-order/${orderId}`);
   }
@@ -87,4 +104,3 @@ export class AdminReturnsService {
     return this.api.post<ReturnRequestRead>('/returns/admin', payload as any);
   }
 }
-

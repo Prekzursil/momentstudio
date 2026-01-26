@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import mimetypes
+from datetime import datetime, timezone
+from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import require_admin_section, require_verified_email
@@ -18,6 +22,7 @@ from app.schemas.returns import (
     ReturnRequestUpdate,
 )
 from app.services import email as email_service
+from app.services import private_storage
 from app.services import returns as returns_service
 
 router = APIRouter(prefix="/returns", tags=["returns"])
@@ -28,6 +33,9 @@ def _serialize_return_request(record: object) -> ReturnRequestRead:
     payload["order_reference"] = getattr(getattr(record, "order", None), "reference_code", None)
     payload["customer_email"] = getattr(getattr(record, "order", None), "customer_email", None)
     payload["customer_name"] = getattr(getattr(record, "order", None), "customer_name", None)
+    payload["return_label_filename"] = getattr(record, "return_label_filename", None)
+    payload["return_label_uploaded_at"] = getattr(record, "return_label_uploaded_at", None)
+    payload["has_return_label"] = bool(getattr(record, "return_label_path", None))
     payload["items"] = [
         {
             "id": item.id,
@@ -39,6 +47,13 @@ def _serialize_return_request(record: object) -> ReturnRequestRead:
         for item in getattr(record, "items", []) or []
     ]
     return ReturnRequestRead(**payload)
+
+
+def _sanitize_filename(value: str | None) -> str:
+    name = Path(value or "").name.strip()
+    if not name:
+        return "return-label"
+    return name[:255]
 
 
 @router.post("", response_model=ReturnRequestRead, status_code=status.HTTP_201_CREATED)
@@ -167,3 +182,79 @@ async def admin_update_return(
         )
 
     return await admin_get_return(updated.id, session=session, _=admin)
+
+
+@router.post("/admin/{return_id}/label", response_model=ReturnRequestRead)
+async def admin_upload_return_label(
+    return_id: UUID,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("returns")),
+) -> ReturnRequestRead:
+    record = await returns_service.get_return_request(session, return_id)
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Return request not found")
+
+    old_path = getattr(record, "return_label_path", None)
+    rel_path, original_name = private_storage.save_private_upload(
+        file,
+        subdir=f"return-labels/{return_id}",
+        allowed_content_types=("application/pdf", "image/png", "image/jpeg", "image/webp"),
+        max_bytes=10 * 1024 * 1024,
+    )
+    now = datetime.now(timezone.utc)
+    record.return_label_path = rel_path
+    record.return_label_filename = _sanitize_filename(original_name)
+    record.return_label_uploaded_at = now
+    session.add(record)
+    await session.commit()
+
+    if old_path and old_path != rel_path:
+        private_storage.delete_private_file(old_path)
+
+    refreshed = await returns_service.get_return_request(session, return_id)
+    if not refreshed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Return request not found")
+    return _serialize_return_request(refreshed)
+
+
+@router.get("/admin/{return_id}/label")
+async def admin_download_return_label(
+    return_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("returns")),
+) -> FileResponse:
+    record = await returns_service.get_return_request(session, return_id)
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Return request not found")
+    rel = getattr(record, "return_label_path", None)
+    if not rel:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Return label not found")
+    path = private_storage.resolve_private_path(rel)
+    if not path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Return label not found")
+
+    filename = _sanitize_filename(getattr(record, "return_label_filename", None) or path.name)
+    media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    headers = {"Cache-Control": "no-store"}
+    return FileResponse(path, media_type=media_type, filename=filename, headers=headers)
+
+
+@router.delete("/admin/{return_id}/label", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+async def admin_delete_return_label(
+    return_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("returns")),
+) -> None:
+    record = await returns_service.get_return_request(session, return_id)
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Return request not found")
+    rel = getattr(record, "return_label_path", None)
+    if not rel:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Return label not found")
+    record.return_label_path = None
+    record.return_label_filename = None
+    record.return_label_uploaded_at = None
+    session.add(record)
+    await session.commit()
+    private_storage.delete_private_file(rel)

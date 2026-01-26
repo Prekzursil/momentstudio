@@ -1555,6 +1555,14 @@
         "statusAll": "Toate",
         "apply": "Aplică"
       },
+      "view": {
+        "list": "Listă",
+        "board": "Kanban"
+      },
+      "board": {
+        "empty": "Nu există retururi în acest stadiu.",
+        "viewAll": "Vezi toate"
+      },
       "status": {
         "requested": "Solicitat",
         "approved": "Aprobat",
@@ -1581,6 +1589,14 @@
         "reason": "Motiv",
         "customerMessage": "Mesaj client",
         "items": "Produse",
+        "returnLabel": "Etichetă retur",
+        "returnLabelChoose": "Alege fișier",
+        "returnLabelNoFile": "Niciun fișier",
+        "returnLabelUpload": "Încarcă",
+        "returnLabelDownload": "Descarcă",
+        "returnLabelDelete": "Șterge",
+        "returnLabelNone": "Nu există etichetă de retur.",
+        "returnLabelConfirmDelete": "Ștergi eticheta de retur?",
         "adminNote": "Notă admin",
         "adminNotePh": "Notițe interne (vizibile doar staff-ului)…",
         "save": "Salvează"

@@ -1555,6 +1555,14 @@
         "statusAll": "All statuses",
         "apply": "Apply"
       },
+      "view": {
+        "list": "List",
+        "board": "Board"
+      },
+      "board": {
+        "empty": "No returns in this stage.",
+        "viewAll": "View all"
+      },
       "status": {
         "requested": "Requested",
         "approved": "Approved",
@@ -1581,6 +1589,14 @@
         "reason": "Reason",
         "customerMessage": "Customer message",
         "items": "Items",
+        "returnLabel": "Return label",
+        "returnLabelChoose": "Choose file",
+        "returnLabelNoFile": "No file",
+        "returnLabelUpload": "Upload",
+        "returnLabelDownload": "Download",
+        "returnLabelDelete": "Delete",
+        "returnLabelNone": "No return label.",
+        "returnLabelConfirmDelete": "Delete the return label?",
         "adminNote": "Admin note",
         "adminNotePh": "Internal notes (visible only to staff)…",
         "save": "Save"
