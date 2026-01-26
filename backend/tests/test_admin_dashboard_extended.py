@@ -173,6 +173,112 @@ def test_admin_filters_and_low_stock(test_app: Dict[str, object]) -> None:
     assert low_stock.json()[0]["stock_quantity"] == 2
 
 
+def test_admin_summary_sales_excludes_cancelled_and_pending(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    asyncio.run(seed(session_factory))
+    headers = auth_headers(client)
+
+    async def add_orders() -> None:
+        async with session_factory() as session:
+            customer = (
+                await session.execute(select(User).where(User.email == "customer@example.com"))
+            ).scalar_one()
+            now = datetime.now(timezone.utc)
+            email = customer.email
+            name = customer.name or customer.email
+
+            session.add_all(
+                [
+                    Order(
+                        user_id=customer.id,
+                        status=OrderStatus.paid,
+                        total_amount=100,
+                        currency="RON",
+                        tax_amount=0,
+                        shipping_amount=0,
+                        customer_email=email,
+                        customer_name=name,
+                        created_at=now,
+                        updated_at=now,
+                    ),
+                    Order(
+                        user_id=customer.id,
+                        status=OrderStatus.shipped,
+                        total_amount=50,
+                        currency="RON",
+                        tax_amount=0,
+                        shipping_amount=0,
+                        customer_email=email,
+                        customer_name=name,
+                        created_at=now,
+                        updated_at=now,
+                    ),
+                    Order(
+                        user_id=customer.id,
+                        status=OrderStatus.delivered,
+                        total_amount=25,
+                        currency="RON",
+                        tax_amount=0,
+                        shipping_amount=0,
+                        customer_email=email,
+                        customer_name=name,
+                        created_at=now,
+                        updated_at=now,
+                    ),
+                    Order(
+                        user_id=customer.id,
+                        status=OrderStatus.pending_acceptance,
+                        total_amount=75,
+                        currency="RON",
+                        tax_amount=0,
+                        shipping_amount=0,
+                        customer_email=email,
+                        customer_name=name,
+                        created_at=now,
+                        updated_at=now,
+                    ),
+                    Order(
+                        user_id=customer.id,
+                        status=OrderStatus.cancelled,
+                        total_amount=500,
+                        currency="RON",
+                        tax_amount=0,
+                        shipping_amount=0,
+                        customer_email=email,
+                        customer_name=name,
+                        created_at=now,
+                        updated_at=now,
+                    ),
+                    Order(
+                        user_id=customer.id,
+                        status=OrderStatus.refunded,
+                        total_amount=35,
+                        currency="RON",
+                        tax_amount=0,
+                        shipping_amount=0,
+                        customer_email=email,
+                        customer_name=name,
+                        created_at=now,
+                        updated_at=now,
+                    ),
+                ]
+            )
+            await session.commit()
+
+    asyncio.run(add_orders())
+
+    resp = client.get("/api/v1/admin/dashboard/summary", headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+
+    assert data["sales_30d"] == pytest.approx(175.0)
+    assert data["sales_range"] == pytest.approx(175.0)
+    assert data["today_sales"] == pytest.approx(175.0)
+
+
 def test_coupon_lifecycle_and_audit(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     engine = test_app["engine"]

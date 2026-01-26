@@ -104,6 +104,7 @@ async def admin_summary(
     range_to: date | None = Query(default=None),
 ) -> dict:
     now = datetime.now(timezone.utc)
+    successful_statuses = (OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered)
 
     if (range_from is None) != (range_to is None):
         raise HTTPException(
@@ -152,7 +153,8 @@ async def admin_summary(
     since = now - timedelta(days=30)
     sales_30d = await session.scalar(
         select(func.coalesce(func.sum(Order.total_amount), 0)).where(
-            Order.created_at >= since
+            Order.created_at >= since,
+            Order.status.in_(successful_statuses),
         )
     )
     orders_30d = await session.scalar(
@@ -161,7 +163,9 @@ async def admin_summary(
 
     sales_range = await session.scalar(
         select(func.coalesce(func.sum(Order.total_amount), 0)).where(
-            Order.created_at >= start, Order.created_at < end
+            Order.created_at >= start,
+            Order.created_at < end,
+            Order.status.in_(successful_statuses),
         )
     )
     orders_range = await session.scalar(
@@ -185,12 +189,16 @@ async def admin_summary(
     )
     today_sales = await session.scalar(
         select(func.coalesce(func.sum(Order.total_amount), 0)).where(
-            Order.created_at >= today_start, Order.created_at < now
+            Order.created_at >= today_start,
+            Order.created_at < now,
+            Order.status.in_(successful_statuses),
         )
     )
     yesterday_sales = await session.scalar(
         select(func.coalesce(func.sum(Order.total_amount), 0)).where(
-            Order.created_at >= yesterday_start, Order.created_at < today_start
+            Order.created_at >= yesterday_start,
+            Order.created_at < today_start,
+            Order.status.in_(successful_statuses),
         )
     )
     today_refunds = await session.scalar(
