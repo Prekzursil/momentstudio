@@ -63,7 +63,7 @@ from app.models.content import (  # noqa: F401
     ContentRedirect,
 )
 from app.models.wishlist import WishlistItem  # noqa: F401
-from app.models.webhook import StripeWebhookEvent  # noqa: F401
+from app.models.webhook import PayPalWebhookEvent, StripeWebhookEvent  # noqa: F401
 from app.models.blog import BlogComment, BlogCommentFlag  # noqa: F401
 from app.models.fx import FxRate  # noqa: F401
 from app.models.taxes import TaxGroup, TaxRate  # noqa: F401
@@ -130,6 +130,7 @@ __all__ = [
     "ContentRedirect",
     "WishlistItem",
     "StripeWebhookEvent",
+    "PayPalWebhookEvent",
     "BlogComment",
     "BlogCommentFlag",
     "FxRate",

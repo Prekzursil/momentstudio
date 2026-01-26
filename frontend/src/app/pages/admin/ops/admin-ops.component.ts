@@ -2,7 +2,15 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { OpsService, BannerLevel, MaintenanceBannerRead, ShippingMethodRead, ShippingSimulationResult } from '../../../core/ops.service';
+import {
+  OpsService,
+  BannerLevel,
+  MaintenanceBannerRead,
+  ShippingMethodRead,
+  ShippingSimulationResult,
+  WebhookEventRead,
+  WebhookEventDetail
+} from '../../../core/ops.service';
 import { ToastService } from '../../../core/toast.service';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
@@ -280,10 +288,10 @@ import { SkeletonComponent } from '../../../shared/skeleton.component';
               </div>
             </div>
 
-            <div *ngIf="simResult()!.methods?.length" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-              <table class="min-w-[760px] w-full text-sm">
-                <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
-                  <tr>
+	            <div *ngIf="simResult()!.methods?.length" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+	              <table class="min-w-[760px] w-full text-sm">
+	                <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+	                  <tr>
                     <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.shipping.table.method' | translate }}</th>
                     <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.shipping.table.rateFlat' | translate }}</th>
                     <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.shipping.table.ratePerKg' | translate }}</th>
@@ -298,13 +306,109 @@ import { SkeletonComponent } from '../../../shared/skeleton.component';
                     <td class="px-3 py-2 font-semibold text-slate-900 dark:text-slate-50">{{ m.computed_shipping_ron }} RON</td>
                   </tr>
                 </tbody>
-              </table>
+	              </table>
+	            </div>
+	          </div>
+	        </div>
+
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ops.webhooks.title' | translate }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.ops.webhooks.hint' | translate }}</div>
             </div>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.ops.webhooks.refresh' | translate"
+              [disabled]="webhooksLoading()"
+              (action)="loadWebhooks()"
+            ></app-button>
+          </div>
+
+          <div *ngIf="webhooksLoading()" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+            <app-skeleton [rows]="4"></app-skeleton>
+          </div>
+
+          <div *ngIf="!webhooksLoading() && webhooksError()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+            {{ webhooksError() }}
+          </div>
+
+          <div
+            *ngIf="!webhooksLoading() && !webhooksError() && !webhooks().length"
+            class="text-sm text-slate-600 dark:text-slate-300"
+          >
+            {{ 'adminUi.ops.webhooks.empty' | translate }}
+          </div>
+
+          <div *ngIf="!webhooksLoading() && webhooks().length" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+            <table class="min-w-[980px] w-full text-sm">
+              <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                <tr>
+                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.webhooks.table.provider' | translate }}</th>
+                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.webhooks.table.eventType' | translate }}</th>
+                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.webhooks.table.status' | translate }}</th>
+                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.webhooks.table.attempts' | translate }}</th>
+                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.webhooks.table.lastAttempt' | translate }}</th>
+                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.webhooks.table.error' | translate }}</th>
+                  <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.ops.webhooks.table.actions' | translate }}</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+                <tr *ngFor="let w of webhooks()">
+                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                    {{ ('adminUi.ops.webhooks.provider.' + w.provider) | translate }}
+                  </td>
+                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                    {{ w.event_type || '—' }}
+                  </td>
+                  <td class="px-3 py-2">
+                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold" [ngClass]="webhookStatusClasses(w.status)">
+                      {{ ('adminUi.ops.webhooks.status.' + w.status) | translate }}
+                    </span>
+                  </td>
+                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ w.attempts }}</td>
+                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ w.last_attempt_at | date: 'short' }}</td>
+                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200 max-w-[360px] truncate">{{ w.last_error || '—' }}</td>
+                  <td class="px-3 py-2">
+                    <div class="flex justify-end items-center gap-2">
+                      <app-button size="sm" variant="ghost" [label]="'adminUi.ops.webhooks.view' | translate" (action)="viewWebhook(w)"></app-button>
+                      <app-button
+                        *ngIf="w.status !== 'processed'"
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.ops.webhooks.retry' | translate"
+                        [disabled]="webhookRetrying() === w.provider + ':' + w.event_id"
+                        (action)="retryWebhook(w)"
+                      ></app-button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div *ngIf="selectedWebhook()" class="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-800">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.ops.webhooks.detailTitle' | translate }} · {{ selectedWebhook()!.provider }} · {{ selectedWebhook()!.event_id }}
+              </div>
+              <app-button size="sm" variant="ghost" [label]="'adminUi.ops.webhooks.close' | translate" (action)="closeWebhookDetail()"></app-button>
+            </div>
+
+            <div
+              *ngIf="selectedWebhook()!.last_error"
+              class="mt-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+            >
+              {{ selectedWebhook()!.last_error }}
+            </div>
+
+            <pre class="mt-3 max-h-[320px] overflow-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-700 dark:bg-slate-950/30 dark:text-slate-200">{{ selectedWebhook()!.payload | json }}</pre>
           </div>
         </div>
-      </div>
-    </div>
-  `
+	      </div>
+	    </div>
+	  `
 })
 export class AdminOpsComponent implements OnInit {
   bannersLoading = signal(true);
@@ -334,12 +438,19 @@ export class AdminOpsComponent implements OnInit {
   simError = signal<string | null>(null);
   simResult = signal<ShippingSimulationResult | null>(null);
 
+  webhooksLoading = signal(true);
+  webhooksError = signal<string | null>(null);
+  webhooks = signal<WebhookEventRead[]>([]);
+  selectedWebhook = signal<WebhookEventDetail | null>(null);
+  webhookRetrying = signal<string | null>(null);
+
   constructor(private ops: OpsService, private toast: ToastService, private translate: TranslateService) {}
 
   ngOnInit(): void {
     this.resetBannerForm();
     this.loadBanners();
     this.loadShippingMethods();
+    this.loadWebhooks();
   }
 
   crumbs(): { label: string; url?: string }[] {
@@ -477,6 +588,51 @@ export class AdminOpsComponent implements OnInit {
       });
   }
 
+  webhookStatusClasses(status: string): string {
+    const s = (status || '').toLowerCase();
+    if (s === 'failed') {
+      return 'bg-rose-50 text-rose-800 dark:bg-rose-950/30 dark:text-rose-100';
+    }
+    if (s === 'processed') {
+      return 'bg-emerald-50 text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100';
+    }
+    return 'bg-slate-100 text-slate-700 dark:bg-slate-800/60 dark:text-slate-200';
+  }
+
+  viewWebhook(w: WebhookEventRead): void {
+    if (!w?.provider || !w?.event_id) return;
+    this.webhooksError.set(null);
+    this.ops.getWebhookDetail(w.provider, w.event_id).subscribe({
+      next: (detail) => this.selectedWebhook.set(detail),
+      error: () => this.toast.error(this.translate.instant('adminUi.ops.webhooks.errors.detail'))
+    });
+  }
+
+  closeWebhookDetail(): void {
+    this.selectedWebhook.set(null);
+  }
+
+  retryWebhook(w: WebhookEventRead): void {
+    if (!w?.provider || !w?.event_id) return;
+    const key = `${w.provider}:${w.event_id}`;
+    this.webhookRetrying.set(key);
+    this.ops.retryWebhook(w.provider, w.event_id).subscribe({
+      next: () => {
+        this.toast.success(this.translate.instant('adminUi.ops.webhooks.success.retried'));
+        this.webhookRetrying.set(null);
+        this.loadWebhooks();
+        if (this.selectedWebhook()?.provider === w.provider && this.selectedWebhook()?.event_id === w.event_id) {
+          this.viewWebhook(w);
+        }
+      },
+      error: (err) => {
+        this.webhookRetrying.set(null);
+        const msg = err?.error?.detail || this.translate.instant('adminUi.ops.webhooks.errors.retry');
+        this.toast.error(msg);
+      }
+    });
+  }
+
   private loadBanners(): void {
     this.bannersLoading.set(true);
     this.bannersError.set(null);
@@ -502,6 +658,21 @@ export class AdminOpsComponent implements OnInit {
       error: () => {
         this.shippingMethods.set([]);
         this.shippingMethodsLoading.set(false);
+      }
+    });
+  }
+
+  loadWebhooks(): void {
+    this.webhooksLoading.set(true);
+    this.webhooksError.set(null);
+    this.ops.listWebhooks().subscribe({
+      next: (rows) => {
+        this.webhooks.set(rows || []);
+        this.webhooksLoading.set(false);
+      },
+      error: () => {
+        this.webhooksError.set(this.translate.instant('adminUi.ops.webhooks.errors.load'));
+        this.webhooksLoading.set(false);
       }
     });
   }

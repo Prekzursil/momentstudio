@@ -776,7 +776,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Returns: return label support – Upload/provide shipping labels for returns.
 - [x] Admin Ops: maintenance banners – Schedule storefront announcement banners (planned downtime/promos).
 - [x] Admin Ops: shipping rate simulator – Test shipping methods/rules for a sample cart/address.
-- [ ] Admin Ops: webhook monitor – View recent provider webhooks and retry failed deliveries.
+- [x] Admin Ops: webhook monitor – View recent provider webhooks and retry failed deliveries.
 - [ ] Admin Security: enforce 2FA for admins – Require TOTP/passkey for owner/admin roles.
 - [ ] Admin Security: IP allowlist – Optional allowlist/denylist for admin access with safe bypass flow.
 - [ ] Admin Audit: retention + export – Export audit logs with retention policies and redaction options.

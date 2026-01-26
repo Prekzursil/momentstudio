@@ -11,6 +11,7 @@ from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
 from app.models.user import UserRole
+from app.models.webhook import StripeWebhookEvent
 from app.schemas.user import UserCreate
 from app.services.auth import create_user, issue_tokens_for_user
 
@@ -102,3 +103,35 @@ def test_ops_banners_and_shipping_simulation(test_app: Dict[str, object]) -> Non
 
     deleted = client.delete(f"/api/v1/ops/admin/banners/{uuid.UUID(banner_id)}", headers=auth_headers(token))
     assert deleted.status_code == 204, deleted.text
+
+    def seed_stripe_webhook() -> None:
+        async def _seed() -> None:
+            async with SessionLocal() as session:
+                session.add(
+                    StripeWebhookEvent(
+                        stripe_event_id="evt_test",
+                        event_type="unhandled.event",
+                        attempts=1,
+                        last_attempt_at=datetime.now(timezone.utc),
+                        processed_at=None,
+                        last_error="boom",
+                        payload={"id": "evt_test", "type": "unhandled.event"},
+                    )
+                )
+                await session.commit()
+
+        asyncio.run(_seed())
+
+    seed_stripe_webhook()
+
+    listed_hooks = client.get("/api/v1/ops/admin/webhooks", headers=auth_headers(token))
+    assert listed_hooks.status_code == 200, listed_hooks.text
+    assert any(row["provider"] == "stripe" and row["event_id"] == "evt_test" for row in listed_hooks.json())
+
+    detail = client.get("/api/v1/ops/admin/webhooks/stripe/evt_test", headers=auth_headers(token))
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["payload"]["id"] == "evt_test"
+
+    retried = client.post("/api/v1/ops/admin/webhooks/stripe/evt_test/retry", headers=auth_headers(token))
+    assert retried.status_code == 200, retried.text
+    assert retried.json()["status"] == "processed"

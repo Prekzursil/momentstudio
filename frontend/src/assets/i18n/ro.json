@@ -1618,6 +1618,42 @@
           "subtotalRequired": "Subtotalul este obligatoriu.",
           "run": "Nu am putut rula simularea."
         }
+      },
+      "webhooks": {
+        "title": "Monitor webhooks",
+        "hint": "Vezi webhooks recente și reîncearcă livrările eșuate.",
+        "refresh": "Reîmprospătează",
+        "empty": "Nu există evenimente webhook.",
+        "view": "Vezi",
+        "retry": "Reîncearcă",
+        "close": "Închide",
+        "detailTitle": "Detalii webhook",
+        "provider": {
+          "stripe": "Stripe",
+          "paypal": "PayPal"
+        },
+        "status": {
+          "received": "Primit",
+          "processed": "Procesat",
+          "failed": "Eșuat"
+        },
+        "table": {
+          "provider": "Provider",
+          "eventType": "Tip eveniment",
+          "status": "Status",
+          "attempts": "Încercări",
+          "lastAttempt": "Ultima încercare",
+          "error": "Ultima eroare",
+          "actions": "Acțiuni"
+        },
+        "success": {
+          "retried": "Webhook reîncercat."
+        },
+        "errors": {
+          "load": "Nu am putut încărca webhooks.",
+          "detail": "Nu am putut încărca detaliile webhook.",
+          "retry": "Nu am putut reîncerca webhook-ul."
+        }
       }
     },
     "returns": {

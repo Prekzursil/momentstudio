@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import require_admin_section
@@ -17,6 +17,8 @@ from app.schemas.ops import (
     MaintenanceBannerUpdate,
     ShippingSimulationRequest,
     ShippingSimulationResult,
+    WebhookEventDetail,
+    WebhookEventRead,
 )
 from app.services import ops as ops_service
 
@@ -103,3 +105,33 @@ async def admin_shipping_simulate(
         country=payload.country,
         postal_code=payload.postal_code,
     )
+
+
+@router.get("/admin/webhooks", response_model=list[WebhookEventRead])
+async def admin_list_webhooks(
+    limit: int = 50,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("ops")),
+) -> list[WebhookEventRead]:
+    return await ops_service.list_recent_webhooks(session, limit=limit)
+
+
+@router.get("/admin/webhooks/{provider}/{event_id}", response_model=WebhookEventDetail)
+async def admin_webhook_detail(
+    provider: str,
+    event_id: str,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("ops")),
+) -> WebhookEventDetail:
+    return await ops_service.get_webhook_detail(session, provider=provider, event_id=event_id)
+
+
+@router.post("/admin/webhooks/{provider}/{event_id}/retry", response_model=WebhookEventRead)
+async def admin_retry_webhook(
+    provider: str,
+    event_id: str,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("ops")),
+) -> WebhookEventRead:
+    return await ops_service.retry_webhook(session, background_tasks, provider=provider, event_id=event_id)

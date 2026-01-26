@@ -93,3 +93,23 @@ class ShippingSimulationResult(BaseModel):
     free_shipping_threshold_ron: Decimal | None = None
     selected_shipping_method_id: UUID | None = None
     methods: list[ShippingSimulationMethod] = Field(default_factory=list)
+
+
+WebhookProvider = Literal["stripe", "paypal"]
+WebhookStatus = Literal["received", "processed", "failed"]
+
+
+class WebhookEventRead(BaseModel):
+    provider: WebhookProvider
+    event_id: str
+    event_type: str | None = None
+    created_at: datetime
+    attempts: int
+    last_attempt_at: datetime
+    processed_at: datetime | None = None
+    last_error: str | None = None
+    status: WebhookStatus
+
+
+class WebhookEventDetail(WebhookEventRead):
+    payload: dict | None = None

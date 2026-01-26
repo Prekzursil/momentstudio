@@ -4,15 +4,17 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import HTTPException, status
+from fastapi import BackgroundTasks, HTTPException, status
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.ops import MaintenanceBanner
-from app.schemas.ops import ShippingSimulationResult
+from app.models.webhook import PayPalWebhookEvent, StripeWebhookEvent
+from app.schemas.ops import ShippingSimulationResult, WebhookEventDetail, WebhookEventRead, WebhookStatus
 from app.services import checkout_settings as checkout_settings_service
 from app.services import order as order_service
 from app.services import pricing
+from app.services import webhook_handlers
 
 
 async def list_maintenance_banners(session: AsyncSession) -> list[MaintenanceBanner]:
@@ -143,3 +145,255 @@ async def simulate_shipping_rates(
         selected_shipping_method_id=selected_id,
         methods=method_rows,  # type: ignore[arg-type]
     )
+
+
+def _webhook_status(*, processed_at: datetime | None, last_error: str | None) -> WebhookStatus:
+    if last_error and last_error.strip():
+        return "failed"
+    if processed_at is not None:
+        return "processed"
+    return "received"
+
+
+async def list_recent_webhooks(session: AsyncSession, *, limit: int = 50) -> list[WebhookEventRead]:
+    limit_clean = max(1, min(int(limit or 0), 200))
+    stripe_rows = (
+        (await session.execute(select(StripeWebhookEvent).order_by(StripeWebhookEvent.last_attempt_at.desc()).limit(limit_clean)))
+        .scalars()
+        .all()
+    )
+    paypal_rows = (
+        (await session.execute(select(PayPalWebhookEvent).order_by(PayPalWebhookEvent.last_attempt_at.desc()).limit(limit_clean)))
+        .scalars()
+        .all()
+    )
+
+    items: list[WebhookEventRead] = []
+    for stripe_row in stripe_rows:
+        items.append(
+            WebhookEventRead(
+                provider="stripe",
+                event_id=stripe_row.stripe_event_id,
+                event_type=stripe_row.event_type,
+                created_at=stripe_row.created_at,
+                attempts=int(getattr(stripe_row, "attempts", 0) or 0),
+                last_attempt_at=stripe_row.last_attempt_at,
+                processed_at=getattr(stripe_row, "processed_at", None),
+                last_error=getattr(stripe_row, "last_error", None),
+                status=_webhook_status(
+                    processed_at=getattr(stripe_row, "processed_at", None), last_error=getattr(stripe_row, "last_error", None)
+                ),
+            )
+        )
+    for paypal_row in paypal_rows:
+        items.append(
+            WebhookEventRead(
+                provider="paypal",
+                event_id=paypal_row.paypal_event_id,
+                event_type=paypal_row.event_type,
+                created_at=paypal_row.created_at,
+                attempts=int(getattr(paypal_row, "attempts", 0) or 0),
+                last_attempt_at=paypal_row.last_attempt_at,
+                processed_at=getattr(paypal_row, "processed_at", None),
+                last_error=getattr(paypal_row, "last_error", None),
+                status=_webhook_status(
+                    processed_at=getattr(paypal_row, "processed_at", None), last_error=getattr(paypal_row, "last_error", None)
+                ),
+            )
+        )
+
+    items.sort(key=lambda item: item.last_attempt_at, reverse=True)
+    return items[:limit_clean]
+
+
+async def get_webhook_detail(session: AsyncSession, *, provider: str, event_id: str) -> WebhookEventDetail:
+    provider_key = (provider or "").strip().lower()
+    event_key = (event_id or "").strip()
+    if provider_key not in {"stripe", "paypal"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported provider")
+    if not event_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing event id")
+
+    if provider_key == "stripe":
+        stripe_row = (
+            (await session.execute(select(StripeWebhookEvent).where(StripeWebhookEvent.stripe_event_id == event_key)))
+            .scalars()
+            .first()
+        )
+        if not stripe_row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found")
+        return WebhookEventDetail(
+            provider="stripe",
+            event_id=stripe_row.stripe_event_id,
+            event_type=stripe_row.event_type,
+            created_at=stripe_row.created_at,
+            attempts=int(getattr(stripe_row, "attempts", 0) or 0),
+            last_attempt_at=stripe_row.last_attempt_at,
+            processed_at=getattr(stripe_row, "processed_at", None),
+            last_error=getattr(stripe_row, "last_error", None),
+            status=_webhook_status(
+                processed_at=getattr(stripe_row, "processed_at", None), last_error=getattr(stripe_row, "last_error", None)
+            ),
+            payload=getattr(stripe_row, "payload", None),
+        )
+
+    paypal_row = (
+        (await session.execute(select(PayPalWebhookEvent).where(PayPalWebhookEvent.paypal_event_id == event_key)))
+        .scalars()
+        .first()
+    )
+    if not paypal_row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found")
+    return WebhookEventDetail(
+        provider="paypal",
+        event_id=paypal_row.paypal_event_id,
+        event_type=paypal_row.event_type,
+        created_at=paypal_row.created_at,
+        attempts=int(getattr(paypal_row, "attempts", 0) or 0),
+        last_attempt_at=paypal_row.last_attempt_at,
+        processed_at=getattr(paypal_row, "processed_at", None),
+        last_error=getattr(paypal_row, "last_error", None),
+        status=_webhook_status(
+            processed_at=getattr(paypal_row, "processed_at", None), last_error=getattr(paypal_row, "last_error", None)
+        ),
+        payload=getattr(paypal_row, "payload", None),
+    )
+
+
+async def retry_webhook(
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    *,
+    provider: str,
+    event_id: str,
+) -> WebhookEventRead:
+    provider_key = (provider or "").strip().lower()
+    event_key = (event_id or "").strip()
+    if provider_key not in {"stripe", "paypal"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported provider")
+    if not event_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing event id")
+
+    now = datetime.now(timezone.utc)
+
+    if provider_key == "stripe":
+        stripe_row = (
+            (await session.execute(select(StripeWebhookEvent).where(StripeWebhookEvent.stripe_event_id == event_key)))
+            .scalars()
+            .first()
+        )
+        if not stripe_row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found")
+        if bool(getattr(stripe_row, "processed_at", None)) and not (getattr(stripe_row, "last_error", None) or "").strip():
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Webhook already processed")
+        payload = getattr(stripe_row, "payload", None)
+        if not payload:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Webhook payload not stored")
+
+        stripe_row.attempts = int(getattr(stripe_row, "attempts", 0) or 0) + 1
+        stripe_row.last_attempt_at = now
+        session.add(stripe_row)
+        await session.commit()
+
+        try:
+            await webhook_handlers.process_stripe_event(session, background_tasks, payload)
+            updated = await session.get(StripeWebhookEvent, stripe_row.id)
+            if updated:
+                updated.processed_at = datetime.now(timezone.utc)
+                updated.last_error = None
+                session.add(updated)
+                await session.commit()
+                return WebhookEventRead(
+                    provider="stripe",
+                    event_id=updated.stripe_event_id,
+                    event_type=updated.event_type,
+                    created_at=updated.created_at,
+                    attempts=int(getattr(updated, "attempts", 0) or 0),
+                    last_attempt_at=updated.last_attempt_at,
+                    processed_at=getattr(updated, "processed_at", None),
+                    last_error=getattr(updated, "last_error", None),
+                    status=_webhook_status(
+                        processed_at=getattr(updated, "processed_at", None), last_error=getattr(updated, "last_error", None)
+                    ),
+                )
+        except HTTPException as exc:
+            await session.rollback()
+            updated = await session.get(StripeWebhookEvent, stripe_row.id)
+            if updated:
+                updated.processed_at = None
+                updated.last_error = str(exc.detail)
+                session.add(updated)
+                await session.commit()
+            raise
+        except Exception as exc:
+            await session.rollback()
+            updated = await session.get(StripeWebhookEvent, stripe_row.id)
+            if updated:
+                updated.processed_at = None
+                updated.last_error = str(exc)
+                session.add(updated)
+                await session.commit()
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Retry failed") from exc
+
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Retry failed")
+
+    paypal_row = (
+        (await session.execute(select(PayPalWebhookEvent).where(PayPalWebhookEvent.paypal_event_id == event_key)))
+        .scalars()
+        .first()
+    )
+    if not paypal_row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found")
+    if bool(getattr(paypal_row, "processed_at", None)) and not (getattr(paypal_row, "last_error", None) or "").strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Webhook already processed")
+    payload = getattr(paypal_row, "payload", None)
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Webhook payload not stored")
+
+    paypal_row.attempts = int(getattr(paypal_row, "attempts", 0) or 0) + 1
+    paypal_row.last_attempt_at = now
+    session.add(paypal_row)
+    await session.commit()
+
+    try:
+        await webhook_handlers.process_paypal_event(session, background_tasks, payload)
+        paypal_updated = await session.get(PayPalWebhookEvent, paypal_row.id)
+        if paypal_updated:
+            paypal_updated.processed_at = datetime.now(timezone.utc)
+            paypal_updated.last_error = None
+            session.add(paypal_updated)
+            await session.commit()
+            return WebhookEventRead(
+                provider="paypal",
+                event_id=paypal_updated.paypal_event_id,
+                event_type=paypal_updated.event_type,
+                created_at=paypal_updated.created_at,
+                attempts=int(getattr(paypal_updated, "attempts", 0) or 0),
+                last_attempt_at=paypal_updated.last_attempt_at,
+                processed_at=getattr(paypal_updated, "processed_at", None),
+                last_error=getattr(paypal_updated, "last_error", None),
+                status=_webhook_status(
+                    processed_at=getattr(paypal_updated, "processed_at", None),
+                    last_error=getattr(paypal_updated, "last_error", None),
+                ),
+            )
+    except HTTPException as exc:
+        await session.rollback()
+        paypal_updated = await session.get(PayPalWebhookEvent, paypal_row.id)
+        if paypal_updated:
+            paypal_updated.processed_at = None
+            paypal_updated.last_error = str(exc.detail)
+            session.add(paypal_updated)
+            await session.commit()
+        raise
+    except Exception as exc:
+        await session.rollback()
+        paypal_updated = await session.get(PayPalWebhookEvent, paypal_row.id)
+        if paypal_updated:
+            paypal_updated.processed_at = None
+            paypal_updated.last_error = str(exc)
+            session.add(paypal_updated)
+            await session.commit()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Retry failed") from exc
+
+    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Retry failed")

@@ -1618,6 +1618,42 @@
           "subtotalRequired": "Subtotal is required.",
           "run": "Could not run simulation."
         }
+      },
+      "webhooks": {
+        "title": "Webhook monitor",
+        "hint": "View recent provider webhooks and retry failed deliveries.",
+        "refresh": "Refresh",
+        "empty": "No webhook events found.",
+        "view": "View",
+        "retry": "Retry",
+        "close": "Close",
+        "detailTitle": "Webhook detail",
+        "provider": {
+          "stripe": "Stripe",
+          "paypal": "PayPal"
+        },
+        "status": {
+          "received": "Received",
+          "processed": "Processed",
+          "failed": "Failed"
+        },
+        "table": {
+          "provider": "Provider",
+          "eventType": "Event type",
+          "status": "Status",
+          "attempts": "Attempts",
+          "lastAttempt": "Last attempt",
+          "error": "Last error",
+          "actions": "Actions"
+        },
+        "success": {
+          "retried": "Webhook retried."
+        },
+        "errors": {
+          "load": "Could not load webhooks.",
+          "detail": "Could not load webhook details.",
+          "retry": "Could not retry webhook."
+        }
       }
     },
     "returns": {

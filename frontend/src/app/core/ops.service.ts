@@ -83,6 +83,25 @@ export interface ShippingSimulationResult {
   methods: ShippingSimulationMethod[];
 }
 
+export type WebhookProvider = 'stripe' | 'paypal';
+export type WebhookStatus = 'received' | 'processed' | 'failed';
+
+export interface WebhookEventRead {
+  provider: WebhookProvider;
+  event_id: string;
+  event_type?: string | null;
+  created_at: string;
+  attempts: number;
+  last_attempt_at: string;
+  processed_at?: string | null;
+  last_error?: string | null;
+  status: WebhookStatus;
+}
+
+export interface WebhookEventDetail extends WebhookEventRead {
+  payload?: any | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class OpsService {
   constructor(private api: ApiService) {}
@@ -123,5 +142,16 @@ export class OpsService {
   }): Observable<ShippingSimulationResult> {
     return this.api.post<ShippingSimulationResult>('/ops/admin/shipping-simulate', payload as any);
   }
-}
 
+  listWebhooks(limit = 50): Observable<WebhookEventRead[]> {
+    return this.api.get<WebhookEventRead[]>('/ops/admin/webhooks', { limit });
+  }
+
+  getWebhookDetail(provider: WebhookProvider, eventId: string): Observable<WebhookEventDetail> {
+    return this.api.get<WebhookEventDetail>(`/ops/admin/webhooks/${provider}/${encodeURIComponent(eventId)}`);
+  }
+
+  retryWebhook(provider: WebhookProvider, eventId: string): Observable<WebhookEventRead> {
+    return this.api.post<WebhookEventRead>(`/ops/admin/webhooks/${provider}/${encodeURIComponent(eventId)}/retry`, {});
+  }
+}
