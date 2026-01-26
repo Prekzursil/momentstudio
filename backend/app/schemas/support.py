@@ -6,7 +6,18 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.support import ContactSubmissionStatus, ContactSubmissionTopic
+from app.models.user import UserRole
 from app.schemas.admin_common import AdminPaginationMeta
+
+
+class SupportAgentRef(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    username: str
+    name: str | None = None
+    name_tag: int | None = None
+    role: UserRole
 
 
 class ContactSubmissionCreate(BaseModel):
@@ -20,6 +31,7 @@ class ContactSubmissionCreate(BaseModel):
 class ContactSubmissionUpdate(BaseModel):
     status: ContactSubmissionStatus | None = None
     admin_note: str | None = Field(default=None, max_length=10_000)
+    assignee_id: UUID | None = None
 
 
 class ContactSubmissionMessageRead(BaseModel):
@@ -43,6 +55,9 @@ class ContactSubmissionRead(BaseModel):
     order_reference: str | None = None
     user_id: UUID | None = None
     admin_note: str | None = None
+    assignee: SupportAgentRef | None = None
+    assigned_by: SupportAgentRef | None = None
+    assigned_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
     resolved_at: datetime | None = None
@@ -56,12 +71,39 @@ class ContactSubmissionListItem(BaseModel):
     name: str
     email: str
     order_reference: str | None = None
+    assignee: SupportAgentRef | None = None
     created_at: datetime
 
 
 class ContactSubmissionListResponse(BaseModel):
     items: list[ContactSubmissionListItem]
     meta: AdminPaginationMeta
+
+
+class SupportCannedResponseRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    body_en: str
+    body_ro: str
+    is_active: bool = True
+    created_at: datetime
+    updated_at: datetime
+
+
+class SupportCannedResponseCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    body_en: str = Field(min_length=1, max_length=10_000)
+    body_ro: str = Field(min_length=1, max_length=10_000)
+    is_active: bool = True
+
+
+class SupportCannedResponseUpdate(BaseModel):
+    title: str | None = Field(default=None, max_length=120)
+    body_en: str | None = Field(default=None, max_length=10_000)
+    body_ro: str | None = Field(default=None, max_length=10_000)
+    is_active: bool | None = None
 
 
 class TicketCreate(BaseModel):

@@ -1448,6 +1448,11 @@
         "topicAll": "Toate",
         "status": "Stare",
         "statusAll": "Toate",
+        "customer": "Client",
+        "customerPlaceholder": "Email sau nume…",
+        "assignee": "Responsabil",
+        "assigneeAll": "Oricare",
+        "assigneeUnassigned": "Neatribuit",
         "apply": "Aplică"
       },
       "topics": {
@@ -1465,6 +1470,7 @@
         "date": "Data",
         "topic": "Subiect",
         "status": "Stare",
+        "assignee": "Responsabil",
         "from": "De la",
         "order": "Comandă"
       },
@@ -1481,6 +1487,15 @@
         "thread": "Conversație",
         "fromSupport": "Suport",
         "fromCustomer": "Client",
+        "assigneeChip": "Responsabil",
+        "assigneeLabel": "Responsabil",
+        "assigneeUnassigned": "Neatribuit",
+        "cannedLabel": "Răspuns rapid",
+        "cannedNone": "Niciunul",
+        "cannedLang": "Limbă",
+        "cannedInsert": "Inserează",
+        "cannedManage": "Gestionează șabloane",
+        "cannedManageHide": "Ascunde șabloane",
         "reply": "Răspunde",
         "replyPlaceholder": "Scrie un răspuns pentru client…",
         "solvedHint": "Acest tichet este marcat ca rezolvat.",
@@ -1490,6 +1505,35 @@
         "adminNotePlaceholder": "Notițe interne (nu sunt vizibile pentru client)…",
         "save": "Salvează"
       },
+      "templates": {
+        "title": "Șabloane",
+        "empty": "Nu există șabloane încă.",
+        "active": "Activ",
+        "inactive": "Inactiv",
+        "newTitle": "Șablon nou",
+        "editTitle": "Editează șablon",
+        "variablesHint": "Variabile: {{customer_name}}, {{customer_email}}, {{order_reference}}, {{ticket_id}}",
+        "confirmDelete": "Ștergi acest șablon? Acțiunea nu poate fi anulată.",
+        "fields": {
+          "title": "Titlu",
+          "titlePlaceholder": "ex: Politica de rambursare",
+          "bodyEn": "Conținut (EN)",
+          "bodyRo": "Conținut (RO)",
+          "bodyPlaceholder": "Scrie șablonul…",
+          "active": "Activ"
+        },
+        "success": {
+          "saved": "Șablon salvat.",
+          "deleted": "Șablon șters.",
+          "inserted": "Șablon inserat."
+        },
+        "errors": {
+          "load": "Nu am putut încărca șabloanele.",
+          "required": "Titlul și ambele variante de limbă sunt obligatorii.",
+          "save": "Nu am putut salva șablonul.",
+          "delete": "Nu am putut șterge șablonul."
+        }
+      },
       "success": {
         "saved": "Salvat.",
         "replySent": "Răspuns trimis."
@@ -1497,6 +1541,7 @@
       "errors": {
         "load": "Nu am putut încărca mesajele.",
         "loadDetail": "Nu am putut încărca detaliile mesajului.",
+        "loadAssignees": "Nu am putut încărca lista de responsabili.",
         "save": "Nu am putut salva modificările.",
         "reply": "Nu am putut trimite răspunsul."
       }

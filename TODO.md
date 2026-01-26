@@ -768,9 +768,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Blog: editorial workflow – Draft/review/publish states with author attribution.
 - [x] Admin Blog: social preview tooling – Generate social preview images per post per language.
 - [x] Admin CMS: page access controls – Optionally restrict certain pages to logged-in users.
-- [ ] Admin Support: unified inbox filters – Filter by status, channel, customer, and assignee.
-- [ ] Admin Support: assign/mention – Assign tickets and @mention other admins with notifications.
-- [ ] Admin Support: canned responses – Template replies with variables and EN/RO variants.
+- [x] Admin Support: unified inbox filters – Filter by status, channel, customer, and assignee.
+- [x] Admin Support: assign/mention – Assign tickets and @mention other admins with notifications.
+- [x] Admin Support: canned responses – Template replies with variables and EN/RO variants.
+- [ ] Support: email guest submissions on staff replies (bilingual) so non-logged-in customers receive updates.
 - [ ] Admin Returns: RMA status board – Kanban view for returns pipeline (requested/approved/received/refunded).
 - [ ] Admin Returns: return label support – Upload/provide shipping labels for returns.
 - [ ] Admin Ops: maintenance banners – Schedule storefront announcement banners (planned downtime/promos).

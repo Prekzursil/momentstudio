@@ -1444,10 +1444,15 @@
       "filters": {
         "search": "Search",
         "searchPlaceholder": "Email, name, message, order ref…",
-        "topic": "Topic",
-        "topicAll": "All topics",
+        "topic": "Channel",
+        "topicAll": "All channels",
         "status": "Status",
         "statusAll": "All statuses",
+        "customer": "Customer",
+        "customerPlaceholder": "Email or name…",
+        "assignee": "Assignee",
+        "assigneeAll": "Any assignee",
+        "assigneeUnassigned": "Unassigned",
         "apply": "Apply"
       },
       "topics": {
@@ -1463,8 +1468,9 @@
       },
       "table": {
         "date": "Date",
-        "topic": "Topic",
+        "topic": "Channel",
         "status": "Status",
+        "assignee": "Assignee",
         "from": "From",
         "order": "Order"
       },
@@ -1481,6 +1487,15 @@
         "thread": "Thread",
         "fromSupport": "Support",
         "fromCustomer": "Customer",
+        "assigneeChip": "Assignee",
+        "assigneeLabel": "Assignee",
+        "assigneeUnassigned": "Unassigned",
+        "cannedLabel": "Canned response",
+        "cannedNone": "None",
+        "cannedLang": "Language",
+        "cannedInsert": "Insert",
+        "cannedManage": "Manage templates",
+        "cannedManageHide": "Hide templates",
         "reply": "Reply",
         "replyPlaceholder": "Write a reply to the customer…",
         "solvedHint": "This ticket is marked as resolved.",
@@ -1490,6 +1505,35 @@
         "adminNotePlaceholder": "Internal notes (not visible to customer)…",
         "save": "Save"
       },
+      "templates": {
+        "title": "Templates",
+        "empty": "No templates yet.",
+        "active": "Active",
+        "inactive": "Inactive",
+        "newTitle": "New template",
+        "editTitle": "Edit template",
+        "variablesHint": "Variables: {{customer_name}}, {{customer_email}}, {{order_reference}}, {{ticket_id}}",
+        "confirmDelete": "Delete this template? This cannot be undone.",
+        "fields": {
+          "title": "Title",
+          "titlePlaceholder": "e.g. Refund policy",
+          "bodyEn": "Body (EN)",
+          "bodyRo": "Body (RO)",
+          "bodyPlaceholder": "Write the template…",
+          "active": "Active"
+        },
+        "success": {
+          "saved": "Template saved.",
+          "deleted": "Template deleted.",
+          "inserted": "Template inserted."
+        },
+        "errors": {
+          "load": "Could not load templates.",
+          "required": "Title and both language variants are required.",
+          "save": "Could not save template.",
+          "delete": "Could not delete template."
+        }
+      },
       "success": {
         "saved": "Saved.",
         "replySent": "Reply sent."
@@ -1497,6 +1541,7 @@
       "errors": {
         "load": "Could not load submissions.",
         "loadDetail": "Could not load submission details.",
+        "loadAssignees": "Could not load assignees.",
         "save": "Could not save changes.",
         "reply": "Could not send reply."
       }

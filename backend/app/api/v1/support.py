@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -21,6 +21,10 @@ from app.schemas.support import (
     ContactSubmissionListResponse,
     ContactSubmissionRead,
     ContactSubmissionUpdate,
+    SupportAgentRef,
+    SupportCannedResponseCreate,
+    SupportCannedResponseRead,
+    SupportCannedResponseUpdate,
     TicketCreate,
     TicketListItemRead,
     TicketMessageCreate,
@@ -174,15 +178,21 @@ async def admin_list_contact_submissions(
     _: User = Depends(require_admin_section("support")),
     q: str | None = Query(default=None),
     status_filter: ContactSubmissionStatus | None = Query(default=None),
+    channel_filter: ContactSubmissionTopic | None = Query(default=None),
     topic_filter: ContactSubmissionTopic | None = Query(default=None),
+    customer_filter: str | None = Query(default=None),
+    assignee_filter: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
 ) -> ContactSubmissionListResponse:
+    topic_filter = channel_filter or topic_filter
     rows, total_items = await support_service.list_contact_submissions(
         session,
         q=q,
         status_filter=status_filter,
         topic_filter=topic_filter,
+        customer_filter=customer_filter,
+        assignee_filter=assignee_filter,
         page=page,
         limit=limit,
     )
@@ -196,12 +206,84 @@ async def admin_list_contact_submissions(
                 name=r.name,
                 email=r.email,
                 order_reference=r.order_reference,
+                assignee=getattr(r, "assignee", None),
                 created_at=r.created_at,
             )
             for r in rows
         ],
         meta=AdminPaginationMeta(total_items=total_items, total_pages=total_pages, page=page, limit=limit),
     )
+
+
+@router.get("/admin/assignees", response_model=list[SupportAgentRef])
+async def admin_list_support_assignees(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("support")),
+) -> list[SupportAgentRef]:
+    rows = await support_service.list_support_agents(session)
+    return [SupportAgentRef.model_validate(r) for r in rows]
+
+
+@router.get("/admin/canned-responses", response_model=list[SupportCannedResponseRead])
+async def admin_list_canned_responses(
+    include_inactive: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("support")),
+) -> list[SupportCannedResponseRead]:
+    rows = await support_service.list_canned_responses(session, include_inactive=include_inactive)
+    return [SupportCannedResponseRead.model_validate(r) for r in rows]
+
+
+@router.post("/admin/canned-responses", response_model=SupportCannedResponseRead, status_code=status.HTTP_201_CREATED)
+async def admin_create_canned_response(
+    payload: SupportCannedResponseCreate,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("support")),
+) -> SupportCannedResponseRead:
+    record = await support_service.create_canned_response(
+        session,
+        title=payload.title,
+        body_en=payload.body_en,
+        body_ro=payload.body_ro,
+        is_active=payload.is_active,
+        actor=admin,
+    )
+    return SupportCannedResponseRead.model_validate(record)
+
+
+@router.patch("/admin/canned-responses/{response_id}", response_model=SupportCannedResponseRead)
+async def admin_update_canned_response(
+    response_id: UUID,
+    payload: SupportCannedResponseUpdate,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("support")),
+) -> SupportCannedResponseRead:
+    record = await support_service.get_canned_response(session, response_id)
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Canned response not found")
+    updated = await support_service.update_canned_response(
+        session,
+        record=record,
+        title=payload.title,
+        body_en=payload.body_en,
+        body_ro=payload.body_ro,
+        is_active=payload.is_active,
+        actor=admin,
+    )
+    return SupportCannedResponseRead.model_validate(updated)
+
+
+@router.delete("/admin/canned-responses/{response_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_delete_canned_response(
+    response_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("support")),
+) -> Response:
+    record = await support_service.get_canned_response(session, response_id)
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Canned response not found")
+    await support_service.delete_canned_response(session, record=record, actor=admin)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/admin/submissions/{submission_id}", response_model=ContactSubmissionRead)
@@ -231,6 +313,8 @@ async def admin_update_contact_submission(
         submission=record,
         status_value=payload.status,
         admin_note=payload.admin_note,
+        assignee_id=payload.assignee_id,
+        assignee_set="assignee_id" in payload.model_fields_set,
         actor=admin,
     )
     hydrated = await support_service.get_contact_submission_with_messages(session, updated.id)

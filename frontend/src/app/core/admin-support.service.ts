@@ -5,6 +5,15 @@ import { ApiService } from './api.service';
 
 export type SupportTopic = 'contact' | 'support' | 'refund' | 'dispute';
 export type SupportStatus = 'new' | 'triaged' | 'resolved';
+export type StaffRole = 'customer' | 'support' | 'fulfillment' | 'content' | 'admin' | 'owner';
+
+export interface SupportAgentRef {
+  id: string;
+  username: string;
+  name?: string | null;
+  name_tag?: number | null;
+  role: StaffRole;
+}
 
 export interface AdminContactSubmissionListItem {
   id: string;
@@ -13,6 +22,7 @@ export interface AdminContactSubmissionListItem {
   name: string;
   email: string;
   order_reference?: string | null;
+  assignee?: SupportAgentRef | null;
   created_at: string;
 }
 
@@ -37,6 +47,9 @@ export interface AdminContactSubmissionRead {
   message: string;
   order_reference?: string | null;
   admin_note?: string | null;
+  assignee?: SupportAgentRef | null;
+  assigned_by?: SupportAgentRef | null;
+  assigned_at?: string | null;
   messages?: AdminContactSubmissionMessage[];
   created_at: string;
   updated_at: string;
@@ -50,6 +63,16 @@ export interface AdminContactSubmissionMessage {
   created_at: string;
 }
 
+export interface SupportCannedResponseRead {
+  id: string;
+  title: string;
+  body_en: string;
+  body_ro: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdminSupportService {
   constructor(private api: ApiService) {}
@@ -57,11 +80,18 @@ export class AdminSupportService {
   list(params: {
     q?: string;
     status_filter?: SupportStatus;
+    channel_filter?: SupportTopic;
     topic_filter?: SupportTopic;
+    customer_filter?: string;
+    assignee_filter?: string;
     page?: number;
     limit?: number;
   }): Observable<AdminContactSubmissionListResponse> {
     return this.api.get<AdminContactSubmissionListResponse>('/support/admin/submissions', params);
+  }
+
+  listAssignees(): Observable<SupportAgentRef[]> {
+    return this.api.get<SupportAgentRef[]>('/support/admin/assignees');
   }
 
   getOne(id: string): Observable<AdminContactSubmissionRead> {
@@ -70,12 +100,36 @@ export class AdminSupportService {
 
   update(
     id: string,
-    payload: { status?: SupportStatus | null; admin_note?: string | null }
+    payload: { status?: SupportStatus | null; admin_note?: string | null; assignee_id?: string | null }
   ): Observable<AdminContactSubmissionRead> {
     return this.api.patch<AdminContactSubmissionRead>(`/support/admin/submissions/${id}`, payload);
   }
 
   addMessage(id: string, message: string): Observable<AdminContactSubmissionRead> {
     return this.api.post<AdminContactSubmissionRead>(`/support/admin/submissions/${id}/messages`, { message });
+  }
+
+  listCannedResponses(params?: { include_inactive?: boolean }): Observable<SupportCannedResponseRead[]> {
+    return this.api.get<SupportCannedResponseRead[]>('/support/admin/canned-responses', params || {});
+  }
+
+  createCannedResponse(payload: {
+    title: string;
+    body_en: string;
+    body_ro: string;
+    is_active: boolean;
+  }): Observable<SupportCannedResponseRead> {
+    return this.api.post<SupportCannedResponseRead>('/support/admin/canned-responses', payload);
+  }
+
+  updateCannedResponse(
+    id: string,
+    payload: { title?: string | null; body_en?: string | null; body_ro?: string | null; is_active?: boolean | null }
+  ): Observable<SupportCannedResponseRead> {
+    return this.api.patch<SupportCannedResponseRead>(`/support/admin/canned-responses/${id}`, payload);
+  }
+
+  deleteCannedResponse(id: string): Observable<unknown> {
+    return this.api.delete(`/support/admin/canned-responses/${id}`);
   }
 }
