@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     backup_last_at: str | None = None
     secret_key: str = "dev-secret-key"
     stripe_secret_key: str = "sk_test_placeholder"
+    stripe_publishable_key: str | None = None
     stripe_webhook_secret: str | None = None
     paypal_client_id: str | None = None
     paypal_client_secret: str | None = None
