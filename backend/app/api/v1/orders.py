@@ -23,11 +23,13 @@ from app.core.dependencies import (
     require_verified_email,
 )
 from app.core.config import settings
+from app.core import security
 from app.core.security import create_receipt_token, decode_receipt_token
 from app.db.session import get_session
 from app.models.address import Address
 from app.models.cart import Cart
 from app.models.order import Order, OrderItem, OrderStatus, OrderEvent
+from app.models.user import User
 from app.schemas.cart import CartRead
 from app.schemas.cart import Totals
 from app.schemas.order import (
@@ -81,11 +83,12 @@ from app.schemas.order_admin_note import OrderAdminNoteCreate
 from app.schemas.order_admin_address import AdminOrderAddressesUpdate
 from app.schemas.order_shipment import OrderShipmentCreate, OrderShipmentUpdate, OrderShipmentRead
 from app.schemas.order_tag import OrderTagCreate, OrderTagsResponse
-from app.schemas.order_refund import AdminOrderRefundCreate
+from app.schemas.order_refund import AdminOrderRefundCreate, AdminOrderRefundRequest
 from app.schemas.receipt import ReceiptRead, ReceiptShareTokenRead
 from app.services import notifications as notification_service
 from app.services import promo_usage
 from app.services import pricing
+from app.services import pii as pii_service
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -882,9 +885,12 @@ async def admin_search_orders(
     to_dt: datetime | None = Query(default=None, alias="to"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("orders")),
+    admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderListResponse:
+    if include_pii:
+        pii_service.require_pii_reveal(admin)
     status_clean = (status or "").strip().lower() if status else None
     pending_any = False
     parsed_status = None
@@ -915,7 +921,7 @@ async def admin_search_orders(
             total_amount=order.total_amount,
             currency=order.currency,
             created_at=order.created_at,
-            customer_email=email,
+            customer_email=email if include_pii else pii_service.mask_email(email),
             customer_username=username,
             tags=[t.tag for t in (getattr(order, "tags", None) or [])],
         )
@@ -938,9 +944,12 @@ async def admin_list_order_tags(
 @router.get("/admin/export")
 async def admin_export_orders(
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("orders")),
+    admin: User = Depends(require_admin_section("orders")),
     columns: list[str] | None = Query(default=None),
+    include_pii: bool = Query(default=False),
 ):
+    if include_pii:
+        pii_service.require_pii_reveal(admin)
     orders = await order_service.list_orders(session)
     allowed: dict[str, Callable[[Order], Any]] = {
         "id": lambda o: str(o.id),
@@ -968,6 +977,12 @@ async def admin_export_orders(
         "created_at": lambda o: o.created_at.isoformat() if getattr(o, "created_at", None) else "",
         "updated_at": lambda o: o.updated_at.isoformat() if getattr(o, "updated_at", None) else "",
     }
+    if not include_pii:
+        allowed["customer_email"] = lambda o: pii_service.mask_email(getattr(o, "customer_email", "") or "") or ""
+        allowed["customer_name"] = lambda o: pii_service.mask_text(getattr(o, "customer_name", "") or "", keep=1) or ""
+        allowed["invoice_company"] = lambda o: pii_service.mask_text(getattr(o, "invoice_company", "") or "", keep=1) or ""
+        allowed["invoice_vat_id"] = lambda o: pii_service.mask_text(getattr(o, "invoice_vat_id", "") or "", keep=2) or ""
+        allowed["locker_address"] = lambda o: "***" if (getattr(o, "locker_address", "") or "").strip() else ""
     default_columns = ["id", "reference_code", "status", "total_amount", "currency", "user_id", "created_at"]
     if not columns:
         selected_columns = default_columns
@@ -996,16 +1011,54 @@ async def admin_export_orders(
     return StreamingResponse(iter([buffer.getvalue()]), media_type="text/csv", headers=headers)
 
 
-async def _serialize_admin_order(session: AsyncSession, order: Order) -> AdminOrderRead:
+async def _serialize_admin_order(
+    session: AsyncSession,
+    order: Order,
+    *,
+    include_pii: bool = False,
+    current_user: User | None = None,
+) -> AdminOrderRead:
+    if include_pii:
+        pii_service.require_pii_reveal(current_user)
     fraud_signals = await order_service.compute_fraud_signals(session, order)
     base = OrderRead.model_validate(order).model_dump()
+
+    def _masked_address(addr: Address | None) -> dict[str, Any] | None:
+        if not addr:
+            return None
+        return {
+            "id": addr.id,
+            "user_id": addr.user_id,
+            "label": addr.label,
+            "phone": None,
+            "line1": "***",
+            "line2": "***" if (addr.line2 or "").strip() else None,
+            "city": "***",
+            "region": "***" if (addr.region or "").strip() else None,
+            "postal_code": "***",
+            "country": addr.country,
+            "is_default_shipping": bool(getattr(addr, "is_default_shipping", False)),
+            "is_default_billing": bool(getattr(addr, "is_default_billing", False)),
+            "created_at": addr.created_at,
+            "updated_at": addr.updated_at,
+        }
+
+    if not include_pii:
+        base["invoice_company"] = pii_service.mask_text(base.get("invoice_company"), keep=1)
+        base["invoice_vat_id"] = pii_service.mask_text(base.get("invoice_vat_id"), keep=2)
+        base["locker_address"] = "***" if (base.get("locker_address") or "").strip() else base.get("locker_address")
+
+    customer_email = getattr(order, "customer_email", None) or (
+        getattr(order.user, "email", None) if getattr(order, "user", None) else None
+    )
+    if not include_pii:
+        customer_email = pii_service.mask_email(customer_email)
     return AdminOrderRead(
         **base,
-        customer_email=getattr(order, "customer_email", None)
-        or (getattr(order.user, "email", None) if getattr(order, "user", None) else None),
+        customer_email=customer_email,
         customer_username=getattr(order.user, "username", None) if getattr(order, "user", None) else None,
-        shipping_address=order.shipping_address,
-        billing_address=order.billing_address,
+        shipping_address=order.shipping_address if include_pii else _masked_address(getattr(order, "shipping_address", None)),
+        billing_address=order.billing_address if include_pii else _masked_address(getattr(order, "billing_address", None)),
         tracking_url=getattr(order, "tracking_url", None),
         shipping_label_filename=getattr(order, "shipping_label_filename", None),
         shipping_label_uploaded_at=getattr(order, "shipping_label_uploaded_at", None),
@@ -1021,14 +1074,15 @@ async def _serialize_admin_order(session: AsyncSession, order: Order) -> AdminOr
 @router.get("/admin/{order_id}", response_model=AdminOrderRead)
 async def admin_get_order(
     order_id: UUID,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("orders")),
+    admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
 
-    return await _serialize_admin_order(session, order)
+    return await _serialize_admin_order(session, order, include_pii=include_pii, current_user=admin)
 
 
 @router.post("/guest-checkout/email/request", response_model=GuestEmailVerificationRequestResponse)
@@ -1384,8 +1438,9 @@ async def admin_update_order(
     background_tasks: BackgroundTasks,
     order_id: UUID,
     payload: OrderUpdate,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("orders")),
+    admin: User = Depends(require_admin_section("orders")),
 ):
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1512,15 +1567,16 @@ async def admin_update_order(
     full = await order_service.get_order_by_id_admin(session, order_id)
     if not full:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    return await _serialize_admin_order(session, full)
+    return await _serialize_admin_order(session, full, include_pii=include_pii, current_user=admin)
 
 
 @router.patch("/admin/{order_id}/addresses", response_model=AdminOrderRead)
 async def admin_update_order_addresses(
     order_id: UUID,
     payload: AdminOrderAddressesUpdate = Body(...),
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin_section("orders")),
+    admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
@@ -1534,7 +1590,7 @@ async def admin_update_order_addresses(
         actor=actor,
         actor_user_id=getattr(admin, "id", None),
     )
-    return await _serialize_admin_order(session, updated)
+    return await _serialize_admin_order(session, updated, include_pii=include_pii, current_user=admin)
 
 
 @router.get("/admin/{order_id}/shipments", response_model=list[OrderShipmentRead])
@@ -1553,8 +1609,9 @@ async def admin_list_order_shipments(
 async def admin_create_order_shipment(
     order_id: UUID,
     payload: OrderShipmentCreate = Body(...),
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin_section("orders")),
+    admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
@@ -1567,7 +1624,7 @@ async def admin_create_order_shipment(
         actor=actor,
         actor_user_id=getattr(admin, "id", None),
     )
-    return await _serialize_admin_order(session, updated)
+    return await _serialize_admin_order(session, updated, include_pii=include_pii, current_user=admin)
 
 
 @router.patch("/admin/{order_id}/shipments/{shipment_id}", response_model=AdminOrderRead)
@@ -1575,8 +1632,9 @@ async def admin_update_order_shipment(
     order_id: UUID,
     shipment_id: UUID,
     payload: OrderShipmentUpdate = Body(...),
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin_section("orders")),
+    admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
@@ -1590,15 +1648,16 @@ async def admin_update_order_shipment(
         actor=actor,
         actor_user_id=getattr(admin, "id", None),
     )
-    return await _serialize_admin_order(session, updated)
+    return await _serialize_admin_order(session, updated, include_pii=include_pii, current_user=admin)
 
 
 @router.delete("/admin/{order_id}/shipments/{shipment_id}", response_model=AdminOrderRead)
 async def admin_delete_order_shipment(
     order_id: UUID,
     shipment_id: UUID,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin_section("orders")),
+    admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
@@ -1611,15 +1670,16 @@ async def admin_delete_order_shipment(
         actor=actor,
         actor_user_id=getattr(admin, "id", None),
     )
-    return await _serialize_admin_order(session, updated)
+    return await _serialize_admin_order(session, updated, include_pii=include_pii, current_user=admin)
 
 
 @router.post("/admin/{order_id}/shipping-label", response_model=AdminOrderRead)
 async def admin_upload_shipping_label(
     order_id: UUID,
     file: UploadFile = File(...),
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("orders")),
+    admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1646,7 +1706,7 @@ async def admin_upload_shipping_label(
     full = await order_service.get_order_by_id_admin(session, order_id)
     if not full:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    return await _serialize_admin_order(session, full)
+    return await _serialize_admin_order(session, full, include_pii=include_pii, current_user=admin)
 
 
 @router.get("/admin/{order_id}/shipping-label")
@@ -1717,10 +1777,15 @@ async def admin_retry_payment(
 async def admin_refund_order(
     background_tasks: BackgroundTasks,
     order_id: UUID,
-    note: str | None = None,
+    payload: AdminOrderRefundRequest = Body(...),
     session: AsyncSession = Depends(get_session),
     admin_user=Depends(require_admin),
 ):
+    password = str(payload.password or "")
+    if not password or not security.verify_password(password, admin_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+
+    note = (payload.note or "").strip() or None
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
@@ -1762,6 +1827,10 @@ async def admin_create_order_refund(
     session: AsyncSession = Depends(get_session),
     admin_user=Depends(require_admin),
 ) -> AdminOrderRead:
+    password = str(payload.password or "")
+    if not password or not security.verify_password(password, admin_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
@@ -1809,8 +1878,9 @@ async def admin_create_order_refund(
 async def admin_add_order_note(
     order_id: UUID,
     payload: OrderAdminNoteCreate = Body(...),
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin_section("orders")),
+    admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1818,15 +1888,16 @@ async def admin_add_order_note(
 
     updated = await order_service.add_admin_note(session, order, note=payload.note, actor_user_id=getattr(admin, "id", None))
 
-    return await _serialize_admin_order(session, updated)
+    return await _serialize_admin_order(session, updated, include_pii=include_pii, current_user=admin)
 
 
 @router.post("/admin/{order_id}/tags", response_model=AdminOrderRead)
 async def admin_add_order_tag(
     order_id: UUID,
     payload: OrderTagCreate = Body(...),
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin_section("orders")),
+    admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1836,15 +1907,16 @@ async def admin_add_order_tag(
         session, order, tag=payload.tag, actor_user_id=getattr(admin, "id", None)
     )
 
-    return await _serialize_admin_order(session, updated)
+    return await _serialize_admin_order(session, updated, include_pii=include_pii, current_user=admin)
 
 
 @router.delete("/admin/{order_id}/tags/{tag}", response_model=AdminOrderRead)
 async def admin_remove_order_tag(
     order_id: UUID,
     tag: str,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin_section("orders")),
+    admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1854,7 +1926,7 @@ async def admin_remove_order_tag(
         session, order, tag=tag, actor_user_id=getattr(admin, "id", None)
     )
 
-    return await _serialize_admin_order(session, updated)
+    return await _serialize_admin_order(session, updated, include_pii=include_pii, current_user=admin)
 
 
 @router.post("/admin/{order_id}/delivery-email", response_model=OrderRead)
@@ -1924,8 +1996,9 @@ async def admin_fulfill_item(
     order_id: UUID,
     item_id: UUID,
     shipped_quantity: int = 0,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("orders")),
+    admin: User = Depends(require_admin_section("orders")),
 ):
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
@@ -1934,7 +2007,7 @@ async def admin_fulfill_item(
     refreshed = await order_service.get_order_by_id_admin(session, order_id)
     if not refreshed:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    return await _serialize_admin_order(session, refreshed)
+    return await _serialize_admin_order(session, refreshed, include_pii=include_pii, current_user=admin)
 
 
 @router.get("/admin/{order_id}/events", response_model=list[OrderEventRead])

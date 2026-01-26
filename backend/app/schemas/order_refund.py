@@ -11,8 +11,13 @@ class OrderRefundItem(BaseModel):
     order_item_id: UUID
     quantity: int = Field(ge=1)
 
+class AdminOrderRefundRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=200)
+    note: str | None = Field(default=None, max_length=2000)
+
 
 class AdminOrderRefundCreate(BaseModel):
+    password: str = Field(min_length=1, max_length=200)
     amount: Decimal = Field(gt=0)
     note: str = Field(min_length=1, max_length=2000)
     items: list[OrderRefundItem] = Field(default_factory=list, max_length=200)
@@ -31,4 +36,3 @@ class OrderRefundRead(BaseModel):
     note: str | None = None
     data: dict | None = None
     created_at: datetime
-

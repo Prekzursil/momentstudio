@@ -397,7 +397,17 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     assert payload["meta"]["total_items"] >= 1
     assert any(item["id"] == order_id for item in payload["items"])
 
-    detail = client.get(f"/api/v1/orders/admin/{order_id}", headers=auth_headers(admin_token))
+    masked_detail = client.get(f"/api/v1/orders/admin/{order_id}", headers=auth_headers(admin_token))
+    assert masked_detail.status_code == 200, masked_detail.text
+    masked = masked_detail.json()
+    assert masked["customer_email"] != "buyer@example.com"
+    assert "*" in masked["customer_email"]
+    assert masked["shipping_address"]["line1"] == "***"
+    assert masked["billing_address"]["line1"] == "***"
+
+    detail = client.get(
+        f"/api/v1/orders/admin/{order_id}", headers=auth_headers(admin_token), params={"include_pii": True}
+    )
     assert detail.status_code == 200, detail.text
     data = detail.json()
     assert data["customer_email"] == "buyer@example.com"
@@ -413,6 +423,7 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
         f"/api/v1/orders/admin/{order_id}",
         json={"status": "paid", "tracking_number": "TRACK999"},
         headers=auth_headers(admin_token),
+        params={"include_pii": True},
     )
     assert updated.status_code == 200, updated.text
     updated_data = updated.json()
@@ -434,6 +445,7 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
             "note": "Fix shipping address",
         },
         headers=auth_headers(admin_token),
+        params={"include_pii": True},
     )
     assert updated_address.status_code == 200, updated_address.text
     updated_address_data = updated_address.json()
@@ -699,8 +711,8 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
 
     refund = client.post(
         f"/api/v1/orders/admin/{order_id}/refund",
-        params={"note": "Customer requested refund"},
         headers=auth_headers(admin_token),
+        json={"password": "orderpass", "note": "Customer requested refund"},
     )
     assert refund.status_code == 200
     assert refund.json()["status"] == "refunded"
@@ -842,7 +854,7 @@ def test_admin_partial_refunds(test_app: Dict[str, object], monkeypatch: pytest.
     forbidden = client.post(
         f"/api/v1/orders/admin/{order_id}/refunds",
         headers=auth_headers(customer_token),
-        json={"amount": "10.00", "note": "Nope", "process_payment": False},
+        json={"password": "orderpass", "amount": "10.00", "note": "Nope", "process_payment": False},
     )
     assert forbidden.status_code == 403
 
@@ -851,6 +863,7 @@ def test_admin_partial_refunds(test_app: Dict[str, object], monkeypatch: pytest.
         f"/api/v1/orders/admin/{order_id}/refunds",
         headers=auth_headers(admin_token),
         json={
+            "password": "orderpass",
             "amount": "10.00",
             "note": "Partial refund for one item",
             "items": [{"order_item_id": item_id, "quantity": 1}],
@@ -869,6 +882,7 @@ def test_admin_partial_refunds(test_app: Dict[str, object], monkeypatch: pytest.
         f"/api/v1/orders/admin/{order_id}/refunds",
         headers=auth_headers(admin_token),
         json={
+            "password": "orderpass",
             "amount": "30.00",
             "note": "Too high for one unit",
             "items": [{"order_item_id": item_id, "quantity": 1}],
@@ -882,6 +896,7 @@ def test_admin_partial_refunds(test_app: Dict[str, object], monkeypatch: pytest.
         f"/api/v1/orders/admin/{order_id}/refunds",
         headers=auth_headers(admin_token),
         json={
+            "password": "orderpass",
             "amount": "10.00",
             "note": "Too many units",
             "items": [{"order_item_id": item_id, "quantity": 5}],
@@ -894,7 +909,7 @@ def test_admin_partial_refunds(test_app: Dict[str, object], monkeypatch: pytest.
     too_much = client.post(
         f"/api/v1/orders/admin/{order_id}/refunds",
         headers=auth_headers(admin_token),
-        json={"amount": "95.00", "note": "Too much", "process_payment": False},
+        json={"password": "orderpass", "amount": "95.00", "note": "Too much", "process_payment": False},
     )
     assert too_much.status_code == 400
 
@@ -902,7 +917,7 @@ def test_admin_partial_refunds(test_app: Dict[str, object], monkeypatch: pytest.
     final = client.post(
         f"/api/v1/orders/admin/{order_id}/refunds",
         headers=auth_headers(admin_token),
-        json={"amount": "90.00", "note": "Complete refund", "process_payment": False},
+        json={"password": "orderpass", "amount": "90.00", "note": "Complete refund", "process_payment": False},
     )
     assert final.status_code == 200
     assert final.json()["status"] == "refunded"
@@ -923,6 +938,7 @@ def test_admin_partial_refunds(test_app: Dict[str, object], monkeypatch: pytest.
         f"/api/v1/orders/admin/{stripe_order_id}/refunds",
         headers=auth_headers(admin_token),
         json={
+            "password": "orderpass",
             "amount": "12.34",
             "note": "Stripe partial refund",
             "items": [{"order_item_id": stripe_item_id, "quantity": 1}],

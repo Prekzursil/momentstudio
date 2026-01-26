@@ -24,15 +24,21 @@ from app.schemas.returns import (
 from app.services import email as email_service
 from app.services import private_storage
 from app.services import returns as returns_service
+from app.services import pii as pii_service
 
 router = APIRouter(prefix="/returns", tags=["returns"])
 
 
-def _serialize_return_request(record: object) -> ReturnRequestRead:
+def _serialize_return_request(record: object, *, include_pii: bool) -> ReturnRequestRead:
     payload = ReturnRequestRead.model_validate(record).model_dump()
     payload["order_reference"] = getattr(getattr(record, "order", None), "reference_code", None)
-    payload["customer_email"] = getattr(getattr(record, "order", None), "customer_email", None)
-    payload["customer_name"] = getattr(getattr(record, "order", None), "customer_name", None)
+    customer_email = getattr(getattr(record, "order", None), "customer_email", None)
+    customer_name = getattr(getattr(record, "order", None), "customer_name", None)
+    if not include_pii:
+        customer_email = pii_service.mask_email(customer_email)
+        customer_name = pii_service.mask_text(customer_name, keep=1)
+    payload["customer_email"] = customer_email
+    payload["customer_name"] = customer_name
     payload["return_label_filename"] = getattr(record, "return_label_filename", None)
     payload["return_label_uploaded_at"] = getattr(record, "return_label_uploaded_at", None)
     payload["has_return_label"] = bool(getattr(record, "return_label_path", None))
@@ -70,19 +76,22 @@ async def create_my_return_request(
         lang = created.user.preferred_language if getattr(created, "user", None) else None
         background_tasks.add_task(email_service.send_return_request_created, to_email, created, lang=lang)
 
-    return _serialize_return_request(created)
+    return _serialize_return_request(created, include_pii=True)
 
 
 @router.get("/admin", response_model=ReturnRequestListResponse)
 async def admin_list_returns(
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("returns")),
+    admin: User = Depends(require_admin_section("returns")),
     q: str | None = Query(default=None),
     status_filter: ReturnRequestStatus | None = Query(default=None),
     order_id: UUID | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
+    include_pii: bool = Query(default=False),
 ) -> ReturnRequestListResponse:
+    if include_pii:
+        pii_service.require_pii_reveal(admin)
     rows, total_items = await returns_service.list_return_requests(
         session,
         q=q,
@@ -98,8 +107,16 @@ async def admin_list_returns(
                 id=r.id,
                 order_id=r.order_id,
                 order_reference=getattr(r.order, "reference_code", None),
-                customer_email=getattr(r.order, "customer_email", None),
-                customer_name=getattr(r.order, "customer_name", None),
+                customer_email=(
+                    getattr(r.order, "customer_email", None)
+                    if include_pii
+                    else pii_service.mask_email(getattr(r.order, "customer_email", None))
+                ),
+                customer_name=(
+                    getattr(r.order, "customer_name", None)
+                    if include_pii
+                    else pii_service.mask_text(getattr(r.order, "customer_name", None), keep=1)
+                ),
                 status=r.status,
                 created_at=r.created_at,
             )
@@ -112,28 +129,34 @@ async def admin_list_returns(
 @router.get("/admin/{return_id}", response_model=ReturnRequestRead)
 async def admin_get_return(
     return_id: UUID,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("returns")),
+    admin: User = Depends(require_admin_section("returns")),
 ) -> ReturnRequestRead:
+    if include_pii:
+        pii_service.require_pii_reveal(admin)
     record = await returns_service.get_return_request(session, return_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Return request not found")
-    return _serialize_return_request(record)
+    return _serialize_return_request(record, include_pii=include_pii)
 
 
 @router.get("/admin/by-order/{order_id}", response_model=list[ReturnRequestRead])
 async def admin_list_returns_for_order(
     order_id: UUID,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("returns")),
+    admin: User = Depends(require_admin_section("returns")),
 ) -> list[ReturnRequestRead]:
+    if include_pii:
+        pii_service.require_pii_reveal(admin)
     rows, _ = await returns_service.list_return_requests(session, order_id=order_id, page=1, limit=100)
     out: list[ReturnRequestRead] = []
     for r in rows:
         detail = await returns_service.get_return_request(session, r.id)
         if not detail:
             continue
-        out.append(_serialize_return_request(detail))
+        out.append(_serialize_return_request(detail, include_pii=include_pii))
     return out
 
 
@@ -151,7 +174,7 @@ async def admin_create_return(
         lang = created.user.preferred_language if getattr(created, "user", None) else None
         background_tasks.add_task(email_service.send_return_request_created, to_email, created, lang=lang)
 
-    return await admin_get_return(created.id, session=session, _=admin)
+    return await admin_get_return(created.id, session=session, admin=admin, include_pii=False)
 
 
 @router.patch("/admin/{return_id}", response_model=ReturnRequestRead)
@@ -181,16 +204,19 @@ async def admin_update_return(
             lang=lang,
         )
 
-    return await admin_get_return(updated.id, session=session, _=admin)
+    return await admin_get_return(updated.id, session=session, admin=admin, include_pii=False)
 
 
 @router.post("/admin/{return_id}/label", response_model=ReturnRequestRead)
 async def admin_upload_return_label(
     return_id: UUID,
     file: UploadFile = File(...),
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("returns")),
+    admin: User = Depends(require_admin_section("returns")),
 ) -> ReturnRequestRead:
+    if include_pii:
+        pii_service.require_pii_reveal(admin)
     record = await returns_service.get_return_request(session, return_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Return request not found")
@@ -215,7 +241,7 @@ async def admin_upload_return_label(
     refreshed = await returns_service.get_return_request(session, return_id)
     if not refreshed:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Return request not found")
-    return _serialize_return_request(refreshed)
+    return _serialize_return_request(refreshed, include_pii=include_pii)
 
 
 @router.get("/admin/{return_id}/label")

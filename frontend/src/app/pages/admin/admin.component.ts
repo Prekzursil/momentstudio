@@ -4924,7 +4924,9 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   updateRole(): void {
     if (!this.selectedUserId || !this.selectedUserRole) return;
-    this.admin.updateUserRole(this.selectedUserId, this.selectedUserRole).subscribe({
+    const password = (prompt(this.t('adminUi.users.rolePasswordPrompt')) || '').trim();
+    if (!password) return;
+    this.admin.updateUserRole(this.selectedUserId, this.selectedUserRole, password).subscribe({
       next: (updated) => {
         this.users = this.users.map((u) => (u.id === updated.id ? updated : u));
         this.toast.success(this.t('adminUi.users.success.role'));

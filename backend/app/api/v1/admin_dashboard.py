@@ -69,6 +69,7 @@ from app.services import email as email_service
 from app.services import private_storage
 from app.services import user_export as user_export_service
 from app.services import self_service
+from app.services import pii as pii_service
 from app.schemas.user_admin import (
     AdminEmailVerificationHistoryResponse,
     AdminEmailVerificationTokenInfo,
@@ -323,12 +324,15 @@ async def admin_summary(
 @router.get("/search", response_model=AdminDashboardSearchResponse)
 async def admin_global_search(
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("dashboard")),
+    current_user: User = Depends(require_admin_section("dashboard")),
     q: str = Query(..., min_length=1, max_length=255),
+    include_pii: bool = Query(default=False),
 ) -> AdminDashboardSearchResponse:
     needle = (q or "").strip()
     if not needle:
         return AdminDashboardSearchResponse(items=[])
+    if include_pii:
+        pii_service.require_pii_reveal(current_user)
 
     parsed_uuid: UUID | None = None
     try:
@@ -341,12 +345,15 @@ async def admin_global_search(
     if parsed_uuid is not None:
         order = await session.get(Order, parsed_uuid)
         if order:
+            subtitle = (order.customer_email or "").strip() or None
+            if not include_pii:
+                subtitle = pii_service.mask_email(subtitle)
             results.append(
                 AdminDashboardSearchResult(
                     type="order",
                     id=str(order.id),
                     label=(order.reference_code or str(order.id)),
-                    subtitle=(order.customer_email or "").strip() or None,
+                    subtitle=subtitle,
                 )
             )
 
@@ -364,13 +371,14 @@ async def admin_global_search(
 
         user = await session.get(User, parsed_uuid)
         if user and user.deleted_at is None:
+            email_value = user.email if include_pii else (pii_service.mask_email(user.email) or user.email)
             subtitle = (user.username or "").strip() or None
             results.append(
                 AdminDashboardSearchResult(
                     type="user",
                     id=str(user.id),
-                    email=user.email,
-                    label=user.email,
+                    email=email_value,
+                    label=email_value,
                     subtitle=subtitle,
                 )
             )
@@ -397,12 +405,15 @@ async def admin_global_search(
         .all()
     )
     for order in orders:
+        subtitle = (order.customer_email or "").strip() or None
+        if not include_pii:
+            subtitle = pii_service.mask_email(subtitle)
         results.append(
             AdminDashboardSearchResult(
                 type="order",
                 id=str(order.id),
                 label=(order.reference_code or str(order.id)),
-                subtitle=(order.customer_email or "").strip() or None,
+                subtitle=subtitle,
             )
         )
 
@@ -456,13 +467,14 @@ async def admin_global_search(
         .all()
     )
     for user in users:
+        email_value = user.email if include_pii else (pii_service.mask_email(user.email) or user.email)
         subtitle = (user.username or "").strip() or None
         results.append(
             AdminDashboardSearchResult(
                 type="user",
                 id=str(user.id),
-                email=user.email,
-                label=user.email,
+                email=email_value,
+                label=email_value,
                 subtitle=subtitle,
             )
         )
@@ -786,8 +798,11 @@ async def products_by_ids(
 @router.get("/orders")
 async def admin_orders(
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("dashboard")),
+    current_user: User = Depends(require_admin_section("dashboard")),
+    include_pii: bool = Query(default=False),
 ) -> list[dict]:
+    if include_pii:
+        pii_service.require_pii_reveal(current_user)
     stmt = (
         select(Order, User.email)
         .join(User, Order.user_id == User.id, isouter=True)
@@ -803,7 +818,7 @@ async def admin_orders(
             "total_amount": float(order.total_amount),
             "currency": order.currency,
             "created_at": order.created_at,
-            "customer": email or "guest",
+            "customer": (email or "guest") if include_pii or not email else (pii_service.mask_email(email) or email),
         }
         for order, email in rows
     ]
@@ -812,8 +827,11 @@ async def admin_orders(
 @router.get("/users")
 async def admin_users(
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("dashboard")),
+    current_user: User = Depends(require_admin_section("dashboard")),
+    include_pii: bool = Query(default=False),
 ) -> list[dict]:
+    if include_pii:
+        pii_service.require_pii_reveal(current_user)
     result = await session.execute(
         select(User).order_by(User.created_at.desc()).limit(20)
     )
@@ -821,9 +839,9 @@ async def admin_users(
     return [
         {
             "id": str(u.id),
-            "email": u.email,
+            "email": u.email if include_pii else (pii_service.mask_email(u.email) or u.email),
             "username": u.username,
-            "name": u.name,
+            "name": u.name if include_pii else pii_service.mask_text(u.name, keep=1),
             "name_tag": u.name_tag,
             "role": u.role,
             "created_at": u.created_at,
@@ -835,12 +853,15 @@ async def admin_users(
 @router.get("/users/search", response_model=AdminUserListResponse)
 async def search_users(
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("users")),
+    current_user: User = Depends(require_admin_section("users")),
     q: str | None = Query(default=None),
     role: UserRole | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
+    include_pii: bool = Query(default=False),
 ) -> AdminUserListResponse:
+    if include_pii:
+        pii_service.require_pii_reveal(current_user)
     offset = (page - 1) * limit
     stmt = select(User).where(User.deleted_at.is_(None))
 
@@ -873,9 +894,9 @@ async def search_users(
     items = [
         AdminUserListItem(
             id=u.id,
-            email=u.email,
+            email=u.email if include_pii else (pii_service.mask_email(u.email) or u.email),
             username=u.username,
-            name=u.name,
+            name=u.name if include_pii else pii_service.mask_text(u.name, keep=1),
             name_tag=u.name_tag,
             role=u.role,
             email_verified=bool(u.email_verified),
@@ -913,12 +934,15 @@ def _user_order_stats_subquery() -> object:
 @router.get("/users/segments/repeat-buyers", response_model=AdminUserSegmentResponse)
 async def admin_user_segment_repeat_buyers(
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("users")),
+    current_user: User = Depends(require_admin_section("users")),
     q: str | None = Query(default=None),
     min_orders: int = Query(default=2, ge=1, le=100),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
+    include_pii: bool = Query(default=False),
 ) -> AdminUserSegmentResponse:
+    if include_pii:
+        pii_service.require_pii_reveal(current_user)
     offset = (page - 1) * limit
     stats = _user_order_stats_subquery()
 
@@ -962,9 +986,9 @@ async def admin_user_segment_repeat_buyers(
             AdminUserSegmentListItem(
                 user=AdminUserListItem(
                     id=user.id,
-                    email=user.email,
+                    email=user.email if include_pii else (pii_service.mask_email(user.email) or user.email),
                     username=user.username,
-                    name=user.name,
+                    name=user.name if include_pii else pii_service.mask_text(user.name, keep=1),
                     name_tag=user.name_tag,
                     role=user.role,
                     email_verified=bool(user.email_verified),
@@ -990,13 +1014,16 @@ async def admin_user_segment_repeat_buyers(
 @router.get("/users/segments/high-aov", response_model=AdminUserSegmentResponse)
 async def admin_user_segment_high_aov(
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("users")),
+    current_user: User = Depends(require_admin_section("users")),
     q: str | None = Query(default=None),
     min_orders: int = Query(default=1, ge=1, le=100),
     min_aov: float = Query(default=0, ge=0),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
+    include_pii: bool = Query(default=False),
 ) -> AdminUserSegmentResponse:
+    if include_pii:
+        pii_service.require_pii_reveal(current_user)
     offset = (page - 1) * limit
     stats = _user_order_stats_subquery()
 
@@ -1042,9 +1069,9 @@ async def admin_user_segment_high_aov(
             AdminUserSegmentListItem(
                 user=AdminUserListItem(
                     id=user.id,
-                    email=user.email,
+                    email=user.email if include_pii else (pii_service.mask_email(user.email) or user.email),
                     username=user.username,
-                    name=user.name,
+                    name=user.name if include_pii else pii_service.mask_text(user.name, keep=1),
                     name_tag=user.name_tag,
                     role=user.role,
                     email_verified=bool(user.email_verified),
@@ -1071,8 +1098,11 @@ async def admin_user_segment_high_aov(
 async def admin_user_aliases(
     user_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("users")),
+    current_user: User = Depends(require_admin_section("users")),
+    include_pii: bool = Query(default=False),
 ) -> dict:
+    if include_pii:
+        pii_service.require_pii_reveal(current_user)
     user = await session.get(User, user_id)
     if not user:
         raise HTTPException(
@@ -1083,9 +1113,9 @@ async def admin_user_aliases(
     return {
         "user": {
             "id": str(user.id),
-            "email": user.email,
+            "email": user.email if include_pii else (pii_service.mask_email(user.email) or user.email),
             "username": user.username,
-            "name": user.name,
+            "name": user.name if include_pii else pii_service.mask_text(user.name, keep=1),
             "name_tag": user.name_tag,
             "role": user.role,
         },
@@ -1104,8 +1134,11 @@ async def admin_user_aliases(
 async def admin_user_profile(
     user_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("users")),
+    current_user: User = Depends(require_admin_section("users")),
+    include_pii: bool = Query(default=False),
 ) -> AdminUserProfileResponse:
+    if include_pii:
+        pii_service.require_pii_reveal(current_user)
     user = await session.get(User, user_id)
     if not user or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -1149,12 +1182,38 @@ async def admin_user_profile(
         .all()
     )
 
+    addresses_payload: list[dict[str, Any]] | list[Address]
+    if include_pii:
+        addresses_payload = addresses
+    else:
+        addresses_payload = [
+            {
+                "id": addr.id,
+                "label": addr.label,
+                "phone": pii_service.mask_phone(addr.phone),
+                "line1": "***",
+                "line2": "***" if (addr.line2 or "").strip() else None,
+                "city": "***",
+                "region": "***" if (addr.region or "").strip() else None,
+                "postal_code": "***",
+                "country": addr.country,
+                "is_default_shipping": bool(getattr(addr, "is_default_shipping", False)),
+                "is_default_billing": bool(getattr(addr, "is_default_billing", False)),
+                "created_at": addr.created_at,
+                "updated_at": addr.updated_at,
+            }
+            for addr in addresses
+        ]
+
+    user_email = user.email if include_pii else (pii_service.mask_email(user.email) or user.email)
+    user_name = user.name if include_pii else pii_service.mask_text(user.name, keep=1)
+
     return AdminUserProfileResponse(
         user=AdminUserProfileUser(
             id=user.id,
-            email=user.email,
+            email=user_email,
             username=user.username,
-            name=user.name,
+            name=user_name,
             name_tag=user.name_tag,
             role=user.role,
             email_verified=bool(user.email_verified),
@@ -1165,7 +1224,7 @@ async def admin_user_profile(
             locked_reason=getattr(user, "locked_reason", None),
             password_reset_required=bool(getattr(user, "password_reset_required", False)),
         ),
-        addresses=addresses,
+        addresses=addresses_payload,
         orders=orders,
         tickets=tickets,
         security_events=security_events,
@@ -2064,12 +2123,15 @@ async def admin_revoke_user_session(
 @router.get("/gdpr/exports", response_model=AdminGdprExportJobsResponse)
 async def admin_gdpr_export_jobs(
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("users")),
+    current_user: User = Depends(require_admin_section("users")),
     q: str | None = Query(default=None),
     status_filter: UserDataExportStatus | None = Query(default=None, alias="status"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
+    include_pii: bool = Query(default=False),
 ) -> AdminGdprExportJobsResponse:
+    if include_pii:
+        pii_service.require_pii_reveal(current_user)
     offset = (page - 1) * limit
     stmt = select(UserDataExportJob, User).join(User, UserDataExportJob.user_id == User.id)
 
@@ -2121,7 +2183,7 @@ async def admin_gdpr_export_jobs(
                 id=job.id,
                 user=AdminGdprUserRef(
                     id=user.id,
-                    email=user.email,
+                    email=user.email if include_pii else (pii_service.mask_email(user.email) or user.email),
                     username=user.username,
                     role=user.role,
                 ),
@@ -2198,7 +2260,12 @@ async def admin_gdpr_retry_export_job(
     sla_due_at = created_at + timedelta(days=sla_days)
     return AdminGdprExportJobItem(
         id=job.id,
-        user=AdminGdprUserRef(id=user.id, email=user.email, username=user.username, role=user.role),
+        user=AdminGdprUserRef(
+            id=user.id,
+            email=pii_service.mask_email(user.email) or user.email,
+            username=user.username,
+            role=user.role,
+        ),
         status=job.status,
         progress=int(job.progress or 0),
         created_at=created_at,
@@ -2260,11 +2327,14 @@ async def admin_gdpr_download_export_job(
 @router.get("/gdpr/deletions", response_model=AdminGdprDeletionRequestsResponse)
 async def admin_gdpr_deletion_requests(
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("users")),
+    current_user: User = Depends(require_admin_section("users")),
     q: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
+    include_pii: bool = Query(default=False),
 ) -> AdminGdprDeletionRequestsResponse:
+    if include_pii:
+        pii_service.require_pii_reveal(current_user)
     offset = (page - 1) * limit
     stmt = select(User).where(User.deleted_at.is_(None), User.deletion_requested_at.is_not(None))
 
@@ -2309,7 +2379,12 @@ async def admin_gdpr_deletion_requests(
 
         items.append(
             AdminGdprDeletionRequestItem(
-                user=AdminGdprUserRef(id=user.id, email=user.email, username=user.username, role=user.role),
+                user=AdminGdprUserRef(
+                    id=user.id,
+                    email=user.email if include_pii else (pii_service.mask_email(user.email) or user.email),
+                    username=user.username,
+                    role=user.role,
+                ),
                 requested_at=requested_at or now,
                 scheduled_for=scheduled_for,
                 status=status_label,
@@ -2408,9 +2483,19 @@ async def admin_gdpr_cancel_deletion(
 async def update_user_role(
     user_id: UUID,
     payload: dict,
+    request: Request,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    current_user: User = Depends(require_admin),
 ) -> dict:
+    if current_user.role not in (UserRole.owner, UserRole.admin):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only owner/admin can change user roles")
+
+    password = str(payload.get("password") or "")
+    if not password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password is required")
+    if not security.verify_password(password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+
     user = await session.get(User, user_id)
     if not user:
         raise HTTPException(
@@ -2432,15 +2517,28 @@ async def update_user_role(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role"
         )
+    before_role = user.role
     user.role = UserRole(role)
     session.add(user)
     await session.flush()
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="user.role.update",
+        actor_user_id=current_user.id,
+        subject_user_id=user.id,
+        data={
+            "before": getattr(before_role, "value", str(before_role)),
+            "after": getattr(user.role, "value", str(user.role)),
+            "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+            "ip_address": (request.client.host if request.client else None),
+        },
+    )
     await session.commit()
     return {
         "id": str(user.id),
-        "email": user.email,
+        "email": pii_service.mask_email(user.email) or user.email,
         "username": user.username,
-        "name": user.name,
+        "name": pii_service.mask_text(user.name, keep=1),
         "name_tag": user.name_tag,
         "role": user.role,
         "created_at": user.created_at,
@@ -2495,9 +2593,9 @@ async def update_user_internal(
 
     return AdminUserProfileUser(
         id=user.id,
-        email=user.email,
+        email=pii_service.mask_email(user.email) or user.email,
         username=user.username,
-        name=user.name,
+        name=pii_service.mask_text(user.name, keep=1),
         name_tag=user.name_tag,
         role=user.role,
         email_verified=bool(user.email_verified),
@@ -2588,9 +2686,9 @@ async def update_user_security(
 
     return AdminUserProfileUser(
         id=user.id,
-        email=user.email,
+        email=pii_service.mask_email(user.email) or user.email,
         username=user.username,
-        name=user.name,
+        name=pii_service.mask_text(user.name, keep=1),
         name_tag=user.name_tag,
         role=user.role,
         email_verified=bool(user.email_verified),
@@ -2715,9 +2813,9 @@ async def override_email_verification(
 
     return AdminUserProfileUser(
         id=user.id,
-        email=user.email,
+        email=pii_service.mask_email(user.email) or user.email,
         username=user.username,
-        name=user.name,
+        name=pii_service.mask_text(user.name, keep=1),
         name_tag=user.name_tag,
         role=user.role,
         email_verified=bool(user.email_verified),

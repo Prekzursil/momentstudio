@@ -1293,6 +1293,11 @@
     "security": {
       "mfaRequired": "Two-factor authentication or a passkey is required for admin access."
     },
+    "pii": {
+      "reveal": "Reveal PII",
+      "hide": "Hide PII",
+      "notAuthorized": "You don't have permission to reveal PII."
+    },
     "ipBypass": {
       "title": "Admin access restricted",
       "copy": "Admin access is restricted by IP. Enter the bypass token to continue on this device.",
@@ -2863,7 +2868,9 @@
         "total": "Total",
         "noteLabel": "Refund note",
         "notePlaceholder": "Required. Add a note for the audit log.",
+        "passwordLabel": "Confirm password",
         "noteRequired": "Refund note is required.",
+        "passwordRequired": "Password is required.",
         "cancel": "Cancel",
         "confirm": "Request refund"
       },
@@ -2878,12 +2885,14 @@
         "amountHint": "Calculated from selected items",
         "noteLabel": "Refund note",
         "notePlaceholder": "Required. Add a note for the audit log.",
+        "passwordLabel": "Confirm password",
         "processPaymentLabel": "Process refund with payment provider",
         "processPaymentHintSupported": "Will attempt a Stripe/PayPal refund and record the provider response.",
         "processPaymentHintMissingStripe": "Missing Stripe payment intent id; provider refund is unavailable.",
         "processPaymentHintMissingPaypal": "Missing PayPal capture id; provider refund is unavailable.",
         "processPaymentHintUnsupported": "This payment method can't be refunded automatically; a manual record will be created.",
         "noteRequired": "Refund note is required.",
+        "passwordRequired": "Password is required.",
         "itemsRequired": "Select at least one item to refund.",
         "amountRequired": "Refund amount is required.",
         "amountTooHigh": "Refund amount exceeds the remaining refundable amount.",
@@ -3070,6 +3079,9 @@
       "gdprQueue": "GDPR queue",
       "segments": "Segments",
       "setRole": "Set role",
+      "rolePasswordPrompt": "Confirm your password to change a user's role.",
+      "rolePasswordLabel": "Your password",
+      "rolePasswordRequired": "Password is required.",
       "forceLogout": "Force logout selected",
       "search": "Search",
       "roleFilter": "Role",

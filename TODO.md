@@ -781,8 +781,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Security: IP allowlist – Optional allowlist/denylist for admin access with safe bypass flow.
 - [x] Admin Audit: retention + export – Export audit logs with retention policies and redaction options.
 - [x] Admin Audit: tamper-evident logging – Optional hash-chaining for stronger audit integrity.
-- [ ] Admin Compliance: default PII masking – Mask customer PII by default with explicit reveal permission.
-- [ ] Admin Security: sensitive action re-auth – Require password confirmation for refunds/role changes.
+- [x] Admin Compliance: default PII masking – Mask customer PII by default with explicit reveal permission.
+- [x] Admin Security: sensitive action re-auth – Require password confirmation for refunds/role changes.
 - [ ] Admin Security: admin login alerts – Notify owner of new admin login/device.
 - [ ] Admin UX: keyboard shortcuts – Add shortcuts for global search, navigation, and common order actions.
 - [ ] Admin UX: table virtualization – Improve performance for large lists (orders/products/users).

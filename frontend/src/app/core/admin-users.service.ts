@@ -157,12 +157,13 @@ export class AdminUsersService {
     role?: string;
     page?: number;
     limit?: number;
+    include_pii?: boolean;
   }): Observable<AdminUserListResponse> {
     return this.api.get<AdminUserListResponse>('/admin/dashboard/users/search', params as any);
   }
 
-  getProfile(userId: string): Observable<AdminUserProfileResponse> {
-    return this.api.get<AdminUserProfileResponse>(`/admin/dashboard/users/${userId}/profile`);
+  getProfile(userId: string, opts?: { include_pii?: boolean }): Observable<AdminUserProfileResponse> {
+    return this.api.get<AdminUserProfileResponse>(`/admin/dashboard/users/${userId}/profile`, opts as any);
   }
 
   updateInternal(userId: string, payload: { vip?: boolean; admin_note?: string | null }): Observable<AdminUserProfileUser> {

@@ -34,6 +34,7 @@ from app.schemas.support import (
 from app.services import auth as auth_service
 from app.services import email as email_service
 from app.services import support as support_service
+from app.services import pii as pii_service
 
 router = APIRouter(prefix="/support", tags=["support"])
 
@@ -70,6 +71,26 @@ def _submission_to_ticket(submission, *, include_thread: bool) -> TicketRead:
         updated_at=submission.updated_at,
         resolved_at=submission.resolved_at,
         messages=messages,
+    )
+
+
+def _mask_contact_submission_read(record: ContactSubmissionRead) -> ContactSubmissionRead:
+    masked_email = pii_service.mask_email(record.email) or record.email
+    masked_name = pii_service.mask_text(record.name, keep=1) or record.name
+    masked_message = pii_service.redact_emails_in_text(record.message) or record.message
+    masked_admin_note = pii_service.redact_emails_in_text(record.admin_note) if record.admin_note else None
+    masked_messages = [
+        m.model_copy(update={"message": pii_service.redact_emails_in_text(m.message) or m.message})
+        for m in (record.messages or [])
+    ]
+    return record.model_copy(
+        update={
+            "email": masked_email,
+            "name": masked_name,
+            "message": masked_message,
+            "admin_note": masked_admin_note,
+            "messages": masked_messages,
+        }
     )
 
 
@@ -175,7 +196,7 @@ async def reply_my_ticket(
 @router.get("/admin/submissions", response_model=ContactSubmissionListResponse)
 async def admin_list_contact_submissions(
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("support")),
+    admin: User = Depends(require_admin_section("support")),
     q: str | None = Query(default=None),
     status_filter: ContactSubmissionStatus | None = Query(default=None),
     channel_filter: ContactSubmissionTopic | None = Query(default=None),
@@ -184,7 +205,10 @@ async def admin_list_contact_submissions(
     assignee_filter: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
+    include_pii: bool = Query(default=False),
 ) -> ContactSubmissionListResponse:
+    if include_pii:
+        pii_service.require_pii_reveal(admin)
     topic_filter = channel_filter or topic_filter
     rows, total_items = await support_service.list_contact_submissions(
         session,
@@ -203,8 +227,8 @@ async def admin_list_contact_submissions(
                 id=r.id,
                 topic=r.topic,
                 status=r.status,
-                name=r.name,
-                email=r.email,
+                name=r.name if include_pii else (pii_service.mask_text(r.name, keep=1) or r.name),
+                email=r.email if include_pii else (pii_service.mask_email(r.email) or r.email),
                 order_reference=r.order_reference,
                 assignee=getattr(r, "assignee", None),
                 created_at=r.created_at,
@@ -289,22 +313,29 @@ async def admin_delete_canned_response(
 @router.get("/admin/submissions/{submission_id}", response_model=ContactSubmissionRead)
 async def admin_get_contact_submission(
     submission_id: UUID,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("support")),
+    admin: User = Depends(require_admin_section("support")),
 ) -> ContactSubmissionRead:
+    if include_pii:
+        pii_service.require_pii_reveal(admin)
     record = await support_service.get_contact_submission_with_messages(session, submission_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
-    return ContactSubmissionRead.model_validate(record)
+    out = ContactSubmissionRead.model_validate(record)
+    return out if include_pii else _mask_contact_submission_read(out)
 
 
 @router.patch("/admin/submissions/{submission_id}", response_model=ContactSubmissionRead)
 async def admin_update_contact_submission(
     submission_id: UUID,
     payload: ContactSubmissionUpdate,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("support")),
 ) -> ContactSubmissionRead:
+    if include_pii:
+        pii_service.require_pii_reveal(admin)
     record = await support_service.get_contact_submission_with_messages(session, submission_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
@@ -320,7 +351,8 @@ async def admin_update_contact_submission(
     hydrated = await support_service.get_contact_submission_with_messages(session, updated.id)
     if not hydrated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
-    return ContactSubmissionRead.model_validate(hydrated)
+    out = ContactSubmissionRead.model_validate(hydrated)
+    return out if include_pii else _mask_contact_submission_read(out)
 
 
 @router.post("/admin/submissions/{submission_id}/messages", response_model=ContactSubmissionRead)
@@ -328,9 +360,12 @@ async def admin_reply_contact_submission(
     submission_id: UUID,
     payload: TicketMessageCreate,
     background_tasks: BackgroundTasks,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("support")),
 ) -> ContactSubmissionRead:
+    if include_pii:
+        pii_service.require_pii_reveal(admin)
     record = await support_service.get_contact_submission_with_messages(session, submission_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
@@ -354,4 +389,5 @@ async def admin_reply_contact_submission(
             contact_url=contact_url,
             lang=None,
         )
-    return ContactSubmissionRead.model_validate(updated)
+    out = ContactSubmissionRead.model_validate(updated)
+    return out if include_pii else _mask_contact_submission_read(out)

@@ -31,16 +31,23 @@ type RoleFilter = 'all' | 'customer' | 'support' | 'fulfillment' | 'content' | '
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
-      <div class="flex items-start justify-between gap-3">
-        <div class="grid gap-1">
-          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.users.title' | translate }}</h1>
-          <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.users.hint' | translate }}</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <app-button size="sm" variant="ghost" routerLink="/admin/users/segments" [label]="'adminUi.users.segments' | translate"></app-button>
-          <app-button size="sm" variant="ghost" routerLink="/admin/users/gdpr" [label]="'adminUi.users.gdprQueue' | translate"></app-button>
-        </div>
-      </div>
+	      <div class="flex items-start justify-between gap-3">
+	        <div class="grid gap-1">
+	          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.users.title' | translate }}</h1>
+	          <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.users.hint' | translate }}</p>
+	        </div>
+	        <div class="flex items-center gap-2">
+	          <app-button
+	            size="sm"
+	            variant="ghost"
+	            [label]="(piiReveal() ? 'adminUi.pii.hide' : 'adminUi.pii.reveal') | translate"
+	            [disabled]="loading() || !canRevealPii()"
+	            (action)="togglePiiReveal()"
+	          ></app-button>
+	          <app-button size="sm" variant="ghost" routerLink="/admin/users/segments" [label]="'adminUi.users.segments' | translate"></app-button>
+	          <app-button size="sm" variant="ghost" routerLink="/admin/users/gdpr" [label]="'adminUi.users.gdprQueue' | translate"></app-button>
+	        </div>
+	      </div>
 
       <div class="grid gap-6 lg:grid-cols-[1.25fr_0.75fr] items-start">
         <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
@@ -655,10 +662,65 @@ type RoleFilter = 'all' | 'customer' | 'support' | 'fulfillment' | 'content' | '
               </ng-container>
             </div>
           </div>
-        </section>
-      </div>
-    </div>
-  `
+	        </section>
+	      </div>
+
+	      <ng-container *ngIf="roleChangeOpen() && selectedUser() as u">
+	        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeRoleChange()">
+	          <div
+	            class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+	            (click)="$event.stopPropagation()"
+	          >
+	            <div class="flex items-start justify-between gap-3">
+	              <div class="grid gap-1">
+	                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.users.setRole' | translate }}</h3>
+	                <div class="text-xs text-slate-600 dark:text-slate-300">{{ identityLabel(u) }}</div>
+	              </div>
+	              <button
+	                type="button"
+	                class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+	                (click)="closeRoleChange()"
+	                [attr.aria-label]="'adminUi.actions.cancel' | translate"
+	              >
+	                ✕
+	              </button>
+	            </div>
+
+	            <p class="mt-3 text-sm text-slate-700 dark:text-slate-200">
+	              {{ 'adminUi.users.rolePasswordPrompt' | translate }}
+	            </p>
+
+	            <div class="mt-3">
+	              <app-input
+	                [label]="'adminUi.users.rolePasswordLabel' | translate"
+	                type="password"
+	                [(value)]="roleChangePassword"
+	                [placeholder]="'auth.password' | translate"
+	                autocomplete="current-password"
+	              ></app-input>
+	            </div>
+	            <div *ngIf="roleChangeError()" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ roleChangeError() }}</div>
+
+	            <div class="mt-4 flex justify-end gap-2">
+	              <app-button
+	                size="sm"
+	                variant="ghost"
+	                [label]="'adminUi.actions.cancel' | translate"
+	                [disabled]="roleChangeBusy()"
+	                (action)="closeRoleChange()"
+	              ></app-button>
+	              <app-button
+	                size="sm"
+	                [label]="'adminUi.users.setRole' | translate"
+	                [disabled]="roleChangeBusy()"
+	                (action)="confirmRoleChange()"
+	              ></app-button>
+	            </div>
+	          </div>
+	        </div>
+	      </ng-container>
+	    </div>
+	  `
 })
 export class AdminUsersComponent implements OnInit {
   crumbs = [
@@ -671,6 +733,7 @@ export class AdminUsersComponent implements OnInit {
   error = signal<string | null>(null);
   users = signal<AdminUserListItem[]>([]);
   meta = signal<AdminUserListResponse['meta'] | null>(null);
+  piiReveal = signal(false);
 
   q = '';
   role: RoleFilter = 'all';
@@ -679,6 +742,10 @@ export class AdminUsersComponent implements OnInit {
 
   selectedUser = signal<AdminUserListItem | null>(null);
   selectedRole = 'customer';
+  roleChangeOpen = signal(false);
+  roleChangeBusy = signal(false);
+  roleChangeError = signal<string | null>(null);
+  roleChangePassword = '';
 
   aliases = signal<AdminUserAliasesResponse | null>(null);
   aliasesLoading = signal(false);
@@ -781,13 +848,50 @@ export class AdminUsersComponent implements OnInit {
     const user = this.selectedUser();
     if (!user) return;
     if (user.role === 'owner') return;
-    this.admin.updateUserRole(user.id, this.selectedRole).subscribe({
+    if (this.selectedRole === user.role) return;
+    this.roleChangePassword = '';
+    this.roleChangeError.set(null);
+    this.roleChangeOpen.set(true);
+  }
+
+  closeRoleChange(): void {
+    this.roleChangeOpen.set(false);
+    this.roleChangeBusy.set(false);
+    this.roleChangeError.set(null);
+    this.roleChangePassword = '';
+  }
+
+  confirmRoleChange(): void {
+    const user = this.selectedUser();
+    if (!user) return;
+    if (user.role === 'owner') return;
+    if (this.selectedRole === user.role) {
+      this.closeRoleChange();
+      return;
+    }
+    const password = this.roleChangePassword.trim();
+    if (!password) {
+      this.roleChangeError.set(this.t('adminUi.users.rolePasswordRequired'));
+      return;
+    }
+
+    this.roleChangeBusy.set(true);
+    this.roleChangeError.set(null);
+    this.admin.updateUserRole(user.id, this.selectedRole, password).subscribe({
       next: (updated) => {
         this.toast.success(this.t('adminUi.users.success.role'));
         this.selectedUser.set({ ...user, role: updated.role });
         this.users.set(this.users().map((u) => (u.id === user.id ? { ...u, role: updated.role } : u)));
+        const profile = this.profile();
+        if (profile) this.profile.set({ ...profile, user: { ...profile.user, role: updated.role } });
+        this.closeRoleChange();
       },
-      error: () => this.toast.error(this.t('adminUi.users.errors.role'))
+      error: (err) => {
+        const msg = err?.error?.detail || this.t('adminUi.users.errors.role');
+        this.roleChangeError.set(msg);
+        this.toast.error(msg);
+        this.roleChangeBusy.set(false);
+      }
     });
   }
 
@@ -1093,6 +1197,22 @@ export class AdminUsersComponent implements OnInit {
     return formatIdentity(user, user.email);
   }
 
+  canRevealPii(): boolean {
+    const role = (this.auth.role() || '').toString();
+    return role === 'owner' || role === 'admin' || role === 'support' || role === 'fulfillment';
+  }
+
+  togglePiiReveal(): void {
+    if (!this.canRevealPii()) return;
+    this.piiReveal.set(!this.piiReveal());
+    this.load();
+    const user = this.selectedUser();
+    if (user) {
+      this.loadAliases(user.id);
+      this.loadProfile(user.id);
+    }
+  }
+
   rolePillClass(role: string): string {
     if (role === 'owner') return 'bg-indigo-100 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100';
     if (role === 'admin') return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100';
@@ -1116,7 +1236,8 @@ export class AdminUsersComponent implements OnInit {
         q: this.q.trim() ? this.q.trim() : undefined,
         role: this.role === 'all' ? undefined : this.role,
         page: this.page,
-        limit: this.limit
+        limit: this.limit,
+        include_pii: this.piiReveal() ? true : undefined
       })
       .subscribe({
         next: (res) => {
@@ -1125,16 +1246,31 @@ export class AdminUsersComponent implements OnInit {
           this.meta.set(res.meta || null);
           this.loading.set(false);
 
+          const selected = this.selectedUser();
+          if (selected) {
+            const refreshed = items.find((u) => u.id === selected.id);
+            if (refreshed) this.selectedUser.set(refreshed);
+          }
+
           if (this.autoSelectAfterLoad && items.length > 0) {
             const needle = (this.pendingPrefillSearch || '').trim().toLowerCase();
             const match =
-              items.find((u) => u.email.toLowerCase() === needle || u.username.toLowerCase() === needle) || items[0];
+              items.find((u) => (u.id || '').toLowerCase() === needle) ||
+              items.find((u) => (u.username || '').toLowerCase() === needle) ||
+              items.find((u) => (u.email || '').toLowerCase() === needle) ||
+              items[0];
             this.autoSelectAfterLoad = false;
             this.pendingPrefillSearch = null;
             this.select(match);
           }
         },
-        error: () => {
+        error: (err) => {
+          if (err?.status === 403 && this.piiReveal()) {
+            this.piiReveal.set(false);
+            this.toast.error(this.t('adminUi.pii.notAuthorized'));
+            this.load();
+            return;
+          }
           this.error.set(this.t('adminUi.users.errors.load'));
           this.loading.set(false);
         }
@@ -1145,7 +1281,7 @@ export class AdminUsersComponent implements OnInit {
     this.aliasesLoading.set(true);
     this.aliasesError.set(null);
     this.aliases.set(null);
-    this.admin.userAliases(userId).subscribe({
+    this.admin.userAliases(userId, { include_pii: this.piiReveal() }).subscribe({
       next: (res) => {
         this.aliases.set(res);
         this.aliasesLoading.set(false);
@@ -1161,7 +1297,7 @@ export class AdminUsersComponent implements OnInit {
     this.profileLoading.set(true);
     this.profileError.set(null);
     this.profile.set(null);
-    this.usersApi.getProfile(userId).subscribe({
+    this.usersApi.getProfile(userId, { include_pii: this.piiReveal() }).subscribe({
       next: (res) => {
         this.profile.set(res);
         this.vip = Boolean(res?.user?.vip);

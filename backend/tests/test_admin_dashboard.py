@@ -367,11 +367,20 @@ def test_admin_lists_and_audit_and_feed(test_app: Dict[str, object]) -> None:
     assert products.status_code == 200
     assert products.json()[0]["category"] == "Art"
 
-    orders = client.get("/api/v1/admin/dashboard/orders", headers=headers)
+    masked_orders = client.get("/api/v1/admin/dashboard/orders", headers=headers)
+    assert masked_orders.status_code == 200
+    assert masked_orders.json()[0]["customer"] != "user@example.com"
+    assert "*" in masked_orders.json()[0]["customer"]
+
+    orders = client.get("/api/v1/admin/dashboard/orders", headers=headers, params={"include_pii": True})
     assert orders.status_code == 200
     assert orders.json()[0]["customer"] == "user@example.com"
 
-    users = client.get("/api/v1/admin/dashboard/users", headers=headers)
+    masked_users = client.get("/api/v1/admin/dashboard/users", headers=headers)
+    assert masked_users.status_code == 200
+    assert "user@example.com" not in [u["email"] for u in masked_users.json()]
+
+    users = client.get("/api/v1/admin/dashboard/users", headers=headers, params={"include_pii": True})
     assert users.status_code == 200
     emails = [u["email"] for u in users.json()]
     assert "admin@example.com" in emails and "user@example.com" in emails
@@ -414,9 +423,20 @@ def test_admin_global_search(test_app: Dict[str, object]) -> None:
         for item in items
     )
 
-    resp_users = client.get(
+    resp_users_masked = client.get(
         "/api/v1/admin/dashboard/search",
         params={"q": "user@example.com"},
+        headers=headers,
+    )
+    assert resp_users_masked.status_code == 200
+    masked_user_items = resp_users_masked.json()["items"]
+    masked_email = next((item.get("email") for item in masked_user_items if item["type"] == "user"), None)
+    assert masked_email is not None and masked_email != "user@example.com"
+    assert "*" in masked_email
+
+    resp_users = client.get(
+        "/api/v1/admin/dashboard/search",
+        params={"q": "user@example.com", "include_pii": True},
         headers=headers,
     )
     assert resp_users.status_code == 200
@@ -728,7 +748,7 @@ def test_revoke_sessions_and_update_role(test_app: Dict[str, object]) -> None:
     role_update = client.patch(
         f"/api/v1/admin/dashboard/users/{data['user_id']}/role",
         headers=headers,
-        json={"role": UserRole.admin.value},
+        json={"role": UserRole.admin.value, "password": "Password123"},
     )
     assert role_update.status_code == 200
     assert role_update.json()["role"] == UserRole.admin.value
@@ -892,7 +912,7 @@ def test_owner_role_cannot_be_changed_via_admin_role_endpoint(
     update = client.patch(
         f"/api/v1/admin/dashboard/users/{owner_id}/role",
         headers=headers,
-        json={"role": UserRole.customer.value},
+        json={"role": UserRole.customer.value, "password": "Password123"},
     )
     assert update.status_code == 400
 

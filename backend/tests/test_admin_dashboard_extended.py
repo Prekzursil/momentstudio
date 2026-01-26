@@ -450,6 +450,7 @@ def test_admin_user_profile_endpoint(test_app: Dict[str, object]) -> None:
     resp = client.get(
         f"/api/v1/admin/dashboard/users/{seeded['customer_id']}/profile",
         headers=headers,
+        params={"include_pii": True},
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
@@ -480,6 +481,7 @@ def test_admin_user_internal_update_creates_audit(test_app: Dict[str, object]) -
     profile = client.get(
         f"/api/v1/admin/dashboard/users/{seeded['customer_id']}/profile",
         headers=headers,
+        params={"include_pii": True},
     )
     assert profile.status_code == 200, profile.text
     assert profile.json()["user"]["vip"] is True

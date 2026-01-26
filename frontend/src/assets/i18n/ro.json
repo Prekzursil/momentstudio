@@ -1293,6 +1293,11 @@
     "security": {
       "mfaRequired": "Autentificarea cu doi factori sau o passkey este necesară pentru accesul de administrare."
     },
+    "pii": {
+      "reveal": "Afișează PII",
+      "hide": "Ascunde PII",
+      "notAuthorized": "Nu ai permisiunea să afișezi date personale."
+    },
     "ipBypass": {
       "title": "Acces admin restricționat",
       "copy": "Accesul de administrare este restricționat pe bază de IP. Introdu tokenul de bypass pentru a continua pe acest dispozitiv.",
@@ -2863,7 +2868,9 @@
         "total": "Total",
         "noteLabel": "Notă rambursare",
         "notePlaceholder": "Obligatoriu. Adaugă o notă pentru audit.",
+        "passwordLabel": "Confirmă parola",
         "noteRequired": "Nota de rambursare este obligatorie.",
+        "passwordRequired": "Parola este obligatorie.",
         "cancel": "Anulează",
         "confirm": "Solicită rambursare"
       },
@@ -2878,12 +2885,14 @@
         "amountHint": "Calculat din produsele selectate",
         "noteLabel": "Notă rambursare",
         "notePlaceholder": "Obligatoriu. Adaugă o notă pentru audit.",
+        "passwordLabel": "Confirmă parola",
         "processPaymentLabel": "Procesează rambursarea la procesator",
         "processPaymentHintSupported": "Va încerca o rambursare Stripe/PayPal și va salva răspunsul procesatorului.",
         "processPaymentHintMissingStripe": "Lipsește id-ul Stripe; rambursarea automată nu este disponibilă.",
         "processPaymentHintMissingPaypal": "Lipsește id-ul PayPal capture; rambursarea automată nu este disponibilă.",
         "processPaymentHintUnsupported": "Metoda de plată nu suportă rambursare automată; se va crea o înregistrare manuală.",
         "noteRequired": "Nota de rambursare este obligatorie.",
+        "passwordRequired": "Parola este obligatorie.",
         "itemsRequired": "Selectează cel puțin un produs pentru rambursare.",
         "amountRequired": "Suma de rambursare este obligatorie.",
         "amountTooHigh": "Suma depășește disponibilul de rambursat.",
@@ -3070,6 +3079,9 @@
       "gdprQueue": "Coada GDPR",
       "segments": "Segmente",
       "setRole": "Setează rol",
+      "rolePasswordPrompt": "Confirmă parola pentru a schimba rolul unui utilizator.",
+      "rolePasswordLabel": "Parola ta",
+      "rolePasswordRequired": "Parola este obligatorie.",
       "forceLogout": "Deconectează selectatul",
       "search": "Caută",
       "roleFilter": "Rol",
