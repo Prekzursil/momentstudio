@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnInit, ViewChild, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Router } from '@angular/router';
@@ -77,6 +77,8 @@ type MetricWidgetId = 'kpis' | 'counts' | 'range';
 	                <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.globalSearchLabel' | translate }}</span>
 	                <div class="relative">
 	                  <input
+                      #globalSearchInput
+                      id="admin-global-search"
 	                    class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
 	                    [placeholder]="'adminUi.dashboard.globalSearchPlaceholder' | translate"
 	                    [(ngModel)]="globalSearchQuery"
@@ -752,7 +754,8 @@ type MetricWidgetId = 'kpis' | 'counts' | 'range';
     </div>
   `
 })
-export class AdminDashboardComponent implements OnInit {
+export class AdminDashboardComponent implements OnInit, AfterViewInit {
+  @ViewChild('globalSearchInput') globalSearchInput?: ElementRef<HTMLInputElement>;
   readonly crumbs: Crumb[] = [
     { label: 'adminUi.nav.dashboard', url: '/admin/dashboard' }
   ];
@@ -812,6 +815,24 @@ export class AdminDashboardComponent implements OnInit {
     private toast: ToastService,
     private translate: TranslateService
   ) {}
+
+  ngAfterViewInit(): void {
+    const shouldFocus = Boolean((history.state as any)?.focusGlobalSearch);
+    if (!shouldFocus) return;
+
+    window.setTimeout(() => {
+      this.globalSearchInput?.nativeElement?.focus();
+      this.globalSearchInput?.nativeElement?.select();
+      this.openGlobalSearch();
+      try {
+        const nextState = { ...(history.state as any) };
+        delete nextState.focusGlobalSearch;
+        history.replaceState(nextState, '');
+      } catch {
+        // Ignore history state write failures (e.g. sandboxed/blocked environments).
+      }
+    }, 0);
+  }
 
   ngOnInit(): void {
     this.loadWidgetPrefs();

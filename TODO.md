@@ -783,8 +783,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Audit: tamper-evident logging – Optional hash-chaining for stronger audit integrity.
 - [x] Admin Compliance: default PII masking – Mask customer PII by default with explicit reveal permission.
 - [x] Admin Security: sensitive action re-auth – Require password confirmation for refunds/role changes.
-- [ ] Admin Security: admin login alerts – Notify owner of new admin login/device.
-- [ ] Admin UX: keyboard shortcuts – Add shortcuts for global search, navigation, and common order actions.
+- [x] Admin Security: admin login alerts – Notify owner of new admin login/device.
+- [x] Admin UX: keyboard shortcuts – Add shortcuts for global search, navigation, and common order actions.
 - [ ] Admin UX: table virtualization – Improve performance for large lists (orders/products/users).
 - [ ] Admin UX: accessibility audit – Ensure focus management, ARIA labels, and keyboard navigation.
 - [ ] Admin UX: standardized error UI – Unified error state with retry and copyable correlation ID.

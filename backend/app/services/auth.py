@@ -807,6 +807,32 @@ async def create_refresh_session(
     return refresh_session
 
 
+_DEVICE_UA_RE = re.compile(r"\d+(?:\.\d+)*")
+
+
+def _device_key_from_user_agent(user_agent: str | None) -> str:
+    ua = (user_agent or "").strip()
+    if not ua:
+        return "unknown"
+    normalized = _DEVICE_UA_RE.sub("x", ua)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized[:255] or "unknown"
+
+
+async def has_seen_refresh_device(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    user_agent: str | None,
+) -> bool:
+    device_key = _device_key_from_user_agent(user_agent)
+    rows = (
+        await session.execute(select(RefreshSession.user_agent).where(RefreshSession.user_id == user_id))
+    ).scalars()
+    existing_keys = {_device_key_from_user_agent(ua) for ua in rows}
+    return device_key in existing_keys
+
+
 async def issue_tokens_for_user(
     session: AsyncSession,
     user: User,

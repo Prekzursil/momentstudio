@@ -29,6 +29,7 @@ from app.db.session import get_session
 from app.models.user import (
     RefreshSession,
     User,
+    UserRole,
     UserDisplayNameHistory,
     UserEmailHistory,
     UserSecondaryEmail,
@@ -520,6 +521,7 @@ async def register(
 async def login(
     payload: LoginRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(login_rate_limit),
     response: Response = None,
@@ -538,6 +540,16 @@ async def login(
     if bool(getattr(user, "two_factor_enabled", False)):
         token = security.create_two_factor_token(str(user.id), remember=persistent, method="password")
         return TwoFactorChallengeResponse(user=UserResponse.model_validate(user), two_factor_token=token)
+
+    is_admin_login = user.role in (UserRole.admin, UserRole.owner)
+    known_device = True
+    if is_admin_login:
+        known_device = await auth_service.has_seen_refresh_device(
+            session,
+            user_id=user.id,
+            user_agent=request.headers.get("user-agent"),
+        )
+
     tokens = await auth_service.issue_tokens_for_user(
         session,
         user,
@@ -555,6 +567,22 @@ async def login(
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
     )
+    if is_admin_login and not known_device:
+        owner = await auth_service.get_owner_user(session)
+        to_email = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+        if to_email:
+            background_tasks.add_task(
+                email_service.send_admin_login_alert,
+                to_email,
+                admin_username=user.username,
+                admin_display_name=user.name,
+                admin_role=str(user.role),
+                ip_address=request.client.host if request.client else None,
+                country_code=_extract_country_code(request),
+                user_agent=request.headers.get("user-agent"),
+                occurred_at=datetime.now(timezone.utc),
+                lang=owner.preferred_language if owner else None,
+            )
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 
@@ -562,6 +590,7 @@ async def login(
 async def login_two_factor(
     payload: TwoFactorLoginRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(two_factor_rate_limit),
     response: Response = None,
@@ -592,6 +621,15 @@ async def login_two_factor(
     if not await auth_service.verify_two_factor_code(session, user, payload.code):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor code")
 
+    is_admin_login = user.role in (UserRole.admin, UserRole.owner)
+    known_device = True
+    if is_admin_login:
+        known_device = await auth_service.has_seen_refresh_device(
+            session,
+            user_id=user.id,
+            user_agent=request.headers.get("user-agent"),
+        )
+
     tokens = await auth_service.issue_tokens_for_user(
         session,
         user,
@@ -611,6 +649,22 @@ async def login_two_factor(
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
     )
+    if is_admin_login and not known_device:
+        owner = await auth_service.get_owner_user(session)
+        to_email = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+        if to_email:
+            background_tasks.add_task(
+                email_service.send_admin_login_alert,
+                to_email,
+                admin_username=user.username,
+                admin_display_name=user.name,
+                admin_role=str(user.role),
+                ip_address=request.client.host if request.client else None,
+                country_code=_extract_country_code(request),
+                user_agent=request.headers.get("user-agent"),
+                occurred_at=datetime.now(timezone.utc),
+                lang=owner.preferred_language if owner else None,
+            )
 
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
@@ -655,6 +709,7 @@ async def passkey_login_options(
 async def passkey_login_verify(
     payload: PasskeyLoginVerifyRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(login_rate_limit),
     response: Response = None,
@@ -692,6 +747,14 @@ async def passkey_login_verify(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
 
     metrics.record_login_success()
+    is_admin_login = user.role in (UserRole.admin, UserRole.owner)
+    known_device = True
+    if is_admin_login:
+        known_device = await auth_service.has_seen_refresh_device(
+            session,
+            user_id=user.id,
+            user_agent=request.headers.get("user-agent"),
+        )
     tokens = await auth_service.issue_tokens_for_user(
         session,
         user,
@@ -710,6 +773,22 @@ async def passkey_login_verify(
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
     )
+    if is_admin_login and not known_device:
+        owner = await auth_service.get_owner_user(session)
+        to_email = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+        if to_email:
+            background_tasks.add_task(
+                email_service.send_admin_login_alert,
+                to_email,
+                admin_username=user.username,
+                admin_display_name=user.name,
+                admin_role=str(user.role),
+                ip_address=request.client.host if request.client else None,
+                country_code=_extract_country_code(request),
+                user_agent=request.headers.get("user-agent"),
+                occurred_at=datetime.now(timezone.utc),
+                lang=owner.preferred_language if owner else None,
+            )
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 
@@ -1884,6 +1963,7 @@ async def google_start(_: None = Depends(google_rate_limit)) -> dict:
 async def google_callback(
     payload: GoogleCallback,
     request: Request,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     response: Response = None,
     _: None = Depends(google_rate_limit),
@@ -1918,6 +1998,15 @@ async def google_callback(
                     requires_two_factor=True,
                     two_factor_token=token,
                 )
+
+            is_admin_login = existing_sub.role in (UserRole.admin, UserRole.owner)
+            known_device = True
+            if is_admin_login:
+                known_device = await auth_service.has_seen_refresh_device(
+                    session,
+                    user_id=existing_sub.id,
+                    user_agent=request.headers.get("user-agent"),
+                )
             tokens = await auth_service.issue_tokens_for_user(
                 session,
                 existing_sub,
@@ -1934,6 +2023,22 @@ async def google_callback(
                 user_agent=request.headers.get("user-agent"),
                 ip_address=request.client.host if request.client else None,
             )
+            if is_admin_login and not known_device:
+                owner = await auth_service.get_owner_user(session)
+                to_email = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+                if to_email:
+                    background_tasks.add_task(
+                        email_service.send_admin_login_alert,
+                        to_email,
+                        admin_username=existing_sub.username,
+                        admin_display_name=existing_sub.name,
+                        admin_role=str(existing_sub.role),
+                        ip_address=request.client.host if request.client else None,
+                        country_code=_extract_country_code(request),
+                        user_agent=request.headers.get("user-agent"),
+                        occurred_at=datetime.now(timezone.utc),
+                        lang=owner.preferred_language if owner else None,
+                    )
             logger.info("google_login_existing", extra={"user_id": str(existing_sub.id)})
             return GoogleCallbackResponse(user=UserResponse.model_validate(existing_sub), tokens=TokenPair(**tokens))
 

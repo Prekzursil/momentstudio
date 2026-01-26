@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, HostListener, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -1407,6 +1407,41 @@ export class AdminOrderDetailComponent implements OnInit {
     }
     this.orderId = id;
     this.load(id);
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  onDocumentKeydown(event: KeyboardEvent): void {
+    if (this.shouldIgnoreShortcut(event)) return;
+    if (!this.order() || this.loading() || this.error()) return;
+    if (this.action() !== null) return;
+
+    const key = (event.key || '').toLowerCase();
+    if ((event.ctrlKey || event.metaKey) && key === 's') {
+      event.preventDefault();
+      this.save();
+      return;
+    }
+
+    if (event.shiftKey && key === 'r') {
+      event.preventDefault();
+      this.openRefundWizard();
+      return;
+    }
+
+    if (event.shiftKey && key === 'p') {
+      event.preventDefault();
+      this.downloadPackingSlip();
+    }
+  }
+
+  private shouldIgnoreShortcut(event: KeyboardEvent): boolean {
+    if (event.defaultPrevented) return true;
+    const target = event.target as HTMLElement | null;
+    if (!target) return false;
+    const tag = (target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+    if (target.isContentEditable) return true;
+    return false;
   }
 
   crumbs(): { label: string; url?: string }[] {

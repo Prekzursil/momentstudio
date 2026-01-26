@@ -741,6 +741,58 @@ async def send_email_changed(
     return await send_email(to_email, subject, text_body, html_body)
 
 
+async def send_admin_login_alert(
+    to_email: str,
+    *,
+    admin_username: str,
+    admin_display_name: str | None = None,
+    admin_role: str | None = None,
+    ip_address: str | None = None,
+    country_code: str | None = None,
+    user_agent: str | None = None,
+    occurred_at: datetime | None = None,
+    lang: str | None = None,
+) -> bool:
+    subject = _bilingual_subject("Alertă: autentificare admin nouă", "Alert: new admin login", preferred_language=lang)
+    admin_name = (admin_display_name or "").strip() or (admin_username or "").strip()
+    role_value = (admin_role or "").strip() or "admin"
+    when = (occurred_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat(timespec="seconds")
+    ip = (ip_address or "").strip() or "unknown"
+    cc = (country_code or "").strip() or None
+    ua = (user_agent or "").strip() or "unknown"
+    dashboard_url = f"{settings.frontend_origin.rstrip('/')}/admin"
+
+    location = f"{ip} ({cc})" if cc else ip
+    text_ro = (
+        "A fost detectată o autentificare nouă pentru un cont de administrator.\n\n"
+        f"Admin: {admin_name} ({admin_username})\n"
+        f"Rol: {role_value}\n"
+        f"Când: {when}\n"
+        f"IP: {location}\n"
+        f"User-Agent: {ua}\n\n"
+        "Dacă nu recunoști această autentificare, recomandăm să schimbi parola și să revoci sesiunile active.\n\n"
+        f"Admin: {dashboard_url}"
+    )
+    text_en = (
+        "A new login was detected for an admin account.\n\n"
+        f"Admin: {admin_name} ({admin_username})\n"
+        f"Role: {role_value}\n"
+        f"When: {when}\n"
+        f"IP: {location}\n"
+        f"User-Agent: {ua}\n\n"
+        "If you don’t recognize this login, we recommend changing the password and revoking active sessions.\n\n"
+        f"Admin: {dashboard_url}"
+    )
+    text_body, html_body = _bilingual_sections(
+        text_ro=text_ro,
+        text_en=text_en,
+        html_ro=_html_pre(text_ro),
+        html_en=_html_pre(text_en),
+        preferred_language=lang,
+    )
+    return await send_email(to_email, subject, text_body, html_body)
+
+
 async def send_shipping_update(to_email: str, order, tracking_number: str | None = None, lang: str | None = None) -> bool:
     ref = getattr(order, "reference_code", None) or str(getattr(order, "id", ""))
     tracking_url = (getattr(order, "tracking_url", None) or "").strip() or None
