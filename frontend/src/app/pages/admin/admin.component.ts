@@ -119,6 +119,253 @@ type PageBuilderKey = `page.${string}`;
 type PageBlockType = 'text' | 'image' | 'gallery' | 'banner' | 'carousel';
 type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
 
+type PageBlocksDraftState = {
+  blocks: PageBlockDraft[];
+  status: ContentStatusUi;
+  publishedAt: string;
+  publishedUntil: string;
+  requiresAuth: boolean;
+};
+
+type CmsAutosaveEnvelope = {
+  v: 1;
+  ts: string;
+  state_json: string;
+};
+
+class CmsDraftManager<T> {
+  private initialized = false;
+  private past: string[] = [];
+  private future: string[] = [];
+  private present = '';
+  private server = '';
+  private restoreCandidate: CmsAutosaveEnvelope | null = null;
+  private pending: string | null = null;
+  private pendingTimer: number | null = null;
+  dirty = false;
+  autosavePending = false;
+  lastAutosavedAt: string | null = null;
+
+  constructor(
+    private readonly storageKey: string,
+    private readonly opts: { debounceMs: number; limit: number } = { debounceMs: 650, limit: 60 }
+  ) {}
+
+  get hasRestorableAutosave(): boolean {
+    return Boolean(this.restoreCandidate?.state_json);
+  }
+
+  get restorableAutosaveAt(): string | null {
+    return this.restoreCandidate?.ts || null;
+  }
+
+  isReady(): boolean {
+    return this.initialized;
+  }
+
+  initFromServer(state: T): void {
+    const serialized = this.serialize(state);
+    this.initialized = true;
+    this.past = [];
+    this.future = [];
+    this.present = serialized;
+    this.server = serialized;
+    this.pending = null;
+    this.clearPendingTimer();
+    this.dirty = false;
+    this.autosavePending = false;
+    this.lastAutosavedAt = null;
+    this.restoreCandidate = this.readAutosaveCandidate(serialized);
+  }
+
+  markServerSaved(state: T, clearAutosave = true): void {
+    if (!this.initialized) return;
+    this.commitNow(state);
+    this.server = this.present;
+    this.dirty = false;
+    if (clearAutosave) this.clearAutosave();
+  }
+
+  observe(state: T): void {
+    if (!this.initialized) return;
+    const serialized = this.serialize(state);
+    this.dirty = serialized !== this.server;
+    if (serialized === this.present) return;
+    this.pending = serialized;
+    this.autosavePending = true;
+    this.resetCommitTimer();
+  }
+
+  canUndo(current: T): boolean {
+    if (!this.initialized) return false;
+    const serialized = this.serialize(current);
+    return this.past.length > 0 || serialized !== this.present;
+  }
+
+  canRedo(current: T): boolean {
+    if (!this.initialized) return false;
+    const serialized = this.serialize(current);
+    if (serialized !== this.present) return false;
+    return this.future.length > 0;
+  }
+
+  undo(current: T): T | null {
+    if (!this.initialized) return null;
+    this.commitNow(current);
+    if (!this.past.length) return null;
+    this.future.push(this.present);
+    const prev = this.past.pop()!;
+    this.present = prev;
+    this.dirty = this.present !== this.server;
+    this.writeAutosave(this.present);
+    return this.deserialize(prev);
+  }
+
+  redo(current: T): T | null {
+    if (!this.initialized) return null;
+    this.commitNow(current);
+    if (!this.future.length) return null;
+    this.past.push(this.present);
+    const next = this.future.pop()!;
+    this.present = next;
+    this.dirty = this.present !== this.server;
+    this.writeAutosave(this.present);
+    return this.deserialize(next);
+  }
+
+	  restoreAutosave(current: T): T | null {
+	    if (!this.initialized) return null;
+	    const candidate = this.restoreCandidate;
+	    if (!candidate?.state_json) return null;
+	    const restored = candidate.state_json;
+	    this.commitNow(current);
+	    if (restored === this.present) {
+	      this.restoreCandidate = null;
+	      return null;
+	    }
+	    this.past.push(this.present);
+	    this.trimPast();
+	    this.present = restored;
+	    this.lastAutosavedAt = candidate.ts;
+    this.dirty = this.present !== this.server;
+    this.restoreCandidate = null;
+    this.writeAutosave(restored, candidate.ts);
+    return this.deserialize(restored);
+  }
+
+  discardAutosave(): void {
+    this.clearAutosave();
+    this.restoreCandidate = null;
+  }
+
+  dispose(): void {
+    this.clearPendingTimer();
+  }
+
+  private commitNow(state: T): void {
+    const serialized = this.serialize(state);
+    this.clearPendingTimer();
+    this.pending = null;
+    this.autosavePending = false;
+    this.dirty = serialized !== this.server;
+    if (serialized === this.present) return;
+    if (this.present) {
+      this.past.push(this.present);
+      this.trimPast();
+    }
+    this.present = serialized;
+    this.future = [];
+    this.writeAutosave(serialized);
+  }
+
+  private resetCommitTimer(): void {
+    this.clearPendingTimer();
+    this.pendingTimer = window.setTimeout(() => this.commitPending(), this.opts.debounceMs);
+  }
+
+  private commitPending(): void {
+    if (!this.pending) {
+      this.autosavePending = false;
+      return;
+    }
+    const next = this.pending;
+    this.pending = null;
+    this.pendingTimer = null;
+    this.autosavePending = false;
+    if (next === this.present) return;
+    if (this.present) {
+      this.past.push(this.present);
+      this.trimPast();
+    }
+    this.present = next;
+    this.future = [];
+    this.dirty = this.present !== this.server;
+    this.writeAutosave(next);
+  }
+
+  private trimPast(): void {
+    if (this.past.length <= this.opts.limit) return;
+    this.past.splice(0, this.past.length - this.opts.limit);
+  }
+
+  private clearPendingTimer(): void {
+    if (this.pendingTimer !== null) {
+      window.clearTimeout(this.pendingTimer);
+      this.pendingTimer = null;
+    }
+  }
+
+  private serialize(state: T): string {
+    return JSON.stringify(state);
+  }
+
+  private deserialize(raw: string): T {
+    return JSON.parse(raw) as T;
+  }
+
+  private writeAutosave(stateJson: string, tsOverride?: string): void {
+    if (typeof window === 'undefined') return;
+    const ts = tsOverride || new Date().toISOString();
+    this.lastAutosavedAt = ts;
+    try {
+      const payload: CmsAutosaveEnvelope = { v: 1, ts, state_json: stateJson };
+      window.localStorage.setItem(this.storageKey, JSON.stringify(payload));
+    } catch {
+      // ignore quota / browser storage errors
+    }
+  }
+
+  private clearAutosave(): void {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.removeItem(this.storageKey);
+    } catch {
+      // ignore
+    }
+    this.lastAutosavedAt = null;
+  }
+
+  private readAutosaveCandidate(serverStateJson: string): CmsAutosaveEnvelope | null {
+    if (typeof window === 'undefined') return null;
+    const raw = window.localStorage.getItem(this.storageKey);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as Partial<CmsAutosaveEnvelope> | null;
+      if (!parsed || parsed.v !== 1) return null;
+      const ts = typeof parsed.ts === 'string' ? parsed.ts : '';
+      const stateJson = typeof parsed.state_json === 'string' ? parsed.state_json : '';
+      if (!ts || !stateJson) return null;
+      if (stateJson === serverStateJson) {
+        window.localStorage.removeItem(this.storageKey);
+        return null;
+      }
+      return { v: 1, ts, state_json: stateJson };
+    } catch {
+      return null;
+    }
+  }
+}
+
 @Component({
   selector: 'app-admin',
   standalone: true,
@@ -140,12 +387,13 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
     TranslateModule
   ],
  template: `
-    <div class="grid gap-6">
-      <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-      <app-error-state
-        *ngIf="error()"
-        [message]="error()!"
-        [requestId]="errorRequestId()"
+	    <div class="grid gap-6">
+	      <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
+	      <div class="sr-only" aria-live="polite" aria-atomic="true">{{ cmsAriaAnnouncement }}</div>
+	      <app-error-state
+	        *ngIf="error()"
+	        [message]="error()!"
+	        [requestId]="errorRequestId()"
         [showRetry]="true"
         (retry)="retryLoadAll()"
       ></app-error-state>
@@ -941,10 +1189,10 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                       {{ 'adminUi.content.blockLibrary.dropHere' | translate }}
                     </div>
 
-                    <ng-container *ngFor="let block of (pageBlocks[pageBlocksKey] || []); let i = index">
-                      <div
-                        class="rounded-xl border border-dashed border-slate-300 p-3 text-sm bg-white dark:border-slate-700 dark:bg-slate-900"
-                        draggable="true"
+	                  <ng-container *ngFor="let block of (pageBlocks[pageBlocksKey] || []); let i = index">
+	                      <div
+	                        class="rounded-xl border border-dashed border-slate-300 p-3 text-sm bg-white dark:border-slate-700 dark:bg-slate-900"
+	                        draggable="true"
                         (dragstart)="onPageBlockDragStart(pageBlocksKey, block.key)"
                         (dragend)="onPageBlockDragEnd()"
                         (dragover)="onPageBlockDragOver($event)"
@@ -956,16 +1204,38 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                               {{ ('adminUi.home.sections.blocks.' + block.type) | translate }}
                             </span>
                             <span class="text-[11px] text-slate-500 dark:text-slate-400 truncate">{{ block.type }} · {{ block.key }}</span>
-                          </div>
-                          <div class="flex items-center gap-3 shrink-0">
-                          <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                            <input type="checkbox" [checked]="block.enabled" (change)="togglePageBlockEnabled(pageBlocksKey, block.key, $event)" />
-                            {{ 'adminUi.home.sections.enabled' | translate }}
-                          </label>
-                          <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.drag' | translate }}</span>
-                          <app-button size="sm" variant="ghost" [label]="'adminUi.actions.delete' | translate" (action)="removePageBlock(pageBlocksKey, block.key)"></app-button>
-                          </div>
-                        </div>
+	                          </div>
+	                          <div class="flex items-center gap-3 shrink-0">
+	                          <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+	                            <input type="checkbox" [checked]="block.enabled" (change)="togglePageBlockEnabled(pageBlocksKey, block.key, $event)" />
+	                            {{ 'adminUi.home.sections.enabled' | translate }}
+	                          </label>
+	                          <div class="flex items-center gap-1">
+	                            <button
+	                              type="button"
+	                              class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700/40"
+	                              [attr.title]="('adminUi.content.reorder.moveUp' | translate) + ': ' + pageBlockLabel(block)"
+	                              [attr.aria-label]="('adminUi.content.reorder.moveUp' | translate) + ': ' + pageBlockLabel(block)"
+	                              [disabled]="i === 0"
+	                              (click)="movePageBlock(pageBlocksKey, block.key, -1)"
+	                            >
+	                              ↑
+	                            </button>
+	                            <button
+	                              type="button"
+	                              class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700/40"
+	                              [attr.title]="('adminUi.content.reorder.moveDown' | translate) + ': ' + pageBlockLabel(block)"
+	                              [attr.aria-label]="('adminUi.content.reorder.moveDown' | translate) + ': ' + pageBlockLabel(block)"
+	                              [disabled]="i === (pageBlocks[pageBlocksKey] || []).length - 1"
+	                              (click)="movePageBlock(pageBlocksKey, block.key, 1)"
+	                            >
+	                              ↓
+	                            </button>
+	                          </div>
+	                          <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.drag' | translate }}</span>
+	                          <app-button size="sm" variant="ghost" [label]="'adminUi.actions.delete' | translate" (action)="removePageBlock(pageBlocksKey, block.key)"></app-button>
+	                          </div>
+	                        </div>
 
                       <div class="mt-3 grid gap-3" *ngIf="block.enabled">
                         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -1457,25 +1727,92 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                   </label>
                 </div>
 
-                <div *ngIf="cmsAdvanced()" class="grid gap-1">
-                  <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                    <input type="checkbox" [(ngModel)]="pageBlocksRequiresAuth[pageBlocksKey]" />
-                    <span>{{ 'adminUi.site.pages.builder.requiresLogin' | translate }}</span>
-                  </label>
-                  <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.site.pages.builder.requiresLoginHint' | translate }}</p>
-                </div>
+	                <div *ngIf="cmsAdvanced()" class="grid gap-1">
+	                  <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                    <input type="checkbox" [(ngModel)]="pageBlocksRequiresAuth[pageBlocksKey]" />
+	                    <span>{{ 'adminUi.site.pages.builder.requiresLogin' | translate }}</span>
+	                  </label>
+	                  <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.site.pages.builder.requiresLoginHint' | translate }}</p>
+	                </div>
 
-                <div class="flex items-center gap-2">
-                  <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="savePageBlocks(pageBlocksKey)"></app-button>
-                  <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="pageBlocksMessage[pageBlocksKey]">
-                    {{ pageBlocksMessage[pageBlocksKey] }}
-                  </span>
-                    <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="pageBlocksError[pageBlocksKey]">
-                      {{ pageBlocksError[pageBlocksKey] }}
-                    </span>
-                  </div>
-                </div>
-              </details>
+	                <div
+	                  *ngIf="pageDraftHasRestore(pageBlocksKey)"
+	                  class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+	                >
+	                  <div class="flex flex-wrap items-center gap-2">
+	                    <span class="font-semibold">{{ 'adminUi.content.autosave.restoreFound' | translate }}</span>
+	                    <span *ngIf="pageDraftRestoreAt(pageBlocksKey)" class="text-amber-700 dark:text-amber-200">
+	                      {{ pageDraftRestoreAt(pageBlocksKey) | date: 'short' }}
+	                    </span>
+	                  </div>
+	                  <div class="flex flex-wrap items-center gap-2">
+	                    <app-button
+	                      size="sm"
+	                      variant="ghost"
+	                      [label]="'adminUi.actions.restore' | translate"
+	                      (action)="restorePageDraftAutosave(pageBlocksKey)"
+	                    ></app-button>
+	                    <app-button
+	                      size="sm"
+	                      variant="ghost"
+	                      [label]="'adminUi.actions.dismiss' | translate"
+	                      (action)="dismissPageDraftAutosave(pageBlocksKey)"
+	                    ></app-button>
+	                  </div>
+	                </div>
+
+	                <div class="flex flex-wrap items-center gap-2">
+	                  <app-button
+	                    size="sm"
+	                    variant="ghost"
+	                    [label]="'adminUi.actions.undo' | translate"
+	                    [disabled]="!pageDraftCanUndo(pageBlocksKey)"
+	                    (action)="undoPageDraft(pageBlocksKey)"
+	                  ></app-button>
+	                  <app-button
+	                    size="sm"
+	                    variant="ghost"
+	                    [label]="'adminUi.actions.redo' | translate"
+	                    [disabled]="!pageDraftCanRedo(pageBlocksKey)"
+	                    (action)="redoPageDraft(pageBlocksKey)"
+	                  ></app-button>
+	                  <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="savePageBlocks(pageBlocksKey)"></app-button>
+	                  <span *ngIf="pageDraftReady(pageBlocksKey)" class="text-xs text-slate-500 dark:text-slate-400">
+	                    <ng-container *ngIf="!pageDraftDirty(pageBlocksKey)">
+	                      {{ 'adminUi.content.autosave.state.saved' | translate }}
+	                    </ng-container>
+	                    <ng-container *ngIf="pageDraftDirty(pageBlocksKey) && pageDraftAutosaving(pageBlocksKey)">
+	                      {{ 'adminUi.content.autosave.state.autosaving' | translate }}
+	                    </ng-container>
+	                    <ng-container
+	                      *ngIf="
+	                        pageDraftDirty(pageBlocksKey) &&
+	                        !pageDraftAutosaving(pageBlocksKey) &&
+	                        pageDraftLastAutosavedAt(pageBlocksKey)
+	                      "
+	                    >
+	                      {{ 'adminUi.content.autosave.state.autosaved' | translate }}
+	                      {{ pageDraftLastAutosavedAt(pageBlocksKey) | date: 'shortTime' }}
+	                    </ng-container>
+	                    <ng-container
+	                      *ngIf="
+	                        pageDraftDirty(pageBlocksKey) &&
+	                        !pageDraftAutosaving(pageBlocksKey) &&
+	                        !pageDraftLastAutosavedAt(pageBlocksKey)
+	                      "
+	                    >
+	                      {{ 'adminUi.content.autosave.state.unsaved' | translate }}
+	                    </ng-container>
+	                  </span>
+	                  <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="pageBlocksMessage[pageBlocksKey]">
+	                    {{ pageBlocksMessage[pageBlocksKey] }}
+	                  </span>
+	                  <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="pageBlocksError[pageBlocksKey]">
+	                    {{ pageBlocksError[pageBlocksKey] }}
+	                  </span>
+	                </div>
+	                </div>
+	              </details>
 
               <details *ngIf="cmsAdvanced()" class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
                 <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
@@ -1649,10 +1986,10 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                 <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.home.sections.title' | translate }}</h2>
                 <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.home.sections.hint' | translate }}</p>
               </div>
-              <div class="flex flex-wrap items-center gap-2 text-sm">
-                <div class="flex gap-2">
-                  <button
-                    class="px-3 py-1 rounded border"
+	              <div class="flex flex-wrap items-center gap-2 text-sm">
+	                <div class="flex gap-2">
+	                  <button
+	                    class="px-3 py-1 rounded border"
                     [class.bg-slate-900]="homeBlocksLang === 'en'"
                     [class.text-white]="homeBlocksLang === 'en'"
                     (click)="selectHomeBlocksLang('en')"
@@ -1667,17 +2004,59 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     (click)="selectHomeBlocksLang('ro')"
                     type="button"
                   >
-                    RO
-                  </button>
-                </div>
-                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.save' | translate" (action)="saveSections()"></app-button>
-              </div>
-            </div>
+	                    RO
+	                  </button>
+	                </div>
+	                <app-button
+	                  size="sm"
+	                  variant="ghost"
+	                  [label]="'adminUi.actions.undo' | translate"
+	                  [disabled]="!homeDraftCanUndo()"
+	                  (action)="undoHomeDraft()"
+	                ></app-button>
+	                <app-button
+	                  size="sm"
+	                  variant="ghost"
+	                  [label]="'adminUi.actions.redo' | translate"
+	                  [disabled]="!homeDraftCanRedo()"
+	                  (action)="redoHomeDraft()"
+	                ></app-button>
+	                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.save' | translate" (action)="saveSections()"></app-button>
+	                <span *ngIf="homeDraftReady()" class="text-xs text-slate-500 dark:text-slate-400">
+	                  <ng-container *ngIf="!homeDraftDirty()">
+	                    {{ 'adminUi.content.autosave.state.saved' | translate }}
+	                  </ng-container>
+	                  <ng-container *ngIf="homeDraftDirty() && homeDraftAutosaving()">
+	                    {{ 'adminUi.content.autosave.state.autosaving' | translate }}
+	                  </ng-container>
+	                  <ng-container *ngIf="homeDraftDirty() && !homeDraftAutosaving() && homeDraftLastAutosavedAt()">
+	                    {{ 'adminUi.content.autosave.state.autosaved' | translate }} {{ homeDraftLastAutosavedAt() | date: 'shortTime' }}
+	                  </ng-container>
+	                  <ng-container *ngIf="homeDraftDirty() && !homeDraftAutosaving() && !homeDraftLastAutosavedAt()">
+	                    {{ 'adminUi.content.autosave.state.unsaved' | translate }}
+	                  </ng-container>
+	                </span>
+	              </div>
+	            </div>
 
-            <app-cms-block-library
-              context="home"
-              (add)="addHomeBlockFromLibrary($event.type, $event.template)"
-              (dragActive)="setHomeInsertDragActive($event)"
+	            <div
+	              *ngIf="homeDraftHasRestore()"
+	              class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+	            >
+	              <div class="flex flex-wrap items-center gap-2">
+	                <span class="font-semibold">{{ 'adminUi.content.autosave.restoreFound' | translate }}</span>
+	                <span *ngIf="homeDraftRestoreAt()" class="text-amber-700 dark:text-amber-200">{{ homeDraftRestoreAt() | date: 'short' }}</span>
+	              </div>
+	              <div class="flex flex-wrap items-center gap-2">
+	                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.restore' | translate" (action)="restoreHomeDraftAutosave()"></app-button>
+	                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.dismiss' | translate" (action)="dismissHomeDraftAutosave()"></app-button>
+	              </div>
+	            </div>
+
+	            <app-cms-block-library
+	              context="home"
+	              (add)="addHomeBlockFromLibrary($event.type, $event.template)"
+	              (dragActive)="setHomeInsertDragActive($event)"
             ></app-cms-block-library>
 
             <div *ngIf="cmsAdvanced()" class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
@@ -1707,10 +2086,10 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                 {{ 'adminUi.content.blockLibrary.dropHere' | translate }}
               </div>
 
-              <ng-container *ngFor="let block of homeBlocks; let i = index">
-                <div
-                  class="rounded-xl border border-dashed border-slate-300 p-3 text-sm bg-slate-50 dark:border-slate-700 dark:bg-slate-950/30"
-                  draggable="true"
+	              <ng-container *ngFor="let block of homeBlocks; let i = index">
+	                <div
+	                  class="rounded-xl border border-dashed border-slate-300 p-3 text-sm bg-slate-50 dark:border-slate-700 dark:bg-slate-950/30"
+	                  draggable="true"
                   (dragstart)="onHomeBlockDragStart(block.key)"
                   (dragend)="onHomeBlockDragEnd()"
                   (dragover)="onHomeBlockDragOver($event)"
@@ -1720,16 +2099,38 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     <div class="grid gap-1 min-w-0">
                       <span class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ homeBlockLabel(block) }}</span>
                       <span class="text-[11px] text-slate-500 dark:text-slate-400 truncate">{{ block.type }} · {{ block.key }}</span>
-                    </div>
-                    <div class="flex items-center gap-3 shrink-0">
-                      <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                        <input type="checkbox" [checked]="block.enabled" (change)="toggleHomeBlockEnabled(block, $event)" />
-                        {{ 'adminUi.home.sections.enabled' | translate }}
-                      </label>
-                      <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.drag' | translate }}</span>
-                      <app-button
-                        *ngIf="isCustomHomeBlock(block)"
-                        size="sm"
+	                    </div>
+	                    <div class="flex items-center gap-3 shrink-0">
+	                      <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+	                        <input type="checkbox" [checked]="block.enabled" (change)="toggleHomeBlockEnabled(block, $event)" />
+	                        {{ 'adminUi.home.sections.enabled' | translate }}
+	                      </label>
+	                      <div class="flex items-center gap-1">
+	                        <button
+	                          type="button"
+	                          class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700/40"
+	                          [attr.title]="('adminUi.content.reorder.moveUp' | translate) + ': ' + homeBlockLabel(block)"
+	                          [attr.aria-label]="('adminUi.content.reorder.moveUp' | translate) + ': ' + homeBlockLabel(block)"
+	                          [disabled]="i === 0"
+	                          (click)="moveHomeBlock(block.key, -1)"
+	                        >
+	                          ↑
+	                        </button>
+	                        <button
+	                          type="button"
+	                          class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700/40"
+	                          [attr.title]="('adminUi.content.reorder.moveDown' | translate) + ': ' + homeBlockLabel(block)"
+	                          [attr.aria-label]="('adminUi.content.reorder.moveDown' | translate) + ': ' + homeBlockLabel(block)"
+	                          [disabled]="i === homeBlocks.length - 1"
+	                          (click)="moveHomeBlock(block.key, 1)"
+	                        >
+	                          ↓
+	                        </button>
+	                      </div>
+	                      <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.drag' | translate }}</span>
+	                      <app-button
+	                        *ngIf="isCustomHomeBlock(block)"
+	                        size="sm"
                         variant="ghost"
                         [label]="'adminUi.actions.delete' | translate"
                         (action)="removeHomeBlock(block.key)"
@@ -4212,15 +4613,19 @@ export class AdminComponent implements OnInit, OnDestroy {
   pageBlocksMessage: Record<string, string | null> = {};
   pageBlocksError: Record<string, string | null> = {};
   pageBlocksNeedsTranslationEn: Record<string, boolean> = {};
-  pageBlocksNeedsTranslationRo: Record<string, boolean> = {};
-  pageBlocksTranslationSaving: Record<string, boolean> = {};
-  draggingPageBlockKey: string | null = null;
-  draggingPageBlocksKey: string | null = null;
-  pageInsertDragActive = false;
-  coupons: AdminCoupon[] = [];
-  newCoupon: Partial<AdminCoupon> = { code: '', percentage_off: 0, active: true, currency: 'RON' };
-  stockEdits: Record<string, number> = {};
-  bulkStock: number | null = null;
+	  pageBlocksNeedsTranslationRo: Record<string, boolean> = {};
+	  pageBlocksTranslationSaving: Record<string, boolean> = {};
+	  draggingPageBlockKey: string | null = null;
+	  draggingPageBlocksKey: string | null = null;
+	  pageInsertDragActive = false;
+	  cmsAriaAnnouncement = '';
+	  private cmsDraftPoller: number | null = null;
+	  private cmsHomeDraft = new CmsDraftManager<HomeBlockDraft[]>('adrianaart.cms.autosave.home.sections');
+	  private cmsPageDrafts = new Map<string, CmsDraftManager<PageBlocksDraftState>>();
+	  coupons: AdminCoupon[] = [];
+	  newCoupon: Partial<AdminCoupon> = { code: '', percentage_off: 0, active: true, currency: 'RON' };
+	  stockEdits: Record<string, number> = {};
+	  bulkStock: number | null = null;
 
   fxStatus = signal<FxAdminStatus | null>(null);
   fxLoading = signal<boolean>(false);
@@ -4255,9 +4660,162 @@ export class AdminComponent implements OnInit, OnDestroy {
     private markdown: MarkdownService
   ) {}
 
-  private t(key: string, params?: Record<string, unknown>): string {
-    return this.translate.instant(key, params);
-  }
+	  private t(key: string, params?: Record<string, unknown>): string {
+	    return this.translate.instant(key, params);
+	  }
+
+	  private announceCms(message: string): void {
+	    this.cmsAriaAnnouncement = '';
+	    window.setTimeout(() => {
+	      this.cmsAriaAnnouncement = message;
+	    }, 10);
+	  }
+
+	  private observeCmsDrafts(): void {
+	    if (this.cmsHomeDraft.isReady()) {
+	      this.cmsHomeDraft.observe(this.homeBlocks);
+	    }
+
+	    const pageKey = this.pageBlocksKey;
+	    const pageDraft = this.ensurePageDraft(pageKey);
+	    if (pageDraft.isReady()) {
+	      pageDraft.observe(this.currentPageDraftState(pageKey));
+	    }
+	  }
+
+	  private ensurePageDraft(pageKey: PageBuilderKey): CmsDraftManager<PageBlocksDraftState> {
+	    const existing = this.cmsPageDrafts.get(pageKey);
+	    if (existing) return existing;
+	    const created = new CmsDraftManager<PageBlocksDraftState>(`adrianaart.cms.autosave.${pageKey}`);
+	    this.cmsPageDrafts.set(pageKey, created);
+	    return created;
+	  }
+
+	  private currentPageDraftState(pageKey: PageBuilderKey): PageBlocksDraftState {
+	    return {
+	      blocks: this.pageBlocks[pageKey] || [],
+	      status: this.pageBlocksStatus[pageKey] || 'draft',
+	      publishedAt: this.pageBlocksPublishedAt[pageKey] || '',
+	      publishedUntil: this.pageBlocksPublishedUntil[pageKey] || '',
+	      requiresAuth: Boolean(this.pageBlocksRequiresAuth[pageKey])
+	    };
+	  }
+
+	  private applyPageDraftState(pageKey: PageBuilderKey, draft: PageBlocksDraftState): void {
+	    this.pageBlocks[pageKey] = Array.isArray(draft?.blocks) ? draft.blocks : [];
+	    this.pageBlocksStatus[pageKey] = draft?.status === 'published' ? 'published' : draft?.status === 'review' ? 'review' : 'draft';
+	    this.pageBlocksPublishedAt[pageKey] = draft?.publishedAt || '';
+	    this.pageBlocksPublishedUntil[pageKey] = draft?.publishedUntil || '';
+	    this.pageBlocksRequiresAuth[pageKey] = Boolean(draft?.requiresAuth);
+	  }
+
+	  homeDraftReady(): boolean {
+	    return this.cmsHomeDraft.isReady();
+	  }
+
+	  homeDraftDirty(): boolean {
+	    return this.cmsHomeDraft.dirty;
+	  }
+
+	  homeDraftAutosaving(): boolean {
+	    return this.cmsHomeDraft.autosavePending;
+	  }
+
+	  homeDraftLastAutosavedAt(): string | null {
+	    return this.cmsHomeDraft.lastAutosavedAt;
+	  }
+
+	  homeDraftHasRestore(): boolean {
+	    return this.cmsHomeDraft.hasRestorableAutosave && !this.cmsHomeDraft.dirty;
+	  }
+
+	  homeDraftRestoreAt(): string | null {
+	    return this.cmsHomeDraft.restorableAutosaveAt;
+	  }
+
+	  homeDraftCanUndo(): boolean {
+	    return this.cmsHomeDraft.canUndo(this.homeBlocks);
+	  }
+
+	  homeDraftCanRedo(): boolean {
+	    return this.cmsHomeDraft.canRedo(this.homeBlocks);
+	  }
+
+	  undoHomeDraft(): void {
+	    const next = this.cmsHomeDraft.undo(this.homeBlocks);
+	    if (next) this.homeBlocks = next;
+	  }
+
+	  redoHomeDraft(): void {
+	    const next = this.cmsHomeDraft.redo(this.homeBlocks);
+	    if (next) this.homeBlocks = next;
+	  }
+
+	  restoreHomeDraftAutosave(): void {
+	    const next = this.cmsHomeDraft.restoreAutosave(this.homeBlocks);
+	    if (next) this.homeBlocks = next;
+	  }
+
+	  dismissHomeDraftAutosave(): void {
+	    this.cmsHomeDraft.discardAutosave();
+	  }
+
+	  pageDraftReady(pageKey: PageBuilderKey): boolean {
+	    return this.ensurePageDraft(pageKey).isReady();
+	  }
+
+	  pageDraftDirty(pageKey: PageBuilderKey): boolean {
+	    return this.ensurePageDraft(pageKey).dirty;
+	  }
+
+	  pageDraftAutosaving(pageKey: PageBuilderKey): boolean {
+	    return this.ensurePageDraft(pageKey).autosavePending;
+	  }
+
+	  pageDraftLastAutosavedAt(pageKey: PageBuilderKey): string | null {
+	    return this.ensurePageDraft(pageKey).lastAutosavedAt;
+	  }
+
+	  pageDraftHasRestore(pageKey: PageBuilderKey): boolean {
+	    const manager = this.ensurePageDraft(pageKey);
+	    return manager.hasRestorableAutosave && !manager.dirty;
+	  }
+
+	  pageDraftRestoreAt(pageKey: PageBuilderKey): string | null {
+	    return this.ensurePageDraft(pageKey).restorableAutosaveAt;
+	  }
+
+	  pageDraftCanUndo(pageKey: PageBuilderKey): boolean {
+	    const manager = this.ensurePageDraft(pageKey);
+	    return manager.canUndo(this.currentPageDraftState(pageKey));
+	  }
+
+	  pageDraftCanRedo(pageKey: PageBuilderKey): boolean {
+	    const manager = this.ensurePageDraft(pageKey);
+	    return manager.canRedo(this.currentPageDraftState(pageKey));
+	  }
+
+	  undoPageDraft(pageKey: PageBuilderKey): void {
+	    const manager = this.ensurePageDraft(pageKey);
+	    const next = manager.undo(this.currentPageDraftState(pageKey));
+	    if (next) this.applyPageDraftState(pageKey, next);
+	  }
+
+	  redoPageDraft(pageKey: PageBuilderKey): void {
+	    const manager = this.ensurePageDraft(pageKey);
+	    const next = manager.redo(this.currentPageDraftState(pageKey));
+	    if (next) this.applyPageDraftState(pageKey, next);
+	  }
+
+	  restorePageDraftAutosave(pageKey: PageBuilderKey): void {
+	    const manager = this.ensurePageDraft(pageKey);
+	    const next = manager.restoreAutosave(this.currentPageDraftState(pageKey));
+	    if (next) this.applyPageDraftState(pageKey, next);
+	  }
+
+	  dismissPageDraftAutosave(pageKey: PageBuilderKey): void {
+	    this.ensurePageDraft(pageKey).discardAutosave();
+	  }
 
   private rememberContentVersion(key: string, block: { version?: number } | null | undefined): void {
     const version = block?.version;
@@ -4366,20 +4924,29 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  ngOnInit(): void {
-    this.routeSub = this.route.data.subscribe((data) => {
-      const next = this.normalizeSection(data['section']);
-      this.applySection(next);
-    });
-  }
+	  ngOnInit(): void {
+	    this.routeSub = this.route.data.subscribe((data) => {
+	      const next = this.normalizeSection(data['section']);
+	      this.applySection(next);
+	    });
+	    if (typeof window !== 'undefined') {
+	      this.cmsDraftPoller = window.setInterval(() => this.observeCmsDrafts(), 250);
+	    }
+	  }
 
-  ngOnDestroy(): void {
-    this.routeSub?.unsubscribe();
-    this.routeSub = undefined;
-    for (const key of Object.keys(this.contentVersions)) {
-      delete this.contentVersions[key];
-    }
-  }
+	  ngOnDestroy(): void {
+	    this.routeSub?.unsubscribe();
+	    this.routeSub = undefined;
+	    if (this.cmsDraftPoller !== null) {
+	      window.clearInterval(this.cmsDraftPoller);
+	      this.cmsDraftPoller = null;
+	    }
+	    this.cmsHomeDraft.dispose();
+	    for (const manager of this.cmsPageDrafts.values()) manager.dispose();
+	    for (const key of Object.keys(this.contentVersions)) {
+	      delete this.contentVersions[key];
+	    }
+	  }
 
   loadAll(): void {
     this.loadForSection(this.section());
@@ -6829,34 +7396,36 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.pageBlocksMessage[pageKey] = null;
     this.pageBlocksError[pageKey] = null;
     this.admin.getContent(pageKey).subscribe({
-      next: (block) => {
-        this.rememberContentVersion(pageKey, block);
-        this.pageBlocksNeedsTranslationEn[pageKey] = Boolean(block.needs_translation_en);
-        this.pageBlocksNeedsTranslationRo[pageKey] = Boolean(block.needs_translation_ro);
+	      next: (block) => {
+	        this.rememberContentVersion(pageKey, block);
+	        this.pageBlocksNeedsTranslationEn[pageKey] = Boolean(block.needs_translation_en);
+	        this.pageBlocksNeedsTranslationRo[pageKey] = Boolean(block.needs_translation_ro);
         this.pageBlocksStatus[pageKey] =
           block.status === 'published' ? 'published' : block.status === 'review' ? 'review' : 'draft';
         this.pageBlocksPublishedAt[pageKey] = block.published_at ? this.toLocalDateTime(block.published_at) : '';
         this.pageBlocksPublishedUntil[pageKey] = block.published_until ? this.toLocalDateTime(block.published_until) : '';
-        const metaObj = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
-        this.pageBlocksMeta[pageKey] = metaObj;
-        this.pageBlocksRequiresAuth[pageKey] = Boolean(metaObj['requires_auth']);
-        this.pageBlocks[pageKey] = this.parsePageBlocksDraft(metaObj);
-      },
-      error: (err) => {
-        if (err?.status === 404) {
-          delete this.contentVersions[pageKey];
+	        const metaObj = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
+	        this.pageBlocksMeta[pageKey] = metaObj;
+	        this.pageBlocksRequiresAuth[pageKey] = Boolean(metaObj['requires_auth']);
+	        this.pageBlocks[pageKey] = this.parsePageBlocksDraft(metaObj);
+	        this.ensurePageDraft(pageKey).initFromServer(this.currentPageDraftState(pageKey));
+	      },
+	      error: (err) => {
+	        if (err?.status === 404) {
+	          delete this.contentVersions[pageKey];
           this.pageBlocksNeedsTranslationEn[pageKey] = false;
           this.pageBlocksNeedsTranslationRo[pageKey] = false;
           this.pageBlocksStatus[pageKey] = 'draft';
           this.pageBlocksPublishedAt[pageKey] = '';
           this.pageBlocksPublishedUntil[pageKey] = '';
-          this.pageBlocksMeta[pageKey] = {};
-          this.pageBlocksRequiresAuth[pageKey] = false;
-          this.pageBlocks[pageKey] = [];
-          return;
-        }
-        this.pageBlocksError[pageKey] = this.t('adminUi.site.pages.builder.errors.load');
-      }
+	          this.pageBlocksMeta[pageKey] = {};
+	          this.pageBlocksRequiresAuth[pageKey] = false;
+	          this.pageBlocks[pageKey] = [];
+	          this.ensurePageDraft(pageKey).initFromServer(this.currentPageDraftState(pageKey));
+	          return;
+	        }
+	        this.pageBlocksError[pageKey] = this.t('adminUi.site.pages.builder.errors.load');
+	      }
     });
   }
 
@@ -7347,11 +7916,31 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).filter((b) => b.key !== blockKey);
   }
 
-  togglePageBlockEnabled(pageKey: PageBuilderKey, blockKey: string, event: Event): void {
-    const target = event.target as HTMLInputElement | null;
-    const enabled = target?.checked !== false;
-    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => (b.key === blockKey ? { ...b, enabled } : b));
-  }
+	  togglePageBlockEnabled(pageKey: PageBuilderKey, blockKey: string, event: Event): void {
+	    const target = event.target as HTMLInputElement | null;
+	    const enabled = target?.checked !== false;
+	    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => (b.key === blockKey ? { ...b, enabled } : b));
+	  }
+
+	  pageBlockLabel(block: PageBlockDraft): string {
+	    const key = `adminUi.home.sections.blocks.${block.type}`;
+	    const translated = this.t(key);
+	    return translated !== key ? translated : String(block.type);
+	  }
+
+	  movePageBlock(pageKey: PageBuilderKey, blockKey: string, delta: number): void {
+	    const current = [...(this.pageBlocks[pageKey] || [])];
+	    const from = current.findIndex((b) => b.key === blockKey);
+	    if (from === -1) return;
+	    const to = from + delta;
+	    if (to < 0 || to >= current.length) return;
+	    const [moved] = current.splice(from, 1);
+	    current.splice(to, 0, moved);
+	    this.pageBlocks[pageKey] = current;
+	    this.announceCms(
+	      this.t('adminUi.content.reorder.moved', { label: this.pageBlockLabel(moved), pos: to + 1, count: current.length })
+	    );
+	  }
 
   onPageBlockDragStart(pageKey: PageBuilderKey, blockKey: string): void {
     this.pageInsertDragActive = true;
@@ -7617,10 +8206,11 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.pageBlocksPublishedAt[pageKey] = block.published_at ? this.toLocalDateTime(block.published_at) : '';
         this.pageBlocksPublishedUntil[pageKey] = block.published_until ? this.toLocalDateTime(block.published_until) : '';
         this.pageBlocksMeta[pageKey] = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
-        this.pageBlocksRequiresAuth[pageKey] = Boolean(this.pageBlocksMeta[pageKey]?.['requires_auth']);
-        this.pageBlocksMessage[pageKey] = ok;
-        this.pageBlocksError[pageKey] = null;
-      },
+	        this.pageBlocksRequiresAuth[pageKey] = Boolean(this.pageBlocksMeta[pageKey]?.['requires_auth']);
+	        this.pageBlocksMessage[pageKey] = ok;
+	        this.pageBlocksError[pageKey] = null;
+	        this.ensurePageDraft(pageKey).markServerSaved(this.currentPageDraftState(pageKey), true);
+	      },
       error: (err) => {
         if (this.handleContentConflict(err, pageKey, reload)) {
           this.pageBlocksError[pageKey] = errMsg;
@@ -7638,19 +8228,20 @@ export class AdminComponent implements OnInit, OnDestroy {
             meta
           };
           this.admin.createContent(pageKey, createPayload).subscribe({
-            next: (created) => {
-              this.rememberContentVersion(pageKey, created);
-              this.pageBlocksNeedsTranslationEn[pageKey] = Boolean(created.needs_translation_en);
-              this.pageBlocksNeedsTranslationRo[pageKey] = Boolean(created.needs_translation_ro);
+	            next: (created) => {
+	              this.rememberContentVersion(pageKey, created);
+	              this.pageBlocksNeedsTranslationEn[pageKey] = Boolean(created.needs_translation_en);
+	              this.pageBlocksNeedsTranslationRo[pageKey] = Boolean(created.needs_translation_ro);
               this.pageBlocksStatus[pageKey] =
                 created.status === 'published' ? 'published' : created.status === 'review' ? 'review' : 'draft';
               this.pageBlocksPublishedAt[pageKey] = created.published_at ? this.toLocalDateTime(created.published_at) : '';
               this.pageBlocksPublishedUntil[pageKey] = created.published_until ? this.toLocalDateTime(created.published_until) : '';
               this.pageBlocksMeta[pageKey] = ((created as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
-              this.pageBlocksRequiresAuth[pageKey] = Boolean(this.pageBlocksMeta[pageKey]?.['requires_auth']);
-              this.pageBlocksMessage[pageKey] = ok;
-              this.pageBlocksError[pageKey] = null;
-            },
+	              this.pageBlocksRequiresAuth[pageKey] = Boolean(this.pageBlocksMeta[pageKey]?.['requires_auth']);
+	              this.pageBlocksMessage[pageKey] = ok;
+	              this.pageBlocksError[pageKey] = null;
+	              this.ensurePageDraft(pageKey).markServerSaved(this.currentPageDraftState(pageKey), true);
+	            },
             error: () => {
               this.pageBlocksError[pageKey] = errMsg;
               this.pageBlocksMessage[pageKey] = null;
@@ -7892,11 +8483,25 @@ export class AdminComponent implements OnInit, OnDestroy {
     return translated !== key ? translated : String(block.type);
   }
 
-  toggleHomeBlockEnabled(block: HomeBlockDraft, event: Event): void {
-    const target = event.target as HTMLInputElement | null;
-    const enabled = target?.checked !== false;
-    this.homeBlocks = this.homeBlocks.map((b) => (b.key === block.key ? { ...b, enabled } : b));
-  }
+	  toggleHomeBlockEnabled(block: HomeBlockDraft, event: Event): void {
+	    const target = event.target as HTMLInputElement | null;
+	    const enabled = target?.checked !== false;
+	    this.homeBlocks = this.homeBlocks.map((b) => (b.key === block.key ? { ...b, enabled } : b));
+	  }
+
+	  moveHomeBlock(blockKey: string, delta: number): void {
+	    const current = [...this.homeBlocks];
+	    const from = current.findIndex((b) => b.key === blockKey);
+	    if (from === -1) return;
+	    const to = from + delta;
+	    if (to < 0 || to >= current.length) return;
+	    const [moved] = current.splice(from, 1);
+	    current.splice(to, 0, moved);
+	    this.homeBlocks = current;
+	    this.announceCms(
+	      this.t('adminUi.content.reorder.moved', { label: this.homeBlockLabel(moved), pos: to + 1, count: current.length })
+	    );
+	  }
 
   setHomeInsertDragActive(active: boolean): void {
     this.homeInsertDragActive = active;
@@ -8221,11 +8826,12 @@ export class AdminComponent implements OnInit, OnDestroy {
             configured.push(draft);
           }
 
-          if (configured.length) {
-            this.homeBlocks = this.ensureAllDefaultHomeBlocks(configured);
-            return;
-          }
-        }
+	          if (configured.length) {
+	            this.homeBlocks = this.ensureAllDefaultHomeBlocks(configured);
+	            this.cmsHomeDraft.initFromServer(this.homeBlocks);
+	            return;
+	          }
+	        }
 
         const derived: HomeBlockDraft[] = [];
         const seen = new Set<HomeSectionId>();
@@ -8242,31 +8848,35 @@ export class AdminComponent implements OnInit, OnDestroy {
             if (!raw || typeof raw !== 'object') continue;
             addSection((raw as { id?: unknown }).id, (raw as { enabled?: unknown }).enabled === false ? false : true);
           }
-          if (derived.length) {
-            this.homeBlocks = this.ensureAllDefaultHomeBlocks(derived);
-            return;
-          }
-        }
+	          if (derived.length) {
+	            this.homeBlocks = this.ensureAllDefaultHomeBlocks(derived);
+	            this.cmsHomeDraft.initFromServer(this.homeBlocks);
+	            return;
+	          }
+	        }
 
         const legacyOrder = meta['order'];
         if (Array.isArray(legacyOrder) && legacyOrder.length) {
           for (const raw of legacyOrder) {
             addSection(raw, true);
           }
-          if (derived.length) {
-            this.homeBlocks = this.ensureAllDefaultHomeBlocks(derived);
-            return;
-          }
-        }
+	          if (derived.length) {
+	            this.homeBlocks = this.ensureAllDefaultHomeBlocks(derived);
+	            this.cmsHomeDraft.initFromServer(this.homeBlocks);
+	            return;
+	          }
+	        }
 
-        this.homeBlocks = this.ensureAllDefaultHomeBlocks([]);
-      },
-      error: () => {
-        delete this.contentVersions['home.sections'];
-        this.homeBlocks = this.ensureAllDefaultHomeBlocks([]);
-      }
-    });
-  }
+	        this.homeBlocks = this.ensureAllDefaultHomeBlocks([]);
+	        this.cmsHomeDraft.initFromServer(this.homeBlocks);
+	      },
+	      error: () => {
+	        delete this.contentVersions['home.sections'];
+	        this.homeBlocks = this.ensureAllDefaultHomeBlocks([]);
+	        this.cmsHomeDraft.initFromServer(this.homeBlocks);
+	      }
+	    });
+	  }
 
   saveSections(): void {
     const blocks = this.homeBlocks.map((b) => {
@@ -8320,26 +8930,28 @@ export class AdminComponent implements OnInit, OnDestroy {
     };
     const ok = this.t('adminUi.home.sections.success.save');
     const errMsg = this.t('adminUi.home.sections.errors.save');
-    this.admin.updateContentBlock('home.sections', this.withExpectedVersion('home.sections', payload)).subscribe({
-      next: (block) => {
-        this.rememberContentVersion('home.sections', block);
-        this.sectionsMessage = ok;
-      },
-      error: (err) => {
-        if (this.handleContentConflict(err, 'home.sections', () => this.loadSections())) {
-          this.sectionsMessage = errMsg;
-          return;
+	    this.admin.updateContentBlock('home.sections', this.withExpectedVersion('home.sections', payload)).subscribe({
+	      next: (block) => {
+	        this.rememberContentVersion('home.sections', block);
+	        this.sectionsMessage = ok;
+	        this.cmsHomeDraft.markServerSaved(this.homeBlocks, true);
+	      },
+	      error: (err) => {
+	        if (this.handleContentConflict(err, 'home.sections', () => this.loadSections())) {
+	          this.sectionsMessage = errMsg;
+	          return;
         }
         if (err?.status === 404) {
-          this.admin.createContent('home.sections', payload).subscribe({
-            next: (created) => {
-              this.rememberContentVersion('home.sections', created);
-              this.sectionsMessage = ok;
-            },
-            error: () => (this.sectionsMessage = errMsg)
-          });
-        } else {
-          this.sectionsMessage = errMsg;
+	          this.admin.createContent('home.sections', payload).subscribe({
+	            next: (created) => {
+	              this.rememberContentVersion('home.sections', created);
+	              this.sectionsMessage = ok;
+	              this.cmsHomeDraft.markServerSaved(this.homeBlocks, true);
+	            },
+	            error: () => (this.sectionsMessage = errMsg)
+	          });
+	        } else {
+	          this.sectionsMessage = errMsg;
         }
       }
     });

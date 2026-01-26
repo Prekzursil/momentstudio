@@ -1503,20 +1503,23 @@
       "recentOrdersSubtitle": "{{count}} in view",
       "lowStockTrackedSubtitle": "{{count}} tracked"
     },
-    "actions": {
-      "add": "Add",
-      "apply": "Apply",
-      "reset": "Reset",
-      "delete": "Delete",
-      "remove": "Remove",
-      "save": "Save",
-      "cancel": "Cancel",
-      "retry": "Retry",
-      "restore": "Restore",
-      "loading": "Loading…",
-      "edit": "Edit",
-      "changeUrl": "Change URL",
-      "refresh": "Refresh",
+      "actions": {
+        "add": "Add",
+        "apply": "Apply",
+        "reset": "Reset",
+        "delete": "Delete",
+        "remove": "Remove",
+        "save": "Save",
+        "cancel": "Cancel",
+        "retry": "Retry",
+        "restore": "Restore",
+        "undo": "Undo",
+        "redo": "Redo",
+        "dismiss": "Dismiss",
+        "loading": "Loading…",
+        "edit": "Edit",
+        "changeUrl": "Change URL",
+        "refresh": "Refresh",
       "search": "Search",
       "copy": "Copy",
       "use": "Use",
@@ -3607,6 +3610,20 @@
           "gallery": "Multi-image gallery with captions and focal points.",
           "banner": "Hero banner with headline, CTA, and background image.",
           "carousel": "Slider with multiple slides and autoplay settings."
+        }
+      },
+      "reorder": {
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "moved": "{{label}} moved to position {{pos}} of {{count}}."
+      },
+      "autosave": {
+        "restoreFound": "Autosaved draft found",
+        "state": {
+          "saved": "Saved",
+          "unsaved": "Unsaved changes",
+          "autosaving": "Autosaving…",
+          "autosaved": "Autosaved"
         }
       },
       "nav": {

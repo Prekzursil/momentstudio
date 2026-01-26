@@ -1503,20 +1503,23 @@
       "recentOrdersSubtitle": "{{count}} în vizualizare",
       "lowStockTrackedSubtitle": "{{count}} urmărite"
     },
-    "actions": {
-      "add": "Adaugă",
-      "apply": "Aplică",
-      "reset": "Resetează",
-      "delete": "Șterge",
-      "remove": "Elimină",
-      "save": "Salvează",
-      "cancel": "Anulează",
-      "retry": "Reîncearcă",
-      "restore": "Restabilește",
-      "loading": "Se încarcă…",
-      "edit": "Editează",
-      "changeUrl": "Schimbă URL-ul",
-      "refresh": "Reîncarcă",
+      "actions": {
+        "add": "Adaugă",
+        "apply": "Aplică",
+        "reset": "Resetează",
+        "delete": "Șterge",
+        "remove": "Elimină",
+        "save": "Salvează",
+        "cancel": "Anulează",
+        "retry": "Reîncearcă",
+        "restore": "Restabilește",
+        "undo": "Anulează",
+        "redo": "Refă",
+        "dismiss": "Ignoră",
+        "loading": "Se încarcă…",
+        "edit": "Editează",
+        "changeUrl": "Schimbă URL-ul",
+        "refresh": "Reîncarcă",
       "search": "Caută",
       "copy": "Copiază",
       "use": "Folosește",
@@ -3607,6 +3610,20 @@
           "gallery": "Galerie cu mai multe imagini, legende și puncte focale.",
           "banner": "Banner tip hero cu titlu, CTA și imagine de fundal.",
           "carousel": "Carusel cu mai multe slide-uri și setări de autoplay."
+        }
+      },
+      "reorder": {
+        "moveUp": "Mută în sus",
+        "moveDown": "Mută în jos",
+        "moved": "{{label}} a fost mutat la poziția {{pos}} din {{count}}."
+      },
+      "autosave": {
+        "restoreFound": "A fost găsit un draft salvat automat",
+        "state": {
+          "saved": "Salvat",
+          "unsaved": "Modificări nesalvate",
+          "autosaving": "Se salvează automat…",
+          "autosaved": "Salvat automat"
         }
       },
       "nav": {
