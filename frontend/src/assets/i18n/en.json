@@ -1282,6 +1282,8 @@
     },
     "nav": {
       "title": "Admin",
+      "searchPlaceholder": "Search admin…",
+      "searchEmpty": "No matches.",
       "dashboard": "Dashboard",
       "products": "Products",
       "inventory": "Inventory",
@@ -1295,6 +1297,15 @@
     },
     "security": {
       "mfaRequired": "Two-factor authentication or a passkey is required for admin access."
+    },
+    "trainingMode": {
+      "title": "Training mode",
+      "on": "On",
+      "off": "Off",
+      "hint": "Read-only: changes are blocked.",
+      "errors": {
+        "save": "Could not update training mode."
+      }
     },
     "onboarding": {
       "open": "Setup tour",
@@ -1320,6 +1331,18 @@
       "reveal": "Reveal PII",
       "hide": "Hide PII",
       "notAuthorized": "You don't have permission to reveal PII."
+    },
+    "customerTimeline": {
+      "title": "Customer timeline",
+      "subtitle": "Recent orders, support tickets, and email activity.",
+      "loading": "Loading customer timeline…",
+      "empty": "No recent activity found.",
+      "errors": { "load": "Could not load customer timeline." },
+      "kinds": { "order": "Order", "ticket": "Ticket", "email": "Email" },
+      "emailStatus": { "sent": "Sent", "failed": "Failed" },
+      "emailGated": "Reveal PII to load email activity.",
+      "noCustomer": "Customer details unavailable for timeline.",
+      "openOps": "Open in Ops"
     },
     "ipBypass": {
       "title": "Admin access restricted",
@@ -1390,6 +1413,30 @@
         "exportOrders": "Export orders"
       },
       "customizeWidgets": "Customize widgets",
+      "liveRefresh": {
+        "lastUpdated": "Last updated",
+        "pause": "Pause",
+        "resume": "Live refresh"
+      },
+      "salesMetric": {
+        "aria": "Sales metric",
+        "net": "Net",
+        "gross": "Gross",
+        "tooltip": "Gross sales includes paid/shipped/delivered/refunded orders. Net sales subtracts refunds (including partial refunds)."
+      },
+      "channelBreakdown": {
+        "title": "Channel breakdown",
+        "paymentMethods": "Payment methods",
+        "couriers": "Couriers",
+        "deliveryTypes": "Delivery types",
+        "empty": "No data in this range.",
+        "error": "Could not load channel breakdown.",
+        "table": {
+          "channel": "Channel",
+          "orders": "Orders",
+          "sales": "Sales"
+        }
+      },
       "widgetsTitle": "Dashboard widgets",
       "widgets": {
         "kpis": "Today KPIs",
@@ -1456,20 +1503,23 @@
       "recentOrdersSubtitle": "{{count}} in view",
       "lowStockTrackedSubtitle": "{{count}} tracked"
     },
-    "actions": {
-      "add": "Add",
-      "apply": "Apply",
-      "reset": "Reset",
-      "delete": "Delete",
-      "remove": "Remove",
-      "save": "Save",
-      "cancel": "Cancel",
-      "retry": "Retry",
-      "restore": "Restore",
-      "loading": "Loading…",
-      "edit": "Edit",
-      "changeUrl": "Change URL",
-      "refresh": "Refresh",
+      "actions": {
+        "add": "Add",
+        "apply": "Apply",
+        "reset": "Reset",
+        "delete": "Delete",
+        "remove": "Remove",
+        "save": "Save",
+        "cancel": "Cancel",
+        "retry": "Retry",
+        "restore": "Restore",
+        "undo": "Undo",
+        "redo": "Redo",
+        "dismiss": "Dismiss",
+        "loading": "Loading…",
+        "edit": "Edit",
+        "changeUrl": "Change URL",
+        "refresh": "Refresh",
       "search": "Search",
       "copy": "Copy",
       "use": "Use",
@@ -1479,7 +1529,101 @@
       "up": "Up",
       "down": "Down",
       "preview": "Preview",
-      "hide": "Hide"
+      "hide": "Hide",
+      "bulkActions": "Bulk actions"
+    },
+    "recent": {
+      "title": "Recently viewed",
+      "hint": "Quickly reopen pages and items you visited.",
+      "empty": "No recent items yet.",
+      "clear": "Clear",
+      "types": {
+        "page": "Page",
+        "content": "Content",
+        "order": "Order",
+        "product": "Product",
+        "user": "User"
+      }
+    },
+    "favorites": {
+      "title": "Favorites",
+      "hint": "Pin pages and items for quick access.",
+      "empty": "No favorites yet.",
+      "clear": "Clear",
+      "pin": "Pin to favorites",
+      "unpin": "Unpin from favorites",
+      "types": {
+        "page": "Page",
+        "content": "Content",
+        "order": "Order",
+        "product": "Product",
+        "user": "User",
+        "filter": "Saved view"
+      },
+      "savedViews": {
+        "label": "Saved views",
+        "none": "None",
+        "pinCurrent": "Pin current view",
+        "unpinCurrent": "Unpin current view",
+        "prompt": "Name this view",
+        "errors": {
+          "nameRequired": "Please enter a name."
+        }
+      },
+      "errors": {
+        "load": "Could not load favorites.",
+        "save": "Could not save favorites."
+      }
+    },
+    "alerts": {
+      "title": "Alerts",
+      "loading": "Loading alerts…",
+      "lowStock": "Low stock",
+      "failedWebhooks": "Webhook failures (24h)",
+      "failedEmails": "Email failures (24h)",
+      "errors": {
+        "load": "Could not load alerts."
+      }
+    },
+    "jobs": {
+      "title": "Background jobs",
+      "hint": "Track long-running exports and bulk actions.",
+      "empty": "No background jobs right now.",
+      "sections": {
+        "gdprExports": "GDPR exports",
+        "couponJobs": "Coupon segment jobs"
+      },
+      "couponActions": {
+        "assign": "Coupon segment assign",
+        "revoke": "Coupon segment revoke"
+      },
+      "status": {
+        "pending": "Pending",
+        "running": "Running",
+        "succeeded": "Succeeded",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      },
+      "actions": {
+        "openGdpr": "GDPR queue",
+        "openCoupons": "Coupons",
+        "download": "Download"
+      },
+      "confirms": {
+        "retry": "Retry this job?",
+        "cancel": "Cancel this job?"
+      },
+      "success": {
+        "retry": "Job restarted.",
+        "cancel": "Job cancelled.",
+        "download": "Export downloaded."
+      },
+      "errors": {
+        "load": "Could not load background jobs.",
+        "retry": "Could not retry job.",
+        "cancel": "Could not cancel job.",
+        "download": "Could not download export."
+      }
     },
     "tableLayout": {
       "title": "Table layout",
@@ -1488,6 +1632,10 @@
       "density": {
         "comfortable": "Comfortable",
         "compact": "Compact"
+      },
+      "densityToggle": {
+        "toCompact": "Compact view",
+        "toComfortable": "Comfortable view"
       },
       "columnsLabel": "Columns",
       "required": "Required",
@@ -1525,9 +1673,25 @@
         "date": "Date",
         "topic": "Channel",
         "status": "Status",
+        "sla": "SLA",
         "assignee": "Assignee",
         "from": "From",
         "order": "Order"
+      },
+      "sla": {
+        "title": "SLA settings",
+        "current": "SLA: first reply {{first}}h · resolution {{resolution}}h",
+        "firstReplyHours": "First reply SLA (hours)",
+        "resolutionHours": "Resolution SLA (hours)",
+        "reply": "Reply",
+        "resolve": "Resolve",
+        "due": "due in {{duration}}",
+        "overdue": "overdue by {{duration}}",
+        "success": { "save": "SLA settings saved." },
+        "errors": {
+          "save": "Could not save SLA settings.",
+          "invalid": "Enter valid SLA hours (1–720)."
+        }
       },
       "empty": "No submissions found.",
       "pagination": "Page {{page}} of {{total}} · {{count}} total",
@@ -1602,6 +1766,8 @@
       }
     },
     "ops": {
+      "title": "Operations",
+      "subtitle": "Store operations, banners, shipping simulator, and webhooks.",
       "banner": {
         "title": "Maintenance banners",
         "hint": "Schedule storefront announcement banners for downtime or promotions.",
@@ -1673,6 +1839,30 @@
           "run": "Could not run simulation."
         }
       },
+      "emailFailures": {
+        "title": "Email failures",
+        "hint": "Track failed outgoing email deliveries.",
+        "refresh": "Refresh",
+        "filters": {
+          "to": "Recipient email",
+          "toPlaceholder": "customer@example.com",
+          "sinceHours": "Since (hours)"
+        },
+        "empty": "No email failures.",
+        "view": "View",
+        "close": "Close",
+        "detailTitle": "Email failure",
+        "table": {
+          "to": "To",
+          "subject": "Subject",
+          "at": "Time",
+          "error": "Error",
+          "actions": "Actions"
+        },
+        "errors": {
+          "load": "Could not load email failures."
+        }
+      },
       "webhooks": {
         "title": "Webhook monitor",
         "hint": "View recent provider webhooks and retry failed deliveries.",
@@ -1712,6 +1902,7 @@
     },
     "returns": {
       "title": "Returns",
+      "subtitle": "Manage return requests and their statuses.",
       "filters": {
         "search": "Search",
         "searchPh": "Order ref, email, name…",
@@ -1788,6 +1979,49 @@
         "errors": {
           "create": "Could not create return request."
         }
+      }
+    },
+    "reports": {
+      "title": "Scheduled reports",
+      "hint": "Weekly/monthly email summaries for sales, top products, and low stock.",
+      "recipients": "Recipients",
+      "recipientsPlaceholder": "owner@example.com, …",
+      "recipientsHint": "Comma-separated emails. Leave empty to send to the owner email.",
+      "weekdays": {
+        "mon": "Monday",
+        "tue": "Tuesday",
+        "wed": "Wednesday",
+        "thu": "Thursday",
+        "fri": "Friday",
+        "sat": "Saturday",
+        "sun": "Sunday"
+      },
+      "weekly": {
+        "title": "Weekly report",
+        "enabled": "Enable weekly report",
+        "weekday": "Day",
+        "hourUtc": "Hour (UTC)",
+        "sendNow": "Send weekly now",
+        "lastSent": "Last sent",
+        "lastError": "Last error"
+      },
+      "monthly": {
+        "title": "Monthly report",
+        "enabled": "Enable monthly report",
+        "day": "Day of month (1–28)",
+        "hourUtc": "Hour (UTC)",
+        "sendNow": "Send monthly now",
+        "lastSent": "Last sent",
+        "lastError": "Last error"
+      },
+      "success": {
+        "save": "Report settings saved.",
+        "sent": "Report sent.",
+        "skipped": "Already sent for this period."
+      },
+      "errors": {
+        "save": "Could not save report settings.",
+        "send": "Could not send report."
       }
     },
     "site": {
@@ -2794,7 +3028,13 @@
       },
       "search": "Search",
       "statusFilter": "Status",
+      "sales": "Sales",
       "tagFilter": "Tag",
+      "testOrdersFilter": "Test orders",
+      "testOrders": {
+        "include": "Include",
+        "exclude": "Exclude"
+      },
       "from": "From",
       "to": "To",
       "presets": {
@@ -2997,8 +3237,11 @@
         "vip": "VIP",
         "fraud_risk": "Fraud risk",
         "gift": "Gift",
+        "test": "Test order",
         "none": "No tags yet.",
         "addLabel": "Add tag",
+        "markTest": "Mark as test",
+        "unmarkTest": "Unmark test",
         "select": "Select",
         "add": "Add",
         "removeLabel": "Remove tag: {{tag}}",
@@ -3209,8 +3452,16 @@
         "support": "Support",
         "fulfillment": "Fulfillment",
         "content": "Content",
-        "admin": "Admin",
+        "admin": "Owner basic",
         "owner": "Owner"
+      },
+      "roleHints": {
+        "customer": "Customer only (no admin access).",
+        "support": "Support preset: Dashboard, Users, Support.",
+        "fulfillment": "Fulfillment preset: Dashboard, Orders, Returns, Inventory.",
+        "content": "Content preset: Dashboard, Content, Products, Coupons.",
+        "admin": "Owner basic: Full access (except owner-only actions).",
+        "owner": "Owner: Full access (locked)."
       },
       "success": {
         "revoke": "Sessions revoked",
@@ -3327,6 +3578,54 @@
     },
     "content": {
       "title": "Content",
+      "subtitle": "Edit the homepage, pages, blog, and site settings.",
+      "editorMode": {
+        "label": "Editor mode",
+        "simple": "Simple",
+        "advanced": "Advanced",
+        "simpleHint": "Simple mode hides SEO and scheduling.",
+        "advancedHint": "Advanced mode shows SEO, scheduling, and extra controls."
+      },
+      "preview": {
+        "deviceLabel": "Preview size",
+        "desktop": "Desktop",
+        "tablet": "Tablet",
+        "mobile": "Mobile",
+        "layoutLabel": "Layout",
+        "stacked": "Stacked",
+        "split": "Split"
+      },
+      "blockLibrary": {
+        "title": "Block library",
+        "hint": "Click to add a block, or drag it into the editor.",
+        "templateLabel": "Template",
+        "templates": {
+          "starter": "Starter",
+          "blank": "Blank"
+        },
+        "dropHere": "Drop here to insert",
+        "items": {
+          "text": "Text section (markdown / rich editor).",
+          "image": "Single image with optional link and caption.",
+          "gallery": "Multi-image gallery with captions and focal points.",
+          "banner": "Hero banner with headline, CTA, and background image.",
+          "carousel": "Slider with multiple slides and autoplay settings."
+        }
+      },
+      "reorder": {
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "moved": "{{label}} moved to position {{pos}} of {{count}}."
+      },
+      "autosave": {
+        "restoreFound": "Autosaved draft found",
+        "state": {
+          "saved": "Saved",
+          "unsaved": "Unsaved changes",
+          "autosaving": "Autosaving…",
+          "autosaved": "Autosaved"
+        }
+      },
       "nav": {
         "home": "Home",
         "pages": "Pages",

@@ -30,6 +30,7 @@ export interface AuthUser {
   google_sub?: string | null;
   google_email?: string | null;
   google_picture_url?: string | null;
+  admin_training_mode?: boolean;
   preferred_language?: string | null;
   role: string;
   created_at?: string;
@@ -363,6 +364,13 @@ export class AuthService {
       return of({} as AuthUser);
     }
     return this.api.patch<AuthUser>('/auth/me/notifications', payload).pipe(tap((user) => this.setUser(user)));
+  }
+
+  updateTrainingMode(enabled: boolean): Observable<AuthUser> {
+    if (!this.isAuthenticated()) {
+      return of({} as AuthUser);
+    }
+    return this.api.patch<AuthUser>('/auth/me/training-mode', { enabled }).pipe(tap((user) => this.setUser(user)));
   }
 
   updateProfile(payload: {

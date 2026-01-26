@@ -8,12 +8,14 @@ import { ButtonComponent } from '../../../shared/button.component';
 import { InputComponent } from '../../../shared/input.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { ToastService } from '../../../core/toast.service';
+import { AuthService } from '../../../core/auth.service';
 import {
   AdminContactSubmissionListItem,
   AdminContactSubmissionRead,
   AdminSupportService,
   SupportAgentRef,
   SupportCannedResponseRead,
+  SupportSlaSettings,
   SupportStatus,
   SupportTopic
 } from '../../../core/admin-support.service';
@@ -133,6 +135,40 @@ import {
               {{ 'adminUi.support.empty' | translate }}
             </div>
 
+            <details class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+              <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.support.sla.title' | translate }}
+              </summary>
+              <div class="mt-3 grid gap-3">
+                <p class="text-xs text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.support.sla.current' | translate: { first: slaFirstReplyHours, resolution: slaResolutionHours } }}
+                </p>
+                <div *ngIf="canEditSlaSettings()" class="grid sm:grid-cols-2 gap-3">
+                  <app-input
+                    [label]="'adminUi.support.sla.firstReplyHours' | translate"
+                    type="number"
+                    [min]="1"
+                    [max]="720"
+                    [step]="1"
+                    [(value)]="slaFirstReplyHoursDraft"
+                  ></app-input>
+                  <app-input
+                    [label]="'adminUi.support.sla.resolutionHours' | translate"
+                    type="number"
+                    [min]="1"
+                    [max]="720"
+                    [step]="1"
+                    [(value)]="slaResolutionHoursDraft"
+                  ></app-input>
+                </div>
+                <div *ngIf="canEditSlaSettings()" class="flex items-center gap-2 text-sm">
+                  <app-button size="sm" [label]="'adminUi.actions.save' | translate" [disabled]="slaSettingsSaving" (action)="saveSlaSettings()"></app-button>
+                  <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="slaSettingsMessage">{{ slaSettingsMessage }}</span>
+                  <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="slaSettingsError">{{ slaSettingsError }}</span>
+                </div>
+              </div>
+            </details>
+
 	            <div *ngIf="items().length" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
 	              <table class="min-w-[860px] w-full text-sm">
 	                <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
@@ -140,6 +176,7 @@ import {
 	                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.support.table.date' | translate }}</th>
 	                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.support.table.topic' | translate }}</th>
 	                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.support.table.status' | translate }}</th>
+	                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.support.table.sla' | translate }}</th>
 	                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.support.table.assignee' | translate }}</th>
 	                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.support.table.from' | translate }}</th>
 	                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.support.table.order' | translate }}</th>
@@ -162,6 +199,14 @@ import {
 	                      <span class="inline-flex rounded-full px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700">
 	                        {{ ('adminUi.support.status.' + row.status) | translate }}
 	                      </span>
+	                    </td>
+	                    <td class="px-3 py-2">
+	                      <ng-container *ngIf="slaInfo(row) as sla; else slaNone">
+	                        <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" [ngClass]="sla.class">
+	                          {{ sla.label }}
+	                        </span>
+	                      </ng-container>
+	                      <ng-template #slaNone>—</ng-template>
 	                    </td>
 	                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
 	                      <span class="text-xs text-slate-600 dark:text-slate-300">
@@ -525,6 +570,14 @@ export class AdminSupportComponent implements OnInit {
   customerFilter = '';
   assigneeFilter = '';
 
+  slaFirstReplyHours = 24;
+  slaResolutionHours = 72;
+  slaFirstReplyHoursDraft: number | string = 24;
+  slaResolutionHoursDraft: number | string = 72;
+  slaSettingsSaving = false;
+  slaSettingsMessage: string | null = null;
+  slaSettingsError: string | null = null;
+
   loading = signal<boolean>(true);
   detailLoading = signal<boolean>(false);
   saving = signal<boolean>(false);
@@ -566,6 +619,7 @@ export class AdminSupportComponent implements OnInit {
 
   constructor(
     private api: AdminSupportService,
+    private auth: AuthService,
     private toast: ToastService,
     private translate: TranslateService,
     private route: ActivatedRoute,
@@ -575,6 +629,7 @@ export class AdminSupportComponent implements OnInit {
   ngOnInit(): void {
     this.cannedLang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     this.loadAssignees();
+    this.loadSlaSettings();
     this.loadCanned();
     this.load();
     const ticketId = this.route.snapshot.queryParamMap.get('ticket');
@@ -586,6 +641,103 @@ export class AdminSupportComponent implements OnInit {
   applyFilters(): void {
     this.meta.set({ ...this.meta(), page: 1 });
     this.load();
+  }
+
+  canEditSlaSettings(): boolean {
+    const role = this.auth.role();
+    return role === 'owner' || role === 'admin';
+  }
+
+  loadSlaSettings(): void {
+    this.api.getSlaSettings().subscribe({
+      next: (settings: SupportSlaSettings) => {
+        const first = Number(settings?.first_reply_hours);
+        const resolution = Number(settings?.resolution_hours);
+        this.slaFirstReplyHours = Number.isFinite(first) ? Math.trunc(first) : 24;
+        this.slaResolutionHours = Number.isFinite(resolution) ? Math.trunc(resolution) : 72;
+        this.slaFirstReplyHoursDraft = this.slaFirstReplyHours;
+        this.slaResolutionHoursDraft = this.slaResolutionHours;
+      },
+      error: () => {
+        // Keep defaults.
+      }
+    });
+  }
+
+  saveSlaSettings(): void {
+    if (this.slaSettingsSaving) return;
+    const firstRaw = Number(this.slaFirstReplyHoursDraft);
+    const resolutionRaw = Number(this.slaResolutionHoursDraft);
+    const first = Number.isFinite(firstRaw) ? Math.trunc(firstRaw) : 0;
+    const resolution = Number.isFinite(resolutionRaw) ? Math.trunc(resolutionRaw) : 0;
+    if (first < 1 || first > 720 || resolution < 1 || resolution > 720) {
+      this.slaSettingsError = this.translate.instant('adminUi.support.sla.errors.invalid');
+      this.slaSettingsMessage = null;
+      return;
+    }
+
+    this.slaSettingsSaving = true;
+    this.slaSettingsError = null;
+    this.slaSettingsMessage = null;
+    this.api.updateSlaSettings({ first_reply_hours: first, resolution_hours: resolution }).subscribe({
+      next: (updated) => {
+        this.slaSettingsSaving = false;
+        const nextFirst = Number(updated?.first_reply_hours);
+        const nextResolution = Number(updated?.resolution_hours);
+        this.slaFirstReplyHours = Number.isFinite(nextFirst) ? Math.trunc(nextFirst) : first;
+        this.slaResolutionHours = Number.isFinite(nextResolution) ? Math.trunc(nextResolution) : resolution;
+        this.slaFirstReplyHoursDraft = this.slaFirstReplyHours;
+        this.slaResolutionHoursDraft = this.slaResolutionHours;
+        this.slaSettingsMessage = this.translate.instant('adminUi.support.sla.success.save');
+        this.slaSettingsError = null;
+      },
+      error: () => {
+        this.slaSettingsSaving = false;
+        this.slaSettingsError = this.translate.instant('adminUi.support.sla.errors.save');
+        this.slaSettingsMessage = null;
+      }
+    });
+  }
+
+  private formatDuration(ms: number): string {
+    const totalMinutes = Math.max(0, Math.floor(ms / 60_000));
+    const days = Math.floor(totalMinutes / (60 * 24));
+    const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+    const minutes = totalMinutes % 60;
+    const parts: string[] = [];
+    if (days) parts.push(`${days}d`);
+    if (hours || days) parts.push(`${hours}h`);
+    parts.push(`${minutes}m`);
+    return parts.join(' ');
+  }
+
+  slaInfo(row: AdminContactSubmissionListItem): { label: string; class: string } | null {
+    const createdAt = new Date(row.created_at).getTime();
+    if (!Number.isFinite(createdAt)) return null;
+    if (row.status === 'resolved') return null;
+
+    const now = Date.now();
+    const replyDueAt = createdAt + this.slaFirstReplyHours * 60 * 60 * 1000;
+    const resolveDueAt = createdAt + this.slaResolutionHours * 60 * 60 * 1000;
+
+    const isReply = row.status === 'new';
+    const dueAt = isReply ? replyDueAt : resolveDueAt;
+    const delta = dueAt - now;
+    const duration = this.formatDuration(Math.abs(delta));
+    const prefix = this.translate.instant(isReply ? 'adminUi.support.sla.reply' : 'adminUi.support.sla.resolve');
+    const suffix = delta < 0
+      ? this.translate.instant('adminUi.support.sla.overdue', { duration })
+      : this.translate.instant('adminUi.support.sla.due', { duration });
+
+    const dueSoon = delta >= 0 && delta <= 6 * 60 * 60 * 1000;
+    const klass =
+      delta < 0
+        ? 'bg-rose-100 text-rose-900 dark:bg-rose-950/30 dark:text-rose-100'
+        : dueSoon
+          ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100'
+          : 'bg-slate-100 text-slate-900 dark:bg-slate-800/70 dark:text-slate-100';
+
+    return { label: `${prefix}: ${suffix}`, class: klass };
   }
 
   formatAgent(agent: SupportAgentRef): string {

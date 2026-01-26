@@ -9,6 +9,7 @@ from app.api.v1 import payments
 from app.api.v1 import content
 from app.api.v1 import email_preview
 from app.api.v1 import admin_dashboard
+from app.api.v1 import admin_ui
 from app.api.v1 import wishlist
 from app.api.v1 import blog
 from app.api.v1 import fx
@@ -40,6 +41,7 @@ api_router.include_router(payments.router)
 api_router.include_router(content.router)
 api_router.include_router(email_preview.router)
 api_router.include_router(admin_dashboard.router)
+api_router.include_router(admin_ui.router)
 api_router.include_router(wishlist.router)
 api_router.include_router(blog.router)
 api_router.include_router(fx.router)

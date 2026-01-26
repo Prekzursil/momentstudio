@@ -31,8 +31,10 @@ import {
   StockAdjustment,
   StockAdjustmentReason,
 } from '../../../core/admin.service';
+import { AdminRecentService } from '../../../core/admin-recent.service';
 import { ToastService } from '../../../core/toast.service';
 import { AuthService } from '../../../core/auth.service';
+import { AdminFavoriteItem, AdminFavoritesService } from '../../../core/admin-favorites.service';
 import {
   AdminTableLayoutV1,
   adminTableCellPaddingClass,
@@ -43,8 +45,11 @@ import {
   visibleAdminTableColumnIds
 } from '../shared/admin-table-layout';
 import { AdminTableLayoutColumnDef, TableLayoutModalComponent } from '../shared/table-layout-modal.component';
+import { adminFilterFavoriteKey } from '../shared/admin-filter-favorites';
 
 type ProductStatusFilter = 'all' | 'draft' | 'published' | 'archived';
+type ProductTranslationFilter = 'all' | 'missing_any' | 'missing_en' | 'missing_ro';
+type ProductView = 'active' | 'deleted';
 
 const PRODUCTS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
   { id: 'select', labelKey: 'adminUi.products.table.select', required: true },
@@ -167,6 +172,7 @@ type PriceHistoryChart = {
         <div class="flex flex-wrap items-center justify-end gap-2">
           <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.export' | translate" (action)="exportProductsCsv()"></app-button>
           <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.import' | translate" (action)="openCsvImport()"></app-button>
+          <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
           <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
           <app-button size="sm" [label]="'adminUi.products.new' | translate" (action)="startNew()"></app-button>
         </div>
@@ -316,8 +322,33 @@ type PriceHistoryChart = {
 	          </div>
 	        </div>
 
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto">
+              {{ 'adminUi.favorites.savedViews.label' | translate }}
+              <select
+                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 min-w-[220px]"
+                [(ngModel)]="selectedSavedViewKey"
+                (ngModelChange)="applySavedView($event)"
+              >
+                <option value="">{{ 'adminUi.favorites.savedViews.none' | translate }}</option>
+                <option *ngFor="let view of savedViews()" [value]="view.key">{{ view.label }}</option>
+              </select>
+            </label>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="(isCurrentViewPinned() ? 'adminUi.favorites.savedViews.unpinCurrent' : 'adminUi.favorites.savedViews.pinCurrent') | translate"
+                [disabled]="favorites.loading()"
+                (action)="toggleCurrentViewPin()"
+              ></app-button>
+            </div>
+          </div>
+
 	          <div
 	            *ngIf="selected.size > 0 && view === 'active'"
+              id="admin-products-bulk-actions"
 	            class="rounded-xl border border-slate-200 bg-slate-50 p-3 grid gap-3 dark:border-slate-800 dark:bg-slate-950/20"
 	          >
             <div class="flex flex-wrap items-center justify-between gap-3">
@@ -2279,6 +2310,35 @@ type PriceHistoryChart = {
 	          </div>
 	        </div>
 	      </section>
+
+        <div *ngIf="selected.size > 0 && view === 'active'" class="h-24"></div>
+
+        <div *ngIf="selected.size > 0 && view === 'active'" class="fixed inset-x-0 bottom-4 z-40 px-4 sm:px-6">
+          <div class="max-w-6xl mx-auto">
+            <div
+              class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 text-sm text-slate-700 shadow-lg backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-200 dark:shadow-none"
+            >
+              <div class="font-medium">
+                {{ 'adminUi.products.bulk.selected' | translate: { count: selected.size } }}
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.actions.bulkActions' | translate"
+                  (action)="scrollToBulkActions()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.products.bulk.clearSelection' | translate"
+                  [disabled]="bulkBusy() || inlineBusy()"
+                  (action)="clearSelection()"
+                ></app-button>
+              </div>
+            </div>
+          </div>
+        </div>
 	    </div>
 	  `
 })
@@ -2305,10 +2365,11 @@ export class AdminProductsComponent implements OnInit {
   q = '';
   status: ProductStatusFilter = 'all';
   categorySlug = '';
-  translationFilter: 'all' | 'missing_any' | 'missing_en' | 'missing_ro' = 'all';
-  view: 'active' | 'deleted' = 'active';
+  translationFilter: ProductTranslationFilter = 'all';
+  view: ProductView = 'active';
   page = 1;
   limit = 25;
+  selectedSavedViewKey = '';
 
 	  editorOpen = signal(false);
 	  editingSlug = signal<string | null>(null);
@@ -2429,17 +2490,21 @@ export class AdminProductsComponent implements OnInit {
     private catalog: CatalogService,
     private admin: AdminService,
     private auth: AuthService,
+    private recent: AdminRecentService,
     private markdown: MarkdownService,
     private toast: ToastService,
-    private translate: TranslateService
+    private translate: TranslateService,
+    public favorites: AdminFavoritesService
   ) {}
 
   ngOnInit(): void {
+    this.favorites.init();
     this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns));
     const state = history.state as any;
     const editSlug = typeof state?.editProductSlug === 'string' ? state.editProductSlug : '';
     this.pendingEditProductSlug = editSlug.trim() ? editSlug.trim() : null;
     this.autoStartNewProduct = !this.pendingEditProductSlug && Boolean(state?.openNewProduct);
+    this.maybeApplyFiltersFromState(state);
     this.loadCategories();
     this.loadAdminCategories();
     this.load();
@@ -2456,6 +2521,32 @@ export class AdminProductsComponent implements OnInit {
   applyTableLayout(layout: AdminTableLayoutV1): void {
     this.tableLayout.set(layout);
     saveAdminTableLayout(this.tableLayoutStorageKey(), layout);
+  }
+
+  toggleDensity(): void {
+    const current = this.tableLayout();
+    const next: AdminTableLayoutV1 = {
+      ...current,
+      density: current.density === 'compact' ? 'comfortable' : 'compact',
+    };
+    this.applyTableLayout(next);
+  }
+
+  densityToggleLabelKey(): string {
+    return this.tableLayout().density === 'compact'
+      ? 'adminUi.tableLayout.densityToggle.toComfortable'
+      : 'adminUi.tableLayout.densityToggle.toCompact';
+  }
+
+  scrollToBulkActions(): void {
+    if (typeof document === 'undefined') return;
+    const el = document.getElementById('admin-products-bulk-actions');
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => {
+      const focusable = el.querySelector<HTMLElement>('select, input, button, [href], [tabindex]:not([tabindex="-1"])');
+      focusable?.focus();
+    }, 0);
   }
 
   visibleColumnIds(): string[] {
@@ -2476,6 +2567,7 @@ export class AdminProductsComponent implements OnInit {
 
   applyFilters(): void {
     this.page = 1;
+    this.selectedSavedViewKey = '';
     this.clearSelection();
     this.cancelInlineEdit();
     this.load();
@@ -2487,9 +2579,105 @@ export class AdminProductsComponent implements OnInit {
     this.categorySlug = '';
     this.translationFilter = 'all';
     this.page = 1;
+    this.selectedSavedViewKey = '';
     this.clearSelection();
     this.cancelInlineEdit();
     this.load();
+  }
+
+  savedViews(): AdminFavoriteItem[] {
+    return this.favorites
+      .items()
+      .filter((item) => item?.type === 'filter' && (item?.state as any)?.adminFilterScope === 'products');
+  }
+
+  applySavedView(key: string): void {
+    this.selectedSavedViewKey = key;
+    if (!key) return;
+    const view = this.savedViews().find((item) => item.key === key);
+    const filters = view?.state && typeof view.state === 'object' ? (view.state as any).adminFilters : null;
+    if (!filters || typeof filters !== 'object') return;
+
+    this.q = String(filters.q ?? '');
+    this.status = (filters.status ?? 'all') as ProductStatusFilter;
+    this.categorySlug = String(filters.categorySlug ?? '');
+    this.translationFilter = (filters.translationFilter ?? 'all') as ProductTranslationFilter;
+    this.view = (filters.view ?? 'active') as ProductView;
+    const nextLimit = typeof filters.limit === 'number' && Number.isFinite(filters.limit) ? filters.limit : this.limit;
+    this.limit = nextLimit;
+    this.page = 1;
+    this.clearSelection();
+    this.cancelInlineEdit();
+    this.load();
+  }
+
+  isCurrentViewPinned(): boolean {
+    return this.favorites.isFavorite(this.currentViewFavoriteKey());
+  }
+
+  toggleCurrentViewPin(): void {
+    const key = this.currentViewFavoriteKey();
+    if (this.favorites.isFavorite(key)) {
+      this.favorites.remove(key);
+      if (this.selectedSavedViewKey === key) this.selectedSavedViewKey = '';
+      return;
+    }
+
+    const name = (window.prompt(this.translate.instant('adminUi.favorites.savedViews.prompt')) ?? '').trim();
+    if (!name) {
+      this.toast.error(this.translate.instant('adminUi.favorites.savedViews.errors.nameRequired'));
+      return;
+    }
+
+    const filters = this.currentViewFilters();
+    this.favorites.add({
+      key,
+      type: 'filter',
+      label: name,
+      subtitle: '',
+      url: '/admin/products',
+      state: { adminFilterScope: 'products', adminFilters: filters }
+    });
+    this.selectedSavedViewKey = key;
+  }
+
+  private maybeApplyFiltersFromState(state: any): void {
+    const scope = (state?.adminFilterScope || '').toString();
+    if (scope !== 'products') return;
+    const filters = state?.adminFilters;
+    if (!filters || typeof filters !== 'object') return;
+
+    this.q = String(filters.q ?? '');
+    this.status = (filters.status ?? 'all') as ProductStatusFilter;
+    this.categorySlug = String(filters.categorySlug ?? '');
+    this.translationFilter = (filters.translationFilter ?? 'all') as ProductTranslationFilter;
+    this.view = (filters.view ?? 'active') as ProductView;
+    const nextLimit = typeof filters.limit === 'number' && Number.isFinite(filters.limit) ? filters.limit : this.limit;
+    this.limit = nextLimit;
+    this.page = 1;
+    this.selectedSavedViewKey = this.currentViewFavoriteKey();
+  }
+
+  private currentViewFilters(): {
+    q: string;
+    status: ProductStatusFilter;
+    categorySlug: string;
+    translationFilter: ProductTranslationFilter;
+    view: ProductView;
+    limit: number;
+  } {
+    return {
+      q: this.q,
+      status: this.status,
+      categorySlug: this.categorySlug,
+      translationFilter: this.translationFilter,
+      view: this.view,
+      limit: this.limit
+    };
+  }
+
+  private currentViewFavoriteKey(): string {
+    return adminFilterFavoriteKey('products', this.currentViewFilters());
   }
 
   goToPage(page: number): void {
@@ -3155,6 +3343,15 @@ export class AdminProductsComponent implements OnInit {
 	    this.resetStockLedger();
     this.admin.getProduct(slug).subscribe({
       next: (prod: any) => {
+        const name = (prod?.name || '').toString().trim();
+        this.recent.add({
+          key: `product:${slug}`,
+          type: 'product',
+          label: name || slug,
+          subtitle: slug,
+          url: '/admin/products',
+          state: { editProductSlug: slug }
+        });
         this.editingProductId.set(prod?.id ? String(prod.id) : null);
         this.editingCurrency.set((prod?.currency || 'RON').toString() || 'RON');
         const basePrice = typeof prod.base_price === 'number' ? prod.base_price : Number(prod.base_price || 0);

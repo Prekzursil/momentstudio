@@ -17,6 +17,7 @@ import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { AdminOrderListItem, AdminOrderListResponse, AdminOrdersService } from '../../../core/admin-orders.service';
 import { orderStatusChipClass } from '../../../shared/order-status';
 import { AuthService } from '../../../core/auth.service';
+import { AdminFavoriteItem, AdminFavoritesService } from '../../../core/admin-favorites.service';
 import {
   AdminTableLayoutV1,
   adminTableCellPaddingClass,
@@ -27,9 +28,11 @@ import {
   visibleAdminTableColumnIds
 } from '../shared/admin-table-layout';
 import { AdminTableLayoutColumnDef, TableLayoutModalComponent } from '../shared/table-layout-modal.component';
+import { adminFilterFavoriteKey } from '../shared/admin-filter-favorites';
 
 type OrderStatusFilter =
   | 'all'
+  | 'sales'
   | 'pending'
   | 'pending_payment'
   | 'pending_acceptance'
@@ -49,6 +52,7 @@ type AdminOrdersFilterPreset = {
     tag: string;
     fromDate: string;
     toDate: string;
+    includeTestOrders: boolean;
     limit: number;
   };
 };
@@ -91,13 +95,14 @@ const ORDERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
-      <div class="flex items-start justify-between gap-4">
-        <div class="grid gap-1">
+        <div class="flex items-start justify-between gap-4">
+          <div class="grid gap-1">
           <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.title' | translate }}</h1>
           <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.orders.hint' | translate }}</p>
         </div>
         <div class="flex items-center gap-2">
           <app-button size="sm" variant="ghost" [label]="'adminUi.orders.export' | translate" (action)="openExportModal()"></app-button>
+          <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
           <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
         </div>
       </div>
@@ -121,6 +126,7 @@ const ORDERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
 	              [(ngModel)]="status"
 	            >
 	              <option value="all">{{ 'adminUi.orders.all' | translate }}</option>
+	              <option value="sales">{{ 'adminUi.orders.sales' | translate }}</option>
 	              <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
 	              <option value="pending_payment">{{ 'adminUi.orders.pending_payment' | translate }}</option>
 	              <option value="pending_acceptance">{{ 'adminUi.orders.pending_acceptance' | translate }}</option>
@@ -140,6 +146,17 @@ const ORDERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
             >
               <option value="">{{ 'adminUi.orders.tags.all' | translate }}</option>
               <option *ngFor="let tagOption of tagOptions()" [value]="tagOption">{{ tagLabel(tagOption) }}</option>
+            </select>
+          </label>
+
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.orders.testOrdersFilter' | translate }}
+            <select
+              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              [(ngModel)]="includeTestOrders"
+            >
+              <option [ngValue]="true">{{ 'adminUi.orders.testOrders.include' | translate }}</option>
+              <option [ngValue]="false">{{ 'adminUi.orders.testOrders.exclude' | translate }}</option>
             </select>
           </label>
 
@@ -202,6 +219,30 @@ const ORDERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
             </div>
           </div>
 
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto">
+              {{ 'adminUi.favorites.savedViews.label' | translate }}
+              <select
+                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 min-w-[220px]"
+                [(ngModel)]="selectedSavedViewKey"
+                (ngModelChange)="applySavedView($event)"
+              >
+                <option value="">{{ 'adminUi.favorites.savedViews.none' | translate }}</option>
+                <option *ngFor="let view of savedViews()" [value]="view.key">{{ view.label }}</option>
+              </select>
+            </label>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="(isCurrentViewPinned() ? 'adminUi.favorites.savedViews.unpinCurrent' : 'adminUi.favorites.savedViews.pinCurrent') | translate"
+                [disabled]="favorites.loading()"
+                (action)="toggleCurrentViewPin()"
+              ></app-button>
+            </div>
+          </div>
+
 	        <app-error-state
             *ngIf="error()"
             [message]="error()!"
@@ -220,6 +261,7 @@ const ORDERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
 
             <div
               *ngIf="selectedIds.size"
+              id="admin-orders-bulk-actions"
               class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
             >
               <div class="font-medium">
@@ -549,6 +591,30 @@ const ORDERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
           </div>
         </div>
       </ng-container>
+
+      <div *ngIf="selectedIds.size" class="h-24"></div>
+
+      <div *ngIf="selectedIds.size" class="fixed inset-x-0 bottom-4 z-40 px-4 sm:px-6">
+        <div class="max-w-6xl mx-auto">
+          <div
+            class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 text-sm text-slate-700 shadow-lg backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-200 dark:shadow-none"
+          >
+            <div class="font-medium">
+              {{ 'adminUi.orders.bulk.selected' | translate: { count: selectedIds.size } }}
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.bulkActions' | translate" (action)="scrollToBulkActions()"></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.orders.bulk.clearSelection' | translate"
+                [disabled]="bulkBusy"
+                (action)="clearSelection()"
+              ></app-button>
+            </div>
+          </div>
+        </div>
+      </div>
 	    </div>
 	  `
 })
@@ -576,11 +642,13 @@ export class AdminOrdersComponent implements OnInit {
   tag = '';
   fromDate = '';
   toDate = '';
+  includeTestOrders = true;
   page = 1;
   limit = 20;
 
   presets: AdminOrdersFilterPreset[] = [];
   selectedPresetId = '';
+  selectedSavedViewKey = '';
   tagOptions = signal<string[]>(['vip', 'fraud_risk', 'gift']);
 
   exportModalOpen = signal(false);
@@ -625,16 +693,19 @@ export class AdminOrdersComponent implements OnInit {
     private router: Router,
     private toast: ToastService,
     private translate: TranslateService,
-    private auth: AuthService
+    private auth: AuthService,
+    public favorites: AdminFavoritesService
   ) {}
 
   ngOnInit(): void {
+    this.favorites.init();
     this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns));
     this.presets = this.loadPresets();
     this.loadExportState();
+    this.maybeApplyFiltersFromState();
     this.ordersApi.listOrderTags().subscribe({
       next: (tags) => {
-        const merged = new Set<string>(['vip', 'fraud_risk', 'gift']);
+        const merged = new Set<string>(['vip', 'fraud_risk', 'gift', 'test']);
         for (const t of tags) merged.add(t);
         this.tagOptions.set(Array.from(merged).sort());
       },
@@ -656,6 +727,32 @@ export class AdminOrdersComponent implements OnInit {
   applyTableLayout(layout: AdminTableLayoutV1): void {
     this.tableLayout.set(layout);
     saveAdminTableLayout(this.tableLayoutStorageKey(), layout);
+  }
+
+  toggleDensity(): void {
+    const current = this.tableLayout();
+    const next: AdminTableLayoutV1 = {
+      ...current,
+      density: current.density === 'compact' ? 'comfortable' : 'compact',
+    };
+    this.applyTableLayout(next);
+  }
+
+  densityToggleLabelKey(): string {
+    return this.tableLayout().density === 'compact'
+      ? 'adminUi.tableLayout.densityToggle.toComfortable'
+      : 'adminUi.tableLayout.densityToggle.toCompact';
+  }
+
+  scrollToBulkActions(): void {
+    if (typeof document === 'undefined') return;
+    const el = document.getElementById('admin-orders-bulk-actions');
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => {
+      const focusable = el.querySelector<HTMLElement>('select, input, button, [href], [tabindex]:not([tabindex="-1"])');
+      focusable?.focus();
+    }, 0);
   }
 
   visibleColumnIds(): string[] {
@@ -683,8 +780,10 @@ export class AdminOrdersComponent implements OnInit {
     this.tag = '';
     this.fromDate = '';
     this.toDate = '';
+    this.includeTestOrders = true;
     this.page = 1;
     this.selectedPresetId = '';
+    this.selectedSavedViewKey = '';
     this.clearSelection();
     this.load();
   }
@@ -700,10 +799,105 @@ export class AdminOrdersComponent implements OnInit {
     this.tag = preset.filters.tag;
     this.fromDate = preset.filters.fromDate;
     this.toDate = preset.filters.toDate;
+    this.includeTestOrders = Boolean(preset.filters.includeTestOrders);
     this.limit = preset.filters.limit;
     this.page = 1;
+    this.selectedSavedViewKey = '';
     this.clearSelection();
     this.load();
+  }
+
+  savedViews(): AdminFavoriteItem[] {
+    return this.favorites
+      .items()
+      .filter((item) => item?.type === 'filter' && (item?.state as any)?.adminFilterScope === 'orders');
+  }
+
+  applySavedView(key: string): void {
+    this.selectedSavedViewKey = key;
+    if (!key) return;
+    const view = this.savedViews().find((item) => item.key === key);
+    const filters = view?.state && typeof view.state === 'object' ? (view.state as any).adminFilters : null;
+    if (!filters || typeof filters !== 'object') return;
+
+    this.q = String(filters.q ?? '');
+    this.status = (filters.status ?? 'all') as OrderStatusFilter;
+    this.tag = String(filters.tag ?? '');
+    this.fromDate = String(filters.fromDate ?? '');
+    this.toDate = String(filters.toDate ?? '');
+    this.includeTestOrders = Boolean(filters.includeTestOrders ?? true);
+    const nextLimit = typeof filters.limit === 'number' && Number.isFinite(filters.limit) ? filters.limit : 20;
+    this.limit = nextLimit;
+    this.page = 1;
+    this.selectedPresetId = '';
+    this.clearSelection();
+    this.load();
+  }
+
+  isCurrentViewPinned(): boolean {
+    return this.favorites.isFavorite(this.currentViewFavoriteKey());
+  }
+
+  toggleCurrentViewPin(): void {
+    const key = this.currentViewFavoriteKey();
+    if (this.favorites.isFavorite(key)) {
+      this.favorites.remove(key);
+      if (this.selectedSavedViewKey === key) this.selectedSavedViewKey = '';
+      return;
+    }
+
+    const name = (window.prompt(this.translate.instant('adminUi.favorites.savedViews.prompt')) ?? '').trim();
+    if (!name) {
+      this.toast.error(this.translate.instant('adminUi.favorites.savedViews.errors.nameRequired'));
+      return;
+    }
+
+    const filters = this.currentViewFilters();
+    this.favorites.add({
+      key,
+      type: 'filter',
+      label: name,
+      subtitle: '',
+      url: '/admin/orders',
+      state: { adminFilterScope: 'orders', adminFilters: filters }
+    });
+    this.selectedSavedViewKey = key;
+  }
+
+  private maybeApplyFiltersFromState(): void {
+    const state = history.state as any;
+    const scope = (state?.adminFilterScope || '').toString();
+    if (scope !== 'orders') return;
+    const filters = state?.adminFilters;
+    if (!filters || typeof filters !== 'object') return;
+
+    this.q = String(filters.q ?? '');
+    this.status = (filters.status ?? 'all') as OrderStatusFilter;
+    this.tag = String(filters.tag ?? '');
+    this.fromDate = String(filters.fromDate ?? '');
+    this.toDate = String(filters.toDate ?? '');
+    this.includeTestOrders = Boolean(filters.includeTestOrders ?? true);
+    const nextLimit = typeof filters.limit === 'number' && Number.isFinite(filters.limit) ? filters.limit : this.limit;
+    this.limit = nextLimit;
+    this.page = 1;
+    this.selectedPresetId = '';
+    this.selectedSavedViewKey = this.currentViewFavoriteKey();
+  }
+
+  private currentViewFilters(): AdminOrdersFilterPreset['filters'] {
+    return {
+      q: this.q,
+      status: this.status,
+      tag: this.tag,
+      fromDate: this.fromDate,
+      toDate: this.toDate,
+      includeTestOrders: this.includeTestOrders,
+      limit: this.limit
+    };
+  }
+
+  private currentViewFavoriteKey(): string {
+    return adminFilterFavoriteKey('orders', this.currentViewFilters());
   }
 
   savePreset(): void {
@@ -725,6 +919,7 @@ export class AdminOrdersComponent implements OnInit {
         tag: this.tag,
         fromDate: this.fromDate,
         toDate: this.toDate,
+        includeTestOrders: this.includeTestOrders,
         limit: this.limit
       }
     };
@@ -1045,6 +1240,7 @@ export class AdminOrdersComponent implements OnInit {
     if (this.status !== 'all') params.status = this.status;
     const tag = this.tag.trim();
     if (tag) params.tag = tag;
+    if (!this.includeTestOrders) params.include_test = false;
     if (this.fromDate) params.from = `${this.fromDate}T00:00:00Z`;
     if (this.toDate) params.to = `${this.toDate}T23:59:59Z`;
 
@@ -1145,6 +1341,8 @@ export class AdminOrdersComponent implements OnInit {
             tag: String(candidate?.filters?.tag ?? ''),
             fromDate: String(candidate?.filters?.fromDate ?? ''),
             toDate: String(candidate?.filters?.toDate ?? ''),
+            includeTestOrders:
+              typeof candidate?.filters?.includeTestOrders === 'boolean' ? candidate.filters.includeTestOrders : true,
             limit:
               typeof candidate?.filters?.limit === 'number' && Number.isFinite(candidate.filters.limit)
                 ? candidate.filters.limit

@@ -76,6 +76,7 @@ export interface AdminOrderShipment {
 }
 
 export interface AdminOrderDetail extends Order {
+  user_id?: string | null;
   payment_retry_count?: number;
   stripe_payment_intent_id?: string | null;
   customer_email?: string | null;
@@ -101,6 +102,7 @@ export class AdminOrdersService {
 
   search(params: {
     q?: string;
+    user_id?: string;
     status?: string;
     tag?: string;
     from?: string;
@@ -108,6 +110,7 @@ export class AdminOrdersService {
     page?: number;
     limit?: number;
     include_pii?: boolean;
+    include_test?: boolean;
   }): Observable<AdminOrderListResponse> {
     return this.api.get<AdminOrderListResponse>('/orders/admin/search', params as any).pipe(
       map((res: any) => ({

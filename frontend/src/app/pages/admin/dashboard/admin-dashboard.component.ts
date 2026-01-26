@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, OnInit, ViewChild, signal } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Router } from '@angular/router';
@@ -20,15 +20,20 @@ import {
   AdminDashboardSearchResult,
   AdminDashboardSearchResultType,
   AdminDashboardWindowMetric,
+  AdminChannelBreakdownResponse,
   ScheduledPromoItem,
   ScheduledPublishItem,
   AdminService,
   AdminSummary
 } from '../../../core/admin.service';
 import { AdminOrdersService } from '../../../core/admin-orders.service';
+import { AdminCouponsV2Service, CouponBulkJobRead } from '../../../core/admin-coupons-v2.service';
 import { ToastService } from '../../../core/toast.service';
+import { AdminGdprExportJobItem, AdminUsersService } from '../../../core/admin-users.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { extractRequestId } from '../../../shared/http-error';
+import { AdminRecentItem, AdminRecentService } from '../../../core/admin-recent.service';
+import { AdminFavoriteItem, AdminFavoritesService } from '../../../core/admin-favorites.service';
 
 type MetricWidgetId = 'kpis' | 'counts' | 'range';
 type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: string | null };
@@ -70,6 +75,53 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
 	          <div class="flex items-center justify-between gap-3 flex-wrap">
 	            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboardTitle' | translate }}</h1>
               <div class="flex items-center gap-2">
+                <span *ngIf="lastUpdatedAt()" class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.dashboard.liveRefresh.lastUpdated' | translate }}: {{ lastUpdatedAt() | date: 'shortTime' }}
+                </span>
+                <div
+                  role="radiogroup"
+                  class="inline-flex items-center gap-0.5 rounded-full border border-slate-200 bg-white/70 p-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/70"
+                  [attr.aria-label]="'adminUi.dashboard.salesMetric.aria' | translate"
+                  [attr.title]="'adminUi.dashboard.salesMetric.tooltip' | translate"
+                >
+                  <button
+                    type="button"
+                    role="radio"
+                    [attr.aria-checked]="salesMetric() === 'net'"
+                    [attr.tabindex]="salesMetric() === 'net' ? 0 : -1"
+                    class="min-h-9 rounded-full px-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                    [ngClass]="
+                      salesMetric() === 'net'
+                        ? 'bg-slate-900 text-white hover:bg-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-50'
+                        : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/50'
+                    "
+                    (click)="setSalesMetric('net')"
+                  >
+                    {{ 'adminUi.dashboard.salesMetric.net' | translate }}
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    [attr.aria-checked]="salesMetric() === 'gross'"
+                    [attr.tabindex]="salesMetric() === 'gross' ? 0 : -1"
+                    class="min-h-9 rounded-full px-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                    [ngClass]="
+                      salesMetric() === 'gross'
+                        ? 'bg-slate-900 text-white hover:bg-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-50'
+                        : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/50'
+                    "
+                    (click)="setSalesMetric('gross')"
+                  >
+                    {{ 'adminUi.dashboard.salesMetric.gross' | translate }}
+                  </button>
+                </div>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="(liveRefreshEnabled() ? 'adminUi.dashboard.liveRefresh.pause' : 'adminUi.dashboard.liveRefresh.resume') | translate"
+                  (action)="toggleLiveRefresh()"
+                ></app-button>
+                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="refreshNow()"></app-button>
 	              <app-button
 	                *ngIf="isOwner()"
 	                size="sm"
@@ -185,6 +237,241 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
 	            </div>
 	          </div>
 
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
+              <div class="flex items-start justify-between gap-3">
+                <div class="grid gap-1">
+                  <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.favorites.title' | translate }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.favorites.hint' | translate }}</div>
+                </div>
+                <app-button
+                  *ngIf="favorites.items().length"
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.favorites.clear' | translate"
+                  [disabled]="favorites.loading()"
+                  (action)="clearFavorites()"
+                ></app-button>
+              </div>
+
+              <div *ngIf="favorites.items().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.favorites.empty' | translate }}
+              </div>
+
+              <div *ngIf="favorites.items().length" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <div
+                  *ngFor="let item of favorites.items()"
+                  class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/40"
+                >
+                  <button type="button" class="min-w-0 text-left" (click)="openFavorite(item)">
+                    <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                      {{ ('adminUi.favorites.types.' + item.type) | translate }}
+                    </div>
+                    <div class="mt-1 font-semibold text-slate-900 dark:text-slate-50 truncate">{{ item.label }}</div>
+                    <div *ngIf="item.subtitle" class="text-xs text-slate-600 dark:text-slate-300 truncate">{{ item.subtitle }}</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="shrink-0 h-9 w-9 rounded-lg border border-transparent text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                    [attr.aria-label]="'adminUi.favorites.unpin' | translate"
+                    [disabled]="favorites.loading()"
+                    (click)="toggleFavorite(item, $event)"
+                  >
+                    <span aria-hidden="true" class="text-base leading-none">★</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
+              <div class="flex items-start justify-between gap-3">
+                <div class="grid gap-1">
+                  <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.recent.title' | translate }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.recent.hint' | translate }}</div>
+                </div>
+                <app-button
+                  *ngIf="recent.items().length"
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.recent.clear' | translate"
+                  (action)="clearRecent()"
+                ></app-button>
+              </div>
+
+              <div *ngIf="recent.items().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.recent.empty' | translate }}
+              </div>
+
+              <div *ngIf="recent.items().length" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <div
+                  *ngFor="let item of recent.items()"
+                  class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/40"
+                >
+                  <button type="button" class="min-w-0 text-left" (click)="openRecent(item)">
+                    <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                      {{ ('adminUi.recent.types.' + item.type) | translate }}
+                    </div>
+                    <div class="mt-1 font-semibold text-slate-900 dark:text-slate-50 truncate">{{ item.label }}</div>
+                    <div *ngIf="item.subtitle" class="text-xs text-slate-600 dark:text-slate-300 truncate">{{ item.subtitle }}</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="shrink-0 h-9 w-9 rounded-lg border border-transparent text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-800/60 dark:hover:text-slate-200"
+                    [attr.aria-label]="(favorites.isFavorite(item.key) ? 'adminUi.favorites.unpin' : 'adminUi.favorites.pin') | translate"
+                    [disabled]="favorites.loading()"
+                    (click)="toggleFavorite(item, $event)"
+                  >
+                    <span aria-hidden="true" class="text-base leading-none" [class.text-amber-500]="favorites.isFavorite(item.key)">
+                      {{ favorites.isFavorite(item.key) ? '★' : '☆' }}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div
+              *ngIf="shouldShowJobsPanel()"
+              class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="grid gap-1">
+                  <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.jobs.title' | translate }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.jobs.hint' | translate }}</div>
+                </div>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.actions.refresh' | translate"
+                  [disabled]="jobsLoading()"
+                  (action)="loadBackgroundJobs()"
+                ></app-button>
+              </div>
+
+              <div *ngIf="jobsError()" class="text-sm text-rose-700 dark:text-rose-200">
+                {{ jobsError() }}
+              </div>
+
+              <div *ngIf="jobsLoading(); else jobsTpl">
+                <app-skeleton [rows]="4"></app-skeleton>
+              </div>
+
+              <ng-template #jobsTpl>
+                <div *ngIf="gdprExportJobs().length === 0 && couponBulkJobs().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.jobs.empty' | translate }}
+                </div>
+
+                <div *ngIf="gdprExportJobs().length" class="grid gap-2">
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.jobs.sections.gdprExports' | translate }}
+                    </div>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.jobs.actions.openGdpr' | translate"
+                      (action)="goToGdprJobs()"
+                    ></app-button>
+                  </div>
+
+                  <div class="grid gap-2">
+                    <div
+                      *ngFor="let job of gdprExportJobs()"
+                      class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                    >
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                          <div class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ job.user.email }}</div>
+                          <div class="text-xs text-slate-500 dark:text-slate-400">
+                            {{ ('adminUi.jobs.status.' + job.status) | translate }} · {{ progressPct(job.progress) }}%
+                          </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <app-button
+                            *ngIf="canManageGdprJobs() && job.status === 'failed'"
+                            size="sm"
+                            variant="ghost"
+                            [label]="'adminUi.actions.retry' | translate"
+                            [disabled]="gdprJobBusyId() === job.id"
+                            (action)="retryGdprExport(job)"
+                          ></app-button>
+                          <app-button
+                            *ngIf="canManageGdprJobs() && job.status === 'succeeded' && job.has_file"
+                            size="sm"
+                            variant="ghost"
+                            [label]="'adminUi.jobs.actions.download' | translate"
+                            [disabled]="gdprJobBusyId() === job.id"
+                            (action)="downloadGdprExport(job)"
+                          ></app-button>
+                        </div>
+                      </div>
+
+                      <div class="h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                        <div class="h-2 bg-indigo-500" [style.width.%]="progressPct(job.progress)"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div *ngIf="couponBulkJobs().length" class="grid gap-2">
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.jobs.sections.couponJobs' | translate }}
+                    </div>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.jobs.actions.openCoupons' | translate"
+                      (action)="goToCoupons()"
+                    ></app-button>
+                  </div>
+
+                  <div class="grid gap-2">
+                    <div
+                      *ngFor="let job of couponBulkJobs()"
+                      class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                    >
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                          <div class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                            {{ ('adminUi.jobs.couponActions.' + job.action) | translate }}
+                          </div>
+                          <div class="text-xs text-slate-500 dark:text-slate-400">
+                            {{ ('adminUi.jobs.status.' + job.status) | translate }} · {{ job.processed || 0 }}/{{ job.total_candidates || 0 }}
+                          </div>
+                          <div *ngIf="job.error_message" class="mt-1 text-xs text-rose-700 dark:text-rose-200 truncate">
+                            {{ job.error_message }}
+                          </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <app-button
+                            *ngIf="canManageCouponJobs() && (job.status === 'pending' || job.status === 'running')"
+                            size="sm"
+                            variant="ghost"
+                            [label]="'adminUi.actions.cancel' | translate"
+                            [disabled]="couponJobBusyId() === job.id"
+                            (action)="cancelCouponJob(job)"
+                          ></app-button>
+                          <app-button
+                            *ngIf="canManageCouponJobs() && (job.status === 'failed' || job.status === 'cancelled')"
+                            size="sm"
+                            variant="ghost"
+                            [label]="'adminUi.actions.retry' | translate"
+                            [disabled]="couponJobBusyId() === job.id"
+                            (action)="retryCouponJob(job)"
+                          ></app-button>
+                        </div>
+                      </div>
+
+                      <div class="h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                        <div class="h-2 bg-indigo-500" [style.width.%]="couponProgressPct(job)"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </ng-template>
+            </div>
+
 	          <div
 	            *ngIf="customizeWidgetsOpen()"
 	            class="rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900"
@@ -230,23 +517,23 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
             <ng-container *ngIf="!isMetricWidgetHidden(widget)">
               <ng-container [ngSwitch]="widget">
                 <div *ngSwitchCase="'kpis'" class="grid md:grid-cols-3 gap-4">
-                  <app-card [title]="'adminUi.cards.ordersToday' | translate">
+                  <app-card [title]="'adminUi.cards.ordersToday' | translate" [clickable]="true" (action)="openOrdersToday()">
                     <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ summary()?.today_orders || 0 }}</div>
                     <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
                       {{ 'adminUi.cards.vsYesterday' | translate }}: {{ summary()?.yesterday_orders || 0 }} ·
                       {{ deltaLabel(summary()?.orders_delta_pct) }}
                     </div>
                   </app-card>
-                  <app-card [title]="'adminUi.cards.salesToday' | translate">
+                  <app-card [title]="'adminUi.cards.salesToday' | translate" [clickable]="true" (action)="openSalesToday()">
                     <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
-                      {{ (summary()?.today_sales || 0) | localizedCurrency : 'RON' }}
+                      {{ (todaySales() || 0) | localizedCurrency : 'RON' }}
                     </div>
                     <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                      {{ 'adminUi.cards.vsYesterday' | translate }}: {{ (summary()?.yesterday_sales || 0) | localizedCurrency : 'RON' }} ·
-                      {{ deltaLabel(summary()?.sales_delta_pct) }}
+                      {{ 'adminUi.cards.vsYesterday' | translate }}: {{ (yesterdaySales() || 0) | localizedCurrency : 'RON' }} ·
+                      {{ deltaLabel(salesDeltaPct()) }}
                     </div>
                   </app-card>
-                  <app-card [title]="'adminUi.cards.refundsToday' | translate">
+                  <app-card [title]="'adminUi.cards.refundsToday' | translate" [clickable]="true" (action)="openRefunds()">
                     <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ summary()?.today_refunds || 0 }}</div>
                     <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
                       {{ 'adminUi.cards.vsYesterday' | translate }}: {{ summary()?.yesterday_refunds || 0 }} ·
@@ -259,14 +546,20 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
                   <app-card
                     [title]="'adminUi.cards.products' | translate"
                     [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.products || 0 }"
+                    [clickable]="true"
+                    (action)="openProducts()"
                   ></app-card>
                   <app-card
                     [title]="'adminUi.cards.orders' | translate"
                     [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.orders || 0 }"
+                    [clickable]="true"
+                    (action)="openOrders()"
                   ></app-card>
                   <app-card
                     [title]="'adminUi.cards.users' | translate"
                     [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.users || 0 }"
+                    [clickable]="true"
+                    (action)="openUsers()"
                   ></app-card>
                 </div>
 
@@ -328,15 +621,124 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
                     <app-card
                       [title]="'adminUi.cards.lowStock' | translate"
                       [subtitle]="'adminUi.cards.countItems' | translate: { count: summary()?.low_stock || 0 }"
+                      [clickable]="true"
+                      (action)="openInventory()"
                     ></app-card>
                     <app-card
                       [title]="'adminUi.cards.salesRange' | translate: { days: summary()?.range_days || 30 }"
-                      [subtitle]="(summary()?.sales_range || 0) | localizedCurrency : 'RON'"
+                      [subtitle]="(rangeSales() || 0) | localizedCurrency : 'RON'"
+                      [clickable]="true"
+                      (action)="openSalesRange()"
                     ></app-card>
                     <app-card
                       [title]="'adminUi.cards.ordersRange' | translate: { days: summary()?.range_days || 30 }"
                       [subtitle]="'adminUi.cards.countOrders' | translate: { count: summary()?.orders_range || 0 }"
+                      [clickable]="true"
+                      (action)="openOrdersRange()"
                     ></app-card>
+                  </div>
+
+                  <div class="grid gap-3">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.dashboard.channelBreakdown.title' | translate }}
+                    </p>
+
+                    <div *ngIf="channelBreakdownLoading()">
+                      <app-skeleton [rows]="3"></app-skeleton>
+                    </div>
+
+                    <div
+                      *ngIf="channelBreakdownError()"
+                      class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+                    >
+                      {{ channelBreakdownError() }}
+                    </div>
+
+                    <div
+                      *ngIf="!channelBreakdownLoading() && !channelBreakdownError() && channelBreakdown() as breakdown"
+                      class="grid gap-4 md:grid-cols-3"
+                    >
+                      <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900">
+                        <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                          {{ 'adminUi.dashboard.channelBreakdown.paymentMethods' | translate }}
+                        </div>
+                        <div *ngIf="(breakdown.payment_methods || []).length === 0" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.dashboard.channelBreakdown.empty' | translate }}
+                        </div>
+                        <table *ngIf="(breakdown.payment_methods || []).length" class="mt-3 w-full text-xs">
+                          <thead>
+                            <tr class="text-left text-slate-500 dark:text-slate-400">
+                              <th class="py-1">{{ 'adminUi.dashboard.channelBreakdown.table.channel' | translate }}</th>
+                              <th class="py-1 text-right">{{ 'adminUi.dashboard.channelBreakdown.table.orders' | translate }}</th>
+                              <th class="py-1 text-right">{{ 'adminUi.dashboard.channelBreakdown.table.sales' | translate }}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr *ngFor="let row of breakdown.payment_methods" class="border-t border-slate-100 dark:border-slate-800">
+                              <td class="py-1.5 pr-2 text-slate-700 dark:text-slate-200">{{ formatChannelKey(row.key) }}</td>
+                              <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">{{ row.orders }}</td>
+                              <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">
+                                {{ channelSales(row) | localizedCurrency : 'RON' }}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900">
+                        <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                          {{ 'adminUi.dashboard.channelBreakdown.couriers' | translate }}
+                        </div>
+                        <div *ngIf="(breakdown.couriers || []).length === 0" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.dashboard.channelBreakdown.empty' | translate }}
+                        </div>
+                        <table *ngIf="(breakdown.couriers || []).length" class="mt-3 w-full text-xs">
+                          <thead>
+                            <tr class="text-left text-slate-500 dark:text-slate-400">
+                              <th class="py-1">{{ 'adminUi.dashboard.channelBreakdown.table.channel' | translate }}</th>
+                              <th class="py-1 text-right">{{ 'adminUi.dashboard.channelBreakdown.table.orders' | translate }}</th>
+                              <th class="py-1 text-right">{{ 'adminUi.dashboard.channelBreakdown.table.sales' | translate }}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr *ngFor="let row of breakdown.couriers" class="border-t border-slate-100 dark:border-slate-800">
+                              <td class="py-1.5 pr-2 text-slate-700 dark:text-slate-200">{{ formatChannelKey(row.key) }}</td>
+                              <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">{{ row.orders }}</td>
+                              <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">
+                                {{ channelSales(row) | localizedCurrency : 'RON' }}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900">
+                        <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                          {{ 'adminUi.dashboard.channelBreakdown.deliveryTypes' | translate }}
+                        </div>
+                        <div *ngIf="(breakdown.delivery_types || []).length === 0" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.dashboard.channelBreakdown.empty' | translate }}
+                        </div>
+                        <table *ngIf="(breakdown.delivery_types || []).length" class="mt-3 w-full text-xs">
+                          <thead>
+                            <tr class="text-left text-slate-500 dark:text-slate-400">
+                              <th class="py-1">{{ 'adminUi.dashboard.channelBreakdown.table.channel' | translate }}</th>
+                              <th class="py-1 text-right">{{ 'adminUi.dashboard.channelBreakdown.table.orders' | translate }}</th>
+                              <th class="py-1 text-right">{{ 'adminUi.dashboard.channelBreakdown.table.sales' | translate }}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr *ngFor="let row of breakdown.delivery_types" class="border-t border-slate-100 dark:border-slate-800">
+                              <td class="py-1.5 pr-2 text-slate-700 dark:text-slate-200">{{ formatChannelKey(row.key) }}</td>
+                              <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">{{ row.orders }}</td>
+                              <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">
+                                {{ channelSales(row) | localizedCurrency : 'RON' }}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </ng-container>
@@ -887,7 +1289,7 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
     </div>
   `
 })
-export class AdminDashboardComponent implements OnInit, AfterViewInit {
+export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('globalSearchInput') globalSearchInput?: ElementRef<HTMLInputElement>;
   readonly crumbs: Crumb[] = [
     { label: 'adminUi.nav.dashboard', url: '/admin/dashboard' }
@@ -897,6 +1299,15 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
   error = signal<string | null>(null);
   errorRequestId = signal<string | null>(null);
   summary = signal<AdminSummary | null>(null);
+  channelBreakdown = signal<AdminChannelBreakdownResponse | null>(null);
+  channelBreakdownLoading = signal(false);
+  channelBreakdownError = signal<string | null>(null);
+  lastUpdatedAt = signal<string | null>(null);
+  liveRefreshEnabled = signal(false);
+  salesMetric = signal<'gross' | 'net'>('net');
+  private liveRefreshTimerId: number | null = null;
+  private readonly liveRefreshStorageKey = 'admin.dashboard.liveRefresh.v1';
+  private readonly salesMetricStorageKey = 'admin.dashboard.salesMetric.v1';
 
   customizeWidgetsOpen = signal(false);
   metricWidgetOrder = signal<MetricWidgetId[]>(['kpis', 'counts', 'range']);
@@ -936,6 +1347,13 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
   scheduledError = signal('');
   scheduledTasks = signal<AdminDashboardScheduledTasksResponse | null>(null);
 
+  jobsLoading = signal(false);
+  jobsError = signal('');
+  gdprExportJobs = signal<AdminGdprExportJobItem[]>([]);
+  couponBulkJobs = signal<CouponBulkJobRead[]>([]);
+  gdprJobBusyId = signal<string | null>(null);
+  couponJobBusyId = signal<string | null>(null);
+
   ownerTransferIdentifier = '';
   ownerTransferConfirm = '';
   ownerTransferPassword = '';
@@ -945,7 +1363,11 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
   constructor(
     private admin: AdminService,
     private ordersApi: AdminOrdersService,
+    private usersApi: AdminUsersService,
+    private couponsApi: AdminCouponsV2Service,
     private auth: AuthService,
+    public favorites: AdminFavoritesService,
+    public recent: AdminRecentService,
     private router: Router,
     private toast: ToastService,
     private translate: TranslateService
@@ -971,15 +1393,327 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
 
   ngOnInit(): void {
     this.loadWidgetPrefs();
+    this.loadLiveRefreshPreference();
+    this.loadSalesMetricPreference();
     this.loadSummary();
+    this.loadChannelBreakdown();
     this.loadScheduledTasks();
+    this.loadBackgroundJobs();
     this.loadAudit(1);
     this.loadAuditRetention();
     this.maybeShowOnboarding();
   }
 
+  clearRecent(): void {
+    this.recent.clear();
+  }
+
+  openRecent(item: AdminRecentItem): void {
+    const url = (item?.url || '').trim();
+    if (!url) return;
+    const state = item?.state && typeof item.state === 'object' ? item.state : null;
+    void this.router.navigateByUrl(url, state ? { state } : undefined);
+  }
+
+  clearFavorites(): void {
+    this.favorites.clear();
+  }
+
+  openFavorite(item: AdminFavoriteItem): void {
+    const url = (item?.url || '').trim();
+    if (!url) return;
+    const state = item?.state && typeof item.state === 'object' ? item.state : null;
+    void this.router.navigateByUrl(url, state ? { state } : undefined);
+  }
+
+  toggleFavorite(item: AdminFavoriteItem, event?: MouseEvent): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+    this.favorites.toggle(item);
+  }
+
   isOwner(): boolean {
     return this.auth.role() === 'owner';
+  }
+
+  openProducts(): void {
+    void this.router.navigateByUrl('/admin/products');
+  }
+
+  openOrders(): void {
+    void this.router.navigateByUrl('/admin/orders');
+  }
+
+  openUsers(): void {
+    void this.router.navigateByUrl('/admin/users');
+  }
+
+  openInventory(): void {
+    void this.router.navigateByUrl('/admin/inventory');
+  }
+
+  openOrdersToday(): void {
+    const today = new Date().toISOString().slice(0, 10);
+    this.openOrdersWithFilters({ q: '', status: 'all', tag: '', fromDate: today, toDate: today, includeTestOrders: false, limit: 20 });
+  }
+
+  openSalesToday(): void {
+    const today = new Date().toISOString().slice(0, 10);
+    this.openOrdersWithFilters({ q: '', status: 'sales', tag: '', fromDate: today, toDate: today, includeTestOrders: false, limit: 20 });
+  }
+
+  openRefunds(): void {
+    this.openOrdersWithFilters({ q: '', status: 'refunded', tag: '', fromDate: '', toDate: '', includeTestOrders: false, limit: 20 });
+  }
+
+  openOrdersRange(): void {
+    const sum = this.summary();
+    const fromDate = sum?.range_from || '';
+    const toDate = sum?.range_to || '';
+    if (!fromDate || !toDate) {
+      this.openOrders();
+      return;
+    }
+    this.openOrdersWithFilters({ q: '', status: 'all', tag: '', fromDate, toDate, includeTestOrders: false, limit: 20 });
+  }
+
+  openSalesRange(): void {
+    const sum = this.summary();
+    const fromDate = sum?.range_from || '';
+    const toDate = sum?.range_to || '';
+    if (!fromDate || !toDate) {
+      this.openOrders();
+      return;
+    }
+    this.openOrdersWithFilters({ q: '', status: 'sales', tag: '', fromDate, toDate, includeTestOrders: false, limit: 20 });
+  }
+
+  refreshNow(): void {
+    if (this.loading()) return;
+    this.refreshSummarySilent();
+    this.refreshChannelBreakdownSilent();
+    this.loadScheduledTasks();
+    this.loadBackgroundJobs();
+  }
+
+  toggleLiveRefresh(): void {
+    const next = !this.liveRefreshEnabled();
+    this.liveRefreshEnabled.set(next);
+    this.persistLiveRefreshPreference(next);
+    if (next) this.startLiveRefresh();
+    else this.stopLiveRefresh();
+  }
+
+  private openOrdersWithFilters(filters: any): void {
+    void this.router.navigateByUrl('/admin/orders', {
+      state: { adminFilterScope: 'orders', adminFilters: filters }
+    });
+  }
+
+  setSalesMetric(metric: 'gross' | 'net'): void {
+    this.salesMetric.set(metric);
+    this.persistSalesMetricPreference(metric);
+  }
+
+  todaySales(): number {
+    const sum = this.summary();
+    if (!sum) return 0;
+    return this.salesMetric() === 'gross' ? sum.gross_today_sales : sum.net_today_sales;
+  }
+
+  yesterdaySales(): number {
+    const sum = this.summary();
+    if (!sum) return 0;
+    return this.salesMetric() === 'gross' ? sum.gross_yesterday_sales : sum.net_yesterday_sales;
+  }
+
+  salesDeltaPct(): number | null {
+    const sum = this.summary();
+    if (!sum) return null;
+    return this.salesMetric() === 'gross' ? sum.gross_sales_delta_pct : sum.net_sales_delta_pct;
+  }
+
+  rangeSales(): number {
+    const sum = this.summary();
+    if (!sum) return 0;
+    return this.salesMetric() === 'gross' ? sum.gross_sales_range : sum.net_sales_range;
+  }
+
+  channelSales(row: { gross_sales: number; net_sales: number }): number {
+    return this.salesMetric() === 'gross' ? Number(row?.gross_sales ?? 0) : Number(row?.net_sales ?? 0);
+  }
+
+  formatChannelKey(key: string): string {
+    const cleaned = String(key ?? '').trim();
+    if (!cleaned) return '—';
+    return cleaned.replace(/_/g, ' ');
+  }
+
+  ngOnDestroy(): void {
+    this.stopLiveRefresh();
+  }
+
+  shouldShowJobsPanel(): boolean {
+    return this.auth.canAccessAdminSection('users') || this.auth.canAccessAdminSection('coupons');
+  }
+
+  canManageGdprJobs(): boolean {
+    return this.auth.isAdmin();
+  }
+
+  canManageCouponJobs(): boolean {
+    return this.auth.canAccessAdminSection('coupons');
+  }
+
+  loadBackgroundJobs(): void {
+    if (!this.shouldShowJobsPanel()) {
+      this.gdprExportJobs.set([]);
+      this.couponBulkJobs.set([]);
+      return;
+    }
+
+    this.jobsLoading.set(true);
+    this.jobsError.set('');
+
+    let pending = 0;
+    const done = (): void => {
+      pending -= 1;
+      if (pending <= 0) this.jobsLoading.set(false);
+    };
+
+    if (this.auth.canAccessAdminSection('users')) {
+      pending += 1;
+      this.usersApi.listGdprExportJobs({ page: 1, limit: 5 }).subscribe({
+        next: (res) => {
+          const items = Array.isArray(res?.items) ? res.items : [];
+          this.gdprExportJobs.set(items.slice(0, 5));
+        },
+        error: () => {
+          this.jobsError.set(this.translate.instant('adminUi.jobs.errors.load'));
+          done();
+        },
+        complete: done
+      });
+    } else {
+      this.gdprExportJobs.set([]);
+    }
+
+    if (this.auth.canAccessAdminSection('coupons')) {
+      pending += 1;
+      this.couponsApi.listAllBulkJobs({ limit: 5 }).subscribe({
+        next: (items) => {
+          const rows = Array.isArray(items) ? items : [];
+          this.couponBulkJobs.set(rows.slice(0, 5));
+        },
+        error: () => {
+          this.jobsError.set(this.translate.instant('adminUi.jobs.errors.load'));
+          done();
+        },
+        complete: done
+      });
+    } else {
+      this.couponBulkJobs.set([]);
+    }
+
+    if (pending === 0) this.jobsLoading.set(false);
+  }
+
+  goToGdprJobs(): void {
+    void this.router.navigateByUrl('/admin/users/gdpr');
+  }
+
+  goToCoupons(): void {
+    void this.router.navigateByUrl('/admin/coupons');
+  }
+
+  progressPct(value: unknown): number {
+    const pct = Number(value ?? 0);
+    if (!Number.isFinite(pct)) return 0;
+    return Math.max(0, Math.min(100, pct));
+  }
+
+  couponProgressPct(job: CouponBulkJobRead): number {
+    const processed = Number(job?.processed ?? 0);
+    const total = Number(job?.total_candidates ?? 0);
+    if (!Number.isFinite(processed) || !Number.isFinite(total) || total <= 0) return 0;
+    return this.progressPct((processed / total) * 100);
+  }
+
+  retryGdprExport(job: AdminGdprExportJobItem): void {
+    if (!this.canManageGdprJobs()) return;
+    if (!job?.id) return;
+    if (!window.confirm(this.translate.instant('adminUi.jobs.confirms.retry'))) return;
+    this.gdprJobBusyId.set(job.id);
+    this.usersApi.retryGdprExportJob(job.id).subscribe({
+      next: () => {
+        this.toast.success(this.translate.instant('adminUi.jobs.success.retry'));
+        this.loadBackgroundJobs();
+        this.gdprJobBusyId.set(null);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.jobs.errors.retry'));
+        this.gdprJobBusyId.set(null);
+      }
+    });
+  }
+
+  downloadGdprExport(job: AdminGdprExportJobItem): void {
+    if (!this.canManageGdprJobs()) return;
+    if (!job?.id) return;
+    this.gdprJobBusyId.set(job.id);
+    this.usersApi.downloadGdprExportJob(job.id).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const stamp = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = `gdpr-export-${stamp}.json`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+        this.toast.success(this.translate.instant('adminUi.jobs.success.download'));
+        this.gdprJobBusyId.set(null);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.jobs.errors.download'));
+        this.gdprJobBusyId.set(null);
+      }
+    });
+  }
+
+  cancelCouponJob(job: CouponBulkJobRead): void {
+    if (!this.canManageCouponJobs()) return;
+    if (!job?.id) return;
+    if (!window.confirm(this.translate.instant('adminUi.jobs.confirms.cancel'))) return;
+    this.couponJobBusyId.set(job.id);
+    this.couponsApi.cancelBulkJob(job.id).subscribe({
+      next: () => {
+        this.toast.success(this.translate.instant('adminUi.jobs.success.cancel'));
+        this.loadBackgroundJobs();
+        this.couponJobBusyId.set(null);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.jobs.errors.cancel'));
+        this.couponJobBusyId.set(null);
+      }
+    });
+  }
+
+  retryCouponJob(job: CouponBulkJobRead): void {
+    if (!this.canManageCouponJobs()) return;
+    if (!job?.id) return;
+    if (!window.confirm(this.translate.instant('adminUi.jobs.confirms.retry'))) return;
+    this.couponJobBusyId.set(job.id);
+    this.couponsApi.retryBulkJob(job.id).subscribe({
+      next: () => {
+        this.toast.success(this.translate.instant('adminUi.jobs.success.retry'));
+        this.loadBackgroundJobs();
+        this.couponJobBusyId.set(null);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.jobs.errors.retry'));
+        this.couponJobBusyId.set(null);
+      }
+    });
   }
 
   onboardingOpen = signal(false);
@@ -993,6 +1727,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
     this.admin.summary(this.buildSummaryParams()).subscribe({
       next: (data) => {
         this.summary.set(data);
+        this.lastUpdatedAt.set(new Date().toISOString());
         this.loading.set(false);
       },
       error: (err) => {
@@ -1003,8 +1738,105 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
     });
   }
 
+  private refreshSummarySilent(): void {
+    this.admin.summary(this.buildSummaryParams()).subscribe({
+      next: (data) => {
+        this.summary.set(data);
+        this.lastUpdatedAt.set(new Date().toISOString());
+      },
+      error: () => {
+        // ignore background refresh failures
+      }
+    });
+  }
+
+  private loadChannelBreakdown(): void {
+    this.channelBreakdownLoading.set(true);
+    this.channelBreakdownError.set(null);
+    this.admin.channelBreakdown(this.buildSummaryParams()).subscribe({
+      next: (data) => {
+        this.channelBreakdown.set(data);
+        this.channelBreakdownLoading.set(false);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.channelBreakdown.error');
+        this.channelBreakdownError.set(msg);
+        this.channelBreakdownLoading.set(false);
+      }
+    });
+  }
+
+  private refreshChannelBreakdownSilent(): void {
+    this.admin.channelBreakdown(this.buildSummaryParams()).subscribe({
+      next: (data) => {
+        this.channelBreakdown.set(data);
+      },
+      error: () => {
+        // ignore background refresh failures
+      }
+    });
+  }
+
+  private startLiveRefresh(): void {
+    this.stopLiveRefresh();
+    this.refreshNow();
+    this.liveRefreshTimerId = window.setInterval(() => this.refreshNow(), 60 * 1000);
+  }
+
+  private stopLiveRefresh(): void {
+    if (this.liveRefreshTimerId === null) return;
+    window.clearInterval(this.liveRefreshTimerId);
+    this.liveRefreshTimerId = null;
+  }
+
+  private loadLiveRefreshPreference(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(this.liveRefreshStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      const enabled = Boolean((parsed as any)?.enabled);
+      this.liveRefreshEnabled.set(enabled);
+      if (enabled) this.startLiveRefresh();
+    } catch {
+      // ignore
+    }
+  }
+
+  private loadSalesMetricPreference(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(this.salesMetricStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      const metric = (parsed as any)?.metric;
+      if (metric === 'gross' || metric === 'net') this.salesMetric.set(metric);
+    } catch {
+      // ignore
+    }
+  }
+
+  private persistLiveRefreshPreference(enabled: boolean): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem(this.liveRefreshStorageKey, JSON.stringify({ enabled }));
+    } catch {
+      // ignore
+    }
+  }
+
+  private persistSalesMetricPreference(metric: 'gross' | 'net'): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem(this.salesMetricStorageKey, JSON.stringify({ metric }));
+    } catch {
+      // ignore
+    }
+  }
+
   retryDashboard(): void {
     this.loadSummary();
+    this.loadChannelBreakdown();
   }
 
   openOnboarding(): void {
@@ -1081,11 +1913,13 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
   onRangePresetChange(): void {
     if (this.rangePreset === 'custom') return;
     this.loadSummary();
+    this.loadChannelBreakdown();
   }
 
   applyRange(): void {
     if (this.rangePreset !== 'custom') {
       this.loadSummary();
+      this.loadChannelBreakdown();
       return;
     }
     const from = (this.rangeFrom || '').trim();
@@ -1099,6 +1933,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
       return;
     }
     this.loadSummary();
+    this.loadChannelBreakdown();
   }
 
   private buildSummaryParams(): { range_days?: number; range_from?: string; range_to?: string } | undefined {

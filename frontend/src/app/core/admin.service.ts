@@ -8,8 +8,12 @@ export interface AdminSummary {
   users: number;
   low_stock: number;
   sales_30d: number;
+  gross_sales_30d: number;
+  net_sales_30d: number;
   orders_30d: number;
   sales_range: number;
+  gross_sales_range: number;
+  net_sales_range: number;
   orders_range: number;
   range_days: number;
   range_from: string;
@@ -20,6 +24,12 @@ export interface AdminSummary {
   today_sales: number;
   yesterday_sales: number;
   sales_delta_pct: number | null;
+  gross_today_sales: number;
+  gross_yesterday_sales: number;
+  gross_sales_delta_pct: number | null;
+  net_today_sales: number;
+  net_yesterday_sales: number;
+  net_sales_delta_pct: number | null;
   today_refunds: number;
   yesterday_refunds: number;
   refunds_delta_pct: number | null;
@@ -44,6 +54,33 @@ export interface AdminDashboardAnomalies {
 export interface AdminDashboardSystemHealth {
   db_ready: boolean;
   backup_last_at: string | null;
+}
+
+export interface AdminChannelBreakdownRow {
+  key: string;
+  orders: number;
+  gross_sales: number;
+  net_sales: number;
+}
+
+export interface AdminChannelBreakdownResponse {
+  range_days: number;
+  range_from: string;
+  range_to: string;
+  payment_methods: AdminChannelBreakdownRow[];
+  couriers: AdminChannelBreakdownRow[];
+  delivery_types: AdminChannelBreakdownRow[];
+}
+
+export type AdminScheduledReportKind = 'weekly' | 'monthly';
+
+export interface AdminScheduledReportSendResponse {
+  kind: AdminScheduledReportKind;
+  period_start: string;
+  period_end: string;
+  attempted: number;
+  delivered: number;
+  skipped: boolean;
 }
 
 export type AdminDashboardSearchResultType = 'order' | 'product' | 'user';
@@ -620,6 +657,10 @@ export class AdminService {
     return this.api.get<AdminSummary>('/admin/dashboard/summary', params);
   }
 
+  channelBreakdown(params?: { range_days?: number; range_from?: string; range_to?: string }): Observable<AdminChannelBreakdownResponse> {
+    return this.api.get<AdminChannelBreakdownResponse>('/admin/dashboard/channel-breakdown', params);
+  }
+
   globalSearch(q: string, opts?: { include_pii?: boolean }): Observable<AdminDashboardSearchResponse> {
     const params: any = { q };
     if (opts?.include_pii) params.include_pii = true;
@@ -942,6 +983,10 @@ export class AdminService {
 
   listFeaturedCollections(): Observable<FeaturedCollection[]> {
     return this.api.get<FeaturedCollection[]>('/catalog/collections/featured');
+  }
+
+  sendScheduledReport(payload: { kind: AdminScheduledReportKind; force?: boolean }): Observable<AdminScheduledReportSendResponse> {
+    return this.api.post<AdminScheduledReportSendResponse>('/admin/dashboard/reports/send', payload);
   }
 
   createFeaturedCollection(payload: { name: string; description?: string | null; product_ids?: string[] }): Observable<FeaturedCollection> {

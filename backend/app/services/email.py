@@ -16,6 +16,9 @@ except ImportError:
 
 from app.core.config import settings
 from app.core.security import create_receipt_token
+from app.db.session import SessionLocal
+from app.models.email_failure import EmailDeliveryFailure
+from app.models.email_event import EmailDeliveryEvent
 from app.services import receipts as receipt_service
 
 logger = logging.getLogger(__name__)
@@ -107,10 +110,44 @@ async def send_email(
                 smtp.login(settings.smtp_username, settings.smtp_password)
             smtp.send_message(msg)
         _record_send(now, to_email)
+        await _record_email_event(to_email=to_email, subject=subject, status="sent", error_message=None)
         return True
     except Exception as exc:
         logger.warning("Email send failed: %s", exc)
+        await _record_email_event(to_email=to_email, subject=subject, status="failed", error_message=str(exc))
+        await _record_email_failure(to_email=to_email, subject=subject, error_message=str(exc))
         return False
+
+
+async def _record_email_event(*, to_email: str, subject: str, status: str, error_message: str | None) -> None:
+    try:
+        async with SessionLocal() as session:
+            session.add(
+                EmailDeliveryEvent(
+                    to_email=(to_email or "")[:255],
+                    subject=(subject or "")[:255],
+                    status=(status or "")[:16] or "sent",
+                    error_message=(error_message or "").strip()[:5000] or None,
+                )
+            )
+            await session.commit()
+    except Exception:
+        logger.exception("Failed to persist email delivery event")
+
+
+async def _record_email_failure(*, to_email: str, subject: str, error_message: str) -> None:
+    try:
+        async with SessionLocal() as session:
+            session.add(
+                EmailDeliveryFailure(
+                    to_email=(to_email or "")[:255],
+                    subject=(subject or "")[:255],
+                    error_message=(error_message or "").strip()[:5000] or None,
+                )
+            )
+            await session.commit()
+    except Exception:
+        logger.exception("Failed to persist email failure")
 
 
 def _lang_or_default(lang: str | None) -> str:
@@ -1329,6 +1366,121 @@ def render_template(template_name: str, context: dict) -> tuple[str, str]:
 async def preview_email(template_name: str, context: dict) -> dict[str, str]:
     text_body, html_body = render_template(template_name, context)
     return {"text": text_body, "html": html_body}
+
+
+async def send_admin_report_summary(
+    to_email: str,
+    *,
+    kind: str,
+    period_start: datetime,
+    period_end: datetime,
+    currency: str = "RON",
+    summary: dict,
+    top_products: list[dict] | None = None,
+    low_stock: list[dict] | None = None,
+    lang: str | None = None,
+) -> bool:
+    kind_clean = (kind or "").strip().lower()
+    kind_label_en = "Weekly" if kind_clean == "weekly" else "Monthly"
+    kind_label_ro = "Săptămânal" if kind_clean == "weekly" else "Lunar"
+    start_label = period_start.astimezone(timezone.utc).date().isoformat()
+    end_label = period_end.astimezone(timezone.utc).date().isoformat()
+
+    gross = summary.get("gross_sales", 0)
+    net = summary.get("net_sales", 0)
+    refunds = summary.get("refunds", 0)
+    missing = summary.get("missing_refunds", 0)
+    orders_total = int(summary.get("orders_total", 0) or 0)
+    orders_success = int(summary.get("orders_success", 0) or 0)
+    orders_refunded = int(summary.get("orders_refunded", 0) or 0)
+
+    def _lines(lng: str) -> list[str]:
+        is_ro = lng == "ro"
+        lines = [
+            (
+                f"Raport {kind_label_ro.lower()} — {start_label} → {end_label} (UTC)"
+                if is_ro
+                else f"{kind_label_en} report — {start_label} → {end_label} (UTC)"
+            ),
+            "",
+            ("Vânzări brute: " if is_ro else "Gross sales: ") + _money_str(gross, currency),
+            ("Vânzări nete: " if is_ro else "Net sales: ") + _money_str(net, currency),
+            ("Rambursări: " if is_ro else "Refunds: ") + _money_str(refunds, currency),
+        ]
+        if Decimal(str(missing or 0)) > 0:
+            lines.append(
+                ("Rambursări lipsă (fallback): " if is_ro else "Missing refunds (fallback): ")
+                + _money_str(missing, currency)
+            )
+        lines.extend(
+            [
+                (
+                    f"Comenzi: {orders_success} plătite/expediate/livrate · {orders_total} total"
+                    if is_ro
+                    else f"Orders: {orders_success} paid/shipped/delivered · {orders_total} total"
+                ),
+                (
+                    f"Comenzi rambursate: {orders_refunded}"
+                    if is_ro
+                    else f"Refunded orders: {orders_refunded}"
+                ),
+                "",
+            ]
+        )
+
+        products = top_products or []
+        if products:
+            lines.append("Top produse:" if is_ro else "Top products:")
+            for row in products:
+                name = (str(row.get("name") or "")).strip() or str(row.get("slug") or "").strip() or "—"
+                slug = (str(row.get("slug") or "")).strip()
+                qty = int(row.get("quantity", 0) or 0)
+                sales = row.get("gross_sales", 0)
+                label = f"{name} ({slug})" if slug and slug not in name else name
+                lines.append(
+                    ("- " + label + f": {qty} buc · " + _money_str(sales, currency))
+                    if is_ro
+                    else ("- " + label + f": {qty} pcs · " + _money_str(sales, currency))
+                )
+            lines.append("")
+        else:
+            lines.append("Top produse: —" if is_ro else "Top products: —")
+            lines.append("")
+
+        lows = low_stock or []
+        if lows:
+            lines.append("Stoc redus:" if is_ro else "Low stock:")
+            for row in lows:
+                name = (str(row.get("name") or "")).strip() or str(row.get("slug") or "").strip() or "—"
+                stock = int(row.get("stock_quantity", 0) or 0)
+                threshold = int(row.get("threshold", 0) or 0)
+                critical = bool(row.get("is_critical", False))
+                status = ("CRITIC" if is_ro else "CRITICAL") if critical else ("scăzut" if is_ro else "low")
+                lines.append(f"- {name}: {stock}/{threshold} ({status})")
+            lines.append("")
+        else:
+            lines.append("Stoc redus: —" if is_ro else "Low stock: —")
+            lines.append("")
+
+        admin_url = f"{settings.frontend_origin.rstrip('/')}/admin/dashboard"
+        lines.append(("Admin: " if is_ro else "Admin: ") + admin_url)
+        return lines
+
+    subject = _bilingual_subject(
+        f"Raport {kind_label_ro.lower()} — {start_label} → {end_label}",
+        f"{kind_label_en} report — {start_label} → {end_label}",
+        preferred_language=lang,
+    )
+    text_ro = "\n".join(_lines("ro"))
+    text_en = "\n".join(_lines("en"))
+    text_body, html_body = _bilingual_sections(
+        text_ro=text_ro,
+        text_en=text_en,
+        html_ro=_html_pre(text_ro),
+        html_en=_html_pre(text_en),
+        preferred_language=lang,
+    )
+    return await send_email(to_email, subject, text_body, html_body)
 
 
 async def notify_critical_error(message: str) -> bool:

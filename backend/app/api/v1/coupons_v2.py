@@ -1791,6 +1791,26 @@ async def admin_get_bulk_job(
     return CouponBulkJobRead.model_validate(job, from_attributes=True)
 
 
+@router.get("/admin/coupons/bulk-jobs", response_model=list[CouponBulkJobRead])
+async def admin_list_bulk_jobs_global(
+    session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=10, ge=1, le=50),
+    _: User = Depends(require_admin_section("coupons")),
+) -> list[CouponBulkJobRead]:
+    jobs = (
+        (
+            await session.execute(
+                select(CouponBulkJob)
+                .order_by(CouponBulkJob.created_at.desc())
+                .limit(limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [CouponBulkJobRead.model_validate(job, from_attributes=True) for job in jobs]
+
+
 @router.get("/admin/coupons/{coupon_id}/bulk-jobs", response_model=list[CouponBulkJobRead])
 async def admin_list_bulk_jobs(
     coupon_id: UUID,

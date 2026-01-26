@@ -295,6 +295,10 @@ export class AdminCouponsV2Service {
     return this.api.get<CouponBulkJobRead[]>(`/coupons/admin/coupons/${couponId}/bulk-jobs`, params as any);
   }
 
+  listAllBulkJobs(params?: { limit?: number }): Observable<CouponBulkJobRead[]> {
+    return this.api.get<CouponBulkJobRead[]>('/coupons/admin/coupons/bulk-jobs', params as any);
+  }
+
   cancelBulkJob(jobId: string): Observable<CouponBulkJobRead> {
     return this.api.post<CouponBulkJobRead>(`/coupons/admin/coupons/bulk-jobs/${jobId}/cancel`, {});
   }

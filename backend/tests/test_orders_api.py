@@ -383,6 +383,7 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
         headers=auth_headers(token),
     )
     assert create_two.status_code == 201, create_two.text
+    order_two_id = create_two.json()["id"]
 
     forbidden = client.get("/api/v1/orders/admin/search", headers=auth_headers(token))
     assert forbidden.status_code == 403
@@ -396,6 +397,17 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     payload = search.json()
     assert payload["meta"]["total_items"] >= 1
     assert any(item["id"] == order_id for item in payload["items"])
+
+    by_user = client.get(
+        "/api/v1/orders/admin/search",
+        params={"user_id": str(user_id), "page": 1, "limit": 10},
+        headers=auth_headers(admin_token),
+    )
+    assert by_user.status_code == 200, by_user.text
+    by_user_payload = by_user.json()
+    assert by_user_payload["meta"]["total_items"] >= 2
+    assert any(item["id"] == order_id for item in by_user_payload["items"])
+    assert any(item["id"] == order_two_id for item in by_user_payload["items"])
 
     masked_detail = client.get(f"/api/v1/orders/admin/{order_id}", headers=auth_headers(admin_token))
     assert masked_detail.status_code == 200, masked_detail.text
@@ -431,6 +443,16 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     assert updated_data["tracking_number"] == "TRACK999"
     assert updated_data["customer_email"] == "buyer@example.com"
     assert updated_data["shipping_address"]["line1"] == "123 Main"
+
+    sales_search = client.get(
+        "/api/v1/orders/admin/search",
+        params={"status": "sales", "page": 1, "limit": 10},
+        headers=auth_headers(admin_token),
+    )
+    assert sales_search.status_code == 200, sales_search.text
+    sales_payload = sales_search.json()
+    assert any(item["id"] == order_id for item in sales_payload["items"])
+    assert not any(item["id"] == order_two_id for item in sales_payload["items"])
 
     updated_address = client.patch(
         f"/api/v1/orders/admin/{order_id}/addresses",
@@ -519,6 +541,29 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     assert tagged_search_after.status_code == 200, tagged_search_after.text
     tagged_payload_after = tagged_search_after.json()
     assert not any(item["id"] == order_id for item in tagged_payload_after["items"])
+
+    test_tagged = client.post(
+        f"/api/v1/orders/admin/{order_id}/tags",
+        json={"tag": "test"},
+        headers=auth_headers(admin_token),
+    )
+    assert test_tagged.status_code == 200, test_tagged.text
+
+    exclude_test = client.get(
+        "/api/v1/orders/admin/search",
+        params={"page": 1, "limit": 10, "include_test": False},
+        headers=auth_headers(admin_token),
+    )
+    assert exclude_test.status_code == 200, exclude_test.text
+    assert not any(item["id"] == order_id for item in exclude_test.json()["items"])
+
+    tag_test = client.get(
+        "/api/v1/orders/admin/search",
+        params={"tag": "test", "page": 1, "limit": 10, "include_test": False},
+        headers=auth_headers(admin_token),
+    )
+    assert tag_test.status_code == 200, tag_test.text
+    assert any(item["id"] == order_id for item in tag_test.json()["items"])
 
 
 def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:

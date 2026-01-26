@@ -12,6 +12,8 @@ from app.db.session import get_session
 from app.main import app
 from app.models.user import UserRole
 from app.models.passkeys import UserPasskey
+from app.models.email_event import EmailDeliveryEvent
+from app.models.email_failure import EmailDeliveryFailure
 from app.models.webhook import StripeWebhookEvent
 from app.schemas.user import UserCreate
 from app.services.auth import create_user, issue_tokens_for_user
@@ -139,9 +141,90 @@ def test_ops_banners_and_shipping_simulation(test_app: Dict[str, object]) -> Non
     assert listed_hooks.status_code == 200, listed_hooks.text
     assert any(row["provider"] == "stripe" and row["event_id"] == "evt_test" for row in listed_hooks.json())
 
+    failure_stats = client.get("/api/v1/ops/admin/webhooks/stats?since_hours=24", headers=auth_headers(token))
+    assert failure_stats.status_code == 200, failure_stats.text
+    assert failure_stats.json()["failed"] == 1
+
     detail = client.get("/api/v1/ops/admin/webhooks/stripe/evt_test", headers=auth_headers(token))
     assert detail.status_code == 200, detail.text
     assert detail.json()["payload"]["id"] == "evt_test"
+
+    def seed_email_failure() -> None:
+        async def _seed() -> None:
+            async with SessionLocal() as session:
+                session.add(
+                    EmailDeliveryFailure(
+                        to_email="customer@example.com",
+                        subject="Test email",
+                        error_message="smtp unavailable",
+                        created_at=datetime.now(timezone.utc),
+                    )
+                )
+                session.add(
+                    EmailDeliveryEvent(
+                        to_email="customer@example.com",
+                        subject="Order confirmation",
+                        status="sent",
+                        created_at=datetime.now(timezone.utc),
+                    )
+                )
+                session.add(
+                    EmailDeliveryEvent(
+                        to_email="customer@example.com",
+                        subject="Shipping update",
+                        status="failed",
+                        error_message="smtp unavailable",
+                        created_at=datetime.now(timezone.utc),
+                    )
+                )
+                await session.commit()
+
+        asyncio.run(_seed())
+
+    seed_email_failure()
+
+    email_stats = client.get("/api/v1/ops/admin/email-failures/stats?since_hours=24", headers=auth_headers(token))
+    assert email_stats.status_code == 200, email_stats.text
+    assert email_stats.json()["failed"] == 1
+
+    email_rows = client.get("/api/v1/ops/admin/email-failures?limit=10&since_hours=24", headers=auth_headers(token))
+    assert email_rows.status_code == 200, email_rows.text
+    assert any(row["to_email"] == "customer@example.com" for row in email_rows.json())
+
+    filtered_email_rows = client.get(
+        "/api/v1/ops/admin/email-failures",
+        params={"limit": 10, "since_hours": 24, "to_email": "customer@example.com"},
+        headers=auth_headers(token),
+    )
+    assert filtered_email_rows.status_code == 200, filtered_email_rows.text
+    assert all(row["to_email"] == "customer@example.com" for row in filtered_email_rows.json())
+
+    filtered_email_rows_none = client.get(
+        "/api/v1/ops/admin/email-failures",
+        params={"limit": 10, "since_hours": 24, "to_email": "nobody@example.com"},
+        headers=auth_headers(token),
+    )
+    assert filtered_email_rows_none.status_code == 200, filtered_email_rows_none.text
+    assert filtered_email_rows_none.json() == []
+
+    email_events = client.get(
+        "/api/v1/ops/admin/email-events",
+        params={"limit": 10, "since_hours": 24, "to_email": "customer@example.com"},
+        headers=auth_headers(token),
+    )
+    assert email_events.status_code == 200, email_events.text
+    events_payload = email_events.json()
+    assert any(row["status"] == "sent" for row in events_payload)
+    assert any(row["status"] == "failed" for row in events_payload)
+
+    sent_only_events = client.get(
+        "/api/v1/ops/admin/email-events",
+        params={"limit": 10, "since_hours": 24, "to_email": "customer@example.com", "status": "sent"},
+        headers=auth_headers(token),
+    )
+    assert sent_only_events.status_code == 200, sent_only_events.text
+    assert sent_only_events.json()
+    assert all(row["status"] == "sent" for row in sent_only_events.json())
 
     retried = client.post("/api/v1/ops/admin/webhooks/stripe/evt_test/retry", headers=auth_headers(token))
     assert retried.status_code == 200, retried.text

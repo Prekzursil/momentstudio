@@ -17,6 +17,7 @@ from app.services import self_service
 
 bearer_scheme = HTTPBearer(auto_error=False)
 _IMPERSONATION_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+_TRAINING_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 _STAFF_ROLES = {
     UserRole.owner,
     UserRole.admin,
@@ -49,6 +50,7 @@ _ADMIN_IP_BYPASS_COOKIE = "admin_ip_bypass"
 _ADMIN_IP_BYPASS_HEADER = "x-admin-ip-bypass"
 _ADMIN_IP_DENIED_DETAIL = "Admin access is blocked from this IP address"
 _ADMIN_IP_ALLOWLIST_DETAIL = "Admin access is restricted to approved IP addresses"
+_TRAINING_MODE_DETAIL = "Training mode is read-only"
 
 _IPAddress = IPv4Address | IPv6Address
 _IPNetwork = IPv4Network | IPv6Network
@@ -135,6 +137,14 @@ def _require_admin_ip_access(request: Request, user: User) -> None:
     allow = _parse_ip_networks(allow_raw)
     if allow and not any(client_ip in network for network in allow):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_ADMIN_IP_ALLOWLIST_DETAIL)
+
+
+def _require_training_mode_writes_allowed(request: Request, user: User) -> None:
+    if not bool(getattr(user, "admin_training_mode", False)):
+        return
+    if request.method.upper() in _TRAINING_SAFE_METHODS:
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_TRAINING_MODE_DETAIL)
 
 
 async def get_current_user(
@@ -253,10 +263,15 @@ async def get_google_completion_user(
     return user
 
 
-async def require_admin(session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)) -> User:
+async def require_admin(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> User:
     if user.role not in (UserRole.admin, UserRole.owner):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     await _require_admin_mfa(session, user)
+    _require_training_mode_writes_allowed(request, user)
     return user
 
 
@@ -279,15 +294,21 @@ def require_admin_section(section: str) -> Callable[..., Awaitable[User]]:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role for this section")
         await _require_admin_mfa(session, user)
         _require_admin_ip_access(request, user)
+        _require_training_mode_writes_allowed(request, user)
         return user
 
     return _dep
 
 
-async def require_owner(session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)) -> User:
+async def require_owner(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> User:
     if user.role != UserRole.owner:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner access required")
     await _require_admin_mfa(session, user)
+    _require_training_mode_writes_allowed(request, user)
     return user
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import require_admin_section
@@ -11,6 +11,9 @@ from app.db.session import get_session
 from app.models.ops import MaintenanceBanner
 from app.models.user import User
 from app.schemas.ops import (
+    EmailEventRead,
+    EmailFailureRead,
+    FailureCount,
     MaintenanceBannerCreate,
     MaintenanceBannerPublic,
     MaintenanceBannerRead,
@@ -116,6 +119,16 @@ async def admin_list_webhooks(
     return await ops_service.list_recent_webhooks(session, limit=limit)
 
 
+@router.get("/admin/webhooks/stats", response_model=FailureCount)
+async def admin_webhook_failure_stats(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("ops")),
+    since_hours: int = Query(default=24, ge=1, le=168),
+) -> FailureCount:
+    failed = await ops_service.count_failed_webhooks(session, since_hours=since_hours)
+    return FailureCount(failed=failed, since_hours=int(since_hours))
+
+
 @router.get("/admin/webhooks/{provider}/{event_id}", response_model=WebhookEventDetail)
 async def admin_webhook_detail(
     provider: str,
@@ -135,3 +148,44 @@ async def admin_retry_webhook(
     _: User = Depends(require_admin_section("ops")),
 ) -> WebhookEventRead:
     return await ops_service.retry_webhook(session, background_tasks, provider=provider, event_id=event_id)
+
+
+@router.get("/admin/email-failures/stats", response_model=FailureCount)
+async def admin_email_failure_stats(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("ops")),
+    since_hours: int = Query(default=24, ge=1, le=168),
+) -> FailureCount:
+    failed = await ops_service.count_email_failures(session, since_hours=since_hours)
+    return FailureCount(failed=failed, since_hours=int(since_hours))
+
+
+@router.get("/admin/email-failures", response_model=list[EmailFailureRead])
+async def admin_list_email_failures(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("ops")),
+    limit: int = Query(default=50, ge=1, le=200),
+    since_hours: int = Query(default=24, ge=1, le=168),
+    to_email: str | None = Query(default=None, max_length=255),
+) -> list[EmailFailureRead]:
+    rows = await ops_service.list_email_failures(session, limit=limit, since_hours=since_hours, to_email=to_email)
+    return [EmailFailureRead.model_validate(row) for row in rows]
+
+
+@router.get("/admin/email-events", response_model=list[EmailEventRead])
+async def admin_list_email_events(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("ops")),
+    limit: int = Query(default=50, ge=1, le=200),
+    since_hours: int = Query(default=24, ge=1, le=168),
+    to_email: str | None = Query(default=None, max_length=255),
+    status_filter: str | None = Query(default=None, alias="status", max_length=16),
+) -> list[EmailEventRead]:
+    rows = await ops_service.list_email_events(
+        session,
+        limit=limit,
+        since_hours=since_hours,
+        to_email=to_email,
+        status=status_filter,
+    )
+    return [EmailEventRead.model_validate(row) for row in rows]

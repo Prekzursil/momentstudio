@@ -60,6 +60,7 @@ from app.schemas.auth import (
     PasswordResetConfirm,
     PasswordResetRequest,
     RefreshRequest,
+    TrainingModeUpdateRequest,
     TokenPair,
     UserEmailsResponse,
     UserResponse,
@@ -1667,6 +1668,27 @@ async def update_notification_preferences(
         current_user.notify_blog_comment_replies = bool(payload.notify_blog_comment_replies)
     if payload.notify_marketing is not None:
         current_user.notify_marketing = bool(payload.notify_marketing)
+    session.add(current_user)
+    await session.commit()
+    await session.refresh(current_user)
+    return UserResponse.model_validate(current_user)
+
+
+@router.patch("/me/training-mode", response_model=UserResponse)
+async def update_training_mode(
+    payload: TrainingModeUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    if current_user.role not in (
+        UserRole.owner,
+        UserRole.admin,
+        UserRole.support,
+        UserRole.fulfillment,
+        UserRole.content,
+    ):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Staff access required")
+    current_user.admin_training_mode = bool(payload.enabled)
     session.add(current_user)
     await session.commit()
     await session.refresh(current_user)

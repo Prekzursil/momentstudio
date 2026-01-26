@@ -126,6 +126,10 @@ class Settings(BaseSettings):
     fx_refresh_enabled: bool = False
     fx_refresh_interval_seconds: int = 60 * 60 * 6
 
+    # Admin scheduled reports (email summaries)
+    admin_reports_scheduler_enabled: bool = True
+    admin_reports_poll_interval_seconds: int = 60
+
     # Locker lookup (Sameday/FANbox)
     # In production you should configure official courier credentials.
     # For local development, Overpass (OpenStreetMap) can be used as a best-effort fallback.

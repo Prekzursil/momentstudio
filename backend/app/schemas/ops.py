@@ -97,6 +97,7 @@ class ShippingSimulationResult(BaseModel):
 
 WebhookProvider = Literal["stripe", "paypal"]
 WebhookStatus = Literal["received", "processed", "failed"]
+EmailEventStatus = Literal["sent", "failed"]
 
 
 class WebhookEventRead(BaseModel):
@@ -113,3 +114,29 @@ class WebhookEventRead(BaseModel):
 
 class WebhookEventDetail(WebhookEventRead):
     payload: dict | None = None
+
+
+class EmailFailureRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    to_email: str
+    subject: str
+    error_message: str | None = None
+    created_at: datetime
+
+
+class EmailEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    to_email: str
+    subject: str
+    status: EmailEventStatus
+    error_message: str | None = None
+    created_at: datetime
+
+
+class FailureCount(BaseModel):
+    failed: int = 0
+    since_hours: int

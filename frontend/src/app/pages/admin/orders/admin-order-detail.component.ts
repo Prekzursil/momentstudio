@@ -14,7 +14,9 @@ import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { ReceiptShareToken } from '../../../core/account.service';
 import { AdminOrderDetail, AdminOrderEvent, AdminOrderFraudSignal, AdminOrderShipment, AdminOrdersService } from '../../../core/admin-orders.service';
 import { AdminReturnsService, ReturnRequestRead } from '../../../core/admin-returns.service';
+import { AdminRecentService } from '../../../core/admin-recent.service';
 import { orderStatusChipClass } from '../../../shared/order-status';
+import { CustomerTimelineComponent } from '../shared/customer-timeline.component';
 
 type OrderStatus =
   | 'pending'
@@ -61,7 +63,8 @@ type OrderAction =
     ErrorStateComponent,
     InputComponent,
     SkeletonComponent,
-    LocalizedCurrencyPipe
+    LocalizedCurrencyPipe,
+    CustomerTimelineComponent
   ],
   template: `
     <div class="grid gap-6">
@@ -212,6 +215,7 @@ type OrderAction =
                       <option value="vip">{{ 'adminUi.orders.tags.vip' | translate }}</option>
                       <option value="fraud_risk">{{ 'adminUi.orders.tags.fraud_risk' | translate }}</option>
                       <option value="gift">{{ 'adminUi.orders.tags.gift' | translate }}</option>
+                      <option value="test">{{ 'adminUi.orders.tags.test' | translate }}</option>
                     </select>
                   </label>
                   <app-button
@@ -220,6 +224,13 @@ type OrderAction =
                     [label]="'adminUi.orders.tags.add' | translate"
                     [disabled]="action() !== null || !tagToAdd"
                     (action)="addTag()"
+                  ></app-button>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="(isTestOrder() ? 'adminUi.orders.tags.unmarkTest' : 'adminUi.orders.tags.markTest') | translate"
+                    [disabled]="action() !== null"
+                    (action)="toggleTestTag()"
                   ></app-button>
                 </div>
               </div>
@@ -796,6 +807,15 @@ type OrderAction =
                 (action)="addAdminNote()"
               ></app-button>
             </div>
+          </section>
+
+          <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
+            <app-customer-timeline
+              [userId]="order()!.user_id"
+              [customerEmail]="order()!.customer_email"
+              [includePii]="piiReveal()"
+              [excludeOrderId]="order()!.id"
+            ></app-customer-timeline>
           </section>
 
           <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
@@ -1399,7 +1419,8 @@ export class AdminOrderDetailComponent implements OnInit {
     private api: AdminOrdersService,
     private returnsApi: AdminReturnsService,
     private toast: ToastService,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private recent: AdminRecentService
   ) {}
 
   statusChipClass(status: string): string {
@@ -1979,6 +2000,38 @@ export class AdminOrderDetailComponent implements OnInit {
     });
   }
 
+  isTestOrder(): boolean {
+    return Boolean((this.order()?.tags || []).includes('test'));
+  }
+
+  toggleTestTag(): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    if (this.action() !== null) return;
+
+    const isTest = this.isTestOrder();
+    this.action.set(isTest ? 'tagRemove' : 'tagAdd');
+    const request = isTest
+      ? this.api.removeOrderTag(orderId, 'test', { include_pii: this.piiReveal() })
+      : this.api.addOrderTag(orderId, 'test', { include_pii: this.piiReveal() });
+    request.subscribe({
+      next: (updated) => {
+        this.order.set(updated);
+        this.toast.success(
+          this.translate.instant(
+            isTest ? 'adminUi.orders.tags.success.remove' : 'adminUi.orders.tags.success.add'
+          )
+        );
+        this.action.set(null);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant(isTest ? 'adminUi.orders.tags.errors.remove' : 'adminUi.orders.tags.errors.add');
+        this.toast.error(msg);
+        this.action.set(null);
+      }
+    });
+  }
+
   removeTag(tag: string): void {
     const orderId = this.orderId;
     if (!orderId) return;
@@ -2501,6 +2554,16 @@ export class AdminOrderDetailComponent implements OnInit {
     this.api.get(orderId, { include_pii: this.piiReveal() }).subscribe({
       next: (o) => {
         this.order.set(o);
+        const ref = o.reference_code || o.id.slice(0, 8);
+        const email = (o.customer_email || '').toString().trim();
+        this.recent.add({
+          key: `order:${o.id}`,
+          type: 'order',
+          label: ref,
+          subtitle: email,
+          url: `/admin/orders/${o.id}`,
+          state: null
+        });
         this.statusValue = (o.status as OrderStatus) || 'pending_acceptance';
         this.trackingNumber = o.tracking_number ?? '';
         this.trackingUrl = o.tracking_url ?? '';

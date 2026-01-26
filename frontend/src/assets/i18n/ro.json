@@ -1282,6 +1282,8 @@
     },
     "nav": {
       "title": "Administrare",
+      "searchPlaceholder": "Caută în admin…",
+      "searchEmpty": "Niciun rezultat.",
       "dashboard": "Panou",
       "products": "Produse",
       "inventory": "Stocuri",
@@ -1295,6 +1297,15 @@
     },
     "security": {
       "mfaRequired": "Autentificarea cu doi factori sau o passkey este necesară pentru accesul de administrare."
+    },
+    "trainingMode": {
+      "title": "Mod de instruire",
+      "on": "Pornit",
+      "off": "Oprit",
+      "hint": "Doar citire: modificările sunt blocate.",
+      "errors": {
+        "save": "Nu s-a putut actualiza modul de instruire."
+      }
     },
     "onboarding": {
       "open": "Tur de configurare",
@@ -1320,6 +1331,18 @@
       "reveal": "Afișează PII",
       "hide": "Ascunde PII",
       "notAuthorized": "Nu ai permisiunea să afișezi date personale."
+    },
+    "customerTimeline": {
+      "title": "Cronologia clientului",
+      "subtitle": "Comenzi, tichete de suport și activitate email recente.",
+      "loading": "Se încarcă cronologia clientului…",
+      "empty": "Nu există activitate recentă.",
+      "errors": { "load": "Nu s-a putut încărca cronologia clientului." },
+      "kinds": { "order": "Comandă", "ticket": "Tichet", "email": "Email" },
+      "emailStatus": { "sent": "Trimis", "failed": "Eșuat" },
+      "emailGated": "Afișează PII pentru a încărca activitatea emailurilor.",
+      "noCustomer": "Detaliile clientului nu sunt disponibile pentru cronologie.",
+      "openOps": "Deschide în Ops"
     },
     "ipBypass": {
       "title": "Acces admin restricționat",
@@ -1390,6 +1413,30 @@
         "exportOrders": "Exportă comenzi"
       },
       "customizeWidgets": "Personalizează widgeturile",
+      "liveRefresh": {
+        "lastUpdated": "Ultima actualizare",
+        "pause": "Pauză",
+        "resume": "Actualizare live"
+      },
+      "salesMetric": {
+        "aria": "Metrică vânzări",
+        "net": "Net",
+        "gross": "Brut",
+        "tooltip": "Vânzări brute: comenzi plătite/expediate/livrate/rambursate. Vânzări nete: scade rambursările (inclusiv rambursări parțiale)."
+      },
+      "channelBreakdown": {
+        "title": "Defalcare pe canale",
+        "paymentMethods": "Metode de plată",
+        "couriers": "Curieri",
+        "deliveryTypes": "Tip livrare",
+        "empty": "Nu există date pentru acest interval.",
+        "error": "Nu am putut încărca defalcarea pe canale.",
+        "table": {
+          "channel": "Canal",
+          "orders": "Comenzi",
+          "sales": "Vânzări"
+        }
+      },
       "widgetsTitle": "Widgeturi panou",
       "widgets": {
         "kpis": "KPI astăzi",
@@ -1456,20 +1503,23 @@
       "recentOrdersSubtitle": "{{count}} în vizualizare",
       "lowStockTrackedSubtitle": "{{count}} urmărite"
     },
-    "actions": {
-      "add": "Adaugă",
-      "apply": "Aplică",
-      "reset": "Resetează",
-      "delete": "Șterge",
-      "remove": "Elimină",
-      "save": "Salvează",
-      "cancel": "Anulează",
-      "retry": "Reîncearcă",
-      "restore": "Restabilește",
-      "loading": "Se încarcă…",
-      "edit": "Editează",
-      "changeUrl": "Schimbă URL-ul",
-      "refresh": "Reîncarcă",
+      "actions": {
+        "add": "Adaugă",
+        "apply": "Aplică",
+        "reset": "Resetează",
+        "delete": "Șterge",
+        "remove": "Elimină",
+        "save": "Salvează",
+        "cancel": "Anulează",
+        "retry": "Reîncearcă",
+        "restore": "Restabilește",
+        "undo": "Anulează",
+        "redo": "Refă",
+        "dismiss": "Ignoră",
+        "loading": "Se încarcă…",
+        "edit": "Editează",
+        "changeUrl": "Schimbă URL-ul",
+        "refresh": "Reîncarcă",
       "search": "Caută",
       "copy": "Copiază",
       "use": "Folosește",
@@ -1479,7 +1529,101 @@
       "up": "Sus",
       "down": "Jos",
       "preview": "Previzualizează",
-      "hide": "Ascunde"
+      "hide": "Ascunde",
+      "bulkActions": "Acțiuni în masă"
+    },
+    "recent": {
+      "title": "Vizualizate recent",
+      "hint": "Redeschide rapid pagini și elemente vizitate.",
+      "empty": "Nu există elemente recente.",
+      "clear": "Șterge",
+      "types": {
+        "page": "Pagină",
+        "content": "Conținut",
+        "order": "Comandă",
+        "product": "Produs",
+        "user": "Utilizator"
+      }
+    },
+    "favorites": {
+      "title": "Favorite",
+      "hint": "Fixează pagini și elemente pentru acces rapid.",
+      "empty": "Nu există favorite încă.",
+      "clear": "Șterge",
+      "pin": "Adaugă la favorite",
+      "unpin": "Elimină din favorite",
+      "types": {
+        "page": "Pagină",
+        "content": "Conținut",
+        "order": "Comandă",
+        "product": "Produs",
+        "user": "Utilizator",
+        "filter": "Vizualizare salvată"
+      },
+      "savedViews": {
+        "label": "Vizualizări salvate",
+        "none": "Niciuna",
+        "pinCurrent": "Fixează vizualizarea curentă",
+        "unpinCurrent": "Elimină fixarea vizualizării curente",
+        "prompt": "Nume pentru această vizualizare",
+        "errors": {
+          "nameRequired": "Te rog introdu un nume."
+        }
+      },
+      "errors": {
+        "load": "Nu am putut încărca favoritele.",
+        "save": "Nu am putut salva favoritele."
+      }
+    },
+    "alerts": {
+      "title": "Alerte",
+      "loading": "Se încarcă alertele…",
+      "lowStock": "Stoc scăzut",
+      "failedWebhooks": "Webhook-uri eșuate (24h)",
+      "failedEmails": "Email-uri eșuate (24h)",
+      "errors": {
+        "load": "Nu am putut încărca alertele."
+      }
+    },
+    "jobs": {
+      "title": "Joburi în fundal",
+      "hint": "Urmărește exporturile și acțiunile în masă care rulează în fundal.",
+      "empty": "Nu există joburi în fundal acum.",
+      "sections": {
+        "gdprExports": "Exporturi GDPR",
+        "couponJobs": "Joburi segment cupoane"
+      },
+      "couponActions": {
+        "assign": "Asignare segment cupoane",
+        "revoke": "Revocare segment cupoane"
+      },
+      "status": {
+        "pending": "În așteptare",
+        "running": "În derulare",
+        "succeeded": "Reușit",
+        "failed": "Eșuat",
+        "cancelled": "Anulat"
+      },
+      "actions": {
+        "openGdpr": "Coada GDPR",
+        "openCoupons": "Cupoane",
+        "download": "Descarcă"
+      },
+      "confirms": {
+        "retry": "Reîncerci acest job?",
+        "cancel": "Anulezi acest job?"
+      },
+      "success": {
+        "retry": "Job repornit.",
+        "cancel": "Job anulat.",
+        "download": "Export descărcat."
+      },
+      "errors": {
+        "load": "Nu am putut încărca joburile în fundal.",
+        "retry": "Nu am putut reporni jobul.",
+        "cancel": "Nu am putut anula jobul.",
+        "download": "Nu am putut descărca exportul."
+      }
     },
     "tableLayout": {
       "title": "Aspect tabel",
@@ -1488,6 +1632,10 @@
       "density": {
         "comfortable": "Confortabil",
         "compact": "Compact"
+      },
+      "densityToggle": {
+        "toCompact": "Vizualizare compactă",
+        "toComfortable": "Vizualizare confortabilă"
       },
       "columnsLabel": "Coloane",
       "required": "Obligatoriu",
@@ -1525,9 +1673,25 @@
         "date": "Data",
         "topic": "Subiect",
         "status": "Stare",
+        "sla": "SLA",
         "assignee": "Responsabil",
         "from": "De la",
         "order": "Comandă"
+      },
+      "sla": {
+        "title": "Setări SLA",
+        "current": "SLA: primul răspuns {{first}}h · rezolvare {{resolution}}h",
+        "firstReplyHours": "SLA primul răspuns (ore)",
+        "resolutionHours": "SLA rezolvare (ore)",
+        "reply": "Răspuns",
+        "resolve": "Rezolvare",
+        "due": "în {{duration}}",
+        "overdue": "depășit cu {{duration}}",
+        "success": { "save": "Setări SLA salvate." },
+        "errors": {
+          "save": "Nu am putut salva setările SLA.",
+          "invalid": "Introdu ore valide (1–720)."
+        }
       },
       "empty": "Nu există mesaje.",
       "pagination": "Pagina {{page}} din {{total}} · {{count}} total",
@@ -1602,6 +1766,8 @@
       }
     },
     "ops": {
+      "title": "Operațiuni",
+      "subtitle": "Operațiuni magazin, bannere, simulator livrare și webhook-uri.",
       "banner": {
         "title": "Bannere mentenanță",
         "hint": "Programează bannere pentru anunțuri (mentenanță, promoții).",
@@ -1673,6 +1839,30 @@
           "run": "Nu am putut rula simularea."
         }
       },
+      "emailFailures": {
+        "title": "Erori email",
+        "hint": "Urmărește trimiterile de email eșuate.",
+        "refresh": "Reîmprospătează",
+        "filters": {
+          "to": "Email destinatar",
+          "toPlaceholder": "customer@example.com",
+          "sinceHours": "De acum (ore)"
+        },
+        "empty": "Nu există erori email.",
+        "view": "Vezi",
+        "close": "Închide",
+        "detailTitle": "Eroare email",
+        "table": {
+          "to": "Către",
+          "subject": "Subiect",
+          "at": "Timp",
+          "error": "Eroare",
+          "actions": "Acțiuni"
+        },
+        "errors": {
+          "load": "Nu am putut încărca erorile email."
+        }
+      },
       "webhooks": {
         "title": "Monitor webhooks",
         "hint": "Vezi webhooks recente și reîncearcă livrările eșuate.",
@@ -1712,6 +1902,7 @@
     },
     "returns": {
       "title": "Retururi",
+      "subtitle": "Gestionează cererile de retur și stările lor.",
       "filters": {
         "search": "Caută",
         "searchPh": "Referință comandă, email, nume…",
@@ -1788,6 +1979,49 @@
         "errors": {
           "create": "Nu am putut crea cererea de retur."
         }
+      }
+    },
+    "reports": {
+      "title": "Rapoarte programate",
+      "hint": "Rezumat săptămânal/lunar prin email pentru vânzări, top produse și stoc redus.",
+      "recipients": "Destinatari",
+      "recipientsPlaceholder": "owner@example.com, …",
+      "recipientsHint": "Emailuri separate prin virgulă. Dacă e gol, se trimite către emailul proprietarului.",
+      "weekdays": {
+        "mon": "Luni",
+        "tue": "Marți",
+        "wed": "Miercuri",
+        "thu": "Joi",
+        "fri": "Vineri",
+        "sat": "Sâmbătă",
+        "sun": "Duminică"
+      },
+      "weekly": {
+        "title": "Raport săptămânal",
+        "enabled": "Activează raport săptămânal",
+        "weekday": "Zi",
+        "hourUtc": "Ora (UTC)",
+        "sendNow": "Trimite raport săptămânal acum",
+        "lastSent": "Ultima trimitere",
+        "lastError": "Ultima eroare"
+      },
+      "monthly": {
+        "title": "Raport lunar",
+        "enabled": "Activează raport lunar",
+        "day": "Ziua lunii (1–28)",
+        "hourUtc": "Ora (UTC)",
+        "sendNow": "Trimite raport lunar acum",
+        "lastSent": "Ultima trimitere",
+        "lastError": "Ultima eroare"
+      },
+      "success": {
+        "save": "Setări rapoarte salvate.",
+        "sent": "Raport trimis.",
+        "skipped": "Deja trimis pentru această perioadă."
+      },
+      "errors": {
+        "save": "Nu s-au putut salva setările rapoartelor.",
+        "send": "Nu s-a putut trimite raportul."
       }
     },
     "site": {
@@ -2794,7 +3028,13 @@
       },
       "search": "Caută",
       "statusFilter": "Status",
+      "sales": "Vânzări",
       "tagFilter": "Etichetă",
+      "testOrdersFilter": "Comenzi test",
+      "testOrders": {
+        "include": "Include",
+        "exclude": "Exclude"
+      },
       "from": "De la",
       "to": "Până la",
       "presets": {
@@ -2997,8 +3237,11 @@
         "vip": "VIP",
         "fraud_risk": "Risc fraudă",
         "gift": "Cadou",
+        "test": "Comandă test",
         "none": "Nicio etichetă încă.",
         "addLabel": "Adaugă etichetă",
+        "markTest": "Marchează ca test",
+        "unmarkTest": "Elimină marcajul test",
         "select": "Alege",
         "add": "Adaugă",
         "removeLabel": "Elimină eticheta: {{tag}}",
@@ -3209,8 +3452,16 @@
         "support": "Suport",
         "fulfillment": "Fulfillment",
         "content": "Conținut",
-        "admin": "Administrator",
+        "admin": "Proprietar (basic)",
         "owner": "Proprietar"
+      },
+      "roleHints": {
+        "customer": "Doar client (fără acces admin).",
+        "support": "Preset suport: Panou, Utilizatori, Suport.",
+        "fulfillment": "Preset fulfillment: Panou, Comenzi, Retururi, Stocuri.",
+        "content": "Preset conținut: Panou, Conținut, Produse, Cupoane.",
+        "admin": "Proprietar (basic): acces complet (fără acțiuni doar pentru proprietar).",
+        "owner": "Proprietar: acces complet (blocat)."
       },
       "success": {
         "revoke": "Sesiuni revocate",
@@ -3327,6 +3578,54 @@
     },
     "content": {
       "title": "Conținut",
+      "subtitle": "Editează pagina de acasă, paginile, blogul și setările.",
+      "editorMode": {
+        "label": "Mod editor",
+        "simple": "Simplu",
+        "advanced": "Avansat",
+        "simpleHint": "Modul Simplu ascunde SEO și programarea.",
+        "advancedHint": "Modul Avansat arată SEO, programarea și controale suplimentare."
+      },
+      "preview": {
+        "deviceLabel": "Dimensiune previzualizare",
+        "desktop": "Desktop",
+        "tablet": "Tabletă",
+        "mobile": "Mobil",
+        "layoutLabel": "Aspect",
+        "stacked": "Vertical",
+        "split": "Împărțit"
+      },
+      "blockLibrary": {
+        "title": "Biblioteca de blocuri",
+        "hint": "Apasă pentru a adăuga un bloc sau trage-l în editor.",
+        "templateLabel": "Șablon",
+        "templates": {
+          "starter": "Starter",
+          "blank": "Gol"
+        },
+        "dropHere": "Lasă aici pentru a insera",
+        "items": {
+          "text": "Secțiune de text (markdown / editor rich).",
+          "image": "O singură imagine cu link și legendă opționale.",
+          "gallery": "Galerie cu mai multe imagini, legende și puncte focale.",
+          "banner": "Banner tip hero cu titlu, CTA și imagine de fundal.",
+          "carousel": "Carusel cu mai multe slide-uri și setări de autoplay."
+        }
+      },
+      "reorder": {
+        "moveUp": "Mută în sus",
+        "moveDown": "Mută în jos",
+        "moved": "{{label}} a fost mutat la poziția {{pos}} din {{count}}."
+      },
+      "autosave": {
+        "restoreFound": "A fost găsit un draft salvat automat",
+        "state": {
+          "saved": "Salvat",
+          "unsaved": "Modificări nesalvate",
+          "autosaving": "Se salvează automat…",
+          "autosaved": "Salvat automat"
+        }
+      },
       "nav": {
         "home": "Acasă",
         "pages": "Pagini",

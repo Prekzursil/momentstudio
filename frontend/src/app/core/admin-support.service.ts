@@ -73,6 +73,11 @@ export interface SupportCannedResponseRead {
   updated_at: string;
 }
 
+export interface SupportSlaSettings {
+  first_reply_hours: number;
+  resolution_hours: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdminSupportService {
   constructor(private api: ApiService) {}
@@ -131,5 +136,13 @@ export class AdminSupportService {
 
   deleteCannedResponse(id: string): Observable<unknown> {
     return this.api.delete(`/support/admin/canned-responses/${id}`);
+  }
+
+  getSlaSettings(): Observable<SupportSlaSettings> {
+    return this.api.get<SupportSlaSettings>('/support/admin/sla-settings');
+  }
+
+  updateSlaSettings(payload: SupportSlaSettings): Observable<SupportSlaSettings> {
+    return this.api.patch<SupportSlaSettings>('/support/admin/sla-settings', payload);
   }
 }

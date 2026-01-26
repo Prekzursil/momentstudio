@@ -1,3 +1,4 @@
+from decimal import Decimal
 import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Dict
@@ -15,7 +16,7 @@ from app.db.session import get_session
 from app.main import app
 from app.models.catalog import Category, Product, ProductImage, ProductStatus, ProductAuditLog, ProductTranslation
 from app.models.content import ContentBlock, ContentStatus, ContentAuditLog
-from app.models.order import Order, OrderStatus
+from app.models.order import Order, OrderRefund, OrderStatus, OrderTag
 from app.models.address import Address
 from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.support import ContactSubmission, ContactSubmissionTopic, ContactSubmissionStatus
@@ -275,8 +276,240 @@ def test_admin_summary_sales_excludes_cancelled_and_pending(test_app: Dict[str, 
     data = resp.json()
 
     assert data["sales_30d"] == pytest.approx(175.0)
+    assert data["gross_sales_30d"] == pytest.approx(210.0)
+    assert data["net_sales_30d"] == pytest.approx(175.0)
     assert data["sales_range"] == pytest.approx(175.0)
+    assert data["gross_sales_range"] == pytest.approx(210.0)
+    assert data["net_sales_range"] == pytest.approx(175.0)
     assert data["today_sales"] == pytest.approx(175.0)
+    assert data["gross_today_sales"] == pytest.approx(210.0)
+    assert data["net_today_sales"] == pytest.approx(175.0)
+
+
+def test_admin_summary_net_sales_subtracts_partial_refunds(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    asyncio.run(seed(session_factory))
+    headers = auth_headers(client)
+
+    async def add_order_and_refund() -> None:
+        async with session_factory() as session:
+            customer = (
+                await session.execute(select(User).where(User.email == "customer@example.com"))
+            ).scalar_one()
+            now = datetime.now(timezone.utc)
+            email = customer.email
+            name = customer.name or customer.email
+
+            order = Order(
+                user_id=customer.id,
+                status=OrderStatus.paid,
+                total_amount=Decimal("100.00"),
+                currency="RON",
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                customer_email=email,
+                customer_name=name,
+                created_at=now,
+                updated_at=now,
+            )
+            session.add(order)
+            await session.flush()
+            session.add(
+                OrderRefund(
+                    order_id=order.id,
+                    amount=Decimal("30.00"),
+                    currency="RON",
+                    provider="manual",
+                    note="test partial refund",
+                    created_at=now,
+                )
+            )
+            await session.commit()
+
+    asyncio.run(add_order_and_refund())
+
+    resp = client.get("/api/v1/admin/dashboard/summary", headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["gross_today_sales"] == pytest.approx(100.0)
+    assert data["net_today_sales"] == pytest.approx(70.0)
+
+
+def test_admin_summary_excludes_test_orders_from_kpis(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    asyncio.run(seed(session_factory))
+    headers = auth_headers(client)
+
+    async def add_orders() -> None:
+        async with session_factory() as session:
+            customer = (
+                await session.execute(select(User).where(User.email == "customer@example.com"))
+            ).scalar_one()
+            now = datetime.now(timezone.utc)
+            email = customer.email
+            name = customer.name or customer.email
+
+            live_order = Order(
+                user_id=customer.id,
+                status=OrderStatus.paid,
+                total_amount=Decimal("100.00"),
+                currency="RON",
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                customer_email=email,
+                customer_name=name,
+                created_at=now,
+                updated_at=now,
+            )
+            test_order = Order(
+                user_id=customer.id,
+                status=OrderStatus.paid,
+                total_amount=Decimal("200.00"),
+                currency="RON",
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                customer_email=email,
+                customer_name=name,
+                created_at=now,
+                updated_at=now,
+            )
+            session.add_all([live_order, test_order])
+            await session.flush()
+            session.add(OrderTag(order_id=test_order.id, tag="test", actor_user_id=None))
+            await session.commit()
+
+    asyncio.run(add_orders())
+
+    resp = client.get("/api/v1/admin/dashboard/summary", headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["gross_today_sales"] == pytest.approx(100.0)
+    assert data["net_today_sales"] == pytest.approx(100.0)
+
+
+def test_admin_channel_breakdown_groups_and_excludes_test_orders(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    asyncio.run(seed(session_factory))
+    headers = auth_headers(client)
+
+    async def add_orders() -> None:
+        async with session_factory() as session:
+            customer = (
+                await session.execute(select(User).where(User.email == "customer@example.com"))
+            ).scalar_one()
+            now = datetime.now(timezone.utc)
+            email = customer.email
+            name = customer.name or customer.email
+
+            stripe_paid = Order(
+                user_id=customer.id,
+                status=OrderStatus.paid,
+                total_amount=Decimal("100.00"),
+                currency="RON",
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                payment_method="stripe",
+                courier="fan_courier",
+                delivery_type="home",
+                customer_email=email,
+                customer_name=name,
+                created_at=now,
+                updated_at=now,
+            )
+            paypal_paid = Order(
+                user_id=customer.id,
+                status=OrderStatus.paid,
+                total_amount=Decimal("50.00"),
+                currency="RON",
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                payment_method="paypal",
+                courier="sameday",
+                delivery_type="locker",
+                customer_email=email,
+                customer_name=name,
+                created_at=now,
+                updated_at=now,
+            )
+            stripe_refunded = Order(
+                user_id=customer.id,
+                status=OrderStatus.refunded,
+                total_amount=Decimal("30.00"),
+                currency="RON",
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                payment_method="stripe",
+                courier="fan_courier",
+                delivery_type="home",
+                customer_email=email,
+                customer_name=name,
+                created_at=now,
+                updated_at=now,
+            )
+            stripe_test = Order(
+                user_id=customer.id,
+                status=OrderStatus.paid,
+                total_amount=Decimal("999.00"),
+                currency="RON",
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                payment_method="stripe",
+                courier="fan_courier",
+                delivery_type="home",
+                customer_email=email,
+                customer_name=name,
+                created_at=now,
+                updated_at=now,
+            )
+
+            session.add_all([stripe_paid, paypal_paid, stripe_refunded, stripe_test])
+            await session.flush()
+
+            session.add(OrderTag(order_id=stripe_test.id, tag="test", actor_user_id=None))
+            session.add(
+                OrderRefund(
+                    order_id=stripe_paid.id,
+                    amount=Decimal("20.00"),
+                    currency="RON",
+                    provider="manual",
+                    note="partial",
+                    created_at=now,
+                )
+            )
+            await session.commit()
+
+    asyncio.run(add_orders())
+
+    resp = client.get("/api/v1/admin/dashboard/channel-breakdown", headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+
+    payment = {row["key"]: row for row in data["payment_methods"]}
+    assert payment["stripe"]["orders"] == 2
+    assert payment["stripe"]["gross_sales"] == pytest.approx(130.0)
+    assert payment["stripe"]["net_sales"] == pytest.approx(80.0)
+    assert payment["paypal"]["orders"] == 1
+    assert payment["paypal"]["gross_sales"] == pytest.approx(50.0)
+    assert payment["paypal"]["net_sales"] == pytest.approx(50.0)
+
+    couriers = {row["key"]: row for row in data["couriers"]}
+    assert couriers["fan_courier"]["gross_sales"] == pytest.approx(130.0)
+    assert couriers["fan_courier"]["net_sales"] == pytest.approx(80.0)
+    assert couriers["sameday"]["gross_sales"] == pytest.approx(50.0)
+
+    delivery = {row["key"]: row for row in data["delivery_types"]}
+    assert delivery["home"]["gross_sales"] == pytest.approx(130.0)
+    assert delivery["home"]["net_sales"] == pytest.approx(80.0)
+    assert delivery["locker"]["gross_sales"] == pytest.approx(50.0)
 
 
 def test_coupon_lifecycle_and_audit(test_app: Dict[str, object]) -> None:
