@@ -341,6 +341,16 @@ Below is a structured checklist you can turn into issues.
 - [x] Pricing: add scheduled FX refresh job (background) so first-page loads never block on upstream fetch.
 - [x] A11y: localize shop filter aria labels and improve keyboard affordances for price range inputs.
 
+### Storefront Catalog – Next Improvements (Backlog)
+- [ ] Shop: active filter chips – Show selected category/price/tags as removable chips + “Clear all”.
+- [ ] Shop: preserve scroll position – When returning from product detail, restore catalog scroll and filters.
+- [ ] Shop: result count – Display “X results” and current page range above the grid.
+- [ ] Shop: quick view modal – Open product quick view from card (gallery + key details + add to cart).
+- [ ] Shop: mobile sticky actions – Keep filter/sort controls accessible while scrolling on mobile.
+- [ ] Shop: “Load more” pagination – Optional progressive loading as an alternative to classic pagination.
+- [ ] Shop: better empty states – Suggest clearing filters / show popular categories when no results.
+- [ ] Shop: skeleton grid – Product card skeletons to reduce layout shift during loading.
+
 ## Blog & Community
 - [x] Nav: add “Blog” link between Home and Shop (header + drawer).
 - [x] Backend: add public blog endpoints (list + detail) backed by ContentBlocks with optional translations (fallback to available language).
@@ -791,6 +801,20 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Observability: client error logging – Capture admin UI errors to a backend log endpoint.
 - [x] Admin UX: onboarding tour – First-run guided tour for owner (shipping, payments, content, taxes).
 - [x] Admin UX: saved table layouts – Persist column visibility/order/density per admin table (orders/products/users).
+
+### Admin Catalog – Next Improvements (Backlog)
+- [ ] Admin Products: status selector – Expose draft/published/archived on create/edit with confirmation and audit entry.
+- [ ] Admin Products: status badges – Add table badges for status (draft/published/archived) and active/inactive.
+- [ ] Admin Products: status filters – Filter products list by status and include an “Archived” tab/view.
+- [ ] Admin Products: bulk status updates – Apply draft/publish/archive to selected products with preview and optional undo window.
+- [ ] Admin Products: quick status toggle – One-click publish/unpublish/archive from the products table row actions.
+- [ ] Admin Products: create category inline (product form) – “Add category” from the category selector without navigating away.
+- [ ] Admin Products: create category inline (filters) – Allow creating a category while filtering/browsing products.
+- [ ] Admin Products: category CRUD shortcut – Open category manager as a drawer/modal from `/admin/products` (avoid separate route hop).
+- [ ] Admin Categories: merge tool – Merge categories (optionally include subcategories) and reassign products with preview.
+- [ ] Admin Categories: safe delete – Block deleting in-use categories; require reassignment or merge.
+- [ ] Admin Categories: bulk import – CSV import for categories (name, parent, sort order, translations) with dry-run validation.
+- [ ] Admin Products: bulk category create+assign – Create a new category and immediately apply it to selected products.
 
 ## Data Portability & Backups (Extended)
 - [x] CLI command `python -m app.cli export-data` exporting users (no passwords), products, categories, orders, addresses to JSON.
