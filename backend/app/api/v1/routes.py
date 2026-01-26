@@ -18,6 +18,7 @@ from app.api.v1 import returns
 from app.api.v1 import shipping
 from app.api.v1 import coupons_v2
 from app.api.v1 import taxes
+from app.api.v1 import ops
 from app.models.catalog import Product
 from fastapi import Response, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,6 +48,7 @@ api_router.include_router(returns.router)
 api_router.include_router(shipping.router)
 api_router.include_router(coupons_v2.router)
 api_router.include_router(taxes.router)
+api_router.include_router(ops.router)
 
 
 @api_router.get("/health", tags=["health"])

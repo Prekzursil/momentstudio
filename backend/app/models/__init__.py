@@ -71,6 +71,7 @@ from app.models.notification import UserNotification  # noqa: F401
 from app.models.user_export import UserDataExportJob, UserDataExportStatus  # noqa: F401
 from app.models.support import ContactSubmission, ContactSubmissionMessage, ContactSubmissionStatus, ContactSubmissionTopic  # noqa: F401
 from app.models.returns import ReturnRequest, ReturnRequestItem, ReturnRequestStatus  # noqa: F401
+from app.models.ops import MaintenanceBanner  # noqa: F401
 
 __all__ = [
     "Base",
@@ -144,4 +145,5 @@ __all__ = [
     "ReturnRequest",
     "ReturnRequestItem",
     "ReturnRequestStatus",
+    "MaintenanceBanner",
 ]

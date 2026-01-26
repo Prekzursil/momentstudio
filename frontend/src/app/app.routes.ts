@@ -265,6 +265,12 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/admin/support/admin-support.component').then((m) => m.AdminSupportComponent),
         canActivate: [adminSectionGuard('support')],
         title: 'Support | Admin | momentstudio'
+      },
+      {
+        path: 'ops',
+        loadComponent: () => import('./pages/admin/ops/admin-ops.component').then((m) => m.AdminOpsComponent),
+        canActivate: [adminSectionGuard('ops')],
+        title: 'Ops | Admin | momentstudio'
       }
     ]
   },

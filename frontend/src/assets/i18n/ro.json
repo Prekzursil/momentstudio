@@ -1287,6 +1287,7 @@
       "coupons": "Cupoane",
       "users": "Utilizatori",
       "support": "Suport",
+      "ops": "Operațiuni",
       "content": "Conținut"
     },
     "inventory": {
@@ -1544,6 +1545,79 @@
         "loadAssignees": "Nu am putut încărca lista de responsabili.",
         "save": "Nu am putut salva modificările.",
         "reply": "Nu am putut trimite răspunsul."
+      }
+    },
+    "ops": {
+      "banner": {
+        "title": "Bannere mentenanță",
+        "hint": "Programează bannere pentru anunțuri (mentenanță, promoții).",
+        "new": "Nou",
+        "creating": "Creezi un banner nou",
+        "editing": "Editezi bannerul",
+        "active": "Activ",
+        "level": "Nivel",
+        "levelInfo": "Info",
+        "levelWarning": "Avertizare",
+        "levelPromo": "Promo",
+        "startsAt": "Începe la",
+        "endsAt": "Se termină la",
+        "messageEn": "Mesaj (EN)",
+        "messageRo": "Mesaj (RO)",
+        "messagePh": "Scrie un anunț scurt…",
+        "linkUrl": "URL link",
+        "linkUrlPh": "ex: /magazin sau https://…",
+        "linkLabelEn": "Etichetă link (EN)",
+        "linkLabelRo": "Etichetă link (RO)",
+        "linkLabelPh": "ex: Află mai multe",
+        "linkDefault": "Află mai multe",
+        "create": "Creează",
+        "save": "Salvează",
+        "delete": "Șterge",
+        "confirmDelete": "Ștergi acest banner?",
+        "saved": "Banner salvat.",
+        "deleted": "Banner șters.",
+        "listTitle": "Bannere recente",
+        "status": {
+          "active": "Activ",
+          "scheduled": "Programat",
+          "expired": "Expirat",
+          "disabled": "Dezactivat"
+        },
+        "errors": {
+          "load": "Nu am putut încărca bannerele.",
+          "save": "Nu am putut salva bannerul.",
+          "delete": "Nu am putut șterge bannerul.",
+          "startsAtRequired": "Data de start este obligatorie.",
+          "messageRequired": "Ambele variante de limbă sunt obligatorii."
+        }
+      },
+      "shipping": {
+        "title": "Simulator cost livrare",
+        "hint": "Simulează totalul pentru un subtotal și compară metodele de livrare.",
+        "subtotal": "Subtotal (RON)",
+        "discount": "Reducere (RON)",
+        "method": "Metodă livrare",
+        "methodAuto": "Auto (setări checkout)",
+        "postalCode": "Cod poștal",
+        "run": "Rulează",
+        "table": {
+          "method": "Metodă",
+          "rateFlat": "Tarif fix",
+          "ratePerKg": "Tarif/kg",
+          "computed": "Livrare calculată"
+        },
+        "result": {
+          "subtotal": "Subtotal",
+          "shipping": "Livrare",
+          "vat": "TVA",
+          "total": "Total",
+          "settingsTitle": "Instantaneu setări",
+          "settingsLine": "shipping_fee_ron={{fee}}, free_shipping_threshold_ron={{threshold}}"
+        },
+        "errors": {
+          "subtotalRequired": "Subtotalul este obligatoriu.",
+          "run": "Nu am putut rula simularea."
+        }
       }
     },
     "returns": {

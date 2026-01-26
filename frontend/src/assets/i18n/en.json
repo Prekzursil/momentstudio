@@ -1287,6 +1287,7 @@
       "coupons": "Coupons",
       "users": "Users",
       "support": "Support",
+      "ops": "Ops",
       "content": "Content"
     },
     "inventory": {
@@ -1544,6 +1545,79 @@
         "loadAssignees": "Could not load assignees.",
         "save": "Could not save changes.",
         "reply": "Could not send reply."
+      }
+    },
+    "ops": {
+      "banner": {
+        "title": "Maintenance banners",
+        "hint": "Schedule storefront announcement banners for downtime or promotions.",
+        "new": "New",
+        "creating": "Creating new banner",
+        "editing": "Editing banner",
+        "active": "Active",
+        "level": "Level",
+        "levelInfo": "Info",
+        "levelWarning": "Warning",
+        "levelPromo": "Promo",
+        "startsAt": "Starts at",
+        "endsAt": "Ends at",
+        "messageEn": "Message (EN)",
+        "messageRo": "Message (RO)",
+        "messagePh": "Write a short announcement…",
+        "linkUrl": "Link URL",
+        "linkUrlPh": "e.g. /shop or https://…",
+        "linkLabelEn": "Link label (EN)",
+        "linkLabelRo": "Link label (RO)",
+        "linkLabelPh": "e.g. Learn more",
+        "linkDefault": "Learn more",
+        "create": "Create",
+        "save": "Save",
+        "delete": "Delete",
+        "confirmDelete": "Delete this banner?",
+        "saved": "Banner saved.",
+        "deleted": "Banner deleted.",
+        "listTitle": "Recent banners",
+        "status": {
+          "active": "Active",
+          "scheduled": "Scheduled",
+          "expired": "Expired",
+          "disabled": "Disabled"
+        },
+        "errors": {
+          "load": "Could not load banners.",
+          "save": "Could not save banner.",
+          "delete": "Could not delete banner.",
+          "startsAtRequired": "Start time is required.",
+          "messageRequired": "Both language variants are required."
+        }
+      },
+      "shipping": {
+        "title": "Shipping rate simulator",
+        "hint": "Simulate totals for a sample subtotal and compare shipping methods.",
+        "subtotal": "Subtotal (RON)",
+        "discount": "Discount (RON)",
+        "method": "Shipping method",
+        "methodAuto": "Auto (checkout settings)",
+        "postalCode": "Postal code",
+        "run": "Run",
+        "table": {
+          "method": "Method",
+          "rateFlat": "Flat rate",
+          "ratePerKg": "Per-kg rate",
+          "computed": "Computed shipping"
+        },
+        "result": {
+          "subtotal": "Subtotal",
+          "shipping": "Shipping",
+          "vat": "VAT",
+          "total": "Total",
+          "settingsTitle": "Settings snapshot",
+          "settingsLine": "shipping_fee_ron={{fee}}, free_shipping_threshold_ron={{threshold}}"
+        },
+        "errors": {
+          "subtotalRequired": "Subtotal is required.",
+          "run": "Could not run simulation."
+        }
       }
     },
     "returns": {

@@ -774,8 +774,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Support: email guest submissions on staff replies (bilingual) so non-logged-in customers receive updates.
 - [x] Admin Returns: RMA status board – Kanban view for returns pipeline (requested/approved/received/refunded).
 - [x] Admin Returns: return label support – Upload/provide shipping labels for returns.
-- [ ] Admin Ops: maintenance banners – Schedule storefront announcement banners (planned downtime/promos).
-- [ ] Admin Ops: shipping rate simulator – Test shipping methods/rules for a sample cart/address.
+- [x] Admin Ops: maintenance banners – Schedule storefront announcement banners (planned downtime/promos).
+- [x] Admin Ops: shipping rate simulator – Test shipping methods/rules for a sample cart/address.
 - [ ] Admin Ops: webhook monitor – View recent provider webhooks and retry failed deliveries.
 - [ ] Admin Security: enforce 2FA for admins – Require TOTP/passkey for owner/admin roles.
 - [ ] Admin Security: IP allowlist – Optional allowlist/denylist for admin access with safe bypass flow.

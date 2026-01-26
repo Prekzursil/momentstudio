@@ -55,7 +55,8 @@ export class AdminLayoutComponent {
     { path: '/admin/returns', labelKey: 'adminUi.nav.returns', section: 'returns' },
     { path: '/admin/coupons', labelKey: 'adminUi.nav.coupons', section: 'coupons' },
     { path: '/admin/users', labelKey: 'adminUi.nav.users', section: 'users' },
-    { path: '/admin/support', labelKey: 'adminUi.nav.support', section: 'support' }
+    { path: '/admin/support', labelKey: 'adminUi.nav.support', section: 'support' },
+    { path: '/admin/ops', labelKey: 'adminUi.nav.ops', section: 'ops' }
   ];
 
   get navItems(): AdminNavItem[] {
