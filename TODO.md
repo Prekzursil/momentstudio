@@ -5,8 +5,11 @@ Below is a structured checklist you can turn into issues.
 ## Project & Infra
 - [x] Initialize monorepo with `backend/`, `frontend/`, `infra/`.
 - [x] Add `docker-compose.yml` for API, frontend, Postgres.
-- [x] Add backend `.env.example` (DATABASE_URL, SECRET_KEY, STRIPE_SECRET_KEY, SMTP_*, FRONTEND_ORIGIN).
-- [x] Add frontend `.env.example` (API_BASE_URL, STRIPE_PUBLISHABLE_KEY, APP_ENV).
+- [x] Add backend `.env.example` (DATABASE_URL, SECRET_KEY, STRIPE_ENV + Stripe keys, SMTP_*, FRONTEND_ORIGIN).
+- [x] Add frontend `.env.example` (API_BASE_URL, STRIPE_ENV + publishable keys, APP_ENV).
+- [x] Payments config: add `STRIPE_ENV` toggle (test/live) + env-specific keys for backend/frontend/docker.
+- [ ] E2E: add Playwright flow for Stripe Checkout success + decline/cancel (sandbox/test mode).
+- [ ] E2E: add PayPal sandbox e2e for success + decline/cancel (with a stable CI strategy or feature flag).
 - [x] Add `.gitignore` for Python, Node, env files, build artifacts.
 - [x] GitHub Actions for backend (lint, tests, type-checks).
 - [x] GitHub Actions for frontend (lint, tests, build).

@@ -49,7 +49,14 @@ const parsed = envPath ? parseDotEnv(fs.readFileSync(envPath, 'utf8')) : {};
 const apiBaseUrl = process.env.API_BASE_URL ?? parsed.API_BASE_URL ?? '/api/v1';
 const appEnv = process.env.APP_ENV ?? parsed.APP_ENV ?? 'development';
 const appVersion = process.env.APP_VERSION ?? parsed.APP_VERSION ?? packageVersion;
-const stripePublishableKey = process.env.STRIPE_PUBLISHABLE_KEY ?? parsed.STRIPE_PUBLISHABLE_KEY ?? '';
+const stripeEnvRaw = process.env.STRIPE_ENV ?? parsed.STRIPE_ENV ?? 'test';
+const stripeEnv = String(stripeEnvRaw).trim().toLowerCase();
+const stripeMode = stripeEnv === 'live' || stripeEnv === 'production' || stripeEnv === 'prod' ? 'live' : 'test';
+const stripePublishableKeyLegacy = process.env.STRIPE_PUBLISHABLE_KEY ?? parsed.STRIPE_PUBLISHABLE_KEY ?? '';
+const stripePublishableKeyTest = process.env.STRIPE_PUBLISHABLE_KEY_TEST ?? parsed.STRIPE_PUBLISHABLE_KEY_TEST ?? '';
+const stripePublishableKeyLive = process.env.STRIPE_PUBLISHABLE_KEY_LIVE ?? parsed.STRIPE_PUBLISHABLE_KEY_LIVE ?? '';
+const stripePublishableKey =
+  stripePublishableKeyLegacy || (stripeMode === 'live' ? stripePublishableKeyLive : stripePublishableKeyTest) || '';
 const paypalEnabledRaw = process.env.PAYPAL_ENABLED ?? parsed.PAYPAL_ENABLED ?? '';
 const netopiaEnabledRaw = process.env.NETOPIA_ENABLED ?? parsed.NETOPIA_ENABLED ?? '';
 const addressAutocompleteEnabledRaw = process.env.ADDRESS_AUTOCOMPLETE_ENABLED ?? parsed.ADDRESS_AUTOCOMPLETE_ENABLED ?? '';

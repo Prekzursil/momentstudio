@@ -18,12 +18,29 @@ truthy() {
 API_BASE_URL="${API_BASE_URL:-/api/v1}"
 APP_ENV="${APP_ENV:-production}"
 APP_VERSION="${APP_VERSION:-}"
+STRIPE_ENV_RAW="${STRIPE_ENV:-test}"
+STRIPE_PUBLISHABLE_KEY_TEST="${STRIPE_PUBLISHABLE_KEY_TEST:-}"
+STRIPE_PUBLISHABLE_KEY_LIVE="${STRIPE_PUBLISHABLE_KEY_LIVE:-}"
 STRIPE_PUBLISHABLE_KEY="${STRIPE_PUBLISHABLE_KEY:-}"
 PAYPAL_ENABLED="${PAYPAL_ENABLED:-}"
 NETOPIA_ENABLED="${NETOPIA_ENABLED:-}"
 ADDRESS_AUTOCOMPLETE_ENABLED="${ADDRESS_AUTOCOMPLETE_ENABLED:-}"
 SENTRY_DSN="${SENTRY_DSN:-}"
 CAPTCHA_SITE_KEY="${CAPTCHA_SITE_KEY:-}"
+
+stripe_env="$(printf '%s' "$STRIPE_ENV_RAW" | tr '[:upper:]' '[:lower:]' | sed 's/^ *//; s/ *$//')"
+case "$stripe_env" in
+  live|prod|production) stripe_mode="live" ;;
+  *) stripe_mode="test" ;;
+esac
+
+if [ -z "$STRIPE_PUBLISHABLE_KEY" ]; then
+  if [ "$stripe_mode" = "live" ]; then
+    STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY_LIVE"
+  else
+    STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY_TEST"
+  fi
+fi
 
 mkdir -p "$(dirname "$CONFIG_PATH")"
 

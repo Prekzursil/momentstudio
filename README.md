@@ -97,7 +97,7 @@ You can swap pieces later, but the initial design assumes:
 - **Local-only dev (quick start)**:  
   - Use SQLite by setting `DATABASE_URL=sqlite+aiosqlite:///./local.db` in `backend/.env` (already handled by pydantic settings).  
   - Media goes to the local `uploads/` directory; no S3 keys required.  
-  - Use Stripe test keys (`STRIPE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY`) and the built-in email console logger (no SMTP).  
+  - Use Stripe test keys (`STRIPE_ENV=test`, `STRIPE_SECRET_KEY_TEST`, `STRIPE_PUBLISHABLE_KEY_TEST`) and the built-in email console logger (no SMTP).  
   - Start both (recommended): `make dev` (or `./start.sh` / `start.bat`).  
   - Backend only: `cd backend && pip install -r requirements.txt && uvicorn app.main:app --reload`.  
   - Frontend only: `cd frontend && npm ci && npm start` (uses `frontend/.env` / `.env.example`; keep `API_BASE_URL=/api/v1` when using the dev proxy).
@@ -107,7 +107,7 @@ You can swap pieces later, but the initial design assumes:
   - Configure S3-compatible storage in `backend/.env` (bucket, region, access keys) and point `MEDIA_ROOT` to the mounted volume or S3 base path.  
   - SMTP settings (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`) for real email delivery.  
   - Optional: configure Sentry (`SENTRY_DSN` in `backend/.env` and `frontend/.env`) for error reporting.  
-  - Stripe live keys in `.env` (and webhook secret) plus HTTPS/TLS in the reverse proxy.  
+  - Stripe live keys in `.env` (`STRIPE_ENV=live` with `STRIPE_SECRET_KEY_LIVE`, and `STRIPE_WEBHOOK_SECRET_LIVE`) plus HTTPS/TLS in the reverse proxy.  
   - Run migrations: `cd backend && alembic upgrade head`.  
   - Build frontend: `cd frontend && npm install && npm run build` and serve the `dist/` output via your web server or CDN.
 
@@ -387,7 +387,7 @@ source .venv/bin/activate       # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 cp .env.example .env            # or .topsecret -> .env pattern
-# edit DATABASE_URL, SECRET_KEY, STRIPE_SECRET_KEY, SMTP_*
+# edit DATABASE_URL, SECRET_KEY, STRIPE_ENV/STRIPE_SECRET_KEY_TEST, SMTP_*
 
 alembic upgrade head
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -402,7 +402,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 cd frontend
 npm install
 cp .env.example .env            # or .env.local if you prefer
-# set API_BASE_URL, STRIPE_PUBLISHABLE_KEY, etc.
+# set API_BASE_URL, STRIPE_ENV/STRIPE_PUBLISHABLE_KEY_TEST, etc.
 
 npm start
 ```
