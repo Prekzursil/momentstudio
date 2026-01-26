@@ -14,6 +14,7 @@ async function loginAsOwner(page: Page): Promise<void> {
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('lang', 'en');
+    localStorage.setItem('admin.onboarding.v1', JSON.stringify({ completed_at: new Date().toISOString() }));
   });
 });
 

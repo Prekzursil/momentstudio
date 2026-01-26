@@ -62,6 +62,8 @@ async def _has_passkey(session: AsyncSession, user_id: UUID) -> bool:
 async def _require_admin_mfa(session: AsyncSession, user: User) -> None:
     if user.role not in (UserRole.admin, UserRole.owner):
         return
+    if not getattr(settings, "admin_mfa_required", True):
+        return
     if bool(getattr(user, "two_factor_enabled", False)):
         return
     if await _has_passkey(session, user.id):

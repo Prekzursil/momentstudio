@@ -6,6 +6,7 @@ const OWNER_PASSWORD = process.env.E2E_OWNER_PASSWORD || 'Password123';
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('lang', 'en');
+    localStorage.setItem('admin.onboarding.v1', JSON.stringify({ completed_at: new Date().toISOString() }));
   });
 });
 
@@ -109,6 +110,6 @@ test('owner can sign in and reach admin dashboard', async ({ page }) => {
   await expect(viewAdmin).toBeVisible();
   await viewAdmin.click();
 
-  await expect(page).toHaveURL(/\/admin(\/orders)?$/);
-  await expect(page.getByRole('heading', { name: 'Orders' })).toBeVisible();
+  await expect(page).toHaveURL(/\/admin\/dashboard/);
+  await expect(page.getByRole('heading', { name: 'Admin dashboard' })).toBeVisible();
 });

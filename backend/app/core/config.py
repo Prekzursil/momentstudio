@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     cookie_samesite: str = "lax"
     maintenance_mode: bool = False
     maintenance_bypass_token: str = "bypass-token"
+    # Enforce 2FA/passkeys for owner/admin access to admin APIs.
+    # In production, keep this enabled. For local dev/CI smoke tests, you can disable it.
+    admin_mfa_required: bool = True
     admin_ip_allowlist: list[str] = []
     admin_ip_denylist: list[str] = []
     admin_ip_header: str | None = None
