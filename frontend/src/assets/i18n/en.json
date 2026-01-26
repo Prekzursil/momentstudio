@@ -1290,6 +1290,20 @@
       "ops": "Ops",
       "content": "Content"
     },
+    "security": {
+      "mfaRequired": "Two-factor authentication or a passkey is required for admin access."
+    },
+    "ipBypass": {
+      "title": "Admin access restricted",
+      "copy": "Admin access is restricted by IP. Enter the bypass token to continue on this device.",
+      "tokenLabel": "Bypass token",
+      "tokenPh": "Paste bypass token",
+      "submit": "Enable bypass",
+      "clear": "Clear bypass",
+      "success": "Bypass enabled for this device.",
+      "cleared": "Bypass cleared.",
+      "restricted": "Admin access is restricted from this IP. Use the bypass token or contact the owner."
+    },
     "inventory": {
       "title": "Inventory",
       "hint": "Low-stock restock list with reserved stock visibility.",

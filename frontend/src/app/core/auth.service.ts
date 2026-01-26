@@ -154,6 +154,10 @@ export interface UserCooldownsResponse {
   email: CooldownInfo;
 }
 
+export interface AdminAccessResponse {
+  allowed: boolean;
+}
+
 type StorageMode = 'local' | 'session';
 
 @Injectable({ providedIn: 'root' })
@@ -569,6 +573,20 @@ export class AuthService {
 
   loadCurrentUser(): Observable<AuthUser> {
     return this.api.get<AuthUser>('/auth/me').pipe(tap((user) => this.setUser(user)));
+  }
+
+  checkAdminAccess(opts?: { silent?: boolean }): Observable<AdminAccessResponse> {
+    const silent = opts?.silent ?? true;
+    const headers = silent ? { 'X-Silent': '1' } : undefined;
+    return this.api.get<AdminAccessResponse>('/auth/admin/access', undefined, headers);
+  }
+
+  setAdminIpBypass(token: string): Observable<void> {
+    return this.api.post<void>('/auth/admin/ip-bypass', { token });
+  }
+
+  clearAdminIpBypass(): Observable<void> {
+    return this.api.delete<void>('/auth/admin/ip-bypass');
   }
 
   ensureAuthenticated(opts?: { silent?: boolean }): Observable<boolean> {

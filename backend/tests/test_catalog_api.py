@@ -16,6 +16,7 @@ from app.db.session import get_session
 from app.models.cart import Cart, CartItem
 from app.models.user import UserRole
 from app.models.catalog import BackInStockRequest, Category, CategoryTranslation, Product, ProductAuditLog, ProductTranslation
+from app.models.passkeys import UserPasskey
 from app.services.auth import create_user
 from app.schemas.user import UserCreate
 from app.core.config import settings
@@ -52,6 +53,16 @@ def create_admin_token(session_factory, email="admin@example.com"):
         async with session_factory() as session:
             user = await create_user(session, UserCreate(email=email, password="adminpass", name="Admin"))
             user.role = UserRole.admin
+            session.add(
+                UserPasskey(
+                    user_id=user.id,
+                    name="Test Passkey",
+                    credential_id=f"cred-{user.id}",
+                    public_key=b"test",
+                    sign_count=0,
+                    backed_up=False,
+                )
+            )
             await session.commit()
             from app.services.auth import issue_tokens_for_user
 

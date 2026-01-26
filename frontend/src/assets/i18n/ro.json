@@ -1290,6 +1290,20 @@
       "ops": "Operațiuni",
       "content": "Conținut"
     },
+    "security": {
+      "mfaRequired": "Autentificarea cu doi factori sau o passkey este necesară pentru accesul de administrare."
+    },
+    "ipBypass": {
+      "title": "Acces admin restricționat",
+      "copy": "Accesul de administrare este restricționat pe bază de IP. Introdu tokenul de bypass pentru a continua pe acest dispozitiv.",
+      "tokenLabel": "Token bypass",
+      "tokenPh": "Lipește tokenul de bypass",
+      "submit": "Activează bypass",
+      "clear": "Șterge bypass",
+      "success": "Bypass activat pentru acest dispozitiv.",
+      "cleared": "Bypass șters.",
+      "restricted": "Accesul de administrare este restricționat de pe acest IP. Folosește tokenul de bypass sau contactează proprietarul."
+    },
     "inventory": {
       "title": "Stocuri",
       "hint": "Listă de reaprovizionare cu vizibilitate pentru stocul rezervat.",

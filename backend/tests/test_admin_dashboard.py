@@ -25,6 +25,7 @@ from app.models.content import ContentAuditLog, ContentBlock, ContentStatus
 from app.models.coupons_v2 import Promotion, PromotionDiscountType
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.promo import PromoCode
+from app.models.passkeys import UserPasskey
 from app.models.user import AdminAuditLog, RefreshSession, User, UserRole
 
 
@@ -62,6 +63,17 @@ async def seed_admin(session_factory):
             role=UserRole.admin,
         )
         session.add(admin)
+        await session.flush()
+        session.add(
+            UserPasskey(
+                user_id=admin.id,
+                name="Test Passkey",
+                credential_id=f"cred-{admin.id}",
+                public_key=b"test",
+                sign_count=0,
+                backed_up=False,
+            )
+        )
         await session.commit()
 
 
@@ -77,6 +89,17 @@ async def seed_owner(session_factory):
             role=UserRole.owner,
         )
         session.add(owner)
+        await session.flush()
+        session.add(
+            UserPasskey(
+                user_id=owner.id,
+                name="Test Passkey",
+                credential_id=f"cred-{owner.id}",
+                public_key=b"test",
+                sign_count=0,
+                backed_up=False,
+            )
+        )
         await session.commit()
 
 

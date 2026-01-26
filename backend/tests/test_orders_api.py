@@ -18,6 +18,7 @@ from app.models.catalog import Category, Product, ProductStatus
 from app.models.cart import Cart, CartItem
 from app.models.coupons_v2 import Coupon, CouponRedemption, CouponReservation, CouponVisibility, Promotion, PromotionDiscountType
 from app.models.order import Order, OrderEvent, OrderStatus, OrderItem
+from app.models.passkeys import UserPasskey
 from app.models.user import User, UserRole
 from app.services.auth import create_user, issue_tokens_for_user
 from app.schemas.user import UserCreate
@@ -62,6 +63,16 @@ def create_user_token(session_factory, email="buyer@example.com", admin: bool = 
             user.email_verified = True
             if admin:
                 user.role = UserRole.admin
+                session.add(
+                    UserPasskey(
+                        user_id=user.id,
+                        name="Test Passkey",
+                        credential_id=f"cred-{user.id}",
+                        public_key=b"test",
+                        sign_count=0,
+                        backed_up=False,
+                    )
+                )
             await session.commit()
             await session.refresh(user)
             tokens = await issue_tokens_for_user(session, user)

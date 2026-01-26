@@ -16,7 +16,13 @@ from webauthn.helpers import base64url_to_bytes
 
 from app.core import security
 from app.core.config import settings
-from app.core.dependencies import get_current_user, get_google_completion_user, require_admin, require_complete_profile
+from app.core.dependencies import (
+    get_current_user,
+    get_google_completion_user,
+    require_admin,
+    require_admin_section,
+    require_complete_profile,
+)
 from app.core.rate_limit import limiter, per_identifier_limiter
 from app.core.security import decode_token
 from app.db.session import get_session
@@ -120,6 +126,28 @@ def set_refresh_cookie(response: Response, token: str, *, persistent: bool = Tru
 def clear_refresh_cookie(response: Response) -> None:
     response.delete_cookie(
         "refresh_token",
+        path="/",
+        secure=settings.secure_cookies,
+        samesite=settings.cookie_samesite.lower(),
+    )
+
+
+def set_admin_ip_bypass_cookie(response: Response, token: str) -> None:
+    max_age = max(60, int(settings.admin_ip_bypass_cookie_minutes) * 60)
+    response.set_cookie(
+        "admin_ip_bypass",
+        token,
+        httponly=True,
+        secure=settings.secure_cookies,
+        samesite=settings.cookie_samesite.lower(),
+        path="/",
+        max_age=max_age,
+    )
+
+
+def clear_admin_ip_bypass_cookie(response: Response) -> None:
+    response.delete_cookie(
+        "admin_ip_bypass",
         path="/",
         secure=settings.secure_cookies,
         samesite=settings.cookie_samesite.lower(),
@@ -917,7 +945,50 @@ async def logout(
         await auth_service.revoke_refresh_token(session, payload_data["jti"], reason="logout")
     if response:
         clear_refresh_cookie(response)
+        clear_admin_ip_bypass_cookie(response)
     return None
+
+
+class AdminIpBypassRequest(BaseModel):
+    token: str = Field(min_length=1, max_length=256)
+
+
+@router.post("/admin/ip-bypass", status_code=status.HTTP_204_NO_CONTENT, summary="Bypass admin IP allowlist for this device")
+async def admin_ip_bypass(
+    payload: AdminIpBypassRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin),
+    response: Response = None,
+) -> None:
+    secret = (settings.admin_ip_bypass_token or "").strip()
+    if not secret:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Admin IP bypass is not configured")
+    if (payload.token or "").strip() != secret:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid bypass token")
+    token = security.create_admin_ip_bypass_token(str(current_user.id))
+    if response:
+        set_admin_ip_bypass_cookie(response, token)
+    await auth_service.record_security_event(
+        session,
+        current_user.id,
+        "admin_ip_bypass_used",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    return None
+
+
+@router.delete("/admin/ip-bypass", status_code=status.HTTP_204_NO_CONTENT, summary="Clear admin IP bypass for this device")
+async def clear_admin_ip_bypass(response: Response = None) -> None:
+    if response:
+        clear_admin_ip_bypass_cookie(response)
+    return None
+
+
+@router.get("/admin/access", status_code=status.HTTP_200_OK, summary="Check whether this session can access the admin UI")
+async def admin_access(_: User = Depends(require_admin_section("dashboard"))) -> dict:
+    return {"allowed": True}
 
 
 @router.post("/password/change", status_code=status.HTTP_200_OK)

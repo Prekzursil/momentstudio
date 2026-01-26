@@ -26,6 +26,7 @@ from app.models.coupons_v2 import (
     PromotionScopeMode,
 )
 from app.models.order import Order, OrderItem, OrderStatus
+from app.models.passkeys import UserPasskey
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate
 from app.services import cart as cart_service
@@ -91,6 +92,19 @@ def promote_user(session_factory: async_sessionmaker, *, user_id: UUID, role: Us
             user = await session.get(User, user_id)
             assert user is not None
             user.role = role
+            if role in (UserRole.admin, UserRole.owner):
+                existing = await session.scalar(select(UserPasskey.id).where(UserPasskey.user_id == user.id).limit(1))
+                if not existing:
+                    session.add(
+                        UserPasskey(
+                            user_id=user.id,
+                            name="Test Passkey",
+                            credential_id=f"cred-{user.id}",
+                            public_key=b"test",
+                            sign_count=0,
+                            backed_up=False,
+                        )
+                    )
             session.add(user)
             await session.commit()
 

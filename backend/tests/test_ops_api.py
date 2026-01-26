@@ -11,6 +11,7 @@ from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
 from app.models.user import UserRole
+from app.models.passkeys import UserPasskey
 from app.models.webhook import StripeWebhookEvent
 from app.schemas.user import UserCreate
 from app.services.auth import create_user, issue_tokens_for_user
@@ -51,6 +52,16 @@ def create_admin_token(session_factory) -> str:
             )
             user.email_verified = True
             user.role = UserRole.admin
+            session.add(
+                UserPasskey(
+                    user_id=user.id,
+                    name="Test Passkey",
+                    credential_id=f"cred-{user.id}",
+                    public_key=b"test",
+                    sign_count=0,
+                    backed_up=False,
+                )
+            )
             await session.commit()
             await session.refresh(user)
             tokens = await issue_tokens_for_user(session, user)

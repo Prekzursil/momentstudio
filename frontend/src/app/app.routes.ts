@@ -164,6 +164,11 @@ export const routes: Routes = [
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       {
+        path: 'ip-bypass',
+        loadComponent: () => import('./pages/admin/ip-bypass/admin-ip-bypass.component').then((m) => m.AdminIpBypassComponent),
+        title: 'Admin access | momentstudio'
+      },
+      {
         path: 'dashboard',
         loadComponent: () => import('./pages/admin/dashboard/admin-dashboard.component').then((m) => m.AdminDashboardComponent),
         canActivate: [adminSectionGuard('dashboard')],

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
+from app.models.passkeys import UserPasskey
 from app.models.user import UserRole
 from app.schemas.user import UserCreate
 from app.services.auth import create_user, issue_tokens_for_user
@@ -45,6 +46,17 @@ def create_user_token(session_factory, *, email: str, role: UserRole = UserRole.
         async with session_factory() as session:
             user = await create_user(session, UserCreate(email=email, password="password123", name="User"))
             user.role = role
+            if role in (UserRole.admin, UserRole.owner):
+                session.add(
+                    UserPasskey(
+                        user_id=user.id,
+                        name="Test Passkey",
+                        credential_id=f"cred-{user.id}",
+                        public_key=b"test",
+                        sign_count=0,
+                        backed_up=False,
+                    )
+                )
             await session.commit()
             tokens = await issue_tokens_for_user(session, user)
             return tokens["access_token"]

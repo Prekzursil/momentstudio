@@ -68,6 +68,12 @@ def create_refresh_token(subject: str, jti: str, expires_at: datetime | None = N
     return _create_token_with_claims(subject, "refresh", delta, jti=jti)
 
 
+def create_admin_ip_bypass_token(subject: str, *, expires_minutes: int | None = None) -> str:
+    minutes = int(expires_minutes if expires_minutes is not None else settings.admin_ip_bypass_cookie_minutes)
+    minutes = max(1, minutes)
+    return _create_token_with_claims(subject, "admin_ip_bypass", timedelta(minutes=minutes))
+
+
 def create_google_completion_token(subject: str) -> str:
     return _create_token_with_claims(subject, "google_completion", timedelta(minutes=settings.google_completion_token_exp_minutes))
 

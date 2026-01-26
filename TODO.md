@@ -777,8 +777,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Ops: maintenance banners – Schedule storefront announcement banners (planned downtime/promos).
 - [x] Admin Ops: shipping rate simulator – Test shipping methods/rules for a sample cart/address.
 - [x] Admin Ops: webhook monitor – View recent provider webhooks and retry failed deliveries.
-- [ ] Admin Security: enforce 2FA for admins – Require TOTP/passkey for owner/admin roles.
-- [ ] Admin Security: IP allowlist – Optional allowlist/denylist for admin access with safe bypass flow.
+- [x] Admin Security: enforce 2FA for admins – Require TOTP/passkey for owner/admin roles.
+- [x] Admin Security: IP allowlist – Optional allowlist/denylist for admin access with safe bypass flow.
 - [ ] Admin Audit: retention + export – Export audit logs with retention policies and redaction options.
 - [ ] Admin Audit: tamper-evident logging – Optional hash-chaining for stronger audit integrity.
 - [ ] Admin Compliance: default PII masking – Mask customer PII by default with explicit reveal permission.

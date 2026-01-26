@@ -19,6 +19,7 @@ from app.models.order import Order, OrderStatus
 from app.models.address import Address
 from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.support import ContactSubmission, ContactSubmissionTopic, ContactSubmissionStatus
+from app.models.passkeys import UserPasskey
 from app.models.user import User, UserRole
 from app.models.user import UserSecurityEvent
 
@@ -77,7 +78,19 @@ async def seed(session_factory):
             name="Customer",
             role=UserRole.customer,
         )
-        session.add_all([admin, customer])
+        session.add(admin)
+        await session.flush()
+        session.add(
+            UserPasskey(
+                user_id=admin.id,
+                name="Test Passkey",
+                credential_id=f"cred-{admin.id}",
+                public_key=b"test",
+                sign_count=0,
+                backed_up=False,
+            )
+        )
+        session.add(customer)
         category = Category(slug="art", name="Art", sort_order=1)
         session.add(category)
         await session.flush()

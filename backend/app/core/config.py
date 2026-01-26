@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     cookie_samesite: str = "lax"
     maintenance_mode: bool = False
     maintenance_bypass_token: str = "bypass-token"
+    admin_ip_allowlist: list[str] = []
+    admin_ip_denylist: list[str] = []
+    admin_ip_header: str | None = None
+    admin_ip_bypass_token: str | None = None
+    admin_ip_bypass_cookie_minutes: int = 30
     max_concurrent_requests: int = 100
     enforce_decimal_prices: bool = True
     coupon_reservation_ttl_minutes: int = 60 * 24

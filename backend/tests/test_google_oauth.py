@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
+from app.models.passkeys import UserPasskey
 from app.models.user import User, UserRole
 from app.services import auth as auth_service
 
@@ -372,6 +373,16 @@ def test_admin_cleanup_incomplete_google_accounts(monkeypatch: pytest.MonkeyPatc
         async with SessionLocal() as session:
             user = (await session.execute(select(User).where(User.email == "cleanup-admin@example.com"))).scalar_one()
             user.role = UserRole.admin
+            session.add(
+                UserPasskey(
+                    user_id=user.id,
+                    name="Test Passkey",
+                    credential_id=f"cred-{user.id}",
+                    public_key=b"test",
+                    sign_count=0,
+                    backed_up=False,
+                )
+            )
 
             old_user = await auth_service.create_google_user(
                 session,

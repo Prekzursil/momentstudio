@@ -16,6 +16,7 @@ from app.main import app
 from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_session
+from app.models.passkeys import UserPasskey
 from app.models.user import User, UserRole, UserDisplayNameHistory, UserUsernameHistory
 
 
@@ -469,6 +470,16 @@ def test_admin_guard(test_app: Dict[str, object]) -> None:
             result = await session.execute(select(User).where(User.email == "admin@example.com"))
             user = result.scalar_one()
             user.role = UserRole.admin
+            session.add(
+                UserPasskey(
+                    user_id=user.id,
+                    name="Test Passkey",
+                    credential_id=f"cred-{user.id}",
+                    public_key=b"test",
+                    sign_count=0,
+                    backed_up=False,
+                )
+            )
             await session.commit()
 
     asyncio.run(promote())
