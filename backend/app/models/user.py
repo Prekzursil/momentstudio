@@ -48,6 +48,7 @@ class User(Base):
     vip: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     admin_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     admin_favorites: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+    admin_training_mode: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     locked_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     password_reset_required: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")

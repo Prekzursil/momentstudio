@@ -24,6 +24,10 @@ class RefreshRequest(BaseModel):
     refresh_token: str | None = None
 
 
+class TrainingModeUpdateRequest(BaseModel):
+    enabled: bool = False
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -47,6 +51,7 @@ class UserResponse(BaseModel):
     google_sub: str | None = None
     google_email: str | None = None
     google_picture_url: str | None = None
+    admin_training_mode: bool = False
     role: UserRole
     created_at: datetime
     updated_at: datetime

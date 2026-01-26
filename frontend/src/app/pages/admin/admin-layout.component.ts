@@ -59,6 +59,27 @@ type AdminNavItem = {
             {{ 'adminUi.nav.searchEmpty' | translate }}
           </div>
 
+          <div class="px-3 pb-2">
+            <div class="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+              <span>{{ 'adminUi.trainingMode.title' | translate }}</span>
+              <label class="inline-flex items-center gap-2 text-xs font-medium normal-case text-slate-600 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  [checked]="isTrainingMode()"
+                  [disabled]="trainingSaving"
+                  (change)="toggleTrainingMode($event)"
+                />
+                <span>{{ isTrainingMode() ? ('adminUi.trainingMode.on' | translate) : ('adminUi.trainingMode.off' | translate) }}</span>
+              </label>
+            </div>
+            <div *ngIf="isTrainingMode()" class="mt-1 text-xs text-amber-700 dark:text-amber-200">
+              {{ 'adminUi.trainingMode.hint' | translate }}
+            </div>
+            <div *ngIf="trainingError" class="mt-1 text-xs text-rose-700 dark:text-rose-200">
+              {{ trainingError }}
+            </div>
+          </div>
+
           <div *ngIf="shouldShowAlerts()" class="pb-2">
             <div class="flex items-center justify-between px-3 pb-1 text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
               <span>{{ 'adminUi.alerts.title' | translate }}</span>
@@ -197,6 +218,8 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
   lowStockCount = 0;
   failedWebhooksCount = 0;
   failedEmailsCount = 0;
+  trainingSaving = false;
+  trainingError: string | null = null;
 
   private readonly allNavItems: AdminNavItem[] = [
     { path: '/admin/dashboard', labelKey: 'adminUi.nav.dashboard', section: 'dashboard', exact: true },
@@ -240,6 +263,27 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     return items.filter((item) => {
       const label = this.navLabel(item).toLowerCase();
       return label.includes(query) || item.section.includes(query);
+    });
+  }
+
+  isTrainingMode(): boolean {
+    return Boolean(this.auth.user()?.admin_training_mode);
+  }
+
+  toggleTrainingMode(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    const enabled = Boolean(target?.checked);
+    if (this.trainingSaving) return;
+    this.trainingSaving = true;
+    this.trainingError = null;
+    this.auth.updateTrainingMode(enabled).subscribe({
+      next: () => {
+        this.trainingSaving = false;
+      },
+      error: () => {
+        this.trainingSaving = false;
+        this.trainingError = this.translate.instant('adminUi.trainingMode.errors.save');
+      }
     });
   }
 
