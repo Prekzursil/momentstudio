@@ -146,3 +146,13 @@ class TicketRead(BaseModel):
     updated_at: datetime
     resolved_at: datetime | None = None
     messages: list[TicketMessageRead]
+
+
+class SupportSlaSettingsRead(BaseModel):
+    first_reply_hours: int = Field(default=24, ge=1, le=720)
+    resolution_hours: int = Field(default=72, ge=1, le=720)
+
+
+class SupportSlaSettingsUpdate(BaseModel):
+    first_reply_hours: int = Field(default=24, ge=1, le=720)
+    resolution_hours: int = Field(default=72, ge=1, le=720)

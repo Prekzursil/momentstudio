@@ -9,12 +9,15 @@ from app.core.config import settings
 from app.core.dependencies import (
     get_current_user,
     get_current_user_optional,
+    require_admin,
     require_admin_section,
 )
 from app.db.session import get_session
 from app.models.support import ContactSubmissionStatus, ContactSubmissionTopic
+from app.models.content import ContentStatus
 from app.models.user import User
 from app.schemas.admin_common import AdminPaginationMeta
+from app.schemas.content import ContentBlockUpdate
 from app.schemas.support import (
     ContactSubmissionCreate,
     ContactSubmissionListItem,
@@ -30,8 +33,11 @@ from app.schemas.support import (
     TicketMessageCreate,
     TicketMessageRead,
     TicketRead,
+    SupportSlaSettingsRead,
+    SupportSlaSettingsUpdate,
 )
 from app.services import auth as auth_service
+from app.services import content as content_service
 from app.services import email as email_service
 from app.services import support as support_service
 from app.services import pii as pii_service
@@ -391,3 +397,55 @@ async def admin_reply_contact_submission(
         )
     out = ContactSubmissionRead.model_validate(updated)
     return out if include_pii else _mask_contact_submission_read(out)
+
+
+_SUPPORT_SLA_SETTINGS_KEY = "site.support_sla"
+_DEFAULT_SUPPORT_FIRST_REPLY_HOURS = 24
+_DEFAULT_SUPPORT_RESOLUTION_HOURS = 72
+
+
+def _parse_sla_hours(value: object | None, *, fallback: int) -> int:
+    try:
+        raw = int(value) if value is not None else fallback
+    except Exception:
+        raw = fallback
+    return max(1, min(720, raw))
+
+
+@router.get("/admin/sla-settings", response_model=SupportSlaSettingsRead)
+async def admin_support_sla_settings(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("support")),
+) -> SupportSlaSettingsRead:
+    block = await content_service.get_published_by_key_following_redirects(session, _SUPPORT_SLA_SETTINGS_KEY)
+    meta = (getattr(block, "meta", None) or {}) if block else {}
+    first_reply = _parse_sla_hours(meta.get("support_sla_first_reply_hours"), fallback=_DEFAULT_SUPPORT_FIRST_REPLY_HOURS)
+    resolution = _parse_sla_hours(meta.get("support_sla_resolution_hours"), fallback=_DEFAULT_SUPPORT_RESOLUTION_HOURS)
+    return SupportSlaSettingsRead(first_reply_hours=first_reply, resolution_hours=resolution)
+
+
+@router.patch("/admin/sla-settings", response_model=SupportSlaSettingsRead)
+async def admin_update_support_sla_settings(
+    payload: SupportSlaSettingsUpdate,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin),
+) -> SupportSlaSettingsRead:
+    meta = {
+        "support_sla_first_reply_hours": int(payload.first_reply_hours),
+        "support_sla_resolution_hours": int(payload.resolution_hours),
+    }
+    updated = await content_service.upsert_block(
+        session,
+        _SUPPORT_SLA_SETTINGS_KEY,
+        ContentBlockUpdate(
+            title="Support SLA settings",
+            body_markdown="SLA thresholds for support tickets.",
+            status=ContentStatus.published,
+            meta=meta,
+        ),
+        actor_id=admin.id,
+    )
+    merged_meta = (getattr(updated, "meta", None) or {}) if updated else {}
+    first_reply = _parse_sla_hours(merged_meta.get("support_sla_first_reply_hours"), fallback=_DEFAULT_SUPPORT_FIRST_REPLY_HOURS)
+    resolution = _parse_sla_hours(merged_meta.get("support_sla_resolution_hours"), fallback=_DEFAULT_SUPPORT_RESOLUTION_HOURS)
+    return SupportSlaSettingsRead(first_reply_hours=first_reply, resolution_hours=resolution)
