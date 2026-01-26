@@ -61,6 +61,19 @@ export interface AdminDashboardSearchResponse {
   items: AdminDashboardSearchResult[];
 }
 
+export type AdminClientErrorKind = 'window_error' | 'unhandled_rejection';
+
+export interface AdminClientErrorIn {
+  kind: AdminClientErrorKind;
+  message: string;
+  stack?: string | null;
+  url?: string | null;
+  route?: string | null;
+  user_agent?: string | null;
+  context?: Record<string, any> | null;
+  occurred_at?: string | null;
+}
+
 export interface ScheduledPublishItem {
   id: string;
   slug: string;
@@ -615,6 +628,10 @@ export class AdminService {
 
   scheduledTasks(): Observable<AdminDashboardScheduledTasksResponse> {
     return this.api.get<AdminDashboardScheduledTasksResponse>('/admin/dashboard/scheduled-tasks');
+  }
+
+  logClientError(payload: AdminClientErrorIn): Observable<void> {
+    return this.api.post<void>('/admin/observability/client-errors', payload, { 'X-Silent': '1' });
   }
 
   products(): Observable<AdminProduct[]> {
