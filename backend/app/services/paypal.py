@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.services import fx_rates
 
 _token_cache: dict[str, dict[str, object]] = {}
-_SUPPORTED_CURRENCIES = {"EUR", "USD"}
+_SUPPORTED_CURRENCIES = {"EUR", "USD", "RON"}
 
 
 def _paypal_env() -> str:
@@ -25,11 +25,13 @@ def _paypal_currency(currency_code: str | None = None) -> str:
         return raw
     raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail=f"Unsupported PayPal currency {raw!r}; configure PAYPAL_CURRENCY as EUR or USD",
+        detail=f"Unsupported PayPal currency {raw!r}; configure PAYPAL_CURRENCY as RON, EUR or USD",
     )
 
 
 async def _fx_per_ron(currency_code: str, *, fx_eur_per_ron: float | None, fx_usd_per_ron: float | None) -> Decimal:
+    if currency_code == "RON":
+        return Decimal("1.0")
     if currency_code == "EUR" and fx_eur_per_ron:
         return Decimal(str(fx_eur_per_ron))
     if currency_code == "USD" and fx_usd_per_ron:

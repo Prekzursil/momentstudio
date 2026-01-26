@@ -18,18 +18,21 @@ class Settings(BaseSettings):
     stripe_secret_key: str = "sk_test_placeholder"
     stripe_publishable_key: str | None = None
     stripe_webhook_secret: str | None = None
-    # Stripe env toggle (similar to PayPal). Prefer *_TEST/*_LIVE, with legacy fallbacks.
-    stripe_env: str = "test"  # test | live
+    # Stripe env toggle (similar to PayPal). Prefer *_SANDBOX/*_LIVE, with *_TEST as legacy aliases.
+    stripe_env: str = "sandbox"  # sandbox | live
+    stripe_secret_key_sandbox: str | None = None
     stripe_secret_key_test: str | None = None
     stripe_secret_key_live: str | None = None
+    stripe_publishable_key_sandbox: str | None = None
     stripe_publishable_key_test: str | None = None
     stripe_publishable_key_live: str | None = None
+    stripe_webhook_secret_sandbox: str | None = None
     stripe_webhook_secret_test: str | None = None
     stripe_webhook_secret_live: str | None = None
     paypal_client_id: str | None = None
     paypal_client_secret: str | None = None
     paypal_env: str = "sandbox"
-    paypal_currency: str = "EUR"
+    paypal_currency: str = "RON"
     paypal_webhook_id: str | None = None
     paypal_client_id_sandbox: str | None = None
     paypal_client_secret_sandbox: str | None = None

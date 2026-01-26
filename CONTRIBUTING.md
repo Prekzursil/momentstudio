@@ -21,7 +21,7 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env  # set DATABASE_URL, SECRET_KEY, STRIPE_ENV/STRIPE_SECRET_KEY_TEST, SMTP_*, FRONTEND_ORIGIN
+cp .env.example .env  # set DATABASE_URL, SECRET_KEY, STRIPE_ENV/STRIPE_SECRET_KEY_SANDBOX, SMTP_*, FRONTEND_ORIGIN
 alembic upgrade head
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
@@ -31,7 +31,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 cd frontend
 npm install
-cp .env.example .env  # set API_BASE_URL, STRIPE_ENV/STRIPE_PUBLISHABLE_KEY_TEST, APP_ENV
+cp .env.example .env  # set API_BASE_URL, STRIPE_ENV/STRIPE_PUBLISHABLE_KEY_SANDBOX, APP_ENV
 npm start
 ```
 

@@ -45,6 +45,6 @@ For local development you can use the Stripe CLI:
 stripe listen --forward-to http://localhost:8001/api/v1/payments/webhook
 ```
 
-Then copy the printed signing secret into `backend/.env` as `STRIPE_WEBHOOK_SECRET_TEST=...` (or legacy `STRIPE_WEBHOOK_SECRET=...`).
+Then copy the printed signing secret into `backend/.env` as `STRIPE_WEBHOOK_SECRET_SANDBOX=...` (or legacy `STRIPE_WEBHOOK_SECRET=...` / `*_TEST`).
 
 Note: for live webhooks, set `STRIPE_ENV=live` and use `STRIPE_WEBHOOK_SECRET_LIVE=...` instead.

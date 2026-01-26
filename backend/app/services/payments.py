@@ -19,11 +19,11 @@ stripe = cast(Any, stripe)
 _STRIPE_PLACEHOLDER_SUFFIX = "_placeholder"
 
 
-def _stripe_env() -> Literal["test", "live"]:
-    raw = (settings.stripe_env or "test").strip().lower()
+def _stripe_env() -> Literal["sandbox", "live"]:
+    raw = (settings.stripe_env or "sandbox").strip().lower()
     if raw in {"live", "production", "prod"}:
         return "live"
-    return "test"
+    return "sandbox"
 
 
 def _looks_configured(value: str | None) -> bool:
@@ -36,13 +36,23 @@ def _looks_configured(value: str | None) -> bool:
 def stripe_secret_key() -> str:
     if _stripe_env() == "live":
         return (settings.stripe_secret_key_live or settings.stripe_secret_key or "").strip()
-    return (settings.stripe_secret_key_test or settings.stripe_secret_key or "").strip()
+    return (
+        settings.stripe_secret_key_sandbox
+        or settings.stripe_secret_key_test
+        or settings.stripe_secret_key
+        or ""
+    ).strip()
 
 
 def stripe_webhook_secret() -> str:
     if _stripe_env() == "live":
         return (settings.stripe_webhook_secret_live or settings.stripe_webhook_secret or "").strip()
-    return (settings.stripe_webhook_secret_test or settings.stripe_webhook_secret or "").strip()
+    return (
+        settings.stripe_webhook_secret_sandbox
+        or settings.stripe_webhook_secret_test
+        or settings.stripe_webhook_secret
+        or ""
+    ).strip()
 
 
 def is_stripe_configured() -> bool:
