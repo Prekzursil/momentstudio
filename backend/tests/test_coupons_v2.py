@@ -1180,6 +1180,14 @@ def test_admin_segment_bulk_job_assign_and_revoke() -> None:
         else:
             raise AssertionError(f"job did not finish: {job_res.json()}")
 
+        global_list = client.get(
+            "/api/v1/coupons/admin/coupons/bulk-jobs?limit=10",
+            headers=auth_headers(admin_token),
+        )
+        assert global_list.status_code == 200, global_list.text
+        ids = [row["id"] for row in global_list.json()]
+        assert job_id in ids
+
         async def _assert_assigned() -> None:
             async with SessionLocal() as session:
                 assigned = (
@@ -1257,5 +1265,14 @@ def test_admin_segment_bulk_job_assign_and_revoke() -> None:
                 assert (assigned.revoked_reason or "").startswith("cleanup")
 
         asyncio.run(_assert_revoked())
+
+        global_list = client.get(
+            "/api/v1/coupons/admin/coupons/bulk-jobs?limit=10",
+            headers=auth_headers(admin_token),
+        )
+        assert global_list.status_code == 200, global_list.text
+        ids = [row["id"] for row in global_list.json()]
+        assert revoke_job_id in ids
+        assert job_id in ids
     finally:
         app.dependency_overrides.clear()

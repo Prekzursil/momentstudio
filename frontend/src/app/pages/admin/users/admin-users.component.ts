@@ -16,6 +16,7 @@ import {
 import { AuthService } from '../../../core/auth.service';
 import type { PromotionRead } from '../../../core/coupons.service';
 import { AdminRecentService } from '../../../core/admin-recent.service';
+import { AdminFavoriteItem, AdminFavoritesService } from '../../../core/admin-favorites.service';
 import { ToastService } from '../../../core/toast.service';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
@@ -34,6 +35,7 @@ import {
   visibleAdminTableColumnIds
 } from '../shared/admin-table-layout';
 import { AdminTableLayoutColumnDef, TableLayoutModalComponent } from '../shared/table-layout-modal.component';
+import { adminFilterFavoriteKey } from '../shared/admin-filter-favorites';
 
 type RoleFilter = 'all' | 'customer' | 'support' | 'fulfillment' | 'content' | 'admin' | 'owner';
 
@@ -118,6 +120,30 @@ const USERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
             <div class="flex items-center gap-2">
               <app-button size="sm" [label]="'adminUi.actions.refresh' | translate" (action)="applyFilters()"></app-button>
               <app-button size="sm" variant="ghost" [label]="'adminUi.actions.reset' | translate" (action)="resetFilters()"></app-button>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto">
+              {{ 'adminUi.favorites.savedViews.label' | translate }}
+              <select
+                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 min-w-[220px]"
+                [(ngModel)]="selectedSavedViewKey"
+                (ngModelChange)="applySavedView($event)"
+              >
+                <option value="">{{ 'adminUi.favorites.savedViews.none' | translate }}</option>
+                <option *ngFor="let view of savedViews()" [value]="view.key">{{ view.label }}</option>
+              </select>
+            </label>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="(isCurrentViewPinned() ? 'adminUi.favorites.savedViews.unpinCurrent' : 'adminUi.favorites.savedViews.pinCurrent') | translate"
+                [disabled]="favorites.loading()"
+                (action)="toggleCurrentViewPin()"
+              ></app-button>
             </div>
           </div>
 
@@ -853,6 +879,7 @@ export class AdminUsersComponent implements OnInit {
   role: RoleFilter = 'all';
   page = 1;
   limit = 25;
+  selectedSavedViewKey = '';
 
   selectedUser = signal<AdminUserListItem | null>(null);
   selectedRole = 'customer';
@@ -908,18 +935,23 @@ export class AdminUsersComponent implements OnInit {
     private auth: AuthService,
     private recent: AdminRecentService,
     private toast: ToastService,
-    private translate: TranslateService
+    private translate: TranslateService,
+    public favorites: AdminFavoritesService
   ) {}
 
   ngOnInit(): void {
+    this.favorites.init();
     this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns));
     const state = history.state as any;
-    const prefill = typeof state?.prefillUserSearch === 'string' ? state.prefillUserSearch : '';
-    this.pendingPrefillSearch = prefill.trim() ? prefill.trim() : null;
-    this.autoSelectAfterLoad = Boolean(state?.autoSelectFirst);
-    if (this.pendingPrefillSearch) {
-      this.q = this.pendingPrefillSearch;
-      this.page = 1;
+    const appliedSavedView = this.maybeApplyFiltersFromState(state);
+    if (!appliedSavedView) {
+      const prefill = typeof state?.prefillUserSearch === 'string' ? state.prefillUserSearch : '';
+      this.pendingPrefillSearch = prefill.trim() ? prefill.trim() : null;
+      this.autoSelectAfterLoad = Boolean(state?.autoSelectFirst);
+      if (this.pendingPrefillSearch) {
+        this.q = this.pendingPrefillSearch;
+        this.page = 1;
+      }
     }
     this.load();
   }
@@ -970,6 +1002,7 @@ export class AdminUsersComponent implements OnInit {
 
   applyFilters(): void {
     this.page = 1;
+    this.selectedSavedViewKey = '';
     this.load();
   }
 
@@ -977,7 +1010,88 @@ export class AdminUsersComponent implements OnInit {
     this.q = '';
     this.role = 'all';
     this.page = 1;
+    this.selectedSavedViewKey = '';
     this.load();
+  }
+
+  savedViews(): AdminFavoriteItem[] {
+    return this.favorites
+      .items()
+      .filter((item) => item?.type === 'filter' && (item?.state as any)?.adminFilterScope === 'users');
+  }
+
+  applySavedView(key: string): void {
+    this.selectedSavedViewKey = key;
+    if (!key) return;
+    const view = this.savedViews().find((item) => item.key === key);
+    const filters = view?.state && typeof view.state === 'object' ? (view.state as any).adminFilters : null;
+    if (!filters || typeof filters !== 'object') return;
+
+    this.q = String(filters.q ?? '');
+    this.role = (filters.role ?? 'all') as RoleFilter;
+    const nextLimit = typeof filters.limit === 'number' && Number.isFinite(filters.limit) ? filters.limit : this.limit;
+    this.limit = nextLimit;
+    this.page = 1;
+    this.load();
+  }
+
+  isCurrentViewPinned(): boolean {
+    return this.favorites.isFavorite(this.currentViewFavoriteKey());
+  }
+
+  toggleCurrentViewPin(): void {
+    const key = this.currentViewFavoriteKey();
+    if (this.favorites.isFavorite(key)) {
+      this.favorites.remove(key);
+      if (this.selectedSavedViewKey === key) this.selectedSavedViewKey = '';
+      return;
+    }
+
+    const name = (window.prompt(this.translate.instant('adminUi.favorites.savedViews.prompt')) ?? '').trim();
+    if (!name) {
+      this.toast.error(this.translate.instant('adminUi.favorites.savedViews.errors.nameRequired'));
+      return;
+    }
+
+    const filters = this.currentViewFilters();
+    this.favorites.add({
+      key,
+      type: 'filter',
+      label: name,
+      subtitle: '',
+      url: '/admin/users',
+      state: { adminFilterScope: 'users', adminFilters: filters }
+    });
+    this.selectedSavedViewKey = key;
+  }
+
+  private maybeApplyFiltersFromState(state: any): boolean {
+    const scope = (state?.adminFilterScope || '').toString();
+    if (scope !== 'users') return false;
+    const filters = state?.adminFilters;
+    if (!filters || typeof filters !== 'object') return false;
+
+    this.q = String(filters.q ?? '');
+    this.role = (filters.role ?? 'all') as RoleFilter;
+    const nextLimit = typeof filters.limit === 'number' && Number.isFinite(filters.limit) ? filters.limit : this.limit;
+    this.limit = nextLimit;
+    this.page = 1;
+    this.selectedSavedViewKey = this.currentViewFavoriteKey();
+    this.pendingPrefillSearch = null;
+    this.autoSelectAfterLoad = false;
+    return true;
+  }
+
+  private currentViewFilters(): { q: string; role: RoleFilter; limit: number } {
+    return {
+      q: this.q,
+      role: this.role,
+      limit: this.limit
+    };
+  }
+
+  private currentViewFavoriteKey(): string {
+    return adminFilterFavoriteKey('users', this.currentViewFilters());
   }
 
   goToPage(page: number): void {

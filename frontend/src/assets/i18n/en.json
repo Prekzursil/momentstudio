@@ -1512,9 +1512,59 @@
         "user": "User",
         "filter": "Saved view"
       },
+      "savedViews": {
+        "label": "Saved views",
+        "none": "None",
+        "pinCurrent": "Pin current view",
+        "unpinCurrent": "Unpin current view",
+        "prompt": "Name this view",
+        "errors": {
+          "nameRequired": "Please enter a name."
+        }
+      },
       "errors": {
         "load": "Could not load favorites.",
         "save": "Could not save favorites."
+      }
+    },
+    "jobs": {
+      "title": "Background jobs",
+      "hint": "Track long-running exports and bulk actions.",
+      "empty": "No background jobs right now.",
+      "sections": {
+        "gdprExports": "GDPR exports",
+        "couponJobs": "Coupon segment jobs"
+      },
+      "couponActions": {
+        "assign": "Coupon segment assign",
+        "revoke": "Coupon segment revoke"
+      },
+      "status": {
+        "pending": "Pending",
+        "running": "Running",
+        "succeeded": "Succeeded",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      },
+      "actions": {
+        "openGdpr": "GDPR queue",
+        "openCoupons": "Coupons",
+        "download": "Download"
+      },
+      "confirms": {
+        "retry": "Retry this job?",
+        "cancel": "Cancel this job?"
+      },
+      "success": {
+        "retry": "Job restarted.",
+        "cancel": "Job cancelled.",
+        "download": "Export downloaded."
+      },
+      "errors": {
+        "load": "Could not load background jobs.",
+        "retry": "Could not retry job.",
+        "cancel": "Could not cancel job.",
+        "download": "Could not download export."
       }
     },
     "tableLayout": {

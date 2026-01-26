@@ -17,6 +17,7 @@ import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { AdminOrderListItem, AdminOrderListResponse, AdminOrdersService } from '../../../core/admin-orders.service';
 import { orderStatusChipClass } from '../../../shared/order-status';
 import { AuthService } from '../../../core/auth.service';
+import { AdminFavoriteItem, AdminFavoritesService } from '../../../core/admin-favorites.service';
 import {
   AdminTableLayoutV1,
   adminTableCellPaddingClass,
@@ -27,6 +28,7 @@ import {
   visibleAdminTableColumnIds
 } from '../shared/admin-table-layout';
 import { AdminTableLayoutColumnDef, TableLayoutModalComponent } from '../shared/table-layout-modal.component';
+import { adminFilterFavoriteKey } from '../shared/admin-filter-favorites';
 
 type OrderStatusFilter =
   | 'all'
@@ -199,6 +201,30 @@ const ORDERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
                 [label]="'adminUi.orders.presets.delete' | translate"
                 [disabled]="!selectedPresetId"
                 (action)="deletePreset()"
+              ></app-button>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto">
+              {{ 'adminUi.favorites.savedViews.label' | translate }}
+              <select
+                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 min-w-[220px]"
+                [(ngModel)]="selectedSavedViewKey"
+                (ngModelChange)="applySavedView($event)"
+              >
+                <option value="">{{ 'adminUi.favorites.savedViews.none' | translate }}</option>
+                <option *ngFor="let view of savedViews()" [value]="view.key">{{ view.label }}</option>
+              </select>
+            </label>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="(isCurrentViewPinned() ? 'adminUi.favorites.savedViews.unpinCurrent' : 'adminUi.favorites.savedViews.pinCurrent') | translate"
+                [disabled]="favorites.loading()"
+                (action)="toggleCurrentViewPin()"
               ></app-button>
             </div>
           </div>
@@ -607,6 +633,7 @@ export class AdminOrdersComponent implements OnInit {
 
   presets: AdminOrdersFilterPreset[] = [];
   selectedPresetId = '';
+  selectedSavedViewKey = '';
   tagOptions = signal<string[]>(['vip', 'fraud_risk', 'gift']);
 
   exportModalOpen = signal(false);
@@ -651,13 +678,16 @@ export class AdminOrdersComponent implements OnInit {
     private router: Router,
     private toast: ToastService,
     private translate: TranslateService,
-    private auth: AuthService
+    private auth: AuthService,
+    public favorites: AdminFavoritesService
   ) {}
 
   ngOnInit(): void {
+    this.favorites.init();
     this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns));
     this.presets = this.loadPresets();
     this.loadExportState();
+    this.maybeApplyFiltersFromState();
     this.ordersApi.listOrderTags().subscribe({
       next: (tags) => {
         const merged = new Set<string>(['vip', 'fraud_risk', 'gift']);
@@ -737,6 +767,7 @@ export class AdminOrdersComponent implements OnInit {
     this.toDate = '';
     this.page = 1;
     this.selectedPresetId = '';
+    this.selectedSavedViewKey = '';
     this.clearSelection();
     this.load();
   }
@@ -754,8 +785,99 @@ export class AdminOrdersComponent implements OnInit {
     this.toDate = preset.filters.toDate;
     this.limit = preset.filters.limit;
     this.page = 1;
+    this.selectedSavedViewKey = '';
     this.clearSelection();
     this.load();
+  }
+
+  savedViews(): AdminFavoriteItem[] {
+    return this.favorites
+      .items()
+      .filter((item) => item?.type === 'filter' && (item?.state as any)?.adminFilterScope === 'orders');
+  }
+
+  applySavedView(key: string): void {
+    this.selectedSavedViewKey = key;
+    if (!key) return;
+    const view = this.savedViews().find((item) => item.key === key);
+    const filters = view?.state && typeof view.state === 'object' ? (view.state as any).adminFilters : null;
+    if (!filters || typeof filters !== 'object') return;
+
+    this.q = String(filters.q ?? '');
+    this.status = (filters.status ?? 'all') as OrderStatusFilter;
+    this.tag = String(filters.tag ?? '');
+    this.fromDate = String(filters.fromDate ?? '');
+    this.toDate = String(filters.toDate ?? '');
+    const nextLimit = typeof filters.limit === 'number' && Number.isFinite(filters.limit) ? filters.limit : 20;
+    this.limit = nextLimit;
+    this.page = 1;
+    this.selectedPresetId = '';
+    this.clearSelection();
+    this.load();
+  }
+
+  isCurrentViewPinned(): boolean {
+    return this.favorites.isFavorite(this.currentViewFavoriteKey());
+  }
+
+  toggleCurrentViewPin(): void {
+    const key = this.currentViewFavoriteKey();
+    if (this.favorites.isFavorite(key)) {
+      this.favorites.remove(key);
+      if (this.selectedSavedViewKey === key) this.selectedSavedViewKey = '';
+      return;
+    }
+
+    const name = (window.prompt(this.translate.instant('adminUi.favorites.savedViews.prompt')) ?? '').trim();
+    if (!name) {
+      this.toast.error(this.translate.instant('adminUi.favorites.savedViews.errors.nameRequired'));
+      return;
+    }
+
+    const filters = this.currentViewFilters();
+    this.favorites.add({
+      key,
+      type: 'filter',
+      label: name,
+      subtitle: '',
+      url: '/admin/orders',
+      state: { adminFilterScope: 'orders', adminFilters: filters }
+    });
+    this.selectedSavedViewKey = key;
+  }
+
+  private maybeApplyFiltersFromState(): void {
+    const state = history.state as any;
+    const scope = (state?.adminFilterScope || '').toString();
+    if (scope !== 'orders') return;
+    const filters = state?.adminFilters;
+    if (!filters || typeof filters !== 'object') return;
+
+    this.q = String(filters.q ?? '');
+    this.status = (filters.status ?? 'all') as OrderStatusFilter;
+    this.tag = String(filters.tag ?? '');
+    this.fromDate = String(filters.fromDate ?? '');
+    this.toDate = String(filters.toDate ?? '');
+    const nextLimit = typeof filters.limit === 'number' && Number.isFinite(filters.limit) ? filters.limit : this.limit;
+    this.limit = nextLimit;
+    this.page = 1;
+    this.selectedPresetId = '';
+    this.selectedSavedViewKey = this.currentViewFavoriteKey();
+  }
+
+  private currentViewFilters(): AdminOrdersFilterPreset['filters'] {
+    return {
+      q: this.q,
+      status: this.status,
+      tag: this.tag,
+      fromDate: this.fromDate,
+      toDate: this.toDate,
+      limit: this.limit
+    };
+  }
+
+  private currentViewFavoriteKey(): string {
+    return adminFilterFavoriteKey('orders', this.currentViewFilters());
   }
 
   savePreset(): void {

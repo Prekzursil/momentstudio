@@ -1512,9 +1512,59 @@
         "user": "Utilizator",
         "filter": "Vizualizare salvată"
       },
+      "savedViews": {
+        "label": "Vizualizări salvate",
+        "none": "Niciuna",
+        "pinCurrent": "Fixează vizualizarea curentă",
+        "unpinCurrent": "Elimină fixarea vizualizării curente",
+        "prompt": "Nume pentru această vizualizare",
+        "errors": {
+          "nameRequired": "Te rog introdu un nume."
+        }
+      },
       "errors": {
         "load": "Nu am putut încărca favoritele.",
         "save": "Nu am putut salva favoritele."
+      }
+    },
+    "jobs": {
+      "title": "Joburi în fundal",
+      "hint": "Urmărește exporturile și acțiunile în masă care rulează în fundal.",
+      "empty": "Nu există joburi în fundal acum.",
+      "sections": {
+        "gdprExports": "Exporturi GDPR",
+        "couponJobs": "Joburi segment cupoane"
+      },
+      "couponActions": {
+        "assign": "Asignare segment cupoane",
+        "revoke": "Revocare segment cupoane"
+      },
+      "status": {
+        "pending": "În așteptare",
+        "running": "În derulare",
+        "succeeded": "Reușit",
+        "failed": "Eșuat",
+        "cancelled": "Anulat"
+      },
+      "actions": {
+        "openGdpr": "Coada GDPR",
+        "openCoupons": "Cupoane",
+        "download": "Descarcă"
+      },
+      "confirms": {
+        "retry": "Reîncerci acest job?",
+        "cancel": "Anulezi acest job?"
+      },
+      "success": {
+        "retry": "Job repornit.",
+        "cancel": "Job anulat.",
+        "download": "Export descărcat."
+      },
+      "errors": {
+        "load": "Nu am putut încărca joburile în fundal.",
+        "retry": "Nu am putut reporni jobul.",
+        "cancel": "Nu am putut anula jobul.",
+        "download": "Nu am putut descărca exportul."
       }
     },
     "tableLayout": {

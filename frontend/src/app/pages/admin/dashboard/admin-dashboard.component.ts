@@ -26,7 +26,9 @@ import {
   AdminSummary
 } from '../../../core/admin.service';
 import { AdminOrdersService } from '../../../core/admin-orders.service';
+import { AdminCouponsV2Service, CouponBulkJobRead } from '../../../core/admin-coupons-v2.service';
 import { ToastService } from '../../../core/toast.service';
+import { AdminGdprExportJobItem, AdminUsersService } from '../../../core/admin-users.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { extractRequestId } from '../../../shared/http-error';
 import { AdminRecentItem, AdminRecentService } from '../../../core/admin-recent.service';
@@ -278,6 +280,148 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
                   </button>
                 </div>
               </div>
+            </div>
+
+            <div
+              *ngIf="shouldShowJobsPanel()"
+              class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="grid gap-1">
+                  <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.jobs.title' | translate }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.jobs.hint' | translate }}</div>
+                </div>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.actions.refresh' | translate"
+                  [disabled]="jobsLoading()"
+                  (action)="loadBackgroundJobs()"
+                ></app-button>
+              </div>
+
+              <div *ngIf="jobsError()" class="text-sm text-rose-700 dark:text-rose-200">
+                {{ jobsError() }}
+              </div>
+
+              <div *ngIf="jobsLoading(); else jobsTpl">
+                <app-skeleton [rows]="4"></app-skeleton>
+              </div>
+
+              <ng-template #jobsTpl>
+                <div *ngIf="gdprExportJobs().length === 0 && couponBulkJobs().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.jobs.empty' | translate }}
+                </div>
+
+                <div *ngIf="gdprExportJobs().length" class="grid gap-2">
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.jobs.sections.gdprExports' | translate }}
+                    </div>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.jobs.actions.openGdpr' | translate"
+                      (action)="goToGdprJobs()"
+                    ></app-button>
+                  </div>
+
+                  <div class="grid gap-2">
+                    <div
+                      *ngFor="let job of gdprExportJobs()"
+                      class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                    >
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                          <div class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ job.user.email }}</div>
+                          <div class="text-xs text-slate-500 dark:text-slate-400">
+                            {{ ('adminUi.jobs.status.' + job.status) | translate }} · {{ progressPct(job.progress) }}%
+                          </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <app-button
+                            *ngIf="canManageGdprJobs() && job.status === 'failed'"
+                            size="sm"
+                            variant="ghost"
+                            [label]="'adminUi.actions.retry' | translate"
+                            [disabled]="gdprJobBusyId() === job.id"
+                            (action)="retryGdprExport(job)"
+                          ></app-button>
+                          <app-button
+                            *ngIf="canManageGdprJobs() && job.status === 'succeeded' && job.has_file"
+                            size="sm"
+                            variant="ghost"
+                            [label]="'adminUi.jobs.actions.download' | translate"
+                            [disabled]="gdprJobBusyId() === job.id"
+                            (action)="downloadGdprExport(job)"
+                          ></app-button>
+                        </div>
+                      </div>
+
+                      <div class="h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                        <div class="h-2 bg-indigo-500" [style.width.%]="progressPct(job.progress)"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div *ngIf="couponBulkJobs().length" class="grid gap-2">
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.jobs.sections.couponJobs' | translate }}
+                    </div>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.jobs.actions.openCoupons' | translate"
+                      (action)="goToCoupons()"
+                    ></app-button>
+                  </div>
+
+                  <div class="grid gap-2">
+                    <div
+                      *ngFor="let job of couponBulkJobs()"
+                      class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                    >
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                          <div class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                            {{ ('adminUi.jobs.couponActions.' + job.action) | translate }}
+                          </div>
+                          <div class="text-xs text-slate-500 dark:text-slate-400">
+                            {{ ('adminUi.jobs.status.' + job.status) | translate }} · {{ job.processed || 0 }}/{{ job.total_candidates || 0 }}
+                          </div>
+                          <div *ngIf="job.error_message" class="mt-1 text-xs text-rose-700 dark:text-rose-200 truncate">
+                            {{ job.error_message }}
+                          </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <app-button
+                            *ngIf="canManageCouponJobs() && (job.status === 'pending' || job.status === 'running')"
+                            size="sm"
+                            variant="ghost"
+                            [label]="'adminUi.actions.cancel' | translate"
+                            [disabled]="couponJobBusyId() === job.id"
+                            (action)="cancelCouponJob(job)"
+                          ></app-button>
+                          <app-button
+                            *ngIf="canManageCouponJobs() && (job.status === 'failed' || job.status === 'cancelled')"
+                            size="sm"
+                            variant="ghost"
+                            [label]="'adminUi.actions.retry' | translate"
+                            [disabled]="couponJobBusyId() === job.id"
+                            (action)="retryCouponJob(job)"
+                          ></app-button>
+                        </div>
+                      </div>
+
+                      <div class="h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                        <div class="h-2 bg-indigo-500" [style.width.%]="couponProgressPct(job)"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </ng-template>
             </div>
 
 	          <div
@@ -1031,6 +1175,13 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
   scheduledError = signal('');
   scheduledTasks = signal<AdminDashboardScheduledTasksResponse | null>(null);
 
+  jobsLoading = signal(false);
+  jobsError = signal('');
+  gdprExportJobs = signal<AdminGdprExportJobItem[]>([]);
+  couponBulkJobs = signal<CouponBulkJobRead[]>([]);
+  gdprJobBusyId = signal<string | null>(null);
+  couponJobBusyId = signal<string | null>(null);
+
   ownerTransferIdentifier = '';
   ownerTransferConfirm = '';
   ownerTransferPassword = '';
@@ -1040,6 +1191,8 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
   constructor(
     private admin: AdminService,
     private ordersApi: AdminOrdersService,
+    private usersApi: AdminUsersService,
+    private couponsApi: AdminCouponsV2Service,
     private auth: AuthService,
     public favorites: AdminFavoritesService,
     public recent: AdminRecentService,
@@ -1070,6 +1223,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
     this.loadWidgetPrefs();
     this.loadSummary();
     this.loadScheduledTasks();
+    this.loadBackgroundJobs();
     this.loadAudit(1);
     this.loadAuditRetention();
     this.maybeShowOnboarding();
@@ -1105,6 +1259,169 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
 
   isOwner(): boolean {
     return this.auth.role() === 'owner';
+  }
+
+  shouldShowJobsPanel(): boolean {
+    return this.auth.canAccessAdminSection('users') || this.auth.canAccessAdminSection('coupons');
+  }
+
+  canManageGdprJobs(): boolean {
+    return this.auth.isAdmin();
+  }
+
+  canManageCouponJobs(): boolean {
+    return this.auth.canAccessAdminSection('coupons');
+  }
+
+  loadBackgroundJobs(): void {
+    if (!this.shouldShowJobsPanel()) {
+      this.gdprExportJobs.set([]);
+      this.couponBulkJobs.set([]);
+      return;
+    }
+
+    this.jobsLoading.set(true);
+    this.jobsError.set('');
+
+    let pending = 0;
+    const done = (): void => {
+      pending -= 1;
+      if (pending <= 0) this.jobsLoading.set(false);
+    };
+
+    if (this.auth.canAccessAdminSection('users')) {
+      pending += 1;
+      this.usersApi.listGdprExportJobs({ page: 1, limit: 5 }).subscribe({
+        next: (res) => {
+          const items = Array.isArray(res?.items) ? res.items : [];
+          this.gdprExportJobs.set(items.slice(0, 5));
+        },
+        error: () => {
+          this.jobsError.set(this.translate.instant('adminUi.jobs.errors.load'));
+          done();
+        },
+        complete: done
+      });
+    } else {
+      this.gdprExportJobs.set([]);
+    }
+
+    if (this.auth.canAccessAdminSection('coupons')) {
+      pending += 1;
+      this.couponsApi.listAllBulkJobs({ limit: 5 }).subscribe({
+        next: (items) => {
+          const rows = Array.isArray(items) ? items : [];
+          this.couponBulkJobs.set(rows.slice(0, 5));
+        },
+        error: () => {
+          this.jobsError.set(this.translate.instant('adminUi.jobs.errors.load'));
+          done();
+        },
+        complete: done
+      });
+    } else {
+      this.couponBulkJobs.set([]);
+    }
+
+    if (pending === 0) this.jobsLoading.set(false);
+  }
+
+  goToGdprJobs(): void {
+    void this.router.navigateByUrl('/admin/users/gdpr');
+  }
+
+  goToCoupons(): void {
+    void this.router.navigateByUrl('/admin/coupons');
+  }
+
+  progressPct(value: unknown): number {
+    const pct = Number(value ?? 0);
+    if (!Number.isFinite(pct)) return 0;
+    return Math.max(0, Math.min(100, pct));
+  }
+
+  couponProgressPct(job: CouponBulkJobRead): number {
+    const processed = Number(job?.processed ?? 0);
+    const total = Number(job?.total_candidates ?? 0);
+    if (!Number.isFinite(processed) || !Number.isFinite(total) || total <= 0) return 0;
+    return this.progressPct((processed / total) * 100);
+  }
+
+  retryGdprExport(job: AdminGdprExportJobItem): void {
+    if (!this.canManageGdprJobs()) return;
+    if (!job?.id) return;
+    if (!window.confirm(this.translate.instant('adminUi.jobs.confirms.retry'))) return;
+    this.gdprJobBusyId.set(job.id);
+    this.usersApi.retryGdprExportJob(job.id).subscribe({
+      next: () => {
+        this.toast.success(this.translate.instant('adminUi.jobs.success.retry'));
+        this.loadBackgroundJobs();
+        this.gdprJobBusyId.set(null);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.jobs.errors.retry'));
+        this.gdprJobBusyId.set(null);
+      }
+    });
+  }
+
+  downloadGdprExport(job: AdminGdprExportJobItem): void {
+    if (!this.canManageGdprJobs()) return;
+    if (!job?.id) return;
+    this.gdprJobBusyId.set(job.id);
+    this.usersApi.downloadGdprExportJob(job.id).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const stamp = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = `gdpr-export-${stamp}.json`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+        this.toast.success(this.translate.instant('adminUi.jobs.success.download'));
+        this.gdprJobBusyId.set(null);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.jobs.errors.download'));
+        this.gdprJobBusyId.set(null);
+      }
+    });
+  }
+
+  cancelCouponJob(job: CouponBulkJobRead): void {
+    if (!this.canManageCouponJobs()) return;
+    if (!job?.id) return;
+    if (!window.confirm(this.translate.instant('adminUi.jobs.confirms.cancel'))) return;
+    this.couponJobBusyId.set(job.id);
+    this.couponsApi.cancelBulkJob(job.id).subscribe({
+      next: () => {
+        this.toast.success(this.translate.instant('adminUi.jobs.success.cancel'));
+        this.loadBackgroundJobs();
+        this.couponJobBusyId.set(null);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.jobs.errors.cancel'));
+        this.couponJobBusyId.set(null);
+      }
+    });
+  }
+
+  retryCouponJob(job: CouponBulkJobRead): void {
+    if (!this.canManageCouponJobs()) return;
+    if (!job?.id) return;
+    if (!window.confirm(this.translate.instant('adminUi.jobs.confirms.retry'))) return;
+    this.couponJobBusyId.set(job.id);
+    this.couponsApi.retryBulkJob(job.id).subscribe({
+      next: () => {
+        this.toast.success(this.translate.instant('adminUi.jobs.success.retry'));
+        this.loadBackgroundJobs();
+        this.couponJobBusyId.set(null);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.jobs.errors.retry'));
+        this.couponJobBusyId.set(null);
+      }
+    });
   }
 
   onboardingOpen = signal(false);
