@@ -1,5 +1,3 @@
-import asyncio
-import json
 from pathlib import Path
 import logging
 import re
@@ -13,18 +11,25 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Qu
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field, EmailStr, field_validator
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 from webauthn.helpers import base64url_to_bytes
 
 from app.core import security
 from app.core.config import settings
-from app.core.dependencies import get_current_user, get_google_completion_user, require_admin, require_complete_profile
+from app.core.dependencies import (
+    get_current_user,
+    get_google_completion_user,
+    require_admin,
+    require_admin_section,
+    require_complete_profile,
+)
 from app.core.rate_limit import limiter, per_identifier_limiter
 from app.core.security import decode_token
 from app.db.session import get_session
 from app.models.user import (
     RefreshSession,
     User,
+    UserRole,
     UserDisplayNameHistory,
     UserEmailHistory,
     UserSecondaryEmail,
@@ -63,10 +68,10 @@ from app.schemas.user import UserCreate
 from app.services import auth as auth_service
 from app.services import captcha as captcha_service
 from app.services import email as email_service
-from app.services import notifications as notification_service
 from app.services import passkeys as passkeys_service
 from app.services import private_storage
 from app.services import self_service
+from app.services import user_export as user_export_service
 from app.services import storage
 from app.core import metrics
 
@@ -128,6 +133,28 @@ def clear_refresh_cookie(response: Response) -> None:
     )
 
 
+def set_admin_ip_bypass_cookie(response: Response, token: str) -> None:
+    max_age = max(60, int(settings.admin_ip_bypass_cookie_minutes) * 60)
+    response.set_cookie(
+        "admin_ip_bypass",
+        token,
+        httponly=True,
+        secure=settings.secure_cookies,
+        samesite=settings.cookie_samesite.lower(),
+        path="/",
+        max_age=max_age,
+    )
+
+
+def clear_admin_ip_bypass_cookie(response: Response) -> None:
+    response.delete_cookie(
+        "admin_ip_bypass",
+        path="/",
+        secure=settings.secure_cookies,
+        samesite=settings.cookie_samesite.lower(),
+    )
+
+
 def _extract_bearer_token(request: Request) -> str | None:
     raw = (request.headers.get("authorization") or "").strip()
     if not raw:
@@ -156,6 +183,26 @@ def _extract_refresh_session_jti(request: Request) -> str | None:
             if jti:
                 return jti
 
+    return None
+
+
+def _extract_country_code(request: Request) -> str | None:
+    candidates = [
+        request.headers.get("cf-ipcountry"),
+        request.headers.get("cloudfront-viewer-country"),
+        request.headers.get("fastly-client-country"),
+        request.headers.get("x-country-code"),
+        request.headers.get("x-country"),
+    ]
+    for raw in candidates:
+        code = (raw or "").strip().upper()
+        if not code or code in ("XX", "ZZ"):
+            continue
+        if len(code) > 8:
+            code = code[:8]
+        if not code.isalnum():
+            continue
+        return code
     return None
 
 
@@ -448,6 +495,7 @@ async def register(
         persistent=False,
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
+        country_code=_extract_country_code(request),
     )
     if response:
         set_refresh_cookie(response, tokens["refresh_token"], persistent=False)
@@ -473,6 +521,7 @@ async def register(
 async def login(
     payload: LoginRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(login_rate_limit),
     response: Response = None,
@@ -491,12 +540,23 @@ async def login(
     if bool(getattr(user, "two_factor_enabled", False)):
         token = security.create_two_factor_token(str(user.id), remember=persistent, method="password")
         return TwoFactorChallengeResponse(user=UserResponse.model_validate(user), two_factor_token=token)
+
+    is_admin_login = user.role in (UserRole.admin, UserRole.owner)
+    known_device = True
+    if is_admin_login:
+        known_device = await auth_service.has_seen_refresh_device(
+            session,
+            user_id=user.id,
+            user_agent=request.headers.get("user-agent"),
+        )
+
     tokens = await auth_service.issue_tokens_for_user(
         session,
         user,
         persistent=persistent,
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
+        country_code=_extract_country_code(request),
     )
     if response:
         set_refresh_cookie(response, tokens["refresh_token"], persistent=persistent)
@@ -507,6 +567,22 @@ async def login(
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
     )
+    if is_admin_login and not known_device:
+        owner = await auth_service.get_owner_user(session)
+        to_email = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+        if to_email:
+            background_tasks.add_task(
+                email_service.send_admin_login_alert,
+                to_email,
+                admin_username=user.username,
+                admin_display_name=user.name,
+                admin_role=str(user.role),
+                ip_address=request.client.host if request.client else None,
+                country_code=_extract_country_code(request),
+                user_agent=request.headers.get("user-agent"),
+                occurred_at=datetime.now(timezone.utc),
+                lang=owner.preferred_language if owner else None,
+            )
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 
@@ -514,6 +590,7 @@ async def login(
 async def login_two_factor(
     payload: TwoFactorLoginRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(two_factor_rate_limit),
     response: Response = None,
@@ -544,12 +621,22 @@ async def login_two_factor(
     if not await auth_service.verify_two_factor_code(session, user, payload.code):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor code")
 
+    is_admin_login = user.role in (UserRole.admin, UserRole.owner)
+    known_device = True
+    if is_admin_login:
+        known_device = await auth_service.has_seen_refresh_device(
+            session,
+            user_id=user.id,
+            user_agent=request.headers.get("user-agent"),
+        )
+
     tokens = await auth_service.issue_tokens_for_user(
         session,
         user,
         persistent=remember,
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
+        country_code=_extract_country_code(request),
     )
     if response:
         set_refresh_cookie(response, tokens["refresh_token"], persistent=remember)
@@ -562,6 +649,22 @@ async def login_two_factor(
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
     )
+    if is_admin_login and not known_device:
+        owner = await auth_service.get_owner_user(session)
+        to_email = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+        if to_email:
+            background_tasks.add_task(
+                email_service.send_admin_login_alert,
+                to_email,
+                admin_username=user.username,
+                admin_display_name=user.name,
+                admin_role=str(user.role),
+                ip_address=request.client.host if request.client else None,
+                country_code=_extract_country_code(request),
+                user_agent=request.headers.get("user-agent"),
+                occurred_at=datetime.now(timezone.utc),
+                lang=owner.preferred_language if owner else None,
+            )
 
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
@@ -606,6 +709,7 @@ async def passkey_login_options(
 async def passkey_login_verify(
     payload: PasskeyLoginVerifyRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(login_rate_limit),
     response: Response = None,
@@ -643,12 +747,21 @@ async def passkey_login_verify(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
 
     metrics.record_login_success()
+    is_admin_login = user.role in (UserRole.admin, UserRole.owner)
+    known_device = True
+    if is_admin_login:
+        known_device = await auth_service.has_seen_refresh_device(
+            session,
+            user_id=user.id,
+            user_agent=request.headers.get("user-agent"),
+        )
     tokens = await auth_service.issue_tokens_for_user(
         session,
         user,
         persistent=remember,
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
+        country_code=_extract_country_code(request),
     )
     if response:
         set_refresh_cookie(response, tokens["refresh_token"], persistent=remember)
@@ -660,6 +773,22 @@ async def passkey_login_verify(
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
     )
+    if is_admin_login and not known_device:
+        owner = await auth_service.get_owner_user(session)
+        to_email = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+        if to_email:
+            background_tasks.add_task(
+                email_service.send_admin_login_alert,
+                to_email,
+                admin_username=user.username,
+                admin_display_name=user.name,
+                admin_role=str(user.role),
+                ip_address=request.client.host if request.client else None,
+                country_code=_extract_country_code(request),
+                user_agent=request.headers.get("user-agent"),
+                occurred_at=datetime.now(timezone.utc),
+                lang=owner.preferred_language if owner else None,
+            )
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 
@@ -808,6 +937,13 @@ async def refresh_tokens(
     if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
         await self_service.execute_account_deletion(session, user)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+    locked_until = getattr(user, "locked_until", None)
+    if locked_until and locked_until.tzinfo is None:
+        locked_until = locked_until.replace(tzinfo=timezone.utc)
+    if locked_until and locked_until > now:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account temporarily locked")
+    if bool(getattr(user, "password_reset_required", False)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Password reset required")
 
     # If the token was already rotated very recently (multi-tab refresh), allow
     # reusing it by issuing tokens for the replacement session without rotating again.
@@ -857,6 +993,7 @@ async def refresh_tokens(
         persistent=persistent,
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
+        country_code=_extract_country_code(request),
     )
     stored.revoked = True
     stored.revoked_reason = "rotated"
@@ -887,7 +1024,50 @@ async def logout(
         await auth_service.revoke_refresh_token(session, payload_data["jti"], reason="logout")
     if response:
         clear_refresh_cookie(response)
+        clear_admin_ip_bypass_cookie(response)
     return None
+
+
+class AdminIpBypassRequest(BaseModel):
+    token: str = Field(min_length=1, max_length=256)
+
+
+@router.post("/admin/ip-bypass", status_code=status.HTTP_204_NO_CONTENT, summary="Bypass admin IP allowlist for this device")
+async def admin_ip_bypass(
+    payload: AdminIpBypassRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin),
+    response: Response = None,
+) -> None:
+    secret = (settings.admin_ip_bypass_token or "").strip()
+    if not secret:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Admin IP bypass is not configured")
+    if (payload.token or "").strip() != secret:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid bypass token")
+    token = security.create_admin_ip_bypass_token(str(current_user.id))
+    if response:
+        set_admin_ip_bypass_cookie(response, token)
+    await auth_service.record_security_event(
+        session,
+        current_user.id,
+        "admin_ip_bypass_used",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    return None
+
+
+@router.delete("/admin/ip-bypass", status_code=status.HTTP_204_NO_CONTENT, summary="Clear admin IP bypass for this device")
+async def clear_admin_ip_bypass(response: Response = None) -> None:
+    if response:
+        clear_admin_ip_bypass_cookie(response)
+    return None
+
+
+@router.get("/admin/access", status_code=status.HTTP_200_OK, summary="Check whether this session can access the admin UI")
+async def admin_access(_: User = Depends(require_admin_section("dashboard"))) -> dict:
+    return {"allowed": True}
 
 
 @router.post("/password/change", status_code=status.HTTP_200_OK)
@@ -901,6 +1081,7 @@ async def change_password(
     if not security.verify_password(payload.current_password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
     current_user.hashed_password = security.hash_password(payload.new_password)
+    current_user.password_reset_required = False
     session.add(current_user)
     await session.commit()
     background_tasks.add_task(email_service.send_password_changed, current_user.email, lang=current_user.preferred_language)
@@ -1295,82 +1476,6 @@ async def export_me(
     )
 
 
-def _export_ready_copy(lang: str | None) -> tuple[str, str]:
-    if (lang or "").strip().lower().startswith("ro"):
-        return (
-            "Exportul tău de date este gata",
-            "Îl poți descărca din cont → Confidențialitate.",
-        )
-    return ("Your data export is ready", "Download it from Account → Privacy.")
-
-
-async def _run_user_export_job(engine: AsyncEngine, *, job_id: UUID) -> None:
-    SessionLocal = async_sessionmaker(engine, expire_on_commit=False, autoflush=False, class_=AsyncSession)
-    async with SessionLocal() as session:
-        job = await session.get(UserDataExportJob, job_id)
-        if not job:
-            return
-        if job.status not in (UserDataExportStatus.pending, UserDataExportStatus.running):
-            return
-
-        now = datetime.now(timezone.utc)
-        try:
-            job.status = UserDataExportStatus.running
-            job.started_at = job.started_at or now
-            job.finished_at = None
-            job.error_message = None
-            job.progress = max(int(job.progress or 0), 1)
-            session.add(job)
-            await session.commit()
-
-            user = await session.get(User, job.user_id)
-            if not user:
-                raise RuntimeError("User not found")
-
-            job.progress = max(int(job.progress or 0), 5)
-            session.add(job)
-            await session.commit()
-
-            payload = await self_service.export_user_data(session, user)
-
-            job.progress = max(int(job.progress or 0), 70)
-            session.add(job)
-            await session.commit()
-
-            private_root = private_storage.ensure_private_root().resolve()
-            export_dir = (private_root / "exports" / str(user.id)).resolve()
-            export_dir.mkdir(parents=True, exist_ok=True)
-            export_path = export_dir / f"{job.id}.json"
-
-            content = json.dumps(payload, ensure_ascii=False, indent=2)
-            await asyncio.to_thread(export_path.write_text, content, encoding="utf-8")
-
-            job.file_path = export_path.relative_to(private_root).as_posix()
-            job.progress = 100
-            job.status = UserDataExportStatus.succeeded
-            job.finished_at = datetime.now(timezone.utc)
-            job.expires_at = job.finished_at + timedelta(days=7)
-            session.add(job)
-            await session.commit()
-
-            title, body = _export_ready_copy(getattr(user, "preferred_language", None))
-            await notification_service.create_notification(
-                session,
-                user_id=user.id,
-                type="privacy",
-                title=title,
-                body=body,
-                url="/account/privacy",
-            )
-        except Exception as exc:  # pragma: no cover
-            job.status = UserDataExportStatus.failed
-            job.error_message = str(exc)[:1000]
-            job.finished_at = datetime.now(timezone.utc)
-            job.progress = min(int(job.progress or 0), 99)
-            session.add(job)
-            await session.commit()
-
-
 @router.post("/me/export/jobs", response_model=UserDataExportJobResponse, status_code=status.HTTP_201_CREATED)
 async def start_export_job(
     background_tasks: BackgroundTasks,
@@ -1394,7 +1499,7 @@ async def start_export_job(
             engine = session.bind
             if engine is None:
                 raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
-            background_tasks.add_task(_run_user_export_job, engine, job_id=latest.id)
+            background_tasks.add_task(user_export_service.run_user_export_job, engine, job_id=latest.id)
         return UserDataExportJobResponse.model_validate(latest, from_attributes=True)
 
     if latest and latest.status == UserDataExportStatus.succeeded:
@@ -1412,7 +1517,7 @@ async def start_export_job(
     engine = session.bind
     if engine is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
-    background_tasks.add_task(_run_user_export_job, engine, job_id=job.id)
+    background_tasks.add_task(user_export_service.run_user_export_job, engine, job_id=job.id)
     return UserDataExportJobResponse.model_validate(job, from_attributes=True)
 
 
@@ -1608,6 +1713,7 @@ async def list_my_sessions(
                 is_current=bool(current_jti and row.jti == current_jti),
                 user_agent=getattr(row, "user_agent", None),
                 ip_address=getattr(row, "ip_address", None),
+                country_code=getattr(row, "country_code", None),
             )
         )
 
@@ -1857,6 +1963,7 @@ async def google_start(_: None = Depends(google_rate_limit)) -> dict:
 async def google_callback(
     payload: GoogleCallback,
     request: Request,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     response: Response = None,
     _: None = Depends(google_rate_limit),
@@ -1891,11 +1998,21 @@ async def google_callback(
                     requires_two_factor=True,
                     two_factor_token=token,
                 )
+
+            is_admin_login = existing_sub.role in (UserRole.admin, UserRole.owner)
+            known_device = True
+            if is_admin_login:
+                known_device = await auth_service.has_seen_refresh_device(
+                    session,
+                    user_id=existing_sub.id,
+                    user_agent=request.headers.get("user-agent"),
+                )
             tokens = await auth_service.issue_tokens_for_user(
                 session,
                 existing_sub,
                 user_agent=request.headers.get("user-agent"),
                 ip_address=request.client.host if request.client else None,
+                country_code=_extract_country_code(request),
             )
             if response:
                 set_refresh_cookie(response, tokens["refresh_token"], persistent=True)
@@ -1906,6 +2023,22 @@ async def google_callback(
                 user_agent=request.headers.get("user-agent"),
                 ip_address=request.client.host if request.client else None,
             )
+            if is_admin_login and not known_device:
+                owner = await auth_service.get_owner_user(session)
+                to_email = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+                if to_email:
+                    background_tasks.add_task(
+                        email_service.send_admin_login_alert,
+                        to_email,
+                        admin_username=existing_sub.username,
+                        admin_display_name=existing_sub.name,
+                        admin_role=str(existing_sub.role),
+                        ip_address=request.client.host if request.client else None,
+                        country_code=_extract_country_code(request),
+                        user_agent=request.headers.get("user-agent"),
+                        occurred_at=datetime.now(timezone.utc),
+                        lang=owner.preferred_language if owner else None,
+                    )
             logger.info("google_login_existing", extra={"user_id": str(existing_sub.id)})
             return GoogleCallbackResponse(user=UserResponse.model_validate(existing_sub), tokens=TokenPair(**tokens))
 
@@ -2027,6 +2160,7 @@ async def google_complete_registration(
         user,
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
+        country_code=_extract_country_code(request),
     )
     if response:
         set_refresh_cookie(response, tokens["refresh_token"], persistent=True)

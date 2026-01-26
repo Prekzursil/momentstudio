@@ -13,6 +13,7 @@ class ContentBlockBase(BaseModel):
     body_markdown: str = Field(min_length=1)
     status: ContentStatus = ContentStatus.draft
     published_at: datetime | None = None
+    published_until: datetime | None = None
     meta: dict[str, Any] | None = None
     sort_order: int = 0
     lang: str | None = Field(default=None, pattern="^(en|ro)$")
@@ -35,6 +36,7 @@ class ContentBlockUpdate(BaseModel):
     body_markdown: str | None = Field(default=None)
     status: ContentStatus | None = None
     published_at: datetime | None = None
+    published_until: datetime | None = None
     meta: dict[str, Any] | None = None
     sort_order: int | None = None
     lang: str | None = Field(default=None, pattern="^(en|ro)$")
@@ -58,7 +60,10 @@ class ContentBlockRead(BaseModel):
     meta: dict[str, Any] | None = None
     sort_order: int
     lang: str | None = None
+    needs_translation_en: bool = False
+    needs_translation_ro: bool = False
     published_at: datetime | None = None
+    published_until: datetime | None = None
     created_at: datetime
     updated_at: datetime
     images: list["ContentImageRead"] = Field(default_factory=list)
@@ -72,6 +77,9 @@ class ContentPageListItem(BaseModel):
     status: ContentStatus
     updated_at: datetime
     published_at: datetime | None = None
+    published_until: datetime | None = None
+    needs_translation_en: bool = False
+    needs_translation_ro: bool = False
 
 
 class ContentPageRenameRequest(BaseModel):
@@ -92,11 +100,45 @@ class ContentRedirectRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     target_exists: bool = True
+    chain_error: str | None = None
 
 
 class ContentRedirectListResponse(BaseModel):
     items: list[ContentRedirectRead]
     meta: PaginationMeta
+
+
+class ContentRedirectImportError(BaseModel):
+    line: int
+    from_value: str | None = None
+    to_value: str | None = None
+    error: str
+
+
+class ContentRedirectImportResult(BaseModel):
+    created: int = 0
+    updated: int = 0
+    skipped: int = 0
+    errors: list[ContentRedirectImportError] = Field(default_factory=list)
+
+
+class SitemapPreviewResponse(BaseModel):
+    by_lang: dict[str, list[str]] = Field(default_factory=dict)
+
+
+class StructuredDataValidationIssue(BaseModel):
+    entity_type: str
+    entity_key: str
+    severity: str = Field(pattern="^(error|warning)$")
+    message: str
+
+
+class StructuredDataValidationResponse(BaseModel):
+    checked_products: int = 0
+    checked_pages: int = 0
+    errors: int = 0
+    warnings: int = 0
+    issues: list[StructuredDataValidationIssue] = Field(default_factory=list)
 
 
 class ContentImageRead(BaseModel):
@@ -106,6 +148,8 @@ class ContentImageRead(BaseModel):
     url: str
     alt_text: str | None = None
     sort_order: int
+    focal_x: int = 50
+    focal_y: int = 50
 
 
 class ContentImageAssetRead(BaseModel):
@@ -115,11 +159,41 @@ class ContentImageAssetRead(BaseModel):
     sort_order: int
     created_at: datetime
     content_key: str
+    tags: list[str] = Field(default_factory=list)
+    focal_x: int = 50
+    focal_y: int = 50
 
 
 class ContentImageAssetListResponse(BaseModel):
     items: list[ContentImageAssetRead]
     meta: PaginationMeta
+
+
+class ContentImageTagsUpdate(BaseModel):
+    tags: list[str] = Field(default_factory=list)
+
+
+class ContentImageFocalPointUpdate(BaseModel):
+    focal_x: int = Field(default=50, ge=0, le=100)
+    focal_y: int = Field(default=50, ge=0, le=100)
+
+
+class ContentTranslationStatusUpdate(BaseModel):
+    needs_translation_en: bool | None = None
+    needs_translation_ro: bool | None = None
+
+
+class ContentLinkCheckIssue(BaseModel):
+    key: str
+    kind: str = Field(pattern="^(link|image)$")
+    source: str = Field(pattern="^(markdown|block)$")
+    field: str
+    url: str
+    reason: str
+
+
+class ContentLinkCheckResponse(BaseModel):
+    issues: list[ContentLinkCheckIssue]
 
 
 class ContentBlockVersionListItem(BaseModel):
@@ -143,6 +217,7 @@ class ContentBlockVersionRead(ContentBlockVersionListItem):
     meta: dict[str, Any] | None = None
     lang: str | None = None
     published_at: datetime | None = None
+    published_until: datetime | None = None
     translations: list[ContentTranslationSnapshot] | None = None
 
 

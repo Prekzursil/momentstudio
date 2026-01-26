@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 import enum
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, func, Enum
+from sqlalchemy import DateTime, ForeignKey, Numeric, String, func, Enum, JSON, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -35,6 +35,8 @@ class Order(Base):
     reference_code: Mapped[str | None] = mapped_column(String(20), unique=True, nullable=True)
     customer_email: Mapped[str] = mapped_column(String(255), nullable=False)
     customer_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    invoice_company: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    invoice_vat_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     shipping_method_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("shipping_methods.id"), nullable=True)
     tracking_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
     tracking_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -81,12 +83,40 @@ class Order(Base):
         "OrderItem", back_populates="order", cascade="all, delete-orphan", lazy="selectin"
     )
     shipping_method: Mapped["ShippingMethod | None"] = relationship("ShippingMethod", lazy="selectin")
+    shipments: Mapped[list["OrderShipment"]] = relationship(
+        "OrderShipment",
+        back_populates="order",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="OrderShipment.created_at",
+    )
     events: Mapped[list["OrderEvent"]] = relationship(
         "OrderEvent",
         back_populates="order",
         cascade="all, delete-orphan",
         lazy="selectin",
         order_by="OrderEvent.created_at",
+    )
+    refunds: Mapped[list["OrderRefund"]] = relationship(
+        "OrderRefund",
+        back_populates="order",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="OrderRefund.created_at",
+    )
+    admin_notes: Mapped[list["OrderAdminNote"]] = relationship(
+        "OrderAdminNote",
+        back_populates="order",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="OrderAdminNote.created_at",
+    )
+    tags: Mapped[list["OrderTag"]] = relationship(
+        "OrderTag",
+        back_populates="order",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="OrderTag.created_at",
     )
 
 
@@ -120,6 +150,20 @@ class ShippingMethod(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+class OrderShipment(Base):
+    __tablename__ = "order_shipments"
+    __table_args__ = (UniqueConstraint("order_id", "tracking_number", name="uq_order_shipments_order_id_tracking_number"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    order_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
+    courier: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    tracking_number: Mapped[str] = mapped_column(String(50), nullable=False)
+    tracking_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    order: Mapped[Order] = relationship("Order", back_populates="shipments")
+
+
 class OrderEvent(Base):
     __tablename__ = "order_events"
 
@@ -127,6 +171,53 @@ class OrderEvent(Base):
     order_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("orders.id"), nullable=False)
     event: Mapped[str] = mapped_column(String(50), nullable=False)
     note: Mapped[str | None] = mapped_column(String, nullable=True)
+    data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     order: Mapped[Order] = relationship("Order", back_populates="events")
+
+
+class OrderRefund(Base):
+    __tablename__ = "order_refunds"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    order_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="RON")
+    provider: Mapped[str] = mapped_column(String(20), nullable=False, default="manual")
+    provider_refund_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    note: Mapped[str | None] = mapped_column(String, nullable=True)
+    data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    order: Mapped[Order] = relationship("Order", back_populates="refunds")
+
+
+class OrderAdminNote(Base):
+    __tablename__ = "order_admin_notes"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    order_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    note: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    order: Mapped[Order] = relationship("Order", back_populates="admin_notes")
+    actor: Mapped[User | None] = relationship("User", foreign_keys=[actor_user_id], lazy="joined")
+
+
+class OrderTag(Base):
+    __tablename__ = "order_tags"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    order_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    tag: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    order: Mapped[Order] = relationship("Order", back_populates="tags")
+    actor: Mapped[User | None] = relationship("User", foreign_keys=[actor_user_id], lazy="joined")

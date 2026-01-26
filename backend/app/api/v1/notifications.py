@@ -15,10 +15,18 @@ router = APIRouter(prefix="/notifications", tags=["notifications"])
 @router.get("", response_model=NotificationListResponse)
 async def list_notifications(
     limit: int = Query(default=20, ge=1, le=100),
+    include_dismissed: bool = Query(default=False),
+    include_old_read: bool = Query(default=False),
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> NotificationListResponse:
-    rows = await notification_service.list_notifications(session, user_id=current_user.id, limit=limit)
+    rows = await notification_service.list_notifications(
+        session,
+        user_id=current_user.id,
+        limit=limit,
+        include_dismissed=include_dismissed,
+        include_old_read=include_old_read,
+    )
     return NotificationListResponse(items=[NotificationRead.model_validate(row) for row in rows])
 
 
@@ -50,3 +58,12 @@ async def dismiss_notification(
     row = await notification_service.dismiss(session, user_id=current_user.id, notification_id=notification_id)
     return NotificationRead.model_validate(row)
 
+
+@router.post("/{notification_id}/restore", response_model=NotificationRead, status_code=status.HTTP_200_OK)
+async def restore_notification(
+    notification_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> NotificationRead:
+    row = await notification_service.restore(session, user_id=current_user.id, notification_id=notification_id)
+    return NotificationRead.model_validate(row)

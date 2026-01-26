@@ -9,6 +9,91 @@ export interface AdminSummary {
   low_stock: number;
   sales_30d: number;
   orders_30d: number;
+  sales_range: number;
+  orders_range: number;
+  range_days: number;
+  range_from: string;
+  range_to: string;
+  today_orders: number;
+  yesterday_orders: number;
+  orders_delta_pct: number | null;
+  today_sales: number;
+  yesterday_sales: number;
+  sales_delta_pct: number | null;
+  today_refunds: number;
+  yesterday_refunds: number;
+  refunds_delta_pct: number | null;
+  anomalies?: AdminDashboardAnomalies;
+  system?: AdminDashboardSystemHealth;
+}
+
+export interface AdminDashboardWindowMetric {
+  window_hours?: number;
+  window_days?: number;
+  current: number;
+  previous: number;
+  delta_pct: number | null;
+}
+
+export interface AdminDashboardAnomalies {
+  failed_payments: AdminDashboardWindowMetric;
+  refund_requests: AdminDashboardWindowMetric;
+  stockouts: { count: number };
+}
+
+export interface AdminDashboardSystemHealth {
+  db_ready: boolean;
+  backup_last_at: string | null;
+}
+
+export type AdminDashboardSearchResultType = 'order' | 'product' | 'user';
+
+export interface AdminDashboardSearchResult {
+  type: AdminDashboardSearchResultType;
+  id: string;
+  label: string;
+  subtitle?: string | null;
+  slug?: string | null;
+  email?: string | null;
+}
+
+export interface AdminDashboardSearchResponse {
+  items: AdminDashboardSearchResult[];
+}
+
+export type AdminClientErrorKind = 'window_error' | 'unhandled_rejection';
+
+export interface AdminClientErrorIn {
+  kind: AdminClientErrorKind;
+  message: string;
+  stack?: string | null;
+  url?: string | null;
+  route?: string | null;
+  user_agent?: string | null;
+  context?: Record<string, any> | null;
+  occurred_at?: string | null;
+}
+
+export interface ScheduledPublishItem {
+  id: string;
+  slug: string;
+  name: string;
+  scheduled_for: string;
+  sale_end_at?: string | null;
+}
+
+export interface ScheduledPromoItem {
+  id: string;
+  name: string;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  next_event_at: string;
+  next_event_type: string;
+}
+
+export interface AdminDashboardScheduledTasksResponse {
+  publish_schedules: ScheduledPublishItem[];
+  promo_schedules: ScheduledPromoItem[];
 }
 
 export interface AdminProduct {
@@ -41,6 +126,17 @@ export interface AdminUser {
   name_tag?: number;
   role: string;
   created_at: string;
+}
+
+export interface AdminUserSession {
+  id: string;
+  created_at: string;
+  expires_at: string;
+  persistent: boolean;
+  is_current: boolean;
+  user_agent?: string | null;
+  ip_address?: string | null;
+  country_code?: string | null;
 }
 
 export interface AdminUserAliasHistoryItem {
@@ -81,6 +177,10 @@ export interface AdminContent {
   lang?: string | null;
   sort_order?: number | null;
   published_at?: string | null;
+  published_until?: string | null;
+  needs_translation_en?: boolean;
+  needs_translation_ro?: boolean;
+  author?: { id: string; username: string; name?: string | null; name_tag?: number | null } | null;
 }
 
 export interface AdminCoupon {
@@ -104,7 +204,9 @@ export interface AdminCategory {
   name: string;
   slug: string;
   description?: string | null;
+  low_stock_threshold?: number | null;
   parent_id?: string | null;
+  tax_group_id?: string | null;
   sort_order?: number;
 }
 
@@ -118,9 +220,22 @@ export interface AdminProductDetail extends AdminProduct {
   short_description?: string | null;
   long_description?: string | null;
   category_id?: string | null;
+  weight_grams?: number | null;
+  width_cm?: number | null;
+  height_cm?: number | null;
+  depth_cm?: number | null;
+  shipping_class?: 'standard' | 'bulky' | 'oversize';
+  shipping_allow_locker?: boolean;
+  shipping_disallowed_couriers?: string[];
   stock_quantity: number;
-  images?: { id: string; url: string; alt_text?: string | null }[];
+  images?: { id: string; url: string; alt_text?: string | null; caption?: string | null }[];
+  variants?: AdminProductVariant[];
   tags?: string[];
+}
+
+export interface AdminProductRelationships {
+  related_product_ids: string[];
+  upsell_product_ids: string[];
 }
 
 export interface AdminProductTranslation {
@@ -130,6 +245,67 @@ export interface AdminProductTranslation {
   long_description?: string | null;
   meta_title?: string | null;
   meta_description?: string | null;
+}
+
+export interface AdminProductImageTranslation {
+  id: string;
+  lang: 'en' | 'ro';
+  alt_text?: string | null;
+  caption?: string | null;
+}
+
+export interface AdminProductImageOptimizationStats {
+  original_bytes?: number | null;
+  thumb_sm_bytes?: number | null;
+  thumb_md_bytes?: number | null;
+  thumb_lg_bytes?: number | null;
+  width?: number | null;
+  height?: number | null;
+}
+
+export interface AdminDeletedProductImage {
+  id: string;
+  url: string;
+  alt_text?: string | null;
+  caption?: string | null;
+  deleted_at?: string | null;
+}
+
+export interface AdminProductAuditEntry {
+  id: string;
+  action: string;
+  created_at: string;
+  user_id?: string | null;
+  user_email?: string | null;
+  payload?: any | null;
+}
+
+export interface AdminProductsImportResult {
+  created: number;
+  updated: number;
+  errors: string[];
+}
+
+export interface AdminProductVariant {
+  id: string;
+  name: string;
+  additional_price_delta: number;
+  stock_quantity: number;
+}
+
+export type StockAdjustmentReason = 'restock' | 'damage' | 'manual_correction';
+
+export interface StockAdjustment {
+  id: string;
+  product_id: string;
+  variant_id?: string | null;
+  actor_user_id?: string | null;
+  reason: StockAdjustmentReason;
+  delta: number;
+  before_quantity: number;
+  after_quantity: number;
+  note?: string | null;
+  created_at: string;
 }
 
 export interface AdminAudit {
@@ -164,6 +340,28 @@ export interface AdminAuditEntriesResponse {
   };
 }
 
+export interface AdminAuditRetentionPolicy {
+  days: number;
+  enabled: boolean;
+  cutoff: string | null;
+}
+
+export interface AdminAuditRetentionCounts {
+  total: number;
+  expired: number;
+}
+
+export interface AdminAuditRetentionResponse {
+  now: string;
+  policies: Record<'product' | 'content' | 'security', AdminAuditRetentionPolicy>;
+  counts: Record<'product' | 'content' | 'security', AdminAuditRetentionCounts>;
+}
+
+export interface AdminAuditRetentionPurgeResponse extends AdminAuditRetentionResponse {
+  dry_run: boolean;
+  deleted: Record<'product' | 'content' | 'security', number>;
+}
+
 export interface AdminAuditItem {
   id: string;
   product_id?: string;
@@ -189,8 +387,58 @@ export interface LowStockItem {
   id: string;
   name: string;
   stock_quantity: number;
+  threshold: number;
+  is_critical: boolean;
   sku: string;
   slug: string;
+}
+
+export type RestockListItemKind = 'product' | 'variant';
+
+export interface RestockListItem {
+  kind: RestockListItemKind;
+  product_id: string;
+  variant_id?: string | null;
+  sku: string;
+  product_slug: string;
+  product_name: string;
+  variant_name?: string | null;
+  stock_quantity: number;
+  reserved_in_carts: number;
+  reserved_in_orders: number;
+  available_quantity: number;
+  threshold: number;
+  is_critical: boolean;
+  restock_at?: string | null;
+  supplier?: string | null;
+  desired_quantity?: number | null;
+  note?: string | null;
+  note_updated_at?: string | null;
+}
+
+export interface RestockListResponse {
+  items: RestockListItem[];
+  meta: {
+    page: number;
+    limit: number;
+    total_items: number;
+    total_pages: number;
+  };
+}
+
+export interface RestockNoteUpsert {
+  product_id: string;
+  variant_id?: string | null;
+  supplier?: string | null;
+  desired_quantity?: number | null;
+  note?: string | null;
+}
+
+export interface RestockNoteRead extends RestockNoteUpsert {
+  id: string;
+  actor_user_id?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface FeaturedCollection {
@@ -212,6 +460,9 @@ export interface ContentBlock {
   lang?: string | null;
   sort_order?: number;
   published_at?: string | null;
+  published_until?: string | null;
+  needs_translation_en?: boolean;
+  needs_translation_ro?: boolean;
   images?: { id: string; url: string; alt_text?: string | null; sort_order?: number }[];
 }
 
@@ -234,6 +485,7 @@ export interface ContentBlockVersionRead extends ContentBlockVersionListItem {
   meta?: Record<string, any> | null;
   lang?: string | null;
   published_at?: string | null;
+  published_until?: string | null;
   translations?: ContentTranslationSnapshot[] | null;
 }
 
@@ -244,6 +496,9 @@ export interface ContentPageListItem {
   status: 'draft' | 'published';
   updated_at: string;
   published_at?: string | null;
+  published_until?: string | null;
+  needs_translation_en?: boolean;
+  needs_translation_ro?: boolean;
 }
 
 export interface ContentPageRenameResponse {
@@ -260,6 +515,7 @@ export interface ContentRedirectRead {
   created_at: string;
   updated_at: string;
   target_exists: boolean;
+  chain_error?: 'loop' | 'too_deep' | null;
 }
 
 export interface ContentRedirectListResponse {
@@ -267,18 +523,67 @@ export interface ContentRedirectListResponse {
   meta: { total_items: number; total_pages: number; page: number; limit: number };
 }
 
+export interface ContentRedirectImportError {
+  line: number;
+  from_value?: string | null;
+  to_value?: string | null;
+  error: string;
+}
+
+export interface ContentRedirectImportResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  errors?: ContentRedirectImportError[];
+}
+
+export interface SitemapPreviewResponse {
+  by_lang: Record<string, string[]>;
+}
+
+export interface StructuredDataValidationIssue {
+  entity_type: 'product' | 'page';
+  entity_key: string;
+  severity: 'error' | 'warning';
+  message: string;
+}
+
+export interface StructuredDataValidationResponse {
+  checked_products: number;
+  checked_pages: number;
+  errors: number;
+  warnings: number;
+  issues: StructuredDataValidationIssue[];
+}
+
 export interface ContentImageAssetRead {
   id: string;
   url: string;
   alt_text?: string | null;
   sort_order: number;
+  focal_x: number;
+  focal_y: number;
   created_at: string;
   content_key: string;
+  tags?: string[];
 }
 
 export interface ContentImageAssetListResponse {
   items: ContentImageAssetRead[];
   meta: { total_items: number; total_pages: number; page: number; limit: number };
+}
+
+export interface ContentLinkCheckIssue {
+  key: string;
+  kind: 'link' | 'image';
+  source: 'markdown' | 'block';
+  field: string;
+  url: string;
+  reason: string;
+}
+
+export interface ContentLinkCheckResponse {
+  issues: ContentLinkCheckIssue[];
 }
 
 export interface ContentSavePayload {
@@ -289,6 +594,7 @@ export interface ContentSavePayload {
   lang?: string | null;
   sort_order?: number;
   published_at?: string | null;
+  published_until?: string | null;
   expected_version?: number;
 }
 
@@ -310,24 +616,38 @@ export interface OwnerTransferResponse {
 export class AdminService {
   constructor(private api: ApiService) {}
 
-  summary(): Observable<AdminSummary> {
-    return this.api.get<AdminSummary>('/admin/dashboard/summary');
+  summary(params?: { range_days?: number; range_from?: string; range_to?: string }): Observable<AdminSummary> {
+    return this.api.get<AdminSummary>('/admin/dashboard/summary', params);
+  }
+
+  globalSearch(q: string, opts?: { include_pii?: boolean }): Observable<AdminDashboardSearchResponse> {
+    const params: any = { q };
+    if (opts?.include_pii) params.include_pii = true;
+    return this.api.get<AdminDashboardSearchResponse>('/admin/dashboard/search', params);
+  }
+
+  scheduledTasks(): Observable<AdminDashboardScheduledTasksResponse> {
+    return this.api.get<AdminDashboardScheduledTasksResponse>('/admin/dashboard/scheduled-tasks');
+  }
+
+  logClientError(payload: AdminClientErrorIn): Observable<void> {
+    return this.api.post<void>('/admin/observability/client-errors', payload, { 'X-Silent': '1' });
   }
 
   products(): Observable<AdminProduct[]> {
     return this.api.get<AdminProduct[]>('/admin/dashboard/products');
   }
 
-  orders(): Observable<AdminOrder[]> {
-    return this.api.get<AdminOrder[]>('/admin/dashboard/orders');
+  orders(opts?: { include_pii?: boolean }): Observable<AdminOrder[]> {
+    return this.api.get<AdminOrder[]>('/admin/dashboard/orders', opts as any);
   }
 
-  users(): Observable<AdminUser[]> {
-    return this.api.get<AdminUser[]>('/admin/dashboard/users');
+  users(opts?: { include_pii?: boolean }): Observable<AdminUser[]> {
+    return this.api.get<AdminUser[]>('/admin/dashboard/users', opts as any);
   }
 
-  userAliases(userId: string): Observable<AdminUserAliasesResponse> {
-    return this.api.get<AdminUserAliasesResponse>(`/admin/dashboard/users/${userId}/aliases`);
+  userAliases(userId: string, opts?: { include_pii?: boolean }): Observable<AdminUserAliasesResponse> {
+    return this.api.get<AdminUserAliasesResponse>(`/admin/dashboard/users/${userId}/aliases`, opts as any);
   }
 
   content(): Observable<AdminContent[]> {
@@ -356,8 +676,16 @@ export class AdminService {
     return this.api.get<AdminAuditEntriesResponse>('/admin/dashboard/audit/entries', params);
   }
 
-  exportAuditCsv(params: { entity?: AdminAuditEntity; action?: string; user?: string }): Observable<Blob> {
+  exportAuditCsv(params: { entity?: AdminAuditEntity; action?: string; user?: string; redact?: boolean }): Observable<Blob> {
     return this.api.getBlob('/admin/dashboard/audit/export.csv', params);
+  }
+
+  auditRetention(): Observable<AdminAuditRetentionResponse> {
+    return this.api.get<AdminAuditRetentionResponse>('/admin/dashboard/audit/retention');
+  }
+
+  purgeAuditRetention(payload: { confirm: string; dry_run?: boolean }): Observable<AdminAuditRetentionPurgeResponse> {
+    return this.api.post<AdminAuditRetentionPurgeResponse>('/admin/dashboard/audit/retention/purge', payload);
   }
 
   transferOwner(payload: { identifier: string; confirm: string; password: string }): Observable<OwnerTransferResponse> {
@@ -368,8 +696,33 @@ export class AdminService {
     return this.api.post<void>(`/admin/dashboard/sessions/${userId}/revoke`, {});
   }
 
+  listUserSessions(userId: string): Observable<AdminUserSession[]> {
+    return this.api.get<AdminUserSession[]>(`/admin/dashboard/sessions/${userId}`);
+  }
+
+  revokeSession(userId: string, sessionId: string): Observable<void> {
+    return this.api.post<void>(`/admin/dashboard/sessions/${userId}/${sessionId}/revoke`, {});
+  }
+
   lowStock(): Observable<LowStockItem[]> {
     return this.api.get<LowStockItem[]>('/admin/dashboard/low-stock');
+  }
+
+  restockList(params: {
+    page?: number;
+    limit?: number;
+    include_variants?: boolean;
+    default_threshold?: number;
+  }): Observable<RestockListResponse> {
+    return this.api.get<RestockListResponse>('/admin/dashboard/inventory/restock-list', params as any);
+  }
+
+  exportRestockListCsv(params: { include_variants?: boolean; default_threshold?: number }): Observable<Blob> {
+    return this.api.getBlob('/admin/dashboard/inventory/restock-list/export', params as any);
+  }
+
+  upsertRestockNote(payload: RestockNoteUpsert): Observable<RestockNoteRead | null> {
+    return this.api.put<RestockNoteRead | null>('/admin/dashboard/inventory/restock-notes', payload);
   }
 
   updateOrderStatus(orderId: string, status: string): Observable<AdminOrder> {
@@ -382,6 +735,9 @@ export class AdminService {
     sale_type?: 'percent' | 'amount' | null;
     sale_value?: number | null;
     stock_quantity?: number | null;
+    category_id?: string | null;
+    publish_scheduled_for?: string | null;
+    unpublish_scheduled_for?: string | null;
     status?: string | null;
   }[]): Observable<any[]> {
     return this.api.post<any[]>('/catalog/products/bulk-update', payload);
@@ -421,6 +777,28 @@ export class AdminService {
 
   getProduct(slug: string): Observable<AdminProductDetail> {
     return this.api.get<AdminProductDetail>(`/catalog/products/${slug}`);
+  }
+
+  exportProductsCsv(): Observable<Blob> {
+    return this.api.getBlob('/catalog/products/export');
+  }
+
+  importProductsCsv(file: File, dryRun = true): Observable<AdminProductsImportResult> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.api.post<AdminProductsImportResult>('/catalog/products/import', form, undefined, { dry_run: dryRun });
+  }
+
+  getProductAudit(slug: string, limit = 50): Observable<AdminProductAuditEntry[]> {
+    return this.api.get<AdminProductAuditEntry[]>(`/catalog/products/${slug}/audit`, { limit } as any);
+  }
+
+  getProductRelationships(slug: string): Observable<AdminProductRelationships> {
+    return this.api.get<AdminProductRelationships>(`/catalog/products/${slug}/relationships`);
+  }
+
+  updateProductRelationships(slug: string, payload: AdminProductRelationships): Observable<AdminProductRelationships> {
+    return this.api.put<AdminProductRelationships>(`/catalog/products/${slug}/relationships`, payload);
   }
 
   getProductTranslations(slug: string): Observable<AdminProductTranslation[]> {
@@ -483,6 +861,14 @@ export class AdminService {
     return this.api.delete<AdminProductDetail>(`/catalog/products/${slug}/images/${imageId}`);
   }
 
+  listDeletedProductImages(slug: string): Observable<AdminDeletedProductImage[]> {
+    return this.api.get<AdminDeletedProductImage[]>(`/catalog/products/${slug}/images/deleted`);
+  }
+
+  restoreProductImage(slug: string, imageId: string): Observable<AdminProductDetail> {
+    return this.api.post<AdminProductDetail>(`/catalog/products/${slug}/images/${imageId}/restore`, {});
+  }
+
   reorderProductImage(slug: string, imageId: string, sortOrder: number): Observable<AdminProductDetail> {
     return this.api.patch<AdminProductDetail>(
       `/catalog/products/${slug}/images/${imageId}/sort?sort_order=${sortOrder}`,
@@ -490,8 +876,60 @@ export class AdminService {
     );
   }
 
-  updateUserRole(userId: string, role: string): Observable<AdminUser> {
-    return this.api.patch<AdminUser>(`/admin/dashboard/users/${userId}/role`, { role });
+  updateProductVariants(
+    slug: string,
+    payload: {
+      variants: Array<{ id?: string | null; name: string; additional_price_delta: number; stock_quantity: number }>;
+      delete_variant_ids?: string[];
+    }
+  ): Observable<AdminProductVariant[]> {
+    return this.api.put<AdminProductVariant[]>(`/catalog/products/${slug}/variants`, payload);
+  }
+
+  getProductImageTranslations(slug: string, imageId: string): Observable<AdminProductImageTranslation[]> {
+    return this.api.get<AdminProductImageTranslation[]>(`/catalog/products/${slug}/images/${imageId}/translations`);
+  }
+
+  upsertProductImageTranslation(
+    slug: string,
+    imageId: string,
+    lang: 'en' | 'ro',
+    payload: { alt_text?: string | null; caption?: string | null }
+  ): Observable<AdminProductImageTranslation> {
+    return this.api.put<AdminProductImageTranslation>(
+      `/catalog/products/${slug}/images/${imageId}/translations/${lang}`,
+      payload
+    );
+  }
+
+  deleteProductImageTranslation(slug: string, imageId: string, lang: 'en' | 'ro'): Observable<void> {
+    return this.api.delete<void>(`/catalog/products/${slug}/images/${imageId}/translations/${lang}`);
+  }
+
+  getProductImageStats(slug: string, imageId: string): Observable<AdminProductImageOptimizationStats> {
+    return this.api.get<AdminProductImageOptimizationStats>(`/catalog/products/${slug}/images/${imageId}/stats`);
+  }
+
+  reprocessProductImage(slug: string, imageId: string): Observable<AdminProductImageOptimizationStats> {
+    return this.api.post<AdminProductImageOptimizationStats>(`/catalog/products/${slug}/images/${imageId}/reprocess`, {});
+  }
+
+  listStockAdjustments(params: { product_id: string; limit?: number; offset?: number }): Observable<StockAdjustment[]> {
+    return this.api.get<StockAdjustment[]>('/admin/dashboard/stock-adjustments', params as any);
+  }
+
+  applyStockAdjustment(payload: {
+    product_id: string;
+    variant_id?: string | null;
+    delta: number;
+    reason: StockAdjustmentReason;
+    note?: string | null;
+  }): Observable<StockAdjustment> {
+    return this.api.post<StockAdjustment>('/admin/dashboard/stock-adjustments', payload);
+  }
+
+  updateUserRole(userId: string, role: string, password: string): Observable<AdminUser> {
+    return this.api.patch<AdminUser>(`/admin/dashboard/users/${userId}/role`, { role, password });
   }
 
   getMaintenance(): Observable<{ enabled: boolean }> {
@@ -542,8 +980,24 @@ export class AdminService {
     return this.api.post<ContentBlock>(`/content/admin/${key}/versions/${version}/rollback`, {});
   }
 
-  listContentImages(params?: { key?: string; q?: string; page?: number; limit?: number }): Observable<ContentImageAssetListResponse> {
+  updateContentTranslationStatus(key: string, payload: { needs_translation_en?: boolean | null; needs_translation_ro?: boolean | null }): Observable<ContentBlock> {
+    return this.api.patch<ContentBlock>(`/content/admin/${encodeURIComponent(key)}/translation-status`, payload);
+  }
+
+  listContentImages(params?: { key?: string; q?: string; tag?: string; page?: number; limit?: number }): Observable<ContentImageAssetListResponse> {
     return this.api.get<ContentImageAssetListResponse>('/content/admin/assets/images', params as any);
+  }
+
+  updateContentImageTags(imageId: string, tags: string[]): Observable<ContentImageAssetRead> {
+    return this.api.patch<ContentImageAssetRead>(`/content/admin/assets/images/${encodeURIComponent(imageId)}/tags`, { tags });
+  }
+
+  updateContentImageFocalPoint(imageId: string, focal_x: number, focal_y: number): Observable<ContentImageAssetRead> {
+    return this.api.patch<ContentImageAssetRead>(`/content/admin/assets/images/${encodeURIComponent(imageId)}/focal`, { focal_x, focal_y });
+  }
+
+  linkCheckContent(key: string): Observable<ContentLinkCheckResponse> {
+    return this.api.get<ContentLinkCheckResponse>('/content/admin/tools/link-check', { key });
   }
 
   fetchSocialThumbnail(url: string): Observable<SocialThumbnailResponse> {
@@ -564,5 +1018,23 @@ export class AdminService {
 
   deleteContentRedirect(id: string): Observable<void> {
     return this.api.delete<void>(`/content/admin/redirects/${encodeURIComponent(id)}`);
+  }
+
+  exportContentRedirects(params?: { q?: string }): Observable<Blob> {
+    return this.api.getBlob('/content/admin/redirects/export', params as any);
+  }
+
+  importContentRedirects(file: File): Observable<ContentRedirectImportResult> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.api.post<ContentRedirectImportResult>('/content/admin/redirects/import', form);
+  }
+
+  getSitemapPreview(): Observable<SitemapPreviewResponse> {
+    return this.api.get<SitemapPreviewResponse>('/content/admin/seo/sitemap-preview');
+  }
+
+  validateStructuredData(): Observable<StructuredDataValidationResponse> {
+    return this.api.get<StructuredDataValidationResponse>('/content/admin/seo/structured-data/validate');
   }
 }

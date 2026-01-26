@@ -23,6 +23,14 @@ export type ReceiptItem = {
   product_url?: string | null;
 };
 
+export type ReceiptRefund = {
+  amount: number;
+  currency: string;
+  provider: string;
+  note?: string | null;
+  created_at: string;
+};
+
 export type ReceiptRead = {
   order_id: string;
   reference_code?: string | null;
@@ -45,6 +53,7 @@ export type ReceiptRead = {
   shipping_address?: ReceiptAddress | null;
   billing_address?: ReceiptAddress | null;
   items: ReceiptItem[];
+  refunds?: ReceiptRefund[];
 };
 
 @Injectable({ providedIn: 'root' })
@@ -67,6 +76,10 @@ export class ReceiptService {
           ...it,
           unit_price: parseMoney(it?.unit_price),
           subtotal: parseMoney(it?.subtotal)
+        })),
+        refunds: (r?.refunds ?? []).map((rf: any) => ({
+          ...rf,
+          amount: parseMoney(rf?.amount)
         }))
       }))
     );

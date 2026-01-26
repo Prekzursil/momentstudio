@@ -26,6 +26,7 @@ class PromotionRead(BaseModel):
     included_category_ids: list[UUID] = Field(default_factory=list)
     excluded_category_ids: list[UUID] = Field(default_factory=list)
     allow_on_sale_items: bool
+    first_order_only: bool = False
     is_active: bool
     starts_at: datetime | None = None
     ends_at: datetime | None = None
@@ -48,6 +49,7 @@ class PromotionCreate(BaseModel):
     included_category_ids: list[UUID] = Field(default_factory=list)
     excluded_category_ids: list[UUID] = Field(default_factory=list)
     allow_on_sale_items: bool = True
+    first_order_only: bool = False
     is_active: bool = True
     starts_at: datetime | None = None
     ends_at: datetime | None = None
@@ -68,6 +70,7 @@ class PromotionUpdate(BaseModel):
     included_category_ids: list[UUID] | None = None
     excluded_category_ids: list[UUID] | None = None
     allow_on_sale_items: bool | None = None
+    first_order_only: bool | None = None
     is_active: bool | None = None
     starts_at: datetime | None = None
     ends_at: datetime | None = None
@@ -99,6 +102,26 @@ class CouponCreate(BaseModel):
     ends_at: datetime | None = None
     global_max_redemptions: int | None = Field(default=None, ge=1)
     per_customer_max_redemptions: int | None = Field(default=None, ge=1)
+
+
+class CouponIssueToUserRequest(BaseModel):
+    user_id: UUID
+    promotion_id: UUID
+    prefix: str | None = Field(default=None, max_length=20)
+    validity_days: int | None = Field(default=None, ge=1, le=3650)
+    ends_at: datetime | None = None
+    per_customer_max_redemptions: int = Field(default=1, ge=1)
+    send_email: bool = True
+
+
+class CouponCodeGenerateRequest(BaseModel):
+    prefix: str | None = Field(default=None, max_length=20)
+    pattern: str | None = Field(default=None, max_length=80)
+    length: int = Field(default=12, ge=4, le=32)
+
+
+class CouponCodeGenerateResponse(BaseModel):
+    code: str
 
 
 class CouponUpdate(BaseModel):
@@ -181,6 +204,9 @@ class CouponBulkResult(BaseModel):
 class CouponBulkSegmentFilters(BaseModel):
     require_marketing_opt_in: bool = False
     require_email_verified: bool = False
+    bucket_total: int | None = Field(default=None, ge=2, le=100)
+    bucket_index: int | None = Field(default=None, ge=0)
+    bucket_seed: str | None = Field(default=None, max_length=80)
 
 
 class CouponBulkSegmentAssignRequest(CouponBulkSegmentFilters):
@@ -213,6 +239,9 @@ class CouponBulkJobRead(BaseModel):
     status: CouponBulkJobStatus
     require_marketing_opt_in: bool
     require_email_verified: bool
+    bucket_total: int | None = None
+    bucket_index: int | None = None
+    bucket_seed: str | None = None
     send_email: bool
     revoke_reason: str | None = None
     total_candidates: int
@@ -227,3 +256,35 @@ class CouponBulkJobRead(BaseModel):
     created_at: datetime
     started_at: datetime | None = None
     finished_at: datetime | None = None
+
+
+class CouponAnalyticsSummary(BaseModel):
+    redemptions: int = 0
+    total_discount_ron: Decimal = Decimal("0.00")
+    total_shipping_discount_ron: Decimal = Decimal("0.00")
+    avg_order_total_with_coupon: Decimal | None = None
+    avg_order_total_without_coupon: Decimal | None = None
+    aov_lift: Decimal | None = None
+
+
+class CouponAnalyticsDaily(BaseModel):
+    date: str
+    redemptions: int = 0
+    discount_ron: Decimal = Decimal("0.00")
+    shipping_discount_ron: Decimal = Decimal("0.00")
+
+
+class CouponAnalyticsTopProduct(BaseModel):
+    product_id: UUID
+    product_slug: str | None = None
+    product_name: str
+    orders_count: int = 0
+    quantity: int = 0
+    gross_sales_ron: Decimal = Decimal("0.00")
+    allocated_discount_ron: Decimal = Decimal("0.00")
+
+
+class CouponAnalyticsResponse(BaseModel):
+    summary: CouponAnalyticsSummary
+    daily: list[CouponAnalyticsDaily] = Field(default_factory=list)
+    top_products: list[CouponAnalyticsTopProduct] = Field(default_factory=list)

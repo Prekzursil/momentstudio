@@ -18,6 +18,7 @@ from app.models.address import Address
 from app.models.cart import Cart, CartItem
 from app.models.catalog import Category, Product, ProductImage, ProductStatus
 from app.models.order import Order, OrderEvent, OrderItem, OrderStatus
+from app.models.passkeys import UserPasskey
 from app.models.promo import PromoCode
 from app.models.user import User, UserRole
 from app.services import storage
@@ -68,6 +69,17 @@ async def seed_data(session_factory):
             role=UserRole.admin,
         )
         session.add(admin)
+        await session.flush()
+        session.add(
+            UserPasskey(
+                user_id=admin.id,
+                name="Test Passkey",
+                credential_id=f"cred-{admin.id}",
+                public_key=b"test",
+                sign_count=0,
+                backed_up=False,
+            )
+        )
 
         customer = User(
             email="customer@example.com",

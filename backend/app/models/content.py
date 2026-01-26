@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, func, JSON, Integer
+from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, func, JSON, Integer, UniqueConstraint, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -11,6 +11,7 @@ from app.db.base import Base
 
 class ContentStatus(str, enum.Enum):
     draft = "draft"
+    review = "review"
     published = "published"
 
 
@@ -26,7 +27,16 @@ class ContentBlock(Base):
     meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     lang: Mapped[str | None] = mapped_column(String(10), nullable=True, index=True)
+    needs_translation_en: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    needs_translation_ro: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    author_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
@@ -49,6 +59,7 @@ class ContentBlock(Base):
         lazy="selectin",
         order_by="ContentAuditLog.created_at",
     )
+    author = relationship("User", foreign_keys=[author_id])
     translations: Mapped[list["ContentBlockTranslation"]] = relationship(
         "ContentBlockTranslation", back_populates="block", cascade="all, delete-orphan", lazy="selectin"
     )
@@ -66,6 +77,7 @@ class ContentBlockVersion(Base):
     meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     lang: Mapped[str | None] = mapped_column(String(10), nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     translations: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
@@ -80,9 +92,28 @@ class ContentImage(Base):
     url: Mapped[str] = mapped_column(String(255), nullable=False)
     alt_text: Mapped[str | None] = mapped_column(String(255), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    focal_x: Mapped[int] = mapped_column(Integer, nullable=False, default=50)
+    focal_y: Mapped[int] = mapped_column(Integer, nullable=False, default=50)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     block: Mapped[ContentBlock] = relationship("ContentBlock", back_populates="images")
+    tags: Mapped[list["ContentImageTag"]] = relationship(
+        "ContentImageTag", back_populates="image", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class ContentImageTag(Base):
+    __tablename__ = "content_image_tags"
+    __table_args__ = (UniqueConstraint("content_image_id", "tag", name="uq_content_image_tags_image_tag"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    content_image_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("content_images.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    tag: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    image: Mapped[ContentImage] = relationship("ContentImage", back_populates="tags")
 
 
 class ContentAuditLog(Base):
@@ -93,6 +124,8 @@ class ContentAuditLog(Base):
     action: Mapped[str] = mapped_column(String(120), nullable=False)
     version: Mapped[int] = mapped_column(nullable=False)
     user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    chain_prev_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    chain_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     block: Mapped[ContentBlock] = relationship("ContentBlock", back_populates="audits")

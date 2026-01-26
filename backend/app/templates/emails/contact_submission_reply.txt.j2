@@ -1,0 +1,54 @@
+{% if lang == "ro" -%}
+Răspuns la mesajul tău
+{% else -%}
+Reply to your message
+{% endif %}
+
+{% if lang == "ro" -%}
+Salut {{ customer_name }},
+{% else -%}
+Hi {{ customer_name }},
+{% endif %}
+
+{% if lang == "ro" -%}
+Am răspuns la solicitarea ta. Păstrează acest email pentru referință.
+{% else -%}
+We replied to your request. Keep this email for your records.
+{% endif %}
+
+{% if topic -%}
+{% if lang == "ro" -%}
+Tip: {{ topic }}
+{% else -%}
+Topic: {{ topic }}
+{% endif %}
+{% endif %}
+
+{% if order_reference -%}
+{% if lang == "ro" -%}
+Comandă: {{ order_reference }}
+{% else -%}
+Order: {{ order_reference }}
+{% endif %}
+{% endif %}
+
+{% if reference -%}
+{% if lang == "ro" -%}
+Referință: {{ reference }}
+{% else -%}
+Reference: {{ reference }}
+{% endif %}
+{% endif %}
+
+---
+
+{{ reply_message }}
+
+{% if contact_url -%}
+
+{% if lang == "ro" -%}
+Ai nevoie de ajutor suplimentar? Trimite-ne un nou mesaj aici: {{ contact_url }}
+{% else -%}
+Need more help? Send us a new message here: {{ contact_url }}
+{% endif %}
+{% endif %}

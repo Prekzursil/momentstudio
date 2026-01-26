@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import re
 import secrets
 import string
 from uuid import UUID
@@ -28,6 +29,8 @@ from app.models.coupons_v2 import (
 from app.models.order import Order, OrderEvent, OrderStatus
 from app.models.user import User
 from app.services import pricing
+from app.services import taxes as taxes_service
+from app.services.taxes import TaxableProductLine
 from app.services.catalog import is_sale_active
 from app.services.checkout_settings import CheckoutSettings
 from app.schemas.cart import Totals
@@ -44,15 +47,15 @@ def _normalize_code(code: str) -> str:
     return (code or "").strip().upper()
 
 
-def _quantize_money(value: Decimal) -> Decimal:
+def _quantize_money(value: Decimal, *, rounding: pricing.MoneyRounding = "half_up") -> Decimal:
     if settings.enforce_decimal_prices:
-        return pricing.quantize_money(value)
+        return pricing.quantize_money(value, rounding=rounding)
     return Decimal(value)
 
 
-def cart_subtotal(cart: Cart) -> Decimal:
+def cart_subtotal(cart: Cart, *, rounding: pricing.MoneyRounding = "half_up") -> Decimal:
     subtotal = sum((Decimal(str(item.unit_price_at_add)) * int(item.quantity or 0) for item in cart.items), start=Decimal("0.00"))
-    return _quantize_money(subtotal)
+    return _quantize_money(subtotal, rounding=rounding)
 
 
 def _promotion_scope_sets(promotion: Promotion) -> tuple[set[UUID], set[UUID], set[UUID], set[UUID]]:
@@ -76,7 +79,9 @@ def _promotion_scope_sets(promotion: Promotion) -> tuple[set[UUID], set[UUID], s
     return include_products, exclude_products, include_categories, exclude_categories
 
 
-def cart_eligible_subtotals_for_promotion(cart: Cart, *, promotion: Promotion) -> tuple[Decimal, Decimal, bool, bool]:
+def cart_eligible_subtotals_for_promotion(
+    cart: Cart, *, promotion: Promotion, rounding: pricing.MoneyRounding = "half_up"
+) -> tuple[Decimal, Decimal, bool, bool]:
     include_products, exclude_products, include_categories, exclude_categories = _promotion_scope_sets(promotion)
     has_includes = bool(include_products or include_categories)
     has_excludes = bool(exclude_products or exclude_categories)
@@ -111,8 +116,8 @@ def cart_eligible_subtotals_for_promotion(cart: Cart, *, promotion: Promotion) -
         eligible_subtotal += line_total
 
     return (
-        _quantize_money(eligible_subtotal),
-        _quantize_money(scope_subtotal),
+        _quantize_money(eligible_subtotal, rounding=rounding),
+        _quantize_money(scope_subtotal, rounding=rounding),
         has_includes,
         has_excludes,
     )
@@ -124,12 +129,13 @@ def _calculate_shipping_amount(
     shipping_method_rate_flat: Decimal | None,
     shipping_method_rate_per_kg: Decimal | None,
     shipping_fee_ron: Decimal | None,
+    rounding: pricing.MoneyRounding = "half_up",
 ) -> Decimal:
     if shipping_fee_ron is not None:
-        return _quantize_money(shipping_fee_ron)
-    base = _quantize_money(Decimal(shipping_method_rate_flat or 0))
-    per = _quantize_money(Decimal(shipping_method_rate_per_kg or 0))
-    return _quantize_money(base + per * subtotal)
+        return _quantize_money(shipping_fee_ron, rounding=rounding)
+    base = _quantize_money(Decimal(shipping_method_rate_flat or 0), rounding=rounding)
+    per = _quantize_money(Decimal(shipping_method_rate_per_kg or 0), rounding=rounding)
+    return _quantize_money(base + per * subtotal, rounding=rounding)
 
 
 @dataclass(frozen=True)
@@ -147,8 +153,9 @@ def compute_coupon_savings(
     shipping_method_rate_flat: Decimal | None,
     shipping_method_rate_per_kg: Decimal | None,
 ) -> CouponComputation:
-    subtotal = cart_subtotal(cart)
-    eligible_subtotal, _, _, _ = cart_eligible_subtotals_for_promotion(cart, promotion=promotion)
+    rounding = checkout.money_rounding
+    subtotal = cart_subtotal(cart, rounding=rounding)
+    eligible_subtotal, _, _, _ = cart_eligible_subtotals_for_promotion(cart, promotion=promotion, rounding=rounding)
 
     # Compute shipping without this coupon (but with free-shipping threshold rules).
     shipping_fee = checkout.shipping_fee_ron
@@ -157,6 +164,7 @@ def compute_coupon_savings(
         shipping_method_rate_flat=shipping_method_rate_flat,
         shipping_method_rate_per_kg=shipping_method_rate_per_kg,
         shipping_fee_ron=shipping_fee,
+        rounding=rounding,
     )
 
     # Apply free-shipping threshold after discount (discount only affects products).
@@ -175,7 +183,7 @@ def compute_coupon_savings(
     if promotion.max_discount_amount is not None:
         discount_estimate = min(discount_estimate, Decimal(promotion.max_discount_amount))
 
-    discount_estimate = _quantize_money(min(discount_estimate, eligible_subtotal))
+    discount_estimate = _quantize_money(min(discount_estimate, eligible_subtotal), rounding=rounding)
 
     threshold = checkout.free_shipping_threshold_ron
     effective_shipping = base_shipping
@@ -184,13 +192,16 @@ def compute_coupon_savings(
 
     if promotion.discount_type == PromotionDiscountType.free_shipping:
         if effective_shipping > 0:
-            return CouponComputation(discount_ron=Decimal("0.00"), shipping_discount_ron=_quantize_money(effective_shipping))
+            return CouponComputation(
+                discount_ron=Decimal("0.00"), shipping_discount_ron=_quantize_money(effective_shipping, rounding=rounding)
+            )
         return CouponComputation(discount_ron=Decimal("0.00"), shipping_discount_ron=Decimal("0.00"))
 
     return CouponComputation(discount_ron=discount_estimate, shipping_discount_ron=Decimal("0.00"))
 
 
-def compute_totals_with_coupon(
+async def compute_totals_with_coupon(
+    session: AsyncSession,
     *,
     cart: Cart,
     checkout: CheckoutSettings,
@@ -198,14 +209,17 @@ def compute_totals_with_coupon(
     shipping_method_rate_per_kg: Decimal | None,
     discount_ron: Decimal,
     free_shipping: bool,
+    country_code: str | None = None,
 ) -> Totals:
-    subtotal = cart_subtotal(cart)
+    rounding = checkout.money_rounding
+    subtotal = cart_subtotal(cart, rounding=rounding)
     shipping_fee = checkout.shipping_fee_ron
     base_shipping = _calculate_shipping_amount(
         subtotal,
         shipping_method_rate_flat=shipping_method_rate_flat,
         shipping_method_rate_per_kg=shipping_method_rate_per_kg,
         shipping_fee_ron=shipping_fee,
+        rounding=rounding,
     )
 
     threshold = checkout.free_shipping_threshold_ron
@@ -215,10 +229,53 @@ def compute_totals_with_coupon(
     if free_shipping:
         shipping = Decimal("0.00")
 
+    base_breakdown = pricing.compute_totals(
+        subtotal=subtotal,
+        discount=_quantize_money(discount_ron, rounding=rounding),
+        shipping=_quantize_money(shipping, rounding=rounding),
+        fee_enabled=checkout.fee_enabled,
+        fee_type=checkout.fee_type,
+        fee_value=checkout.fee_value,
+        vat_enabled=False,
+        vat_rate_percent=checkout.vat_rate_percent,
+        vat_apply_to_shipping=checkout.vat_apply_to_shipping,
+        vat_apply_to_fee=checkout.vat_apply_to_fee,
+        rounding=checkout.money_rounding,
+    )
+
+    lines: list[TaxableProductLine] = []
+    for item in cart.items:
+        product_id = getattr(item, "product_id", None) or getattr(getattr(item, "product", None), "id", None)
+        if not product_id:
+            continue
+        line_total = Decimal(str(item.unit_price_at_add)) * int(item.quantity or 0)
+        line_subtotal = _quantize_money(line_total, rounding=rounding)
+        lines.append(TaxableProductLine(product_id=product_id, subtotal=line_subtotal))
+
+    if lines:
+        line_sum = sum((line.subtotal for line in lines), start=Decimal("0.00"))
+        diff = _quantize_money(base_breakdown.subtotal - line_sum, rounding=rounding)
+        if diff != 0:
+            idx = max(range(len(lines)), key=lambda i: lines[i].subtotal)
+            adjusted = lines[idx].subtotal + diff
+            if adjusted < 0:
+                adjusted = Decimal("0.00")
+            lines[idx] = TaxableProductLine(product_id=lines[idx].product_id, subtotal=adjusted)
+
+    vat_override = await taxes_service.compute_cart_vat_amount(
+        session,
+        country_code=country_code,
+        lines=lines,
+        discount=base_breakdown.discount,
+        shipping=base_breakdown.shipping,
+        fee=base_breakdown.fee,
+        checkout=checkout,
+    )
+
     breakdown = pricing.compute_totals(
         subtotal=subtotal,
-        discount=_quantize_money(discount_ron),
-        shipping=_quantize_money(shipping),
+        discount=_quantize_money(discount_ron, rounding=rounding),
+        shipping=_quantize_money(shipping, rounding=rounding),
         fee_enabled=checkout.fee_enabled,
         fee_type=checkout.fee_type,
         fee_value=checkout.fee_value,
@@ -226,6 +283,8 @@ def compute_totals_with_coupon(
         vat_rate_percent=checkout.vat_rate_percent,
         vat_apply_to_shipping=checkout.vat_apply_to_shipping,
         vat_apply_to_fee=checkout.vat_apply_to_fee,
+        rounding=checkout.money_rounding,
+        vat_override=vat_override,
     )
 
     return Totals(
@@ -255,16 +314,19 @@ async def apply_discount_code_to_cart(
     shipping_method_rate_flat: Decimal | None,
     shipping_method_rate_per_kg: Decimal | None,
     code: str | None,
+    country_code: str | None = None,
 ) -> AppliedDiscount:
     cleaned = _normalize_code(code or "")
     if not cleaned:
-        totals = compute_totals_with_coupon(
+        totals = await compute_totals_with_coupon(
+            session,
             cart=cart,
             checkout=checkout,
             shipping_method_rate_flat=shipping_method_rate_flat,
             shipping_method_rate_per_kg=shipping_method_rate_per_kg,
             discount_ron=Decimal("0.00"),
             free_shipping=False,
+            country_code=country_code,
         )
         return AppliedDiscount(coupon=None, discount_ron=Decimal("0.00"), shipping_discount_ron=Decimal("0.00"), totals=totals)
 
@@ -285,13 +347,15 @@ async def apply_discount_code_to_cart(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Coupon is not eligible")
 
     free_shipping = coupon.promotion.discount_type == PromotionDiscountType.free_shipping
-    totals = compute_totals_with_coupon(
+    totals = await compute_totals_with_coupon(
+        session,
         cart=cart,
         checkout=checkout,
         shipping_method_rate_flat=shipping_method_rate_flat,
         shipping_method_rate_per_kg=shipping_method_rate_per_kg,
         discount_ron=eval_result.estimated_discount_ron,
         free_shipping=free_shipping,
+        country_code=country_code,
     )
     return AppliedDiscount(
         coupon=coupon,
@@ -383,6 +447,24 @@ async def _count_user_active_reservations(session: AsyncSession, *, coupon_id: U
     )
 
 
+async def _user_has_delivered_orders(session: AsyncSession, *, user_id: UUID) -> bool:
+    return (
+        int(
+            (
+                await session.execute(
+                    select(func.count())
+                    .select_from(Order)
+                    .where(
+                        Order.user_id == user_id,
+                        Order.status == OrderStatus.delivered,
+                    )
+                )
+            ).scalar_one()
+        )
+        > 0
+    )
+
+
 async def get_coupon_by_code(session: AsyncSession, *, code: str) -> Coupon | None:
     cleaned = _normalize_code(code)
     if not cleaned:
@@ -437,6 +519,7 @@ async def evaluate_coupon_for_cart(
     checkout: CheckoutSettings,
     shipping_method_rate_flat: Decimal | None,
     shipping_method_rate_per_kg: Decimal | None,
+    user_has_delivered_orders: bool | None = None,
 ) -> CouponEligibility:
     now = _now()
     promotion = coupon.promotion
@@ -444,9 +527,10 @@ async def evaluate_coupon_for_cart(
     reasons.extend(_promotion_reasons(promotion, now))
     reasons.extend(_coupon_reasons(coupon, now))
 
-    subtotal = cart_subtotal(cart)
+    rounding = checkout.money_rounding
+    subtotal = cart_subtotal(cart, rounding=rounding)
     eligible_subtotal, scope_subtotal, has_includes, has_excludes = cart_eligible_subtotals_for_promotion(
-        cart, promotion=promotion
+        cart, promotion=promotion, rounding=rounding
     )
     if promotion.discount_type in {PromotionDiscountType.percent, PromotionDiscountType.amount} and eligible_subtotal <= 0:
         reasons.append("no_eligible_items")
@@ -460,6 +544,13 @@ async def evaluate_coupon_for_cart(
         min_required = Decimal(promotion.min_subtotal)
         if subtotal < min_required:
             reasons.append("min_subtotal_not_met")
+
+    if getattr(promotion, "first_order_only", False):
+        has_delivered = user_has_delivered_orders
+        if has_delivered is None:
+            has_delivered = await _user_has_delivered_orders(session, user_id=user_id)
+        if has_delivered:
+            reasons.append("first_order_only")
 
     savings = compute_coupon_savings(
         promotion=promotion,
@@ -544,6 +635,9 @@ async def evaluate_coupons_for_user_cart(
     shipping_method_rate_per_kg: Decimal | None,
 ) -> list[CouponEligibility]:
     coupons = await get_user_visible_coupons(session, user_id=user.id)
+    delivered_flag: bool | None = None
+    if any(getattr(getattr(coupon, "promotion", None), "first_order_only", False) for coupon in coupons):
+        delivered_flag = await _user_has_delivered_orders(session, user_id=user.id)
     results: list[CouponEligibility] = []
     for coupon in coupons:
         results.append(
@@ -555,6 +649,7 @@ async def evaluate_coupons_for_user_cart(
                 checkout=checkout,
                 shipping_method_rate_flat=shipping_method_rate_flat,
                 shipping_method_rate_per_kg=shipping_method_rate_per_kg,
+                user_has_delivered_orders=delivered_flag,
             )
         )
     return results
@@ -720,11 +815,70 @@ async def release_coupon_for_order(session: AsyncSession, *, order: Order, reaso
         await session.commit()
 
 
-def generate_coupon_code(*, prefix: str, length: int = 10) -> str:
-    alphabet = string.ascii_uppercase + string.digits
-    suffix = "".join(secrets.choice(alphabet) for _ in range(length))
-    base = f"{prefix}-{suffix}".strip("-").upper()
-    return base[:40]
+_COUPON_CODE_ALPHABET = string.ascii_uppercase + string.digits
+_COUPON_CODE_TOKEN_RE = re.compile(r"\{RAND(?::(\d{1,2}))?\}")
+
+
+def generate_coupon_code(*, prefix: str = "", length: int = 10, pattern: str | None = None) -> str:
+    """Generate a coupon code candidate.
+
+    Supports a limited pattern language:
+    - `{RAND}` or `{RAND:n}` tokens are replaced with random uppercase alphanumerics.
+    - If the pattern contains no `{RAND}` token, a random suffix is appended.
+    """
+
+    default_len = max(1, int(length or 10))
+    prefix_clean = (prefix or "").strip().upper()
+    pattern_clean = (pattern or "").strip().upper()
+
+    def _rand(n: int) -> str:
+        size = max(1, int(n))
+        return "".join(secrets.choice(_COUPON_CODE_ALPHABET) for _ in range(size))
+
+    if pattern_clean:
+        token_hits = 0
+
+        def _replace(match: re.Match[str]) -> str:
+            nonlocal token_hits
+            token_hits += 1
+            n_raw = match.group(1)
+            try:
+                n = int(n_raw) if n_raw else default_len
+            except Exception:
+                n = default_len
+            n = max(1, min(n, 32))
+            return _rand(n)
+
+        rendered = _COUPON_CODE_TOKEN_RE.sub(_replace, pattern_clean)
+        if token_hits == 0:
+            rendered = f"{rendered}-{_rand(default_len)}".strip("-")
+        base = rendered
+    else:
+        base = f"{prefix_clean}-{_rand(default_len)}".strip("-")
+
+    cleaned = re.sub(r"[^A-Z0-9-]+", "-", base)
+    cleaned = re.sub(r"-{2,}", "-", cleaned).strip("-")
+    return cleaned[:40]
+
+
+async def generate_unique_coupon_code(
+    session: AsyncSession,
+    *,
+    prefix: str,
+    length: int = 12,
+    pattern: str | None = None,
+    attempts: int = 20,
+) -> str:
+    prefix_clean = _normalize_code(prefix or "").replace("-", "")[:20] or "COUPON"
+    pattern_clean = (pattern or "").strip() or None
+    max_attempts = max(1, min(int(attempts or 20), 200))
+
+    for _ in range(max_attempts):
+        candidate = generate_coupon_code(prefix=prefix_clean, length=length, pattern=pattern_clean)
+        exists = (await session.execute(select(func.count()).select_from(Coupon).where(Coupon.code == candidate))).scalar_one()
+        if int(exists) == 0:
+            return candidate
+    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate coupon code")
 
 
 async def ensure_first_order_promotion(session: AsyncSession) -> Promotion:
@@ -810,17 +964,7 @@ async def issue_first_order_reward_if_eligible(
 
     promotion = await ensure_first_order_promotion(session)
     prefix = "FIRST20"
-    code = ""
-    for _ in range(10):
-        candidate = generate_coupon_code(prefix=prefix, length=12)
-        exists = (
-            (await session.execute(select(func.count()).select_from(Coupon).where(Coupon.code == candidate))).scalar_one()
-        )
-        if int(exists) == 0:
-            code = candidate
-            break
-    if not code:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate coupon code")
+    code = await generate_unique_coupon_code(session, prefix=prefix, length=12)
 
     starts_at = _now()
     ends_at = starts_at + timedelta(days=int(validity_days))

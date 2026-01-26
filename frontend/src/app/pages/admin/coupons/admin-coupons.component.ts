@@ -6,6 +6,7 @@ import { forkJoin } from 'rxjs';
 
 import {
   AdminCouponsV2Service,
+  type CouponAnalyticsResponse,
   type CouponAssignmentRead,
   type CouponBulkJobRead,
   type CouponBulkResult,
@@ -30,6 +31,7 @@ type PromotionForm = {
   max_discount_amount: string | number;
   min_subtotal: string | number;
   allow_on_sale_items: boolean;
+  first_order_only: boolean;
   starts_at: string;
   ends_at: string;
   is_active: boolean;
@@ -49,6 +51,14 @@ type CouponForm = {
   ends_at: string;
   global_max_redemptions: string | number;
   per_customer_max_redemptions: string | number;
+};
+
+type PromotionScheduleRow = {
+  promotion: PromotionRead;
+  leftPct: number;
+  widthPct: number;
+  conflictCount: number;
+  conflictNames: string;
 };
 
 @Component({
@@ -133,6 +143,93 @@ type CouponForm = {
           </ng-template>
 
           <div class="border-t border-slate-200 pt-4 grid gap-4 dark:border-slate-800">
+            <div class="flex items-start justify-between gap-3">
+              <div class="grid gap-1">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.couponsV2.calendar.title' | translate }}
+                </h3>
+                <p class="text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.couponsV2.calendar.hint' | translate }}
+                </p>
+              </div>
+              <label class="grid gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.couponsV2.calendar.window' | translate }}
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="promotionCalendarDays"
+                >
+                  <option [ngValue]="30">{{ 'adminUi.couponsV2.calendar.window30' | translate }}</option>
+                  <option [ngValue]="90">{{ 'adminUi.couponsV2.calendar.window90' | translate }}</option>
+                  <option [ngValue]="180">{{ 'adminUi.couponsV2.calendar.window180' | translate }}</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="text-xs text-slate-500 dark:text-slate-400">
+              <span class="font-semibold">{{ promotionCalendarStartDate() | date: 'yyyy-MM-dd' }}</span>
+              <span class="px-1">→</span>
+              <span class="font-semibold">{{ promotionCalendarEndDate() | date: 'yyyy-MM-dd' }}</span>
+            </div>
+
+            <div *ngIf="promotionScheduleRows().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.couponsV2.calendar.empty' | translate }}
+            </div>
+
+            <div *ngIf="promotionScheduleRows().length" class="grid gap-3">
+              <div
+                *ngFor="let row of promotionScheduleRows()"
+                class="grid gap-2 lg:grid-cols-[240px_1fr] items-center"
+              >
+                <button
+                  type="button"
+                  class="text-left rounded-lg px-2 py-1 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                  (click)="selectPromotion(row.promotion)"
+                >
+                  <div class="flex items-center gap-2">
+                    <div class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                      {{ row.promotion.name }}
+                    </div>
+                    <span
+                      *ngIf="row.conflictCount"
+                      class="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+                      [title]="row.conflictNames"
+                    >
+                      {{ 'adminUi.couponsV2.calendar.conflicts' | translate:{ count: row.conflictCount } }}
+                    </span>
+                  </div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400 truncate">
+                    {{
+                      row.promotion.starts_at
+                        ? (row.promotion.starts_at | date: 'yyyy-MM-dd')
+                        : ('adminUi.couponsV2.calendar.startImmediate' | translate)
+                    }}
+                    <span class="px-1">→</span>
+                    {{
+                      row.promotion.ends_at ? (row.promotion.ends_at | date: 'yyyy-MM-dd') : ('adminUi.couponsV2.calendar.noEnd' | translate)
+                    }}
+                  </div>
+                </button>
+
+                <div class="relative h-10 rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                  <div class="absolute inset-y-2 left-0 right-0 border border-dashed border-slate-200 dark:border-slate-700 rounded-md"></div>
+                  <div
+                    class="absolute inset-y-2 rounded-md"
+                    [style.left.%]="row.leftPct"
+                    [style.width.%]="row.widthPct"
+                    [ngClass]="
+                      row.promotion.is_active
+                        ? row.conflictCount
+                          ? 'bg-indigo-600 ring-2 ring-rose-500/60'
+                          : 'bg-indigo-600'
+                        : 'bg-slate-400 dark:bg-slate-600'
+                    "
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="border-t border-slate-200 pt-4 grid gap-4 dark:border-slate-800">
             <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
               {{
                 selectedPromotion()
@@ -191,7 +288,7 @@ type CouponForm = {
                 </div>
               </div>
 
-              <div class="grid gap-3 lg:grid-cols-3">
+              <div class="grid gap-3 lg:grid-cols-4">
                 <app-input
                   [label]="'adminUi.couponsV2.fields.maxDiscount' | translate"
                   type="number"
@@ -212,6 +309,14 @@ type CouponForm = {
                     type="checkbox"
                     class="h-5 w-5 accent-indigo-600"
                     [(ngModel)]="promotionForm.allow_on_sale_items"
+                  />
+                </label>
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.couponsV2.fields.firstOrderOnly' | translate }}
+                  <input
+                    type="checkbox"
+                    class="h-5 w-5 accent-indigo-600"
+                    [(ngModel)]="promotionForm.first_order_only"
                   />
                 </label>
               </div>
@@ -244,6 +349,56 @@ type CouponForm = {
                   <input type="checkbox" class="h-5 w-5 accent-indigo-600" [(ngModel)]="promotionForm.is_automatic" />
                   {{ 'adminUi.couponsV2.fields.automatic' | translate }}
                 </label>
+              </div>
+
+              <div class="rounded-xl border border-slate-200 p-3 grid gap-3 dark:border-slate-800">
+                <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.couponsV2.stacking.title' | translate }}
+                </div>
+                <p class="text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.couponsV2.stacking.hint' | translate }}
+                </p>
+
+                <div class="grid gap-3 lg:grid-cols-3 items-end">
+                  <app-input
+                    [label]="'adminUi.couponsV2.stacking.sampleSubtotal' | translate"
+                    type="number"
+                    [min]="0"
+                    [step]="0.01"
+                    [(value)]="stackingSampleSubtotal"
+                  ></app-input>
+                  <div class="text-xs text-slate-600 dark:text-slate-300 lg:col-span-2">
+                    {{ promotionForm.allow_on_sale_items ? ('adminUi.couponsV2.stacking.saleAllowed' | translate) : ('adminUi.couponsV2.stacking.saleBlocked' | translate) }}
+                    ·
+                    {{
+                      promotionForm.discount_type === 'free_shipping'
+                        ? ('adminUi.couponsV2.stacking.shippingFree' | translate)
+                        : ('adminUi.couponsV2.stacking.shippingNone' | translate)
+                    }}
+                  </div>
+                </div>
+
+                <div *ngIf="promotionForm.discount_type !== 'free_shipping'" class="grid gap-2 text-sm">
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="text-slate-600 dark:text-slate-300">{{ 'adminUi.couponsV2.stacking.regularItems' | translate }}</span>
+                    <span class="font-semibold text-slate-900 dark:text-slate-50">{{ formatRon(stackingPreviewProductDiscount(false)) }}</span>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="text-slate-600 dark:text-slate-300">{{ 'adminUi.couponsV2.stacking.saleItems' | translate }}</span>
+                    <span class="font-semibold text-slate-900 dark:text-slate-50">{{ formatRon(stackingPreviewProductDiscount(true)) }}</span>
+                  </div>
+                </div>
+
+                <div
+                  *ngIf="stackingMinSubtotalBlocked()"
+                  class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 dark:bg-amber-950/30 dark:text-amber-100 dark:border-amber-900/40"
+                >
+                  {{ 'adminUi.couponsV2.stacking.minSubtotalWarning' | translate:{ min: promotionForm.min_subtotal } }}
+                </div>
+
+                <div class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.couponsV2.stacking.scopeNote' | translate }}
+                </div>
               </div>
 
               <div class="rounded-xl border border-slate-200 p-3 grid gap-3 dark:border-slate-800">
@@ -504,6 +659,30 @@ type CouponForm = {
                 </label>
               </div>
 
+              <div *ngIf="!selectedCoupon()" class="grid gap-3 lg:grid-cols-4 items-end">
+                <app-input [label]="'adminUi.couponsV2.coupons.generator.prefix' | translate" [(value)]="couponCodeGen.prefix"></app-input>
+                <app-input
+                  [label]="'adminUi.couponsV2.coupons.generator.pattern' | translate"
+                  [(value)]="couponCodeGen.pattern"
+                  [hint]="'adminUi.couponsV2.coupons.generator.patternHint' | translate"
+                ></app-input>
+                <app-input
+                  [label]="'adminUi.couponsV2.coupons.generator.length' | translate"
+                  type="number"
+                  [min]="4"
+                  [step]="1"
+                  [(value)]="couponCodeGen.length"
+                ></app-input>
+                <div class="flex justify-end">
+                  <app-button
+                    size="sm"
+                    [disabled]="couponCodeGenerating()"
+                    [label]="'adminUi.couponsV2.coupons.generator.generate' | translate"
+                    (action)="generateCouponCode()"
+                  ></app-button>
+                </div>
+              </div>
+
               <div class="grid gap-3 lg:grid-cols-2">
                 <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                   <input type="checkbox" class="h-5 w-5 accent-indigo-600" [(ngModel)]="couponForm.is_active" />
@@ -557,6 +736,165 @@ type CouponForm = {
                 <span *ngIf="couponSaving()" class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.couponsV2.common.saving' | translate }}</span>
               </div>
             </div>
+          </div>
+
+          <div *ngIf="selectedPromotion()" class="border-t border-slate-200 pt-4 grid gap-4 dark:border-slate-800">
+            <div class="flex items-start justify-between gap-3">
+              <div class="grid gap-1">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.couponsV2.analytics.title' | translate }}</h3>
+                <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.couponsV2.analytics.hint' | translate }}</p>
+              </div>
+              <div class="flex flex-wrap items-end gap-3 justify-end">
+                <label class="grid gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.couponsV2.analytics.window' | translate }}
+                  <select
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="analyticsDays"
+                    (ngModelChange)="loadAnalytics()"
+                  >
+                    <option [ngValue]="7">{{ 'adminUi.couponsV2.analytics.window7' | translate }}</option>
+                    <option [ngValue]="30">{{ 'adminUi.couponsV2.analytics.window30' | translate }}</option>
+                    <option [ngValue]="90">{{ 'adminUi.couponsV2.analytics.window90' | translate }}</option>
+                  </select>
+                </label>
+                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadAnalytics()"></app-button>
+              </div>
+            </div>
+
+            <label *ngIf="selectedCoupon()" class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+              <input
+                type="checkbox"
+                class="h-5 w-5 accent-indigo-600"
+                [(ngModel)]="analyticsOnlySelectedCoupon"
+                (ngModelChange)="loadAnalytics()"
+              />
+              {{ 'adminUi.couponsV2.analytics.onlySelectedCoupon' | translate }}
+            </label>
+
+            <div
+              *ngIf="analyticsError()"
+              class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+            >
+              {{ analyticsError() }}
+            </div>
+
+            <div *ngIf="analyticsLoading(); else analyticsTpl">
+              <app-skeleton [rows]="4"></app-skeleton>
+            </div>
+            <ng-template #analyticsTpl>
+              <div *ngIf="!analytics() || analytics()!.summary.redemptions === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.couponsV2.analytics.empty' | translate }}
+              </div>
+
+              <div *ngIf="analytics()" class="grid gap-4">
+                <div class="grid gap-3 lg:grid-cols-3">
+                  <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 grid gap-1 dark:border-slate-800 dark:bg-slate-950/40">
+                    <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.couponsV2.analytics.summary.redemptions' | translate }}
+                    </div>
+                    <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                      {{ analytics()!.summary.redemptions }}
+                    </div>
+                  </div>
+                  <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 grid gap-1 dark:border-slate-800 dark:bg-slate-950/40">
+                    <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.couponsV2.analytics.summary.totalDiscount' | translate }}
+                    </div>
+                    <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                      {{ formatRonString(analytics()!.summary.total_discount_ron) }}
+                    </div>
+                  </div>
+                  <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 grid gap-1 dark:border-slate-800 dark:bg-slate-950/40">
+                    <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.couponsV2.analytics.summary.shippingDiscount' | translate }}
+                    </div>
+                    <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                      {{ formatRonString(analytics()!.summary.total_shipping_discount_ron) }}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="grid gap-3 lg:grid-cols-3">
+                  <div class="rounded-xl border border-slate-200 p-3 grid gap-1 dark:border-slate-800">
+                    <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.couponsV2.analytics.summary.avgWith' | translate }}
+                    </div>
+                    <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                      {{ formatRonString(analytics()!.summary.avg_order_total_with_coupon) }}
+                    </div>
+                  </div>
+                  <div class="rounded-xl border border-slate-200 p-3 grid gap-1 dark:border-slate-800">
+                    <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.couponsV2.analytics.summary.avgWithout' | translate }}
+                    </div>
+                    <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                      {{ formatRonString(analytics()!.summary.avg_order_total_without_coupon) }}
+                    </div>
+                  </div>
+                  <div class="rounded-xl border border-slate-200 p-3 grid gap-1 dark:border-slate-800">
+                    <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.couponsV2.analytics.summary.lift' | translate }}
+                    </div>
+                    <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                      {{ formatRonString(analytics()!.summary.aov_lift) }}
+                    </div>
+                  </div>
+                </div>
+
+                <div *ngIf="analytics()!.daily.length" class="rounded-xl border border-slate-200 overflow-x-auto dark:border-slate-800">
+                  <div class="px-3 py-2 text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    {{ 'adminUi.couponsV2.analytics.daily.title' | translate }}
+                  </div>
+                  <table class="min-w-[520px] w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                      <tr>
+                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.couponsV2.analytics.daily.table.date' | translate }}</th>
+                        <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.couponsV2.analytics.daily.table.redemptions' | translate }}</th>
+                        <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.couponsV2.analytics.daily.table.discount' | translate }}</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+                      <tr *ngFor="let row of analytics()!.daily">
+                        <td class="px-3 py-2 text-slate-900 dark:text-slate-50">{{ row.date }}</td>
+                        <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-200">{{ row.redemptions }}</td>
+                        <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-200">{{ formatRonString(row.discount_ron) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div *ngIf="analytics()!.top_products.length" class="rounded-xl border border-slate-200 overflow-x-auto dark:border-slate-800">
+                  <div class="px-3 py-2 text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    {{ 'adminUi.couponsV2.analytics.topProducts.title' | translate }}
+                  </div>
+                  <table class="min-w-[720px] w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                      <tr>
+                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.couponsV2.analytics.topProducts.table.product' | translate }}</th>
+                        <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.couponsV2.analytics.topProducts.table.orders' | translate }}</th>
+                        <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.couponsV2.analytics.topProducts.table.quantity' | translate }}</th>
+                        <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.couponsV2.analytics.topProducts.table.gross' | translate }}</th>
+                        <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.couponsV2.analytics.topProducts.table.allocated' | translate }}</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+                      <tr *ngFor="let row of analytics()!.top_products">
+                        <td class="px-3 py-2 min-w-[240px]">
+                          <div class="font-medium text-slate-900 dark:text-slate-50">{{ row.product_name }}</div>
+                          <div *ngIf="row.product_slug" class="text-xs text-slate-500 dark:text-slate-400">{{ row.product_slug }}</div>
+                        </td>
+                        <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-200">{{ row.orders_count }}</td>
+                        <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-200">{{ row.quantity }}</td>
+                        <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-200">{{ formatRonString(row.gross_sales_ron) }}</td>
+                        <td class="px-3 py-2 text-right font-semibold text-slate-900 dark:text-slate-50">
+                          {{ formatRonString(row.allocated_discount_ron) }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </ng-template>
           </div>
 
           <div *ngIf="selectedCoupon()" class="border-t border-slate-200 pt-4 grid gap-4 dark:border-slate-800">
@@ -862,6 +1200,136 @@ type CouponForm = {
               </div>
             </div>
 
+            <div class="rounded-xl border border-slate-200 p-3 grid gap-3 dark:border-slate-800">
+              <div class="grid gap-1">
+                <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.couponsV2.ab.title' | translate }}</div>
+                <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.couponsV2.ab.hint' | translate }}</p>
+              </div>
+
+              <div *ngIf="!abCanRun()" class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3 dark:bg-amber-950/30 dark:text-amber-100 dark:border-amber-900/40">
+                {{ 'adminUi.couponsV2.ab.requiresAssigned' | translate }}
+              </div>
+
+              <div class="grid gap-3 lg:grid-cols-[1fr_auto] items-end">
+                <app-input [label]="'adminUi.couponsV2.ab.couponB' | translate" [(value)]="abCouponQuery"></app-input>
+                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.search' | translate" (action)="abSearchCoupons()"></app-button>
+              </div>
+
+              <div *ngIf="abCouponError()" class="text-sm text-rose-700 dark:text-rose-200">{{ abCouponError() }}</div>
+              <div *ngIf="abCouponLoading()" class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.couponsV2.ab.searching' | translate }}</div>
+
+              <div *ngIf="abCouponResults().length" class="rounded-lg border border-slate-200 bg-white text-sm dark:border-slate-800 dark:bg-slate-900">
+                <button
+                  *ngFor="let c of abCouponResults()"
+                  type="button"
+                  class="w-full text-left border-t border-slate-200 px-3 py-2 hover:bg-slate-50 first:border-t-0 dark:border-slate-800 dark:hover:bg-slate-800/40"
+                  (click)="selectAbCouponB(c)"
+                >
+                  <div class="font-semibold text-slate-900 dark:text-slate-50">{{ c.code }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ c.promotion?.name || c.promotion_id }}</div>
+                </button>
+              </div>
+
+              <div *ngIf="abCouponB()" class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200">
+                <div class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.couponsV2.ab.selectedB' | translate }}</div>
+                <div class="mt-1">
+                  <span class="font-semibold">{{ abCouponB()!.code }}</span>
+                  <span class="text-slate-500 dark:text-slate-400">· {{ abCouponB()!.promotion?.name || abCouponB()!.promotion_id }}</span>
+                </div>
+                <div *ngIf="abCouponB()!.visibility !== 'assigned'" class="mt-2 text-xs text-amber-800 dark:text-amber-200">
+                  {{ 'adminUi.couponsV2.ab.publicWarning' | translate }}
+                </div>
+              </div>
+
+              <div class="grid gap-2 lg:grid-cols-2">
+                <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  <input type="checkbox" class="h-5 w-5 accent-indigo-600" [(ngModel)]="abRequireMarketingOptIn" />
+                  {{ 'adminUi.couponsV2.bulk.segment.filterMarketing' | translate }}
+                </label>
+                <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  <input type="checkbox" class="h-5 w-5 accent-indigo-600" [(ngModel)]="abRequireEmailVerified" />
+                  {{ 'adminUi.couponsV2.bulk.segment.filterVerified' | translate }}
+                </label>
+              </div>
+
+              <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                <input type="checkbox" class="h-5 w-5 accent-indigo-600" [(ngModel)]="abSendEmail" />
+                {{ 'adminUi.couponsV2.bulk.sendEmailAssign' | translate }}
+              </label>
+
+                <div class="grid gap-3 lg:grid-cols-[1fr_auto] items-end">
+                  <app-input [label]="'adminUi.couponsV2.ab.seed' | translate" [(value)]="abBucketSeed"></app-input>
+                <app-button
+                  size="sm"
+                  [disabled]="abBusy() || !abCouponB() || !abCanRun()"
+                  [label]="'adminUi.couponsV2.ab.start' | translate"
+                  (action)="startAbTest()"
+                ></app-button>
+                </div>
+
+              <div *ngIf="abJobA() || abJobB()" class="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+                <div class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.couponsV2.ab.jobsTitle' | translate }}</div>
+                <div class="mt-2 grid gap-2">
+                  <div *ngIf="abJobA()" class="flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="font-semibold text-slate-900 dark:text-slate-50">{{ selectedCoupon()!.code }} · A</div>
+                      <div class="text-xs text-slate-500 dark:text-slate-400">
+                        {{ 'adminUi.couponsV2.bulk.segment.jobProgress' | translate:{ processed: abJobA()!.processed, total: abJobA()!.total_candidates } }}
+                      </div>
+                    </div>
+                    <div class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ abJobA()!.status }}</div>
+                  </div>
+                  <div *ngIf="abJobB()" class="flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="font-semibold text-slate-900 dark:text-slate-50">{{ abCouponB()!.code }} · B</div>
+                      <div class="text-xs text-slate-500 dark:text-slate-400">
+                        {{ 'adminUi.couponsV2.bulk.segment.jobProgress' | translate:{ processed: abJobB()!.processed, total: abJobB()!.total_candidates } }}
+                      </div>
+                    </div>
+                    <div class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ abJobB()!.status }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <label class="grid gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.couponsV2.ab.window' | translate }}
+                  <select
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="abAnalyticsDays"
+                    (ngModelChange)="loadAbAnalytics()"
+                  >
+                    <option [ngValue]="7">{{ 'adminUi.couponsV2.analytics.window7' | translate }}</option>
+                    <option [ngValue]="30">{{ 'adminUi.couponsV2.analytics.window30' | translate }}</option>
+                    <option [ngValue]="90">{{ 'adminUi.couponsV2.analytics.window90' | translate }}</option>
+                  </select>
+                </label>
+                <app-button size="sm" variant="ghost" [disabled]="!abCouponB()" [label]="'adminUi.actions.refresh' | translate" (action)="loadAbAnalytics()"></app-button>
+              </div>
+
+              <div *ngIf="abAnalyticsError()" class="text-sm text-rose-700 dark:text-rose-200">{{ abAnalyticsError() }}</div>
+              <div *ngIf="abAnalyticsLoading()" class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.couponsV2.ab.loading' | translate }}</div>
+
+              <div *ngIf="abAnalyticsA() && abAnalyticsB()" class="grid gap-3 lg:grid-cols-2">
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+                  <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ selectedCoupon()!.code }} · A</div>
+                  <div class="mt-2 grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+                    <div>{{ 'adminUi.couponsV2.analytics.summary.redemptions' | translate }}: {{ abAnalyticsA()!.summary.redemptions }}</div>
+                    <div>{{ 'adminUi.couponsV2.analytics.summary.totalDiscount' | translate }}: {{ formatRonString(abAnalyticsA()!.summary.total_discount_ron) }}</div>
+                    <div>{{ 'adminUi.couponsV2.analytics.summary.lift' | translate }}: {{ formatRonString(abAnalyticsA()!.summary.aov_lift) }}</div>
+                  </div>
+                </div>
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+                  <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ abCouponB()!.code }} · B</div>
+                  <div class="mt-2 grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+                    <div>{{ 'adminUi.couponsV2.analytics.summary.redemptions' | translate }}: {{ abAnalyticsB()!.summary.redemptions }}</div>
+                    <div>{{ 'adminUi.couponsV2.analytics.summary.totalDiscount' | translate }}: {{ formatRonString(abAnalyticsB()!.summary.total_discount_ron) }}</div>
+                    <div>{{ 'adminUi.couponsV2.analytics.summary.lift' | translate }}: {{ formatRonString(abAnalyticsB()!.summary.aov_lift) }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div
               *ngIf="assignmentsError()"
               class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
@@ -939,6 +1407,8 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
   scopeProductsLoading = signal(false);
   scopeProductsError = signal<string | null>(null);
 
+  promotionCalendarDays = 90;
+
   couponsLoading = signal(false);
   couponsError = signal<string | null>(null);
   coupons = signal<CouponRead[]>([]);
@@ -983,8 +1453,41 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
   private segmentJobPollHandle: number | null = null;
   private segmentJobLastStatus: string | null = null;
 
+  analyticsLoading = signal(false);
+  analyticsError = signal<string | null>(null);
+  analytics = signal<CouponAnalyticsResponse | null>(null);
+  analyticsDays = 30;
+  analyticsTopLimit = 10;
+  analyticsOnlySelectedCoupon = false;
+
+  abCouponQuery = '';
+  abCouponLoading = signal(false);
+  abCouponError = signal<string | null>(null);
+  abCouponResults = signal<CouponRead[]>([]);
+  abCouponB = signal<CouponRead | null>(null);
+  abRequireMarketingOptIn = false;
+  abRequireEmailVerified = false;
+  abSendEmail = true;
+  abBucketSeed = '';
+  abBusy = signal(false);
+  abJobA = signal<CouponBulkJobRead | null>(null);
+  abJobB = signal<CouponBulkJobRead | null>(null);
+  private abPollHandle: number | null = null;
+
+  abAnalyticsDays = 30;
+  abAnalyticsLoading = signal(false);
+  abAnalyticsError = signal<string | null>(null);
+  abAnalyticsA = signal<CouponAnalyticsResponse | null>(null);
+  abAnalyticsB = signal<CouponAnalyticsResponse | null>(null);
+
   promotionForm: PromotionForm = this.blankPromotionForm();
   couponForm: CouponForm = this.blankCouponForm();
+  couponCodeGen = { prefix: '', pattern: '', length: 12 };
+  couponCodeGenerating = signal(false);
+  stackingSampleSubtotal: string | number = 200;
+
+  private autoStartNewPromotion = false;
+  private preselectPromotionId: string | null = null;
 
   constructor(
     private adminCoupons: AdminCouponsV2Service,
@@ -995,12 +1498,16 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    const state = history.state as any;
+    this.autoStartNewPromotion = Boolean(state?.openNewPromotion);
+    this.preselectPromotionId = String(state?.editPromotionId || '').trim() || null;
     this.loadCategories();
     this.loadPromotions();
   }
 
   ngOnDestroy(): void {
     this.stopSegmentPolling();
+    this.stopAbPolling();
   }
 
   loadCategories(): void {
@@ -1019,6 +1526,22 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
         const list = Array.isArray(promos) ? promos : [];
         this.promotions.set(list);
         this.promotionsLoading.set(false);
+
+        if (this.autoStartNewPromotion) {
+          this.autoStartNewPromotion = false;
+          this.startNewPromotion();
+          return;
+        }
+
+        if (this.preselectPromotionId) {
+          const desiredId = this.preselectPromotionId;
+          this.preselectPromotionId = null;
+          const found = list.find((p) => p.id === desiredId) || null;
+          if (found) {
+            this.selectPromotion(found);
+            return;
+          }
+        }
 
         if (currentId) {
           const found = list.find((p) => p.id === currentId) || null;
@@ -1048,6 +1571,7 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     this.loadScopedProducts();
     this.startNewCoupon();
     this.loadCoupons();
+    this.loadAnalytics();
   }
 
   startNewPromotion(): void {
@@ -1060,6 +1584,10 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     this.coupons.set([]);
     this.selectedCoupon.set(null);
     this.assignments.set([]);
+    this.analytics.set(null);
+    this.analyticsError.set(null);
+    this.analyticsLoading.set(false);
+    this.resetAbState();
   }
 
   onDiscountTypeChange(): void {
@@ -1151,6 +1679,161 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     });
   }
 
+  loadAnalytics(): void {
+    const promoId = this.selectedPromotion()?.id || null;
+    if (!promoId) {
+      this.analytics.set(null);
+      this.analyticsError.set(null);
+      this.analyticsLoading.set(false);
+      return;
+    }
+
+    const couponId = this.analyticsOnlySelectedCoupon && this.selectedCoupon() ? this.selectedCoupon()!.id : null;
+    this.analyticsLoading.set(true);
+    this.analyticsError.set(null);
+    this.adminCoupons
+      .getAnalytics({
+        promotion_id: promoId,
+        coupon_id: couponId || undefined,
+        days: this.analyticsDays,
+        top_limit: this.analyticsTopLimit
+      })
+      .subscribe({
+        next: (data) => {
+          this.analyticsLoading.set(false);
+          this.analytics.set(data || null);
+        },
+        error: (err) => {
+          this.analyticsLoading.set(false);
+          this.analytics.set(null);
+          this.analyticsError.set(err?.error?.detail || this.t('adminUi.couponsV2.errors.loadAnalytics'));
+        }
+      });
+  }
+
+  abCanRun(): boolean {
+    const couponA = this.selectedCoupon();
+    if (!couponA) return false;
+    if (couponA.visibility !== 'assigned') return false;
+    const couponB = this.abCouponB();
+    if (couponB && couponB.visibility !== 'assigned') return false;
+    return true;
+  }
+
+  abSearchCoupons(): void {
+    const q = (this.abCouponQuery || '').trim();
+    if (!q) {
+      this.abCouponResults.set([]);
+      this.abCouponError.set(null);
+      this.abCouponLoading.set(false);
+      return;
+    }
+    this.abCouponLoading.set(true);
+    this.abCouponError.set(null);
+    const currentId = this.selectedCoupon()?.id || null;
+    this.adminCoupons.listCoupons({ q }).subscribe({
+      next: (list) => {
+        this.abCouponLoading.set(false);
+        const results = (Array.isArray(list) ? list : []).filter((c) => c.id !== currentId);
+        this.abCouponResults.set(results.slice(0, 10));
+      },
+      error: (err) => {
+        this.abCouponLoading.set(false);
+        this.abCouponResults.set([]);
+        this.abCouponError.set(err?.error?.detail || this.t('adminUi.couponsV2.ab.searchError'));
+      }
+    });
+  }
+
+  selectAbCouponB(coupon: CouponRead): void {
+    if (!coupon?.id) return;
+    const currentId = this.selectedCoupon()?.id || null;
+    if (currentId && coupon.id === currentId) return;
+    this.abCouponB.set(coupon);
+    this.abCouponResults.set([]);
+    this.abCouponError.set(null);
+    this.abCouponQuery = coupon.code || this.abCouponQuery;
+    if (!this.abBucketSeed.trim()) {
+      this.abBucketSeed = this.defaultAbBucketSeed();
+    }
+    this.loadAbAnalytics();
+  }
+
+  startAbTest(): void {
+    const couponA = this.selectedCoupon();
+    const couponB = this.abCouponB();
+    if (!couponA || !couponB) return;
+    if (!this.abCanRun()) {
+      this.toast.error(this.t('adminUi.couponsV2.errors.validation'), this.t('adminUi.couponsV2.ab.requiresAssigned'));
+      return;
+    }
+
+    const seed = (this.abBucketSeed || '').trim() || this.defaultAbBucketSeed();
+    this.abBucketSeed = seed;
+
+    this.abBusy.set(true);
+    this.abJobA.set(null);
+    this.abJobB.set(null);
+    this.abAnalyticsError.set(null);
+    this.stopAbPolling();
+
+    const basePayload = {
+      require_marketing_opt_in: this.abRequireMarketingOptIn,
+      require_email_verified: this.abRequireEmailVerified,
+      send_email: this.abSendEmail,
+      bucket_total: 2,
+      bucket_seed: seed
+    };
+
+    forkJoin({
+      a: this.adminCoupons.startSegmentAssignJob(couponA.id, { ...basePayload, bucket_index: 0 }),
+      b: this.adminCoupons.startSegmentAssignJob(couponB.id, { ...basePayload, bucket_index: 1 })
+    }).subscribe({
+      next: ({ a, b }) => {
+        this.abBusy.set(false);
+        this.abJobA.set(a);
+        this.abJobB.set(b);
+        this.toast.success(this.t('adminUi.couponsV2.ab.started'));
+        this.startAbPolling();
+      },
+      error: (err) => {
+        this.abBusy.set(false);
+        this.toast.error(this.t('adminUi.couponsV2.ab.startError'), err?.error?.detail || undefined);
+      }
+    });
+  }
+
+  loadAbAnalytics(): void {
+    const couponA = this.selectedCoupon();
+    const couponB = this.abCouponB();
+    if (!couponA || !couponB) {
+      this.abAnalyticsA.set(null);
+      this.abAnalyticsB.set(null);
+      this.abAnalyticsError.set(null);
+      this.abAnalyticsLoading.set(false);
+      return;
+    }
+
+    this.abAnalyticsLoading.set(true);
+    this.abAnalyticsError.set(null);
+    forkJoin({
+      a: this.adminCoupons.getAnalytics({ promotion_id: couponA.promotion_id, coupon_id: couponA.id, days: this.abAnalyticsDays }),
+      b: this.adminCoupons.getAnalytics({ promotion_id: couponB.promotion_id, coupon_id: couponB.id, days: this.abAnalyticsDays })
+    }).subscribe({
+      next: ({ a, b }) => {
+        this.abAnalyticsLoading.set(false);
+        this.abAnalyticsA.set(a);
+        this.abAnalyticsB.set(b);
+      },
+      error: (err) => {
+        this.abAnalyticsLoading.set(false);
+        this.abAnalyticsA.set(null);
+        this.abAnalyticsB.set(null);
+        this.abAnalyticsError.set(err?.error?.detail || this.t('adminUi.couponsV2.errors.loadAnalytics'));
+      }
+    });
+  }
+
   selectCoupon(coupon: CouponRead): void {
     this.selectedCoupon.set(coupon);
     this.couponForm = this.couponToForm(coupon);
@@ -1159,8 +1842,10 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     this.revokeReason = '';
     this.resetBulkState();
     this.resetSegmentState();
+    this.resetAbState();
     this.loadAssignments();
     this.loadSegmentJobs();
+    if (this.analyticsOnlySelectedCoupon) this.loadAnalytics();
   }
 
   startNewCoupon(): void {
@@ -1168,9 +1853,38 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     this.couponForm = this.blankCouponForm();
     const promoId = this.selectedPromotion()?.id;
     if (promoId) this.couponForm.promotion_id = promoId;
+    this.couponCodeGen = { prefix: this.suggestedCouponPrefix(), pattern: '', length: 12 };
     this.assignments.set([]);
     this.resetBulkState();
     this.resetSegmentState();
+    this.resetAbState();
+  }
+
+  private suggestedCouponPrefix(): string {
+    const promo = this.selectedPromotion();
+    const candidate = (promo?.key || promo?.name || 'COUPON').trim();
+    return candidate || 'COUPON';
+  }
+
+  generateCouponCode(): void {
+    if (this.selectedCoupon()) return;
+    const prefix = (this.couponCodeGen.prefix || '').trim() || this.suggestedCouponPrefix();
+    const pattern = (this.couponCodeGen.pattern || '').trim() || null;
+    const lengthRaw = Number(this.couponCodeGen.length);
+    const length = Number.isFinite(lengthRaw) && lengthRaw > 0 ? lengthRaw : 12;
+
+    this.couponCodeGenerating.set(true);
+    this.adminCoupons.generateCouponCode({ prefix, pattern, length }).subscribe({
+      next: (res) => {
+        this.couponCodeGenerating.set(false);
+        this.couponForm.code = String(res?.code || '').trim().toUpperCase();
+        if (this.couponForm.code) this.toast.success(this.t('adminUi.couponsV2.success.codeGenerated'));
+      },
+      error: (err) => {
+        this.couponCodeGenerating.set(false);
+        this.toast.error(this.t('adminUi.couponsV2.errors.validation'), err?.error?.detail || this.t('adminUi.couponsV2.errors.codeGenerate'));
+      }
+    });
   }
 
   saveCoupon(): void {
@@ -1387,6 +2101,95 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     return this.t('adminUi.couponsV2.discountSummary.percentOff', { value });
   }
 
+  promotionCalendarStartDate(): Date {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }
+
+  promotionCalendarEndDate(): Date {
+    const start = this.promotionCalendarStartDate();
+    return new Date(start.getTime() + this.promotionCalendarDays * 86_400_000);
+  }
+
+  promotionScheduleRows(): PromotionScheduleRow[] {
+    const promos = this.promotions();
+    if (!promos.length) return [];
+
+    const startDate = this.promotionCalendarStartDate();
+    const windowStart = startDate.getTime();
+    const windowEnd = windowStart + this.promotionCalendarDays * 86_400_000;
+    const duration = windowEnd - windowStart;
+
+    const parseEpoch = (value: string | null | undefined, fallback: number) => {
+      if (!value) return fallback;
+      const ms = Date.parse(value);
+      return Number.isNaN(ms) ? fallback : ms;
+    };
+
+    const visible: Array<{
+      promotion: PromotionRead;
+      startMs: number;
+      endMs: number;
+      visibleStartMs: number;
+      visibleEndMs: number;
+    }> = [];
+
+    for (const promo of promos) {
+      const startMs = parseEpoch(promo.starts_at ?? null, Number.NEGATIVE_INFINITY);
+      const endMs = parseEpoch(promo.ends_at ?? null, Number.POSITIVE_INFINITY);
+      const visibleStartMs = Math.max(startMs, windowStart);
+      const visibleEndMs = Math.min(endMs, windowEnd);
+      if (!(visibleEndMs > windowStart && visibleStartMs < windowEnd)) continue;
+      if (!(visibleEndMs > visibleStartMs)) continue;
+      visible.push({ promotion: promo, startMs, endMs, visibleStartMs, visibleEndMs });
+    }
+
+    if (!visible.length) return [];
+
+    const conflicts = new Map<string, { names: Set<string> }>();
+    for (const row of visible) {
+      conflicts.set(row.promotion.id, { names: new Set() });
+    }
+
+    for (let i = 0; i < visible.length; i += 1) {
+      const a = visible[i];
+      if (!a.promotion.is_active) continue;
+      for (let j = i + 1; j < visible.length; j += 1) {
+        const b = visible[j];
+        if (!b.promotion.is_active) continue;
+        const overlaps = a.visibleStartMs < b.visibleEndMs && b.visibleStartMs < a.visibleEndMs;
+        if (!overlaps) continue;
+        conflicts.get(a.promotion.id)?.names.add(b.promotion.name);
+        conflicts.get(b.promotion.id)?.names.add(a.promotion.name);
+      }
+    }
+
+    visible.sort((a, b) => a.visibleStartMs - b.visibleStartMs);
+
+    const rows: PromotionScheduleRow[] = [];
+    for (const row of visible) {
+      const leftPct = Math.max(0, Math.min(100, ((row.visibleStartMs - windowStart) / duration) * 100));
+      let widthPct = Math.max(0, ((row.visibleEndMs - row.visibleStartMs) / duration) * 100);
+      widthPct = Math.max(widthPct, 1);
+      widthPct = Math.min(widthPct, 100 - leftPct);
+
+      const conflictNames = Array.from(conflicts.get(row.promotion.id)?.names ?? []);
+      const preview = conflictNames.slice(0, 6);
+      const conflictNamesLabel =
+        conflictNames.length > preview.length ? `${preview.join(', ')} +${conflictNames.length - preview.length}` : preview.join(', ');
+
+      rows.push({
+        promotion: row.promotion,
+        leftPct,
+        widthPct,
+        conflictCount: conflictNames.length,
+        conflictNames: conflictNamesLabel
+      });
+    }
+
+    return rows;
+  }
+
   productLabel(id: string): string {
     const hit = this.productCache[id];
     if (hit?.name) return hit.name;
@@ -1468,6 +2271,7 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
       included_category_ids: this.uniqueIds(this.promotionForm.included_category_ids),
       excluded_category_ids: this.uniqueIds(this.promotionForm.excluded_category_ids),
       allow_on_sale_items: !!this.promotionForm.allow_on_sale_items,
+      first_order_only: !!this.promotionForm.first_order_only,
       is_active: !!this.promotionForm.is_active,
       starts_at: this.promotionForm.starts_at ? new Date(this.promotionForm.starts_at).toISOString() : null,
       ends_at: this.promotionForm.ends_at ? new Date(this.promotionForm.ends_at).toISOString() : null,
@@ -1486,6 +2290,7 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
       max_discount_amount: (promo.max_discount_amount ?? '').toString(),
       min_subtotal: (promo.min_subtotal ?? '').toString(),
       allow_on_sale_items: promo.allow_on_sale_items !== false,
+      first_order_only: promo.first_order_only === true,
       starts_at: promo.starts_at ? this.toLocalDateTime(promo.starts_at) : '',
       ends_at: promo.ends_at ? this.toLocalDateTime(promo.ends_at) : '',
       is_active: promo.is_active !== false,
@@ -1521,6 +2326,7 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
       max_discount_amount: '',
       min_subtotal: '',
       allow_on_sale_items: true,
+      first_order_only: false,
       starts_at: '',
       ends_at: '',
       is_active: true,
@@ -1543,6 +2349,55 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
       global_max_redemptions: '',
       per_customer_max_redemptions: ''
     };
+  }
+
+  stackingMinSubtotalBlocked(): boolean {
+    const min = this.optionalNumber(this.promotionForm.min_subtotal);
+    if (min === null || min <= 0) return false;
+    const subtotal = this.optionalNumber(this.stackingSampleSubtotal);
+    if (subtotal === null) return false;
+    return subtotal < min;
+  }
+
+  stackingPreviewProductDiscount(assumeAllItemsOnSale: boolean): number | null {
+    if (this.promotionForm.discount_type === 'free_shipping') return null;
+    const subtotal = this.optionalNumber(this.stackingSampleSubtotal);
+    if (subtotal === null || subtotal <= 0) return 0;
+
+    if (this.stackingMinSubtotalBlocked()) return 0;
+
+    const eligibleSubtotal = assumeAllItemsOnSale && !this.promotionForm.allow_on_sale_items ? 0 : subtotal;
+    if (eligibleSubtotal <= 0) return 0;
+
+    let discount = 0;
+    if (this.promotionForm.discount_type === 'percent') {
+      const pct = this.optionalNumber(this.promotionForm.percentage_off);
+      if (pct === null || pct <= 0) return 0;
+      discount = (eligibleSubtotal * pct) / 100;
+    } else if (this.promotionForm.discount_type === 'amount') {
+      const amount = this.optionalNumber(this.promotionForm.amount_off);
+      if (amount === null || amount <= 0) return 0;
+      discount = Math.min(amount, eligibleSubtotal);
+    }
+
+    const cap = this.optionalNumber(this.promotionForm.max_discount_amount);
+    if (cap !== null && cap >= 0) {
+      discount = Math.min(discount, cap);
+    }
+    discount = Math.min(discount, eligibleSubtotal);
+
+    return Math.round(discount * 100) / 100;
+  }
+
+  formatRon(value: number | null): string {
+    if (value === null) return '—';
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '—';
+    return `${num.toFixed(2)} RON`;
+  }
+
+  formatRonString(value: string | null | undefined): string {
+    return this.formatRon(this.optionalNumber(value));
   }
 
   private uniqueIds(ids: string[]): string[] {
@@ -1860,6 +2715,48 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     }
   }
 
+  private startAbPolling(): void {
+    this.stopAbPolling();
+    this.refreshAbJobs();
+    this.abPollHandle = window.setInterval(() => this.refreshAbJobs(), 2000);
+  }
+
+  private stopAbPolling(): void {
+    if (this.abPollHandle !== null) {
+      window.clearInterval(this.abPollHandle);
+      this.abPollHandle = null;
+    }
+  }
+
+  private refreshAbJobs(): void {
+    const jobA = this.abJobA();
+    const jobB = this.abJobB();
+    const terminal = (status: string) => status === 'succeeded' || status === 'failed' || status === 'cancelled';
+
+    const requests: Record<string, any> = {};
+    if (jobA && !terminal(jobA.status)) requests['a'] = this.adminCoupons.getBulkJob(jobA.id);
+    if (jobB && !terminal(jobB.status)) requests['b'] = this.adminCoupons.getBulkJob(jobB.id);
+
+    if (Object.keys(requests).length === 0) {
+      this.stopAbPolling();
+      return;
+    }
+
+    forkJoin(requests).subscribe({
+      next: (data: any) => {
+        if (data?.['a']) this.abJobA.set(data['a']);
+        if (data?.['b']) this.abJobB.set(data['b']);
+        const nextA = this.abJobA();
+        const nextB = this.abJobB();
+        if (nextA && nextB && terminal(nextA.status) && terminal(nextB.status)) {
+          this.stopAbPolling();
+          this.loadAssignments();
+        }
+      },
+      error: () => this.stopAbPolling()
+    });
+  }
+
   private refreshSegmentJob(jobId: string): void {
     this.adminCoupons.getBulkJob(jobId).subscribe({
       next: (job) => {
@@ -1919,6 +2816,30 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     this.segmentJobsError.set(null);
     this.segmentJobs.set([]);
     this.segmentJobsBusy.set(false);
+  }
+
+  private resetAbState(): void {
+    this.stopAbPolling();
+    this.abCouponQuery = '';
+    this.abCouponLoading.set(false);
+    this.abCouponError.set(null);
+    this.abCouponResults.set([]);
+    this.abCouponB.set(null);
+    this.abBucketSeed = '';
+    this.abBusy.set(false);
+    this.abJobA.set(null);
+    this.abJobB.set(null);
+    this.abAnalyticsLoading.set(false);
+    this.abAnalyticsError.set(null);
+    this.abAnalyticsA.set(null);
+    this.abAnalyticsB.set(null);
+  }
+
+  private defaultAbBucketSeed(): string {
+    const couponA = this.selectedCoupon()?.id || '';
+    const couponB = this.abCouponB()?.id || '';
+    if (!couponA || !couponB) return 'ab-test';
+    return `ab:${couponA}:${couponB}`;
   }
 
   private parseEmailsFromCsv(text: string): { emails: string[]; invalid: string[]; duplicates: number; truncated: number } {

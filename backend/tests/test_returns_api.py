@@ -15,6 +15,7 @@ from app.db.session import get_session
 from app.main import app
 from app.models.catalog import Category, Product, ProductStatus
 from app.models.order import Order, OrderItem, OrderStatus
+from app.models.passkeys import UserPasskey
 from app.models.user import User, UserRole
 
 
@@ -45,7 +46,22 @@ async def _seed_admin(session_factory) -> None:
     async with session_factory() as session:
         existing = (await session.execute(select(User).where(User.email == "admin@example.com"))).scalar_one_or_none()
         if existing:
+            existing_passkey = await session.scalar(select(UserPasskey.id).where(UserPasskey.user_id == existing.id).limit(1))
+            if existing_passkey:
+                return
+            session.add(
+                UserPasskey(
+                    user_id=existing.id,
+                    name="Test Passkey",
+                    credential_id=f"cred-{existing.id}",
+                    public_key=b"test",
+                    sign_count=0,
+                    backed_up=False,
+                )
+            )
+            await session.commit()
             return
+
         admin = User(
             email="admin@example.com",
             username="admin",
@@ -55,6 +71,17 @@ async def _seed_admin(session_factory) -> None:
             email_verified=True,
         )
         session.add(admin)
+        await session.flush()
+        session.add(
+            UserPasskey(
+                user_id=admin.id,
+                name="Test Passkey",
+                credential_id=f"cred-{admin.id}",
+                public_key=b"test",
+                sign_count=0,
+                backed_up=False,
+            )
+        )
         await session.commit()
 
 

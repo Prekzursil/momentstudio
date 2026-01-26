@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Literal, cast
 
@@ -222,7 +223,28 @@ async def create_checkout_session(
     return {"session_id": str(session_id), "checkout_url": str(checkout_url)}
 
 
-async def handle_webhook_event(session: AsyncSession, payload: bytes, sig_header: str | None) -> tuple[dict, bool]:
+def _stripe_event_payload_summary(event: Any) -> dict[str, Any]:
+    event_type = str(event.get("type") or "")
+    summary: dict[str, Any] = {
+        "id": str(event.get("id") or ""),
+        "type": event_type,
+        "created": event.get("created"),
+    }
+    data = event.get("data")
+    obj = data.get("object") if isinstance(data, dict) else None
+    get = getattr(obj, "get", None)
+    if callable(get):
+        obj_summary: dict[str, Any] = {}
+        for key in ("id", "payment_intent", "payment_status", "charge", "amount", "currency", "reason", "status"):
+            value = get(key)
+            if value is not None:
+                obj_summary[key] = value
+        if obj_summary:
+            summary["data"] = {"object": obj_summary}
+    return summary
+
+
+async def handle_webhook_event(session: AsyncSession, payload: bytes, sig_header: str | None) -> tuple[dict, StripeWebhookEvent]:
     if not settings.stripe_webhook_secret:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Webhook secret not set")
     init_stripe()
@@ -231,20 +253,38 @@ async def handle_webhook_event(session: AsyncSession, payload: bytes, sig_header
     except Exception as exc:  # broad for Stripe signature errors
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload") from exc
 
-    event_id = event.get("id")
-    inserted = False
-    if event_id:
-        record = StripeWebhookEvent(
-            stripe_event_id=str(event_id),
-            event_type=str(event.get("type")) if event.get("type") else None,
-        )
-        session.add(record)
-        try:
-            await session.commit()
-            inserted = True
-        except IntegrityError:
-            await session.rollback()
-    return event, inserted
+    event_id = str(event.get("id") or "").strip()
+    if not event_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing event id")
+
+    now = datetime.now(timezone.utc)
+    event_type = str(event.get("type") or "").strip() or None
+    payload_summary = _stripe_event_payload_summary(event)
+
+    record = StripeWebhookEvent(
+        stripe_event_id=event_id,
+        event_type=event_type,
+        attempts=1,
+        last_attempt_at=now,
+        payload=payload_summary,
+    )
+    session.add(record)
+    try:
+        await session.commit()
+        await session.refresh(record)
+        return event, record
+    except IntegrityError:
+        await session.rollback()
+
+    existing = (await session.execute(select(StripeWebhookEvent).where(StripeWebhookEvent.stripe_event_id == event_id))).scalar_one()
+    existing.attempts = int(getattr(existing, "attempts", 0) or 0) + 1
+    existing.last_attempt_at = now
+    existing.event_type = event_type or existing.event_type
+    existing.payload = payload_summary or existing.payload
+    session.add(existing)
+    await session.commit()
+    await session.refresh(existing)
+    return event, existing
 
 
 async def capture_payment_intent(intent_id: str) -> dict:
@@ -269,12 +309,15 @@ async def void_payment_intent(intent_id: str) -> dict:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
-async def refund_payment_intent(intent_id: str) -> dict:
-    """Refund a captured PaymentIntent."""
+async def refund_payment_intent(intent_id: str, *, amount_cents: int | None = None) -> dict:
+    """Refund a captured PaymentIntent (supports partial refunds via `amount_cents`)."""
     if not settings.stripe_secret_key:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
     init_stripe()
     try:
-        return stripe.Refund.create(payment_intent=intent_id)
+        payload: dict = {"payment_intent": intent_id}
+        if amount_cents is not None:
+            payload["amount"] = int(amount_cents)
+        return stripe.Refund.create(**payload)
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc

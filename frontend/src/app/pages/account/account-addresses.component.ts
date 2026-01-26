@@ -101,6 +101,7 @@ import { AccountComponent } from './account.component';
         >
         <span>{{ addr.city }}<ng-container *ngIf="addr.region">, {{ addr.region }}</ng-container>, {{ addr.postal_code }}</span>
         <span>{{ addr.country }}</span>
+        <span *ngIf="addr.phone">{{ addr.phone }}</span>
       </div>
     </section>
   `

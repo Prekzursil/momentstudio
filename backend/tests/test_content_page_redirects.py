@@ -13,6 +13,7 @@ from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
 from app.models.content import ContentBlock, ContentRedirect, ContentStatus
+from app.models.passkeys import UserPasskey
 from app.models.user import User, UserRole
 
 
@@ -41,6 +42,7 @@ def test_app() -> Dict[str, object]:
 async def seed_admin(session_factory) -> None:
     settings.maintenance_mode = False
     async with session_factory() as session:
+        await session.execute(delete(UserPasskey))
         await session.execute(delete(User).where(User.email == "admin@example.com"))
         admin = User(
             email="admin@example.com",
@@ -50,6 +52,17 @@ async def seed_admin(session_factory) -> None:
             role=UserRole.admin,
         )
         session.add(admin)
+        await session.flush()
+        session.add(
+            UserPasskey(
+                user_id=admin.id,
+                name="Test Passkey",
+                credential_id=f"cred-{admin.id}",
+                public_key=b"test",
+                sign_count=0,
+                backed_up=False,
+            )
+        )
         await session.commit()
 
 

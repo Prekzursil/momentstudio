@@ -1,8 +1,9 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
+import { TranslateService } from '@ngx-translate/core';
 import { ToastService } from './toast.service';
 import { AuthService } from './auth.service';
-import { catchError, map, of } from 'rxjs';
+import { catchError, map, of, switchMap } from 'rxjs';
 
 export const authGuard: CanActivateFn = () => {
   const router = inject(Router);
@@ -27,13 +28,59 @@ export const adminGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   return auth.ensureAuthenticated({ silent: true }).pipe(
     map((ok) => {
-      if (ok && auth.isAuthenticated() && auth.isAdmin()) return true;
-      toast.error(ok ? 'Admin access required.' : 'Please sign in to continue.');
+      if (ok && auth.isAuthenticated() && auth.isStaff()) return true;
+      toast.error(ok ? 'Staff access required.' : 'Please sign in to continue.');
       return router.parseUrl('/');
     }),
     catchError(() => {
-      toast.error('Admin access required.');
+      toast.error('Staff access required.');
       return of(router.parseUrl('/'));
     })
   );
 };
+
+export const adminSectionGuard =
+  (section: string): CanActivateFn =>
+  (_route, state) => {
+    const router = inject(Router);
+    const toast = inject(ToastService);
+    const auth = inject(AuthService);
+    const translate = inject(TranslateService);
+    return auth.ensureAuthenticated({ silent: true }).pipe(
+      switchMap((ok) => {
+        if (!ok || !auth.isAuthenticated() || !auth.isStaff()) {
+          toast.error(ok ? 'Staff access required.' : 'Please sign in to continue.');
+          return of(router.parseUrl('/'));
+        }
+        if (!auth.canAccessAdminSection(section)) {
+          toast.error('You do not have access to this section.');
+          return of(router.parseUrl('/admin/dashboard'));
+        }
+        return auth.checkAdminAccess({ silent: true }).pipe(
+          map(() => true),
+          catchError((err) => {
+            const detail = err?.error?.detail;
+            if (detail === 'Two-factor authentication or passkey required for admin access') {
+              toast.error(translate.instant('adminUi.security.mfaRequired'));
+              return of(router.parseUrl('/account/security'));
+            }
+            if (
+              detail === 'Admin access is blocked from this IP address' ||
+              detail === 'Admin access is restricted to approved IP addresses'
+            ) {
+              toast.error(translate.instant('adminUi.ipBypass.restricted'));
+              const next = encodeURIComponent(state.url || '/admin/dashboard');
+              return of(router.parseUrl(`/admin/ip-bypass?returnUrl=${next}`));
+            }
+            toast.error(detail || 'You do not have access to this section.');
+            return of(router.parseUrl('/'));
+          })
+        );
+      })
+      ,
+      catchError(() => {
+        toast.error('You do not have access to this section.');
+        return of(router.parseUrl('/'));
+      })
+    );
+  };

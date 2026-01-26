@@ -7,6 +7,7 @@ import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { CartStore } from '../../core/cart.store';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { TranslateModule } from '@ngx-translate/core';
+import { AnalyticsService } from '../../core/analytics.service';
 
 type CheckoutSuccessItem = {
   name: string;
@@ -101,10 +102,10 @@ const CHECKOUT_SUCCESS_KEY = 'checkout_last_order';
             <span>{{ 'checkout.shipping' | translate }}</span>
             <span>{{ summary.totals.shipping | localizedCurrency : summary.totals.currency }}</span>
           </div>
-          <div class="flex items-center justify-between" *ngIf="summary.totals.discount > 0">
-            <span>{{ 'checkout.promo' | translate }}</span>
-            <span class="text-emerald-700 dark:text-emerald-300">-{{ summary.totals.discount | localizedCurrency : summary.totals.currency }}</span>
-          </div>
+	          <div class="flex items-center justify-between" *ngIf="summary.totals.discount > 0">
+	            <span>{{ 'checkout.discount' | translate }}</span>
+	            <span class="text-emerald-700 dark:text-emerald-300">{{ -summary.totals.discount | localizedCurrency : summary.totals.currency }}</span>
+	          </div>
           <div class="flex items-center justify-between text-base font-semibold text-slate-900 pt-1 dark:text-slate-50">
             <span>{{ 'checkout.estimatedTotal' | translate }}</span>
             <span>{{ summary.totals.total | localizedCurrency : summary.totals.currency }}</span>
@@ -128,10 +129,14 @@ export class SuccessComponent {
 
   summary: CheckoutSuccessSummary | null = null;
 
-  constructor(private cart: CartStore) {
+  constructor(
+    private cart: CartStore,
+    private analytics: AnalyticsService
+  ) {
     // Keep the cart in sync in case the backend cleared it while we were paying.
     this.cart.loadFromBackend();
     this.summary = this.loadSummary();
+    this.trackCheckoutSuccess();
   }
 
   private loadSummary(): CheckoutSuccessSummary | null {
@@ -146,6 +151,28 @@ export class SuccessComponent {
     } catch {
       return null;
     }
+  }
+
+  private trackCheckoutSuccess(): void {
+    const summary = this.summary;
+    if (!summary) return;
+    const items = summary.items ?? [];
+    const units = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    this.analytics.track('checkout_success', {
+      order_id: summary.order_id,
+      payment_method: summary.payment_method,
+      courier: summary.courier,
+      delivery_type: summary.delivery_type,
+      line_items: items.length,
+      units,
+      subtotal: summary.totals?.subtotal,
+      discount: summary.totals?.discount,
+      fee: summary.totals?.fee ?? 0,
+      tax: summary.totals?.tax,
+      shipping: summary.totals?.shipping,
+      total: summary.totals?.total,
+      currency: summary.totals?.currency
+    });
   }
 
   courierLabel(): string | null {

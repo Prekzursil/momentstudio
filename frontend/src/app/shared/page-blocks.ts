@@ -16,6 +16,8 @@ export interface Slide {
   variant: SlideVariant;
   size: SlideSize;
   text_style: SlideTextStyle;
+  focal_x?: number;
+  focal_y?: number;
 }
 
 export interface PageBlockBase {
@@ -36,12 +38,16 @@ export interface PageImageBlock extends PageBlockBase {
   alt?: string | null;
   caption?: string | null;
   link_url?: string | null;
+  focal_x: number;
+  focal_y: number;
 }
 
 export interface PageGalleryImage {
   url: string;
   alt?: string | null;
   caption?: string | null;
+  focal_x: number;
+  focal_y: number;
 }
 
 export interface PageGalleryBlock extends PageBlockBase {
@@ -150,6 +156,8 @@ function parseSlide(raw: unknown, lang: UiLang): Slide | null {
   const variant = normalizeVariant(rec['variant']);
   const size = normalizeSize(rec['size']);
   const textStyle = normalizeTextStyle(rec['text_style']);
+  const focalX = Math.max(0, Math.min(100, Math.round(readNumber(rec['focal_x'], 50))));
+  const focalY = Math.max(0, Math.min(100, Math.round(readNumber(rec['focal_y'], 50))));
 
   const hasContent = Boolean(imageUrl || headline || subheadline || ctaLabel);
   if (!hasContent) return null;
@@ -163,7 +171,9 @@ function parseSlide(raw: unknown, lang: UiLang): Slide | null {
     cta_url: ctaUrl,
     variant,
     size,
-    text_style: textStyle
+    text_style: textStyle,
+    focal_x: focalX,
+    focal_y: focalY
   };
 }
 
@@ -219,6 +229,8 @@ export function parsePageBlocks(
       const url = typeof rec['url'] === 'string' ? rec['url'].trim() : '';
       if (!url) continue;
       const linkUrl = typeof rec['link_url'] === 'string' ? rec['link_url'].trim() : '';
+      const focalX = Math.max(0, Math.min(100, Math.round(readNumber(rec['focal_x'], 50))));
+      const focalY = Math.max(0, Math.min(100, Math.round(readNumber(rec['focal_y'], 50))));
       blocks.push({
         key,
         type: 'image',
@@ -227,7 +239,9 @@ export function parsePageBlocks(
         url,
         alt: readLocalized(rec['alt'], lang),
         caption: readLocalized(rec['caption'], lang),
-        link_url: linkUrl || null
+        link_url: linkUrl || null,
+        focal_x: focalX,
+        focal_y: focalY
       } satisfies PageImageBlock);
       continue;
     }
@@ -274,10 +288,14 @@ export function parsePageBlocks(
       const imgRec = imgRaw as Record<string, unknown>;
       const url = typeof imgRec['url'] === 'string' ? imgRec['url'].trim() : '';
       if (!url) continue;
+      const focalX = Math.max(0, Math.min(100, Math.round(readNumber(imgRec['focal_x'], 50))));
+      const focalY = Math.max(0, Math.min(100, Math.round(readNumber(imgRec['focal_y'], 50))));
       images.push({
         url,
         alt: readLocalized(imgRec['alt'], lang),
-        caption: readLocalized(imgRec['caption'], lang)
+        caption: readLocalized(imgRec['caption'], lang),
+        focal_x: focalX,
+        focal_y: focalY
       });
     }
     if (!images.length) continue;

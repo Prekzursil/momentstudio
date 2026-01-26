@@ -17,7 +17,8 @@ from app.models.address import Address
 from app.models.catalog import Category, Product, ProductStatus
 from app.models.cart import Cart, CartItem
 from app.models.coupons_v2 import Coupon, CouponRedemption, CouponReservation, CouponVisibility, Promotion, PromotionDiscountType
-from app.models.order import Order, OrderEvent, OrderStatus
+from app.models.order import Order, OrderEvent, OrderStatus, OrderItem
+from app.models.passkeys import UserPasskey
 from app.models.user import User, UserRole
 from app.services.auth import create_user, issue_tokens_for_user
 from app.schemas.user import UserCreate
@@ -62,6 +63,16 @@ def create_user_token(session_factory, email="buyer@example.com", admin: bool = 
             user.email_verified = True
             if admin:
                 user.role = UserRole.admin
+                session.add(
+                    UserPasskey(
+                        user_id=user.id,
+                        name="Test Passkey",
+                        credential_id=f"cred-{user.id}",
+                        public_key=b"test",
+                        sign_count=0,
+                        backed_up=False,
+                    )
+                )
             await session.commit()
             await session.refresh(user)
             tokens = await issue_tokens_for_user(session, user)
@@ -327,7 +338,7 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
                 label="Billing",
                 line1="456 Billing",
                 city="Bucharest",
-                country="RO",
+                country="US",
                 postal_code="000000",
             )
             session.add(shipping)
@@ -362,6 +373,17 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     order_id = order["id"]
     ref = order["reference_code"]
 
+    create_two = client.post(
+        "/api/v1/orders",
+        json={
+            "shipping_address_id": str(shipping_address_id),
+            "billing_address_id": str(billing_address_id),
+            "shipping_method_id": str(shipping_method_id),
+        },
+        headers=auth_headers(token),
+    )
+    assert create_two.status_code == 201, create_two.text
+
     forbidden = client.get("/api/v1/orders/admin/search", headers=auth_headers(token))
     assert forbidden.status_code == 403
 
@@ -375,7 +397,17 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     assert payload["meta"]["total_items"] >= 1
     assert any(item["id"] == order_id for item in payload["items"])
 
-    detail = client.get(f"/api/v1/orders/admin/{order_id}", headers=auth_headers(admin_token))
+    masked_detail = client.get(f"/api/v1/orders/admin/{order_id}", headers=auth_headers(admin_token))
+    assert masked_detail.status_code == 200, masked_detail.text
+    masked = masked_detail.json()
+    assert masked["customer_email"] != "buyer@example.com"
+    assert "*" in masked["customer_email"]
+    assert masked["shipping_address"]["line1"] == "***"
+    assert masked["billing_address"]["line1"] == "***"
+
+    detail = client.get(
+        f"/api/v1/orders/admin/{order_id}", headers=auth_headers(admin_token), params={"include_pii": True}
+    )
     assert detail.status_code == 200, detail.text
     data = detail.json()
     assert data["customer_email"] == "buyer@example.com"
@@ -383,10 +415,15 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     assert data["shipping_address"]["line1"] == "123 Main"
     assert data["billing_address"]["line1"] == "456 Billing"
 
+    signals = {signal["code"]: signal for signal in (data.get("fraud_signals") or [])}
+    assert signals["velocity_email"]["data"]["count"] >= 2
+    assert signals["country_mismatch"]["data"]["billing_country"] == "US"
+
     updated = client.patch(
         f"/api/v1/orders/admin/{order_id}",
         json={"status": "paid", "tracking_number": "TRACK999"},
         headers=auth_headers(admin_token),
+        params={"include_pii": True},
     )
     assert updated.status_code == 200, updated.text
     updated_data = updated.json()
@@ -394,6 +431,94 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     assert updated_data["tracking_number"] == "TRACK999"
     assert updated_data["customer_email"] == "buyer@example.com"
     assert updated_data["shipping_address"]["line1"] == "123 Main"
+
+    updated_address = client.patch(
+        f"/api/v1/orders/admin/{order_id}/addresses",
+        json={
+            "shipping_address": {
+                "line1": "999 New Street",
+                "city": "Cluj",
+                "postal_code": "400000",
+                "country": "RO",
+            },
+            "rerate_shipping": True,
+            "note": "Fix shipping address",
+        },
+        headers=auth_headers(admin_token),
+        params={"include_pii": True},
+    )
+    assert updated_address.status_code == 200, updated_address.text
+    updated_address_data = updated_address.json()
+    assert updated_address_data["shipping_address"]["line1"] == "999 New Street"
+    assert updated_address_data["shipping_address"]["id"] != str(shipping_address_id)
+
+    async def assert_address_snapshot() -> None:
+        async with SessionLocal() as session:
+            original = await session.get(Address, shipping_address_id)
+            assert original is not None
+            assert original.line1 == "123 Main"
+
+            db_order = await session.get(Order, UUID(order_id))
+            assert db_order is not None
+            await session.refresh(db_order, attribute_names=["shipping_address"])
+            assert db_order.shipping_address_id != shipping_address_id
+            assert db_order.shipping_address is not None
+            assert db_order.shipping_address.user_id is None
+            assert db_order.shipping_address.line1 == "999 New Street"
+
+    asyncio.run(assert_address_snapshot())
+
+    async def seed_payment_retries() -> None:
+        async with SessionLocal() as session:
+            db_order = (await session.execute(select(Order).where(Order.id == UUID(order_id)))).scalar_one()
+            db_order.payment_retry_count = 2
+            session.add(db_order)
+            await session.commit()
+
+    asyncio.run(seed_payment_retries())
+    detail_retry = client.get(f"/api/v1/orders/admin/{order_id}", headers=auth_headers(admin_token))
+    assert detail_retry.status_code == 200, detail_retry.text
+    retry_signals = {signal["code"]: signal for signal in (detail_retry.json().get("fraud_signals") or [])}
+    assert retry_signals["payment_retries"]["data"]["count"] == 2
+
+    tagged = client.post(
+        f"/api/v1/orders/admin/{order_id}/tags",
+        json={"tag": "VIP"},
+        headers=auth_headers(admin_token),
+    )
+    assert tagged.status_code == 200, tagged.text
+    tagged_data = tagged.json()
+    assert tagged_data["tags"] == ["vip"]
+
+    tags_list = client.get("/api/v1/orders/admin/tags", headers=auth_headers(admin_token))
+    assert tags_list.status_code == 200, tags_list.text
+    assert "vip" in tags_list.json()["items"]
+
+    tagged_search = client.get(
+        "/api/v1/orders/admin/search",
+        params={"tag": "vip", "page": 1, "limit": 10},
+        headers=auth_headers(admin_token),
+    )
+    assert tagged_search.status_code == 200, tagged_search.text
+    tagged_payload = tagged_search.json()
+    assert any(item["id"] == order_id for item in tagged_payload["items"])
+
+    removed = client.delete(
+        f"/api/v1/orders/admin/{order_id}/tags/vip",
+        headers=auth_headers(admin_token),
+    )
+    assert removed.status_code == 200, removed.text
+    removed_data = removed.json()
+    assert removed_data["tags"] == []
+
+    tagged_search_after = client.get(
+        "/api/v1/orders/admin/search",
+        params={"tag": "vip", "page": 1, "limit": 10},
+        headers=auth_headers(admin_token),
+    )
+    assert tagged_search_after.status_code == 200, tagged_search_after.text
+    tagged_payload_after = tagged_search_after.json()
+    assert not any(item["id"] == order_id for item in tagged_payload_after["items"])
 
 
 def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
@@ -523,6 +648,14 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     assert ok.json()["status"] == "paid"
     assert ok.json()["tracking_number"] == "TRACK123"
 
+    courier_update = client.patch(
+        f"/api/v1/orders/admin/{order_id}",
+        json={"courier": "sameday"},
+        headers=auth_headers(admin_token),
+    )
+    assert courier_update.status_code == 200
+    assert courier_update.json()["courier"] == "sameday"
+
     final = client.patch(
         f"/api/v1/orders/admin/{order_id}",
         json={"status": "shipped"},
@@ -578,8 +711,8 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
 
     refund = client.post(
         f"/api/v1/orders/admin/{order_id}/refund",
-        params={"note": "Customer requested refund"},
         headers=auth_headers(admin_token),
+        json={"password": "orderpass", "note": "Customer requested refund"},
     )
     assert refund.status_code == 200
     assert refund.json()["status"] == "refunded"
@@ -611,9 +744,20 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
 
     packing = client.get(f"/api/v1/orders/admin/{order_id}/packing-slip", headers=auth_headers(admin_token))
     assert packing.status_code == 200
-    assert "Packing slip for order" in packing.text
-    assert "Items:" in packing.text
+    assert packing.headers.get("content-type", "").startswith("application/pdf")
+    assert packing.headers.get("content-disposition", "").startswith("attachment;")
+    assert packing.content.startswith(b"%PDF")
     assert sent["shipped"] == 1
+
+    batch_packing = client.post(
+        "/api/v1/orders/admin/batch/packing-slips",
+        headers=auth_headers(admin_token),
+        json={"order_ids": [order_id, stripe_order_id]},
+    )
+    assert batch_packing.status_code == 200
+    assert batch_packing.headers.get("content-type", "").startswith("application/pdf")
+    assert batch_packing.headers.get("content-disposition", "").startswith("attachment;")
+    assert batch_packing.content.startswith(b"%PDF")
 
     receipt = client.get(f"/api/v1/orders/{order_id}/receipt", headers=auth_headers(token))
     assert receipt.status_code == 200
@@ -640,7 +784,174 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
 
     delivery = client.post(f"/api/v1/orders/admin/{order_id}/delivery-email", headers=auth_headers(admin_token))
     assert delivery.status_code == 200
+
     assert sent["delivered"] == 1
+
+    confirm = client.post(
+        f"/api/v1/orders/admin/{order_id}/confirmation-email",
+        headers=auth_headers(admin_token),
+        json={"note": "Resend for customer request"},
+    )
+    assert confirm.status_code == 200
+    assert sent["count"] == 2
+
+
+def test_admin_partial_refunds(test_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token, _ = create_user_token(SessionLocal, email="admin-refunds@example.com", admin=True)
+    customer_token, customer_id = create_user_token(SessionLocal, email="buyer-refunds@example.com")
+
+    async def seed_paid_order(*, payment_method: str, intent_id: str | None = None) -> tuple[str, str]:
+        async with SessionLocal() as session:
+            category = Category(slug=f"refund-cat-{payment_method}", name="Refunds")
+            product = Product(
+                category=category,
+                slug=f"refund-item-{payment_method}",
+                sku=f"RFND-{payment_method.upper()}",
+                name="Refund Item",
+                base_price=Decimal("20.00"),
+                currency="RON",
+                stock_quantity=5,
+                status=ProductStatus.published,
+            )
+            session.add(product)
+            await session.flush()
+
+            order = Order(
+                user_id=customer_id,
+                status=OrderStatus.paid,
+                reference_code=f"REF-{payment_method.upper()}",
+                customer_email="buyer-refunds@example.com",
+                customer_name="Buyer",
+                total_amount=Decimal("100.00"),
+                tax_amount=Decimal("0.00"),
+                fee_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+                payment_method=payment_method,
+                stripe_payment_intent_id=intent_id,
+            )
+            session.add(order)
+            await session.flush()
+
+            item = OrderItem(
+                order_id=order.id,
+                product_id=product.id,
+                quantity=5,
+                unit_price=Decimal("20.00"),
+                subtotal=Decimal("100.00"),
+            )
+            session.add(item)
+            session.add(OrderEvent(order_id=order.id, event="payment_captured", note="seed"))
+            await session.commit()
+            return str(order.id), str(item.id)
+
+    order_id, item_id = asyncio.run(seed_paid_order(payment_method="cod"))
+
+    # Unauthorized
+    forbidden = client.post(
+        f"/api/v1/orders/admin/{order_id}/refunds",
+        headers=auth_headers(customer_token),
+        json={"password": "orderpass", "amount": "10.00", "note": "Nope", "process_payment": False},
+    )
+    assert forbidden.status_code == 403
+
+    # Manual partial refund record
+    partial = client.post(
+        f"/api/v1/orders/admin/{order_id}/refunds",
+        headers=auth_headers(admin_token),
+        json={
+            "password": "orderpass",
+            "amount": "10.00",
+            "note": "Partial refund for one item",
+            "items": [{"order_item_id": item_id, "quantity": 1}],
+            "process_payment": False,
+        },
+    )
+    assert partial.status_code == 200, partial.text
+    assert partial.json()["status"] == "paid"
+    assert any(evt["event"] == "refund_partial" for evt in partial.json().get("events", []))
+    refunds = partial.json().get("refunds") or []
+    assert len(refunds) == 1
+    assert refunds[0]["provider"] == "manual"
+
+    # Cannot refund more than the selected items total.
+    bad_amount = client.post(
+        f"/api/v1/orders/admin/{order_id}/refunds",
+        headers=auth_headers(admin_token),
+        json={
+            "password": "orderpass",
+            "amount": "30.00",
+            "note": "Too high for one unit",
+            "items": [{"order_item_id": item_id, "quantity": 1}],
+            "process_payment": False,
+        },
+    )
+    assert bad_amount.status_code == 400
+
+    # Cannot refund more item quantity than remains (cumulative).
+    bad_qty = client.post(
+        f"/api/v1/orders/admin/{order_id}/refunds",
+        headers=auth_headers(admin_token),
+        json={
+            "password": "orderpass",
+            "amount": "10.00",
+            "note": "Too many units",
+            "items": [{"order_item_id": item_id, "quantity": 5}],
+            "process_payment": False,
+        },
+    )
+    assert bad_qty.status_code == 400
+
+    # Cannot refund beyond remaining amount
+    too_much = client.post(
+        f"/api/v1/orders/admin/{order_id}/refunds",
+        headers=auth_headers(admin_token),
+        json={"password": "orderpass", "amount": "95.00", "note": "Too much", "process_payment": False},
+    )
+    assert too_much.status_code == 400
+
+    # Final partial refund completes the order refund
+    final = client.post(
+        f"/api/v1/orders/admin/{order_id}/refunds",
+        headers=auth_headers(admin_token),
+        json={"password": "orderpass", "amount": "90.00", "note": "Complete refund", "process_payment": False},
+    )
+    assert final.status_code == 200
+    assert final.json()["status"] == "refunded"
+    assert len(final.json().get("refunds") or []) == 2
+
+    # Stripe sync path (monkeypatched)
+    stripe_order_id, stripe_item_id = asyncio.run(seed_paid_order(payment_method="stripe", intent_id="pi_test_123"))
+    called: dict[str, object] = {}
+
+    async def fake_refund_payment_intent(intent: str, *, amount_cents: int | None = None) -> dict:
+        called["intent"] = intent
+        called["amount_cents"] = amount_cents
+        return {"id": "re_test_123"}
+
+    monkeypatch.setattr(payments_service, "refund_payment_intent", fake_refund_payment_intent)
+
+    stripe_refund = client.post(
+        f"/api/v1/orders/admin/{stripe_order_id}/refunds",
+        headers=auth_headers(admin_token),
+        json={
+            "password": "orderpass",
+            "amount": "12.34",
+            "note": "Stripe partial refund",
+            "items": [{"order_item_id": stripe_item_id, "quantity": 1}],
+            "process_payment": True,
+        },
+    )
+    assert stripe_refund.status_code == 200, stripe_refund.text
+    payload = stripe_refund.json()
+    assert called.get("intent") == "pi_test_123"
+    assert called.get("amount_cents") == 1234
+    assert len(payload.get("refunds") or []) == 1
+    assert payload["refunds"][0]["provider"] == "stripe"
+    assert payload["refunds"][0]["provider_refund_id"] == "re_test_123"
 
 
 def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
@@ -803,10 +1114,94 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
     assert "text/csv" in export_resp.headers.get("content-type", "")
     assert "reference_code" in export_resp.text
 
+    export_cols = client.get(
+        "/api/v1/orders/admin/export",
+        params=[("columns", "reference_code"), ("columns", "status")],
+        headers=auth_headers(admin_token),
+    )
+    assert export_cols.status_code == 200
+    header = export_cols.text.splitlines()[0]
+    assert header == "reference_code,status"
+
+    export_invalid = client.get(
+        "/api/v1/orders/admin/export",
+        params=[("columns", "nope")],
+        headers=auth_headers(admin_token),
+    )
+    assert export_invalid.status_code == 400
+
     reorder_resp = client.post(f"/api/v1/orders/{order_id}/reorder", headers=auth_headers(token))
     assert reorder_resp.status_code == 200
     assert len(reorder_resp.json()["items"]) == 1
     assert reorder_resp.json()["items"][0]["product_id"]
+
+
+def test_admin_order_shipments_crud(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    token, user_id = create_user_token(SessionLocal, email="buyer-shipments@example.com")
+    admin_token, _ = create_user_token(SessionLocal, email="admin-shipments@example.com", admin=True)
+    seed_cart_with_product(SessionLocal, user_id)
+
+    async def seed_shipping() -> UUID:
+        async with SessionLocal() as session:
+            method = await order_service.create_shipping_method(
+                session, ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0)
+            )
+            return method.id
+
+    shipping_method_id = asyncio.run(seed_shipping())
+
+    res = client.post(
+        "/api/v1/orders",
+        json={"shipping_method_id": str(shipping_method_id)},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 201, res.text
+    order_id = res.json()["id"]
+
+    created = client.post(
+        f"/api/v1/orders/admin/{order_id}/shipments",
+        json={"tracking_number": "TRACK1", "courier": "sameday", "tracking_url": "https://example.com/track/1"},
+        headers=auth_headers(admin_token),
+    )
+    assert created.status_code == 200, created.text
+    assert created.json()["tracking_number"] == "TRACK1"
+    assert len(created.json().get("shipments") or []) == 1
+
+    listed = client.get(
+        f"/api/v1/orders/admin/{order_id}/shipments",
+        headers=auth_headers(admin_token),
+    )
+    assert listed.status_code == 200, listed.text
+    shipments = listed.json()
+    assert len(shipments) == 1
+    shipment_id = shipments[0]["id"]
+    assert shipments[0]["tracking_number"] == "TRACK1"
+
+    updated = client.patch(
+        f"/api/v1/orders/admin/{order_id}/shipments/{shipment_id}",
+        json={"tracking_url": "https://example.com/track/new"},
+        headers=auth_headers(admin_token),
+    )
+    assert updated.status_code == 200, updated.text
+    updated_shipments = updated.json().get("shipments") or []
+    assert any(s["id"] == shipment_id and s["tracking_url"] == "https://example.com/track/new" for s in updated_shipments)
+
+    duplicate = client.post(
+        f"/api/v1/orders/admin/{order_id}/shipments",
+        json={"tracking_number": "TRACK1"},
+        headers=auth_headers(admin_token),
+    )
+    assert duplicate.status_code == 409
+
+    deleted = client.delete(
+        f"/api/v1/orders/admin/{order_id}/shipments/{shipment_id}",
+        headers=auth_headers(admin_token),
+    )
+    assert deleted.status_code == 200, deleted.text
+    assert all(s["id"] != shipment_id for s in (deleted.json().get("shipments") or []))
 
 
 def test_admin_accept_requires_payment_capture_and_cancel_reason(

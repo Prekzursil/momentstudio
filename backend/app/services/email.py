@@ -216,7 +216,7 @@ def _payment_method_label(payment_method: str | None, *, lang: str) -> str | Non
     if value == "stripe":
         return "Stripe"
     if value == "cod":
-        return "Cash on delivery" if lang == "en" else "Ramburs"
+        return "Cash" if lang == "en" else "Numerar"
     if value == "paypal":
         return "PayPal"
     if value == "netopia":
@@ -528,6 +528,57 @@ async def send_order_refunded_update(to_email: str, order, *, lang: str | None =
     return await send_email(to_email, subject, text_body, html_body)
 
 
+async def send_order_partial_refund_update(
+    to_email: str,
+    order,
+    refund,
+    *,
+    lang: str | None = None,
+) -> bool:
+    ref = getattr(order, "reference_code", None) or str(getattr(order, "id", ""))
+    account_url = f"{settings.frontend_origin.rstrip('/')}/account/orders"
+    currency = getattr(order, "currency", "RON") or "RON"
+
+    amount = _money_str(getattr(refund, "amount", 0), currency)
+    note = (getattr(refund, "note", None) or "").strip() or None
+    provider = (getattr(refund, "provider", None) or "").strip() or None
+
+    def _lines(lng: str) -> list[str]:
+        lines = [
+            (
+                f"A fost emisă o rambursare parțială pentru comanda {ref}."
+                if lng == "ro"
+                else f"A partial refund was issued for your order {ref}."
+            )
+        ]
+        lines.append(("Sumă: " if lng == "ro" else "Amount: ") + amount)
+        if provider:
+            lines.append(("Procesator: " if lng == "ro" else "Provider: ") + provider)
+        if note:
+            lines.append(("Notă: " if lng == "ro" else "Note: ") + note)
+        lines.append("")
+        lines.append(
+            f"Detalii în cont: {account_url}" if lng == "ro" else f"View in your account: {account_url}"
+        )
+        return lines
+
+    subject = _bilingual_subject(
+        f"Rambursare parțială pentru comanda {ref}",
+        f"Partial refund for order {ref}",
+        preferred_language=lang,
+    )
+    text_ro = "\n".join(_lines("ro"))
+    text_en = "\n".join(_lines("en"))
+    text_body, html_body = _bilingual_sections(
+        text_ro=text_ro,
+        text_en=text_en,
+        html_ro=_html_pre(text_ro),
+        html_en=_html_pre(text_en),
+        preferred_language=lang,
+    )
+    return await send_email(to_email, subject, text_body, html_body)
+
+
 async def send_new_order_notification(
     to_email: str, order, customer_email: str | None = None, lang: str | None = None
 ) -> bool:
@@ -679,6 +730,58 @@ async def send_email_changed(
         f"New: {new_email}\n\n"
         "If you did not make this change, please contact us immediately.\n\n"
         f"Account: {account_url}"
+    )
+    text_body, html_body = _bilingual_sections(
+        text_ro=text_ro,
+        text_en=text_en,
+        html_ro=_html_pre(text_ro),
+        html_en=_html_pre(text_en),
+        preferred_language=lang,
+    )
+    return await send_email(to_email, subject, text_body, html_body)
+
+
+async def send_admin_login_alert(
+    to_email: str,
+    *,
+    admin_username: str,
+    admin_display_name: str | None = None,
+    admin_role: str | None = None,
+    ip_address: str | None = None,
+    country_code: str | None = None,
+    user_agent: str | None = None,
+    occurred_at: datetime | None = None,
+    lang: str | None = None,
+) -> bool:
+    subject = _bilingual_subject("Alertă: autentificare admin nouă", "Alert: new admin login", preferred_language=lang)
+    admin_name = (admin_display_name or "").strip() or (admin_username or "").strip()
+    role_value = (admin_role or "").strip() or "admin"
+    when = (occurred_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat(timespec="seconds")
+    ip = (ip_address or "").strip() or "unknown"
+    cc = (country_code or "").strip() or None
+    ua = (user_agent or "").strip() or "unknown"
+    dashboard_url = f"{settings.frontend_origin.rstrip('/')}/admin"
+
+    location = f"{ip} ({cc})" if cc else ip
+    text_ro = (
+        "A fost detectată o autentificare nouă pentru un cont de administrator.\n\n"
+        f"Admin: {admin_name} ({admin_username})\n"
+        f"Rol: {role_value}\n"
+        f"Când: {when}\n"
+        f"IP: {location}\n"
+        f"User-Agent: {ua}\n\n"
+        "Dacă nu recunoști această autentificare, recomandăm să schimbi parola și să revoci sesiunile active.\n\n"
+        f"Admin: {dashboard_url}"
+    )
+    text_en = (
+        "A new login was detected for an admin account.\n\n"
+        f"Admin: {admin_name} ({admin_username})\n"
+        f"Role: {role_value}\n"
+        f"When: {when}\n"
+        f"IP: {location}\n"
+        f"User-Agent: {ua}\n\n"
+        "If you don’t recognize this login, we recommend changing the password and revoking active sessions.\n\n"
+        f"Admin: {dashboard_url}"
     )
     text_body, html_body = _bilingual_sections(
         text_ro=text_ro,
@@ -1037,6 +1140,62 @@ async def send_contact_submission_notification(
             "message": message,
             "order_reference": order_reference,
             "admin_url": admin_url,
+        },
+        preferred_language=lang,
+    )
+    return await send_email(to_email, subject, text_body, html_body)
+
+
+async def send_contact_submission_reply(
+    to_email: str,
+    *,
+    customer_name: str,
+    reply_message: str,
+    topic: str | None = None,
+    order_reference: str | None = None,
+    reference: str | None = None,
+    contact_url: str | None = None,
+    lang: str | None = None,
+) -> bool:
+    subject = _bilingual_subject("Răspuns la solicitarea ta", "Reply to your request", preferred_language=lang)
+    safe_name = (customer_name or "").strip() or "Customer"
+    if env is None:
+        ro_lines = ["Răspuns la mesajul tău", f"Salut {safe_name},", ""]
+        en_lines = ["Reply to your message", f"Hi {safe_name},", ""]
+        if topic:
+            ro_lines.append(f"Tip: {topic}")
+            en_lines.append(f"Topic: {topic}")
+        if order_reference:
+            ro_lines.append(f"Comandă: {order_reference}")
+            en_lines.append(f"Order: {order_reference}")
+        if reference:
+            ro_lines.append(f"Referință: {reference}")
+            en_lines.append(f"Reference: {reference}")
+        ro_lines.extend(["", reply_message])
+        en_lines.extend(["", reply_message])
+        if contact_url:
+            ro_lines.extend(["", f"Ajutor: {contact_url}"])
+            en_lines.extend(["", f"Help: {contact_url}"])
+        text_ro = "\n".join(ro_lines)
+        text_en = "\n".join(en_lines)
+        text_body, html_body = _bilingual_sections(
+            text_ro=text_ro,
+            text_en=text_en,
+            html_ro=_html_pre(text_ro),
+            html_en=_html_pre(text_en),
+            preferred_language=lang,
+        )
+        return await send_email(to_email, subject, text_body, html_body)
+
+    text_body, html_body = render_bilingual_template(
+        "contact_submission_reply.txt.j2",
+        {
+            "customer_name": safe_name,
+            "reply_message": reply_message,
+            "topic": topic,
+            "order_reference": order_reference,
+            "reference": reference,
+            "contact_url": contact_url,
         },
         preferred_language=lang,
     )

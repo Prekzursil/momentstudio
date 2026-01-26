@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Text, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -39,6 +39,10 @@ class ReturnRequest(Base):
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     customer_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     admin_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    return_label_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    return_label_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    return_label_uploaded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
@@ -80,4 +84,3 @@ class ReturnRequestItem(Base):
 
     return_request: Mapped[ReturnRequest] = relationship("ReturnRequest", back_populates="items")
     order_item: Mapped[OrderItem | None] = relationship("OrderItem", lazy="joined")
-

@@ -53,7 +53,7 @@ async function createCoupon(request: APIRequestContext, token: string): Promise<
   return coupon.code as string;
 }
 
-async function syncCartWithFirstProduct(request: APIRequestContext, token: string): Promise<void> {
+async function syncCartWithFirstProduct(request: APIRequestContext, sessionId: string): Promise<void> {
   const listRes = await request.get('/api/v1/catalog/products?sort=newest&page=1&limit=25');
   expect(listRes.ok()).toBeTruthy();
   const listPayload = (await listRes.json()) as any;
@@ -73,8 +73,9 @@ async function syncCartWithFirstProduct(request: APIRequestContext, token: strin
   }
 
   const product = candidates[0];
+  // Use a per-test session cart to avoid cross-test cart races (CI runs tests in parallel).
   const syncRes = await request.post('/api/v1/cart/sync', {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { 'X-Session-Id': sessionId },
     data: {
       items: [
         {
@@ -101,6 +102,11 @@ async function fillShippingAddress(page: Page, email: string): Promise<void> {
     await page.locator('input[name="region"]').fill('București');
   }
   await page.locator('input[name="postal"]').fill('010000');
+
+  const phoneInput = page.locator('input[name="shippingPhoneNational"]');
+  if (await phoneInput.isVisible()) {
+    await phoneInput.fill('712345678');
+  }
 }
 
 test.beforeEach(async ({ page }) => {
@@ -113,7 +119,12 @@ test.beforeEach(async ({ page }) => {
 test('coupons v2: apply coupon and prevent reuse after redemption', async ({ page, request }) => {
   const token = await loginApi(request);
   const code = await createCoupon(request, token);
-  await syncCartWithFirstProduct(request, token);
+  const sessionId = `e2e-coupons-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  await page.addInitScript((sid) => {
+    localStorage.setItem('cart_session_id', sid);
+    localStorage.removeItem('cart_cache');
+  }, sessionId);
+  await syncCartWithFirstProduct(request, sessionId);
 
   await loginUi(page);
 
@@ -121,10 +132,15 @@ test('coupons v2: apply coupon and prevent reuse after redemption', async ({ pag
   const cartLoad = page.waitForResponse(
     (res) => res.url().includes('/api/v1/cart') && res.request().method() === 'GET' && res.status() === 200
   );
-  await page.goto('/checkout');
+  await page.goto('/cart');
   await cartLoad;
+  await expect(page.getByRole('link', { name: 'Proceed to checkout' })).toBeVisible();
+  await page.getByRole('link', { name: 'Proceed to checkout' }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
 
-  await page.locator('input[name="promo"]').fill(code);
+  const promoInput = page.locator('input[name="promo"]');
+  await expect(promoInput).toBeVisible();
+  await promoInput.fill(code);
   await page.getByRole('button', { name: 'Apply' }).first().click();
 
   await expect(page.getByText(`Promo ${code} applied.`)).toBeVisible();
@@ -139,16 +155,70 @@ test('coupons v2: apply coupon and prevent reuse after redemption', async ({ pag
   await expect(page.getByRole('heading', { name: 'Thank you for your purchase!' })).toBeVisible();
 
   // Add again and ensure the same coupon cannot be redeemed twice.
-  await syncCartWithFirstProduct(request, token);
+  await syncCartWithFirstProduct(request, sessionId);
   await page.evaluate(() => localStorage.removeItem('cart_cache'));
   const cartLoad2 = page.waitForResponse(
     (res) => res.url().includes('/api/v1/cart') && res.request().method() === 'GET' && res.status() === 200
   );
-  await page.goto('/checkout');
+  await page.goto('/cart');
   await cartLoad2;
+  await page.getByRole('link', { name: 'Proceed to checkout' }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
 
   await page.locator('input[name="promo"]').fill(code);
   await page.getByRole('button', { name: 'Apply' }).click();
   await expect(page.getByText('Coupon not eligible')).toBeVisible();
   await expect(page.getByText('You already used this coupon')).toBeVisible();
+});
+
+test('coupons v2: guests are prompted to sign in', async ({ page, request }) => {
+  const sessionId = `guest-e2e-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  await page.addInitScript((sid) => {
+    localStorage.setItem('cart_session_id', sid);
+  }, sessionId);
+
+  const listRes = await request.get('/api/v1/catalog/products?sort=newest&page=1&limit=25');
+  expect(listRes.ok()).toBeTruthy();
+  const listPayload = (await listRes.json()) as any;
+
+  const items = Array.isArray(listPayload?.items) ? listPayload.items : [];
+  const candidates = items
+    .filter((p: any) => typeof p?.id === 'string' && p.id.length > 0)
+    .filter((p: any) => {
+      const stock = typeof p?.stock_quantity === 'number' ? p.stock_quantity : 0;
+      return stock > 0 || !!p?.allow_backorder;
+    });
+
+  if (!candidates.length) {
+    test.skip(true, 'No in-stock products available for guest coupon restriction e2e.');
+    return;
+  }
+
+  const product = candidates[0];
+  const syncRes = await request.post('/api/v1/cart/sync', {
+    headers: { 'X-Session-Id': sessionId },
+    data: {
+      items: [
+        {
+          product_id: product.id,
+          variant_id: null,
+          quantity: 1
+        }
+      ]
+    }
+  });
+  expect(syncRes.ok()).toBeTruthy();
+
+  const cartLoad = page.waitForResponse(
+    (res) => res.url().includes('/api/v1/cart') && res.request().method() === 'GET' && res.status() === 200
+  );
+  await page.goto('/cart');
+  await cartLoad;
+
+  await page.getByRole('link', { name: 'Proceed to checkout' }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
+
+  await expect(page.getByText('Sign in to use coupons.')).toBeVisible();
+  await expect(page.locator('#checkout-step-3').getByRole('link', { name: 'Sign in' })).toBeVisible();
+  await expect(page.locator('input[name="promo"]')).toHaveCount(0);
 });

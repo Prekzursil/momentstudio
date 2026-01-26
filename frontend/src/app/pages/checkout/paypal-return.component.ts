@@ -28,19 +28,20 @@ const CHECKOUT_PAYPAL_PENDING_KEY = 'checkout_paypal_pending';
         <p class="mt-3 text-sm text-slate-700 dark:text-slate-200">{{ 'checkout.paypalCapturing' | translate }}</p>
       </div>
 
-      <div
-        *ngIf="!loading && errorMessage"
-        class="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
-      >
-        <p class="text-sm font-semibold tracking-[0.2em] uppercase">{{ 'checkout.paypalReturnTitle' | translate }}</p>
-        <p class="mt-3 text-sm">{{ errorMessage }}</p>
-        <div class="mt-5 flex flex-wrap gap-3">
-          <app-button routerLink="/checkout" [label]="'checkout.backToCheckout' | translate"></app-button>
-          <app-button routerLink="/cart" variant="ghost" [label]="'checkout.backToCart' | translate"></app-button>
-        </div>
-      </div>
-    </app-container>
-  `
+	      <div
+	        *ngIf="!loading && errorMessage"
+	        class="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+	      >
+	        <p class="text-sm font-semibold tracking-[0.2em] uppercase">{{ 'checkout.paypalReturnTitle' | translate }}</p>
+	        <p class="mt-3 text-sm">{{ errorMessage }}</p>
+	        <div class="mt-5 flex flex-wrap gap-3">
+	          <app-button [label]="'checkout.retry' | translate" (action)="retry()"></app-button>
+	          <app-button routerLink="/checkout" variant="ghost" [label]="'checkout.backToCheckout' | translate"></app-button>
+	          <app-button routerLink="/contact" variant="ghost" [label]="'nav.contact' | translate"></app-button>
+	        </div>
+	      </div>
+	    </app-container>
+	  `
 })
 export class PayPalReturnComponent implements OnInit {
   crumbs = [
@@ -51,6 +52,7 @@ export class PayPalReturnComponent implements OnInit {
 
   loading = true;
   errorMessage = '';
+  private token = '';
 
   constructor(
     private route: ActivatedRoute,
@@ -85,12 +87,25 @@ export class PayPalReturnComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    const token = this.route.snapshot.queryParamMap.get('token') || '';
-    if (!token) {
+    this.token = this.route.snapshot.queryParamMap.get('token') || '';
+    if (!this.token) {
       this.loading = false;
       this.errorMessage = this.translate.instant('checkout.paypalMissingToken');
       return;
     }
+    this.capturePayment();
+  }
+
+  retry(): void {
+    if (this.loading) return;
+    if (!this.token) return;
+    this.capturePayment();
+  }
+
+  private capturePayment(): void {
+    const token = this.token;
+    this.loading = true;
+    this.errorMessage = '';
 
     const orderId = this.pendingOrderId();
     const payload: { paypal_order_id: string; order_id?: string } = { paypal_order_id: token };

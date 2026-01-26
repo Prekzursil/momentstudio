@@ -6,11 +6,13 @@ import { Subscription } from 'rxjs';
 import { AdminService, ContentBlockVersionListItem, ContentBlockVersionRead } from '../../../core/admin.service';
 import { ToastService } from '../../../core/toast.service';
 import { diffLines, Change } from 'diff';
+import { ErrorStateComponent } from '../../../shared/error-state.component';
+import { extractRequestId } from '../../../shared/http-error';
 
 @Component({
   selector: 'app-content-revisions',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule, DatePipe],
+  imports: [CommonModule, FormsModule, TranslateModule, DatePipe, ErrorStateComponent],
   template: `
     <div class="grid gap-3">
       <div class="flex items-center justify-between gap-3">
@@ -29,9 +31,13 @@ import { diffLines, Change } from 'diff';
         </button>
       </div>
 
-      <div *ngIf="error()" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
-        {{ error() }}
-      </div>
+      <app-error-state
+        *ngIf="error()"
+        [message]="error()!"
+        [requestId]="errorRequestId()"
+        [showRetry]="true"
+        (retry)="reload()"
+      ></app-error-state>
 
       <div *ngIf="loading()" class="text-sm text-slate-600 dark:text-slate-300">
         {{ 'adminUi.content.revisions.loading' | translate }}
@@ -58,7 +64,7 @@ import { diffLines, Change } from 'diff';
         <div *ngIf="selectedRead() && currentRead()" class="grid gap-2">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-              {{ 'adminUi.content.revisions.diffVsCurrent' | translate: { version: currentRead()!.version } }}
+              {{ 'adminUi.content.revisions.diffVsCurrent' | translate: { from: selectedRead()!.version, to: currentRead()!.version } }}
             </p>
             <button
               type="button"
@@ -88,6 +94,7 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
 
   loading = signal(false);
   error = signal<string | null>(null);
+  errorRequestId = signal<string | null>(null);
   versions = signal<ContentBlockVersionListItem[]>([]);
   selectedRead = signal<ContentBlockVersionRead | null>(null);
   currentRead = signal<ContentBlockVersionRead | null>(null);
@@ -124,6 +131,7 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
     if (!key) return;
     this.loading.set(true);
     this.error.set(null);
+    this.errorRequestId.set(null);
     this.versions.set([]);
     this.selectedRead.set(null);
     this.currentRead.set(null);
@@ -138,14 +146,28 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
       }
     };
 
+    const maybeInitSelection = (): void => {
+      if (pendingCurrent) return;
+      if (this.selectedVersion) return;
+      const items = this.versions();
+      if (!items?.length) return;
+      const current = this.currentRead();
+      const latest = items[0]?.version;
+      if (!latest) return;
+      let nextVersion = latest;
+      if (current?.status === 'draft') {
+        const published = items.find((v) => v.status === 'published');
+        if (published?.version) nextVersion = published.version;
+      }
+      this.selectedVersion = nextVersion;
+      this.loadSelectedVersion();
+    };
+
     this.subs.add(
       this.admin.listContentVersions(key).subscribe({
         next: (items) => {
           this.versions.set(items || []);
-          if (items?.length) {
-            this.selectedVersion = items[0].version;
-            this.loadSelectedVersion();
-          }
+          maybeInitSelection();
           pendingVersions = false;
           finish();
         },
@@ -154,6 +176,7 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
             this.versions.set([]);
           } else {
             this.error.set(this.t('adminUi.content.revisions.errors.load'));
+            this.errorRequestId.set(extractRequestId(err));
           }
           pendingVersions = false;
           finish();
@@ -162,38 +185,43 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
     );
 
     this.subs.add(
-      this.admin.getContent(key).subscribe({
-        next: (block) => {
-          const version = block?.version;
-          if (!version) {
+        this.admin.getContent(key).subscribe({
+          next: (block) => {
+            const version = block?.version;
+            if (!version) {
+              pendingCurrent = false;
+              maybeInitSelection();
+              finish();
+              return;
+            }
+            this.subs.add(
+              this.admin.getContentVersion(key, version).subscribe({
+                next: (read) => {
+                  this.currentRead.set(read);
+                  this.recomputeDiff();
+                  pendingCurrent = false;
+                  maybeInitSelection();
+                  finish();
+                },
+                error: (err) => {
+                  this.error.set(this.t('adminUi.content.revisions.errors.loadVersion'));
+                  this.errorRequestId.set(extractRequestId(err));
+                  pendingCurrent = false;
+                  maybeInitSelection();
+                  finish();
+                }
+              })
+            );
+          },
+          error: () => {
+            // Missing content blocks simply have no history yet.
+            this.currentRead.set(null);
             pendingCurrent = false;
+            maybeInitSelection();
             finish();
-            return;
           }
-          this.subs.add(
-            this.admin.getContentVersion(key, version).subscribe({
-              next: (read) => {
-                this.currentRead.set(read);
-                this.recomputeDiff();
-                pendingCurrent = false;
-                finish();
-              },
-              error: () => {
-                this.error.set(this.t('adminUi.content.revisions.errors.loadVersion'));
-                pendingCurrent = false;
-                finish();
-              }
-            })
-          );
-        },
-        error: () => {
-          // Missing content blocks simply have no history yet.
-          this.currentRead.set(null);
-          pendingCurrent = false;
-          finish();
-        }
-      })
-    );
+        })
+      );
   }
 
   loadSelectedVersion(): void {
@@ -237,8 +265,8 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
       this.diffParts = [];
       return;
     }
-    const from = this.snapshotText(current);
-    const to = this.snapshotText(selected);
+    const from = this.snapshotText(selected);
+    const to = this.snapshotText(current);
     this.diffParts = diffLines(from, to);
   }
 
@@ -255,6 +283,7 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
       `status: ${read.status}`,
       `lang: ${read.lang ?? 'null'}`,
       `published_at: ${read.published_at ?? 'null'}`,
+      `published_until: ${read.published_until ?? 'null'}`,
       `meta:\n${meta}`,
       `body_markdown:\n${read.body_markdown || ''}`,
       `translations:\n${translations.length ? translations.join('\n\n') : '[]'}`

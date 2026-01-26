@@ -270,6 +270,13 @@ async def authenticate_user(session: AsyncSession, identifier: str, password: st
     if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
         await self_service.execute_account_deletion(session, user)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+    locked_until = getattr(user, "locked_until", None)
+    if locked_until and locked_until.tzinfo is None:
+        locked_until = locked_until.replace(tzinfo=timezone.utc)
+    if locked_until and locked_until > datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account temporarily locked")
+    if bool(getattr(user, "password_reset_required", False)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Password reset required")
     return user
 
 
@@ -758,6 +765,7 @@ async def confirm_reset_token(session: AsyncSession, token: str, new_password: s
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     user.hashed_password = security.hash_password(new_password)
+    user.password_reset_required = False
     reset.used = True
     await _revoke_other_reset_tokens(session, user.id)
     session.add_all([user, reset])
@@ -780,6 +788,7 @@ async def create_refresh_session(
     persistent: bool = True,
     user_agent: str | None = None,
     ip_address: str | None = None,
+    country_code: str | None = None,
 ) -> RefreshSession:
     jti = secrets.token_hex(16)
     expires_at = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_exp_days)
@@ -791,10 +800,37 @@ async def create_refresh_session(
         revoked=False,
         user_agent=_truncate(user_agent, 255),
         ip_address=_truncate(ip_address, 45),
+        country_code=_truncate(country_code, 8),
     )
     session.add(refresh_session)
     await session.flush()
     return refresh_session
+
+
+_DEVICE_UA_RE = re.compile(r"\d+(?:\.\d+)*")
+
+
+def _device_key_from_user_agent(user_agent: str | None) -> str:
+    ua = (user_agent or "").strip()
+    if not ua:
+        return "unknown"
+    normalized = _DEVICE_UA_RE.sub("x", ua)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized[:255] or "unknown"
+
+
+async def has_seen_refresh_device(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    user_agent: str | None,
+) -> bool:
+    device_key = _device_key_from_user_agent(user_agent)
+    rows = (
+        await session.execute(select(RefreshSession.user_agent).where(RefreshSession.user_id == user_id))
+    ).scalars()
+    existing_keys = {_device_key_from_user_agent(ua) for ua in rows}
+    return device_key in existing_keys
 
 
 async def issue_tokens_for_user(
@@ -804,9 +840,22 @@ async def issue_tokens_for_user(
     persistent: bool = True,
     user_agent: str | None = None,
     ip_address: str | None = None,
+    country_code: str | None = None,
 ) -> dict[str, str]:
+    locked_until = getattr(user, "locked_until", None)
+    if locked_until and locked_until.tzinfo is None:
+        locked_until = locked_until.replace(tzinfo=timezone.utc)
+    if locked_until and locked_until > datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account temporarily locked")
+    if bool(getattr(user, "password_reset_required", False)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Password reset required")
     refresh_session = await create_refresh_session(
-        session, user.id, persistent=persistent, user_agent=user_agent, ip_address=ip_address
+        session,
+        user.id,
+        persistent=persistent,
+        user_agent=user_agent,
+        ip_address=ip_address,
+        country_code=country_code,
     )
     access = security.create_access_token(str(user.id), refresh_session.jti)
     refresh = security.create_refresh_token(str(user.id), refresh_session.jti, refresh_session.expires_at)

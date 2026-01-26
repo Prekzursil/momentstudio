@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
+import { ErrorStateComponent } from '../../shared/error-state.component';
 import { InputComponent } from '../../shared/input.component';
 import { RichEditorComponent } from '../../shared/rich-editor.component';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
@@ -22,18 +23,24 @@ import {
   AdminCategory,
   AdminProductDetail,
   FeaturedCollection,
+  ContentImageAssetRead,
   ContentBlockVersionListItem,
   ContentBlockVersionRead,
   ContentPageListItem,
-  ContentRedirectRead
+  ContentRedirectRead,
+  ContentRedirectImportResult,
+  StructuredDataValidationResponse,
+  ContentLinkCheckIssue
 } from '../../core/admin.service';
 import { AdminBlogComment, BlogService } from '../../core/blog.service';
-import { FxAdminService, FxAdminStatus } from '../../core/fx-admin.service';
+import { FxAdminService, FxAdminStatus, FxOverrideAuditEntry } from '../../core/fx-admin.service';
+import { TaxGroupRead, TaxesAdminService } from '../../core/taxes-admin.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { MarkdownService } from '../../core/markdown.service';
 import { AuthService } from '../../core/auth.service';
+import { appConfig } from '../../core/app-config';
 import { diffLines } from 'diff';
 import { formatIdentity } from '../../shared/user-identity';
 import { ContentRevisionsComponent } from './shared/content-revisions.component';
@@ -43,6 +50,7 @@ import { CarouselBlockComponent } from '../../shared/carousel-block.component';
 
 type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
 type UiLang = 'en' | 'ro';
+type ContentStatusUi = 'draft' | 'review' | 'published';
 
 type HomeSectionId =
   | 'featured_products'
@@ -61,6 +69,8 @@ type HomeGalleryImageDraft = {
   url: string;
   alt: LocalizedText;
   caption: LocalizedText;
+  focal_x: number;
+  focal_y: number;
 };
 
 type SlideDraft = {
@@ -73,6 +83,8 @@ type SlideDraft = {
   variant: 'full' | 'split';
   size: 'S' | 'M' | 'L';
   text_style: 'light' | 'dark';
+  focal_x: number;
+  focal_y: number;
 };
 
 type CarouselSettingsDraft = {
@@ -91,6 +103,8 @@ type HomeBlockDraft = {
   body_markdown: LocalizedText;
   url: string;
   link_url: string;
+  focal_x: number;
+  focal_y: number;
   alt: LocalizedText;
   caption: LocalizedText;
   images: HomeGalleryImageDraft[];
@@ -111,6 +125,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
     FormsModule,
     BreadcrumbComponent,
     ButtonComponent,
+    ErrorStateComponent,
     InputComponent,
     RichEditorComponent,
     LocalizedCurrencyPipe,
@@ -124,9 +139,13 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
  template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-      <div *ngIf="error()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
-        {{ error() }}
-      </div>
+      <app-error-state
+        *ngIf="error()"
+        [message]="error()!"
+        [requestId]="errorRequestId()"
+        [showRetry]="true"
+        (retry)="retryLoadAll()"
+      ></app-error-state>
       <div class="grid gap-6" *ngIf="!loading(); else loadingTpl">
 	          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
 	            <div class="flex items-center justify-between">
@@ -280,6 +299,41 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
               ></app-input>
             </div>
 
+            <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950">
+              <p class="text-xs font-semibold text-slate-600 uppercase tracking-[0.2em] dark:text-slate-300">
+                {{ 'adminUi.site.checkout.roundingTitle' | translate }}
+              </p>
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.site.checkout.roundingMode' | translate }}
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="checkoutSettingsForm.money_rounding"
+                >
+                  <option value="half_up">{{ 'adminUi.site.checkout.roundingModeHalfUp' | translate }}</option>
+                  <option value="half_even">{{ 'adminUi.site.checkout.roundingModeHalfEven' | translate }}</option>
+                  <option value="up">{{ 'adminUi.site.checkout.roundingModeUp' | translate }}</option>
+                  <option value="down">{{ 'adminUi.site.checkout.roundingModeDown' | translate }}</option>
+                </select>
+                <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.site.checkout.roundingHint' | translate }}
+                </span>
+              </label>
+            </div>
+
+            <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950">
+              <p class="text-xs font-semibold text-slate-600 uppercase tracking-[0.2em] dark:text-slate-300">
+                {{ 'adminUi.site.checkout.phoneRequirementsTitle' | translate }}
+              </p>
+              <label class="flex items-center gap-2">
+                <input type="checkbox" [(ngModel)]="checkoutSettingsForm.phone_required_home" />
+                <span class="text-slate-700 dark:text-slate-200">{{ 'adminUi.site.checkout.phoneRequiredHome' | translate }}</span>
+              </label>
+              <label class="flex items-center gap-2">
+                <input type="checkbox" [(ngModel)]="checkoutSettingsForm.phone_required_locker" />
+                <span class="text-slate-700 dark:text-slate-200">{{ 'adminUi.site.checkout.phoneRequiredLocker' | translate }}</span>
+              </label>
+            </div>
+
             <div class="grid gap-3 text-sm">
               <label class="flex items-center gap-2">
                 <input type="checkbox" [(ngModel)]="checkoutSettingsForm.fee_enabled" />
@@ -400,12 +454,125 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                 ></textarea>
               </label>
             </div>
-            <div class="flex items-center gap-2 text-sm">
-              <app-button size="sm" [label]="'adminUi.site.seo.save' | translate" (action)="saveSeo()"></app-button>
-              <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="seoMessage">{{ seoMessage }}</span>
-              <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="seoError">{{ seoError }}</span>
-            </div>
-          </section>
+	            <div class="flex items-center gap-2 text-sm">
+	              <app-button size="sm" [label]="'adminUi.site.seo.save' | translate" (action)="saveSeo()"></app-button>
+	              <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="seoMessage">{{ seoMessage }}</span>
+	              <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="seoError">{{ seoError }}</span>
+	            </div>
+
+	            <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+	              <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+	                {{ 'adminUi.site.seo.sitemapPreview.title' | translate }}
+	              </summary>
+	              <div class="mt-3 grid gap-3">
+	                <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.site.seo.sitemapPreview.hint' | translate }}</p>
+	                <div class="flex flex-wrap items-center gap-2">
+	                  <app-button
+	                    size="sm"
+	                    variant="ghost"
+	                    [disabled]="sitemapPreviewLoading"
+	                    [label]="'adminUi.site.seo.sitemapPreview.load' | translate"
+	                    (action)="loadSitemapPreview()"
+	                  ></app-button>
+	                  <span *ngIf="sitemapPreviewError" class="text-xs text-rose-700 dark:text-rose-300">{{ sitemapPreviewError }}</span>
+	                </div>
+	                <div *ngIf="sitemapPreviewLoading" class="text-sm text-slate-600 dark:text-slate-300">
+	                  {{ 'notifications.loading' | translate }}
+	                </div>
+	                <div *ngIf="!sitemapPreviewLoading && sitemapPreviewByLang" class="grid gap-3 md:grid-cols-2">
+	                  <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+	                    <h3 class="font-semibold text-slate-900 dark:text-slate-50">
+	                      EN ({{ sitemapPreviewByLang['en']?.length || 0 }})
+	                    </h3>
+	                    <div class="mt-2 grid gap-1 text-[11px]">
+	                      <a
+	                        *ngFor="let url of (sitemapPreviewByLang['en'] || [])"
+	                        [href]="url"
+	                        target="_blank"
+	                        rel="noopener noreferrer"
+	                        class="truncate text-indigo-600 hover:underline dark:text-indigo-300"
+	                      >
+	                        {{ url }}
+	                      </a>
+	                    </div>
+	                  </div>
+	                  <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+	                    <h3 class="font-semibold text-slate-900 dark:text-slate-50">
+	                      RO ({{ sitemapPreviewByLang['ro']?.length || 0 }})
+	                    </h3>
+	                    <div class="mt-2 grid gap-1 text-[11px]">
+	                      <a
+	                        *ngFor="let url of (sitemapPreviewByLang['ro'] || [])"
+	                        [href]="url"
+	                        target="_blank"
+	                        rel="noopener noreferrer"
+	                        class="truncate text-indigo-600 hover:underline dark:text-indigo-300"
+	                      >
+	                        {{ url }}
+	                      </a>
+	                    </div>
+	                  </div>
+	                </div>
+	              </div>
+	            </details>
+
+	            <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+	              <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+	                {{ 'adminUi.site.seo.structuredData.title' | translate }}
+	              </summary>
+	              <div class="mt-3 grid gap-3">
+	                <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.site.seo.structuredData.hint' | translate }}</p>
+	                <div class="flex flex-wrap items-center gap-2">
+	                  <app-button
+	                    size="sm"
+	                    variant="ghost"
+	                    [disabled]="structuredDataLoading"
+	                    [label]="'adminUi.site.seo.structuredData.run' | translate"
+	                    (action)="runStructuredDataValidation()"
+	                  ></app-button>
+	                  <span *ngIf="structuredDataError" class="text-xs text-rose-700 dark:text-rose-300">{{ structuredDataError }}</span>
+	                </div>
+	                <div *ngIf="structuredDataLoading" class="text-sm text-slate-600 dark:text-slate-300">
+	                  {{ 'notifications.loading' | translate }}
+	                </div>
+	                <div *ngIf="!structuredDataLoading && structuredDataResult" class="grid gap-3">
+	                  <p class="text-xs text-slate-700 dark:text-slate-200">
+	                    {{ 'adminUi.site.seo.structuredData.summary' | translate:{ products: structuredDataResult.checked_products, pages: structuredDataResult.checked_pages, errors: structuredDataResult.errors, warnings: structuredDataResult.warnings } }}
+	                  </p>
+	                  <div *ngIf="structuredDataResult.issues?.length; else noStructuredDataIssues" class="grid gap-2">
+	                    <div
+	                      *ngFor="let issue of structuredDataResult.issues"
+	                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-800 dark:bg-slate-900"
+	                    >
+	                      <div class="flex flex-wrap items-center justify-between gap-2">
+	                        <span
+	                          class="font-semibold"
+	                          [class.text-rose-700]="issue.severity === 'error'"
+	                          [class.dark:text-rose-300]="issue.severity === 'error'"
+	                          [class.text-amber-800]="issue.severity === 'warning'"
+	                          [class.dark:text-amber-200]="issue.severity === 'warning'"
+	                        >
+	                          {{ issue.severity.toUpperCase() }}
+	                        </span>
+	                        <a
+	                          class="font-mono text-indigo-600 hover:underline dark:text-indigo-300"
+	                          [href]="structuredDataIssueUrl(issue)"
+	                          target="_blank"
+	                          rel="noopener noreferrer"
+	                        >
+	                          {{ issue.entity_type }} · {{ issue.entity_key }}
+	                        </a>
+	                      </div>
+	                      <p class="mt-1 text-slate-700 dark:text-slate-200">{{ issue.message }}</p>
+	                    </div>
+	                  </div>
+	                  <ng-template #noStructuredDataIssues>
+	                    <p class="text-sm text-emerald-700 dark:text-emerald-300">{{ 'adminUi.site.seo.structuredData.ok' | translate }}</p>
+	                  </ng-template>
+	                </div>
+	              </div>
+	            </details>
+	          </section>
 
           <section *ngIf="section() === 'pages'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
@@ -495,6 +662,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                         [(ngModel)]="newCustomPageStatus"
                       >
                         <option [ngValue]="'draft'">{{ 'adminUi.status.draft' | translate }}</option>
+                        <option [ngValue]="'review'">{{ 'adminUi.status.review' | translate }}</option>
                         <option [ngValue]="'published'">{{ 'adminUi.status.published' | translate }}</option>
                       </select>
                     </label>
@@ -504,6 +672,33 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                       [disabled]="creatingCustomPage || !(newCustomPageTitle || '').trim()"
                       (action)="createCustomPage()"
                     ></app-button>
+                  </div>
+
+                  <div class="grid gap-3 md:grid-cols-2">
+                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {{ 'adminUi.site.pages.builder.publishAtOptional' | translate }}
+                      <input
+                        type="datetime-local"
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        [(ngModel)]="newCustomPagePublishedAt"
+                        [disabled]="newCustomPageStatus !== 'published'"
+                      />
+                      <span class="text-xs text-slate-500 dark:text-slate-400">
+                        {{ 'adminUi.site.pages.builder.publishAtHint' | translate }}
+                      </span>
+                    </label>
+                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {{ 'adminUi.site.pages.builder.unpublishAtOptional' | translate }}
+                      <input
+                        type="datetime-local"
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        [(ngModel)]="newCustomPagePublishedUntil"
+                        [disabled]="newCustomPageStatus !== 'published'"
+                      />
+                      <span class="text-xs text-slate-500 dark:text-slate-400">
+                        {{ 'adminUi.site.pages.builder.unpublishAtHint' | translate }}
+                      </span>
+                    </label>
                   </div>
 
                   <div *ngIf="contentPagesError" class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
@@ -519,7 +714,15 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                         (ngModelChange)="onPageBlocksKeyChange($event)"
                       >
                         <ng-container *ngIf="contentPages.length; else defaultPages">
-                          <option *ngFor="let p of contentPages" [ngValue]="p.key">{{ p.title || p.slug }} · {{ p.slug }}</option>
+                          <option *ngFor="let p of contentPages" [ngValue]="p.key">
+                            {{ p.title || p.slug }} · {{ p.slug }}
+                            <ng-container *ngIf="p.needs_translation_en || p.needs_translation_ro">
+                              ·
+                              <ng-container *ngIf="p.needs_translation_en">EN</ng-container>
+                              <ng-container *ngIf="p.needs_translation_en && p.needs_translation_ro">/</ng-container>
+                              <ng-container *ngIf="p.needs_translation_ro">RO</ng-container>
+                            </ng-container>
+                          </option>
                         </ng-container>
                         <ng-template #defaultPages>
                           <option [ngValue]="'page.about'">{{ 'adminUi.site.pages.aboutLabel' | translate }}</option>
@@ -551,6 +754,34 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                       </label>
                       <app-button size="sm" [label]="'adminUi.actions.add' | translate" (action)="addPageBlock(pageBlocksKey)"></app-button>
                     </div>
+                  </div>
+
+                  <div
+                    *ngIf="contentPages.length"
+                    class="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 bg-white/60 px-3 py-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200"
+                  >
+                    <span class="font-semibold">{{ 'adminUi.site.pages.builder.translation.title' | translate }}</span>
+                    <label class="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        [disabled]="pageBlocksTranslationSaving[pageBlocksKey]"
+                        [checked]="pageBlocksNeedsTranslationEn[pageBlocksKey]"
+                        (change)="togglePageNeedsTranslation(pageBlocksKey, 'en', $event)"
+                      />
+                      EN {{ 'adminUi.site.pages.builder.translation.needsLabel' | translate }}
+                    </label>
+                    <label class="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        [disabled]="pageBlocksTranslationSaving[pageBlocksKey]"
+                        [checked]="pageBlocksNeedsTranslationRo[pageBlocksKey]"
+                        (change)="togglePageNeedsTranslation(pageBlocksKey, 'ro', $event)"
+                      />
+                      RO {{ 'adminUi.site.pages.builder.translation.needsLabel' | translate }}
+                    </label>
+                    <span *ngIf="pageBlocksTranslationSaving[pageBlocksKey]" class="text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.site.pages.builder.translation.saving' | translate }}
+                    </span>
                   </div>
 
                   <div class="grid gap-2">
@@ -640,11 +871,34 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                 />
                               </label>
                             </div>
+                            <div class="grid gap-3 sm:grid-cols-2">
+                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                {{ 'adminUi.home.sections.fields.focalX' | translate }}
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  [(ngModel)]="block.focal_x"
+                                />
+                              </label>
+                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                {{ 'adminUi.home.sections.fields.focalY' | translate }}
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  [(ngModel)]="block.focal_y"
+                                />
+                              </label>
+                            </div>
                             <img
                               *ngIf="(block.url || '').trim()"
                               class="mt-2 w-full max-h-[260px] rounded-2xl border border-slate-200 object-cover dark:border-slate-800"
                               [src]="block.url"
                               [alt]="block.alt[infoLang] || block.title[infoLang] || ''"
+                              [style.object-position]="focalPosition(block.focal_x, block.focal_y)"
                               loading="lazy"
                             />
                             <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
@@ -657,7 +911,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                   [allowSelect]="true"
                                   [uploadKey]="pageBlocksKey"
                                   [initialKey]="pageBlocksKey"
-                                  (select)="setPageImageBlockUrl(pageBlocksKey, block.key, $event)"
+                                  (selectAsset)="setPageImageBlockUrl(pageBlocksKey, block.key, $event)"
                                 ></app-asset-library>
                               </div>
                             </details>
@@ -702,12 +956,35 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                     />
                                   </label>
                                 </div>
+                                <div class="grid gap-3 sm:grid-cols-2">
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.focalX' | translate }}
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="img.focal_x"
+                                    />
+                                  </label>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.focalY' | translate }}
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="img.focal_y"
+                                    />
+                                  </label>
+                                </div>
                                 <div class="flex items-center gap-3">
                                   <img
                                     *ngIf="(img.url || '').trim()"
                                     class="h-16 w-16 rounded-xl border border-slate-200 object-cover dark:border-slate-800"
                                     [src]="img.url"
                                     [alt]="img.alt[infoLang] || ''"
+                                    [style.object-position]="focalPosition(img.focal_x, img.focal_y)"
                                     loading="lazy"
                                   />
                                 </div>
@@ -723,7 +1000,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                     [allowSelect]="true"
                                     [uploadKey]="pageBlocksKey"
                                     [initialKey]="pageBlocksKey"
-                                    (select)="addPageGalleryImageFromAsset(pageBlocksKey, block.key, $event)"
+                                    (selectAsset)="addPageGalleryImageFromAsset(pageBlocksKey, block.key, $event)"
                                   ></app-asset-library>
                                 </div>
                               </details>
@@ -775,6 +1052,26 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                     [(ngModel)]="block.slide.cta_url"
                                   />
                                 </label>
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.sections.fields.focalX' | translate }}
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="block.slide.focal_x"
+                                  />
+                                </label>
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.sections.fields.focalY' | translate }}
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="block.slide.focal_y"
+                                  />
+                                </label>
                               </div>
 
                               <div class="grid gap-3 md:grid-cols-3">
@@ -821,7 +1118,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                     [allowSelect]="true"
                                     [uploadKey]="pageBlocksKey"
                                     [initialKey]="pageBlocksKey"
-                                    (select)="setPageBannerSlideImage(pageBlocksKey, block.key, $event)"
+                                    (selectAsset)="setPageBannerSlideImage(pageBlocksKey, block.key, $event)"
                                   ></app-asset-library>
                                 </div>
                               </details>
@@ -882,6 +1179,26 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                         [(ngModel)]="slide.subheadline[infoLang]"
                                       />
                                     </label>
+                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                      {{ 'adminUi.home.sections.fields.focalX' | translate }}
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                        [(ngModel)]="slide.focal_x"
+                                      />
+                                    </label>
+                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                      {{ 'adminUi.home.sections.fields.focalY' | translate }}
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                        [(ngModel)]="slide.focal_y"
+                                      />
+                                    </label>
                                   </div>
                                   <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
                                     <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
@@ -893,7 +1210,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                         [allowSelect]="true"
                                         [uploadKey]="pageBlocksKey"
                                         [initialKey]="pageBlocksKey"
-                                        (select)="setPageCarouselSlideImage(pageBlocksKey, block.key, idx, $event)"
+                                        (selectAsset)="setPageCarouselSlideImage(pageBlocksKey, block.key, idx, $event)"
                                       ></app-asset-library>
                                     </div>
                                   </details>
@@ -936,14 +1253,54 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                           </ng-container>
                         </ng-container>
                       </div>
-                    </div>
                   </div>
+                </div>
 
-                  <div class="flex items-center gap-2">
-                    <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="savePageBlocks(pageBlocksKey)"></app-button>
-                    <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="pageBlocksMessage[pageBlocksKey]">
-                      {{ pageBlocksMessage[pageBlocksKey] }}
-                    </span>
+                <div class="grid gap-3 md:grid-cols-3 items-end">
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.site.pages.builder.status' | translate }}
+                    <select
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [(ngModel)]="pageBlocksStatus[pageBlocksKey]"
+                    >
+                      <option [ngValue]="'draft'">{{ 'adminUi.status.draft' | translate }}</option>
+                      <option [ngValue]="'review'">{{ 'adminUi.status.review' | translate }}</option>
+                      <option [ngValue]="'published'">{{ 'adminUi.status.published' | translate }}</option>
+                    </select>
+                  </label>
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.site.pages.builder.publishAtOptional' | translate }}
+                    <input
+                      type="datetime-local"
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [(ngModel)]="pageBlocksPublishedAt[pageBlocksKey]"
+                      [disabled]="pageBlocksStatus[pageBlocksKey] !== 'published'"
+                    />
+                  </label>
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.site.pages.builder.unpublishAtOptional' | translate }}
+                    <input
+                      type="datetime-local"
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [(ngModel)]="pageBlocksPublishedUntil[pageBlocksKey]"
+                      [disabled]="pageBlocksStatus[pageBlocksKey] !== 'published'"
+                    />
+                  </label>
+                </div>
+
+                <div class="grid gap-1">
+                  <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    <input type="checkbox" [(ngModel)]="pageBlocksRequiresAuth[pageBlocksKey]" />
+                    <span>{{ 'adminUi.site.pages.builder.requiresLogin' | translate }}</span>
+                  </label>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.site.pages.builder.requiresLoginHint' | translate }}</p>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="savePageBlocks(pageBlocksKey)"></app-button>
+                  <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="pageBlocksMessage[pageBlocksKey]">
+                    {{ pageBlocksMessage[pageBlocksKey] }}
+                  </span>
                     <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="pageBlocksError[pageBlocksKey]">
                       {{ pageBlocksError[pageBlocksKey] }}
                     </span>
@@ -961,6 +1318,32 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                   <div class="flex flex-wrap gap-2 items-end">
                     <app-input [label]="'adminUi.site.pages.redirects.search' | translate" [(value)]="redirectsQuery"></app-input>
                     <app-button size="sm" variant="ghost" [label]="'adminUi.actions.search' | translate" (action)="loadContentRedirects(true)"></app-button>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.site.pages.redirects.export' | translate"
+                      [disabled]="redirectsExporting"
+                      (action)="exportContentRedirects()"
+                    ></app-button>
+                    <label class="grid gap-1 text-xs font-medium text-slate-700 dark:text-slate-200">
+                      {{ 'adminUi.site.pages.redirects.import' | translate }}
+                      <input
+                        type="file"
+                        accept=".csv,text/csv"
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:file:bg-slate-700 dark:file:text-slate-100"
+                        [disabled]="redirectsImporting"
+                        (change)="importContentRedirects($event)"
+                      />
+                    </label>
+                  </div>
+                  <div *ngIf="redirectsImportResult" class="rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+                    <p class="font-semibold">{{ 'adminUi.site.pages.redirects.importResult' | translate:{ created: redirectsImportResult.created, updated: redirectsImportResult.updated, skipped: redirectsImportResult.skipped } }}</p>
+                    <div *ngIf="redirectsImportResult.errors?.length" class="mt-1 grid gap-1">
+                      <p class="text-rose-700 dark:text-rose-300">{{ 'adminUi.site.pages.redirects.importErrors' | translate }}</p>
+                      <p *ngFor="let e of redirectsImportResult.errors" class="text-[11px] text-rose-700 dark:text-rose-300">
+                        #{{ e.line }}: {{ e.error }}
+                      </p>
+                    </div>
                   </div>
 
                   <div *ngIf="redirectsError" class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
@@ -988,6 +1371,12 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                         </p>
                         <p *ngIf="!r.target_exists" class="text-xs text-rose-700 dark:text-rose-300">
                           {{ 'adminUi.site.pages.redirects.stale' | translate }}
+                        </p>
+                        <p *ngIf="r.chain_error === 'loop'" class="text-xs text-rose-700 dark:text-rose-300">
+                          {{ 'adminUi.site.pages.redirects.loop' | translate }}
+                        </p>
+                        <p *ngIf="r.chain_error === 'too_deep'" class="text-xs text-amber-800 dark:text-amber-200">
+                          {{ 'adminUi.site.pages.redirects.tooDeep' | translate }}
                         </p>
                         <p class="text-[11px] text-slate-500 dark:text-slate-400">{{ r.created_at | date: 'short' }}</p>
                       </div>
@@ -1035,6 +1424,51 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     </select>
                   </label>
                   <app-content-revisions [contentKey]="pagesRevisionKey" [titleKey]="pagesRevisionTitleKey()"></app-content-revisions>
+                </div>
+              </details>
+
+              <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.content.linkCheck.title' | translate }}
+                </summary>
+                <div class="mt-3 grid gap-3">
+                  <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.content.linkCheck.hint' | translate }}</p>
+
+                  <div class="flex flex-wrap gap-2 items-end">
+                    <app-input [label]="'adminUi.content.linkCheck.key' | translate" [(value)]="linkCheckKey"></app-input>
+                    <app-button size="sm" [label]="'adminUi.content.linkCheck.run' | translate" (action)="runLinkCheck()"></app-button>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.content.linkCheck.useSelectedPage' | translate"
+                      (action)="runLinkCheck(pageBlocksKey)"
+                    ></app-button>
+                  </div>
+
+                  <div *ngIf="linkCheckError" class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+                    {{ linkCheckError }}
+                  </div>
+
+                  <div *ngIf="linkCheckLoading" class="text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.content.linkCheck.loading' | translate }}
+                  </div>
+
+                  <div *ngIf="!linkCheckLoading && !linkCheckError && linkCheckIssues.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.content.linkCheck.empty' | translate }}
+                  </div>
+
+                  <div *ngIf="!linkCheckLoading && linkCheckIssues.length" class="grid gap-2">
+                    <div
+                      *ngFor="let issue of linkCheckIssues"
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900"
+                    >
+                      <p class="text-sm font-medium text-slate-900 dark:text-slate-50">{{ issue.reason }}</p>
+                      <p class="mt-1 text-xs text-slate-600 dark:text-slate-300 font-mono break-all">{{ issue.url }}</p>
+                      <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                        {{ issue.kind }} · {{ issue.source }} · {{ issue.field }}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </details>
             </div>
@@ -1174,6 +1608,26 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                               [(ngModel)]="block.caption[homeBlocksLang]"
                             />
                           </label>
+                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                            {{ 'adminUi.home.sections.fields.focalX' | translate }}
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                              [(ngModel)]="block.focal_x"
+                            />
+                          </label>
+                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                            {{ 'adminUi.home.sections.fields.focalY' | translate }}
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                              [(ngModel)]="block.focal_y"
+                            />
+                          </label>
                         </div>
 
                         <details class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
@@ -1185,14 +1639,20 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                               [allowUpload]="true"
                               [allowSelect]="true"
                               [initialKey]="'site.assets'"
-                              (select)="setImageBlockUrl(block.key, $event)"
+                              (selectAsset)="setImageBlockUrl(block.key, $event)"
                             ></app-asset-library>
                           </div>
                         </details>
 
                         <div *ngIf="block.url" class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
                           <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.fields.preview' | translate }}</p>
-                          <img class="mt-3 w-full max-h-[260px] rounded-2xl object-cover" [src]="block.url" [alt]="block.alt[homeBlocksLang] || block.title[homeBlocksLang] || ''" loading="lazy" />
+                          <img
+                            class="mt-3 w-full max-h-[260px] rounded-2xl object-cover"
+                            [src]="block.url"
+                            [alt]="block.alt[homeBlocksLang] || block.title[homeBlocksLang] || ''"
+                            [style.object-position]="focalPosition(block.focal_x, block.focal_y)"
+                            loading="lazy"
+                          />
                         </div>
                       </ng-container>
 
@@ -1235,9 +1695,35 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                     [(ngModel)]="img.caption[homeBlocksLang]"
                                   />
                                 </label>
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.sections.fields.focalX' | translate }}
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="img.focal_x"
+                                  />
+                                </label>
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.sections.fields.focalY' | translate }}
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="img.focal_y"
+                                  />
+                                </label>
                               </div>
                               <div *ngIf="img.url" class="flex items-center gap-3">
-                                <img class="h-16 w-16 rounded-xl object-cover" [src]="img.url" [alt]="img.alt[homeBlocksLang] || ''" loading="lazy" />
+                                <img
+                                  class="h-16 w-16 rounded-xl object-cover"
+                                  [src]="img.url"
+                                  [alt]="img.alt[homeBlocksLang] || ''"
+                                  [style.object-position]="focalPosition(img.focal_x, img.focal_y)"
+                                  loading="lazy"
+                                />
                                 <span class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ img.url }}</span>
                               </div>
                             </div>
@@ -1252,7 +1738,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                 [allowUpload]="true"
                                 [allowSelect]="true"
                                 [initialKey]="'site.assets'"
-                                (select)="addGalleryImageFromAsset(block.key, $event)"
+                                (selectAsset)="addGalleryImageFromAsset(block.key, $event)"
                               ></app-asset-library>
                             </div>
                           </details>
@@ -1304,6 +1790,26 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                 [(ngModel)]="block.slide.cta_url"
                               />
                             </label>
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.home.sections.fields.focalX' | translate }}
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.slide.focal_x"
+                              />
+                            </label>
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.home.sections.fields.focalY' | translate }}
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.slide.focal_y"
+                              />
+                            </label>
                           </div>
 
                           <div class="grid gap-3 md:grid-cols-3">
@@ -1349,7 +1855,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                 [allowUpload]="true"
                                 [allowSelect]="true"
                                 [initialKey]="'site.assets'"
-                                (select)="setBannerSlideImage(block.key, $event)"
+                                (selectAsset)="setBannerSlideImage(block.key, $event)"
                               ></app-asset-library>
                             </div>
                           </details>
@@ -1428,6 +1934,26 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                       [(ngModel)]="slide.cta_url"
                                     />
                                   </label>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.focalX' | translate }}
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="slide.focal_x"
+                                    />
+                                  </label>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.focalY' | translate }}
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="slide.focal_y"
+                                    />
+                                  </label>
                                 </div>
 
                                 <div class="grid gap-3 md:grid-cols-3">
@@ -1473,7 +1999,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                                       [allowUpload]="true"
                                       [allowSelect]="true"
                                       [initialKey]="'site.assets'"
-                                      (select)="setCarouselSlideImage(block.key, idx, $event)"
+                                      (selectAsset)="setCarouselSlideImage(block.key, idx, $event)"
                                     ></app-asset-library>
                                   </div>
                                 </details>
@@ -1803,6 +2329,30 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     </select>
                   </label>
 
+                  <label class="mt-2 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                    <span class="font-semibold">{{ 'adminUi.lowStock.thresholdLabel' | translate }}:</span>
+                    <input
+                      type="number"
+                      min="0"
+                      class="h-8 w-28 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [ngModel]="cat.low_stock_threshold ?? ''"
+                      (ngModelChange)="updateCategoryLowStockThreshold(cat, $event)"
+                    />
+                    <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.lowStock.thresholdHint' | translate }}</span>
+                  </label>
+
+                  <label class="mt-2 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                    <span class="font-semibold">{{ 'adminUi.taxes.categoryGroupLabel' | translate }}:</span>
+                    <select
+                      class="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [ngModel]="cat.tax_group_id || ''"
+                      (ngModelChange)="updateCategoryTaxGroup(cat, $event)"
+                    >
+                      <option value="">{{ 'adminUi.taxes.categoryGroupDefault' | translate }}</option>
+                      <option *ngFor="let tg of taxGroups" [value]="tg.id">{{ tg.name }} ({{ tg.code }})</option>
+                    </select>
+                  </label>
+
 	                <div *ngIf="categoryTranslationsSlug === cat.slug" class="mt-3 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/30">
 	                  <div class="flex items-center justify-between gap-3">
 	                    <p class="text-xs font-semibold tracking-wide uppercase text-slate-600 dark:text-slate-300">
@@ -1871,6 +2421,209 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
 	                    </div>
 	                  </div>
 	                </div>
+	              </div>
+	            </div>
+
+	            <div class="grid gap-3 rounded-xl border border-slate-200 p-3 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200">
+	              <div class="flex flex-wrap items-start justify-between gap-2">
+	                <div class="grid gap-0.5">
+	                  <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+	                    {{ 'adminUi.taxes.groupsTitle' | translate }}
+	                  </p>
+	                  <p class="text-xs text-slate-500 dark:text-slate-400">
+	                    {{ 'adminUi.taxes.groupsHint' | translate }}
+	                  </p>
+	                </div>
+	                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadTaxGroups()"></app-button>
+	              </div>
+
+	              <div
+	                *ngIf="taxGroupsError"
+	                class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+	              >
+	                {{ taxGroupsError }}
+	              </div>
+
+	              <div *ngIf="taxGroupsLoading" class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.actions.loading' | translate }}</div>
+
+	              <div *ngIf="!taxGroupsLoading" class="grid gap-3">
+	                <div class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+	                  <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+	                    {{ 'adminUi.taxes.createTitle' | translate }}
+	                  </p>
+	                  <div class="grid gap-2 md:grid-cols-4">
+	                    <app-input [label]="'adminUi.taxes.code' | translate" [(value)]="taxGroupCreate.code"></app-input>
+	                    <app-input [label]="'adminUi.taxes.name' | translate" [(value)]="taxGroupCreate.name"></app-input>
+	                    <app-input [label]="'adminUi.taxes.description' | translate" [(value)]="taxGroupCreate.description"></app-input>
+	                    <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+	                      <input type="checkbox" [(ngModel)]="taxGroupCreate.is_default" />
+	                      {{ 'adminUi.taxes.default' | translate }}
+	                    </label>
+	                  </div>
+	                  <div class="flex justify-end">
+	                    <app-button size="sm" [label]="'adminUi.taxes.create' | translate" (action)="createTaxGroup()"></app-button>
+	                  </div>
+	                </div>
+
+	                <div *ngIf="taxGroups.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+	                  {{ 'adminUi.taxes.empty' | translate }}
+	                </div>
+
+	                <div
+	                  *ngFor="let group of taxGroups"
+	                  class="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+	                >
+	                  <div class="flex flex-wrap items-start justify-between gap-3">
+	                    <div class="grid gap-1">
+	                      <p class="text-xs text-slate-500 dark:text-slate-400">
+	                        <span class="font-semibold">{{ 'adminUi.taxes.code' | translate }}:</span>
+	                        <span class="font-mono">{{ group.code }}</span>
+	                        <span *ngIf="group.is_default" class="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">
+	                          {{ 'adminUi.taxes.default' | translate }}
+	                        </span>
+	                      </p>
+	                      <div class="grid gap-2 md:grid-cols-2">
+	                        <app-input [label]="'adminUi.taxes.name' | translate" [(value)]="group.name"></app-input>
+	                        <app-input [label]="'adminUi.taxes.description' | translate" [(value)]="group.description"></app-input>
+	                      </div>
+	                    </div>
+	                    <div class="flex flex-wrap items-center justify-end gap-2">
+	                      <app-button
+	                        *ngIf="!group.is_default"
+	                        size="sm"
+	                        variant="ghost"
+	                        [label]="'adminUi.taxes.setDefault' | translate"
+	                        (action)="setDefaultTaxGroup(group)"
+	                      ></app-button>
+	                      <app-button size="sm" variant="ghost" [label]="'adminUi.actions.save' | translate" (action)="saveTaxGroup(group)"></app-button>
+	                      <app-button
+	                        size="sm"
+	                        variant="ghost"
+	                        [label]="'adminUi.actions.delete' | translate"
+	                        [disabled]="group.is_default"
+	                        (action)="deleteTaxGroup(group)"
+	                      ></app-button>
+	                    </div>
+	                  </div>
+
+	                  <div class="grid gap-2">
+	                    <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+	                      {{ 'adminUi.taxes.ratesTitle' | translate }}
+	                    </p>
+
+	                    <div *ngIf="group.rates?.length" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+	                      <table class="w-full text-left text-sm">
+	                        <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
+	                          <tr>
+	                            <th class="px-3 py-2">{{ 'adminUi.taxes.country' | translate }}</th>
+	                            <th class="px-3 py-2">{{ 'adminUi.taxes.vatRate' | translate }}</th>
+	                            <th class="px-3 py-2"></th>
+	                          </tr>
+	                        </thead>
+	                        <tbody>
+	                          <tr *ngFor="let rate of group.rates" class="border-t border-slate-200 dark:border-slate-800">
+	                            <td class="px-3 py-2 font-mono text-slate-700 dark:text-slate-200">{{ rate.country_code }}</td>
+	                            <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ rate.vat_rate_percent }}%</td>
+	                            <td class="px-3 py-2 text-right">
+	                              <app-button
+	                                size="sm"
+	                                variant="ghost"
+	                                [label]="'adminUi.actions.delete' | translate"
+	                                (action)="deleteTaxRate(group, rate.country_code)"
+	                              ></app-button>
+	                            </td>
+	                          </tr>
+	                        </tbody>
+	                      </table>
+	                    </div>
+
+	                    <div class="grid gap-2 md:grid-cols-[140px_160px_auto] items-end">
+	                      <app-input
+	                        [label]="'adminUi.taxes.country' | translate"
+	                        [(value)]="taxRateCountry[group.id]"
+	                        placeholder="RO"
+	                      ></app-input>
+	                      <app-input
+	                        [label]="'adminUi.taxes.vatRate' | translate"
+	                        type="number"
+	                        [(value)]="taxRatePercent[group.id]"
+	                        placeholder="19"
+	                      ></app-input>
+	                      <div class="flex justify-end">
+	                        <app-button size="sm" [label]="'adminUi.taxes.addRate' | translate" (action)="upsertTaxRate(group)"></app-button>
+	                      </div>
+	                    </div>
+	                  </div>
+	                </div>
+	              </div>
+	            </div>
+
+	            <div class="grid gap-3 rounded-xl border border-slate-200 p-3 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200">
+	              <div class="flex flex-wrap items-start justify-between gap-2">
+	                <div class="grid gap-0.5">
+	                  <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+	                    {{ 'adminUi.fx.audit.title' | translate }}
+	                  </p>
+	                  <p class="text-xs text-slate-500 dark:text-slate-400">
+	                    {{ 'adminUi.fx.audit.hint' | translate }}
+	                  </p>
+	                </div>
+	                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadFxAudit()"></app-button>
+	              </div>
+
+	              <div
+	                *ngIf="fxAuditError()"
+	                class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+	              >
+	                {{ fxAuditError() }}
+	              </div>
+
+	              <div *ngIf="fxAuditLoading()" class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.actions.loading' | translate }}</div>
+
+	              <div *ngIf="!fxAuditLoading() && fxAudit().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+	                {{ 'adminUi.fx.audit.empty' | translate }}
+	              </div>
+
+	              <div
+	                *ngIf="fxAudit().length > 0"
+	                class="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+	              >
+	                <table class="w-full text-left text-sm">
+	                  <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
+	                    <tr>
+	                      <th class="px-3 py-2">{{ 'adminUi.fx.audit.table.when' | translate }}</th>
+	                      <th class="px-3 py-2">{{ 'adminUi.fx.audit.table.action' | translate }}</th>
+	                      <th class="px-3 py-2">{{ 'adminUi.fx.audit.table.user' | translate }}</th>
+	                      <th class="px-3 py-2">{{ 'adminUi.fx.eurPerRon' | translate }}</th>
+	                      <th class="px-3 py-2">{{ 'adminUi.fx.usdPerRon' | translate }}</th>
+	                      <th class="px-3 py-2">{{ 'adminUi.fx.asOf' | translate }}</th>
+	                      <th class="px-3 py-2"></th>
+	                    </tr>
+	                  </thead>
+	                  <tbody>
+	                    <tr *ngFor="let entry of fxAudit()" class="border-t border-slate-200 dark:border-slate-800">
+	                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ entry.created_at | date: 'short' }}</td>
+	                      <td class="px-3 py-2 font-semibold text-slate-900 dark:text-slate-50">{{ fxAuditActionLabel(entry.action) }}</td>
+	                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ entry.user_email || entry.user_id || '—' }}</td>
+	                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+	                        {{ entry.eur_per_ron ? (entry.eur_per_ron | number: '1.4-6') : '—' }}
+	                      </td>
+	                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+	                        {{ entry.usd_per_ron ? (entry.usd_per_ron | number: '1.4-6') : '—' }}
+	                      </td>
+	                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ entry.as_of || '—' }}</td>
+	                      <td class="px-3 py-2">
+	                        <app-button
+	                          size="sm"
+	                          variant="ghost"
+	                          [label]="'adminUi.fx.audit.restore' | translate"
+	                          (action)="restoreFxOverrideFromAudit(entry)"
+	                          [disabled]="fxAuditRestoring() === entry.id || !entry.eur_per_ron || !entry.usd_per_ron || !entry.as_of"
+	                        ></app-button>
+	                      </td>
+	                    </tr>
+	                  </tbody>
+	                </table>
 	              </div>
 	            </div>
 	          </section>
@@ -2030,7 +2783,8 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                 <div>
                   <p class="font-semibold text-slate-900 dark:text-slate-50">{{ post.title }}</p>
                   <p class="text-xs text-slate-500 dark:text-slate-400">
-                    {{ post.key }} · v{{ post.version }} · {{ post.updated_at | date: 'short' }}
+                    {{ post.key }} · {{ ('adminUi.status.' + (post.status || 'draft')) | translate }} ·
+                    {{ post.author ? commentAuthorLabel(post.author) : '—' }} · v{{ post.version }} · {{ post.updated_at | date: 'short' }}
                   </p>
                 </div>
                 <div class="flex items-center gap-3">
@@ -2077,6 +2831,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     [(ngModel)]="blogCreate.status"
                   >
                     <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+                    <option value="review">{{ 'adminUi.status.review' | translate }}</option>
                     <option value="published">{{ 'adminUi.status.published' | translate }}</option>
                   </select>
                 </label>
@@ -2084,11 +2839,24 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                   {{ 'adminUi.blog.fields.publishAtOptional' | translate }}
                   <input
                     type="datetime-local"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="blogCreate.published_at"
+                    [disabled]="blogCreate.status !== 'published'"
                   />
                   <span class="text-xs text-slate-500 dark:text-slate-400">
                     {{ 'adminUi.blog.fields.publishAtHint' | translate }}
+                  </span>
+                </label>
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.blog.fields.unpublishAtOptional' | translate }}
+                  <input
+                    type="datetime-local"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogCreate.published_until"
+                    [disabled]="blogCreate.status !== 'published'"
+                  />
+                  <span class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.blog.fields.unpublishAtHint' | translate }}
                   </span>
                 </label>
                 <div class="md:col-span-2">
@@ -2195,6 +2963,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     [disabled]="blogEditLang !== blogBaseLang"
                   >
                     <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+                    <option value="review">{{ 'adminUi.status.review' | translate }}</option>
                     <option value="published">{{ 'adminUi.status.published' | translate }}</option>
                   </select>
                 </label>
@@ -2204,10 +2973,22 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     type="datetime-local"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="blogForm.published_at"
-                    [disabled]="blogEditLang !== blogBaseLang"
+                    [disabled]="blogEditLang !== blogBaseLang || blogForm.status !== 'published'"
                   />
                   <span class="text-xs text-slate-500 dark:text-slate-400">
                     {{ 'adminUi.blog.editing.publishAtBaseOnlyHint' | translate }}
+                  </span>
+                </label>
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                  {{ 'adminUi.blog.editing.unpublishAtBaseOnlyOptional' | translate }}
+                  <input
+                    type="datetime-local"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogForm.published_until"
+                    [disabled]="blogEditLang !== blogBaseLang || blogForm.status !== 'published'"
+                  />
+                  <span class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.blog.editing.unpublishAtBaseOnlyHint' | translate }}
                   </span>
                 </label>
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
@@ -2401,6 +3182,97 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                   {{ 'adminUi.blog.preview.expires' | translate }} {{ blogPreviewExpiresAt | date: 'short' }}
                 </p>
               </div>
+
+              <details class="rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-900">
+                <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.blog.social.title' | translate }}
+                </summary>
+                <div class="mt-3 grid gap-3">
+                  <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.blog.social.hint' | translate }}</p>
+
+                  <div
+                    *ngIf="!blogPreviewToken"
+                    class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+                  >
+                    <p class="font-semibold">{{ 'adminUi.blog.social.previewTokenTitle' | translate }}</p>
+                    <p class="text-xs">{{ 'adminUi.blog.social.previewTokenCopy' | translate }}</p>
+                    <div class="mt-2">
+                      <app-button size="sm" variant="ghost" [label]="'adminUi.blog.actions.previewLink' | translate" (action)="generateBlogPreviewLink()"></app-button>
+                    </div>
+                  </div>
+
+                  <div class="grid gap-4 md:grid-cols-2">
+                    <div
+                      *ngFor="let lang of blogSocialLangs"
+                      class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30"
+                    >
+                      <div class="flex items-center justify-between gap-2">
+                        <p class="text-xs font-semibold tracking-wide uppercase text-slate-600 dark:text-slate-300">{{ lang.toUpperCase() }}</p>
+                        <div class="flex items-center gap-2">
+                          <a
+                            class="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
+                            [attr.href]="blogPublicUrl(lang)"
+                            target="_blank"
+                            rel="noopener"
+                          >
+                            {{ 'adminUi.blog.actions.view' | translate }}
+                          </a>
+                          <app-button size="sm" variant="ghost" [label]="'adminUi.blog.actions.copy' | translate" (action)="copyText(blogPublicUrl(lang))"></app-button>
+                        </div>
+                      </div>
+
+                      <img
+                        *ngIf="blogPreviewToken || blogForm.status === 'published'"
+                        [src]="blogPreviewOgImageUrl(lang) || blogPublishedOgImageUrl(lang)"
+                        [alt]="'adminUi.blog.social.ogAlt' | translate"
+                        class="w-full rounded-lg border border-slate-200 bg-white object-cover dark:border-slate-800 dark:bg-slate-900"
+                        loading="lazy"
+                      />
+
+                      <div class="grid gap-2">
+                        <label class="grid gap-1 text-xs font-medium text-slate-700 dark:text-slate-200">
+                          {{ 'adminUi.blog.social.pageUrl' | translate }}
+                          <input
+                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                            [value]="blogPublicUrl(lang)"
+                            readonly
+                          />
+                        </label>
+
+                        <label class="grid gap-1 text-xs font-medium text-slate-700 dark:text-slate-200" *ngIf="blogPreviewToken">
+                          {{ 'adminUi.blog.social.previewImageUrl' | translate }}
+                          <div class="flex items-center gap-2">
+                            <input
+                              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                              [value]="blogPreviewOgImageUrl(lang) || ''"
+                              readonly
+                            />
+                            <app-button
+                              size="sm"
+                              variant="ghost"
+                              [label]="'adminUi.blog.actions.copy' | translate"
+                              (action)="copyText(blogPreviewOgImageUrl(lang) || '')"
+                            ></app-button>
+                          </div>
+                        </label>
+
+                        <label class="grid gap-1 text-xs font-medium text-slate-700 dark:text-slate-200">
+                          {{ 'adminUi.blog.social.publishedImageUrl' | translate }}
+                          <div class="flex items-center gap-2">
+                            <input
+                              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                              [value]="blogPublishedOgImageUrl(lang)"
+                              readonly
+                            />
+                            <app-button size="sm" variant="ghost" [label]="'adminUi.blog.actions.copy' | translate" (action)="copyText(blogPublishedOgImageUrl(lang))"></app-button>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </details>
+
               <div class="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-900">
                 <div class="flex items-center justify-between gap-2">
                   <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.blog.revisions.title' | translate }}</p>
@@ -2412,7 +3284,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                 <div *ngFor="let v of blogVersions" class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
                   <div>
                     <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">v{{ v.version }} · {{ v.created_at | date: 'short' }}</p>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ v.status }}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ ('adminUi.status.' + v.status) | translate }}</p>
                   </div>
                   <div class="flex items-center gap-2">
                     <app-button size="sm" variant="ghost" [label]="'adminUi.blog.revisions.diff' | translate" (action)="selectBlogVersion(v.version)"></app-button>
@@ -2514,6 +3386,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                 {{ 'adminUi.content.status' | translate }}
                 <select class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="contentForm.status">
                   <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+                  <option value="review">{{ 'adminUi.status.review' | translate }}</option>
                   <option value="published">{{ 'adminUi.status.published' | translate }}</option>
                 </select>
               </label>
@@ -2774,7 +3647,12 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                   <p class="font-semibold text-slate-900 dark:text-slate-50">{{ item.name }}</p>
                   <p class="text-xs text-slate-500 dark:text-slate-400">{{ item.sku }} — {{ item.slug }}</p>
                 </div>
-                <span class="text-xs rounded-full bg-amber-100 px-2 py-1 text-amber-900">{{ 'adminUi.lowStock.stock' | translate:{count: item.stock_quantity} }}</span>
+                <span
+                  class="text-xs rounded-full px-2 py-1 font-semibold"
+                  [ngClass]="item.is_critical ? 'bg-rose-100 text-rose-900 dark:bg-rose-950/30 dark:text-rose-100' : 'bg-amber-100 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100'"
+                >
+                  {{ 'adminUi.lowStock.stockWithThreshold' | translate:{count: item.stock_quantity, threshold: item.threshold} }}
+                </span>
               </div>
             </div>
           </section>
@@ -2828,6 +3706,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   summary = signal<AdminSummary | null>(null);
   loading = signal<boolean>(true);
   error = signal<string | null>(null);
+  errorRequestId = signal<string | null>(null);
 
   products: AdminProduct[] = [];
   categories: AdminCategory[] = [];
@@ -2840,6 +3719,12 @@ export class AdminComponent implements OnInit, OnDestroy {
     en: this.blankCategoryTranslation(),
     ro: this.blankCategoryTranslation()
   };
+  taxGroups: TaxGroupRead[] = [];
+  taxGroupsLoading = false;
+  taxGroupsError: string | null = null;
+  taxGroupCreate = { code: '', name: '', description: '', is_default: false };
+  taxRateCountry: Record<string, string> = {};
+  taxRatePercent: Record<string, string> = {};
   maintenanceEnabledValue = false;
   maintenanceEnabled = signal<boolean>(false);
   draggingSlug: string | null = null;
@@ -2901,8 +3786,9 @@ export class AdminComponent implements OnInit, OnDestroy {
 	  showBlogCreate = false;
 	  blogCreate: {
 	    baseLang: 'en' | 'ro';
-	    status: 'draft' | 'published';
+	    status: ContentStatusUi;
 	    published_at: string;
+	    published_until: string;
 	    title: string;
     body_markdown: string;
     summary: string;
@@ -2916,6 +3802,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    baseLang: 'en',
 	    status: 'draft',
 	    published_at: '',
+	    published_until: '',
 	    title: '',
     body_markdown: '',
     summary: '',
@@ -2934,6 +3821,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     body_markdown: '',
     status: 'draft',
     published_at: '',
+    published_until: '',
     summary: '',
     tags: '',
     cover_image_url: '',
@@ -2943,7 +3831,9 @@ export class AdminComponent implements OnInit, OnDestroy {
   blogImages: { id: string; url: string; alt_text?: string | null }[] = [];
   showBlogPreview = false;
   useRichBlogEditor = true;
+  blogSocialLangs: UiLang[] = ['en', 'ro'];
   blogPreviewUrl: string | null = null;
+  blogPreviewToken: string | null = null;
   blogPreviewExpiresAt: string | null = null;
   blogVersions: ContentBlockVersionListItem[] = [];
   blogVersionDetail: ContentBlockVersionRead | null = null;
@@ -2976,29 +3866,35 @@ export class AdminComponent implements OnInit, OnDestroy {
   socialError: string | null = null;
   socialThumbLoading: Record<string, boolean> = {};
   socialThumbErrors: Record<string, string> = {};
-  checkoutSettingsForm: {
-    shipping_fee_ron: number | string;
-    free_shipping_threshold_ron: number | string;
-    fee_enabled: boolean;
-    fee_type: 'flat' | 'percent';
-    fee_value: number | string;
-    vat_enabled: boolean;
-    vat_rate_percent: number | string;
-    vat_apply_to_shipping: boolean;
-    vat_apply_to_fee: boolean;
-    receipt_share_days: number | string;
-  } = {
-    shipping_fee_ron: 20,
-    free_shipping_threshold_ron: 300,
-    fee_enabled: false,
-    fee_type: 'flat',
-    fee_value: 0,
-    vat_enabled: true,
-    vat_rate_percent: 10,
-    vat_apply_to_shipping: false,
-    vat_apply_to_fee: false,
-    receipt_share_days: 365
-  };
+	  checkoutSettingsForm: {
+	    shipping_fee_ron: number | string;
+	    free_shipping_threshold_ron: number | string;
+	    phone_required_home: boolean;
+	    phone_required_locker: boolean;
+	    fee_enabled: boolean;
+	    fee_type: 'flat' | 'percent';
+	    fee_value: number | string;
+	    vat_enabled: boolean;
+	    vat_rate_percent: number | string;
+	    vat_apply_to_shipping: boolean;
+	    vat_apply_to_fee: boolean;
+	    receipt_share_days: number | string;
+	    money_rounding: 'half_up' | 'half_even' | 'up' | 'down';
+	  } = {
+	    shipping_fee_ron: 20,
+	    free_shipping_threshold_ron: 300,
+	    phone_required_home: true,
+	    phone_required_locker: true,
+	    fee_enabled: false,
+	    fee_type: 'flat',
+	    fee_value: 0,
+	    vat_enabled: true,
+	    vat_rate_percent: 10,
+	    vat_apply_to_shipping: false,
+	    vat_apply_to_fee: false,
+	    receipt_share_days: 365,
+	    money_rounding: 'half_up'
+	  };
   checkoutSettingsMessage: string | null = null;
   checkoutSettingsError: string | null = null;
   seoLang: 'en' | 'ro' = 'en';
@@ -3006,6 +3902,12 @@ export class AdminComponent implements OnInit, OnDestroy {
   seoForm = { title: '', description: '' };
   seoMessage: string | null = null;
   seoError: string | null = null;
+  sitemapPreviewLoading = false;
+  sitemapPreviewError: string | null = null;
+  sitemapPreviewByLang: Record<string, string[]> | null = null;
+  structuredDataLoading = false;
+  structuredDataError: string | null = null;
+  structuredDataResult: StructuredDataValidationResponse | null = null;
   infoLang: UiLang = 'en';
   infoForm: { about: LocalizedText; faq: LocalizedText; shipping: LocalizedText; contact: LocalizedText } = {
     about: { en: '', ro: '' },
@@ -3023,15 +3925,31 @@ export class AdminComponent implements OnInit, OnDestroy {
   redirectsLoading = false;
   redirectsError: string | null = null;
   redirectsQuery = '';
+  redirectsExporting = false;
+  redirectsImporting = false;
+  redirectsImportResult: ContentRedirectImportResult | null = null;
+  linkCheckKey = 'page.about';
+  linkCheckLoading = false;
+  linkCheckError: string | null = null;
+  linkCheckIssues: ContentLinkCheckIssue[] = [];
   newCustomPageTitle = '';
-  newCustomPageStatus: 'draft' | 'published' = 'draft';
+  newCustomPageStatus: ContentStatusUi = 'draft';
+  newCustomPagePublishedAt = '';
+  newCustomPagePublishedUntil = '';
   creatingCustomPage = false;
   pageBlocksKey: PageBuilderKey = 'page.about';
   newPageBlockType: PageBlockType = 'text';
   pageBlocks: Record<string, PageBlockDraft[]> = {};
   pageBlocksMeta: Record<string, Record<string, unknown>> = {};
+  pageBlocksRequiresAuth: Record<string, boolean> = {};
+  pageBlocksStatus: Record<string, ContentStatusUi> = {};
+  pageBlocksPublishedAt: Record<string, string> = {};
+  pageBlocksPublishedUntil: Record<string, string> = {};
   pageBlocksMessage: Record<string, string | null> = {};
   pageBlocksError: Record<string, string | null> = {};
+  pageBlocksNeedsTranslationEn: Record<string, boolean> = {};
+  pageBlocksNeedsTranslationRo: Record<string, boolean> = {};
+  pageBlocksTranslationSaving: Record<string, boolean> = {};
   draggingPageBlockKey: string | null = null;
   draggingPageBlocksKey: string | null = null;
   coupons: AdminCoupon[] = [];
@@ -3043,6 +3961,10 @@ export class AdminComponent implements OnInit, OnDestroy {
   fxLoading = signal<boolean>(false);
   fxError = signal<string | null>(null);
   fxOverrideForm: { eur_per_ron: number; usd_per_ron: number; as_of: string } = { eur_per_ron: 0, usd_per_ron: 0, as_of: '' };
+  fxAudit = signal<FxOverrideAuditEntry[]>([]);
+  fxAuditLoading = signal(false);
+  fxAuditError = signal<string | null>(null);
+  fxAuditRestoring = signal<string | null>(null);
 
   productAudit: AdminAudit['products'] = [];
   contentAudit: AdminAudit['content'] = [];
@@ -3060,6 +3982,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     private admin: AdminService,
     private blog: BlogService,
     private fxAdmin: FxAdminService,
+    private taxesAdmin: TaxesAdminService,
     private auth: AuthService,
     private toast: ToastService,
     private translate: TranslateService,
@@ -3160,6 +4083,10 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.loadForSection(this.section());
   }
 
+  retryLoadAll(): void {
+    this.loadAll();
+  }
+
   private normalizeSection(value: unknown): AdminContentSection {
     if (value === 'home' || value === 'pages' || value === 'blog' || value === 'settings') return value;
     return 'home';
@@ -3181,6 +4108,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   private resetSectionState(next: AdminContentSection): void {
     this.error.set(null);
+    this.errorRequestId.set(null);
     if (next !== 'blog') {
       this.closeBlogEditor();
       this.showBlogCreate = false;
@@ -3196,6 +4124,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   private loadForSection(section: AdminContentSection): void {
     this.loading.set(true);
     this.error.set(null);
+    this.errorRequestId.set(null);
 
     if (section === 'home') {
       this.admin.products().subscribe({ next: (p) => (this.products = p), error: () => (this.products = []) });
@@ -3241,6 +4170,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       },
       error: () => (this.categories = [])
     });
+    this.loadTaxGroups();
     this.loadAssets();
     this.loadSocial();
     this.loadCheckoutSettings();
@@ -3302,6 +4232,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   loadFxStatus(): void {
     this.fxLoading.set(true);
     this.fxError.set(null);
+    this.loadFxAudit();
     this.fxAdmin.getStatus().subscribe({
       next: (status) => {
         this.fxStatus.set(status);
@@ -3317,6 +4248,56 @@ export class AdminComponent implements OnInit, OnDestroy {
       },
       complete: () => {
         this.fxLoading.set(false);
+      }
+    });
+  }
+
+  loadFxAudit(): void {
+    this.fxAuditLoading.set(true);
+    this.fxAuditError.set(null);
+    this.fxAdmin.listOverrideAudit(50).subscribe({
+      next: (items) => {
+        this.fxAudit.set(Array.isArray(items) ? items : []);
+      },
+      error: () => {
+        this.fxAudit.set([]);
+        this.fxAuditError.set(this.t('adminUi.fx.audit.errors.load'));
+      },
+      complete: () => {
+        this.fxAuditLoading.set(false);
+      }
+    });
+  }
+
+  fxAuditActionLabel(action: string): string {
+    const normalized = (action || '').trim().toLowerCase();
+    const key = `adminUi.fx.audit.actions.${normalized}`;
+    const translated = this.t(key);
+    return translated === key ? action : translated;
+  }
+
+  restoreFxOverrideFromAudit(entry: FxOverrideAuditEntry): void {
+    const id = (entry?.id || '').toString().trim();
+    if (!id) return;
+    if (!confirm(this.t('adminUi.fx.audit.confirmRestore'))) return;
+    this.fxAuditRestoring.set(id);
+    this.fxAdmin.restoreOverrideFromAudit(id).subscribe({
+      next: (status) => {
+        this.fxStatus.set(status);
+        const current = status.override ?? status.effective;
+        this.fxOverrideForm = {
+          eur_per_ron: Number(current.eur_per_ron) || 0,
+          usd_per_ron: Number(current.usd_per_ron) || 0,
+          as_of: current.as_of || ''
+        };
+        this.toast.success(this.t('adminUi.fx.success.overrideRestored'));
+        this.loadFxAudit();
+      },
+      error: () => {
+        this.toast.error(this.t('adminUi.fx.audit.errors.restore'));
+      },
+      complete: () => {
+        this.fxAuditRestoring.set(null);
       }
     });
   }
@@ -3472,6 +4453,119 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
+  loadTaxGroups(): void {
+    this.taxGroupsLoading = true;
+    this.taxGroupsError = null;
+    this.taxesAdmin.listGroups().subscribe({
+      next: (groups) => {
+        this.taxGroups = Array.isArray(groups) ? groups : [];
+        this.taxGroupsLoading = false;
+      },
+      error: (err) => {
+        this.taxGroupsLoading = false;
+        this.taxGroups = [];
+        this.taxGroupsError = err?.error?.detail || this.t('adminUi.taxes.errors.load');
+      }
+    });
+  }
+
+  createTaxGroup(): void {
+    const code = (this.taxGroupCreate.code || '').trim();
+    const name = (this.taxGroupCreate.name || '').trim();
+    if (!code || !name) {
+      this.toast.error(this.t('adminUi.taxes.errors.required'));
+      return;
+    }
+    this.taxesAdmin
+      .createGroup({
+        code,
+        name,
+        description: (this.taxGroupCreate.description || '').trim() || null,
+        is_default: !!this.taxGroupCreate.is_default
+      })
+      .subscribe({
+        next: () => {
+          this.taxGroupCreate = { code: '', name: '', description: '', is_default: false };
+          this.toast.success(this.t('adminUi.taxes.success.create'));
+          this.loadTaxGroups();
+        },
+        error: (err) => this.toast.error(err?.error?.detail || this.t('adminUi.taxes.errors.create'))
+      });
+  }
+
+  saveTaxGroup(group: TaxGroupRead): void {
+    const name = (group.name || '').trim();
+    if (!name) {
+      this.toast.error(this.t('adminUi.taxes.errors.required'));
+      return;
+    }
+    this.taxesAdmin
+      .updateGroup(group.id, { name, description: (group.description || '').trim() || null })
+      .subscribe({
+        next: () => {
+          this.toast.success(this.t('adminUi.taxes.success.update'));
+          this.loadTaxGroups();
+        },
+        error: (err) => this.toast.error(err?.error?.detail || this.t('adminUi.taxes.errors.update'))
+      });
+  }
+
+  setDefaultTaxGroup(group: TaxGroupRead): void {
+    if (group.is_default) return;
+    this.taxesAdmin.updateGroup(group.id, { is_default: true }).subscribe({
+      next: () => {
+        this.toast.success(this.t('adminUi.taxes.success.default'));
+        this.loadTaxGroups();
+      },
+      error: (err) => this.toast.error(err?.error?.detail || this.t('adminUi.taxes.errors.update'))
+    });
+  }
+
+  deleteTaxGroup(group: TaxGroupRead): void {
+    if (group.is_default) {
+      this.toast.error(this.t('adminUi.taxes.errors.deleteDefault'));
+      return;
+    }
+    this.taxesAdmin.deleteGroup(group.id).subscribe({
+      next: () => {
+        this.toast.success(this.t('adminUi.taxes.success.delete'));
+        this.loadTaxGroups();
+      },
+      error: (err) => this.toast.error(err?.error?.detail || this.t('adminUi.taxes.errors.delete'))
+    });
+  }
+
+  upsertTaxRate(group: TaxGroupRead): void {
+    const rawCountry = (this.taxRateCountry[group.id] || '').trim();
+    const rawRate = String(this.taxRatePercent[group.id] || '').trim();
+    const vat = Number(rawRate);
+    if (!rawCountry || !Number.isFinite(vat)) {
+      this.toast.error(this.t('adminUi.taxes.errors.rateInvalid'));
+      return;
+    }
+    this.taxesAdmin.upsertRate(group.id, { country_code: rawCountry, vat_rate_percent: vat }).subscribe({
+      next: () => {
+        this.taxRateCountry[group.id] = '';
+        this.taxRatePercent[group.id] = '';
+        this.toast.success(this.t('adminUi.taxes.success.rate'));
+        this.loadTaxGroups();
+      },
+      error: (err) => this.toast.error(err?.error?.detail || this.t('adminUi.taxes.errors.rate'))
+    });
+  }
+
+  deleteTaxRate(group: TaxGroupRead, countryCode: string): void {
+    const code = (countryCode || '').trim();
+    if (!code) return;
+    this.taxesAdmin.deleteRate(group.id, code).subscribe({
+      next: () => {
+        this.toast.success(this.t('adminUi.taxes.success.rateDelete'));
+        this.loadTaxGroups();
+      },
+      error: (err) => this.toast.error(err?.error?.detail || this.t('adminUi.taxes.errors.rateDelete'))
+    });
+  }
+
   categoryParentLabel(cat: AdminCategory): string {
     const parentId = (cat.parent_id ?? '').trim();
     if (!parentId) return this.t('adminUi.categories.parentNone');
@@ -3524,6 +4618,46 @@ export class AdminComponent implements OnInit, OnDestroy {
       error: () => {
         cat.parent_id = prevParentId;
         this.toast.error(this.t('adminUi.categories.errors.updateParent'));
+      }
+    });
+  }
+
+  updateCategoryLowStockThreshold(cat: AdminCategory, raw: string | number): void {
+    const prevThreshold = cat.low_stock_threshold ?? null;
+    const trimmed = String(raw ?? '').trim();
+    const nextThreshold = trimmed ? Number(trimmed) : null;
+    if (nextThreshold !== null && (!Number.isFinite(nextThreshold) || nextThreshold < 0)) {
+      cat.low_stock_threshold = prevThreshold;
+      this.toast.error(this.t('adminUi.categories.errors.updateLowStockThreshold'));
+      return;
+    }
+    if (nextThreshold === prevThreshold) return;
+    cat.low_stock_threshold = nextThreshold;
+    this.admin.updateCategory(cat.slug, { low_stock_threshold: nextThreshold }).subscribe({
+      next: (updated) => {
+        cat.low_stock_threshold = updated.low_stock_threshold ?? null;
+        this.toast.success(this.t('adminUi.categories.success.updateLowStockThreshold'));
+      },
+      error: () => {
+        cat.low_stock_threshold = prevThreshold;
+        this.toast.error(this.t('adminUi.categories.errors.updateLowStockThreshold'));
+      }
+    });
+  }
+
+  updateCategoryTaxGroup(cat: AdminCategory, raw: string): void {
+    const nextGroupId = (raw ?? '').trim() || null;
+    const prevGroupId = (cat.tax_group_id ?? '').trim() || null;
+    if (nextGroupId === prevGroupId) return;
+    cat.tax_group_id = nextGroupId;
+    this.admin.updateCategory(cat.slug, { tax_group_id: nextGroupId }).subscribe({
+      next: (updated) => {
+        cat.tax_group_id = updated.tax_group_id ?? null;
+        this.toast.success(this.t('adminUi.taxes.success.categoryAssign'));
+      },
+      error: () => {
+        cat.tax_group_id = prevGroupId;
+        this.toast.error(this.t('adminUi.taxes.errors.categoryAssign'));
       }
     });
   }
@@ -3803,7 +4937,9 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   updateRole(): void {
     if (!this.selectedUserId || !this.selectedUserRole) return;
-    this.admin.updateUserRole(this.selectedUserId, this.selectedUserRole).subscribe({
+    const password = (prompt(this.t('adminUi.users.rolePasswordPrompt')) || '').trim();
+    if (!password) return;
+    this.admin.updateUserRole(this.selectedUserId, this.selectedUserRole, password).subscribe({
       next: (updated) => {
         this.users = this.users.map((u) => (u.id === updated.id ? updated : u));
         this.toast.success(this.t('adminUi.users.success.role'));
@@ -3965,6 +5101,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	      baseLang: 'en',
 	      status: 'draft',
 	      published_at: '',
+	      published_until: '',
 	      title: '',
       body_markdown: '',
       summary: '',
@@ -3985,6 +5122,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.selectedBlogKey = null;
     this.blogImages = [];
     this.blogPreviewUrl = null;
+    this.blogPreviewToken = null;
     this.blogPreviewExpiresAt = null;
     this.blogVersions = [];
     this.blogVersionDetail = null;
@@ -4018,11 +5156,12 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (cover) {
       meta['cover_image_url'] = cover;
     }
-    const rt = Number(String(this.blogCreate.reading_time_minutes || '').trim());
-    if (Number.isFinite(rt) && rt > 0) {
-      meta['reading_time_minutes'] = Math.trunc(rt);
-    }
+	    const rt = Number(String(this.blogCreate.reading_time_minutes || '').trim());
+	    if (Number.isFinite(rt) && rt > 0) {
+	      meta['reading_time_minutes'] = Math.trunc(rt);
+	    }
 	    const published_at = this.blogCreate.published_at ? new Date(this.blogCreate.published_at).toISOString() : undefined;
+	    const published_until = this.blogCreate.published_until ? new Date(this.blogCreate.published_until).toISOString() : undefined;
 
 	    try {
 	      const payload = {
@@ -4031,6 +5170,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	        status: this.blogCreate.status,
 	        lang: baseLang,
 	        published_at,
+	        published_until,
 	        meta: Object.keys(meta).length ? meta : undefined
 	      };
 
@@ -4098,6 +5238,7 @@ export class AdminComponent implements OnInit, OnDestroy {
           this.blogForm.status = block.status;
         }
         this.blogForm.published_at = block.published_at ? this.toLocalDateTime(block.published_at) : '';
+        this.blogForm.published_until = block.published_until ? this.toLocalDateTime(block.published_until) : '';
         this.blogMeta = block.meta || this.blogMeta || {};
         this.syncBlogMetaToForm(lang);
       },
@@ -4121,12 +5262,18 @@ export class AdminComponent implements OnInit, OnDestroy {
         ? new Date(this.blogForm.published_at).toISOString()
         : null
       : undefined;
+    const published_until = isBase
+      ? this.blogForm.published_until
+        ? new Date(this.blogForm.published_until).toISOString()
+        : null
+      : undefined;
     if (isBase) {
       const payload = this.withExpectedVersion(key, {
         title: this.blogForm.title.trim(),
         body_markdown: this.blogForm.body_markdown,
         status: this.blogForm.status as any,
         published_at,
+        published_until,
         meta: nextMeta
       });
       this.admin.updateContentBlock(key, payload).subscribe({
@@ -4190,6 +5337,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.blog.createPreviewToken(slug, { lang: this.blogEditLang }).subscribe({
       next: (resp) => {
         this.blogPreviewUrl = resp.url;
+        this.blogPreviewToken = resp.token;
         this.blogPreviewExpiresAt = resp.expires_at;
         this.toast.success(this.t('adminUi.blog.preview.success.ready'));
         void this.copyToClipboard(resp.url).then((ok) => {
@@ -4205,6 +5353,36 @@ export class AdminComponent implements OnInit, OnDestroy {
     void this.copyToClipboard(this.blogPreviewUrl).then((ok) => {
       if (ok) this.toast.info(this.t('adminUi.blog.preview.success.copied'));
       else this.toast.error(this.t('adminUi.blog.preview.errors.copy'));
+    });
+  }
+
+  blogPublicUrl(lang: UiLang): string {
+    if (typeof window === 'undefined') return `/blog/${this.currentBlogSlug()}?lang=${lang}`;
+    return `${window.location.origin}/blog/${this.currentBlogSlug()}?lang=${lang}`;
+  }
+
+  blogPublishedOgImageUrl(lang: UiLang): string {
+    const apiBaseUrl = (appConfig.apiBaseUrl || '/api/v1').replace(/\/$/, '');
+    const ogPath = `${apiBaseUrl}/blog/posts/${this.currentBlogSlug()}/og.png?lang=${lang}`;
+    if (ogPath.startsWith('http://') || ogPath.startsWith('https://') || typeof window === 'undefined') return ogPath;
+    return `${window.location.origin}${ogPath}`;
+  }
+
+  blogPreviewOgImageUrl(lang: UiLang): string | null {
+    if (!this.blogPreviewToken) return null;
+    const apiBaseUrl = (appConfig.apiBaseUrl || '/api/v1').replace(/\/$/, '');
+    const token = encodeURIComponent(this.blogPreviewToken);
+    const ogPath = `${apiBaseUrl}/blog/posts/${this.currentBlogSlug()}/og-preview.png?lang=${lang}&token=${token}`;
+    if (ogPath.startsWith('http://') || ogPath.startsWith('https://') || typeof window === 'undefined') return ogPath;
+    return `${window.location.origin}${ogPath}`;
+  }
+
+  copyText(text: string): void {
+    const value = (text || '').trim();
+    if (!value) return;
+    void this.copyToClipboard(value).then((ok) => {
+      if (ok) this.toast.info(this.t('adminUi.blog.social.success.copied'));
+      else this.toast.error(this.t('adminUi.blog.social.errors.copy'));
     });
   }
 
@@ -4471,6 +5649,7 @@ export class AdminComponent implements OnInit, OnDestroy {
           body_markdown: block.body_markdown,
           status: block.status,
           published_at: block.published_at ? this.toLocalDateTime(block.published_at) : '',
+          published_until: block.published_until ? this.toLocalDateTime(block.published_until) : '',
           summary: '',
           tags: '',
           cover_image_url: '',
@@ -4494,6 +5673,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       body_markdown: '',
       status: 'draft',
       published_at: '',
+      published_until: '',
       summary: '',
       tags: '',
       cover_image_url: '',
@@ -4634,6 +5814,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         };
         const shipping = Number(meta['shipping_fee_ron']);
         const threshold = Number(meta['free_shipping_threshold_ron']);
+        const phoneRequiredHome = parseBool(meta['phone_required_home'], true);
+        const phoneRequiredLocker = parseBool(meta['phone_required_locker'], true);
         const feeEnabled = parseBool(meta['fee_enabled'], false);
         const feeTypeRaw = String(meta['fee_type'] ?? 'flat').trim().toLowerCase();
         const feeType = feeTypeRaw === 'percent' ? 'percent' : 'flat';
@@ -4647,9 +5829,14 @@ export class AdminComponent implements OnInit, OnDestroy {
         const receiptDaysRaw = Number(meta['receipt_share_days']);
         const receiptShareDays =
           Number.isFinite(receiptDaysRaw) && receiptDaysRaw >= 1 && receiptDaysRaw <= 3650 ? Math.trunc(receiptDaysRaw) : 365;
+        const roundingRaw = String(meta['money_rounding'] ?? 'half_up').trim().toLowerCase();
+        const moneyRounding: 'half_up' | 'half_even' | 'up' | 'down' =
+          roundingRaw === 'half_even' || roundingRaw === 'up' || roundingRaw === 'down' ? roundingRaw : 'half_up';
         this.checkoutSettingsForm = {
           shipping_fee_ron: Number.isFinite(shipping) && shipping >= 0 ? shipping : 20,
           free_shipping_threshold_ron: Number.isFinite(threshold) && threshold >= 0 ? threshold : 300,
+          phone_required_home: phoneRequiredHome,
+          phone_required_locker: phoneRequiredLocker,
           fee_enabled: feeEnabled,
           fee_type: feeType,
           fee_value: feeValue,
@@ -4657,7 +5844,8 @@ export class AdminComponent implements OnInit, OnDestroy {
           vat_rate_percent: vatRate,
           vat_apply_to_shipping: vatApplyToShipping,
           vat_apply_to_fee: vatApplyToFee,
-          receipt_share_days: receiptShareDays
+          receipt_share_days: receiptShareDays,
+          money_rounding: moneyRounding
         };
       },
       error: () => {
@@ -4665,6 +5853,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.checkoutSettingsForm = {
           shipping_fee_ron: 20,
           free_shipping_threshold_ron: 300,
+          phone_required_home: true,
+          phone_required_locker: true,
           fee_enabled: false,
           fee_type: 'flat',
           fee_value: 0,
@@ -4672,7 +5862,8 @@ export class AdminComponent implements OnInit, OnDestroy {
           vat_rate_percent: 10,
           vat_apply_to_shipping: false,
           vat_apply_to_fee: false,
-          receipt_share_days: 365
+          receipt_share_days: 365,
+          money_rounding: 'half_up'
         };
       }
     });
@@ -4685,6 +5876,9 @@ export class AdminComponent implements OnInit, OnDestroy {
     const thresholdRaw = Number(this.checkoutSettingsForm.free_shipping_threshold_ron);
     const shipping = Number.isFinite(shippingRaw) && shippingRaw >= 0 ? Math.round(shippingRaw * 100) / 100 : 20;
     const threshold = Number.isFinite(thresholdRaw) && thresholdRaw >= 0 ? Math.round(thresholdRaw * 100) / 100 : 300;
+
+    const phoneRequiredHome = Boolean(this.checkoutSettingsForm.phone_required_home);
+    const phoneRequiredLocker = Boolean(this.checkoutSettingsForm.phone_required_locker);
 
     const feeEnabled = Boolean(this.checkoutSettingsForm.fee_enabled);
     const feeType = this.checkoutSettingsForm.fee_type === 'percent' ? 'percent' : 'flat';
@@ -4702,6 +5896,10 @@ export class AdminComponent implements OnInit, OnDestroy {
     const receiptShareDays =
       Number.isFinite(receiptDaysRaw) && receiptDaysRaw >= 1 && receiptDaysRaw <= 3650 ? Math.trunc(receiptDaysRaw) : 365;
 
+    const roundingRaw = String(this.checkoutSettingsForm.money_rounding || 'half_up').trim().toLowerCase();
+    const moneyRounding: 'half_up' | 'half_even' | 'up' | 'down' =
+      roundingRaw === 'half_even' || roundingRaw === 'up' || roundingRaw === 'down' ? roundingRaw : 'half_up';
+
     const payload = {
       title: 'Checkout settings',
       body_markdown:
@@ -4711,6 +5909,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         version: 1,
         shipping_fee_ron: shipping,
         free_shipping_threshold_ron: threshold,
+        phone_required_home: phoneRequiredHome,
+        phone_required_locker: phoneRequiredLocker,
         fee_enabled: feeEnabled,
         fee_type: feeType,
         fee_value: feeValue,
@@ -4718,7 +5918,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         vat_rate_percent: vatRate,
         vat_apply_to_shipping: vatApplyToShipping,
         vat_apply_to_fee: vatApplyToFee,
-        receipt_share_days: receiptShareDays
+        receipt_share_days: receiptShareDays,
+        money_rounding: moneyRounding
       }
     };
 
@@ -4980,12 +6181,64 @@ export class AdminComponent implements OnInit, OnDestroy {
 	          }
 	        })
         }
-	    });
-	  }
+		    });
+		  }
 
-  selectInfoLang(lang: UiLang): void {
-    this.infoLang = lang;
+  loadSitemapPreview(): void {
+    this.sitemapPreviewLoading = true;
+    this.sitemapPreviewError = null;
+    this.sitemapPreviewByLang = null;
+    this.admin.getSitemapPreview().subscribe({
+      next: (res) => {
+        this.sitemapPreviewByLang = (res && typeof res === 'object' ? res.by_lang : null) || {};
+        this.sitemapPreviewLoading = false;
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.sitemapPreviewLoading = false;
+        this.sitemapPreviewByLang = null;
+        this.sitemapPreviewError = detail || this.t('adminUi.site.seo.sitemapPreview.errors.load');
+      }
+    });
   }
+
+  structuredDataIssueUrl(issue: { entity_type: string; entity_key: string }): string {
+    const type = String(issue?.entity_type || '').trim().toLowerCase();
+    const key = String(issue?.entity_key || '').trim();
+    if (type === 'product') {
+      return `/products/${encodeURIComponent(key)}`;
+    }
+    if (type === 'page') {
+      const raw = key.startsWith('page.') ? key.slice('page.'.length) : key;
+      if (raw === 'about') return '/about';
+      if (raw === 'contact') return '/contact';
+      if (!raw) return '/pages';
+      return `/pages/${encodeURIComponent(raw)}`;
+    }
+    return '/';
+  }
+
+  runStructuredDataValidation(): void {
+    this.structuredDataLoading = true;
+    this.structuredDataError = null;
+    this.structuredDataResult = null;
+    this.admin.validateStructuredData().subscribe({
+      next: (res) => {
+        this.structuredDataLoading = false;
+        this.structuredDataResult = res || null;
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.structuredDataLoading = false;
+        this.structuredDataResult = null;
+        this.structuredDataError = detail || this.t('adminUi.site.seo.structuredData.errors.load');
+      }
+    });
+  }
+
+	  selectInfoLang(lang: UiLang): void {
+	    this.infoLang = lang;
+	  }
 
   loadInfo(): void {
     const loadKey = async (key: string, target: 'about' | 'faq' | 'shipping' | 'contact'): Promise<void> => {
@@ -5033,8 +6286,11 @@ export class AdminComponent implements OnInit, OnDestroy {
       title: key,
       ...payload
     };
-	    const onSuccess = (block?: { version?: number } | null) => {
+	    const onSuccess = (block?: any | null) => {
         this.rememberContentVersion(key, block);
+        this.pageBlocksNeedsTranslationEn[key] = Boolean(block?.needs_translation_en);
+        this.pageBlocksNeedsTranslationRo[key] = Boolean(block?.needs_translation_ro);
+        this.loadContentPages();
 	      this.infoMessage = this.t('adminUi.site.pages.success.save');
 	      this.infoError = null;
 	    };
@@ -5057,12 +6313,41 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    });
 	  }
 
+  togglePageNeedsTranslation(pageKey: PageBuilderKey, lang: UiLang, event: Event): void {
+    const key = (pageKey || '').trim();
+    if (!key) return;
+    const target = event.target as HTMLInputElement | null;
+    const checked = Boolean(target?.checked);
+    const payload = lang === 'en' ? { needs_translation_en: checked } : { needs_translation_ro: checked };
+    this.pageBlocksTranslationSaving[key] = true;
+    this.admin.updateContentTranslationStatus(key, payload).subscribe({
+      next: (block) => {
+        this.pageBlocksNeedsTranslationEn[key] = Boolean(block.needs_translation_en);
+        this.pageBlocksNeedsTranslationRo[key] = Boolean(block.needs_translation_ro);
+        this.pageBlocksTranslationSaving[key] = false;
+        this.toast.success(this.t('adminUi.site.pages.builder.translation.success'));
+        this.loadContentPages();
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.pageBlocksTranslationSaving[key] = false;
+        this.toast.error(detail || this.t('adminUi.site.pages.builder.translation.errors.save'));
+      }
+    });
+  }
+
   loadContentPages(): void {
     this.contentPagesLoading = true;
     this.contentPagesError = null;
     this.admin.listContentPages().subscribe({
       next: (pages) => {
         this.contentPages = [...(pages || [])].sort((a, b) => (a.slug || '').localeCompare(b.slug || ''));
+        this.pageBlocksNeedsTranslationEn = {};
+        this.pageBlocksNeedsTranslationRo = {};
+        for (const page of this.contentPages) {
+          this.pageBlocksNeedsTranslationEn[page.key] = Boolean(page.needs_translation_en);
+          this.pageBlocksNeedsTranslationRo[page.key] = Boolean(page.needs_translation_ro);
+        }
         this.contentPagesLoading = false;
         if (!this.contentPages.length) return;
         const exists = this.contentPages.some((p) => p.key === this.pageBlocksKey);
@@ -5091,14 +6376,27 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.admin.getContent(pageKey).subscribe({
       next: (block) => {
         this.rememberContentVersion(pageKey, block);
+        this.pageBlocksNeedsTranslationEn[pageKey] = Boolean(block.needs_translation_en);
+        this.pageBlocksNeedsTranslationRo[pageKey] = Boolean(block.needs_translation_ro);
+        this.pageBlocksStatus[pageKey] =
+          block.status === 'published' ? 'published' : block.status === 'review' ? 'review' : 'draft';
+        this.pageBlocksPublishedAt[pageKey] = block.published_at ? this.toLocalDateTime(block.published_at) : '';
+        this.pageBlocksPublishedUntil[pageKey] = block.published_until ? this.toLocalDateTime(block.published_until) : '';
         const metaObj = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
         this.pageBlocksMeta[pageKey] = metaObj;
+        this.pageBlocksRequiresAuth[pageKey] = Boolean(metaObj['requires_auth']);
         this.pageBlocks[pageKey] = this.parsePageBlocksDraft(metaObj);
       },
       error: (err) => {
         if (err?.status === 404) {
           delete this.contentVersions[pageKey];
+          this.pageBlocksNeedsTranslationEn[pageKey] = false;
+          this.pageBlocksNeedsTranslationRo[pageKey] = false;
+          this.pageBlocksStatus[pageKey] = 'draft';
+          this.pageBlocksPublishedAt[pageKey] = '';
+          this.pageBlocksPublishedUntil[pageKey] = '';
           this.pageBlocksMeta[pageKey] = {};
+          this.pageBlocksRequiresAuth[pageKey] = false;
           this.pageBlocks[pageKey] = [];
           return;
         }
@@ -5123,10 +6421,24 @@ export class AdminComponent implements OnInit, OnDestroy {
     }
     const key = `page.${slug}` as PageBuilderKey;
     this.creatingCustomPage = true;
+    const published_at =
+      this.newCustomPageStatus === 'published'
+        ? this.newCustomPagePublishedAt
+          ? new Date(this.newCustomPagePublishedAt).toISOString()
+          : null
+        : null;
+    const published_until =
+      this.newCustomPageStatus === 'published'
+        ? this.newCustomPagePublishedUntil
+          ? new Date(this.newCustomPagePublishedUntil).toISOString()
+          : null
+        : null;
     const payload = {
       title,
       body_markdown: 'Page builder',
       status: this.newCustomPageStatus,
+      published_at,
+      published_until,
       meta: { version: 2, blocks: [] }
     };
     const done = () => {
@@ -5138,6 +6450,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.toast.success(this.t('adminUi.site.pages.success.created'));
         this.newCustomPageTitle = '';
         this.newCustomPageStatus = 'draft';
+        this.newCustomPagePublishedAt = '';
+        this.newCustomPagePublishedUntil = '';
         this.loadContentPages();
         this.pageBlocksKey = key;
         this.loadPageBlocks(key);
@@ -5197,6 +6511,76 @@ export class AdminComponent implements OnInit, OnDestroy {
       error: (err) => {
         const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
         this.toast.error(detail || this.t('adminUi.site.pages.redirects.errors.delete'));
+      }
+    });
+  }
+
+  exportContentRedirects(): void {
+    if (this.redirectsExporting) return;
+    this.redirectsExporting = true;
+    const q = (this.redirectsQuery || '').trim();
+    this.admin.exportContentRedirects({ q: q || undefined }).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const stamp = new Date().toISOString().slice(0, 10);
+        a.download = `content-redirects-${stamp}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        this.redirectsExporting = false;
+        this.toast.success(this.t('adminUi.site.pages.redirects.success.export'));
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.redirectsExporting = false;
+        this.toast.error(detail || this.t('adminUi.site.pages.redirects.errors.export'));
+      }
+    });
+  }
+
+  importContentRedirects(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.[0] || null;
+    if (input) input.value = '';
+    if (!file) return;
+    if (this.redirectsImporting) return;
+    this.redirectsImporting = true;
+    this.redirectsImportResult = null;
+    this.admin.importContentRedirects(file).subscribe({
+      next: (res) => {
+        this.redirectsImportResult = res || null;
+        this.redirectsImporting = false;
+        this.toast.success(this.t('adminUi.site.pages.redirects.success.import'));
+        this.loadContentRedirects(true);
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.redirectsImporting = false;
+        this.toast.error(detail || this.t('adminUi.site.pages.redirects.errors.import'));
+      }
+    });
+  }
+
+  runLinkCheck(keyOverride?: string): void {
+    const key = (keyOverride ?? this.linkCheckKey ?? '').trim();
+    if (!key) return;
+    this.linkCheckKey = key;
+    this.linkCheckLoading = true;
+    this.linkCheckError = null;
+    this.linkCheckIssues = [];
+    this.admin.linkCheckContent(key).subscribe({
+      next: (resp) => {
+        this.linkCheckIssues = resp?.issues || [];
+        this.linkCheckLoading = false;
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.linkCheckError = detail || this.t('adminUi.content.linkCheck.errors.load');
+        this.linkCheckIssues = [];
+        this.linkCheckLoading = false;
       }
     });
   }
@@ -5325,6 +6709,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         body_markdown: this.emptyLocalizedText(),
         url: '',
         link_url: '',
+        focal_x: 50,
+        focal_y: 50,
         alt: this.emptyLocalizedText(),
         caption: this.emptyLocalizedText(),
         images: [],
@@ -5340,6 +6726,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         draft.link_url = typeof rec['link_url'] === 'string' ? String(rec['link_url']).trim() : '';
         draft.alt = this.toLocalizedText(rec['alt']);
         draft.caption = this.toLocalizedText(rec['caption']);
+        draft.focal_x = this.toFocalValue(rec['focal_x']);
+        draft.focal_y = this.toFocalValue(rec['focal_y']);
       } else if (typeRaw === 'gallery') {
         const imagesRaw = rec['images'];
         if (Array.isArray(imagesRaw)) {
@@ -5351,7 +6739,9 @@ export class AdminComponent implements OnInit, OnDestroy {
             draft.images.push({
               url,
               alt: this.toLocalizedText(imgRec['alt']),
-              caption: this.toLocalizedText(imgRec['caption'])
+              caption: this.toLocalizedText(imgRec['caption']),
+              focal_x: this.toFocalValue(imgRec['focal_x']),
+              focal_y: this.toFocalValue(imgRec['focal_y'])
             });
           }
         }
@@ -5391,6 +6781,8 @@ export class AdminComponent implements OnInit, OnDestroy {
       body_markdown: this.emptyLocalizedText(),
       url: '',
       link_url: '',
+      focal_x: 50,
+      focal_y: 50,
       alt: this.emptyLocalizedText(),
       caption: this.emptyLocalizedText(),
       images: [],
@@ -5437,19 +6829,25 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.draggingPageBlockKey = null;
   }
 
-  setPageImageBlockUrl(pageKey: PageBuilderKey, blockKey: string, url: string): void {
-    const value = (url || '').trim();
+  setPageImageBlockUrl(pageKey: PageBuilderKey, blockKey: string, asset: ContentImageAssetRead): void {
+    const value = (asset?.url || '').trim();
     if (!value) return;
-    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => (b.key === blockKey ? { ...b, url: value } : b));
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) =>
+      b.key === blockKey ? { ...b, url: value, focal_x: focalX, focal_y: focalY } : b
+    );
     this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
   }
 
-  setPageBannerSlideImage(pageKey: PageBuilderKey, blockKey: string, url: string): void {
-    const value = (url || '').trim();
+  setPageBannerSlideImage(pageKey: PageBuilderKey, blockKey: string, asset: ContentImageAssetRead): void {
+    const value = (asset?.url || '').trim();
     if (!value) return;
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
     this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'banner') return b;
-      return { ...b, slide: { ...b.slide, image_url: value } };
+      return { ...b, slide: { ...b.slide, image_url: value, focal_x: focalX, focal_y: focalY } };
     });
     this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
   }
@@ -5484,15 +6882,17 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  setPageCarouselSlideImage(pageKey: PageBuilderKey, blockKey: string, idx: number, url: string): void {
-    const value = (url || '').trim();
+  setPageCarouselSlideImage(pageKey: PageBuilderKey, blockKey: string, idx: number, asset: ContentImageAssetRead): void {
+    const value = (asset?.url || '').trim();
     if (!value) return;
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
     this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'carousel') return b;
       const slides = [...(b.slides || [])];
       const target = slides[idx];
       if (!target) return b;
-      slides[idx] = { ...target, image_url: value };
+      slides[idx] = { ...target, image_url: value, focal_x: focalX, focal_y: focalY };
       return { ...b, slides };
     });
     this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
@@ -5508,16 +6908,20 @@ export class AdminComponent implements OnInit, OnDestroy {
           {
             url: '',
             alt: this.emptyLocalizedText(),
-            caption: this.emptyLocalizedText()
+            caption: this.emptyLocalizedText(),
+            focal_x: 50,
+            focal_y: 50
           }
         ]
       };
     });
   }
 
-  addPageGalleryImageFromAsset(pageKey: PageBuilderKey, blockKey: string, url: string): void {
-    const value = (url || '').trim();
+  addPageGalleryImageFromAsset(pageKey: PageBuilderKey, blockKey: string, asset: ContentImageAssetRead): void {
+    const value = (asset?.url || '').trim();
     if (!value) return;
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
     this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'gallery') return b;
       return {
@@ -5527,7 +6931,9 @@ export class AdminComponent implements OnInit, OnDestroy {
           {
             url: value,
             alt: this.emptyLocalizedText(),
-            caption: this.emptyLocalizedText()
+            caption: this.emptyLocalizedText(),
+            focal_x: focalX,
+            focal_y: focalY
           }
         ]
       };
@@ -5557,8 +6963,16 @@ export class AdminComponent implements OnInit, OnDestroy {
         base['link_url'] = b.link_url;
         base['alt'] = b.alt;
         base['caption'] = b.caption;
+        base['focal_x'] = this.toFocalValue(b.focal_x);
+        base['focal_y'] = this.toFocalValue(b.focal_y);
       } else if (b.type === 'gallery') {
-        base['images'] = b.images.map((img) => ({ url: img.url, alt: img.alt, caption: img.caption }));
+        base['images'] = b.images.map((img) => ({
+          url: img.url,
+          alt: img.alt,
+          caption: img.caption,
+          focal_x: this.toFocalValue(img.focal_x),
+          focal_y: this.toFocalValue(img.focal_y)
+        }));
       } else if (b.type === 'banner') {
         base['slide'] = this.serializeSlideDraft(b.slide);
       } else if (b.type === 'carousel') {
@@ -5568,8 +6982,26 @@ export class AdminComponent implements OnInit, OnDestroy {
       return base;
     });
 
-    const meta = { ...(this.pageBlocksMeta[pageKey] || {}), blocks };
-    const payload: Record<string, unknown> = { meta };
+    const meta = { ...(this.pageBlocksMeta[pageKey] || {}), blocks } as Record<string, unknown>;
+    if (this.pageBlocksRequiresAuth[pageKey]) {
+      meta['requires_auth'] = true;
+    } else {
+      delete meta['requires_auth'];
+    }
+    const status: ContentStatusUi = this.pageBlocksStatus[pageKey] || 'draft';
+    const published_at =
+      status === 'published'
+        ? this.pageBlocksPublishedAt[pageKey]
+          ? new Date(this.pageBlocksPublishedAt[pageKey]).toISOString()
+          : null
+        : null;
+    const published_until =
+      status === 'published'
+        ? this.pageBlocksPublishedUntil[pageKey]
+          ? new Date(this.pageBlocksPublishedUntil[pageKey]).toISOString()
+          : null
+        : null;
+    const payload: Record<string, unknown> = { meta, status, published_at, published_until, lang: this.infoLang };
 
     const ok = this.t('adminUi.site.pages.builder.success.save');
     const errMsg = this.t('adminUi.site.pages.builder.errors.save');
@@ -5579,7 +7011,14 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.admin.updateContentBlock(pageKey, this.withExpectedVersion(pageKey, payload)).subscribe({
       next: (block) => {
         this.rememberContentVersion(pageKey, block);
+        this.pageBlocksNeedsTranslationEn[pageKey] = Boolean(block.needs_translation_en);
+        this.pageBlocksNeedsTranslationRo[pageKey] = Boolean(block.needs_translation_ro);
+        this.pageBlocksStatus[pageKey] =
+          block.status === 'published' ? 'published' : block.status === 'review' ? 'review' : 'draft';
+        this.pageBlocksPublishedAt[pageKey] = block.published_at ? this.toLocalDateTime(block.published_at) : '';
+        this.pageBlocksPublishedUntil[pageKey] = block.published_until ? this.toLocalDateTime(block.published_until) : '';
         this.pageBlocksMeta[pageKey] = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
+        this.pageBlocksRequiresAuth[pageKey] = Boolean(this.pageBlocksMeta[pageKey]?.['requires_auth']);
         this.pageBlocksMessage[pageKey] = ok;
         this.pageBlocksError[pageKey] = null;
       },
@@ -5593,13 +7032,23 @@ export class AdminComponent implements OnInit, OnDestroy {
           const createPayload = {
             title: this.contentPages.find((p) => p.key === pageKey)?.title || pageKey,
             body_markdown: 'Page builder',
-            status: 'published',
+            status,
+            lang: this.infoLang,
+            published_at,
+            published_until,
             meta
           };
           this.admin.createContent(pageKey, createPayload).subscribe({
             next: (created) => {
               this.rememberContentVersion(pageKey, created);
+              this.pageBlocksNeedsTranslationEn[pageKey] = Boolean(created.needs_translation_en);
+              this.pageBlocksNeedsTranslationRo[pageKey] = Boolean(created.needs_translation_ro);
+              this.pageBlocksStatus[pageKey] =
+                created.status === 'published' ? 'published' : created.status === 'review' ? 'review' : 'draft';
+              this.pageBlocksPublishedAt[pageKey] = created.published_at ? this.toLocalDateTime(created.published_at) : '';
+              this.pageBlocksPublishedUntil[pageKey] = created.published_until ? this.toLocalDateTime(created.published_until) : '';
               this.pageBlocksMeta[pageKey] = ((created as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
+              this.pageBlocksRequiresAuth[pageKey] = Boolean(this.pageBlocksMeta[pageKey]?.['requires_auth']);
               this.pageBlocksMessage[pageKey] = ok;
               this.pageBlocksError[pageKey] = null;
             },
@@ -5640,6 +7089,16 @@ export class AdminComponent implements OnInit, OnDestroy {
     };
   }
 
+  private toFocalValue(value: unknown, fallback = 50): number {
+    const raw = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(raw)) return fallback;
+    return Math.max(0, Math.min(100, Math.round(raw)));
+  }
+
+  focalPosition(focalX: unknown, focalY: unknown): string {
+    return `${this.toFocalValue(focalX)}% ${this.toFocalValue(focalY)}%`;
+  }
+
   private emptySlideDraft(): SlideDraft {
     return {
       image_url: '',
@@ -5650,7 +7109,9 @@ export class AdminComponent implements OnInit, OnDestroy {
       cta_url: '',
       variant: 'split',
       size: 'M',
-      text_style: 'dark'
+      text_style: 'dark',
+      focal_x: 50,
+      focal_y: 50
     };
   }
 
@@ -5672,6 +7133,8 @@ export class AdminComponent implements OnInit, OnDestroy {
     draft.variant = rec['variant'] === 'full' ? 'full' : 'split';
     draft.size = rec['size'] === 'S' || rec['size'] === 'L' ? (rec['size'] as any) : 'M';
     draft.text_style = rec['text_style'] === 'light' ? 'light' : 'dark';
+    draft.focal_x = this.toFocalValue(rec['focal_x']);
+    draft.focal_y = this.toFocalValue(rec['focal_y']);
     return draft;
   }
 
@@ -5697,7 +7160,9 @@ export class AdminComponent implements OnInit, OnDestroy {
       cta_url: (slide.cta_url || '').trim(),
       variant: slide.variant,
       size: slide.size,
-      text_style: slide.text_style
+      text_style: slide.text_style,
+      focal_x: this.toFocalValue(slide.focal_x),
+      focal_y: this.toFocalValue(slide.focal_y)
     };
   }
 
@@ -5728,7 +7193,9 @@ export class AdminComponent implements OnInit, OnDestroy {
       cta_url: (slide.cta_url || '').trim() || null,
       variant: slide.variant,
       size: slide.size,
-      text_style: slide.text_style
+      text_style: slide.text_style,
+      focal_x: this.toFocalValue(slide.focal_x),
+      focal_y: this.toFocalValue(slide.focal_y)
     };
   }
 
@@ -5789,6 +7256,8 @@ export class AdminComponent implements OnInit, OnDestroy {
       body_markdown: this.emptyLocalizedText(),
       url: '',
       link_url: '',
+      focal_x: 50,
+      focal_y: 50,
       alt: this.emptyLocalizedText(),
       caption: this.emptyLocalizedText(),
       images: [],
@@ -5877,10 +7346,12 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.homeBlocks = this.homeBlocks.filter((b) => b.key !== key);
   }
 
-  setImageBlockUrl(blockKey: string, url: string): void {
-    const value = (url || '').trim();
+  setImageBlockUrl(blockKey: string, asset: ContentImageAssetRead): void {
+    const value = (asset?.url || '').trim();
     if (!value) return;
-    this.homeBlocks = this.homeBlocks.map((b) => (b.key === blockKey ? { ...b, url: value } : b));
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
+    this.homeBlocks = this.homeBlocks.map((b) => (b.key === blockKey ? { ...b, url: value, focal_x: focalX, focal_y: focalY } : b));
     this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
   }
 
@@ -5894,16 +7365,20 @@ export class AdminComponent implements OnInit, OnDestroy {
           {
             url: '',
             alt: this.emptyLocalizedText(),
-            caption: this.emptyLocalizedText()
+            caption: this.emptyLocalizedText(),
+            focal_x: 50,
+            focal_y: 50
           }
         ]
       };
     });
   }
 
-  addGalleryImageFromAsset(blockKey: string, url: string): void {
-    const value = (url || '').trim();
+  addGalleryImageFromAsset(blockKey: string, asset: ContentImageAssetRead): void {
+    const value = (asset?.url || '').trim();
     if (!value) return;
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
     this.homeBlocks = this.homeBlocks.map((b) => {
       if (b.key !== blockKey || b.type !== 'gallery') return b;
       return {
@@ -5913,7 +7388,9 @@ export class AdminComponent implements OnInit, OnDestroy {
           {
             url: value,
             alt: this.emptyLocalizedText(),
-            caption: this.emptyLocalizedText()
+            caption: this.emptyLocalizedText(),
+            focal_x: focalX,
+            focal_y: focalY
           }
         ]
       };
@@ -5930,12 +7407,14 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  setBannerSlideImage(blockKey: string, url: string): void {
-    const value = (url || '').trim();
+  setBannerSlideImage(blockKey: string, asset: ContentImageAssetRead): void {
+    const value = (asset?.url || '').trim();
     if (!value) return;
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
     this.homeBlocks = this.homeBlocks.map((b) => {
       if (b.key !== blockKey || b.type !== 'banner') return b;
-      return { ...b, slide: { ...b.slide, image_url: value } };
+      return { ...b, slide: { ...b.slide, image_url: value, focal_x: focalX, focal_y: focalY } };
     });
     this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
   }
@@ -5970,15 +7449,17 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  setCarouselSlideImage(blockKey: string, idx: number, url: string): void {
-    const value = (url || '').trim();
+  setCarouselSlideImage(blockKey: string, idx: number, asset: ContentImageAssetRead): void {
+    const value = (asset?.url || '').trim();
     if (!value) return;
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
     this.homeBlocks = this.homeBlocks.map((b) => {
       if (b.key !== blockKey || b.type !== 'carousel') return b;
       const slides = [...(b.slides || [])];
       const target = slides[idx];
       if (!target) return b;
-      slides[idx] = { ...target, image_url: value };
+      slides[idx] = { ...target, image_url: value, focal_x: focalX, focal_y: focalY };
       return { ...b, slides };
     });
     this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
@@ -6043,6 +7524,8 @@ export class AdminComponent implements OnInit, OnDestroy {
               draft.link_url = typeof rec['link_url'] === 'string' ? String(rec['link_url']).trim() : '';
               draft.alt = this.toLocalizedText(rec['alt']);
               draft.caption = this.toLocalizedText(rec['caption']);
+              draft.focal_x = this.toFocalValue(rec['focal_x']);
+              draft.focal_y = this.toFocalValue(rec['focal_y']);
             } else if (type === 'gallery') {
               const imagesRaw = rec['images'];
               if (Array.isArray(imagesRaw)) {
@@ -6054,7 +7537,9 @@ export class AdminComponent implements OnInit, OnDestroy {
                   draft.images.push({
                     url,
                     alt: this.toLocalizedText(imgRec['alt']),
-                    caption: this.toLocalizedText(imgRec['caption'])
+                    caption: this.toLocalizedText(imgRec['caption']),
+                    focal_x: this.toFocalValue(imgRec['focal_x']),
+                    focal_y: this.toFocalValue(imgRec['focal_y'])
                   });
                 }
               }
@@ -6131,9 +7616,17 @@ export class AdminComponent implements OnInit, OnDestroy {
         base['link_url'] = b.link_url;
         base['alt'] = b.alt;
         base['caption'] = b.caption;
+        base['focal_x'] = this.toFocalValue(b.focal_x);
+        base['focal_y'] = this.toFocalValue(b.focal_y);
       } else if (b.type === 'gallery') {
         base['title'] = b.title;
-        base['images'] = b.images.map((img) => ({ url: img.url, alt: img.alt, caption: img.caption }));
+        base['images'] = b.images.map((img) => ({
+          url: img.url,
+          alt: img.alt,
+          caption: img.caption,
+          focal_x: this.toFocalValue(img.focal_x),
+          focal_y: this.toFocalValue(img.focal_y)
+        }));
       } else if (b.type === 'banner') {
         base['title'] = b.title;
         base['slide'] = this.serializeSlideDraft(b.slide);

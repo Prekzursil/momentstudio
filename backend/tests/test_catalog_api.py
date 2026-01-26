@@ -1,5 +1,7 @@
 import asyncio
 import io
+import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Dict
 
 import pytest
@@ -11,8 +13,10 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.main import app
 from app.db.base import Base
 from app.db.session import get_session
+from app.models.cart import Cart, CartItem
 from app.models.user import UserRole
 from app.models.catalog import BackInStockRequest, Category, CategoryTranslation, Product, ProductAuditLog, ProductTranslation
+from app.models.passkeys import UserPasskey
 from app.services.auth import create_user
 from app.schemas.user import UserCreate
 from app.core.config import settings
@@ -49,6 +53,16 @@ def create_admin_token(session_factory, email="admin@example.com"):
         async with session_factory() as session:
             user = await create_user(session, UserCreate(email=email, password="adminpass", name="Admin"))
             user.role = UserRole.admin
+            session.add(
+                UserPasskey(
+                    user_id=user.id,
+                    name="Test Passkey",
+                    credential_id=f"cred-{user.id}",
+                    public_key=b"test",
+                    sign_count=0,
+                    backed_up=False,
+                )
+            )
             await session.commit()
             from app.services.auth import issue_tokens_for_user
 
@@ -129,12 +143,27 @@ def test_catalog_admin_and_public_flows(test_app: Dict[str, object]) -> None:
     assert second.status_code == 201, second.text
     assert second.json()["status"] == "published"
 
+    badge_update = client.patch(
+        "/api/v1/catalog/products/blue-cup",
+        json={
+            "badges": [
+                {"badge": "new", "start_at": None, "end_at": None},
+                {"badge": "limited", "start_at": datetime.now(timezone.utc).isoformat(), "end_at": None},
+            ]
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert badge_update.status_code == 200, badge_update.text
+    badge_payload = badge_update.json()["badges"]
+    assert {b["badge"] for b in badge_payload} == {"new", "limited"}
+
     # Public list should only include published + active products
     res = client.get("/api/v1/catalog/products?sort=name_asc")
     assert res.status_code == 200
     body = res.json()
     assert body["meta"]["total_items"] == 1
     assert len(body["items"]) == 1
+    assert {b["badge"] for b in body["items"][0].get("badges", [])} == {"new", "limited"}
     assert body["bounds"]["min_price"] == 25.0
     assert body["bounds"]["max_price"] == 25.0
     assert body["bounds"]["currency"] == "RON"
@@ -565,6 +594,107 @@ def test_product_image_upload_and_delete(tmp_path, test_app: Dict[str, object]) 
     settings.media_root = original_media
 
 
+def test_product_image_translations_and_stats(tmp_path, test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal, email="imgmetaadmin@example.com")
+
+    original_media = settings.media_root
+    settings.media_root = str(tmp_path)
+
+    try:
+        res = client.post(
+            "/api/v1/catalog/categories",
+            json={"name": "Plates"},
+            headers=auth_headers(admin_token),
+        )
+        category_id = res.json()["id"]
+
+        res = client.post(
+            "/api/v1/catalog/products",
+            json={
+                "category_id": category_id,
+                "slug": "meta-plate",
+                "name": "Meta Plate",
+                "base_price": 12,
+                "currency": "RON",
+                "stock_quantity": 2,
+            },
+            headers=auth_headers(admin_token),
+        )
+        assert res.status_code == 201
+
+        upload_res = client.post(
+            "/api/v1/catalog/products/meta-plate/images",
+            files={"file": ("pic.jpg", _jpeg_bytes(), "image/jpeg")},
+            headers=auth_headers(admin_token),
+        )
+        assert upload_res.status_code == 200
+        image_id = upload_res.json()["images"][0]["id"]
+        image_url = upload_res.json()["images"][0]["url"]
+
+        stats_res = client.get(
+            f"/api/v1/catalog/products/meta-plate/images/{image_id}/stats",
+            headers=auth_headers(admin_token),
+        )
+        assert stats_res.status_code == 200, stats_res.text
+        stats = stats_res.json()
+        assert stats["original_bytes"] is not None
+        assert stats["thumb_sm_bytes"] is not None
+        assert stats["width"] == 1
+        assert stats["height"] == 1
+
+        ro_res = client.put(
+            f"/api/v1/catalog/products/meta-plate/images/{image_id}/translations/ro",
+            json={"alt_text": "Farfurie", "caption": "Legendă"},
+            headers=auth_headers(admin_token),
+        )
+        assert ro_res.status_code == 200, ro_res.text
+        en_res = client.put(
+            f"/api/v1/catalog/products/meta-plate/images/{image_id}/translations/en",
+            json={"alt_text": "Plate", "caption": "Caption"},
+            headers=auth_headers(admin_token),
+        )
+        assert en_res.status_code == 200, en_res.text
+
+        translations = client.get(
+            f"/api/v1/catalog/products/meta-plate/images/{image_id}/translations",
+            headers=auth_headers(admin_token),
+        )
+        assert translations.status_code == 200
+        rows = translations.json()
+        langs = {row["lang"]: row for row in rows}
+        assert langs["ro"]["alt_text"] == "Farfurie"
+        assert langs["en"]["caption"] == "Caption"
+
+        ro_product = client.get(
+            "/api/v1/catalog/products/meta-plate",
+            params={"lang": "ro"},
+            headers=auth_headers(admin_token),
+        )
+        assert ro_product.status_code == 200, ro_product.text
+        assert ro_product.json()["images"][0]["alt_text"] == "Farfurie"
+        assert ro_product.json()["images"][0]["caption"] == "Legendă"
+
+        from pathlib import Path
+
+        if image_url.startswith("/media/"):
+            rel = image_url.removeprefix("/media/")
+            original_path = Path(settings.media_root) / rel
+            thumb_sm = original_path.with_name(f"{original_path.stem}-sm{original_path.suffix}")
+            if thumb_sm.exists():
+                thumb_sm.unlink()
+
+        reprocess_res = client.post(
+            f"/api/v1/catalog/products/meta-plate/images/{image_id}/reprocess",
+            headers=auth_headers(admin_token),
+        )
+        assert reprocess_res.status_code == 200, reprocess_res.text
+        assert reprocess_res.json()["thumb_sm_bytes"] is not None
+    finally:
+        settings.media_root = original_media
+
+
 def test_bulk_update_and_publish(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
@@ -608,6 +738,70 @@ def test_bulk_update_and_publish(test_app: Dict[str, object]) -> None:
     assert updated[prods[0]["id"]]["stock_quantity"] == 5
     assert updated[prods[0]["id"]]["status"] == "published"
     assert updated[prods[0]["id"]]["publish_at"] is not None
+
+
+def test_bulk_category_assignment_and_publish_scheduling(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal, email="scheduleadmin@example.com")
+
+    cat1 = client.post(
+        "/api/v1/catalog/categories",
+        json={"name": "Schedule Cat 1"},
+        headers=auth_headers(admin_token),
+    ).json()["id"]
+    cat2 = client.post(
+        "/api/v1/catalog/categories",
+        json={"name": "Schedule Cat 2"},
+        headers=auth_headers(admin_token),
+    ).json()["id"]
+
+    prod = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": cat1,
+            "slug": "sched-prod",
+            "name": "Sched Prod",
+            "base_price": 10.0,
+            "currency": "RON",
+            "stock_quantity": 1,
+        },
+        headers=auth_headers(admin_token),
+    ).json()
+
+    bulk_res = client.post(
+        "/api/v1/catalog/products/bulk-update",
+        json=[{"product_id": prod["id"], "category_id": cat2}],
+        headers=auth_headers(admin_token),
+    )
+    assert bulk_res.status_code == 200, bulk_res.text
+
+    admin_view = client.get("/api/v1/catalog/products/sched-prod", headers=auth_headers(admin_token))
+    assert admin_view.status_code == 200, admin_view.text
+    assert admin_view.json()["category"]["id"] == cat2
+
+    past = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+    schedule_res = client.post(
+        "/api/v1/catalog/products/bulk-update",
+        json=[{"product_id": prod["id"], "publish_scheduled_for": past}],
+        headers=auth_headers(admin_token),
+    )
+    assert schedule_res.status_code == 200, schedule_res.text
+
+    public_view = client.get("/api/v1/catalog/products/sched-prod")
+    assert public_view.status_code == 200, public_view.text
+    assert public_view.json()["status"] == "published"
+
+    unpublish_past = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+    unpublish_res = client.post(
+        "/api/v1/catalog/products/bulk-update",
+        json=[{"product_id": prod["id"], "unpublish_scheduled_for": unpublish_past}],
+        headers=auth_headers(admin_token),
+    )
+    assert unpublish_res.status_code == 200, unpublish_res.text
+
+    public_after_unpublish = client.get("/api/v1/catalog/products/sched-prod")
+    assert public_after_unpublish.status_code == 404
 
 
 def test_product_reviews_and_related(test_app: Dict[str, object]) -> None:
@@ -673,6 +867,104 @@ def test_product_reviews_and_related(test_app: Dict[str, object]) -> None:
     related = client.get("/api/v1/catalog/products/teapot/related")
     assert related.status_code == 200
     assert len(related.json()) >= 1
+
+
+def test_product_relationships_curate_related_and_upsells(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal, email="relsadmin@example.com")
+
+    cat1 = client.post(
+        "/api/v1/catalog/categories",
+        json={"name": "Base"},
+        headers=auth_headers(admin_token),
+    ).json()["id"]
+    cat2 = client.post(
+        "/api/v1/catalog/categories",
+        json={"name": "Cross"},
+        headers=auth_headers(admin_token),
+    ).json()["id"]
+
+    base_res = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": cat1,
+            "slug": "base-prod",
+            "name": "Base product",
+            "base_price": 40,
+            "currency": "RON",
+            "stock_quantity": 2,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert base_res.status_code == 201, base_res.text
+
+    client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": cat1,
+            "slug": "same-cat",
+            "name": "Same category",
+            "base_price": 45,
+            "currency": "RON",
+            "stock_quantity": 2,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    )
+
+    related = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": cat2,
+            "slug": "cross-related",
+            "name": "Cross related",
+            "base_price": 50,
+            "currency": "RON",
+            "stock_quantity": 2,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    ).json()
+
+    upsell = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": cat2,
+            "slug": "cross-upsell",
+            "name": "Cross upsell",
+            "base_price": 60,
+            "currency": "RON",
+            "stock_quantity": 2,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    ).json()
+
+    update = client.put(
+        "/api/v1/catalog/products/base-prod/relationships",
+        json={
+            "related_product_ids": [related["id"]],
+            "upsell_product_ids": [upsell["id"]],
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert update.status_code == 200, update.text
+    assert update.json()["related_product_ids"] == [related["id"]]
+    assert update.json()["upsell_product_ids"] == [upsell["id"]]
+
+    read_admin = client.get("/api/v1/catalog/products/base-prod/relationships", headers=auth_headers(admin_token))
+    assert read_admin.status_code == 200
+    assert read_admin.json()["related_product_ids"] == [related["id"]]
+
+    related_public = client.get("/api/v1/catalog/products/base-prod/related")
+    assert related_public.status_code == 200, related_public.text
+    assert [p["slug"] for p in related_public.json()] == ["cross-related"]
+
+    upsells_public = client.get("/api/v1/catalog/products/base-prod/upsells")
+    assert upsells_public.status_code == 200, upsells_public.text
+    assert [p["slug"] for p in upsells_public.json()] == ["cross-upsell"]
 
 
 def test_slug_history_recently_viewed_and_csv(test_app: Dict[str, object]) -> None:
@@ -994,3 +1286,159 @@ def test_back_in_stock_fulfilled_on_restock(test_app: Dict[str, object]) -> None
 
     record = asyncio.run(read_request())
     assert record.fulfilled_at is not None
+
+
+def test_catalog_variant_matrix_update_and_delete_guards(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token = create_admin_token(SessionLocal, email="variants@example.com")
+
+    category_res = client.post(
+        "/api/v1/catalog/categories",
+        json={"name": "Cups"},
+        headers=auth_headers(admin_token),
+    )
+    assert category_res.status_code == 201, category_res.text
+    category_id = category_res.json()["id"]
+
+    create_res = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": category_id,
+            "slug": "variant-cup",
+            "name": "Variant Cup",
+            "base_price": 10.0,
+            "currency": "RON",
+            "stock_quantity": 3,
+            "status": "published",
+            "variants": [{"name": "Large", "additional_price_delta": 2.5, "stock_quantity": 2}],
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert create_res.status_code == 201, create_res.text
+    product_id = create_res.json()["id"]
+    large_id = create_res.json()["variants"][0]["id"]
+
+    update_res = client.put(
+        "/api/v1/catalog/products/variant-cup/variants",
+        json={
+            "variants": [
+                {"id": large_id, "name": "Large", "additional_price_delta": 3.0, "stock_quantity": 5},
+                {"name": "Small", "additional_price_delta": -1.0, "stock_quantity": 1},
+            ]
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert update_res.status_code == 200, update_res.text
+    variants = update_res.json()
+    assert len(variants) == 2
+    assert next(v for v in variants if v["id"] == large_id)["stock_quantity"] == 5
+    small_id = next(v for v in variants if v["name"] == "Small")["id"]
+
+    delete_res = client.put(
+        "/api/v1/catalog/products/variant-cup/variants",
+        json={
+            "variants": [{"id": large_id, "name": "Large", "additional_price_delta": 3.0, "stock_quantity": 5}],
+            "delete_variant_ids": [small_id],
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert delete_res.status_code == 200, delete_res.text
+    assert len(delete_res.json()) == 1
+
+    async def add_cart_item() -> None:
+        async with SessionLocal() as session:
+            cart = Cart(session_id="session-1")
+            session.add(cart)
+            await session.flush()
+            session.add(
+                CartItem(
+                    cart_id=cart.id,
+                    product_id=uuid.UUID(product_id),
+                    variant_id=uuid.UUID(large_id),
+                    quantity=1,
+                    unit_price_at_add=10.0,
+                )
+            )
+            await session.commit()
+
+    asyncio.run(add_cart_item())
+
+    blocked = client.put(
+        "/api/v1/catalog/products/variant-cup/variants",
+        json={"variants": [], "delete_variant_ids": [large_id]},
+        headers=auth_headers(admin_token),
+    )
+    assert blocked.status_code == 400, blocked.text
+    assert "cart" in blocked.json()["detail"].lower()
+
+
+def test_stock_adjustment_ledger_records_changes(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token = create_admin_token(SessionLocal, email="stock@example.com")
+
+    category_res = client.post(
+        "/api/v1/catalog/categories",
+        json={"name": "Art"},
+        headers=auth_headers(admin_token),
+    )
+    assert category_res.status_code == 201, category_res.text
+    category_id = category_res.json()["id"]
+
+    create_res = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": category_id,
+            "slug": "stock-cup",
+            "name": "Stock Cup",
+            "base_price": 10.0,
+            "currency": "RON",
+            "stock_quantity": 3,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert create_res.status_code == 201, create_res.text
+    product_id = create_res.json()["id"]
+
+    patch_res = client.patch(
+        "/api/v1/catalog/products/stock-cup",
+        json={"stock_quantity": 10},
+        headers=auth_headers(admin_token),
+    )
+    assert patch_res.status_code == 200, patch_res.text
+
+    list_res = client.get(
+        "/api/v1/admin/dashboard/stock-adjustments",
+        params={"product_id": product_id},
+        headers=auth_headers(admin_token),
+    )
+    assert list_res.status_code == 200, list_res.text
+    rows = list_res.json()
+    assert len(rows) == 1
+    assert rows[0]["delta"] == 7
+    assert rows[0]["before_quantity"] == 3
+    assert rows[0]["after_quantity"] == 10
+
+    apply_res = client.post(
+        "/api/v1/admin/dashboard/stock-adjustments",
+        json={"product_id": product_id, "delta": -2, "reason": "damage", "note": "broken"},
+        headers=auth_headers(admin_token),
+    )
+    assert apply_res.status_code == 201, apply_res.text
+    applied = apply_res.json()
+    assert applied["delta"] == -2
+    assert applied["after_quantity"] == 8
+
+    list_res = client.get(
+        "/api/v1/admin/dashboard/stock-adjustments",
+        params={"product_id": product_id},
+        headers=auth_headers(admin_token),
+    )
+    assert list_res.status_code == 200, list_res.text
+    rows = list_res.json()
+    assert len(rows) == 2
+    assert any(row["id"] == applied["id"] for row in rows)

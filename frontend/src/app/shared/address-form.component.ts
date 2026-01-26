@@ -5,7 +5,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AddressCreateRequest } from '../core/account.service';
 import { appConfig } from '../core/app-config';
 import { ButtonComponent } from './button.component';
-import { listPhoneCountries, PhoneCountryOption } from './phone';
+import { buildE164, listPhoneCountries, PhoneCountryOption, splitE164 } from './phone';
 import { RO_CITIES, RO_COUNTIES } from './ro-geo';
 
 @Component({
@@ -44,9 +44,9 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
 
       <div class="grid gap-1 text-sm">
         <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'addressForm.label' | translate }}</label>
-        <div class="grid gap-2 sm:grid-cols-2">
+        <div class="grid gap-2 sm:grid-cols-2 min-w-0">
           <select
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             name="labelPreset"
             [(ngModel)]="labelPreset"
             (ngModelChange)="applyLabelPreset()"
@@ -58,7 +58,7 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
           </select>
           <input
             *ngIf="labelPreset === 'custom'"
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+            class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
             name="labelCustom"
             autocomplete="off"
             [(ngModel)]="labelCustom"
@@ -67,6 +67,48 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
             maxlength="50"
           />
         </div>
+      </div>
+
+      <div class="grid gap-1 text-sm">
+        <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'auth.phone' | translate }}</label>
+        <div class="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
+          <select
+            class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            name="phoneCountry"
+            [(ngModel)]="phoneCountry"
+            (ngModelChange)="onPhoneChanged()"
+          >
+            <option *ngFor="let c of countries" [value]="c.code">{{ c.flag }} {{ c.dial }} {{ c.name }}</option>
+          </select>
+          <input
+            #phoneCtrl="ngModel"
+            type="tel"
+            class="w-full min-w-0 rounded-lg border bg-white px-3 py-2 text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+            [ngClass]="
+              (phoneCtrl.invalid && (phoneCtrl.touched || addrForm.submitted)) || (phoneNational && !phoneE164())
+                ? 'border-rose-300 ring-2 ring-rose-200 dark:border-rose-900/40 dark:ring-rose-900/30'
+                : 'border-slate-200 dark:border-slate-700'
+            "
+            [attr.aria-invalid]="
+              (phoneCtrl.invalid && (phoneCtrl.touched || addrForm.submitted)) || (phoneNational && !phoneE164()) ? 'true' : null
+            "
+            aria-describedby="address-phone-invalid"
+            name="phoneNational"
+            [(ngModel)]="phoneNational"
+            (ngModelChange)="onPhoneChanged()"
+            autocomplete="tel-national"
+            inputmode="numeric"
+            pattern="^[0-9]{6,14}$"
+          />
+        </div>
+        <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'auth.phoneHint' | translate }}</span>
+        <span
+          *ngIf="phoneNational && !phoneE164()"
+          id="address-phone-invalid"
+          class="text-xs font-normal text-rose-700 dark:text-rose-300"
+        >
+          {{ 'validation.phoneInvalid' | translate }}
+        </span>
       </div>
       <div class="grid gap-1 text-sm">
         <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'addressForm.line1' | translate }} <span class="text-rose-600">*</span></label>
@@ -110,7 +152,7 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
           >
           <ng-container *ngIf="model.country === 'RO'; else freeRegion">
             <select
-              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               name="region"
               autocomplete="address-level1"
               [(ngModel)]="model.region"
@@ -122,7 +164,7 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
           </ng-container>
           <ng-template #freeRegion>
             <input
-              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
               name="region"
               autocomplete="address-level1"
               [(ngModel)]="model.region"
@@ -135,7 +177,7 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
         <div class="grid gap-1 text-sm">
           <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'checkout.postal' | translate }} <span class="text-rose-600">*</span></label>
           <input
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+            class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
             name="postal_code"
             autocomplete="postal-code"
             [(ngModel)]="model.postal_code"
@@ -161,7 +203,7 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
         <div class="grid gap-1 text-sm">
           <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'checkout.country' | translate }} <span class="text-rose-600">*</span></label>
           <select
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             name="country"
             autocomplete="country"
             required
@@ -195,7 +237,7 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
           {{ 'addressForm.useAsBillingToo' | translate }}
         </button>
       </div>
-      <div class="flex justify-end gap-2 pt-2">
+      <div [ngClass]="stickyActions ? stickyActionsClass : normalActionsClass">
         <app-button type="button" variant="ghost" [label]="'addressForm.cancel' | translate" (action)="cancel.emit()"></app-button>
         <app-button type="submit" [label]="'addressForm.save' | translate"></app-button>
       </div>
@@ -209,6 +251,7 @@ export class AddressFormComponent implements OnChanges, OnDestroy {
     postal_code: '',
     country: 'RO'
   };
+  @Input() stickyActions = false;
   readonly roCounties = RO_COUNTIES;
   readonly roCities = RO_CITIES;
   readonly countries: PhoneCountryOption[];
@@ -219,8 +262,13 @@ export class AddressFormComponent implements OnChanges, OnDestroy {
   private autocompleteAbort: AbortController | null = null;
   labelPreset: 'home' | 'work' | 'other' | 'custom' = 'home';
   labelCustom = '';
+  phoneCountry = 'RO';
+  phoneNational = '';
   @Output() save = new EventEmitter<AddressCreateRequest>();
   @Output() cancel = new EventEmitter<void>();
+  readonly normalActionsClass = 'flex justify-end gap-2 pt-2';
+  readonly stickyActionsClass =
+    'sticky bottom-0 z-10 -mx-4 sm:-mx-6 mt-4 px-4 sm:px-6 py-3 flex justify-end gap-2 bg-white/95 backdrop-blur border-t border-slate-200 dark:bg-slate-900/95 dark:border-slate-700';
 
   constructor(translate: TranslateService) {
     this.countries = listPhoneCountries(translate.currentLang || 'en');
@@ -229,6 +277,7 @@ export class AddressFormComponent implements OnChanges, OnDestroy {
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['model']) {
       this.syncLabelState();
+      this.syncPhoneState();
     }
   }
 
@@ -239,6 +288,20 @@ export class AddressFormComponent implements OnChanges, OnDestroy {
     }
     this.autocompleteAbort?.abort();
     this.autocompleteAbort = null;
+  }
+
+  phoneE164(): string | null {
+    const country = (this.phoneCountry || 'RO') as any;
+    return buildE164(country, this.phoneNational);
+  }
+
+  onPhoneChanged(): void {
+    const digits = (this.phoneNational || '').trim();
+    if (!digits) {
+      this.model.phone = null;
+      return;
+    }
+    this.model.phone = this.phoneE164();
   }
 
   get postalExample(): string {
@@ -252,6 +315,18 @@ export class AddressFormComponent implements OnChanges, OnDestroy {
         DE: '12345'
       }[country] || '12345'
     );
+  }
+
+  private syncPhoneState(): void {
+    const raw = typeof this.model?.phone === 'string' ? this.model.phone.trim() : '';
+    if (!raw) {
+      this.phoneCountry = 'RO';
+      this.phoneNational = '';
+      return;
+    }
+    const split = splitE164(raw);
+    if (split.country) this.phoneCountry = split.country;
+    this.phoneNational = split.nationalNumber || '';
   }
 
   get postalPattern(): string | null {
@@ -398,7 +473,7 @@ export class AddressFormComponent implements OnChanges, OnDestroy {
   }
 
   submit(form: NgForm): void {
-    if (form.valid) {
+    if (form.valid && !(this.phoneNational && !this.phoneE164())) {
       this.save.emit(this.model);
     }
   }

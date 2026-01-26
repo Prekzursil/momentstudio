@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, date
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, String, func, ForeignKey, Integer, UniqueConstraint, JSON
+from sqlalchemy import Boolean, Date, DateTime, Enum, String, Text, func, ForeignKey, Integer, UniqueConstraint, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -17,6 +17,9 @@ if TYPE_CHECKING:
 
 class UserRole(str, enum.Enum):
     customer = "customer"
+    support = "support"
+    fulfillment = "fulfillment"
+    content = "content"
     admin = "admin"
     owner = "owner"
 
@@ -42,6 +45,11 @@ class User(Base):
     notify_blog_comments: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     notify_blog_comment_replies: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     notify_marketing: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    vip: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    admin_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    locked_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    password_reset_required: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     two_factor_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     two_factor_totp_secret: Mapped[str | None] = mapped_column(String(512), nullable=True)
     two_factor_recovery_codes: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
@@ -197,6 +205,7 @@ class RefreshSession(Base):
     replaced_by_jti: Mapped[str | None] = mapped_column(String(255), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    country_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     user: Mapped[User] = relationship("User", back_populates="refresh_sessions")
@@ -238,6 +247,8 @@ class AdminAuditLog(Base):
     actor_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     subject_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    chain_prev_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    chain_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     actor: Mapped[User | None] = relationship("User", foreign_keys=[actor_user_id], lazy="joined")

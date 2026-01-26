@@ -160,7 +160,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Payments: add PayPal webhooks to capture/settle orders even if the buyer never returns to the site.
 - [x] Payments: itemize Stripe Checkout line items (products + shipping + discount) instead of a single aggregated line.
 - [x] Payments: map internal promo codes to reusable Stripe coupons/promotion codes (avoid per-checkout coupon creation).
-- [ ] Payments: implement Netopia callback/webhook settlement + signature verification once enabled.
+- [x] Payments: implement Netopia callback/webhook settlement + signature verification once enabled.
 - [x] Money: migrate monetary fields to Decimal end-to-end (models + schemas + calculations), eliminating float casts.
 - [x] Tax: make tax/VAT strategy configurable (rate, exemptions) instead of hard-coded `0.1`.
 - [x] Receipts: add Share/Revoke actions in Account + Admin UI (copy link, show expiry, revoke token).
@@ -307,6 +307,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Search bar hitting /products.
 - [x] Product card component (image, name, price, stock badge).
 - [x] Product detail page with gallery, variants, quantity/add-to-cart.
+- [x] Storefront: product page add-to-cart respects selected variant (currently always sends `variant_id: null`).
 - [x] Handmade uniqueness note.
 - [x] Sort controls (price/name/newest).
 - [x] Price range slider.
@@ -333,6 +334,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Pricing: show EN approx EUR/USD for RON prices (display-only; checkout remains in RON) using live FX rates.
 - [x] Pricing: add FX rate source/TTL settings (backend env: `FX_RATES_URL`, `FX_RATES_CACHE_TTL_SECONDS`).
 - [x] Pricing: add optional admin override/fallback for FX rates (store last-known rates; use when upstream is down).
+- [x] Pricing: make FX rate persistence idempotent (avoid `uq_fx_rates_is_override` errors under concurrent refresh/seed by using a Postgres upsert instead of insert-then-retry).
 - [x] Pricing: enforce single-currency RON across products/orders and document the policy.
 - [x] Pricing: add admin UI to view/set/clear FX rate overrides and display last-known/as-of timestamps.
 - [x] Shop perf: include min/max price bounds in `/catalog/products` response to avoid an extra `/price-bounds` call per filter change.
@@ -409,6 +411,61 @@ Below is a structured checklist you can turn into issues.
 - [x] Checkout: add courier selection (home delivery vs locker) and show it in order details/emails.
 - [x] Payments UX: add PayPal (optional) and show all payment options with icons + clear copy.
 - [x] Shipping: integrate official locker APIs for Sameday + Fan Courier (env-configured; optional Overpass fallback for local dev).
+### Cart & Checkout – Next Improvements (Backlog)
+- [x] Cart/Checkout: translate remaining hard-coded UI strings and error messages (no raw English).
+- [x] Cart: show quantity validation errors per item (avoid a single global error banner).
+- [x] Cart: add “Clear cart” action with confirmation (keep backend in sync).
+- [x] Cart: show discount breakdown in summary (sale vs coupon vs shipping) using backend quote totals.
+- [x] Cart: add promo code apply UI (signed-in only for coupons) with applied-code chip + remove action.
+- [x] Cart: add item notes/gift messages UI and persist to backend cart items.
+- [x] Cart: add skeleton loading state while cart syncs/loads from backend.
+- [x] Cart: replace quantity input with +/- stepper (debounced) and clamp to stock.
+- [x] Cart: show low-stock messaging (“Only X left”) and highlight when at max quantity.
+- [x] Cart: add “Move to wishlist” action for signed-in users.
+- [x] Cart: add recommendations (“You may also like”) using category/featured products.
+- [x] Cart: show free-shipping threshold progress (configurable) and suggested add-ons.
+- [x] Cart: show estimated delivery window based on courier selection (if available).
+- [x] Cart: persist delivery type/courier selections and prefill checkout.
+- [x] Cart: add “Save for later” list (separate from wishlist; optional).
+- [x] Checkout: redirect to cart when cart is empty (with helpful message).
+- [x] Checkout: stepper UI polish (completion checkmarks + scroll-to-next on continue).
+- [x] Checkout: block placing an order while cart sync is pending (prevent stale totals).
+- [x] Checkout: debounce cart sync and show explicit “Syncing…” indicator.
+- [x] Checkout: preselect default saved shipping/billing addresses and allow quick switch.
+- [x] Checkout: allow editing a selected saved address inline (opens modal) and re-apply it.
+- [x] Checkout: improve guest email verification UX (clearer errors, resend cooldown, avoid masking specific errors).
+- [x] Checkout: show eligible + ineligible coupons with reasons and estimated savings.
+- [x] Checkout: optionally auto-apply the best eligible coupon (toggleable).
+- [x] Checkout: clearly show stacking rules (sale price + coupon) and why some coupons can’t be applied.
+- [x] Checkout: order summary breakdown (subtotal, discount, shipping, VAT) with consistent formatting.
+- [x] Checkout: include item thumbnails + per-line totals in the order summary.
+- [x] Checkout: ensure guest “create account” preserves saved address + preferences on submit.
+- [x] Checkout: add helper copy and links per payment method (Stripe/PayPal/COD/Netopia).
+- [x] Checkout: improve Stripe return/cancel screens (clear status, retry CTA, support link).
+- [x] Checkout: improve PayPal return/cancel screens (clear status, retry CTA, support link).
+- [x] Checkout: show loader when payment method is “not ready” instead of a hard error.
+- [x] Checkout: show inline field validation (per field) with `aria-describedby` and consistent styling.
+- [x] Checkout: add “Copy from shipping” button for billing address when not “same as shipping”.
+- [x] Checkout: add “Save as default shipping/billing” toggles when saving address (signed-in).
+- [x] Checkout: expose courier price/ETA differences more clearly (radio cards).
+- [x] Checkout: add phone field to shipping address if courier requires it (configurable).
+- [x] Checkout: add optional invoice details (company name, VAT ID) under billing.
+- [x] Payments UX: hide/disable payment methods that are not available for current cart/currency/country.
+- [x] Payments UX: remember last-used payment method and default to it on next checkout.
+- [x] Payments UX: prevent double-submits and show progress on “Place order” (incl. network retries).
+- [x] Checkout: allow saving/editing phone on saved addresses and prefill it in checkout.
+- [x] Receipts/Admin: show invoice details (company/VAT) on order detail + receipt PDF (redact in share links).
+- [x] A11y: add aria-labels for cart remove/quantity controls and ensure full keyboard support.
+- [x] A11y: announce validation errors via `aria-live` on checkout and move focus to first error.
+- [x] A11y: ensure focus management when steps change or modals open/close.
+- [x] Checkout A11y: tie guest “create account” phone validation to the field (`aria-invalid`/`aria-describedby`) instead of only showing a passive hint.
+- [x] Performance: split the monolithic `CheckoutComponent` into smaller components (shipping/promo/payment).
+- [x] Performance: add route-level prefetching/resolvers for shipping methods and CMS pricing settings.
+- [x] Observability: add client-side analytics events for cart/checkout steps (start, abandon, success).
+- [x] Testing: add Playwright e2e for cart → checkout → COD success.
+- [x] Testing: add Playwright e2e for coupons eligibility + guest restriction.
+- [x] Testing: add Playwright e2e for PayPal and Stripe return/cancel flows (smoke).
+- [x] Checkout: audit `phone_required_*` defaults between cart totals, CMS settings, and backend checkout enforcement (avoid UI/backend mismatch).
 
 ## Frontend - Auth & Account
 - [x] Login page with validation.
@@ -629,6 +686,112 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin maintenance mode toggle (customer-facing maintenance page, admin bypass).
 - [x] Admin audit log page listing important events (login, product changes, content updates, Google linking).
 
+### Admin Dashboard – Next Improvements (Backlog)
+- [x] Admin Dashboard: add “Today” KPI strip – Show today’s orders/GMV/refunds vs yesterday with percent deltas.
+- [x] Admin Dashboard: add configurable date ranges – Allow last 7/30/90/custom ranges across all widgets.
+- [x] Admin Dashboard: widget personalization – Let admins hide/reorder dashboard widgets and persist per user.
+- [x] Admin Dashboard: alert cards for anomalies – Highlight spikes in failed payments, stockouts, or refund requests.
+- [x] Admin Dashboard: system health panel – Show DB status and last backup timestamp.
+- [x] Admin Dashboard: quick actions toolbar – Add buttons for “Create product”, “Create coupon”, “Export orders”, etc.
+- [x] Admin Dashboard: global search – Search across orders/products/users by id/email/slug with typeahead.
+- [x] Admin Dashboard: recent activity feed – Show last admin actions with deep links to affected entities.
+- [x] Admin Dashboard: scheduled tasks overview – Show upcoming publish schedules and promo schedules.
+- [x] Admin Dashboard: configurable low-stock thresholds – Per-category/product threshold overrides + “critical” highlight.
+- [x] Admin Orders: saved filter presets – Persist common filter sets (e.g., “Pending acceptance”, “Cash awaiting shipment”).
+- [x] Admin Orders: bulk status updates – Select multiple orders and set status/assign courier with one action.
+- [x] Admin Orders: bulk email resend – Resend confirmation/delivery emails for selected orders with audit notes.
+- [x] Admin Orders: printable batch packing slips – Generate a merged PDF for selected orders.
+- [x] Admin Orders: shipping label management – Upload/store labels per order and show print/download history.
+- [x] Admin Orders: one-click refund flow – Guided refund wizard with amount breakdown and required notes.
+- [x] Admin Orders: partial refunds UI – Support item-level partial refunds and sync with payment provider.
+- [x] Admin Orders: timeline diff view – Show field diffs (status, tracking, address changes) between events.
+- [x] Admin Orders: customer notes – Allow internal notes per order (visible only to admins).
+- [x] Admin Orders: tag/label system – Add tags like “VIP”, “Fraud risk”, “Gift” and filter by tag.
+- [x] Admin Orders: fraud signals panel – Show velocity checks, mismatched country, multiple failed payments, etc.
+- [x] Admin Orders: address edit + re-rate shipping – Edit shipping address and recompute shipping cost (audit + constraints).
+- [x] Admin Orders: timeline diff view – include address diffs once address edit lands (shipping/billing before/after blocks).
+- [x] Admin Orders: split shipments – Support partial fulfillment with per-item shipped qty and multiple tracking numbers.
+- [x] Admin Orders: export improvements – Add CSV export columns picker + saved export templates.
+- [x] Admin Orders: print/i18n hardening – Ensure PDFs render diacritics and locale number/date formats.
+- [x] Admin Orders: partial refunds validation – Enforce per-item refunded qty/amount caps (cumulative) and validate amount vs selected items when items are provided.
+- [x] Admin Orders: partial refund notifications – Email customer on partial refund (amount + note) and include the refund in receipt/share views.
+- [x] Admin Products: inline price editing – Spreadsheet-style editing for price/sale/stock with validation.
+- [x] Admin Products: bulk price adjustments – Apply +/- percent/amount to selected products with preview.
+- [x] Admin Products: bulk category assignment – Add/remove categories for selected products.
+- [x] Admin Products: bulk publish scheduling – Set publish/unpublish dates for multiple products.
+- [x] Admin Products: image alt text + captions – Manage SEO alt text per image per language.
+- [x] Admin Products: image optimization stats – Display image size and offer one-click reprocess/resize.
+- [x] Admin Products: variant matrix editor – Edit variant attributes/prices/stock in a grid.
+- [x] Admin Inventory: stock adjustment ledger – Record stock changes with reason (“restock”, “damage”, “manual correction”).
+- [x] Admin Inventory: low-stock restock list – A “to restock” queue with supplier notes and export.
+- [x] Admin Inventory: reserved stock visibility – Show stock reserved in carts/orders vs available.
+- [x] Admin Products: duplicate detection – Warn on duplicate slugs/SKUs/names; provide merge guidance.
+- [x] Admin Products: SEO preview – Live preview of storefront card + meta snippet per language.
+- [x] Admin Products: product relationships – Define “related products” and “upsells” used in storefront.
+- [x] Admin Products: soft-delete recovery – View and restore deleted products/images.
+- [x] Admin Products: audit trail for edits – Show per-field history for product changes.
+- [x] Admin Products: import/export CSV – Import products/stock/prices via CSV with validation + error report.
+- [x] Admin Products: markdown preview – Inline preview for descriptions with sanitation warnings.
+- [x] Admin Products: per-product shipping overrides – Set weight/size shipping class and exceptions.
+- [x] Admin Products: translation completeness – Dashboard for missing RO/EN fields (name/description/content).
+- [x] Admin Products: feature flags per product – Toggle badges like “New”, “Limited”, “Handmade” with scheduling.
+- [x] Admin Users: customer profile page – View user details, addresses, orders, tickets, and activity.
+- [x] Admin Users: internal customer notes – Add private notes + “VIP” flag with audit trail.
+- [x] Admin Users: safe impersonation – View storefront as a user (read-only) with explicit audit + timeout.
+- [x] Admin Users: account lock/ban tools – Temporarily lock account or require password reset (security workflow).
+- [x] Admin Users: email verification controls – Resend verification, view history, and owner-only overrides.
+- [x] Admin Users: granular roles – Add roles like support/fulfillment/content with per-section permissions.
+- [x] Admin Users: session overview – Show active sessions with geo/IP and revoke per session.
+- [x] Admin Users: GDPR tooling – Export/delete request queue with statuses, SLAs, and audit.
+- [x] Admin Users: segmentation – Build customer segments (repeat buyers, high AOV) for analytics/campaigns.
+- [x] Admin Users: targeted coupon grant – Issue a one-off coupon to a customer and email them via template.
+- [x] Admin Coupons: advanced rules UI – Minimum subtotal, category include/exclude, first-order only, etc.
+- [x] Admin Coupons: stacking preview – Show how coupons interact with sale pricing and shipping discounts.
+- [x] Admin Coupons: redemption analytics – Usage over time, conversion lift, and top discounted products.
+- [x] Admin Promotions: scheduling calendar – Visual calendar for promo start/end and conflicts.
+- [x] Admin Promotions: A/B promo testing – Optional randomized assignment and performance reporting.
+- [x] Admin Pricing: price history charts – Track price changes per product (and sale periods).
+- [x] Admin Pricing: FX override audit – Show who changed FX overrides and allow “revert” action.
+- [x] Admin Pricing: rounding rules config – Configure rounding strategy for display/checkout.
+- [x] Admin Taxes: configurable tax groups – Manage VAT rates per country/category (future-proofing).
+- [x] Admin Promotions: code generator upgrades – Generate codes with patterns/prefixes and collision checks.
+- [x] Admin CMS: content diff before publish – Side-by-side diff between draft and published versions.
+- [x] Admin CMS: scheduled publishing – Schedule page/blog publish/unpublish windows.
+- [x] Admin CMS: content rollback – Restore a previous version with one click (audit).
+- [x] Admin CMS: broken link checker – Validate internal links/images and surface warnings.
+- [x] Admin CMS: media library tags – Organize assets with tags and search filters.
+- [x] Admin CMS: image focal point – Set focal point for responsive crops (hero/cards).
+- [x] Admin CMS: translation workflow – Mark items “needs translation” and track completion per language.
+- [x] Admin SEO: redirects bulk tools – Bulk import/export redirects and detect redirect loops.
+- [x] Admin SEO: sitemap preview – Show which URLs appear in sitemap by language.
+- [x] Admin SEO: structured data validator – Validate JSON-LD for products/pages and show errors.
+- [x] Admin Blog: editorial workflow – Draft/review/publish states with author attribution.
+- [x] Admin Blog: social preview tooling – Generate social preview images per post per language.
+- [x] Admin CMS: page access controls – Optionally restrict certain pages to logged-in users.
+- [x] Admin Support: unified inbox filters – Filter by status, channel, customer, and assignee.
+- [x] Admin Support: assign/mention – Assign tickets and @mention other admins with notifications.
+- [x] Admin Support: canned responses – Template replies with variables and EN/RO variants.
+- [x] Support: email guest submissions on staff replies (bilingual) so non-logged-in customers receive updates.
+- [x] Admin Returns: RMA status board – Kanban view for returns pipeline (requested/approved/received/refunded).
+- [x] Admin Returns: return label support – Upload/provide shipping labels for returns.
+- [x] Admin Ops: maintenance banners – Schedule storefront announcement banners (planned downtime/promos).
+- [x] Admin Ops: shipping rate simulator – Test shipping methods/rules for a sample cart/address.
+- [x] Admin Ops: webhook monitor – View recent provider webhooks and retry failed deliveries.
+- [x] Admin Security: enforce 2FA for admins – Require TOTP/passkey for owner/admin roles.
+- [x] Admin Security: IP allowlist – Optional allowlist/denylist for admin access with safe bypass flow.
+- [x] Admin Audit: retention + export – Export audit logs with retention policies and redaction options.
+- [x] Admin Audit: tamper-evident logging – Optional hash-chaining for stronger audit integrity.
+- [x] Admin Compliance: default PII masking – Mask customer PII by default with explicit reveal permission.
+- [x] Admin Security: sensitive action re-auth – Require password confirmation for refunds/role changes.
+- [x] Admin Security: admin login alerts – Notify owner of new admin login/device.
+- [x] Admin UX: keyboard shortcuts – Add shortcuts for global search, navigation, and common order actions.
+- [x] Admin UX: table virtualization – Improve performance for large lists (orders/products/users).
+- [x] Admin UX: accessibility audit – Ensure focus management, ARIA labels, and keyboard navigation.
+- [x] Admin UX: standardized error UI – Unified error state with retry and copyable correlation ID.
+- [x] Admin Observability: client error logging – Capture admin UI errors to a backend log endpoint.
+- [x] Admin UX: onboarding tour – First-run guided tour for owner (shipping, payments, content, taxes).
+- [x] Admin UX: saved table layouts – Persist column visibility/order/density per admin table (orders/products/users).
+
 ## Data Portability & Backups (Extended)
 - [x] CLI command `python -m app.cli export-data` exporting users (no passwords), products, categories, orders, addresses to JSON.
 - [x] CLI command `import-data` to bootstrap a new DB from JSON exports with idempotent upserts.
@@ -666,3 +829,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Perf: fix account idle-timer event listener cleanup (avoid leaking listeners with `.bind(this)`).
 - [x] Follow-up: set `<meta name="theme-color">` dynamically based on selected theme (mobile address bar).
 - [x] Follow-up: add early theme bootstrap in `frontend/src/index.html` to avoid flash of incorrect theme on load.
+- [x] Checkout: fix address modal overflow on smaller screens (prevent action buttons/inputs rendering off-screen).
+- [x] Notifications: deep-link notification clicks to relevant page (avoid always landing on account settings).
+- [x] Notifications: add archived/dismissed notifications view so hidden items remain discoverable.
+- [x] Receipts: improve share link UX (explicit “Copy link” button + visible confirmation for copy action).
+- [x] CI: make compose-smoke E2E resilient (mock locker lookup / disable Overpass fallback to reduce flakiness).
+- [x] Catalog: investigate product detail page sometimes failing to load from listings (route/slug/API error).

@@ -68,6 +68,8 @@ class OrderRead(BaseModel):
     currency: str
     payment_method: str
     promo_code: str | None = None
+    invoice_company: str | None = Field(default=None, max_length=200)
+    invoice_vat_id: str | None = Field(default=None, max_length=64)
     stripe_payment_intent_id: str | None = None
     paypal_order_id: str | None = None
     paypal_capture_id: str | None = None
@@ -103,6 +105,7 @@ class OrderCreate(BaseModel):
 class OrderUpdate(BaseModel):
     status: OrderStatus | None = None
     cancel_reason: str | None = Field(default=None, max_length=2000)
+    courier: str | None = Field(default=None, max_length=30)
     tracking_number: str | None = Field(default=None, max_length=50)
     tracking_url: str | None = Field(default=None, max_length=255)
     shipping_method_id: UUID | None = None
@@ -119,6 +122,7 @@ class OrderEventRead(BaseModel):
     id: UUID
     event: str
     note: str | None = None
+    data: dict | None = None
     created_at: datetime
 
 

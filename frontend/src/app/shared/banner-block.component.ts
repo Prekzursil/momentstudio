@@ -47,6 +47,7 @@ import { ButtonComponent } from './button.component';
                 [ngClass]="imageClass()"
                 [src]="slide.image_url"
                 [alt]="slide.alt || slide.headline || ''"
+                [style.object-position]="focalPosition()"
                 loading="lazy"
               />
               <div
@@ -68,6 +69,7 @@ import { ButtonComponent } from './button.component';
             [ngClass]="fullImageClass()"
             [src]="slide.image_url"
             [alt]="slide.alt || slide.headline || ''"
+            [style.object-position]="focalPosition()"
             loading="lazy"
           />
           <div
@@ -141,6 +143,12 @@ export class BannerBlockComponent {
     return `${aspect} w-full object-cover`;
   }
 
+  focalPosition(): string {
+    const x = Math.max(0, Math.min(100, Math.round(Number(this.slide?.focal_x ?? 50))));
+    const y = Math.max(0, Math.min(100, Math.round(Number(this.slide?.focal_y ?? 50))));
+    return `${x}% ${y}%`;
+  }
+
   overlayClass(): string {
     return this.slide.text_style === 'light'
       ? 'bg-gradient-to-t from-slate-900/70 via-slate-900/30 to-transparent'
@@ -155,4 +163,3 @@ export class BannerBlockComponent {
     return this.slide.text_style === 'light' ? 'text-slate-100' : 'text-slate-700 dark:text-slate-200';
   }
 }
-

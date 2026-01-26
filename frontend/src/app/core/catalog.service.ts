@@ -25,6 +25,15 @@ export interface ProductVariant {
   stock_quantity: number | null;
 }
 
+export type ProductBadgeType = 'new' | 'limited' | 'handmade';
+
+export interface ProductBadge {
+  id: string;
+  badge: ProductBadgeType;
+  start_at?: string | null;
+  end_at?: string | null;
+}
+
 export interface Product {
   id: string;
   slug: string;
@@ -42,6 +51,7 @@ export interface Product {
   rating_count?: number;
   images?: ProductImage[];
   tags?: { slug: string; name: string }[];
+  badges?: ProductBadge[];
   variants?: ProductVariant[];
 }
 
@@ -140,6 +150,14 @@ export class CatalogService {
 
   getProduct(slug: string): Observable<Product> {
     return this.api.get<Product>(`/catalog/products/${slug}`).pipe(map((p: any) => this.normalizeProduct(p)));
+  }
+
+  getRelatedProducts(slug: string): Observable<Product[]> {
+    return this.api.get<Product[]>(`/catalog/products/${slug}/related`).pipe(map((rows: any) => (rows ?? []).map((p: any) => this.normalizeProduct(p))));
+  }
+
+  getUpsellProducts(slug: string): Observable<Product[]> {
+    return this.api.get<Product[]>(`/catalog/products/${slug}/upsells`).pipe(map((rows: any) => (rows ?? []).map((p: any) => this.normalizeProduct(p))));
   }
 
   getBackInStockStatus(slug: string): Observable<BackInStockStatus> {

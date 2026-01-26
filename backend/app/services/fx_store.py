@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from datetime import date, datetime, timezone
 
 from fastapi import HTTPException, status
+from sqlalchemy import func
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from app.models.fx import FxRate
+from app.models.fx import FxOverrideAuditLog, FxRate
 from app.schemas.fx import FxAdminStatus, FxOverrideUpsert, FxRatesRead
 from app.services import fx_rates
 
@@ -32,6 +36,41 @@ async def _get_row(session: AsyncSession, *, is_override: bool) -> FxRate | None
 
 
 async def _upsert_row(session: AsyncSession, *, is_override: bool, data: FxRatesRead) -> FxRate:
+    bind = session.get_bind()
+    dialect = getattr(getattr(bind, "dialect", None), "name", "")
+    insert_fn = pg_insert if dialect == "postgresql" else (sqlite_insert if dialect == "sqlite" else None)
+
+    if insert_fn is not None:
+        stmt = insert_fn(FxRate).values(
+            base=data.base,
+            eur_per_ron=data.eur_per_ron,
+            usd_per_ron=data.usd_per_ron,
+            as_of=data.as_of,
+            source=data.source,
+            fetched_at=data.fetched_at,
+            is_override=is_override,
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[FxRate.is_override],
+            set_={
+                "base": data.base,
+                "eur_per_ron": data.eur_per_ron,
+                "usd_per_ron": data.usd_per_ron,
+                "as_of": data.as_of,
+                "source": data.source,
+                "fetched_at": data.fetched_at,
+                "updated_at": func.now(),
+            },
+        )
+        await session.execute(stmt)
+        await session.commit()
+
+        row = await _get_row(session, is_override=is_override)
+        if not row:
+            raise RuntimeError("fx_rate_upsert_failed")
+        await session.refresh(row)
+        return row
+
     existing = await _get_row(session, is_override=is_override)
     if existing:
         existing.base = data.base
@@ -58,7 +97,6 @@ async def _upsert_row(session: AsyncSession, *, is_override: bool, data: FxRates
     try:
         await session.commit()
     except IntegrityError:
-        # A concurrent request inserted the row first; fall back to update.
         await session.rollback()
         existing = await _get_row(session, is_override=is_override)
         if not existing:
@@ -75,6 +113,25 @@ async def _upsert_row(session: AsyncSession, *, is_override: bool, data: FxRates
         return existing
     await session.refresh(row)
     return row
+
+
+async def _log_override_audit(
+    session: AsyncSession,
+    *,
+    action: str,
+    user_id: uuid.UUID | None,
+    data: FxRatesRead | None,
+) -> None:
+    entry = FxOverrideAuditLog(
+        action=action,
+        user_id=user_id,
+        eur_per_ron=data.eur_per_ron if data else None,
+        usd_per_ron=data.usd_per_ron if data else None,
+        as_of=data.as_of if data else None,
+        created_at=datetime.now(timezone.utc),
+    )
+    session.add(entry)
+    await session.commit()
 
 
 async def get_effective_rates(session: AsyncSession) -> FxRatesRead:
@@ -108,7 +165,13 @@ async def get_effective_rates(session: AsyncSession) -> FxRatesRead:
     return read
 
 
-async def set_override(session: AsyncSession, payload: FxOverrideUpsert) -> FxRatesRead:
+async def set_override(
+    session: AsyncSession,
+    payload: FxOverrideUpsert,
+    *,
+    user_id: uuid.UUID | None = None,
+    audit_action: str = "set",
+) -> FxRatesRead:
     now = datetime.now(timezone.utc)
     as_of = payload.as_of or date.today()
     read = FxRatesRead(
@@ -120,15 +183,23 @@ async def set_override(session: AsyncSession, payload: FxOverrideUpsert) -> FxRa
         fetched_at=now,
     )
     await _upsert_row(session, is_override=True, data=read)
+    await _log_override_audit(session, action=audit_action, user_id=user_id, data=read)
     return read
 
 
-async def clear_override(session: AsyncSession) -> None:
+async def clear_override(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID | None = None,
+    audit_action: str = "clear",
+) -> None:
     existing = await _get_row(session, is_override=True)
     if not existing:
         return
+    cleared = _row_to_read(existing)
     await session.delete(existing)
     await session.commit()
+    await _log_override_audit(session, action=audit_action, user_id=user_id, data=cleared)
 
 
 async def get_admin_status(session: AsyncSession) -> FxAdminStatus:

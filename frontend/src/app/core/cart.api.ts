@@ -17,6 +17,11 @@ export interface CartTotals {
   shipping: string;
   total: string;
   currency?: string;
+  free_shipping_threshold_ron?: string | null;
+  phone_required_home?: boolean;
+  phone_required_locker?: boolean;
+  delivery_locker_allowed?: boolean;
+  delivery_allowed_couriers?: string[];
 }
 
 export interface CartResponse {

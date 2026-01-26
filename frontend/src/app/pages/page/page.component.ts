@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
 import { Subscription } from 'rxjs';
 import { ApiService } from '../../core/api.service';
@@ -16,6 +16,8 @@ import { CarouselBlockComponent } from '../../shared/carousel-block.component';
 interface ContentImage {
   url: string;
   alt_text?: string | null;
+  focal_x?: number;
+  focal_y?: number;
 }
 
 interface ContentBlock {
@@ -31,6 +33,7 @@ interface ContentBlock {
   standalone: true,
   imports: [
     CommonModule,
+    RouterLink,
     ContainerComponent,
     BreadcrumbComponent,
     CardComponent,
@@ -51,6 +54,20 @@ interface ContentBlock {
         <div *ngIf="!loading() && hasError()" class="grid gap-2">
           <p class="font-semibold text-amber-900 dark:text-amber-100">{{ 'about.errorTitle' | translate }}</p>
           <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'about.errorCopy' | translate }}</p>
+        </div>
+
+        <div *ngIf="!loading() && requiresLogin()" class="grid gap-2">
+          <p class="font-semibold text-amber-900 dark:text-amber-100">{{ 'page.restricted.title' | translate }}</p>
+          <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'page.restricted.copy' | translate }}</p>
+          <div class="flex">
+            <a
+              [routerLink]="['/login']"
+              [queryParams]="{ next: loginNextUrl() }"
+              class="inline-flex items-center justify-center rounded-full font-semibold transition px-3 py-2 text-sm bg-slate-900 text-white hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-white"
+            >
+              {{ 'auth.login' | translate }}
+            </a>
+          </div>
         </div>
 
         <div *ngIf="!loading() && !hasError() && block()" class="grid gap-5">
@@ -80,6 +97,7 @@ interface ContentBlock {
                         [src]="b.url"
                         [alt]="b.alt || b.title || ''"
                         class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+                        [style.object-position]="focalPosition(b.focal_x, b.focal_y)"
                         loading="lazy"
                       />
                     </a>
@@ -88,6 +106,7 @@ interface ContentBlock {
                         [src]="b.url"
                         [alt]="b.alt || b.title || ''"
                         class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+                        [style.object-position]="focalPosition(b.focal_x, b.focal_y)"
                         loading="lazy"
                       />
                     </ng-template>
@@ -104,6 +123,7 @@ interface ContentBlock {
                           [src]="img.url"
                           [alt]="img.alt || b.title || ''"
                           class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+                          [style.object-position]="focalPosition(img.focal_x, img.focal_y)"
                           loading="lazy"
                         />
                         <p *ngIf="img.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ img.caption }}</p>
@@ -135,6 +155,7 @@ interface ContentBlock {
               [src]="block()!.images[0].url"
               [alt]="block()!.images[0].alt_text || block()!.title"
               class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+              [style.object-position]="focalPosition(block()!.images[0].focal_x, block()!.images[0].focal_y)"
               loading="lazy"
             />
             <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
@@ -148,6 +169,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
   block = signal<ContentBlock | null>(null);
   loading = signal<boolean>(true);
   hasError = signal<boolean>(false);
+  requiresLogin = signal<boolean>(false);
   bodyHtml = signal<string>('');
   pageBlocks = signal<PageBlock[]>([]);
   crumbs = signal<{ label: string; url?: string }[]>([
@@ -187,17 +209,25 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     this.slugSub?.unsubscribe();
   }
 
+  focalPosition(focalX?: number, focalY?: number): string {
+    const x = Math.max(0, Math.min(100, Math.round(Number(focalX ?? 50))));
+    const y = Math.max(0, Math.min(100, Math.round(Number(focalY ?? 50))));
+    return `${x}% ${y}%`;
+  }
+
   private load(): void {
     const slug = (this.slug || '').trim();
     if (!slug) {
       this.block.set(null);
       this.loading.set(false);
       this.hasError.set(true);
+      this.requiresLogin.set(false);
       return;
     }
 
     this.loading.set(true);
     this.hasError.set(false);
+    this.requiresLogin.set(false);
     this.pageBlocks.set([]);
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     this.api.get<ContentBlock>(`/content/pages/${encodeURIComponent(slug)}`, { lang }).subscribe({
@@ -219,12 +249,26 @@ export class CmsPageComponent implements OnInit, OnDestroy {
         ]);
         this.setMetaTags(block.title || slug, metaBody);
       },
-      error: () => {
+      error: (err) => {
+        if (err?.status === 401) {
+          this.block.set(null);
+          this.bodyHtml.set('');
+          this.pageBlocks.set([]);
+          this.loading.set(false);
+          this.hasError.set(false);
+          this.requiresLogin.set(true);
+          this.crumbs.set([
+            { label: 'nav.home', url: '/' },
+            { label: slug }
+          ]);
+          return;
+        }
         this.block.set(null);
         this.bodyHtml.set('');
         this.pageBlocks.set([]);
         this.loading.set(false);
         this.hasError.set(true);
+        this.requiresLogin.set(false);
         this.crumbs.set([
           { label: 'nav.home', url: '/' },
           { label: slug }
@@ -232,6 +276,10 @@ export class CmsPageComponent implements OnInit, OnDestroy {
         this.setMetaTags(slug, this.translate.instant('about.metaDescription'));
       }
     });
+  }
+
+  loginNextUrl(): string {
+    return typeof window === 'undefined' ? `/pages/${this.slug}` : this.router.url;
   }
 
   private slugFromKey(key: string): string {

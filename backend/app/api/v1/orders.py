@@ -5,21 +5,31 @@ import secrets
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
+from typing import Any, Callable
+from urllib.parse import quote_plus
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, UploadFile, File
-from fastapi.responses import PlainTextResponse, StreamingResponse, FileResponse
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, UploadFile, File, Body, Response
+from fastapi.responses import StreamingResponse, FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.core.dependencies import require_complete_profile, require_verified_email, require_admin, get_current_user_optional
+from app.core.dependencies import (
+    get_current_user_optional,
+    require_admin,
+    require_admin_section,
+    require_complete_profile,
+    require_verified_email,
+)
 from app.core.config import settings
+from app.core import security
 from app.core.security import create_receipt_token, decode_receipt_token
 from app.db.session import get_session
 from app.models.address import Address
 from app.models.cart import Cart
 from app.models.order import Order, OrderItem, OrderStatus, OrderEvent
+from app.models.user import User
 from app.schemas.cart import CartRead
 from app.schemas.cart import Totals
 from app.schemas.order import (
@@ -41,6 +51,7 @@ from app.services import checkout_settings as checkout_settings_service
 from app.services import auth as auth_service
 from app.services import private_storage
 from app.services import receipts as receipt_service
+from app.services import packing_slips as packing_slips_service
 from app.schemas.checkout import (
     CheckoutRequest,
     GuestCheckoutRequest,
@@ -60,17 +71,35 @@ from app.services import payments
 from app.services import paypal as paypal_service
 from app.services import address as address_service
 from app.api.v1 import cart as cart_api
-from app.schemas.order_admin import AdminOrderListItem, AdminOrderListResponse, AdminOrderRead, AdminPaginationMeta
+from app.schemas.order_admin import (
+    AdminOrderListItem,
+    AdminOrderListResponse,
+    AdminOrderRead,
+    AdminPaginationMeta,
+    AdminOrderEmailResendRequest,
+    AdminOrderIdsRequest,
+)
+from app.schemas.order_admin_note import OrderAdminNoteCreate
+from app.schemas.order_admin_address import AdminOrderAddressesUpdate
+from app.schemas.order_shipment import OrderShipmentCreate, OrderShipmentUpdate, OrderShipmentRead
+from app.schemas.order_tag import OrderTagCreate, OrderTagsResponse
+from app.schemas.order_refund import AdminOrderRefundCreate, AdminOrderRefundRequest
 from app.schemas.receipt import ReceiptRead, ReceiptShareTokenRead
 from app.services import notifications as notification_service
 from app.services import promo_usage
 from app.services import pricing
+from app.services import pii as pii_service
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
 
 def _normalize_email(email: str) -> str:
     return (email or "").strip().lower()
+
+
+def _account_orders_url(order: Order) -> str:
+    token = str(order.reference_code or order.id)
+    return f"/account/orders?q={quote_plus(token)}"
 
 
 def _generate_guest_email_token() -> str:
@@ -243,11 +272,14 @@ async def create_order(
     if not cart or not cart.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
 
+    shipping_country: str | None = None
     for address_id in [payload.shipping_address_id, payload.billing_address_id]:
         if address_id:
             addr = await session.get(Address, address_id)
             if not addr or addr.user_id != current_user.id:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid address")
+            if address_id == payload.shipping_address_id:
+                shipping_country = addr.country
 
     shipping_method = None
     if payload.shipping_method_id:
@@ -256,11 +288,13 @@ async def create_order(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
 
     checkout_settings = await checkout_settings_service.get_checkout_settings(session)
-    totals, _ = cart_service.calculate_totals(
+    totals, _ = await cart_service.calculate_totals_async(
+        session,
         cart,
         shipping_method=shipping_method,
         promo=None,
         checkout_settings=checkout_settings,
+        country_code=shipping_country,
     )
 
     order = await order_service.build_order_from_cart(
@@ -284,7 +318,7 @@ async def create_order(
         type="order",
         title="Order placed" if (current_user.preferred_language or "en") != "ro" else "Comandă plasată",
         body=f"Reference {order.reference_code}" if order.reference_code else None,
-        url="/account",
+        url=_account_orders_url(order),
     )
     background_tasks.add_task(
         email_service.send_order_confirmation,
@@ -313,8 +347,9 @@ async def checkout(
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     current_user=Depends(require_verified_email),
+    session_id: str | None = Depends(cart_api.session_header),
 ) -> GuestCheckoutResponse:
-    user_cart = await cart_service.get_cart(session, current_user.id, None)
+    user_cart = await cart_service.get_cart(session, current_user.id, session_id)
     if not user_cart.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
 
@@ -325,6 +360,31 @@ async def checkout(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
 
     checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+
+    courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = _delivery_from_payload(
+        courier=payload.courier,
+        delivery_type=payload.delivery_type,
+        locker_id=payload.locker_id,
+        locker_name=payload.locker_name,
+        locker_address=payload.locker_address,
+        locker_lat=payload.locker_lat,
+        locker_lng=payload.locker_lng,
+    )
+    locker_allowed, allowed_couriers = cart_service.delivery_constraints(user_cart)
+    if not allowed_couriers:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No couriers available for cart items")
+    if courier not in allowed_couriers:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Selected courier is not available for cart items")
+    if delivery_type == "locker" and not locker_allowed:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Locker delivery is not available for cart items")
+    phone_required = bool(
+        checkout_settings.phone_required_locker if delivery_type == "locker" else checkout_settings.phone_required_home
+    )
+    phone = (payload.phone or "").strip() or None
+    if not phone:
+        phone = (getattr(current_user, "phone", None) or "").strip() or None
+    if phone_required and not phone:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phone is required")
 
     promo = None
     applied_discount = None
@@ -342,6 +402,7 @@ async def checkout(
                 shipping_method_rate_flat=rate_flat,
                 shipping_method_rate_per_kg=rate_per,
                 code=payload.promo_code,
+                country_code=payload.country,
             )
             applied_coupon = applied_discount.coupon if applied_discount else None
             coupon_shipping_discount = applied_discount.shipping_discount_ron if applied_discount else Decimal("0.00")
@@ -355,20 +416,27 @@ async def checkout(
     billing_same_as_shipping = not has_billing
 
     address_user_id = current_user.id if payload.save_address else None
+    default_shipping = bool(
+        payload.save_address and (payload.default_shipping if payload.default_shipping is not None else True)
+    )
+    default_billing = bool(
+        payload.save_address and (payload.default_billing if payload.default_billing is not None else True)
+    )
 
     shipping_addr = await address_service.create_address(
         session,
         address_user_id,
         AddressCreate(
             label="Checkout" if payload.save_address else "Checkout (One-time)",
+            phone=phone,
             line1=payload.line1,
             line2=payload.line2,
             city=payload.city,
             region=payload.region,
             postal_code=payload.postal_code,
             country=payload.country,
-            is_default_shipping=payload.save_address,
-            is_default_billing=bool(payload.save_address and billing_same_as_shipping),
+            is_default_shipping=default_shipping,
+            is_default_billing=bool(default_billing and billing_same_as_shipping),
         ),
     )
 
@@ -386,6 +454,7 @@ async def checkout(
             address_user_id,
             AddressCreate(
                 label="Checkout (Billing)" if payload.save_address else "Checkout (Billing · One-time)",
+                phone=phone,
                 line1=payload.billing_line1 or payload.line1,
                 line2=payload.billing_line2,
                 city=payload.billing_city,
@@ -393,29 +462,22 @@ async def checkout(
                 postal_code=payload.billing_postal_code,
                 country=payload.billing_country,
                 is_default_shipping=False,
-                is_default_billing=payload.save_address,
+                is_default_billing=default_billing,
             ),
         )
 
     if applied_coupon and applied_discount:
         totals, discount_val = applied_discount.totals, applied_discount.discount_ron
     else:
-        totals, discount_val = cart_service.calculate_totals(
+        totals, discount_val = await cart_service.calculate_totals_async(
+            session,
             user_cart,
             shipping_method=shipping_method,
             promo=promo,
             checkout_settings=checkout_settings,
+            country_code=shipping_addr.country,
         )
     payment_method = payload.payment_method or "stripe"
-    courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = _delivery_from_payload(
-        courier=payload.courier,
-        delivery_type=payload.delivery_type,
-        locker_id=payload.locker_id,
-        locker_name=payload.locker_name,
-        locker_address=payload.locker_address,
-        locker_lat=payload.locker_lat,
-        locker_lng=payload.locker_lng,
-    )
     stripe_session_id = None
     stripe_checkout_url = None
     payment_intent_id = None
@@ -476,6 +538,8 @@ async def checkout(
         locker_lng=locker_lng,
         discount=discount_val,
         promo_code=payload.promo_code,
+        invoice_company=payload.invoice_company,
+        invoice_vat_id=payload.invoice_vat_id,
         tax_amount=totals.tax,
         fee_amount=totals.fee,
         shipping_amount=totals.shipping,
@@ -498,7 +562,7 @@ async def checkout(
         type="order",
         title="Order placed" if (current_user.preferred_language or "en") != "ro" else "Comandă plasată",
         body=f"Reference {order.reference_code}" if order.reference_code else None,
-        url="/account",
+        url=_account_orders_url(order),
     )
     if (payment_method or "").strip().lower() == "cod":
         background_tasks.add_task(
@@ -627,7 +691,7 @@ async def capture_paypal_order(
             type="order",
             title="Payment received" if (order.user.preferred_language or "en") != "ro" else "Plată confirmată",
             body=f"Reference {order.reference_code}" if order.reference_code else None,
-            url="/account",
+            url=_account_orders_url(order),
         )
 
     return PayPalCaptureResponse(
@@ -754,7 +818,7 @@ async def confirm_stripe_checkout(
                 if (order.user.preferred_language or "en") != "ro"
                 else "Plată confirmată",
                 body=f"Reference {order.reference_code}" if order.reference_code else None,
-                url="/account",
+                url=_account_orders_url(order),
             )
 
     return StripeConfirmResponse(order_id=order.id, reference_code=order.reference_code, status=order.status)
@@ -807,7 +871,7 @@ async def admin_list_orders(
     status: OrderStatus | None = Query(default=None),
     user_id: UUID | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("orders")),
 ):
     return await order_service.list_orders(session, status=status, user_id=user_id)
 
@@ -816,13 +880,17 @@ async def admin_list_orders(
 async def admin_search_orders(
     q: str | None = Query(default=None, max_length=200),
     status: str | None = Query(default=None),
+    tag: str | None = Query(default=None, max_length=50),
     from_dt: datetime | None = Query(default=None, alias="from"),
     to_dt: datetime | None = Query(default=None, alias="to"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderListResponse:
+    if include_pii:
+        pii_service.require_pii_reveal(admin)
     status_clean = (status or "").strip().lower() if status else None
     pending_any = False
     parsed_status = None
@@ -839,6 +907,7 @@ async def admin_search_orders(
         q=q,
         status=parsed_status,
         pending_any=pending_any,
+        tag=tag,
         from_dt=from_dt,
         to_dt=to_dt,
         page=page,
@@ -852,8 +921,9 @@ async def admin_search_orders(
             total_amount=order.total_amount,
             currency=order.currency,
             created_at=order.created_at,
-            customer_email=email,
+            customer_email=email if include_pii else pii_service.mask_email(email),
             customer_username=username,
+            tags=[t.tag for t in (getattr(order, "tags", None) or [])],
         )
         for (order, email, username) in rows
     ]
@@ -862,55 +932,157 @@ async def admin_search_orders(
     return AdminOrderListResponse(items=items, meta=meta)
 
 
+@router.get("/admin/tags", response_model=OrderTagsResponse)
+async def admin_list_order_tags(
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("orders")),
+) -> OrderTagsResponse:
+    tags = await order_service.list_order_tags(session)
+    return OrderTagsResponse(items=tags)
+
+
 @router.get("/admin/export")
 async def admin_export_orders(
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    admin: User = Depends(require_admin_section("orders")),
+    columns: list[str] | None = Query(default=None),
+    include_pii: bool = Query(default=False),
 ):
+    if include_pii:
+        pii_service.require_pii_reveal(admin)
     orders = await order_service.list_orders(session)
+    allowed: dict[str, Callable[[Order], Any]] = {
+        "id": lambda o: str(o.id),
+        "reference_code": lambda o: o.reference_code or "",
+        "status": lambda o: getattr(o.status, "value", str(o.status)),
+        "total_amount": lambda o: str(o.total_amount),
+        "tax_amount": lambda o: str(o.tax_amount),
+        "fee_amount": lambda o: str(getattr(o, "fee_amount", 0) or 0),
+        "shipping_amount": lambda o: str(o.shipping_amount),
+        "currency": lambda o: o.currency or "",
+        "user_id": lambda o: str(o.user_id) if o.user_id else "",
+        "customer_email": lambda o: getattr(o, "customer_email", "") or "",
+        "customer_name": lambda o: getattr(o, "customer_name", "") or "",
+        "payment_method": lambda o: getattr(o, "payment_method", "") or "",
+        "promo_code": lambda o: getattr(o, "promo_code", "") or "",
+        "courier": lambda o: getattr(o, "courier", "") or "",
+        "delivery_type": lambda o: getattr(o, "delivery_type", "") or "",
+        "tracking_number": lambda o: getattr(o, "tracking_number", "") or "",
+        "tracking_url": lambda o: getattr(o, "tracking_url", "") or "",
+        "invoice_company": lambda o: getattr(o, "invoice_company", "") or "",
+        "invoice_vat_id": lambda o: getattr(o, "invoice_vat_id", "") or "",
+        "shipping_method": lambda o: getattr(getattr(o, "shipping_method", None), "name", "") or "",
+        "locker_name": lambda o: getattr(o, "locker_name", "") or "",
+        "locker_address": lambda o: getattr(o, "locker_address", "") or "",
+        "created_at": lambda o: o.created_at.isoformat() if getattr(o, "created_at", None) else "",
+        "updated_at": lambda o: o.updated_at.isoformat() if getattr(o, "updated_at", None) else "",
+    }
+    if not include_pii:
+        allowed["customer_email"] = lambda o: pii_service.mask_email(getattr(o, "customer_email", "") or "") or ""
+        allowed["customer_name"] = lambda o: pii_service.mask_text(getattr(o, "customer_name", "") or "", keep=1) or ""
+        allowed["invoice_company"] = lambda o: pii_service.mask_text(getattr(o, "invoice_company", "") or "", keep=1) or ""
+        allowed["invoice_vat_id"] = lambda o: pii_service.mask_text(getattr(o, "invoice_vat_id", "") or "", keep=2) or ""
+        allowed["locker_address"] = lambda o: "***" if (getattr(o, "locker_address", "") or "").strip() else ""
+    default_columns = ["id", "reference_code", "status", "total_amount", "currency", "user_id", "created_at"]
+    if not columns:
+        selected_columns = default_columns
+    else:
+        requested: list[str] = []
+        for raw in columns:
+            for part in str(raw).split(","):
+                cleaned = part.strip()
+                if cleaned:
+                    requested.append(cleaned)
+        invalid = [c for c in requested if c not in allowed]
+        if invalid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid export columns: {', '.join(sorted(set(invalid)))}. Allowed: {', '.join(sorted(allowed.keys()))}",
+            )
+        selected_columns = requested
+
     buffer = io.StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["id", "reference_code", "status", "total_amount", "currency", "user_id", "created_at"])
+    writer.writerow(selected_columns)
     for order in orders:
-        writer.writerow(
-            [
-                order.id,
-                order.reference_code,
-                order.status.value,
-                order.total_amount,
-                order.currency,
-                order.user_id,
-                order.created_at,
-            ]
-        )
+        writer.writerow([allowed[col](order) for col in selected_columns])
     buffer.seek(0)
     headers = {"Content-Disposition": "attachment; filename=orders.csv"}
     return StreamingResponse(iter([buffer.getvalue()]), media_type="text/csv", headers=headers)
 
 
+async def _serialize_admin_order(
+    session: AsyncSession,
+    order: Order,
+    *,
+    include_pii: bool = False,
+    current_user: User | None = None,
+) -> AdminOrderRead:
+    if include_pii:
+        pii_service.require_pii_reveal(current_user)
+    fraud_signals = await order_service.compute_fraud_signals(session, order)
+    base = OrderRead.model_validate(order).model_dump()
+
+    def _masked_address(addr: Address | None) -> dict[str, Any] | None:
+        if not addr:
+            return None
+        return {
+            "id": addr.id,
+            "user_id": addr.user_id,
+            "label": addr.label,
+            "phone": None,
+            "line1": "***",
+            "line2": "***" if (addr.line2 or "").strip() else None,
+            "city": "***",
+            "region": "***" if (addr.region or "").strip() else None,
+            "postal_code": "***",
+            "country": addr.country,
+            "is_default_shipping": bool(getattr(addr, "is_default_shipping", False)),
+            "is_default_billing": bool(getattr(addr, "is_default_billing", False)),
+            "created_at": addr.created_at,
+            "updated_at": addr.updated_at,
+        }
+
+    if not include_pii:
+        base["invoice_company"] = pii_service.mask_text(base.get("invoice_company"), keep=1)
+        base["invoice_vat_id"] = pii_service.mask_text(base.get("invoice_vat_id"), keep=2)
+        base["locker_address"] = "***" if (base.get("locker_address") or "").strip() else base.get("locker_address")
+
+    customer_email = getattr(order, "customer_email", None) or (
+        getattr(order.user, "email", None) if getattr(order, "user", None) else None
+    )
+    if not include_pii:
+        customer_email = pii_service.mask_email(customer_email)
+    return AdminOrderRead(
+        **base,
+        customer_email=customer_email,
+        customer_username=getattr(order.user, "username", None) if getattr(order, "user", None) else None,
+        shipping_address=order.shipping_address if include_pii else _masked_address(getattr(order, "shipping_address", None)),
+        billing_address=order.billing_address if include_pii else _masked_address(getattr(order, "billing_address", None)),
+        tracking_url=getattr(order, "tracking_url", None),
+        shipping_label_filename=getattr(order, "shipping_label_filename", None),
+        shipping_label_uploaded_at=getattr(order, "shipping_label_uploaded_at", None),
+        has_shipping_label=bool(getattr(order, "shipping_label_path", None)),
+        refunds=getattr(order, "refunds", []) or [],
+        admin_notes=getattr(order, "admin_notes", []) or [],
+        tags=[t.tag for t in (getattr(order, "tags", None) or [])],
+        fraud_signals=fraud_signals,
+        shipments=getattr(order, "shipments", []) or [],
+    )
+
+
 @router.get("/admin/{order_id}", response_model=AdminOrderRead)
 async def admin_get_order(
     order_id: UUID,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
 
-    base = OrderRead.model_validate(order).model_dump()
-    return AdminOrderRead(
-        **base,
-        customer_email=getattr(order, "customer_email", None)
-        or (getattr(order.user, "email", None) if getattr(order, "user", None) else None),
-        customer_username=getattr(order.user, "username", None) if getattr(order, "user", None) else None,
-        shipping_address=order.shipping_address,
-        billing_address=order.billing_address,
-        tracking_url=getattr(order, "tracking_url", None),
-        shipping_label_filename=getattr(order, "shipping_label_filename", None),
-        shipping_label_uploaded_at=getattr(order, "shipping_label_uploaded_at", None),
-        has_shipping_label=bool(getattr(order, "shipping_label_path", None)),
-    )
+    return await _serialize_admin_order(session, order, include_pii=include_pii, current_user=admin)
 
 
 @router.post("/guest-checkout/email/request", response_model=GuestEmailVerificationRequestResponse)
@@ -1083,6 +1255,30 @@ async def guest_checkout(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sign in to use coupons.")
     promo = None
 
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+    courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = _delivery_from_payload(
+        courier=payload.courier,
+        delivery_type=payload.delivery_type,
+        locker_id=payload.locker_id,
+        locker_name=payload.locker_name,
+        locker_address=payload.locker_address,
+        locker_lat=payload.locker_lat,
+        locker_lng=payload.locker_lng,
+    )
+    locker_allowed, allowed_couriers = cart_service.delivery_constraints(cart)
+    if not allowed_couriers:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No couriers available for cart items")
+    if courier not in allowed_couriers:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Selected courier is not available for cart items")
+    if delivery_type == "locker" and not locker_allowed:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Locker delivery is not available for cart items")
+    phone_required = bool(
+        checkout_settings.phone_required_locker if delivery_type == "locker" else checkout_settings.phone_required_home
+    )
+    phone = (payload.phone or "").strip() or None
+    if phone_required and not phone:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phone is required")
+
     has_billing = bool((payload.billing_line1 or "").strip())
     billing_same_as_shipping = not has_billing
 
@@ -1091,6 +1287,7 @@ async def guest_checkout(
         user_id,
         AddressCreate(
             label="Guest Checkout" if not payload.create_account else "Checkout",
+            phone=phone,
             line1=payload.line1,
             line2=payload.line2,
             city=payload.city,
@@ -1116,6 +1313,7 @@ async def guest_checkout(
             user_id,
             AddressCreate(
                 label="Guest Checkout (Billing)" if not payload.create_account else "Checkout (Billing)",
+                phone=phone,
                 line1=payload.billing_line1 or payload.line1,
                 line2=payload.billing_line2,
                 city=payload.billing_city,
@@ -1127,23 +1325,15 @@ async def guest_checkout(
             ),
         )
 
-    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
-    totals, discount_val = cart_service.calculate_totals(
+    totals, discount_val = await cart_service.calculate_totals_async(
+        session,
         cart,
         shipping_method=shipping_method,
         promo=promo,
         checkout_settings=checkout_settings,
+        country_code=shipping_addr.country,
     )
     payment_method = payload.payment_method or "stripe"
-    courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = _delivery_from_payload(
-        courier=payload.courier,
-        delivery_type=payload.delivery_type,
-        locker_id=payload.locker_id,
-        locker_name=payload.locker_name,
-        locker_address=payload.locker_address,
-        locker_lat=payload.locker_lat,
-        locker_lng=payload.locker_lng,
-    )
     stripe_session_id = None
     stripe_checkout_url = None
     payment_intent_id = None
@@ -1204,6 +1394,8 @@ async def guest_checkout(
         locker_lng=locker_lng,
         discount=discount_val,
         promo_code=None,
+        invoice_company=payload.invoice_company,
+        invoice_vat_id=payload.invoice_vat_id,
         tax_amount=totals.tax,
         fee_amount=totals.fee,
         shipping_amount=totals.shipping,
@@ -1246,8 +1438,9 @@ async def admin_update_order(
     background_tasks: BackgroundTasks,
     order_id: UUID,
     payload: OrderUpdate,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    admin: User = Depends(require_admin_section("orders")),
 ):
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1369,31 +1562,124 @@ async def admin_update_order(
                 type="order",
                 title=title,
                 body=f"Reference {updated.reference_code}" if updated.reference_code else None,
-                url="/account",
+                url=_account_orders_url(updated),
             )
     full = await order_service.get_order_by_id_admin(session, order_id)
     if not full:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    base = OrderRead.model_validate(full).model_dump()
-    return AdminOrderRead(
-        **base,
-        customer_email=getattr(full, "customer_email", None) or (getattr(full.user, "email", None) if getattr(full, "user", None) else None),
-        customer_username=getattr(full.user, "username", None) if getattr(full, "user", None) else None,
-        shipping_address=full.shipping_address,
-        billing_address=full.billing_address,
-        tracking_url=getattr(full, "tracking_url", None),
-        shipping_label_filename=getattr(full, "shipping_label_filename", None),
-        shipping_label_uploaded_at=getattr(full, "shipping_label_uploaded_at", None),
-        has_shipping_label=bool(getattr(full, "shipping_label_path", None)),
+    return await _serialize_admin_order(session, full, include_pii=include_pii, current_user=admin)
+
+
+@router.patch("/admin/{order_id}/addresses", response_model=AdminOrderRead)
+async def admin_update_order_addresses(
+    order_id: UUID,
+    payload: AdminOrderAddressesUpdate = Body(...),
+    include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("orders")),
+) -> AdminOrderRead:
+    order = await order_service.get_order_by_id_admin(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    actor = (getattr(admin, "email", None) or getattr(admin, "username", None) or "admin").strip()
+    updated = await order_service.update_order_addresses(
+        session,
+        order,
+        payload,
+        actor=actor,
+        actor_user_id=getattr(admin, "id", None),
     )
+    return await _serialize_admin_order(session, updated, include_pii=include_pii, current_user=admin)
+
+
+@router.get("/admin/{order_id}/shipments", response_model=list[OrderShipmentRead])
+async def admin_list_order_shipments(
+    order_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("orders")),
+) -> list[OrderShipmentRead]:
+    order = await order_service.get_order_by_id_admin(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    return getattr(order, "shipments", []) or []
+
+
+@router.post("/admin/{order_id}/shipments", response_model=AdminOrderRead)
+async def admin_create_order_shipment(
+    order_id: UUID,
+    payload: OrderShipmentCreate = Body(...),
+    include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("orders")),
+) -> AdminOrderRead:
+    order = await order_service.get_order_by_id_admin(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    actor = (getattr(admin, "email", None) or getattr(admin, "username", None) or "admin").strip()
+    updated = await order_service.create_order_shipment(
+        session,
+        order,
+        payload,
+        actor=actor,
+        actor_user_id=getattr(admin, "id", None),
+    )
+    return await _serialize_admin_order(session, updated, include_pii=include_pii, current_user=admin)
+
+
+@router.patch("/admin/{order_id}/shipments/{shipment_id}", response_model=AdminOrderRead)
+async def admin_update_order_shipment(
+    order_id: UUID,
+    shipment_id: UUID,
+    payload: OrderShipmentUpdate = Body(...),
+    include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("orders")),
+) -> AdminOrderRead:
+    order = await order_service.get_order_by_id_admin(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    actor = (getattr(admin, "email", None) or getattr(admin, "username", None) or "admin").strip()
+    updated = await order_service.update_order_shipment(
+        session,
+        order,
+        shipment_id,
+        payload,
+        actor=actor,
+        actor_user_id=getattr(admin, "id", None),
+    )
+    return await _serialize_admin_order(session, updated, include_pii=include_pii, current_user=admin)
+
+
+@router.delete("/admin/{order_id}/shipments/{shipment_id}", response_model=AdminOrderRead)
+async def admin_delete_order_shipment(
+    order_id: UUID,
+    shipment_id: UUID,
+    include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("orders")),
+) -> AdminOrderRead:
+    order = await order_service.get_order_by_id_admin(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    actor = (getattr(admin, "email", None) or getattr(admin, "username", None) or "admin").strip()
+    updated = await order_service.delete_order_shipment(
+        session,
+        order,
+        shipment_id,
+        actor=actor,
+        actor_user_id=getattr(admin, "id", None),
+    )
+    return await _serialize_admin_order(session, updated, include_pii=include_pii, current_user=admin)
 
 
 @router.post("/admin/{order_id}/shipping-label", response_model=AdminOrderRead)
 async def admin_upload_shipping_label(
     order_id: UUID,
     file: UploadFile = File(...),
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1420,25 +1706,15 @@ async def admin_upload_shipping_label(
     full = await order_service.get_order_by_id_admin(session, order_id)
     if not full:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    base = OrderRead.model_validate(full).model_dump()
-    return AdminOrderRead(
-        **base,
-        customer_email=getattr(full, "customer_email", None) or (getattr(full.user, "email", None) if getattr(full, "user", None) else None),
-        customer_username=getattr(full.user, "username", None) if getattr(full, "user", None) else None,
-        shipping_address=full.shipping_address,
-        billing_address=full.billing_address,
-        tracking_url=getattr(full, "tracking_url", None),
-        shipping_label_filename=getattr(full, "shipping_label_filename", None),
-        shipping_label_uploaded_at=getattr(full, "shipping_label_uploaded_at", None),
-        has_shipping_label=bool(getattr(full, "shipping_label_path", None)),
-    )
+    return await _serialize_admin_order(session, full, include_pii=include_pii, current_user=admin)
 
 
 @router.get("/admin/{order_id}/shipping-label")
 async def admin_download_shipping_label(
     order_id: UUID,
+    action: str | None = Query(default=None, max_length=20),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    admin=Depends(require_admin_section("orders")),
 ) -> FileResponse:
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1451,6 +1727,12 @@ async def admin_download_shipping_label(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping label not found")
 
     filename = _sanitize_filename(getattr(order, "shipping_label_filename", None) or path.name)
+    action_clean = (action or "").strip().lower()
+    event = "shipping_label_printed" if action_clean == "print" else "shipping_label_downloaded"
+    actor = (getattr(admin, "email", None) or getattr(admin, "username", None) or "admin").strip()
+    note = f"{actor}: {filename}" if actor else filename
+    session.add(OrderEvent(order_id=order.id, event=event, note=note))
+    await session.commit()
     media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
     headers = {"Cache-Control": "no-store"}
     return FileResponse(path, media_type=media_type, filename=filename, headers=headers)
@@ -1460,7 +1742,7 @@ async def admin_download_shipping_label(
 async def admin_delete_shipping_label(
     order_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("orders")),
 ) -> None:
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1495,10 +1777,15 @@ async def admin_retry_payment(
 async def admin_refund_order(
     background_tasks: BackgroundTasks,
     order_id: UUID,
-    note: str | None = None,
+    payload: AdminOrderRefundRequest = Body(...),
     session: AsyncSession = Depends(get_session),
     admin_user=Depends(require_admin),
 ):
+    password = str(payload.password or "")
+    if not password or not security.verify_password(password, admin_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+
+    note = (payload.note or "").strip() or None
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
@@ -1515,7 +1802,7 @@ async def admin_refund_order(
             type="order",
             title="Order refunded" if (updated.user.preferred_language or "en") != "ro" else "Comandă rambursată",
             body=f"Reference {updated.reference_code}" if updated.reference_code else None,
-            url="/account",
+            url=_account_orders_url(updated),
         )
     owner = await auth_service.get_owner_user(session)
     admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
@@ -1532,11 +1819,123 @@ async def admin_refund_order(
     return updated
 
 
+@router.post("/admin/{order_id}/refunds", response_model=AdminOrderRead)
+async def admin_create_order_refund(
+    background_tasks: BackgroundTasks,
+    order_id: UUID,
+    payload: AdminOrderRefundCreate = Body(...),
+    session: AsyncSession = Depends(get_session),
+    admin_user=Depends(require_admin),
+) -> AdminOrderRead:
+    password = str(payload.password or "")
+    if not password or not security.verify_password(password, admin_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+
+    order = await order_service.get_order_by_id_admin(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    items = [(row.order_item_id, int(row.quantity)) for row in (payload.items or [])]
+    updated = await order_service.create_order_refund(
+        session,
+        order,
+        amount=payload.amount,
+        note=payload.note,
+        items=items,
+        process_payment=bool(payload.process_payment),
+        actor=(getattr(admin_user, "email", None) or getattr(admin_user, "username", None) or "admin").strip(),
+    )
+    if updated.status == OrderStatus.refunded:
+        await coupons_service.release_coupon_for_order(session, order=updated, reason="refunded")
+
+    refund_record = (getattr(updated, "refunds", None) or [])[-1] if (getattr(updated, "refunds", None) or []) else None
+    if refund_record:
+        customer_to = (updated.user.email if updated.user and updated.user.email else None) or getattr(updated, "customer_email", None)
+        customer_lang = updated.user.preferred_language if updated.user else None
+        if customer_to:
+            background_tasks.add_task(email_service.send_order_partial_refund_update, customer_to, updated, refund_record, lang=customer_lang)
+        if updated.user and updated.user.id:
+            amount = getattr(refund_record, "amount", None)
+            currency = getattr(updated, "currency", None) or "RON"
+            body = f"{amount} {currency}" if amount is not None else None
+            await notification_service.create_notification(
+                session,
+                user_id=updated.user.id,
+                type="order",
+                title=(
+                    "Partial refund issued"
+                    if (updated.user.preferred_language or "en") != "ro"
+                    else "Rambursare parțială"
+                ),
+                body=body,
+                url="/account/orders",
+            )
+
+    return await _serialize_admin_order(session, updated)
+
+
+@router.post("/admin/{order_id}/notes", response_model=AdminOrderRead)
+async def admin_add_order_note(
+    order_id: UUID,
+    payload: OrderAdminNoteCreate = Body(...),
+    include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("orders")),
+) -> AdminOrderRead:
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    updated = await order_service.add_admin_note(session, order, note=payload.note, actor_user_id=getattr(admin, "id", None))
+
+    return await _serialize_admin_order(session, updated, include_pii=include_pii, current_user=admin)
+
+
+@router.post("/admin/{order_id}/tags", response_model=AdminOrderRead)
+async def admin_add_order_tag(
+    order_id: UUID,
+    payload: OrderTagCreate = Body(...),
+    include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("orders")),
+) -> AdminOrderRead:
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    updated = await order_service.add_order_tag(
+        session, order, tag=payload.tag, actor_user_id=getattr(admin, "id", None)
+    )
+
+    return await _serialize_admin_order(session, updated, include_pii=include_pii, current_user=admin)
+
+
+@router.delete("/admin/{order_id}/tags/{tag}", response_model=AdminOrderRead)
+async def admin_remove_order_tag(
+    order_id: UUID,
+    tag: str,
+    include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("orders")),
+) -> AdminOrderRead:
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    updated = await order_service.remove_order_tag(
+        session, order, tag=tag, actor_user_id=getattr(admin, "id", None)
+    )
+
+    return await _serialize_admin_order(session, updated, include_pii=include_pii, current_user=admin)
+
+
 @router.post("/admin/{order_id}/delivery-email", response_model=OrderRead)
 async def admin_send_delivery_email(
+    background_tasks: BackgroundTasks,
     order_id: UUID,
+    payload: AdminOrderEmailResendRequest = Body(default=AdminOrderEmailResendRequest()),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    admin=Depends(require_admin_section("orders")),
 ) -> OrderRead:
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1544,29 +1943,78 @@ async def admin_send_delivery_email(
     to_email = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
     if not to_email:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order customer email missing")
-    await email_service.send_delivery_confirmation(to_email, order, getattr(order.user, "preferred_language", None) if order.user else None)
+    note = (payload.note or "").strip() or None
+    actor = (getattr(admin, "email", None) or getattr(admin, "username", None) or "admin").strip()
+    event_note = f"{actor}: {note}" if note else actor
+    session.add(OrderEvent(order_id=order.id, event="email_resend_delivery", note=event_note))
+    await session.commit()
+    await session.refresh(order, attribute_names=["events"])
+    background_tasks.add_task(
+        email_service.send_delivery_confirmation,
+        to_email,
+        order,
+        getattr(order.user, "preferred_language", None) if order.user else None,
+    )
     return order
 
 
-@router.post("/admin/{order_id}/items/{item_id}/fulfill", response_model=OrderRead)
+@router.post("/admin/{order_id}/confirmation-email", response_model=OrderRead)
+async def admin_send_confirmation_email(
+    background_tasks: BackgroundTasks,
+    order_id: UUID,
+    payload: AdminOrderEmailResendRequest = Body(default=AdminOrderEmailResendRequest()),
+    session: AsyncSession = Depends(get_session),
+    admin=Depends(require_admin_section("orders")),
+) -> OrderRead:
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    to_email = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
+    if not to_email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order customer email missing")
+    note = (payload.note or "").strip() or None
+    actor = (getattr(admin, "email", None) or getattr(admin, "username", None) or "admin").strip()
+    event_note = f"{actor}: {note}" if note else actor
+    session.add(OrderEvent(order_id=order.id, event="email_resend_confirmation", note=event_note))
+    await session.commit()
+    await session.refresh(order, attribute_names=["events"])
+
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+    background_tasks.add_task(
+        email_service.send_order_confirmation,
+        to_email,
+        order,
+        order.items,
+        getattr(order.user, "preferred_language", None) if order.user else None,
+        receipt_share_days=checkout_settings.receipt_share_days,
+    )
+    return order
+
+
+@router.post("/admin/{order_id}/items/{item_id}/fulfill", response_model=AdminOrderRead)
 async def admin_fulfill_item(
     order_id: UUID,
     item_id: UUID,
     shipped_quantity: int = 0,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    admin: User = Depends(require_admin_section("orders")),
 ):
-    order = await order_service.get_order_by_id(session, order_id)
+    order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    return await order_service.update_fulfillment(session, order, item_id, shipped_quantity)
+    await order_service.update_fulfillment(session, order, item_id, shipped_quantity)
+    refreshed = await order_service.get_order_by_id_admin(session, order_id)
+    if not refreshed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    return await _serialize_admin_order(session, refreshed, include_pii=include_pii, current_user=admin)
 
 
 @router.get("/admin/{order_id}/events", response_model=list[OrderEventRead])
 async def admin_order_events(
     order_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("orders")),
 ):
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -1578,13 +2026,51 @@ async def admin_order_events(
 async def admin_packing_slip(
     order_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("orders")),
 ):
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    content = f"Packing slip for order {order.reference_code or order.id}\nItems: {len(order.items)}"
-    return PlainTextResponse(content, media_type="application/pdf")
+    pdf = packing_slips_service.render_packing_slip_pdf(order)
+    ref = getattr(order, "reference_code", None) or str(order.id)
+    headers = {"Content-Disposition": f"attachment; filename=packing-slip-{ref}.pdf"}
+    return Response(content=pdf, media_type="application/pdf", headers=headers)
+
+
+@router.post("/admin/batch/packing-slips")
+async def admin_batch_packing_slips(
+    payload: AdminOrderIdsRequest,
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("orders")),
+):
+    ids = list(dict.fromkeys(payload.order_ids))
+    if not ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No orders selected")
+    if len(ids) > 50:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many orders selected")
+
+    result = await session.execute(
+        select(Order)
+        .execution_options(populate_existing=True)
+        .options(
+            selectinload(Order.items).selectinload(OrderItem.product),
+            selectinload(Order.user),
+            selectinload(Order.shipping_address),
+            selectinload(Order.billing_address),
+        )
+        .where(Order.id.in_(ids))
+    )
+    orders = list(result.scalars().unique())
+    found = {o.id for o in orders}
+    missing = [str(order_id) for order_id in ids if order_id not in found]
+    if missing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"missing_order_ids": missing})
+
+    order_by_id = {o.id: o for o in orders}
+    ordered = [order_by_id[order_id] for order_id in ids if order_id in order_by_id]
+    pdf = packing_slips_service.render_batch_packing_slips_pdf(ordered)
+    headers = {"Content-Disposition": "attachment; filename=packing-slips.pdf"}
+    return Response(content=pdf, media_type="application/pdf", headers=headers)
 
 
 @router.post("/admin/{order_id}/capture-payment", response_model=OrderRead)
@@ -1615,7 +2101,7 @@ async def admin_capture_payment(
             type="order",
             title="Order processing" if (updated.user.preferred_language or "en") != "ro" else "Comandă în procesare",
             body=f"Reference {updated.reference_code}" if updated.reference_code else None,
-            url="/account",
+            url=_account_orders_url(updated),
         )
     return updated
 
@@ -1644,7 +2130,7 @@ async def admin_void_payment(
             type="order",
             title="Order cancelled" if (updated.user.preferred_language or "en") != "ro" else "Comandă anulată",
             body=f"Reference {updated.reference_code}" if updated.reference_code else None,
-            url="/account",
+            url=_account_orders_url(updated),
         )
     return updated
 
@@ -1871,7 +2357,7 @@ async def request_order_cancellation(
         type="order",
         title="Cancel requested" if (current_user.preferred_language or "en") != "ro" else "Anulare solicitată",
         body=f"Reference {order.reference_code}" if order.reference_code else None,
-        url="/account",
+        url=_account_orders_url(order),
     )
 
     return order

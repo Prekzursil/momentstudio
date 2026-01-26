@@ -22,3 +22,14 @@ class FxAdminStatus(BaseModel):
     effective: FxRatesRead
     override: FxRatesRead | None = None
     last_known: FxRatesRead | None = None
+
+
+class FxOverrideAuditEntry(BaseModel):
+    id: str
+    action: str
+    created_at: datetime
+    user_id: str | None = None
+    user_email: str | None = None
+    eur_per_ron: float | None = None
+    usd_per_ron: float | None = None
+    as_of: date | None = None

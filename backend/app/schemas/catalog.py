@@ -5,14 +5,47 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic import field_validator
 
-from app.models.catalog import ProductStatus
+from app.models.catalog import ProductBadgeType, ProductStatus, ShippingClass, StockAdjustmentReason
+
+
+_ALLOWED_COURIERS: set[str] = {"sameday", "fan_courier"}
+
+
+def _normalize_courier(value: object) -> str:
+    return str(value or "").strip().lower()
+
+
+def _validate_disallowed_couriers(value: object | None) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError("Invalid couriers list")
+    cleaned: list[str] = []
+    for raw in value:
+        code = _normalize_courier(raw)
+        if not code:
+            continue
+        if code not in _ALLOWED_COURIERS:
+            raise ValueError("Invalid courier")
+        cleaned.append(code)
+    # Preserve the requested order as much as possible, but drop duplicates.
+    seen: set[str] = set()
+    unique: list[str] = []
+    for code in cleaned:
+        if code in seen:
+            continue
+        seen.add(code)
+        unique.append(code)
+    return unique
 
 
 class CategoryFields(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     description: str | None = None
+    low_stock_threshold: int | None = Field(default=None, ge=0)
     sort_order: int = 0
     parent_id: UUID | None = None
+    tax_group_id: UUID | None = None
 
 
 class CategoryBase(CategoryFields):
@@ -30,8 +63,10 @@ class CategoryUpdate(BaseModel):
     slug: str | None = Field(default=None, min_length=1, max_length=120)
     name: str | None = Field(default=None, max_length=120)
     description: str | None = None
+    low_stock_threshold: int | None = Field(default=None, ge=0)
     sort_order: int | None = None
     parent_id: UUID | None = None
+    tax_group_id: UUID | None = None
 
 
 class CategoryReorderItem(BaseModel):
@@ -46,6 +81,7 @@ class CategoryRead(CategoryBase):
     created_at: datetime
     updated_at: datetime
     sort_order: int
+    tax_group_id: UUID | None = None
 
 
 class CategoryTranslationUpsert(BaseModel):
@@ -75,12 +111,16 @@ class ProductFields(BaseModel):
     is_active: bool = True
     is_featured: bool = False
     stock_quantity: int = Field(ge=0)
+    low_stock_threshold: int | None = Field(default=None, ge=0)
     allow_backorder: bool = False
     restock_at: datetime | None = None
     weight_grams: int | None = Field(default=None, ge=0)
     width_cm: float | None = Field(default=None, ge=0)
     height_cm: float | None = Field(default=None, ge=0)
     depth_cm: float | None = Field(default=None, ge=0)
+    shipping_class: ShippingClass = ShippingClass.standard
+    shipping_allow_locker: bool = True
+    shipping_disallowed_couriers: list[str] = Field(default_factory=list)
     meta_title: str | None = Field(default=None, max_length=180)
     meta_description: str | None = Field(default=None, max_length=300)
 
@@ -90,6 +130,11 @@ class ProductFields(BaseModel):
         if value and "<script" in value.lower():
             raise ValueError("Invalid rich text content")
         return value
+
+    @field_validator("shipping_disallowed_couriers")
+    @classmethod
+    def validate_shipping_disallowed_couriers(cls, value: object):
+        return _validate_disallowed_couriers(value)
 
     @field_validator("currency")
     @classmethod
@@ -107,6 +152,7 @@ class ProductBase(ProductFields):
 class ProductImageBase(BaseModel):
     url: str
     alt_text: str | None = None
+    caption: str | None = None
     sort_order: int = 0
 
 
@@ -118,6 +164,27 @@ class ProductImageRead(ProductImageBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+
+
+class ProductImageTranslationUpsert(BaseModel):
+    alt_text: str | None = Field(default=None, max_length=255)
+    caption: str | None = None
+
+
+class ProductImageTranslationRead(ProductImageTranslationUpsert):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    lang: str
+
+
+class ProductImageOptimizationStats(BaseModel):
+    original_bytes: int | None = None
+    thumb_sm_bytes: int | None = None
+    thumb_md_bytes: int | None = None
+    thumb_lg_bytes: int | None = None
+    width: int | None = None
+    height: int | None = None
 
 
 class ProductVariantBase(BaseModel):
@@ -134,6 +201,18 @@ class ProductVariantRead(ProductVariantBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+
+
+class ProductVariantUpsert(BaseModel):
+    id: UUID | None = None
+    name: str = Field(min_length=1, max_length=120)
+    additional_price_delta: Decimal = Decimal("0.00")
+    stock_quantity: int = Field(default=0, ge=0)
+
+
+class ProductVariantMatrixUpdate(BaseModel):
+    variants: list[ProductVariantUpsert] = []
+    delete_variant_ids: list[UUID] = []
 
 
 class ProductOptionBase(BaseModel):
@@ -157,6 +236,18 @@ class TagRead(BaseModel):
     id: UUID
     name: str
     slug: str
+
+
+class ProductBadgeUpsert(BaseModel):
+    badge: ProductBadgeType
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+
+
+class ProductBadgeRead(ProductBadgeUpsert):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
 
 
 class FeaturedCollectionBase(BaseModel):
@@ -217,6 +308,7 @@ class ProductCreate(ProductFields):
     images: list[ProductImageCreate] = []
     variants: list[ProductVariantCreate] = []
     tags: list[str] = []
+    badges: list[ProductBadgeUpsert] = []
     options: list[ProductOptionCreate] = []
     status: ProductStatus = ProductStatus.draft
 
@@ -236,11 +328,15 @@ class ProductUpdate(BaseModel):
     is_active: bool | None = None
     is_featured: bool | None = None
     stock_quantity: int | None = Field(default=None, ge=0)
+    low_stock_threshold: int | None = Field(default=None, ge=0)
     category_id: UUID | None = None
     sku: str | None = Field(default=None, min_length=3, max_length=64)
     status: ProductStatus | None = None
     publish_at: datetime | None = None
+    publish_scheduled_for: datetime | None = None
+    unpublish_scheduled_for: datetime | None = None
     tags: list[str] | None = None
+    badges: list[ProductBadgeUpsert] | None = None
     options: list[ProductOptionCreate] | None = None
     allow_backorder: bool | None = None
     restock_at: datetime | None = None
@@ -248,6 +344,9 @@ class ProductUpdate(BaseModel):
     width_cm: float | None = Field(default=None, ge=0)
     height_cm: float | None = Field(default=None, ge=0)
     depth_cm: float | None = Field(default=None, ge=0)
+    shipping_class: ShippingClass | None = None
+    shipping_allow_locker: bool | None = None
+    shipping_disallowed_couriers: list[str] | None = None
 
     @field_validator("currency")
     @classmethod
@@ -258,6 +357,13 @@ class ProductUpdate(BaseModel):
         if cleaned != "RON":
             raise ValueError("Only RON currency is supported")
         return cleaned
+
+    @field_validator("shipping_disallowed_couriers")
+    @classmethod
+    def validate_shipping_disallowed_couriers(cls, value: object | None):
+        if value is None:
+            return value
+        return _validate_disallowed_couriers(value)
     meta_title: str | None = Field(default=None, max_length=180)
     meta_description: str | None = Field(default=None, max_length=300)
 
@@ -314,7 +420,42 @@ class BulkProductUpdateItem(BaseModel):
     sale_end_at: datetime | None = None
     sale_auto_publish: bool | None = None
     stock_quantity: int | None = Field(default=None, ge=0)
+    category_id: UUID | None = None
+    publish_scheduled_for: datetime | None = None
+    unpublish_scheduled_for: datetime | None = None
     status: ProductStatus | None = None
+
+
+class StockAdjustmentCreate(BaseModel):
+    product_id: UUID
+    variant_id: UUID | None = None
+    delta: int
+    reason: StockAdjustmentReason
+    note: str | None = Field(default=None, max_length=500)
+
+
+class ProductRelationshipsUpdate(BaseModel):
+    related_product_ids: list[UUID] = Field(default_factory=list, max_length=30)
+    upsell_product_ids: list[UUID] = Field(default_factory=list, max_length=30)
+
+
+class ProductRelationshipsRead(ProductRelationshipsUpdate):
+    pass
+
+
+class StockAdjustmentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    product_id: UUID
+    variant_id: UUID | None
+    actor_user_id: UUID | None
+    reason: StockAdjustmentReason
+    delta: int
+    before_quantity: int
+    after_quantity: int
+    note: str | None
+    created_at: datetime
 
 
 class ProductRead(ProductBase):
@@ -334,6 +475,7 @@ class ProductRead(ProductBase):
     variants: list[ProductVariantRead] = []
     options: list[ProductOptionRead] = []
     tags: list[TagRead] = []
+    badges: list[ProductBadgeRead] = []
     reviews: list[ProductReviewRead] = []
     featured_collections: list[FeaturedCollectionBase] = []
 
@@ -350,6 +492,7 @@ class ProductReadBrief(BaseModel):
     is_featured: bool
     status: ProductStatus
     tags: list[TagRead] = []
+    badges: list[ProductBadgeRead] = []
 
 
 class ProductFeedItem(BaseModel):

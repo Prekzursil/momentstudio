@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
+from app.models.passkeys import UserPasskey
 from app.models.user import UserRole
 from app.schemas.user import UserCreate
 from app.services.auth import create_user, issue_tokens_for_user
@@ -45,6 +46,17 @@ def create_user_token(session_factory, *, email: str, role: UserRole = UserRole.
         async with session_factory() as session:
             user = await create_user(session, UserCreate(email=email, password="password123", name="User"))
             user.role = role
+            if role in (UserRole.admin, UserRole.owner):
+                session.add(
+                    UserPasskey(
+                        user_id=user.id,
+                        name="Test Passkey",
+                        credential_id=f"cred-{user.id}",
+                        public_key=b"test",
+                        sign_count=0,
+                        backed_up=False,
+                    )
+                )
             await session.commit()
             tokens = await issue_tokens_for_user(session, user)
             return tokens["access_token"]
@@ -177,6 +189,26 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert filtered_q.json()["meta"]["total_items"] == 1
     assert filtered_q.json()["items"][0]["slug"] == "second-post"
 
+    # Unpublish window: a post with a past published_until should not be visible.
+    expired = client.post(
+        "/api/v1/content/admin/blog.expired-post",
+        json={
+            "title": "Expired",
+            "body_markdown": "This is expired.",
+            "status": "published",
+            "lang": "en",
+            "published_at": (datetime.now(timezone.utc) - timedelta(days=2)).isoformat(),
+            "published_until": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert expired.status_code == 201, expired.text
+    expired_listing = client.get("/api/v1/blog/posts", params={"lang": "en"})
+    assert expired_listing.status_code == 200, expired_listing.text
+    assert expired_listing.json()["meta"]["total_items"] == 2
+    expired_detail = client.get("/api/v1/blog/posts/expired-post", params={"lang": "en"})
+    assert expired_detail.status_code == 404, expired_detail.text
+
     # Scheduling: published posts with a future published_at should not be visible yet.
     future = (datetime.now(timezone.utc) + timedelta(days=2)).isoformat()
     scheduled = client.post(
@@ -207,6 +239,7 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert "blog/first-post?lang=en" in sitemap.text
     assert "blog/second-post?lang=en" in sitemap.text
     assert "blog/scheduled-post?lang=en" not in sitemap.text
+    assert "blog/expired-post?lang=en" not in sitemap.text
 
     # Draft previews: admin can mint a token and fetch the unpublished/scheduled post.
     minted = client.post(
@@ -226,6 +259,10 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     preview = client.get("/api/v1/blog/posts/scheduled-post/preview", params={"lang": "en", "token": token})
     assert preview.status_code == 200, preview.text
     assert preview.json()["title"] == "Scheduled"
+
+    og_preview = client.get("/api/v1/blog/posts/scheduled-post/og-preview.png", params={"lang": "en", "token": token})
+    assert og_preview.status_code == 200, og_preview.text
+    assert og_preview.headers.get("content-type", "").startswith("image/png")
 
     invalid_preview = client.get("/api/v1/blog/posts/scheduled-post/preview", params={"lang": "en", "token": "nope"})
     assert invalid_preview.status_code == 403, invalid_preview.text

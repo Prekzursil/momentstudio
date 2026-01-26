@@ -1,3 +1,4 @@
+import json
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, UploadFile, status
@@ -6,10 +7,22 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.dependencies import require_admin, get_current_user_optional, require_complete_profile
+from app.core.dependencies import (
+    get_current_user_optional,
+    require_admin_section,
+    require_complete_profile,
+)
 from app.db.session import get_session
-from app.models.catalog import Category, Product, ProductReview, ProductStatus
-from app.models.user import UserRole
+from app.models.catalog import (
+    Category,
+    Product,
+    ProductAuditLog,
+    ProductImage,
+    ProductReview,
+    ProductStatus,
+    ProductRelationshipType,
+)
+from app.models.user import User, UserRole
 from app.schemas.catalog import (
     CategoryCreate,
     CategoryRead,
@@ -35,7 +48,15 @@ from app.schemas.catalog import (
     ProductPriceBounds,
     BackInStockRequestRead,
     BackInStockStatus,
+    ProductImageTranslationRead,
+    ProductImageTranslationUpsert,
+    ProductImageOptimizationStats,
+    ProductVariantMatrixUpdate,
+    ProductVariantRead,
+    ProductRelationshipsRead,
+    ProductRelationshipsUpdate,
 )
+from app.schemas.catalog_admin import AdminDeletedProductImage, AdminProductAuditEntry
 from app.services import catalog as catalog_service
 from app.services import storage
 
@@ -77,6 +98,7 @@ async def list_products(
         category_slug = None
 
     await catalog_service.auto_publish_due_sales(session)
+    await catalog_service.apply_due_product_schedules(session)
     offset = (page - 1) * limit
     min_bound, max_bound, currency = await catalog_service.get_product_price_bounds(
         session,
@@ -128,6 +150,7 @@ async def get_product_price_bounds(
         category_slug = None
 
     await catalog_service.auto_publish_due_sales(session)
+    await catalog_service.apply_due_product_schedules(session)
     min_price, max_price, currency = await catalog_service.get_product_price_bounds(
         session,
         category_slug=category_slug,
@@ -164,7 +187,7 @@ async def product_feed_csv(
 async def create_category(
     payload: CategoryCreate,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> Category:
     return await catalog_service.create_category(session, payload)
 
@@ -174,7 +197,7 @@ async def update_category(
     slug: str,
     payload: CategoryUpdate,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> Category:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
@@ -186,7 +209,7 @@ async def update_category(
 async def list_category_translations(
     slug: str,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> list[CategoryTranslationRead]:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
@@ -201,7 +224,7 @@ async def upsert_category_translation(
     lang: str = Path(..., pattern="^(en|ro)$"),
     payload: CategoryTranslationUpsert = ...,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> CategoryTranslationRead:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
@@ -215,7 +238,7 @@ async def delete_category_translation(
     slug: str,
     lang: str = Path(..., pattern="^(en|ro)$"),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> None:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
@@ -228,7 +251,7 @@ async def delete_category_translation(
 async def delete_category(
     slug: str,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> Category:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
@@ -242,7 +265,7 @@ async def delete_category(
 async def reorder_categories(
     payload: list[CategoryReorderItem],
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> list[CategoryRead]:
     updated = await catalog_service.reorder_categories(session, payload)
     return updated
@@ -252,7 +275,7 @@ async def reorder_categories(
 async def create_product(
     payload: ProductCreate,
     session: AsyncSession = Depends(get_session),
-    current_user=Depends(require_admin),
+    current_user=Depends(require_admin_section("products")),
 ) -> Product:
     return await catalog_service.create_product(session, payload, user_id=current_user.id)
 
@@ -262,7 +285,7 @@ async def update_product(
     slug: str,
     payload: ProductUpdate,
     session: AsyncSession = Depends(get_session),
-    current_user=Depends(require_admin),
+    current_user=Depends(require_admin_section("products")),
 ) -> Product:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
@@ -274,7 +297,7 @@ async def update_product(
 async def list_product_translations(
     slug: str,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> list[ProductTranslationRead]:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
@@ -289,7 +312,7 @@ async def upsert_product_translation(
     lang: str = Path(..., pattern="^(en|ro)$"),
     payload: ProductTranslationUpsert = ...,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> ProductTranslationRead:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
@@ -303,7 +326,7 @@ async def delete_product_translation(
     slug: str,
     lang: str = Path(..., pattern="^(en|ro)$"),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> None:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
@@ -312,11 +335,76 @@ async def delete_product_translation(
     return None
 
 
+@router.get("/products/{slug}/relationships", response_model=ProductRelationshipsRead)
+async def get_product_relationships(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("products")),
+) -> ProductRelationshipsRead:
+    product = await catalog_service.get_product_by_slug(session, slug)
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    return await catalog_service.get_product_relationships(session, product.id)
+
+
+@router.put("/products/{slug}/relationships", response_model=ProductRelationshipsRead)
+async def update_product_relationships(
+    slug: str,
+    payload: ProductRelationshipsUpdate,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(require_admin_section("products")),
+) -> ProductRelationshipsRead:
+    product = await catalog_service.get_product_by_slug(session, slug)
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    return await catalog_service.update_product_relationships(session, product=product, payload=payload, user_id=current_user.id)
+
+
+@router.get("/products/{slug}/audit", response_model=list[AdminProductAuditEntry])
+async def list_product_audit(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("products")),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> list[AdminProductAuditEntry]:
+    product = await catalog_service.get_product_by_slug(session, slug)
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    rows = (
+        await session.execute(
+            select(ProductAuditLog, User.email)
+            .join(User, ProductAuditLog.user_id == User.id, isouter=True)
+            .where(ProductAuditLog.product_id == product.id)
+            .order_by(ProductAuditLog.created_at.desc())
+            .limit(limit)
+        )
+    ).all()
+    entries: list[AdminProductAuditEntry] = []
+    for log, email in rows:
+        payload: dict | None = None
+        if log.payload:
+            try:
+                payload = json.loads(log.payload)
+            except json.JSONDecodeError:
+                payload = {"raw": log.payload}
+        entries.append(
+            AdminProductAuditEntry(
+                id=log.id,
+                action=log.action,
+                created_at=log.created_at,
+                user_id=log.user_id,
+                user_email=email,
+                payload=payload,
+            )
+        )
+    return entries
+
+
 @router.delete("/products/{slug}", status_code=status.HTTP_204_NO_CONTENT)
 async def soft_delete_product(
     slug: str,
     session: AsyncSession = Depends(get_session),
-    current_user=Depends(require_admin),
+    current_user=Depends(require_admin_section("products")),
 ) -> None:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
@@ -330,7 +418,7 @@ async def upload_product_image(
     slug: str,
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> Product:
     product = await catalog_service.get_product_by_slug(
         session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
@@ -347,23 +435,41 @@ async def upload_product_image(
     await catalog_service.add_product_image_from_path(
         session, product, url=path, alt_text=filename, sort_order=len(product.images) + 1
     )
-    await session.refresh(product)
-    return product
+    refreshed = await catalog_service.get_product_by_slug(
+        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+    )
+    if not refreshed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    return ProductRead.model_validate(refreshed)
 
 
 @router.post("/products/bulk-update", response_model=list[ProductRead])
 async def bulk_update_products(
     payload: list[BulkProductUpdateItem],
     session: AsyncSession = Depends(get_session),
-    current_user=Depends(require_admin),
+    current_user=Depends(require_admin_section("products")),
 ) -> list[Product]:
     updated = await catalog_service.bulk_update_products(session, payload, user_id=current_user.id)
     return updated
 
 
+@router.put("/products/{slug}/variants", response_model=list[ProductVariantRead])
+async def update_product_variants(
+    slug: str,
+    payload: ProductVariantMatrixUpdate,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(require_admin_section("products")),
+) -> list[ProductVariantRead]:
+    product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.variants)])
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    return await catalog_service.update_product_variants(session, product=product, payload=payload, user_id=current_user.id)
+
+
 @router.get("/collections/featured", response_model=list[FeaturedCollectionRead])
 async def list_featured_collections(session: AsyncSession = Depends(get_session)) -> list[FeaturedCollectionRead]:
     await catalog_service.auto_publish_due_sales(session)
+    await catalog_service.apply_due_product_schedules(session)
     collections = await catalog_service.list_featured_collections(session)
     payload: list[FeaturedCollectionRead] = []
     for collection in collections:
@@ -390,7 +496,7 @@ async def list_featured_collections(session: AsyncSession = Depends(get_session)
 async def create_featured_collection(
     payload: FeaturedCollectionCreate,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> FeaturedCollectionRead:
     created = await catalog_service.create_featured_collection(session, payload)
     return FeaturedCollectionRead.model_validate(created)
@@ -401,7 +507,7 @@ async def update_featured_collection(
     slug: str,
     payload: FeaturedCollectionUpdate,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> FeaturedCollectionRead:
     collection = await catalog_service.get_featured_collection_by_slug(session, slug)
     if not collection:
@@ -414,7 +520,7 @@ async def update_featured_collection(
 async def duplicate_product(
     slug: str,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> Product:
     product = await catalog_service.get_product_by_slug(
         session, slug, options=[selectinload(Product.images), selectinload(Product.category), selectinload(Product.options)]
@@ -434,6 +540,7 @@ async def recently_viewed_products(
     current_user=Depends(get_current_user_optional),
 ) -> list[Product]:
     await catalog_service.auto_publish_due_sales(session)
+    await catalog_service.apply_due_product_schedules(session)
     products = await catalog_service.get_recently_viewed(
         session, getattr(current_user, "id", None) if current_user else None, session_id, limit
     )
@@ -452,7 +559,7 @@ async def recently_viewed_products(
 @router.get("/products/export", response_class=StreamingResponse)
 async def export_products_csv(
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ):
     content = await catalog_service.export_products_csv(session)
     headers = {"Content-Disposition": 'attachment; filename="products.csv"'}
@@ -464,7 +571,7 @@ async def import_products_csv(
     file: UploadFile = File(...),
     dry_run: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> ImportResult:
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSV file required")
@@ -486,7 +593,11 @@ async def get_product(
     current_user=Depends(get_current_user_optional),
 ) -> Product:
     await catalog_service.auto_publish_due_sales(session)
-    product_options = [selectinload(Product.images)]
+    await catalog_service.apply_due_product_schedules(session)
+    image_loader = selectinload(Product.images)
+    if lang:
+        image_loader = image_loader.selectinload(ProductImage.translations)
+    product_options = [image_loader]
     if lang:
         product_options.append(selectinload(Product.translations))
         product_options.append(selectinload(Product.category).selectinload(Category.translations))
@@ -497,7 +608,7 @@ async def get_product(
     )
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) in (UserRole.admin, UserRole.owner)
+    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
     if not is_admin and (not product.is_active or product.status != ProductStatus.published):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     if product.is_active and product.status == ProductStatus.published:
@@ -519,7 +630,7 @@ async def get_back_in_stock_status(
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) in (UserRole.admin, UserRole.owner)
+    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
     if not is_admin and (not product.is_active or product.status != ProductStatus.published):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     request = await catalog_service.get_active_back_in_stock_request(session, user_id=current_user.id, product_id=product.id)
@@ -538,7 +649,7 @@ async def request_back_in_stock(
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) in (UserRole.admin, UserRole.owner)
+    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
     if not is_admin and (not product.is_active or product.status != ProductStatus.published):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     record = await catalog_service.create_back_in_stock_request(session, user_id=current_user.id, product=product)
@@ -554,7 +665,7 @@ async def cancel_back_in_stock(
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) in (UserRole.admin, UserRole.owner)
+    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
     if not is_admin and (not product.is_active or product.status != ProductStatus.published):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     await catalog_service.cancel_back_in_stock_request(session, user_id=current_user.id, product_id=product.id)
@@ -566,7 +677,7 @@ async def delete_product_image(
     slug: str,
     image_id: UUID,
     session: AsyncSession = Depends(get_session),
-    current_user=Depends(require_admin),
+    current_user=Depends(require_admin_section("products")),
 ) -> Product:
     product = await catalog_service.get_product_by_slug(
         session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
@@ -575,8 +686,12 @@ async def delete_product_image(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
     await catalog_service.delete_product_image(session, product, str(image_id), user_id=current_user.id)
-    await session.refresh(product)
-    return product
+    refreshed = await catalog_service.get_product_by_slug(
+        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+    )
+    if not refreshed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    return ProductRead.model_validate(refreshed)
 
 
 @router.patch("/products/{slug}/images/{image_id}/sort", response_model=ProductRead)
@@ -585,15 +700,145 @@ async def reorder_product_image(
     image_id: UUID,
     sort_order: int = Query(..., ge=0),
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> Product:
     product = await catalog_service.get_product_by_slug(
         session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
     )
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    updated = await catalog_service.update_product_image_sort(session, product, str(image_id), sort_order)
-    return updated
+    await catalog_service.update_product_image_sort(session, product, str(image_id), sort_order)
+    refreshed = await catalog_service.get_product_by_slug(
+        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+    )
+    if not refreshed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    return ProductRead.model_validate(refreshed)
+
+
+@router.get("/products/{slug}/images/deleted", response_model=list[AdminDeletedProductImage])
+async def list_deleted_product_images(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("products")),
+) -> list[AdminDeletedProductImage]:
+    product = await catalog_service.get_product_by_slug(session, slug)
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    images = await catalog_service.list_deleted_product_images(session, product.id)
+    return [
+        AdminDeletedProductImage(
+            id=image.id,
+            url=image.url,
+            alt_text=image.alt_text,
+            caption=image.caption,
+            deleted_at=getattr(image, "deleted_at", None),
+        )
+        for image in images
+    ]
+
+
+@router.post("/products/{slug}/images/{image_id}/restore", response_model=ProductRead)
+async def restore_deleted_product_image(
+    slug: str,
+    image_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(require_admin_section("products")),
+) -> ProductRead:
+    product = await catalog_service.get_product_by_slug(session, slug)
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    await catalog_service.restore_product_image(session, product, str(image_id), user_id=current_user.id)
+    refreshed = await catalog_service.get_product_by_slug(
+        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+    )
+    if not refreshed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    return ProductRead.model_validate(refreshed)
+
+
+@router.get("/products/{slug}/images/{image_id}/translations", response_model=list[ProductImageTranslationRead])
+async def list_product_image_translations(
+    slug: str,
+    image_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("products")),
+) -> list[ProductImageTranslationRead]:
+    product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    image = next((img for img in product.images if str(img.id) == str(image_id)), None)
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    return await catalog_service.list_product_image_translations(session, image=image)
+
+
+@router.put("/products/{slug}/images/{image_id}/translations/{lang}", response_model=ProductImageTranslationRead)
+async def upsert_product_image_translation(
+    slug: str,
+    image_id: UUID,
+    payload: ProductImageTranslationUpsert,
+    lang: str = Path(..., pattern="^(en|ro)$"),
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("products")),
+) -> ProductImageTranslationRead:
+    product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    image = next((img for img in product.images if str(img.id) == str(image_id)), None)
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    return await catalog_service.upsert_product_image_translation(session, image=image, lang=lang, payload=payload)
+
+
+@router.delete("/products/{slug}/images/{image_id}/translations/{lang}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_product_image_translation(
+    slug: str,
+    image_id: UUID,
+    lang: str = Path(..., pattern="^(en|ro)$"),
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("products")),
+) -> None:
+    product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    image = next((img for img in product.images if str(img.id) == str(image_id)), None)
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    await catalog_service.delete_product_image_translation(session, image=image, lang=lang)
+    return None
+
+
+@router.get("/products/{slug}/images/{image_id}/stats", response_model=ProductImageOptimizationStats)
+async def get_product_image_stats(
+    slug: str,
+    image_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("products")),
+) -> ProductImageOptimizationStats:
+    product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    image = next((img for img in product.images if str(img.id) == str(image_id)), None)
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    return catalog_service.get_product_image_optimization_stats(image)
+
+
+@router.post("/products/{slug}/images/{image_id}/reprocess", response_model=ProductImageOptimizationStats)
+async def reprocess_product_image(
+    slug: str,
+    image_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("products")),
+) -> ProductImageOptimizationStats:
+    product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    image = next((img for img in product.images if str(img.id) == str(image_id)), None)
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    return catalog_service.reprocess_product_image_thumbnails(image)
 
 
 @router.post("/products/{slug}/reviews", response_model=ProductReviewRead, status_code=status.HTTP_201_CREATED)
@@ -606,7 +851,7 @@ async def create_review(
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) in (UserRole.admin, UserRole.owner)
+    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
     if not is_admin and (not product.is_active or product.status != ProductStatus.published):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     review = await catalog_service.add_review(session, product, payload, getattr(current_user, "id", None) if current_user else None)
@@ -618,7 +863,7 @@ async def approve_review(
     slug: str,
     review_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: object = Depends(require_admin_section("products")),
 ) -> ProductReviewRead:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
@@ -640,17 +885,58 @@ async def related_products(
     current_user=Depends(get_current_user_optional),
 ) -> list[Product]:
     await catalog_service.auto_publish_due_sales(session)
+    await catalog_service.apply_due_product_schedules(session)
     product = await catalog_service.get_product_by_slug(
         session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
     )
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) in (UserRole.admin, UserRole.owner)
+    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
     if not is_admin and (not product.is_active or product.status != ProductStatus.published):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    related = await catalog_service.get_related_products(session, product, limit=4)
+    curated = await catalog_service.get_curated_relationship_products(
+        session,
+        product_id=product.id,
+        relationship_type=ProductRelationshipType.related,
+        limit=4,
+        include_inactive=is_admin,
+    )
+    related = curated or await catalog_service.get_related_products(session, product, limit=4)
     payload_items = []
     for p in related:
+        model = ProductRead.model_validate(p)
+        if not catalog_service.is_sale_active(p):
+            model.sale_price = None
+        payload_items.append(model)
+    return payload_items
+
+
+@router.get("/products/{slug}/upsells", response_model=list[ProductRead])
+async def upsell_products(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user_optional),
+) -> list[Product]:
+    await catalog_service.auto_publish_due_sales(session)
+    await catalog_service.apply_due_product_schedules(session)
+    product = await catalog_service.get_product_by_slug(
+        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+    )
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
+    if not is_admin and (not product.is_active or product.status != ProductStatus.published):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    upsells = await catalog_service.get_curated_relationship_products(
+        session,
+        product_id=product.id,
+        relationship_type=ProductRelationshipType.upsell,
+        limit=4,
+        include_inactive=is_admin,
+    )
+    payload_items = []
+    for p in upsells:
         model = ProductRead.model_validate(p)
         if not catalog_service.is_sale_active(p):
             model.sale_price = None

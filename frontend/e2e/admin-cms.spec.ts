@@ -14,6 +14,7 @@ async function loginAsOwner(page: Page): Promise<void> {
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('lang', 'en');
+    localStorage.setItem('admin.onboarding.v1', JSON.stringify({ completed_at: new Date().toISOString() }));
   });
 });
 
@@ -59,9 +60,10 @@ test('owner can update About page via CMS and audit log records it', async ({ pa
   await expect(page.getByText(marker)).toBeVisible({ timeout: 30_000 });
 
   await page.goto('/admin/dashboard');
-  await page.getByLabel('Entity').selectOption('content');
-  await page.getByRole('button', { name: 'Apply' }).click();
-  await expect(page.getByText('page.about').first()).toBeVisible();
+  const auditPanel = page.locator('section', { has: page.getByRole('heading', { name: 'Audit log' }) });
+  await auditPanel.getByLabel('Entity').selectOption('content');
+  await auditPanel.getByRole('button', { name: 'Apply', exact: true }).click();
+  await expect(auditPanel.getByText('page.about').first()).toBeVisible();
 });
 
 test('owner can toggle homepage sections via CMS', async ({ page }) => {

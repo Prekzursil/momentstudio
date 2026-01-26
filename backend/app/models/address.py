@@ -15,6 +15,7 @@ class Address(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     label: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
     line1: Mapped[str] = mapped_column(String(200), nullable=False)
     line2: Mapped[str | None] = mapped_column(String(200), nullable=True)
     city: Mapped[str] = mapped_column(String(100), nullable=False)

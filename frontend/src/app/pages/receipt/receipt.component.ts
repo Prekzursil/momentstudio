@@ -94,7 +94,7 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
                 {{ receipt.status }}
               </p>
               <p class="mt-1 text-sm text-slate-700 dark:text-slate-200" *ngIf="receipt.payment_method">
-                Payment / Plată: {{ receipt.payment_method }}
+                Payment / Plată: {{ paymentMethodLabel() }}
               </p>
               <p class="mt-1 text-sm text-slate-700 dark:text-slate-200" *ngIf="receipt.courier || receipt.delivery_type">
                 Delivery / Livrare: {{ receipt.courier || '—' }} · {{ receipt.delivery_type || '—' }}
@@ -195,6 +195,35 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
             </div>
           </div>
 
+          <div
+            *ngIf="(receipt.refunds || []).length > 0"
+            class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950"
+          >
+            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+              Refunds / Rambursări
+            </p>
+            <div class="mt-3 grid gap-2">
+              <div
+                *ngFor="let rf of receipt.refunds"
+                class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+              >
+                <div class="flex items-start justify-between gap-4">
+                  <div class="grid gap-0.5">
+                    <div class="font-semibold text-slate-900 dark:text-slate-50">
+                      {{ rf.amount | localizedCurrency: receipt.currency }}
+                    </div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400">
+                      {{ rf.created_at | date: 'short' }} · {{ rf.provider }}
+                    </div>
+                    <div *ngIf="rf.note" class="text-xs text-slate-600 dark:text-slate-300">
+                      {{ rf.note }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <p class="text-xs text-slate-500 dark:text-slate-400">Thank you! / Mulțumim!</p>
         </ng-container>
       </div>
@@ -212,6 +241,16 @@ export class ReceiptComponent implements OnInit, OnDestroy {
   private sub?: Subscription;
 
   constructor(private route: ActivatedRoute, private receipts: ReceiptService, public auth: AuthService) {}
+
+  paymentMethodLabel(): string {
+    const method = (this.receipt?.payment_method ?? '').trim().toLowerCase();
+    if (!method) return '';
+    if (method === 'stripe') return 'Stripe';
+    if (method === 'paypal') return 'PayPal';
+    if (method === 'netopia') return 'Netopia';
+    if (method === 'cod') return 'Cash / Numerar';
+    return method.toUpperCase();
+  }
 
   ngOnInit(): void {
     this.sub = this.route.paramMap.subscribe((params) => {

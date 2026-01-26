@@ -61,6 +61,10 @@ class ReturnRequestRead(BaseModel):
     customer_name: str | None = None
     user_id: UUID | None = None
 
+    return_label_filename: str | None = None
+    return_label_uploaded_at: datetime | None = None
+    has_return_label: bool = False
+
     status: ReturnRequestStatus
     reason: str
     customer_message: str | None = None
@@ -74,4 +78,3 @@ class ReturnRequestRead(BaseModel):
     closed_at: datetime | None = None
 
     items: list[ReturnRequestItemRead] = Field(default_factory=list)
-

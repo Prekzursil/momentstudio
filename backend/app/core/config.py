@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     environment: str = "local"
 
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/adrianaart"
+    backup_last_at: str | None = None
     secret_key: str = "dev-secret-key"
     stripe_secret_key: str = "sk_test_placeholder"
     stripe_webhook_secret: str | None = None
@@ -28,8 +29,13 @@ class Settings(BaseSettings):
     paypal_client_secret_live: str | None = None
     paypal_webhook_id_live: str | None = None
     netopia_enabled: bool = False
+    netopia_pos_signature: str | None = None
+    netopia_public_key_pem: str | None = None
+    netopia_public_key_path: str | None = None
+    netopia_jwt_alg: str = "RS512"
     jwt_algorithm: str = "HS256"
     access_token_exp_minutes: int = 30
+    admin_impersonation_exp_minutes: int = 10
     refresh_token_exp_days: int = 7
     refresh_token_rotation: bool = True
     refresh_token_rotation_grace_seconds: int = 60
@@ -43,13 +49,29 @@ class Settings(BaseSettings):
     webauthn_rp_name: str | None = None
     webauthn_allowed_origins: list[str] = []
     account_deletion_cooldown_hours: int = 24
+    gdpr_export_sla_days: int = 30
+    gdpr_deletion_sla_days: int = 30
+    audit_retention_days_product: int = 0
+    audit_retention_days_content: int = 0
+    audit_retention_days_security: int = 0
+    audit_hash_chain_enabled: bool = False
+    audit_hash_chain_secret: str | None = None
     secure_cookies: bool = False
     cookie_samesite: str = "lax"
     maintenance_mode: bool = False
     maintenance_bypass_token: str = "bypass-token"
+    # Enforce 2FA/passkeys for owner/admin access to admin APIs.
+    # In production, keep this enabled. For local dev/CI smoke tests, you can disable it.
+    admin_mfa_required: bool = True
+    admin_ip_allowlist: list[str] = []
+    admin_ip_denylist: list[str] = []
+    admin_ip_header: str | None = None
+    admin_ip_bypass_token: str | None = None
+    admin_ip_bypass_cookie_minutes: int = 30
     max_concurrent_requests: int = 100
     enforce_decimal_prices: bool = True
     coupon_reservation_ttl_minutes: int = 60 * 24
+    cart_reservation_window_minutes: int = 60 * 2
     first_order_reward_coupon_validity_days: int = 30
 
     media_root: str = "uploads"
@@ -113,6 +135,11 @@ class Settings(BaseSettings):
     fan_api_base_url: str = "https://api.fancourier.ro"
     fan_api_username: str | None = None
     fan_api_password: str | None = None
+
+    # Fraud/risk signals (admin-only; informational)
+    fraud_velocity_window_minutes: int = 60 * 24
+    fraud_velocity_threshold: int = 3
+    fraud_payment_retry_threshold: int = 2
 
 
 @lru_cache

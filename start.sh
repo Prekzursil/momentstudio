@@ -260,6 +260,8 @@ if [ "${START_BACKEND}" -eq 1 ]; then
   fi
 else
   echo "Skipping backend setup (backend already running)"
+  echo "Tip: if you pulled new migrations and see errors like \"column ... does not exist\", run:"
+  echo "  cd backend && alembic upgrade head"
 fi
 
 # Node deps

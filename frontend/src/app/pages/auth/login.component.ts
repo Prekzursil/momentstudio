@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
@@ -149,8 +149,29 @@ export class LoginComponent {
   twoFactorToken: string | null = null;
   twoFactorUserEmail: string | null = null;
   twoFactorCode = '';
+  nextUrl: string | null = null;
 
-  constructor(private toast: ToastService, private auth: AuthService, private router: Router, private translate: TranslateService) {}
+  constructor(
+    private toast: ToastService,
+    private auth: AuthService,
+    private router: Router,
+    private route: ActivatedRoute,
+    private translate: TranslateService
+  ) {
+    this.nextUrl = this.normalizeNextUrl(this.route.snapshot.queryParamMap.get('next'));
+  }
+
+  private normalizeNextUrl(raw: string | null): string | null {
+    const value = (raw || '').trim();
+    if (!value) return null;
+    if (!value.startsWith('/') || value.startsWith('//')) return null;
+    if (value.startsWith('/login')) return null;
+    return value;
+  }
+
+  private navigateAfterLogin(): void {
+    void this.router.navigateByUrl(this.nextUrl || '/account');
+  }
 
   cancelTwoFactor(): void {
     this.twoFactorToken = null;
@@ -184,7 +205,7 @@ export class LoginComponent {
           this.auth.completePasskeyLogin(res.authentication_token, payload, this.keepSignedIn).subscribe({
             next: (authRes) => {
               this.toast.success(this.translate.instant('auth.successLogin'), authRes?.user?.email);
-              void this.router.navigateByUrl('/account');
+              this.navigateAfterLogin();
             },
             error: (err) => {
               const message = err?.error?.detail || this.translate.instant('auth.passkeyError');
@@ -250,7 +271,7 @@ export class LoginComponent {
           this.twoFactorUserEmail = null;
           this.twoFactorCode = '';
           this.toast.success(this.translate.instant('auth.successLogin'), authRes?.user?.email);
-          void this.router.navigateByUrl('/account');
+          this.navigateAfterLogin();
         },
         error: (err) => {
           if (err?.status === 401) {
@@ -293,7 +314,7 @@ export class LoginComponent {
           return;
         }
         this.toast.success(this.translate.instant('auth.successLogin'), anyRes?.user?.email);
-        void this.router.navigateByUrl('/account');
+        this.navigateAfterLogin();
       },
       error: (err) => {
         if (err?.status === 401) {

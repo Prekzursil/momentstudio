@@ -1,4 +1,6 @@
+import csv
 import httpx
+from io import StringIO
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Query, Response
@@ -6,8 +8,9 @@ from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.dependencies import get_session, require_admin
-from app.models.content import ContentBlock, ContentBlockVersion, ContentImage, ContentRedirect
+from app.core.dependencies import get_current_user_optional, get_session, require_admin_section
+from app.models.content import ContentBlock, ContentBlockVersion, ContentImage, ContentRedirect, ContentImageTag
+from app.models.user import User
 from app.schemas.content import (
     ContentAuditRead,
     ContentBlockCreate,
@@ -15,19 +18,90 @@ from app.schemas.content import (
     ContentBlockUpdate,
     ContentImageAssetListResponse,
     ContentImageAssetRead,
+    ContentImageFocalPointUpdate,
     ContentPageListItem,
     ContentPageRenameRequest,
     ContentPageRenameResponse,
     ContentRedirectListResponse,
     ContentRedirectRead,
+    ContentRedirectImportResult,
+    ContentRedirectImportError,
     ContentBlockVersionListItem,
     ContentBlockVersionRead,
+    ContentImageTagsUpdate,
+    ContentLinkCheckResponse,
+    ContentTranslationStatusUpdate,
+    SitemapPreviewResponse,
+    StructuredDataValidationResponse,
 )
 from app.schemas.social import SocialThumbnailRequest, SocialThumbnailResponse
 from app.services import content as content_service
+from app.services import sitemap as sitemap_service
+from app.services import structured_data as structured_data_service
 from app.services import social_thumbnails
 
 router = APIRouter(prefix="/content", tags=["content"])
+
+
+def _requires_auth(block: ContentBlock) -> bool:
+    meta = getattr(block, "meta", None) or {}
+    return bool(meta.get("requires_auth")) if isinstance(meta, dict) else False
+
+
+def _normalize_image_tags(tags: list[str]) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw in tags or []:
+        value = str(raw or "").strip().lower()
+        if not value:
+            continue
+        value = value.replace(" ", "-")
+        value = "".join(ch for ch in value if ch.isalnum() or ch in ("-", "_"))
+        value = value.strip("-_")
+        if not value or len(value) > 64:
+            continue
+        if value in seen:
+            continue
+        seen.add(value)
+        normalized.append(value)
+        if len(normalized) >= 10:
+            break
+    return normalized
+
+
+def _redirect_key_to_display_value(key: str) -> str:
+    value = (key or "").strip()
+    if value.startswith("page."):
+        slug = value.split(".", 1)[1] if "." in value else ""
+        return f"/pages/{slug}"
+    return value
+
+
+def _redirect_display_value_to_key(value: str) -> str:
+    raw = (value or "").strip()
+    if raw.startswith("/"):
+        raw = raw[1:]
+    if raw.startswith("pages/"):
+        slug = raw.split("/", 1)[1] if "/" in raw else ""
+        slug_norm = content_service.slugify_page_slug(slug)
+        return f"page.{slug_norm}" if slug_norm else ""
+    return (value or "").strip()
+
+
+def _redirect_chain_error(from_key: str, redirects: dict[str, str], *, max_hops: int = 50) -> str | None:
+    current = (from_key or "").strip()
+    if not current:
+        return None
+    seen: set[str] = set()
+    for _ in range(max_hops):
+        if current in seen:
+            return "loop"
+        seen.add(current)
+        nxt = redirects.get(current)
+        if not nxt:
+            return None
+        current = nxt
+    return "too_deep"
 
 
 @router.get("/pages/{slug}", response_model=ContentBlockRead)
@@ -35,6 +109,7 @@ async def get_static_page(
     slug: str,
     session: AsyncSession = Depends(get_session),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+    user: User | None = Depends(get_current_user_optional),
 ) -> ContentBlockRead:
     slug_value = content_service.slugify_page_slug(slug)
     if not slug_value:
@@ -43,6 +118,8 @@ async def get_static_page(
     block = await content_service.get_published_by_key_following_redirects(session, key, lang=lang)
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+    if _requires_auth(block) and not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     return block
 
 
@@ -51,17 +128,20 @@ async def get_content(
     key: str,
     session: AsyncSession = Depends(get_session),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+    user: User | None = Depends(get_current_user_optional),
 ) -> ContentBlockRead:
     block = await content_service.get_published_by_key_following_redirects(session, key, lang=lang)
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+    if getattr(block, "key", "").startswith("page.") and _requires_auth(block) and not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     return block
 
 
 @router.post("/admin/social/thumbnail", response_model=SocialThumbnailResponse)
 async def admin_fetch_social_thumbnail(
     payload: SocialThumbnailRequest,
-    _: object = Depends(require_admin),
+    _: User = Depends(require_admin_section("content")),
 ) -> SocialThumbnailResponse:
     try:
         thumbnail_url = await social_thumbnails.fetch_social_thumbnail_url(payload.url)
@@ -78,7 +158,7 @@ async def admin_list_redirects(
     q: str | None = Query(default=None, description="Search from/to key"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("content")),
 ) -> ContentRedirectListResponse:
     filters = []
     if q:
@@ -106,8 +186,12 @@ async def admin_list_redirects(
             (await session.execute(select(ContentBlock.key).where(ContentBlock.key.in_(to_keys)))).scalars().all()
         )
 
+    redirect_map_rows = (await session.execute(select(ContentRedirect.from_key, ContentRedirect.to_key))).all()
+    redirect_map = {from_key: to_key for from_key, to_key in redirect_map_rows if from_key and to_key}
+
     items: list[ContentRedirectRead] = []
     for r in redirects:
+        chain_error = _redirect_chain_error(r.from_key, redirect_map)
         items.append(
             ContentRedirectRead(
                 id=r.id,
@@ -116,6 +200,7 @@ async def admin_list_redirects(
                 created_at=r.created_at,
                 updated_at=r.updated_at,
                 target_exists=r.to_key in existing_targets,
+                chain_error=chain_error,
             )
         )
 
@@ -125,11 +210,168 @@ async def admin_list_redirects(
     )
 
 
+@router.get("/admin/redirects/export")
+async def admin_export_redirects(
+    session: AsyncSession = Depends(get_session),
+    q: str | None = Query(default=None, description="Search from/to key"),
+    _: User = Depends(require_admin_section("content")),
+) -> Response:
+    filters = []
+    if q:
+        needle = f"%{q.strip()}%"
+        filters.append(or_(ContentRedirect.from_key.ilike(needle), ContentRedirect.to_key.ilike(needle)))
+
+    result = await session.execute(
+        select(ContentRedirect.from_key, ContentRedirect.to_key).where(*filters).order_by(ContentRedirect.from_key)
+    )
+    rows = result.all()
+
+    buf = StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["from", "to", "from_key", "to_key"])
+    for from_key, to_key in rows:
+        writer.writerow(
+            [
+                _redirect_key_to_display_value(from_key),
+                _redirect_key_to_display_value(to_key),
+                from_key,
+                to_key,
+            ]
+        )
+
+    filename = "content-redirects.csv"
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/admin/redirects/import", response_model=ContentRedirectImportResult)
+async def admin_import_redirects(
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentRedirectImportResult:
+    raw = await file.read()
+    text = raw.decode("utf-8-sig", errors="replace")
+
+    rows: list[tuple[int, str, str]] = []
+    errors: list[ContentRedirectImportError] = []
+
+    reader = csv.reader(StringIO(text))
+    line = 0
+    for row in reader:
+        line += 1
+        if not row or all(not str(cell or "").strip() for cell in row):
+            continue
+        if row and str(row[0] or "").lstrip().startswith("#"):
+            continue
+        if line == 1 and len(row) >= 2:
+            first = str(row[0] or "").strip().lower()
+            second = str(row[1] or "").strip().lower()
+            if first in {"from", "from_key"} and second in {"to", "to_key"}:
+                continue
+        if len(row) < 2:
+            errors.append(ContentRedirectImportError(line=line, from_value=row[0] if row else None, error="Missing columns"))
+            continue
+        from_value = str(row[0] or "").strip()
+        to_value = str(row[1] or "").strip()
+        if not from_value or not to_value:
+            errors.append(ContentRedirectImportError(line=line, from_value=from_value or None, to_value=to_value or None, error="Missing from/to"))
+            continue
+        from_key = _redirect_display_value_to_key(from_value)
+        to_key = _redirect_display_value_to_key(to_value)
+        if not from_key or not to_key:
+            errors.append(ContentRedirectImportError(line=line, from_value=from_value, to_value=to_value, error="Invalid redirect value"))
+            continue
+        if len(from_key) > 120 or len(to_key) > 120:
+            errors.append(ContentRedirectImportError(line=line, from_value=from_value, to_value=to_value, error="Key too long"))
+            continue
+        if from_key == to_key:
+            errors.append(ContentRedirectImportError(line=line, from_value=from_value, to_value=to_value, error="from and to must differ"))
+            continue
+        rows.append((line, from_key, to_key))
+
+    if not rows:
+        return ContentRedirectImportResult(created=0, updated=0, skipped=0, errors=errors)
+
+    existing_rows = (await session.execute(select(ContentRedirect.from_key, ContentRedirect.to_key))).all()
+    redirect_map = {from_key: to_key for from_key, to_key in existing_rows if from_key and to_key}
+    for _, from_key, to_key in rows:
+        redirect_map[from_key] = to_key
+
+    loop_keys: set[str] = set()
+    too_deep_keys: set[str] = set()
+    for from_key in redirect_map.keys():
+        err = _redirect_chain_error(from_key, redirect_map)
+        if err == "loop":
+            loop_keys.add(from_key)
+        elif err == "too_deep":
+            too_deep_keys.add(from_key)
+    if loop_keys or too_deep_keys:
+        details: list[str] = []
+        if loop_keys:
+            sample = ", ".join(sorted(loop_keys)[:5])
+            details.append(f"Redirect loop detected (e.g. {sample})")
+        if too_deep_keys:
+            sample = ", ".join(sorted(too_deep_keys)[:5])
+            details.append(f"Redirect chain too deep (e.g. {sample})")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="; ".join(details))
+
+    created = 0
+    updated = 0
+    skipped = 0
+
+    unique_rows: dict[str, tuple[int, str]] = {}
+    for line_no, from_key, to_key in rows:
+        unique_rows[from_key] = (line_no, to_key)
+
+    existing = (
+        await session.execute(select(ContentRedirect).where(ContentRedirect.from_key.in_(list(unique_rows.keys()))))
+    ).scalars().all()
+    existing_by_key = {r.from_key: r for r in existing}
+
+    for from_key, (_, to_key) in unique_rows.items():
+        row = existing_by_key.get(from_key)
+        if row:
+            if row.to_key == to_key:
+                skipped += 1
+                continue
+            row.to_key = to_key
+            session.add(row)
+            updated += 1
+            continue
+        session.add(ContentRedirect(from_key=from_key, to_key=to_key))
+        created += 1
+
+    await session.commit()
+    return ContentRedirectImportResult(created=created, updated=updated, skipped=skipped, errors=errors)
+
+
+@router.get("/admin/seo/sitemap-preview", response_model=SitemapPreviewResponse)
+async def admin_sitemap_preview(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> SitemapPreviewResponse:
+    by_lang = await sitemap_service.build_sitemap_urls(session)
+    return SitemapPreviewResponse(by_lang=by_lang)
+
+
+@router.get("/admin/seo/structured-data/validate", response_model=StructuredDataValidationResponse)
+async def admin_validate_structured_data(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> StructuredDataValidationResponse:
+    payload = await structured_data_service.validate_structured_data(session)
+    return StructuredDataValidationResponse(**payload)
+
+
 @router.delete("/admin/redirects/{redirect_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def admin_delete_redirect(
     redirect_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("content")),
 ) -> Response:
     redirect = await session.scalar(select(ContentRedirect).where(ContentRedirect.id == redirect_id))
     if not redirect:
@@ -144,7 +386,7 @@ async def admin_get_content(
     key: str,
     session: AsyncSession = Depends(get_session),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("content")),
 ) -> ContentBlockRead:
     block = await content_service.get_block_by_key(session, key, lang=lang)
     if not block:
@@ -157,7 +399,7 @@ async def admin_update_content(
     key: str,
     payload: ContentBlockUpdate,
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    admin: User = Depends(require_admin_section("content")),
 ) -> ContentBlockRead:
     block = await content_service.upsert_block(session, key, payload, actor_id=admin.id)
     return block
@@ -168,7 +410,7 @@ async def admin_create_content(
     key: str,
     payload: ContentBlockCreate,
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    admin: User = Depends(require_admin_section("content")),
 ) -> ContentBlockRead:
     content_service.validate_page_key_for_create(key)
     existing = await content_service.get_block_by_key(session, key)
@@ -183,7 +425,7 @@ async def admin_upload_content_image(
     key: str,
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    admin: User = Depends(require_admin_section("content")),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
 ) -> ContentBlockRead:
     block = await content_service.get_block_by_key(session, key, lang=lang)
@@ -206,9 +448,10 @@ async def admin_list_content_images(
     session: AsyncSession = Depends(get_session),
     key: str | None = Query(default=None, description="Filter by content block key"),
     q: str | None = Query(default=None, description="Search content key, URL, or alt text"),
+    tag: str | None = Query(default=None, description="Filter by tag"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=24, ge=1, le=100),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("content")),
 ) -> ContentImageAssetListResponse:
     filters = []
     if key:
@@ -222,13 +465,21 @@ async def admin_list_content_images(
                 ContentImage.alt_text.ilike(needle),
             )
         )
+    tag_value = (tag or "").strip().lower()
+    if tag_value:
+        filters.append(ContentImageTag.tag == tag_value)
 
-    total = await session.scalar(select(func.count()).select_from(ContentImage).join(ContentBlock).where(*filters))
+    count_query = select(func.count()).select_from(ContentImage).join(ContentBlock)
+    if tag_value:
+        count_query = select(func.count(func.distinct(ContentImage.id))).select_from(ContentImage).join(ContentBlock).join(
+            ContentImageTag
+        )
+    total = await session.scalar(count_query.where(*filters))
     total_items = int(total or 0)
     total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
     offset = (page - 1) * limit
 
-    result = await session.execute(
+    query = (
         select(ContentImage, ContentBlock.key)
         .join(ContentBlock)
         .where(*filters)
@@ -236,16 +487,33 @@ async def admin_list_content_images(
         .offset(offset)
         .limit(limit)
     )
+    if tag_value:
+        query = query.join(ContentImageTag)
+    result = await session.execute(query)
+    rows = result.all()
+    image_ids = [img.id for img, _ in rows]
+    tag_map: dict[UUID, list[str]] = {}
+    if image_ids:
+        tag_rows = await session.execute(
+            select(ContentImageTag.content_image_id, ContentImageTag.tag).where(ContentImageTag.content_image_id.in_(image_ids))
+        )
+        for image_id, tag_value_row in tag_rows.all():
+            tag_map.setdefault(image_id, []).append(tag_value_row)
+        for image_id in list(tag_map.keys()):
+            tag_map[image_id] = sorted(set(tag_map[image_id]))
     items: list[ContentImageAssetRead] = []
-    for img, block_key in result.all():
+    for img, block_key in rows:
         items.append(
             ContentImageAssetRead(
                 id=img.id,
                 url=img.url,
                 alt_text=img.alt_text,
                 sort_order=img.sort_order,
+                focal_x=getattr(img, "focal_x", 50),
+                focal_y=getattr(img, "focal_y", 50),
                 created_at=img.created_at,
                 content_key=block_key,
+                tags=tag_map.get(img.id, []),
             )
         )
     return ContentImageAssetListResponse(
@@ -254,10 +522,106 @@ async def admin_list_content_images(
     )
 
 
+@router.patch("/admin/assets/images/{image_id}/tags", response_model=ContentImageAssetRead)
+async def admin_update_content_image_tags(
+    image_id: UUID,
+    payload: ContentImageTagsUpdate,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentImageAssetRead:
+    image = await session.scalar(select(ContentImage).where(ContentImage.id == image_id))
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    tags = _normalize_image_tags(payload.tags)
+
+    existing = (
+        await session.execute(select(ContentImageTag).where(ContentImageTag.content_image_id == image_id))
+    ).scalars().all()
+    existing_by_value = {t.tag: t for t in existing}
+
+    want = set(tags)
+    have = set(existing_by_value.keys())
+
+    for value in have - want:
+        await session.delete(existing_by_value[value])
+
+    for value in want - have:
+        session.add(ContentImageTag(content_image_id=image_id, tag=value))
+
+    await session.commit()
+
+    content_key = ""
+    if getattr(image, "content_block_id", None):
+        content_key = (
+            await session.scalar(select(ContentBlock.key).where(ContentBlock.id == image.content_block_id))
+        ) or ""
+
+    return ContentImageAssetRead(
+        id=image.id,
+        url=image.url,
+        alt_text=image.alt_text,
+        sort_order=image.sort_order,
+        focal_x=getattr(image, "focal_x", 50),
+        focal_y=getattr(image, "focal_y", 50),
+        created_at=image.created_at,
+        content_key=content_key,
+        tags=tags,
+    )
+
+
+@router.patch("/admin/assets/images/{image_id}/focal", response_model=ContentImageAssetRead)
+async def admin_update_content_image_focal_point(
+    image_id: UUID,
+    payload: ContentImageFocalPointUpdate,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentImageAssetRead:
+    image = await session.scalar(select(ContentImage).where(ContentImage.id == image_id))
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    image.focal_x = int(payload.focal_x)
+    image.focal_y = int(payload.focal_y)
+    session.add(image)
+    await session.commit()
+
+    tags = (
+        await session.execute(select(ContentImageTag.tag).where(ContentImageTag.content_image_id == image_id))
+    ).scalars().all()
+    tags_sorted = sorted(set(tags))
+
+    content_key = ""
+    if getattr(image, "content_block_id", None):
+        content_key = (await session.scalar(select(ContentBlock.key).where(ContentBlock.id == image.content_block_id))) or ""
+
+    return ContentImageAssetRead(
+        id=image.id,
+        url=image.url,
+        alt_text=image.alt_text,
+        sort_order=image.sort_order,
+        focal_x=getattr(image, "focal_x", 50),
+        focal_y=getattr(image, "focal_y", 50),
+        created_at=image.created_at,
+        content_key=content_key,
+        tags=tags_sorted,
+    )
+
+
+@router.get("/admin/tools/link-check", response_model=ContentLinkCheckResponse)
+async def admin_link_check(
+    key: str = Query(..., description="Content key to check"),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentLinkCheckResponse:
+    issues = await content_service.check_content_links(session, key=key)
+    return ContentLinkCheckResponse(issues=issues)
+
+
 @router.get("/admin/pages/list", response_model=list[ContentPageListItem])
 async def admin_list_pages(
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("content")),
 ) -> list[ContentPageListItem]:
     result = await session.execute(select(ContentBlock).where(ContentBlock.key.like("page.%")).order_by(ContentBlock.key))
     items: list[ContentPageListItem] = []
@@ -271,9 +635,23 @@ async def admin_list_pages(
                 status=block.status,
                 updated_at=block.updated_at,
                 published_at=block.published_at,
+                published_until=block.published_until,
+                needs_translation_en=getattr(block, "needs_translation_en", False),
+                needs_translation_ro=getattr(block, "needs_translation_ro", False),
             )
         )
     return items
+
+
+@router.patch("/admin/{key}/translation-status", response_model=ContentBlockRead)
+async def admin_update_translation_status(
+    key: str,
+    payload: ContentTranslationStatusUpdate,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> ContentBlockRead:
+    block = await content_service.set_translation_status(session, key=key, payload=payload, actor_id=admin.id)
+    return block
 
 
 @router.post("/admin/pages/{slug}/rename", response_model=ContentPageRenameResponse)
@@ -281,7 +659,7 @@ async def admin_rename_page(
     slug: str,
     payload: ContentPageRenameRequest,
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    admin: User = Depends(require_admin_section("content")),
 ) -> ContentPageRenameResponse:
     old_slug, new_slug, old_key, new_key = await content_service.rename_page_slug(
         session,
@@ -311,7 +689,7 @@ async def admin_preview_content(
 async def admin_list_content_audit(
     key: str,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("content")),
 ) -> list[ContentAuditRead]:
     block = await content_service.get_block_by_key(session, key)
     if not block:
@@ -323,7 +701,7 @@ async def admin_list_content_audit(
 async def admin_list_content_versions(
     key: str,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("content")),
 ) -> list[ContentBlockVersionListItem]:
     block = await content_service.get_block_by_key(session, key)
     if not block:
@@ -341,7 +719,7 @@ async def admin_get_content_version(
     key: str,
     version: int,
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("content")),
 ) -> ContentBlockVersionRead:
     block = await content_service.get_block_by_key(session, key)
     if not block:
@@ -362,6 +740,6 @@ async def admin_rollback_content_version(
     key: str,
     version: int,
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin),
+    admin: User = Depends(require_admin_section("content")),
 ) -> ContentBlockRead:
     return await content_service.rollback_to_version(session, key=key, version=version, actor_id=admin.id)

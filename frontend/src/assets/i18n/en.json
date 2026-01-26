@@ -23,6 +23,7 @@
     "signIn": "Sign in",
     "register": "Register",
     "signOut": "Sign out",
+    "exitImpersonation": "Exit view",
     "menu": "Menu",
     "preferences": "Preferences",
     "theme": "Theme",
@@ -32,8 +33,18 @@
     "title": "Notifications",
     "loading": "Loading…",
     "empty": "No notifications yet.",
+    "emptyHidden": "No hidden notifications.",
+    "loadError": "Could not load notifications.",
+    "viewAll": "View all",
+    "settings": "Settings",
+    "refresh": "Refresh",
+    "inbox": "Inbox",
+    "hidden": "Hidden",
+    "inboxHint": "Recent notifications and unread updates.",
+    "hiddenHint": "Dismissed notifications. Restore to show them again.",
     "markRead": "Mark read",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "restore": "Restore"
   },
   "footer": {
     "tagline": "Handcrafted Art",
@@ -47,6 +58,12 @@
     "errorCopy": "Please try again in a moment.",
     "metaTitle": "Our story",
     "metaDescription": "Learn about momentstudio and the story behind our handcrafted art."
+  },
+  "page": {
+    "restricted": {
+      "title": "Sign in required",
+      "copy": "This page is available to signed-in customers only."
+    }
   },
   "contact": {
     "title": "Contact",
@@ -619,6 +636,8 @@
       "reorderError": "Could not reorder.",
       "receiptPdf": "Receipt (PDF)",
       "receiptShare": "Share receipt",
+      "receiptCopyLink": "Copy link",
+      "receiptCopiedShort": "Link copied",
       "receiptRevoke": "Revoke share",
       "receiptDownloadError": "Could not download receipt.",
       "receiptCopied": "Receipt link copied",
@@ -887,6 +906,11 @@
     "reviews": "{{count}} review(s)",
     "soldOut": "Sold out",
     "lowStock": "Low stock",
+    "badges": {
+      "new": "New",
+      "limited": "Limited",
+      "handmade": "Handmade"
+    },
     "notifyBackInStock": "Notify me when back in stock",
     "notifyRequested": "Requested",
     "notifyCancel": "Cancel request",
@@ -902,6 +926,8 @@
     "quantity": "Quantity",
     "addToCart": "Add to cart",
     "backToShop": "Back to shop",
+    "upsells": "Recommended add-ons",
+    "relatedProducts": "Related products",
     "recentlyViewed": "Recently viewed",
     "notFound": "Product not found",
     "loadErrorTitle": "Could not load product.",
@@ -917,9 +943,30 @@
     "items": "{{count}} item(s)",
     "emptyTitle": "Your cart is empty",
     "emptyCopy": "Browse the shop to add items.",
+    "emptyFromCheckout": "Your cart is empty — add items to continue checkout.",
     "backToShop": "Back to shop",
+    "syncing": "Syncing…",
     "qty": "Qty",
     "each": "each",
+    "inStock": "In stock: {{count}}",
+    "onlyLeft": "Only {{count}} left",
+    "maxQtyReached": "Max quantity for this item.",
+    "decreaseQty": "Decrease quantity",
+    "increaseQty": "Increase quantity",
+    "decreaseQtyItem": "Decrease quantity for {{name}}",
+    "increaseQtyItem": "Increase quantity for {{name}}",
+    "quantityForItem": "Quantity for {{name}}",
+    "moveToWishlist": "Move to wishlist",
+    "moveToWishlistFailed": "Could not add item to wishlist.",
+    "saveForLater": "Save for later",
+    "saveForLaterFailed": "Could not save item for later.",
+    "savedForLaterTitle": "Saved for later",
+    "moveToCart": "Move to cart",
+    "moveToCartFailed": "Could not move item to cart.",
+    "remove": "Remove",
+    "removeItem": "Remove {{name}}",
+    "noteLabel": "Note (optional)",
+    "notePlaceholder": "Add a gift note (optional)",
     "summary": "Order summary",
     "subtotal": "Subtotal",
     "shipping": "Shipping",
@@ -927,13 +974,40 @@
     "calcAtCheckout": "Calculated at checkout",
     "estimatedTotal": "Estimated total",
     "checkout": "Proceed to checkout",
-    "continue": "Continue shopping"
+    "continue": "Continue shopping",
+    "clear": "Clear cart",
+    "confirmClear": "Clear your cart? This will remove all items.",
+    "recommendationsTitle": "You may also like",
+    "recommendationsBrowse": "Browse products",
+    "recommendationsError": "Could not load recommendations.",
+    "freeShippingTitle": "Free shipping",
+    "freeShippingApplied": "Free shipping applied.",
+    "freeShippingRemaining": "Add {{amount}} more for free shipping.",
+    "freeShippingUnlocked": "You’ve unlocked free shipping.",
+    "suggestedAddOns": "Suggested add-ons",
+    "deliveryEstimateRange": "Estimated delivery: {{min}}–{{max}} business days",
+    "deliveryEstimateSingle": "Estimated delivery: {{days}} business days",
+    "errors": {
+      "notFound": "Item not found.",
+      "minQty": "Quantity must be at least 1.",
+      "insufficientStock": "Not enough stock available.",
+      "noteTooLong": "Note is too long (max 255 characters)."
+    }
   },
   "checkout": {
     "title": "Checkout",
+    "syncing": "Syncing…",
+    "continue": "Continue",
     "retry": "Retry",
     "addressRequired": "Please complete all required fields.",
+    "cartSyncing": "Syncing cart totals…",
+    "cartSyncError": "Could not sync cart with server.",
+    "cartLoadError": "Could not load cart from server.",
+    "checkoutFailed": "Checkout failed.",
     "countryInvalid": "Please select a valid country.",
+    "stockOnlyLeft": "Only {{count}} left of {{name}}. Please reduce quantity.",
+    "editShippingAddressTitle": "Edit shipping address",
+    "editBillingAddressTitle": "Edit billing address",
     "savedAddressesTitle": "Saved addresses",
     "manageAddresses": "Manage",
     "savedShippingAddress": "Shipping address",
@@ -951,7 +1025,10 @@
     "email": "Email",
     "emailVerifySend": "Send code",
     "emailVerifyResend": "Resend code",
+    "emailVerifyResendIn": "Resend in {{seconds}}s",
     "emailVerifyVerified": "Verified",
+    "emailVerifySendFailed": "Could not send verification code.",
+    "emailVerifyInvalidCode": "Invalid code.",
     "line1": "Address line",
     "city": "City",
     "region": "County / State",
@@ -960,14 +1037,19 @@
     "country": "Country",
     "countrySelect": "Select a country",
     "saveAddress": "Save this address for next time",
+    "saveAddressRequiredForAccount": "Required when creating an account.",
     "deliveryTitle": "Delivery",
     "deliveryType": "Delivery type",
     "deliveryHome": "Home delivery",
     "deliveryLocker": "Locker pickup",
     "deliveryLockerRequired": "Please select a locker for pickup.",
+    "deliveryLockerUnavailable": "Locker pickup is not available for one or more items in your cart.",
     "courier": "Courier",
     "courierSameday": "Sameday",
     "courierFanCourier": "Fan Courier",
+    "courierUnavailable": "This courier is not available for one or more items in your cart.",
+    "deliveryEstimateRange": "Estimated delivery: {{min}}–{{max}} business days",
+    "deliveryEstimateSingle": "Estimated delivery: {{days}} business days",
     "locker": "Locker",
     "lockers": {
       "useMyLocation": "Use my location",
@@ -980,7 +1062,12 @@
       "geoDenied": "Could not access your location. Please allow location access and try again."
     },
     "billingTitle": "Billing address",
+    "invoiceToggle": "Add invoice details (optional)",
+    "invoiceCompany": "Company name",
+    "invoiceVatId": "VAT ID",
+    "invoiceVatHint": "Optional. Include country prefix if applicable (e.g., RO12345678).",
     "billingSameAsShipping": "Same as shipping",
+    "copyFromShipping": "Copy from shipping",
     "step3": "Promo code",
     "promoPlaceholder": "Enter code",
     "apply": "Apply",
@@ -989,13 +1076,15 @@
     "paymentStripe": "Stripe",
     "paymentNetopia": "Netopia",
     "paymentPayPal": "PayPal",
-    "paymentCash": "Cash on delivery",
+    "paymentCash": "Cash",
     "paymentCardHint": "Pay by card (processed securely).",
     "paymentStripeHint": "Pay with Stripe (you’ll be redirected).",
     "paymentNetopiaHint": "Pay with Netopia (you’ll be redirected).",
     "paymentNetopiaDisabled": "Netopia is not configured yet.",
+    "paymentMethodUnavailable": "This payment method is not available for your current cart.",
     "paymentPayPalHint": "Pay with PayPal (you’ll be redirected). PayPal charges in EUR and the total is converted at checkout.",
     "paymentCashHint": "Pay in cash upon delivery (RON).",
+    "paymentHelpLink": "Contact us",
     "paypalReturnTitle": "PayPal",
     "paypalCapturing": "Confirming your PayPal payment…",
     "paypalMissingToken": "Missing PayPal return token.",
@@ -1010,6 +1099,7 @@
     "stripeCancelledCopy": "No payment was made. You can return to checkout and try another method.",
     "backToCheckout": "Back to checkout",
     "placeOrder": "Place order",
+    "placingOrder": "Placing order…",
     "backToCart": "Back to cart",
     "successTitle": "Order confirmed",
     "successHeadline": "Thank you for your purchase!",
@@ -1024,6 +1114,7 @@
     "tax": "VAT",
     "shipping": "Shipping",
     "promo": "Promo",
+    "discount": "Discount",
     "promoApplied": "Promo {{code}} applied.",
     "promoPending": "Promo {{code}} will be validated at checkout.",
     "couponsLoginRequired": "Sign in to use coupons.",
@@ -1032,6 +1123,13 @@
     "availableCoupons": "Available coupons",
     "unavailableCoupons": "Unavailable coupons",
     "bestCouponTitle": "Best coupon for this cart",
+    "couponRulesTitle": "How coupons work",
+    "couponRulesSubtotal": "Coupons apply to the subtotal only (shipping/VAT aren’t discounted).",
+    "couponRulesOneCoupon": "One coupon per order.",
+    "couponRulesSaleItems": "Some coupons don’t apply to sale items.",
+    "autoApplyBestCoupon": "Auto-apply best coupon",
+    "couponStacksWithSales": "Works on sale items",
+    "couponExcludesSaleItems": "Excludes sale items",
     "couponNotEligible": "Coupon not eligible",
     "couponMinSubtotalRemaining": "Add {{amount}} RON more to reach the {{min}} RON minimum subtotal.",
     "couponReasons": {
@@ -1177,27 +1275,177 @@
   },
   "adminUi": {
     "errors": {
+      "title": "Something went wrong",
+      "requestId": "Request ID",
+      "copied": "Copied",
       "generic": "Something went wrong. Please try again."
     },
     "nav": {
       "title": "Admin",
       "dashboard": "Dashboard",
       "products": "Products",
+      "inventory": "Inventory",
       "orders": "Orders",
       "returns": "Returns",
       "coupons": "Coupons",
       "users": "Users",
       "support": "Support",
+      "ops": "Ops",
       "content": "Content"
     },
+    "security": {
+      "mfaRequired": "Two-factor authentication or a passkey is required for admin access."
+    },
+    "onboarding": {
+      "open": "Setup tour",
+      "title": "Welcome",
+      "subtitle": "A quick checklist to get your store ready.",
+      "intro": "Use these shortcuts to configure the essentials. You can reopen this tour anytime from the dashboard.",
+      "steps": {
+        "contentTitle": "Content",
+        "contentCopy": "Update the homepage and content pages.",
+        "shippingTitle": "Shipping",
+        "shippingCopy": "Review shipping rules and try the shipping simulator.",
+        "paymentsTitle": "Payments",
+        "paymentsCopy": "Check provider webhooks and test a checkout flow.",
+        "taxesTitle": "Taxes & VAT",
+        "taxesCopy": "Configure VAT/tax groups and checkout pricing."
+      },
+      "actions": {
+        "later": "Remind me later",
+        "done": "Mark as done"
+      }
+    },
+    "pii": {
+      "reveal": "Reveal PII",
+      "hide": "Hide PII",
+      "notAuthorized": "You don't have permission to reveal PII."
+    },
+    "ipBypass": {
+      "title": "Admin access restricted",
+      "copy": "Admin access is restricted by IP. Enter the bypass token to continue on this device.",
+      "tokenLabel": "Bypass token",
+      "tokenPh": "Paste bypass token",
+      "submit": "Enable bypass",
+      "clear": "Clear bypass",
+      "success": "Bypass enabled for this device.",
+      "cleared": "Bypass cleared.",
+      "restricted": "Admin access is restricted from this IP. Use the bypass token or contact the owner."
+    },
+    "inventory": {
+      "title": "Inventory",
+      "hint": "Low-stock restock list with reserved stock visibility.",
+      "filters": {
+        "includeVariants": "Include variants",
+        "defaultThreshold": "Default threshold"
+      },
+      "export": "Export CSV",
+      "exportReady": "Export downloaded",
+      "empty": "Nothing to restock right now.",
+      "table": {
+        "item": "Item",
+        "stock": "Stock",
+        "reservedCarts": "Reserved (carts)",
+        "reservedOrders": "Reserved (orders)",
+        "available": "Available",
+        "threshold": "Threshold",
+        "supplier": "Supplier",
+        "desiredQty": "Desired qty",
+        "note": "Note",
+        "updated": "Updated",
+        "actions": "Actions"
+      },
+      "actions": {
+        "saving": "Saving…"
+      },
+      "success": {
+        "noteSaved": "Restock note saved"
+      },
+      "errors": {
+        "noteSave": "Could not save restock note.",
+        "export": "Could not export restock list."
+      }
+    },
     "dashboardTitle": "Admin dashboard",
+    "dashboard": {
+      "rangeLabel": "Range",
+      "lastDays": "Last {{days}}d",
+      "customRange": "Custom",
+      "rangeFrom": "From",
+      "rangeTo": "To",
+      "applyRange": "Apply range",
+      "globalSearchLabel": "Global search",
+      "globalSearchPlaceholder": "Search orders, products, users…",
+      "globalSearchLoading": "Searching…",
+      "globalSearchEmpty": "No results.",
+      "globalSearchTypes": {
+        "order": "Order",
+        "product": "Product",
+        "user": "User"
+      },
+      "quickActionsTitle": "Quick actions",
+      "quickActions": {
+        "createProduct": "Create product",
+        "createCoupon": "Create coupon",
+        "exportOrders": "Export orders"
+      },
+      "customizeWidgets": "Customize widgets",
+      "widgetsTitle": "Dashboard widgets",
+      "widgets": {
+        "kpis": "Today KPIs",
+        "counts": "Totals",
+        "range": "Range metrics"
+      },
+      "alertsTitle": "Alerts",
+      "alertsEmpty": "No alerts right now.",
+      "alerts": {
+        "failedPayments": "Payment failures",
+        "refundRequests": "Refund requests",
+        "stockouts": "Stockouts",
+        "stockoutsHint": "Products currently out of stock.",
+        "windowHours": "Last {{hours}}h",
+        "windowDays": "Last {{days}}d",
+        "vsPrevious": "vs previous"
+      },
+      "systemHealthTitle": "System health",
+      "systemHealth": {
+        "db": "Database",
+        "backup": "Last backup",
+        "ready": "Ready",
+        "unavailable": "Unavailable",
+        "backupNotConfigured": "Not configured"
+      },
+      "scheduledTitle": "Scheduled tasks",
+      "scheduledLoading": "Loading scheduled tasks…",
+      "scheduledError": "Could not load scheduled tasks.",
+      "scheduledPublishesTitle": "Upcoming publishes",
+      "scheduledPromosTitle": "Promo schedules",
+      "scheduledFor": "Scheduled for",
+      "scheduledSaleEnds": "Sale ends",
+      "scheduledEmptyPublishes": "No upcoming product publishes.",
+      "scheduledEmptyPromos": "No upcoming promo schedules.",
+      "promoStartsAt": "Starts at",
+      "promoEndsAt": "Ends at",
+      "promoStartsShort": "Starts",
+      "promoEndsShort": "Ends",
+      "rangeErrors": {
+        "missing": "Select both start and end dates.",
+        "order": "End date must be on/after start date."
+      }
+    },
     "cards": {
       "products": "Products",
       "orders": "Orders",
       "users": "Users",
       "lowStock": "Low stock",
+      "ordersToday": "Orders today",
+      "salesToday": "Sales today",
+      "refundsToday": "Refunds today",
+      "vsYesterday": "vs yesterday",
       "sales30": "Sales (30d)",
       "orders30": "Orders (30d)",
+      "salesRange": "Sales ({{days}}d)",
+      "ordersRange": "Orders ({{days}}d)",
       "openOrders": "Open orders",
       "recentOrders": "Recent orders",
       "lowStockTracked": "Low stock tracked",
@@ -1210,12 +1458,15 @@
     },
     "actions": {
       "add": "Add",
+      "apply": "Apply",
       "reset": "Reset",
       "delete": "Delete",
       "remove": "Remove",
       "save": "Save",
       "cancel": "Cancel",
       "retry": "Retry",
+      "restore": "Restore",
+      "loading": "Loading…",
       "edit": "Edit",
       "changeUrl": "Change URL",
       "refresh": "Refresh",
@@ -1224,8 +1475,23 @@
       "use": "Use",
       "prev": "Prev",
       "next": "Next",
+      "open": "Open",
       "up": "Up",
-      "down": "Down"
+      "down": "Down",
+      "preview": "Preview",
+      "hide": "Hide"
+    },
+    "tableLayout": {
+      "title": "Table layout",
+      "subtitle": "Choose visible columns and density.",
+      "densityLabel": "Density",
+      "density": {
+        "comfortable": "Comfortable",
+        "compact": "Compact"
+      },
+      "columnsLabel": "Columns",
+      "required": "Required",
+      "reset": "Reset to defaults"
     },
     "support": {
       "title": "Support inbox",
@@ -1233,10 +1499,15 @@
       "filters": {
         "search": "Search",
         "searchPlaceholder": "Email, name, message, order ref…",
-        "topic": "Topic",
-        "topicAll": "All topics",
+        "topic": "Channel",
+        "topicAll": "All channels",
         "status": "Status",
         "statusAll": "All statuses",
+        "customer": "Customer",
+        "customerPlaceholder": "Email or name…",
+        "assignee": "Assignee",
+        "assigneeAll": "Any assignee",
+        "assigneeUnassigned": "Unassigned",
         "apply": "Apply"
       },
       "topics": {
@@ -1252,8 +1523,9 @@
       },
       "table": {
         "date": "Date",
-        "topic": "Topic",
+        "topic": "Channel",
         "status": "Status",
+        "assignee": "Assignee",
         "from": "From",
         "order": "Order"
       },
@@ -1270,6 +1542,15 @@
         "thread": "Thread",
         "fromSupport": "Support",
         "fromCustomer": "Customer",
+        "assigneeChip": "Assignee",
+        "assigneeLabel": "Assignee",
+        "assigneeUnassigned": "Unassigned",
+        "cannedLabel": "Canned response",
+        "cannedNone": "None",
+        "cannedLang": "Language",
+        "cannedInsert": "Insert",
+        "cannedManage": "Manage templates",
+        "cannedManageHide": "Hide templates",
         "reply": "Reply",
         "replyPlaceholder": "Write a reply to the customer…",
         "solvedHint": "This ticket is marked as resolved.",
@@ -1279,6 +1560,35 @@
         "adminNotePlaceholder": "Internal notes (not visible to customer)…",
         "save": "Save"
       },
+      "templates": {
+        "title": "Templates",
+        "empty": "No templates yet.",
+        "active": "Active",
+        "inactive": "Inactive",
+        "newTitle": "New template",
+        "editTitle": "Edit template",
+        "variablesHint": "Variables: {{customer_name}}, {{customer_email}}, {{order_reference}}, {{ticket_id}}",
+        "confirmDelete": "Delete this template? This cannot be undone.",
+        "fields": {
+          "title": "Title",
+          "titlePlaceholder": "e.g. Refund policy",
+          "bodyEn": "Body (EN)",
+          "bodyRo": "Body (RO)",
+          "bodyPlaceholder": "Write the template…",
+          "active": "Active"
+        },
+        "success": {
+          "saved": "Template saved.",
+          "deleted": "Template deleted.",
+          "inserted": "Template inserted."
+        },
+        "errors": {
+          "load": "Could not load templates.",
+          "required": "Title and both language variants are required.",
+          "save": "Could not save template.",
+          "delete": "Could not delete template."
+        }
+      },
       "success": {
         "saved": "Saved.",
         "replySent": "Reply sent."
@@ -1286,8 +1596,118 @@
       "errors": {
         "load": "Could not load submissions.",
         "loadDetail": "Could not load submission details.",
+        "loadAssignees": "Could not load assignees.",
         "save": "Could not save changes.",
         "reply": "Could not send reply."
+      }
+    },
+    "ops": {
+      "banner": {
+        "title": "Maintenance banners",
+        "hint": "Schedule storefront announcement banners for downtime or promotions.",
+        "new": "New",
+        "creating": "Creating new banner",
+        "editing": "Editing banner",
+        "active": "Active",
+        "level": "Level",
+        "levelInfo": "Info",
+        "levelWarning": "Warning",
+        "levelPromo": "Promo",
+        "startsAt": "Starts at",
+        "endsAt": "Ends at",
+        "messageEn": "Message (EN)",
+        "messageRo": "Message (RO)",
+        "messagePh": "Write a short announcement…",
+        "linkUrl": "Link URL",
+        "linkUrlPh": "e.g. /shop or https://…",
+        "linkLabelEn": "Link label (EN)",
+        "linkLabelRo": "Link label (RO)",
+        "linkLabelPh": "e.g. Learn more",
+        "linkDefault": "Learn more",
+        "create": "Create",
+        "save": "Save",
+        "delete": "Delete",
+        "confirmDelete": "Delete this banner?",
+        "saved": "Banner saved.",
+        "deleted": "Banner deleted.",
+        "listTitle": "Recent banners",
+        "status": {
+          "active": "Active",
+          "scheduled": "Scheduled",
+          "expired": "Expired",
+          "disabled": "Disabled"
+        },
+        "errors": {
+          "load": "Could not load banners.",
+          "save": "Could not save banner.",
+          "delete": "Could not delete banner.",
+          "startsAtRequired": "Start time is required.",
+          "messageRequired": "Both language variants are required."
+        }
+      },
+      "shipping": {
+        "title": "Shipping rate simulator",
+        "hint": "Simulate totals for a sample subtotal and compare shipping methods.",
+        "subtotal": "Subtotal (RON)",
+        "discount": "Discount (RON)",
+        "method": "Shipping method",
+        "methodAuto": "Auto (checkout settings)",
+        "postalCode": "Postal code",
+        "run": "Run",
+        "table": {
+          "method": "Method",
+          "rateFlat": "Flat rate",
+          "ratePerKg": "Per-kg rate",
+          "computed": "Computed shipping"
+        },
+        "result": {
+          "subtotal": "Subtotal",
+          "shipping": "Shipping",
+          "vat": "VAT",
+          "total": "Total",
+          "settingsTitle": "Settings snapshot",
+          "settingsLine": "shipping_fee_ron={{fee}}, free_shipping_threshold_ron={{threshold}}"
+        },
+        "errors": {
+          "subtotalRequired": "Subtotal is required.",
+          "run": "Could not run simulation."
+        }
+      },
+      "webhooks": {
+        "title": "Webhook monitor",
+        "hint": "View recent provider webhooks and retry failed deliveries.",
+        "refresh": "Refresh",
+        "empty": "No webhook events found.",
+        "view": "View",
+        "retry": "Retry",
+        "close": "Close",
+        "detailTitle": "Webhook detail",
+        "provider": {
+          "stripe": "Stripe",
+          "paypal": "PayPal"
+        },
+        "status": {
+          "received": "Received",
+          "processed": "Processed",
+          "failed": "Failed"
+        },
+        "table": {
+          "provider": "Provider",
+          "eventType": "Event type",
+          "status": "Status",
+          "attempts": "Attempts",
+          "lastAttempt": "Last attempt",
+          "error": "Last error",
+          "actions": "Actions"
+        },
+        "success": {
+          "retried": "Webhook retried."
+        },
+        "errors": {
+          "load": "Could not load webhooks.",
+          "detail": "Could not load webhook details.",
+          "retry": "Could not retry webhook."
+        }
       }
     },
     "returns": {
@@ -1298,6 +1718,14 @@
         "status": "Status",
         "statusAll": "All statuses",
         "apply": "Apply"
+      },
+      "view": {
+        "list": "List",
+        "board": "Board"
+      },
+      "board": {
+        "empty": "No returns in this stage.",
+        "viewAll": "View all"
       },
       "status": {
         "requested": "Requested",
@@ -1325,6 +1753,14 @@
         "reason": "Reason",
         "customerMessage": "Customer message",
         "items": "Items",
+        "returnLabel": "Return label",
+        "returnLabelChoose": "Choose file",
+        "returnLabelNoFile": "No file",
+        "returnLabelUpload": "Upload",
+        "returnLabelDownload": "Download",
+        "returnLabelDelete": "Delete",
+        "returnLabelNone": "No return label.",
+        "returnLabelConfirmDelete": "Delete the return label?",
         "adminNote": "Admin note",
         "adminNotePh": "Internal notes (visible only to staff)…",
         "save": "Save"
@@ -1370,6 +1806,18 @@
           "searchPlaceholder": "Search by key, URL, or alt text…",
           "scope": "Scope",
           "scopeAll": "All keys",
+          "tagFilter": "Tag",
+          "tagFilterPlaceholder": "e.g. hero, homepage",
+          "tagsEdit": "Tags",
+          "tagsPrompt": "Tags (comma-separated)",
+          "tagsSaved": "Tags updated.",
+          "tagsErrorsSave": "Could not update tags.",
+          "focalEdit": "Focal",
+          "focalPrompt": "Focal point as \"x, y\" percent (0–100). Example: 50, 50",
+          "focalLabel": "Focal: {{x}}% {{y}}%",
+          "focalSaved": "Focal point updated.",
+          "focalErrorsSave": "Could not update focal point.",
+          "focalErrorsFormat": "Enter focal point as \"x, y\" with values between 0 and 100.",
           "upload": "Upload image",
           "uploadHint": "Uploads are attached to {{key}} for easy organization.",
           "loading": "Loading assets…",
@@ -1415,6 +1863,16 @@
         "hint": "Shipping uses these values. Free shipping applies when subtotal minus discounts is at or above the threshold.",
         "shippingFee": "Shipping fee (RON)",
         "freeShippingThreshold": "Free shipping threshold (RON)",
+        "roundingTitle": "Rounding rules",
+        "roundingMode": "Rounding mode",
+        "roundingHint": "Controls how cart/checkout totals are rounded to 2 decimals.",
+        "roundingModeHalfUp": "Round half up",
+        "roundingModeHalfEven": "Banker's rounding (half even)",
+        "roundingModeUp": "Always round up",
+        "roundingModeDown": "Always round down",
+        "phoneRequirementsTitle": "Shipping phone requirements",
+        "phoneRequiredHome": "Require phone for home delivery",
+        "phoneRequiredLocker": "Require phone for locker pickup",
         "feeEnabled": "Additional cost enabled",
         "feeType": "Additional cost type",
         "feeTypeFlat": "Flat amount (RON)",
@@ -1441,6 +1899,20 @@
         "metaTitle": "Meta title",
         "metaDescription": "Meta description",
         "save": "Save SEO",
+        "sitemapPreview": {
+          "title": "Sitemap preview",
+          "hint": "Shows the exact URLs included in sitemap.xml per language.",
+          "load": "Load preview",
+          "errors": { "load": "Could not load sitemap preview." }
+        },
+        "structuredData": {
+          "title": "Structured data validator",
+          "hint": "Checks product/page JSON-LD prerequisites and flags common issues.",
+          "run": "Run validator",
+          "summary": "{{errors}} errors, {{warnings}} warnings across {{products}} products and {{pages}} pages.",
+          "ok": "No issues found.",
+          "errors": { "load": "Could not run structured data validation." }
+        },
         "success": { "save": "SEO saved." },
         "errors": { "save": "Could not save SEO." }
       },
@@ -1461,9 +1933,22 @@
           "status": "Status",
           "createPage": "Create page",
           "page": "Page",
+          "publishAtOptional": "Publish at (optional)",
+          "publishAtHint": "If this is in the future and status is published, the page will go live at that time.",
+          "unpublishAtOptional": "Unpublish at (optional)",
+          "unpublishAtHint": "If set, the page will be hidden after this time.",
+          "requiresLogin": "Require login",
+          "requiresLoginHint": "When enabled, only signed-in users can view this page (it will not appear in the sitemap).",
           "changeUrlPrompt": "New URL (slug) for this page",
           "changeUrlConfirm": "Change URL from /pages/{{old}} to /pages/{{next}}? Existing links will redirect.",
           "addBlock": "Add block",
+          "translation": {
+            "title": "Translation workflow",
+            "needsLabel": "needs translation",
+            "saving": "Saving...",
+            "success": "Translation status updated.",
+            "errors": { "save": "Could not update translation status." }
+          },
           "success": { "save": "Blocks saved.", "rename": "Page URL updated (redirect created)." },
           "errors": { "load": "Could not load page blocks.", "save": "Could not save blocks.", "rename": "Could not change page URL." }
         },
@@ -1471,11 +1956,22 @@
           "title": "Redirects",
           "hint": "Created automatically when changing a page URL. Stale redirects point to missing content.",
           "search": "Search redirects",
+          "export": "Export CSV",
+          "import": "Import CSV",
+          "importResult": "{{created}} created, {{updated}} updated, {{skipped}} unchanged.",
+          "importErrors": "Some rows were skipped:",
           "empty": "No redirects found.",
           "stale": "Stale redirect: target page no longer exists.",
+          "loop": "Redirect loop detected.",
+          "tooDeep": "Redirect chain too deep.",
           "deleteConfirm": "Delete this redirect?",
-          "success": { "deleted": "Redirect deleted." },
-          "errors": { "load": "Could not load redirects.", "delete": "Could not delete redirect." }
+          "success": { "deleted": "Redirect deleted.", "export": "Redirects exported.", "import": "Redirects imported." },
+          "errors": {
+            "load": "Could not load redirects.",
+            "delete": "Could not delete redirect.",
+            "export": "Could not export redirects.",
+            "import": "Could not import redirects."
+          }
         },
         "success": { "save": "Content saved.", "created": "Page created." },
         "errors": {
@@ -1533,6 +2029,8 @@
           "linkUrl": "Link URL (optional)",
           "alt": "Alt text",
           "caption": "Caption (optional)",
+          "focalX": "Focal X (%)",
+          "focalY": "Focal Y (%)",
           "gallery": "Gallery images",
           "galleryEmpty": "No images yet. Add one to display this block.",
           "image": "Image",
@@ -1606,6 +2104,8 @@
         "status": "Status",
         "publishAtOptional": "Publish at (optional)",
         "publishAtHint": "Set a future time to schedule publishing.",
+        "unpublishAtOptional": "Unpublish at (optional)",
+        "unpublishAtHint": "If set, the post will be hidden after this time.",
         "title": "Title",
         "summaryOptional": "Summary (optional)",
         "tags": "Tags (comma-separated)",
@@ -1628,6 +2128,8 @@
         "statusBaseOnly": "Status (base only)",
         "publishAtBaseOnlyOptional": "Publish at (base only) (optional)",
         "publishAtBaseOnlyHint": "If this is in the future and status is published, the post will go live at that time.",
+        "unpublishAtBaseOnlyOptional": "Unpublish at (base only) (optional)",
+        "unpublishAtBaseOnlyHint": "If set, the post will be hidden after this time.",
         "summaryOptional": "Summary ({{lang}}) (optional)",
         "summaryHint": "Used for the blog list excerpt and SEO description.",
         "richEditor": "Rich editor",
@@ -1660,6 +2162,22 @@
         },
         "errors": {
           "generate": "Could not generate preview link",
+          "copy": "Could not copy to clipboard"
+        }
+      },
+      "social": {
+        "title": "Social preview",
+        "hint": "Preview OpenGraph images and URLs per language (EN/RO). Social platforms require the published URL for real sharing.",
+        "previewTokenTitle": "Preview token needed for drafts",
+        "previewTokenCopy": "Generate a preview link to render social images for draft/review posts.",
+        "ogAlt": "OpenGraph preview image",
+        "pageUrl": "Page URL",
+        "previewImageUrl": "Preview OG image URL",
+        "publishedImageUrl": "Published OG image URL",
+        "success": {
+          "copied": "Copied"
+        },
+        "errors": {
           "copy": "Could not copy to clipboard"
         }
       },
@@ -1753,7 +2271,29 @@
       },
       "success": {
         "overrideSet": "FX override saved.",
-        "overrideCleared": "FX override cleared."
+        "overrideCleared": "FX override cleared.",
+        "overrideRestored": "FX override restored."
+      },
+      "audit": {
+        "title": "Override audit",
+        "hint": "Recent override changes with restore tooling.",
+        "empty": "No override changes yet.",
+        "confirmRestore": "Restore this FX override?",
+        "restore": "Restore",
+        "table": {
+          "when": "When",
+          "action": "Action",
+          "user": "User"
+        },
+        "actions": {
+          "set": "Set",
+          "clear": "Clear",
+          "restore": "Restore"
+        },
+        "errors": {
+          "load": "Could not load override audit.",
+          "restore": "Could not restore override."
+        }
       },
       "errors": {
         "load": "Could not load FX rates.",
@@ -1762,8 +2302,48 @@
         "overrideCleared": "Could not clear FX override."
       }
     },
+    "taxes": {
+      "groupsTitle": "VAT tax groups",
+      "groupsHint": "Configure VAT rates by country and assign tax groups to categories.",
+      "createTitle": "New tax group",
+      "code": "Code",
+      "name": "Name",
+      "description": "Description",
+      "default": "Default",
+      "create": "Create",
+      "setDefault": "Set default",
+      "ratesTitle": "VAT rates",
+      "country": "Country",
+      "vatRate": "VAT %",
+      "addRate": "Add / update rate",
+      "empty": "No tax groups yet.",
+      "categoryGroupLabel": "Tax group",
+      "categoryGroupDefault": "Use default group",
+      "success": {
+        "create": "Tax group created.",
+        "update": "Tax group updated.",
+        "delete": "Tax group deleted.",
+        "default": "Default group updated.",
+        "rate": "VAT rate saved.",
+        "rateDelete": "VAT rate deleted.",
+        "categoryAssign": "Category tax group updated."
+      },
+      "errors": {
+        "required": "Code and name are required.",
+        "load": "Could not load tax groups.",
+        "create": "Could not create tax group.",
+        "update": "Could not update tax group.",
+        "delete": "Could not delete tax group.",
+        "deleteDefault": "Cannot delete the default tax group.",
+        "rate": "Could not save VAT rate.",
+        "rateDelete": "Could not delete VAT rate.",
+        "rateInvalid": "Enter a valid country code and VAT rate.",
+        "categoryAssign": "Could not update category tax group."
+      }
+    },
     "status": {
       "draft": "Draft",
+      "review": "In review",
       "published": "Published",
       "archived": "Archived"
     },
@@ -1773,6 +2353,7 @@
       "new": "New",
       "delete": "Delete",
       "edit": "Edit product",
+      "inlineEdit": "Quick edit",
       "create": "Create product",
       "selectCategory": "Select category",
       "search": "Search",
@@ -1785,14 +2366,22 @@
       "prev": "Prev",
       "next": "Next",
       "table": {
+        "select": "Select",
         "name": "Name",
         "price": "Price",
         "status": "Status",
+        "view": "View",
         "category": "Category",
+        "translations": "Translations",
         "stock": "Stock",
         "active": "Active",
         "updated": "Updated",
+        "deletedAt": "Deleted",
         "actions": "Actions"
+      },
+      "view": {
+        "active": "Active",
+        "deleted": "Deleted"
       },
       "form": {
         "slug": "Slug",
@@ -1805,14 +2394,66 @@
         "description": "Description",
         "save": "Save product",
         "upload": "Upload image",
+        "showDeletedImages": "Show deleted",
+        "hideDeletedImages": "Hide deleted",
         "images": "Images",
+        "deletedImages": "Deleted images",
+        "noDeletedImages": "No deleted images.",
+        "deletedAt": "Deleted",
         "image": "Image",
         "active": "Active",
         "featured": "Featured",
         "bestseller": "Bestseller",
         "highlight": "Highlight",
         "publishAt": "Publish at",
-        "noImages": "No images yet."
+        "noImages": "No images yet.",
+        "imageMeta": "Image SEO",
+        "imageAltText": "Alt text",
+        "imageCaption": "Caption",
+        "imageSize": "Original",
+        "imageThumbs": "Thumbnails",
+        "imageReprocess": "Reprocess thumbnails",
+        "imageMetaSaved": "Image text saved",
+        "imageMetaLoadError": "Could not load image text.",
+        "imageMetaSaveError": "Could not save image text.",
+        "imageReprocessed": "Thumbnails regenerated",
+        "imageReprocessError": "Could not reprocess image.",
+        "variantsTitle": "Variants",
+        "variantsHint": "Optional variants with their own pricing and stock.",
+        "variantsAdd": "Add variant",
+        "variantsSave": "Save variants",
+        "variantsSaved": "Variants saved.",
+        "variantsSaveError": "Could not save variants.",
+        "variantsRemove": "Remove",
+        "variantsEmpty": "No variants yet.",
+        "variantsName": "Name",
+        "variantsDelta": "Price delta",
+        "variantsPrice": "Computed price",
+        "variantsStock": "Stock",
+        "variantNameRequired": "Variant name is required.",
+        "stockLedgerTitle": "Stock adjustments",
+        "stockLedgerHint": "Record stock changes with a reason for better traceability.",
+        "stockLedgerTarget": "Target",
+        "stockLedgerTargetProduct": "Whole product",
+        "stockLedgerReason": "Reason",
+        "stockLedgerDelta": "Delta",
+        "stockLedgerDeltaInvalid": "Enter a non-zero whole-number delta.",
+        "stockLedgerNote": "Note",
+        "stockLedgerApply": "Apply",
+        "stockLedgerApplying": "Applying...",
+        "stockLedgerApplied": "Stock adjusted.",
+        "stockLedgerApplyError": "Could not adjust stock.",
+        "stockLedgerLoadError": "Could not load stock adjustments.",
+        "stockLedgerEmpty": "No adjustments recorded yet.",
+        "stockLedgerWhen": "When",
+        "stockLedgerItem": "Item",
+        "stockLedgerBefore": "Before",
+        "stockLedgerAfter": "After",
+        "stockReason": {
+          "restock": "Restock",
+          "damage": "Damage",
+          "manual_correction": "Manual correction"
+        }
       },
       "sale": {
         "title": "Sale",
@@ -1840,14 +2481,53 @@
         "valueRequired": "Enter a sale value.",
         "success": "Updated selected products.",
         "published": "Published selected products.",
-        "error": "Bulk update failed."
+        "error": "Bulk update failed.",
+        "category": {
+          "label": "Category",
+          "placeholder": "Select category",
+          "apply": "Apply category",
+          "valueRequired": "Select a category."
+        },
+        "schedule": {
+          "publishAt": "Publish at",
+          "unpublishAt": "Unpublish at",
+          "apply": "Apply schedule",
+          "clearPublish": "Clear publish schedule",
+          "clearUnpublish": "Clear unpublish schedule",
+          "valueRequired": "Choose at least one date.",
+          "orderInvalid": "Unpublish must be after publish.",
+          "invalidDate": "Enter a valid date/time."
+        },
+        "priceAdjust": {
+          "mode": "Price change",
+          "modePercent": "% change",
+          "modeAmount": "Amount change",
+          "direction": "Direction",
+          "directionIncrease": "Increase",
+          "directionDecrease": "Decrease",
+          "value": "Value",
+          "apply": "Apply price change",
+          "preview": "Preview: {{old_min}}–{{old_max}} → {{new_min}}–{{new_max}} {{currency}}",
+          "valueRequired": "Enter a price change value.",
+          "negative": "Price change would make a price negative.",
+          "success": "Updated selected prices."
+        }
+      },
+      "inline": {
+        "success": "Product updated.",
+        "errors": {
+          "save": "Inline update failed.",
+          "stockRequired": "Stock is required.",
+          "stockInvalid": "Stock must be a whole number ≥ 0."
+        }
       },
       "success": {
         "save": "Product saved",
         "delete": "Product deleted",
         "duplicate": "Product duplicated as draft",
         "imageUpload": "Image uploaded",
-        "imageDelete": "Image deleted"
+        "imageDelete": "Image deleted",
+        "imageRestore": "Image restored"
       },
       "errors": {
         "loadList": "Could not load products.",
@@ -1857,12 +2537,29 @@
         "required": "Category name is required",
         "image": "Image upload failed",
         "deleteImage": "Failed to delete image",
+        "loadDeletedImages": "Could not load deleted images.",
+        "restoreImage": "Failed to restore image",
         "duplicate": "Could not duplicate product",
         "saveFirst": "Save product before uploading images"
+      },
+      "trash": {
+        "success": {
+          "restore": "Product restored"
+        },
+        "errors": {
+          "restore": "Failed to restore product"
+        }
       },
       "translations": {
         "title": "Translations",
         "hint": "Optional per-language overrides. If empty, the storefront falls back to the default fields.",
+        "filter": {
+          "all": "All products",
+          "missingAny": "Missing (any)",
+          "missingEn": "Missing EN",
+          "missingRo": "Missing RO"
+        },
+        "missing": "Missing:",
         "success": {
           "save": "Translation saved",
           "delete": "Translation removed"
@@ -1872,6 +2569,132 @@
           "save": "Could not save translation.",
           "delete": "Could not delete translation.",
           "nameRequired": "Name is required for translations."
+        }
+      },
+      "duplicates": {
+        "title": "Potential duplicates",
+        "checking": "Checking…",
+        "slugTaken": "Slug '{{slug}}' is already used. This product will be created as '{{suggested}}'.",
+        "skuMatches": "SKU already used by:",
+        "nameMatches": "Same name found:",
+        "open": "Open",
+        "mergeHint": "If these refer to the same item, consider updating the existing product instead of creating a new one."
+      },
+      "seoPreview": {
+        "title": "SEO & preview",
+        "hint": "See how this product may appear in listings and search results per language.",
+        "cardTitle": "Storefront card",
+        "snippetTitle": "Search snippet"
+      },
+      "csv": {
+        "export": "Export CSV",
+        "import": "Import CSV",
+        "title": "CSV import",
+        "hint": "Upload a products CSV (use Export as a template). Run a dry-run first, then import if there are no errors.",
+        "file": "CSV file",
+        "dryRun": "Dry run",
+        "apply": "Import",
+        "result": "Result",
+        "created": "Created",
+        "updated": "Updated",
+        "errorsTitle": "Errors",
+        "noErrors": "No errors found.",
+        "success": {
+          "imported": "CSV import completed"
+        },
+        "errors": {
+          "noFile": "Select a CSV file first.",
+          "export": "Could not export products CSV.",
+          "import": "Could not import products CSV."
+        }
+      },
+      "markdownPreview": {
+        "title": "Preview",
+        "sanitizedWarning": "Some HTML was removed for safety. Review the preview output."
+      },
+      "badges": {
+        "title": "Badges",
+        "hint": "Optional storefront badges with scheduling.",
+        "new": "New",
+        "limited": "Limited",
+        "handmade": "Handmade",
+        "startAt": "Start at",
+        "endAt": "End at",
+        "errors": {
+          "invalidDate": "Enter a valid start/end date.",
+          "endBeforeStart": "Badge end must be after badge start."
+        }
+      },
+      "shipping": {
+        "title": "Shipping",
+        "hint": "Shipping class and delivery exceptions for this product.",
+        "weight": "Weight",
+        "weightUnit": "Grams (g). Optional.",
+        "width": "Width",
+        "height": "Height",
+        "depth": "Depth",
+        "cm": "Centimeters (cm). Optional.",
+        "classLabel": "Shipping class",
+        "class": {
+          "standard": "Standard",
+          "bulky": "Bulky",
+          "oversize": "Oversize"
+        },
+        "allowLocker": "Allow locker pickup",
+        "disallowedCouriers": "Disallowed couriers",
+        "courier": {
+          "sameday": "Sameday",
+          "fan_courier": "FAN Courier"
+        },
+        "disallowedHint": "If you disallow both couriers, customers will not be able to checkout this product.",
+        "weightHint": "Weight must be a non-negative integer (grams).",
+        "dimensionsHint": "Dimensions must be non-negative numbers (cm)."
+      },
+      "priceHistory": {
+        "title": "Price history",
+        "hint": "Base price changes over time. Sale windows are highlighted.",
+        "empty": "No pricing changes recorded yet.",
+        "latest": "Latest",
+        "min": "Min",
+        "max": "Max",
+        "saleWindow": "Sale window",
+        "table": {
+          "when": "When",
+          "user": "User",
+          "from": "From",
+          "to": "To"
+        }
+      },
+      "audit": {
+        "title": "Audit trail",
+        "hint": "Recent product changes with per-field history.",
+        "empty": "No audit entries yet.",
+        "when": "When",
+        "action": "Action",
+        "user": "User",
+        "details": "Details",
+        "errors": {
+          "load": "Could not load audit entries."
+        }
+      },
+      "relationships": {
+        "title": "Relationships",
+        "hint": "Curate related products and upsells shown on the storefront.",
+        "saveFirst": "Save the product first to manage relationships.",
+        "searchLabel": "Search products to add",
+        "searchLoading": "Searching…",
+        "addRelated": "Add related",
+        "addUpsell": "Add upsell",
+        "related": "Related products",
+        "upsells": "Upsells",
+        "empty": "No products added yet.",
+        "save": "Save relationships",
+        "success": {
+          "save": "Relationships saved"
+        },
+        "errors": {
+          "load": "Could not load relationships.",
+          "save": "Could not save relationships."
         }
       },
       "actions": {
@@ -1908,23 +2731,112 @@
         "add": "Category added",
         "delete": "Category deleted",
         "reorder": "Category order saved",
-        "updateParent": "Category parent updated"
+        "updateParent": "Category parent updated",
+        "updateLowStockThreshold": "Low-stock threshold updated"
       },
       "errors": {
         "add": "Failed to add category",
         "delete": "Failed to delete category",
         "reorder": "Failed to reorder categories",
-        "updateParent": "Failed to update category parent"
+        "updateParent": "Failed to update category parent",
+        "updateLowStockThreshold": "Failed to update low-stock threshold"
       }
     },
     "orders": {
       "title": "Orders",
       "hint": "Search by reference, id, email, or username.",
       "export": "Export CSV",
+      "exportModal": {
+        "title": "Export orders",
+        "hint": "Pick columns or use a saved template.",
+        "template": "Template",
+        "custom": "Custom",
+        "saveTemplate": "Save template",
+        "deleteTemplate": "Delete template",
+        "templatePrompt": "Template name",
+        "confirmDelete": "Delete export template \"{{name}}\"?",
+        "columnsTitle": "Columns",
+        "download": "Download CSV",
+        "success": {
+          "saved": "Template saved",
+          "deleted": "Template deleted"
+        },
+        "errors": {
+          "templateNameRequired": "Template name is required.",
+          "noColumns": "Select at least one column."
+        }
+      },
+      "exportColumns": {
+        "id": "ID",
+        "reference_code": "Reference",
+        "status": "Status",
+        "customer_email": "Customer email",
+        "customer_name": "Customer name",
+        "total_amount": "Total",
+        "currency": "Currency",
+        "tax_amount": "VAT",
+        "shipping_amount": "Shipping",
+        "fee_amount": "Fee",
+        "payment_method": "Payment method",
+        "promo_code": "Promo code",
+        "courier": "Courier",
+        "delivery_type": "Delivery type",
+        "tracking_number": "Tracking number",
+        "tracking_url": "Tracking URL",
+        "shipping_method": "Shipping method",
+        "invoice_company": "Invoice company",
+        "invoice_vat_id": "Invoice VAT ID",
+        "locker_name": "Locker name",
+        "locker_address": "Locker address",
+        "user_id": "User id",
+        "created_at": "Created at",
+        "updated_at": "Updated at"
+      },
       "search": "Search",
       "statusFilter": "Status",
+      "tagFilter": "Tag",
       "from": "From",
       "to": "To",
+      "presets": {
+        "label": "Presets",
+        "none": "No preset",
+        "save": "Save preset",
+        "delete": "Delete preset",
+        "prompt": "Preset name",
+        "confirmDelete": "Delete preset \"{{name}}\"?",
+        "success": {
+          "saved": "Preset saved",
+          "deleted": "Preset deleted"
+        },
+        "errors": {
+          "nameRequired": "Preset name is required."
+        }
+      },
+      "bulk": {
+        "selected": "{{count}} selected",
+        "status": "Status",
+        "courier": "Courier",
+        "email": "Resend email",
+        "emailConfirmation": "Order confirmation",
+        "emailDelivery": "Delivery confirmation",
+        "noChange": "No change",
+        "clearCourier": "Clear courier",
+        "apply": "Apply",
+        "sendEmails": "Resend",
+        "emailNotePrompt": "Audit note (optional)",
+        "emailsQueued": "Queued emails for {{count}} orders.",
+        "emailsPartial": "Queued emails for {{success}} of {{total}} orders.",
+        "packingSlips": "Packing slips PDF",
+        "packingSlipsReady": "Packing slips ready",
+        "clearSelection": "Clear selection",
+        "success": "Updated {{count}} orders.",
+        "partial": "Updated {{success}} of {{total}} orders.",
+        "errors": {
+          "chooseAction": "Choose a status or courier to apply.",
+          "chooseEmail": "Choose an email to resend.",
+          "packingSlips": "Could not download packing slips."
+        }
+      },
       "empty": "No orders match these filters.",
       "view": "View",
       "guest": "Guest",
@@ -1941,7 +2853,15 @@
       "shippingLabelNone": "No shipping label uploaded yet.",
       "shippingLabelUpload": "Upload",
       "shippingLabelDownload": "Download",
+      "shippingLabelPrint": "Print",
       "shippingLabelDelete": "Delete",
+      "shippingLabelHistory": "History",
+      "shippingLabelEvents": {
+        "uploaded": "Label uploaded",
+        "downloaded": "Label downloaded",
+        "printed": "Label printed",
+        "deleted": "Label deleted"
+      },
       "confirmDeleteLabel": "Delete the shipping label for this order?",
       "save": "Save changes",
       "saveHint": "Updates status and tracking; emails send on status changes.",
@@ -1959,7 +2879,7 @@
       "paymentTitle": "Payment",
       "paymentMethod": "Payment method",
       "paymentStripe": "Stripe",
-      "paymentCod": "Cash on delivery",
+      "paymentCod": "Cash",
       "paymentPaypal": "PayPal",
       "paymentNetopia": "Netopia",
       "customerCommsTitle": "Customer",
@@ -1975,34 +2895,176 @@
       "refundNotePlaceholder": "Add a note for audit/email (optional)",
       "refundHint": "Refund is manual; this records an event and notifies the owner inbox.",
       "confirmRefund": "Request a refund for this order?",
+      "refundWizard": {
+        "title": "Request refund",
+        "subtotal": "Subtotal",
+        "shipping": "Shipping",
+        "vat": "VAT",
+        "fee": "Fee",
+        "total": "Total",
+        "noteLabel": "Refund note",
+        "notePlaceholder": "Required. Add a note for the audit log.",
+        "passwordLabel": "Confirm password",
+        "noteRequired": "Refund note is required.",
+        "passwordRequired": "Password is required.",
+        "cancel": "Cancel",
+        "confirm": "Request refund"
+      },
+      "partialRefundWizard": {
+        "title": "Partial refund",
+        "remaining": "Remaining refundable",
+        "alreadyRefunded": "Already refunded",
+        "itemsTitle": "Items to refund",
+        "purchasedQty": "Purchased",
+        "amountLabel": "Refund amount",
+        "amountPlaceholder": "0.00",
+        "amountHint": "Calculated from selected items",
+        "noteLabel": "Refund note",
+        "notePlaceholder": "Required. Add a note for the audit log.",
+        "passwordLabel": "Confirm password",
+        "processPaymentLabel": "Process refund with payment provider",
+        "processPaymentHintSupported": "Will attempt a Stripe/PayPal refund and record the provider response.",
+        "processPaymentHintMissingStripe": "Missing Stripe payment intent id; provider refund is unavailable.",
+        "processPaymentHintMissingPaypal": "Missing PayPal capture id; provider refund is unavailable.",
+        "processPaymentHintUnsupported": "This payment method can't be refunded automatically; a manual record will be created.",
+        "noteRequired": "Refund note is required.",
+        "passwordRequired": "Password is required.",
+        "itemsRequired": "Select at least one item to refund.",
+        "amountRequired": "Refund amount is required.",
+        "amountTooHigh": "Refund amount exceeds the remaining refundable amount.",
+        "historyTitle": "Refund history",
+        "providerRefundId": "Provider refund id",
+        "cancel": "Cancel",
+        "confirm": "Create refund"
+      },
       "actions": {
         "retryPayment": "Retry payment",
         "capturePayment": "Capture payment",
         "voidPayment": "Void payment",
         "deliveryEmail": "Send delivery email",
         "packingSlip": "Download packing slip",
+        "partialRefund": "Partial refund",
+        "addNote": "Add note",
         "refund": "Request refund"
       },
       "itemsTitle": "Items",
+      "shipments": {
+        "title": "Shipments",
+        "add": "Add shipment",
+        "addTitle": "Add shipment",
+        "editTitle": "Edit shipment",
+        "empty": "No shipments yet.",
+        "courier": "Courier",
+        "courierNone": "No courier",
+        "trackingNumber": "Tracking number",
+        "trackingUrl": "Tracking URL",
+        "openTracking": "Open tracking",
+        "success": "Shipment saved",
+        "deleted": "Shipment deleted",
+        "errors": {
+          "trackingRequired": "Tracking number is required.",
+          "save": "Could not save shipment.",
+          "delete": "Could not delete shipment."
+        }
+      },
       "addressesTitle": "Addresses",
       "shippingAddress": "Shipping address",
       "billingAddress": "Billing address",
+      "addressEdit": {
+        "titleShipping": "Edit shipping address",
+        "titleBilling": "Edit billing address",
+        "noteLabel": "Audit note (optional)",
+        "notePlaceholder": "Why is this change needed?",
+        "rerate": "Re-rate shipping",
+        "rerateHint": "Recomputes shipping totals after the address update (disabled after captured payments).",
+        "success": "Address updated",
+        "errors": {
+          "update": "Could not update address."
+        }
+      },
+      "invoiceTitle": "Invoice",
+      "invoiceCompany": "Company",
+      "invoiceVatId": "VAT ID",
       "noAddress": "No address on file.",
       "timelineTitle": "Timeline",
       "timelineEmpty": "No events recorded yet.",
+      "notesTitle": "Internal notes",
+      "notesEmpty": "No internal notes yet.",
+      "notesAddLabel": "Add note",
+      "notesPlaceholder": "Write an internal note for this order…",
+      "tags": {
+        "all": "All tags",
+        "vip": "VIP",
+        "fraud_risk": "Fraud risk",
+        "gift": "Gift",
+        "none": "No tags yet.",
+        "addLabel": "Add tag",
+        "select": "Select",
+        "add": "Add",
+        "removeLabel": "Remove tag: {{tag}}",
+        "success": {
+          "add": "Tag added",
+          "remove": "Tag removed"
+        },
+        "errors": {
+          "add": "Could not add tag.",
+          "remove": "Could not remove tag."
+        }
+      },
+      "fraudSignals": {
+        "title": "Fraud signals",
+        "empty": "No signals detected.",
+        "severity": {
+          "info": "Info",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        },
+        "signals": {
+          "velocity_email": {
+            "title": "Email velocity",
+            "description": "{{count}} orders with the same email in the last {{window_minutes}} minutes."
+          },
+          "velocity_user": {
+            "title": "Account velocity",
+            "description": "{{count}} orders from the same account in the last {{window_minutes}} minutes."
+          },
+          "country_mismatch": {
+            "title": "Country mismatch",
+            "description": "Shipping country {{shipping_country}} differs from billing country {{billing_country}}."
+          },
+          "payment_retries": {
+            "title": "Payment retries",
+            "description": "Payment was retried {{count}} times."
+          }
+        }
+      },
+      "diff": {
+        "before": "Before",
+        "after": "After",
+        "courier": "Courier",
+        "shippingMethod": "Shipping method"
+      },
       "notFound": "Order not found.",
       "table": {
+        "select": "Select",
         "reference": "Reference",
         "customer": "Customer",
         "status": "Status",
+        "tags": "Tags",
         "total": "Total",
-        "created": "Created"
+        "created": "Created",
+        "actions": "Actions"
       },
       "items": {
         "product": "Product",
         "qty": "Qty",
+        "shipped": "Shipped",
         "unit": "Unit",
-        "subtotal": "Subtotal"
+        "subtotal": "Subtotal",
+        "fulfill": "Fulfill",
+        "fulfillSuccess": "Fulfillment updated",
+        "fulfillError": "Could not update fulfillment."
       },
       "pagination": "Page {{page}} of {{total_pages}} · {{total_items}} total",
       "prev": "Prev",
@@ -2021,7 +3083,9 @@
         "retry": "Payment retry started",
         "capture": "Payment captured",
         "void": "Payment voided",
+        "partialRefund": "Partial refund created",
         "refund": "Refund requested",
+        "note": "Note added",
         "deliveryEmail": "Delivery email sent",
         "shippingLabelUpload": "Shipping label uploaded",
         "shippingLabelDelete": "Shipping label deleted"
@@ -2034,7 +3098,10 @@
         "retry": "Could not retry payment.",
         "capture": "Could not capture payment.",
         "void": "Could not void payment.",
+        "partialRefund": "Could not create partial refund.",
         "refund": "Could not request refund.",
+        "note": "Could not add note.",
+        "noteRequired": "Note is required.",
         "deliveryEmail": "Could not send delivery email.",
         "packingSlip": "Could not download packing slip.",
         "shippingLabelUpload": "Could not upload shipping label.",
@@ -2047,7 +3114,12 @@
     "users": {
       "title": "Users",
       "hint": "Search by email, username, or display name.",
+      "gdprQueue": "GDPR queue",
+      "segments": "Segments",
       "setRole": "Set role",
+      "rolePasswordPrompt": "Confirm your password to change a user's role.",
+      "rolePasswordLabel": "Your password",
+      "rolePasswordRequired": "Password is required.",
       "forceLogout": "Force logout selected",
       "search": "Search",
       "roleFilter": "Role",
@@ -2065,6 +3137,62 @@
       "ownerLocked": "Owner role can only be transferred.",
       "aliasHistory": "Alias history",
       "loadingAliases": "Loading history…",
+      "customerProfile": "Customer profile",
+      "profileLoading": "Loading profile…",
+      "addressesTitle": "Addresses",
+      "addressesEmpty": "No saved addresses.",
+      "defaultShipping": "Default shipping",
+      "defaultBilling": "Default billing",
+      "ordersTitle": "Orders",
+      "ordersEmpty": "No orders yet.",
+      "ticketsTitle": "Tickets",
+      "ticketsEmpty": "No tickets yet.",
+      "activityTitle": "Recent activity",
+      "activityEmpty": "No recent activity.",
+      "vip": "VIP",
+      "adminNote": "Internal note",
+      "adminNoteHint": "Private admin-only notes (max 2000 characters).",
+      "saveInternal": "Save note",
+      "viewAsUser": "View storefront as user",
+      "securityTitle": "Security",
+      "lockStatus": "Account lock",
+      "locked": "Locked",
+      "unlocked": "Unlocked",
+      "lockedUntil": "Locked until",
+      "lockReason": "Lock reason",
+      "lock1h": "Lock 1h",
+      "lock24h": "Lock 24h",
+      "lock7d": "Lock 7d",
+      "unlock": "Unlock",
+      "passwordResetRequired": "Require password reset",
+      "saveSecurity": "Save security",
+      "sessionsTitle": "Active sessions",
+      "sessionsLoading": "Loading sessions…",
+      "sessionsEmpty": "No active sessions.",
+      "sessionPersistent": "Persistent",
+      "sessionNonPersistent": "Session",
+      "sessionCreated": "Created",
+      "sessionExpires": "Expires",
+      "revokeSession": "Revoke",
+      "unknownDevice": "Unknown device",
+      "couponGrantTitle": "Grant coupon",
+      "couponPromotionsLoading": "Loading promotions…",
+      "couponPromotionsEmpty": "No promotions available.",
+      "couponPromotion": "Promotion",
+      "couponPrefix": "Code prefix (optional)",
+      "couponValidityDays": "Validity (days)",
+      "couponSendEmail": "Email customer",
+      "issueCoupon": "Issue coupon",
+      "copyCouponCode": "Copy code",
+      "couponIssuedCode": "Issued code",
+      "emailVerificationTitle": "Email verification",
+      "resendVerification": "Resend verification",
+      "loadVerificationHistory": "Load history",
+      "overrideVerification": "Mark verified (owner)",
+      "loadingVerificationHistory": "Loading verification history…",
+      "verificationUsed": "Used",
+      "verificationPending": "Pending",
+      "verificationExpires": "Expires",
       "usernameHistory": "Username history",
       "displayNameHistory": "Display name history",
       "noHistory": "No history yet.",
@@ -2078,18 +3206,123 @@
       },
       "roles": {
         "customer": "Customer",
+        "support": "Support",
+        "fulfillment": "Fulfillment",
+        "content": "Content",
         "admin": "Admin",
         "owner": "Owner"
       },
       "success": {
         "revoke": "Sessions revoked",
-        "role": "Role updated"
+        "sessionRevoked": "Session revoked",
+        "role": "Role updated",
+        "internal": "Saved",
+        "impersonate": "Opened in a new tab",
+        "security": "Security updated",
+        "verificationResent": "Verification email sent",
+        "verificationOverridden": "Marked verified",
+        "couponIssued": "Coupon issued",
+        "couponCopied": "Copied"
       },
       "errors": {
         "load": "Could not load users.",
         "aliases": "Could not load alias history.",
+        "profile": "Could not load customer profile.",
+        "internal": "Could not save internal notes.",
+        "security": "Could not update security settings.",
+        "impersonate": "Could not start impersonation.",
+        "verificationHistory": "Could not load verification history.",
+        "verificationResent": "Could not resend verification email.",
+        "verificationOverridden": "Could not override email verification.",
+        "sessionsLoad": "Could not load sessions.",
+        "sessionRevoke": "Could not revoke session.",
         "revoke": "Failed to revoke sessions",
-        "role": "Failed to update role"
+        "role": "Failed to update role",
+        "couponPromotions": "Could not load promotions.",
+        "couponIssued": "Could not issue coupon."
+      }
+    },
+    "gdpr": {
+      "title": "GDPR",
+      "hint": "Monitor data export and account deletion requests and ensure they complete within SLA.",
+      "search": "Search",
+      "exportStatus": "Export status",
+      "statusAll": "All",
+      "slaBreached": "SLA breached",
+      "download": "Download",
+      "retry": "Retry",
+      "executeNow": "Execute now",
+      "cancelRequest": "Cancel request",
+      "pagination": "Page {{page}} of {{total_pages}} · {{total_items}} total",
+      "exportsTitle": "Data exports",
+      "exportsEmpty": "No export jobs found.",
+      "deletionsTitle": "Deletion requests",
+      "deletionsEmpty": "No deletion requests found.",
+      "table": {
+        "user": "User",
+        "status": "Status",
+        "requested": "Requested",
+        "scheduledFor": "Scheduled for",
+        "slaDue": "SLA due",
+        "expires": "Expires",
+        "actions": "Actions"
+      },
+      "status": {
+        "pending": "Pending",
+        "running": "Running",
+        "succeeded": "Succeeded",
+        "failed": "Failed"
+      },
+      "deletionStatus": {
+        "cooldown": "Cooldown",
+        "due": "Due",
+        "scheduled": "Scheduled"
+      },
+      "confirms": {
+        "retryExport": "Retry this export job? This will regenerate the export file.",
+        "executeDeletion": "Execute deletion now? This action is irreversible.",
+        "cancelDeletion": "Cancel this deletion request?"
+      },
+      "success": {
+        "retryExport": "Export job restarted",
+        "download": "Export downloaded",
+        "executeDeletion": "Deletion executed",
+        "cancelDeletion": "Deletion canceled"
+      },
+      "errors": {
+        "loadExports": "Could not load export jobs.",
+        "loadDeletions": "Could not load deletion requests.",
+        "retryExport": "Could not retry export job.",
+        "download": "Could not download export.",
+        "executeDeletion": "Could not execute deletion.",
+        "cancelDeletion": "Could not cancel deletion."
+      }
+    },
+    "segments": {
+      "title": "Segments",
+      "hint": "Quick customer segments built from order history.",
+      "search": "Search",
+      "pagination": "Page {{page}} of {{total_pages}} · {{total_items}} total",
+      "table": {
+        "user": "User",
+        "orders": "Orders",
+        "total": "Total spent",
+        "aov": "Avg order"
+      },
+      "repeatBuyers": {
+        "title": "Repeat buyers",
+        "minOrders": "Min orders",
+        "empty": "No customers match these filters."
+      },
+      "highAov": {
+        "title": "High AOV",
+        "minOrders": "Min orders",
+        "minAov": "Min avg (RON)",
+        "empty": "No customers match these filters."
+      },
+      "errors": {
+        "repeatLoad": "Could not load repeat buyers segment.",
+        "aovLoad": "Could not load high AOV segment."
       }
     },
     "content": {
@@ -2112,7 +3345,7 @@
         "loading": "Loading revisions…",
         "empty": "No revisions yet.",
         "select": "Select revision",
-        "diffVsCurrent": "Diff vs current (v{{version}})",
+        "diffVsCurrent": "Diff v{{from}} → v{{to}}",
         "rollback": "Rollback",
         "confirms": {
           "rollback": "Rollback to version {{version}}? This will overwrite the current content."
@@ -2124,6 +3357,18 @@
           "load": "Could not load revisions",
           "loadVersion": "Could not load version",
           "rollback": "Could not rollback"
+        }
+      },
+      "linkCheck": {
+        "title": "Link checker",
+        "hint": "Checks internal links and media references for the selected content key.",
+        "key": "Content key",
+        "run": "Run",
+        "useSelectedPage": "Use selected page",
+        "loading": "Checking…",
+        "empty": "No issues found.",
+        "errors": {
+          "load": "Could not run link checker."
         }
       },
       "errors": {
@@ -2184,10 +3429,89 @@
         "maxDiscount": "Max discount (RON)",
         "minSubtotal": "Min subtotal (RON)",
         "allowOnSale": "Allow on-sale items",
+        "firstOrderOnly": "First order only",
         "startsAt": "Starts at",
         "endsAt": "Ends at",
         "active": "Active",
         "automatic": "Automatic"
+      },
+      "stacking": {
+        "title": "Stacking preview",
+        "hint": "Preview how this promotion stacks with sale prices and shipping rules (scope rules still apply).",
+        "sampleSubtotal": "Sample subtotal (RON)",
+        "regularItems": "Discount (regular items)",
+        "saleItems": "Discount (sale items)",
+        "saleAllowed": "Discount applies on top of sale prices",
+        "saleBlocked": "Sale items are excluded from the discount",
+        "shippingFree": "Provides free shipping",
+        "shippingNone": "Does not discount shipping (free shipping threshold applies after discount)",
+        "minSubtotalWarning": "Not eligible at this subtotal (min subtotal is {{min}}).",
+        "scopeNote": "This preview assumes all items are in scope; included/excluded category/product rules can reduce the eligible subtotal."
+      },
+      "analytics": {
+        "title": "Analytics",
+        "hint": "Usage over time, AOV lift, and top discounted products.",
+        "window": "Window",
+        "window7": "Last 7 days",
+        "window30": "Last 30 days",
+        "window90": "Last 90 days",
+        "onlySelectedCoupon": "Only selected coupon",
+        "empty": "No redemptions in this period yet.",
+        "summary": {
+          "redemptions": "Redemptions",
+          "totalDiscount": "Total discount",
+          "shippingDiscount": "Shipping discount",
+          "avgWith": "Avg order total (with coupon)",
+          "avgWithout": "Avg order total (no coupon)",
+          "lift": "AOV lift"
+        },
+        "daily": {
+          "title": "Usage over time",
+          "table": {
+            "date": "Date",
+            "redemptions": "Redemptions",
+            "discount": "Discount"
+          }
+        },
+        "topProducts": {
+          "title": "Top discounted products",
+          "table": {
+            "product": "Product",
+            "orders": "Orders",
+            "quantity": "Qty",
+            "gross": "Gross sales",
+            "allocated": "Allocated discount"
+          }
+        }
+      },
+      "calendar": {
+        "title": "Scheduling calendar",
+        "hint": "Visualize promotion windows and overlaps.",
+        "window": "Window",
+        "window30": "Next 30 days",
+        "window90": "Next 90 days",
+        "window180": "Next 180 days",
+        "empty": "No promotions scheduled in this window.",
+        "conflicts": "{{count}} conflicts",
+        "startImmediate": "Now",
+        "noEnd": "No end date"
+      },
+      "ab": {
+        "title": "A/B promo test",
+        "hint": "Randomly assign a customer segment to two assigned coupons and compare performance.",
+        "requiresAssigned": "A/B testing works best with assigned coupons (visibility: assigned) to avoid leakage across groups.",
+        "couponB": "Coupon B code",
+        "searching": "Searching coupons…",
+        "searchError": "Could not search coupons",
+        "selectedB": "Selected variant B",
+        "publicWarning": "This coupon is public. Consider using assigned coupons so only the intended group can redeem it.",
+        "seed": "Bucket seed (stable)",
+        "start": "Start A/B assignment",
+        "started": "A/B assignment started",
+        "startError": "Could not start A/B assignment",
+        "jobsTitle": "A/B jobs",
+        "window": "Reporting window",
+        "loading": "Loading A/B report…"
       },
       "scopes": {
         "title": "Scope rules",
@@ -2232,6 +3556,13 @@
           "endsAt": "Ends at",
           "globalMax": "Global max redemptions",
           "perCustomerMax": "Per-customer max redemptions"
+        },
+        "generator": {
+          "prefix": "Prefix",
+          "pattern": "Pattern (optional)",
+          "patternHint": "Supports {RAND} and {RAND:n} tokens. Example: VIP-{RAND:8}",
+          "length": "Random length",
+          "generate": "Generate code"
         },
         "visibility": {
           "public": "Public",
@@ -2321,6 +3652,7 @@
       "success": {
         "savePromotion": "Promotion saved",
         "saveCoupon": "Coupon saved",
+        "codeGenerated": "Coupon code generated",
         "assign": "Coupon assigned",
         "revoke": "Coupon revoked"
       },
@@ -2337,7 +3669,9 @@
         "savePromotion": "Could not save promotion",
         "loadCoupons": "Could not load coupons",
         "saveCoupon": "Could not save coupon",
+        "codeGenerate": "Could not generate coupon code",
         "loadAssignments": "Could not load assignments",
+        "loadAnalytics": "Could not load analytics",
         "assign": "Could not assign coupon",
         "revoke": "Could not revoke coupon",
         "searchProducts": "Could not search products",
@@ -2358,6 +3692,27 @@
       "entityAll": "All",
       "export": "Export CSV",
       "exportLimitNote": "Limited to 5,000 entries",
+      "redactLabel": "Redact PII",
+      "redactLocked": "Only the owner can export unredacted audit logs.",
+      "retention": {
+        "title": "Retention",
+        "hint": "Purge old audit rows based on configured retention days.",
+        "refresh": "Refresh",
+        "enabled": "Keep {{days}} days",
+        "disabled": "Disabled",
+        "counts": "{{total}} total · {{expired}} expired",
+        "confirmLabel": "Type to confirm",
+        "confirmPlaceholder": "PURGE",
+        "dryRun": "Dry run",
+        "run": "Run cleanup",
+        "successTitle": "Audit retention",
+        "successCopy": "Deleted {{deleted}} rows.",
+        "successDryRunCopy": "Dry run: would delete {{deleted}} rows.",
+        "errors": {
+          "load": "Could not load retention status.",
+          "purge": "Could not purge audit logs."
+        }
+      },
       "filters": {
         "entity": "Entity",
         "action": "Action contains",
@@ -2409,8 +3764,12 @@
     },
     "lowStock": {
       "title": "Low stock",
-      "hint": "Below 5 units",
-      "stock": "Stock: {{count}}"
+      "hint": "Below configured threshold",
+      "thresholdLabel": "Threshold",
+      "thresholdHint": "Leave empty to use default",
+      "thresholdError": "Threshold must be a non-negative number.",
+      "stock": "Stock: {{count}}",
+      "stockWithThreshold": "Stock: {{count}} / {{threshold}}"
     }
   },
   "wishlist": {

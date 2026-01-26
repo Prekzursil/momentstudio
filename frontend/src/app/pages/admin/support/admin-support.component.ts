@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { BreadcrumbComponent, Crumb } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
@@ -11,6 +12,8 @@ import {
   AdminContactSubmissionListItem,
   AdminContactSubmissionRead,
   AdminSupportService,
+  SupportAgentRef,
+  SupportCannedResponseRead,
   SupportStatus,
   SupportTopic
 } from '../../../core/admin-support.service';
@@ -30,24 +33,24 @@ import {
         </div>
       </div>
 
-      <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
-        <div class="grid gap-3 md:grid-cols-[1fr_200px_220px_auto] items-end">
-          <app-input
-            [label]="'adminUi.support.filters.search' | translate"
-            [(value)]="q"
-            [placeholder]="'adminUi.support.filters.searchPlaceholder' | translate"
-            [ariaLabel]="'adminUi.support.filters.search' | translate"
-          ></app-input>
-
-          <label class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
-            <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.support.filters.topic' | translate }}</span>
-            <select
-              class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
-              [(ngModel)]="topic"
-            >
-              <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="">
-                {{ 'adminUi.support.filters.topicAll' | translate }}
-              </option>
+	      <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+	        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_220px_220px_1fr_220px_auto] items-end">
+	          <app-input
+	            [label]="'adminUi.support.filters.search' | translate"
+	            [(value)]="q"
+	            [placeholder]="'adminUi.support.filters.searchPlaceholder' | translate"
+	            [ariaLabel]="'adminUi.support.filters.search' | translate"
+	          ></app-input>
+	
+	          <label class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+	            <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.support.filters.topic' | translate }}</span>
+	            <select
+	              class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
+	              [(ngModel)]="channel"
+	            >
+	              <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="">
+	                {{ 'adminUi.support.filters.topicAll' | translate }}
+	              </option>
               <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="contact">
                 {{ 'adminUi.support.topics.contact' | translate }}
               </option>
@@ -60,15 +63,15 @@ import {
               <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="dispute">
                 {{ 'adminUi.support.topics.dispute' | translate }}
               </option>
-            </select>
-          </label>
-
-          <label class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
-            <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.support.filters.status' | translate }}</span>
-            <select
-              class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
-              [(ngModel)]="status"
-            >
+	            </select>
+	          </label>
+	
+	          <label class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+	            <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.support.filters.status' | translate }}</span>
+	            <select
+	              class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
+	              [(ngModel)]="status"
+	            >
               <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="">
                 {{ 'adminUi.support.filters.statusAll' | translate }}
               </option>
@@ -81,11 +84,40 @@ import {
               <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="resolved">
                 {{ 'adminUi.support.status.resolved' | translate }}
               </option>
-            </select>
-          </label>
+	            </select>
+	          </label>
 
-          <app-button size="sm" [label]="'adminUi.support.filters.apply' | translate" (action)="applyFilters()"></app-button>
-        </div>
+	          <app-input
+	            [label]="'adminUi.support.filters.customer' | translate"
+	            [(value)]="customerFilter"
+	            [placeholder]="'adminUi.support.filters.customerPlaceholder' | translate"
+	            [ariaLabel]="'adminUi.support.filters.customer' | translate"
+	          ></app-input>
+
+	          <label class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+	            <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.support.filters.assignee' | translate }}</span>
+	            <select
+	              class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
+	              [(ngModel)]="assigneeFilter"
+	            >
+	              <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="">
+	                {{ 'adminUi.support.filters.assigneeAll' | translate }}
+	              </option>
+	              <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="unassigned">
+	                {{ 'adminUi.support.filters.assigneeUnassigned' | translate }}
+	              </option>
+	              <option
+	                *ngFor="let a of assignees()"
+	                class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+	                [value]="a.id"
+	              >
+	                {{ formatAgent(a) }}
+	              </option>
+	            </select>
+	          </label>
+	
+	          <app-button size="sm" [label]="'adminUi.support.filters.apply' | translate" (action)="applyFilters()"></app-button>
+	        </div>
 
         <div class="grid lg:grid-cols-[1fr_420px] gap-4 items-start">
           <div class="grid gap-3">
@@ -101,17 +133,18 @@ import {
               {{ 'adminUi.support.empty' | translate }}
             </div>
 
-            <div *ngIf="items().length" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-              <table class="min-w-[680px] w-full text-sm">
-                <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
-                  <tr>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.support.table.date' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.support.table.topic' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.support.table.status' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.support.table.from' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.support.table.order' | translate }}</th>
-                  </tr>
-	                </thead>
+	            <div *ngIf="items().length" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+	              <table class="min-w-[860px] w-full text-sm">
+	                <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+	                  <tr>
+	                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.support.table.date' | translate }}</th>
+	                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.support.table.topic' | translate }}</th>
+	                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.support.table.status' | translate }}</th>
+	                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.support.table.assignee' | translate }}</th>
+	                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.support.table.from' | translate }}</th>
+	                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.support.table.order' | translate }}</th>
+	                  </tr>
+		                </thead>
 	                <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
 	                  <tr
 	                    *ngFor="let row of items()"
@@ -125,15 +158,20 @@ import {
                     <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
                       {{ ('adminUi.support.topics.' + row.topic) | translate }}
                     </td>
-                    <td class="px-3 py-2">
-                      <span class="inline-flex rounded-full px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700">
-                        {{ ('adminUi.support.status.' + row.status) | translate }}
-                      </span>
-                    </td>
-                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
-                      <div class="font-medium text-slate-900 dark:text-slate-50">{{ row.name }}</div>
-                      <div class="text-xs text-slate-500 dark:text-slate-400">{{ row.email }}</div>
-                    </td>
+	                    <td class="px-3 py-2">
+	                      <span class="inline-flex rounded-full px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700">
+	                        {{ ('adminUi.support.status.' + row.status) | translate }}
+	                      </span>
+	                    </td>
+	                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+	                      <span class="text-xs text-slate-600 dark:text-slate-300">
+	                        {{ row.assignee ? formatAgent(row.assignee) : '—' }}
+	                      </span>
+	                    </td>
+	                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+	                      <div class="font-medium text-slate-900 dark:text-slate-50">{{ row.name }}</div>
+	                      <div class="text-xs text-slate-500 dark:text-slate-400">{{ row.email }}</div>
+	                    </td>
                     <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
                       <span class="font-mono text-xs text-slate-600 dark:text-slate-400">{{ row.order_reference || '—' }}</span>
                     </td>
@@ -174,19 +212,25 @@ import {
                 </a>
               </div>
 
-              <div class="grid gap-1">
-                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.support.detail.meta' | translate }}</div>
-                <div class="flex flex-wrap gap-2">
-                  <span class="inline-flex rounded-full px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700">
-                    {{ ('adminUi.support.topics.' + selected()!.topic) | translate }}
-                  </span>
-                  <span class="inline-flex rounded-full px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700">
-                    {{ ('adminUi.support.status.' + selected()!.status) | translate }}
-                  </span>
-                  <span class="text-xs text-slate-500 dark:text-slate-400">
-                    {{ selected()!.created_at | date: 'medium' }}
-                  </span>
-                </div>
+	              <div class="grid gap-1">
+	                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.support.detail.meta' | translate }}</div>
+	                <div class="flex flex-wrap gap-2">
+	                  <span class="inline-flex rounded-full px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700">
+	                    {{ ('adminUi.support.topics.' + selected()!.topic) | translate }}
+	                  </span>
+	                  <span class="inline-flex rounded-full px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700">
+	                    {{ ('adminUi.support.status.' + selected()!.status) | translate }}
+	                  </span>
+	                  <span
+	                    *ngIf="selected()!.assignee"
+	                    class="inline-flex rounded-full px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700"
+	                  >
+	                    {{ 'adminUi.support.detail.assigneeChip' | translate }}: {{ formatAgent(selected()!.assignee!) }}
+	                  </span>
+	                  <span class="text-xs text-slate-500 dark:text-slate-400">
+	                    {{ selected()!.created_at | date: 'medium' }}
+	                  </span>
+	                </div>
                 <div *ngIf="selected()!.order_reference" class="text-xs text-slate-500 dark:text-slate-400">
                   {{ 'adminUi.support.detail.order' | translate }}:
                   <span class="font-mono">{{ selected()!.order_reference }}</span>
@@ -221,40 +265,227 @@ import {
                 </div>
               </div>
 
-              <div class="grid gap-2">
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.support.detail.reply' | translate }}
-                  <textarea
-                    class="min-h-[120px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                    [(ngModel)]="replyMessage"
-                    name="replyMessage"
-                    maxlength="10000"
-                    [disabled]="selected()!.status === 'resolved'"
-                    [placeholder]="
-                      selected()!.status === 'resolved'
-                        ? ('adminUi.support.detail.solvedHint' | translate)
-                        : ('adminUi.support.detail.replyPlaceholder' | translate)
-                    "
-                  ></textarea>
-                </label>
+	              <div class="grid gap-2">
+	                <div class="flex flex-wrap items-end justify-between gap-2">
+	                  <div class="flex flex-wrap items-end gap-2">
+	                    <label class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+	                      <span class="text-xs font-medium text-slate-600 dark:text-slate-300">
+	                        {{ 'adminUi.support.detail.cannedLabel' | translate }}
+	                      </span>
+	                      <select
+	                        class="h-11 w-full min-w-[220px] rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
+	                        [(ngModel)]="cannedSelectedId"
+	                      >
+	                        <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="">
+	                          {{ 'adminUi.support.detail.cannedNone' | translate }}
+	                        </option>
+	                        <option
+	                          *ngFor="let t of activeCannedResponses()"
+	                          class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+	                          [value]="t.id"
+	                        >
+	                          {{ t.title }}
+	                        </option>
+	                      </select>
+	                    </label>
 
-                <div class="flex justify-end">
-                  <app-button
-                    size="sm"
-                    [disabled]="replying() || selected()!.status === 'resolved'"
-                    [label]="'adminUi.support.detail.sendReply' | translate"
-                    (action)="sendReply()"
-                  ></app-button>
-                </div>
-              </div>
+	                    <label class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+	                      <span class="text-xs font-medium text-slate-600 dark:text-slate-300">
+	                        {{ 'adminUi.support.detail.cannedLang' | translate }}
+	                      </span>
+	                      <select
+	                        class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
+	                        [(ngModel)]="cannedLang"
+	                      >
+	                        <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="en">EN</option>
+	                        <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="ro">RO</option>
+	                      </select>
+	                    </label>
 
-              <div class="grid gap-2">
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.support.detail.statusLabel' | translate }}
-                  <select
-                    class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
-                    [(ngModel)]="editStatus"
-                  >
+	                    <app-button
+	                      size="sm"
+	                      [disabled]="!cannedSelectedId || selected()!.status === 'resolved'"
+	                      [label]="'adminUi.support.detail.cannedInsert' | translate"
+	                      (action)="insertCanned()"
+	                    ></app-button>
+	                  </div>
+
+	                  <app-button
+	                    size="sm"
+	                    [label]="
+	                      showTemplates()
+	                        ? ('adminUi.support.detail.cannedManageHide' | translate)
+	                        : ('adminUi.support.detail.cannedManage' | translate)
+	                    "
+	                    (action)="toggleTemplates()"
+	                  ></app-button>
+	                </div>
+
+	                <div
+	                  *ngIf="showTemplates()"
+	                  class="rounded-xl border border-slate-200 bg-slate-50 p-3 grid gap-3 dark:border-slate-800 dark:bg-slate-950/20"
+	                >
+	                  <div class="flex items-center justify-between gap-2">
+	                    <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-300">
+	                      {{ 'adminUi.support.templates.title' | translate }}
+	                    </div>
+	                    <div class="flex items-center gap-2">
+	                      <app-button
+	                        size="sm"
+	                        [disabled]="cannedLoading()"
+	                        [label]="'adminUi.actions.refresh' | translate"
+	                        (action)="loadCanned()"
+	                      ></app-button>
+	                      <app-button size="sm" [label]="'adminUi.actions.add' | translate" (action)="startNewTemplate()"></app-button>
+	                    </div>
+	                  </div>
+
+	                  <div *ngIf="cannedLoading()" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+	                    <app-skeleton [rows]="3"></app-skeleton>
+	                  </div>
+
+	                  <div *ngIf="!cannedLoading() && !cannedResponses().length" class="text-sm text-slate-600 dark:text-slate-300">
+	                    {{ 'adminUi.support.templates.empty' | translate }}
+	                  </div>
+
+	                  <div *ngIf="!cannedLoading() && cannedResponses().length" class="grid gap-2">
+	                    <div
+	                      *ngFor="let t of cannedResponses()"
+	                      class="rounded-xl border border-slate-200 bg-white p-3 flex flex-wrap items-start justify-between gap-3 dark:border-slate-800 dark:bg-slate-900"
+	                    >
+	                      <div class="grid gap-0.5">
+	                        <div class="font-medium text-slate-900 dark:text-slate-50">
+	                          {{ t.title }}
+	                        </div>
+	                        <div class="text-xs text-slate-500 dark:text-slate-300">
+	                          {{
+	                            (t.is_active ? 'adminUi.support.templates.active' : 'adminUi.support.templates.inactive')
+	                              | translate
+	                          }}
+	                        </div>
+	                      </div>
+	                      <div class="flex flex-wrap items-center gap-2">
+	                        <app-button size="sm" [label]="'adminUi.actions.edit' | translate" (action)="editTemplate(t)"></app-button>
+	                        <app-button
+	                          size="sm"
+	                          [label]="t.is_active ? ('adminUi.actions.hide' | translate) : ('adminUi.actions.restore' | translate)"
+	                          (action)="toggleTemplateActive(t)"
+	                        ></app-button>
+	                        <app-button size="sm" [label]="'adminUi.actions.delete' | translate" (action)="deleteTemplate(t)"></app-button>
+	                      </div>
+	                    </div>
+	                  </div>
+
+	                  <div
+	                    *ngIf="templateFormOpen()"
+	                    class="rounded-xl border border-slate-200 bg-white p-3 grid gap-3 dark:border-slate-800 dark:bg-slate-900"
+	                  >
+	                    <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+	                      {{
+	                        (templateEditingId ? 'adminUi.support.templates.editTitle' : 'adminUi.support.templates.newTitle') | translate
+	                      }}
+	                    </div>
+
+	                    <app-input
+	                      [label]="'adminUi.support.templates.fields.title' | translate"
+	                      [(value)]="templateTitle"
+	                      [placeholder]="'adminUi.support.templates.fields.titlePlaceholder' | translate"
+	                      [ariaLabel]="'adminUi.support.templates.fields.title' | translate"
+	                    ></app-input>
+
+	                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                      {{ 'adminUi.support.templates.fields.bodyEn' | translate }}
+	                      <textarea
+	                        class="min-h-[120px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                        [(ngModel)]="templateBodyEn"
+	                        maxlength="10000"
+	                        [placeholder]="'adminUi.support.templates.fields.bodyPlaceholder' | translate"
+	                      ></textarea>
+	                    </label>
+
+	                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                      {{ 'adminUi.support.templates.fields.bodyRo' | translate }}
+	                      <textarea
+	                        class="min-h-[120px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                        [(ngModel)]="templateBodyRo"
+	                        maxlength="10000"
+	                        [placeholder]="'adminUi.support.templates.fields.bodyPlaceholder' | translate"
+	                      ></textarea>
+	                    </label>
+
+	                    <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+	                      <input type="checkbox" class="h-4 w-4 rounded border-slate-300" [(ngModel)]="templateActive" />
+	                      <span>{{ 'adminUi.support.templates.fields.active' | translate }}</span>
+	                    </label>
+
+	                    <div class="text-xs text-slate-500 dark:text-slate-300">
+	                      {{ 'adminUi.support.templates.variablesHint' | translate }}
+	                    </div>
+
+	                    <div class="flex items-center justify-end gap-2">
+	                      <app-button size="sm" [label]="'adminUi.actions.cancel' | translate" (action)="cancelTemplateEdit()"></app-button>
+	                      <app-button
+	                        size="sm"
+	                        [disabled]="templateSaving()"
+	                        [label]="'adminUi.actions.save' | translate"
+	                        (action)="saveTemplate()"
+	                      ></app-button>
+	                    </div>
+	                  </div>
+	                </div>
+
+	                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                  {{ 'adminUi.support.detail.reply' | translate }}
+	                  <textarea
+	                    class="min-h-[120px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+	                    [(ngModel)]="replyMessage"
+	                    name="replyMessage"
+	                    maxlength="10000"
+	                    [disabled]="selected()!.status === 'resolved'"
+	                    [placeholder]="
+	                      selected()!.status === 'resolved'
+	                        ? ('adminUi.support.detail.solvedHint' | translate)
+	                        : ('adminUi.support.detail.replyPlaceholder' | translate)
+	                    "
+	                  ></textarea>
+	                </label>
+	
+	                <div class="flex justify-end">
+	                  <app-button
+	                    size="sm"
+	                    [disabled]="replying() || selected()!.status === 'resolved'"
+	                    [label]="'adminUi.support.detail.sendReply' | translate"
+	                    (action)="sendReply()"
+	                  ></app-button>
+	                </div>
+	              </div>
+
+	              <div class="grid gap-2">
+	                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                  {{ 'adminUi.support.detail.assigneeLabel' | translate }}
+	                  <select
+	                    class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
+	                    [(ngModel)]="editAssigneeId"
+	                  >
+	                    <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="">
+	                      {{ 'adminUi.support.detail.assigneeUnassigned' | translate }}
+	                    </option>
+	                    <option
+	                      *ngFor="let a of assignees()"
+	                      class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+	                      [value]="a.id"
+	                    >
+	                      {{ formatAgent(a) }}
+	                    </option>
+	                  </select>
+	                </label>
+
+	                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                  {{ 'adminUi.support.detail.statusLabel' | translate }}
+	                  <select
+	                    class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
+	                    [(ngModel)]="editStatus"
+	                  >
                     <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="new">{{ 'adminUi.support.status.new' | translate }}</option>
                     <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="triaged">{{ 'adminUi.support.status.triaged' | translate }}</option>
                     <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="resolved">{{ 'adminUi.support.status.resolved' | translate }}</option>
@@ -289,14 +520,33 @@ export class AdminSupportComponent implements OnInit {
   ];
 
   q = '';
-  topic: '' | SupportTopic = '';
+  channel: '' | SupportTopic = '';
   status: '' | SupportStatus = '';
+  customerFilter = '';
+  assigneeFilter = '';
 
   loading = signal<boolean>(true);
   detailLoading = signal<boolean>(false);
   saving = signal<boolean>(false);
   replying = signal<boolean>(false);
   error = signal<string>('');
+
+  assigneesLoading = signal<boolean>(false);
+  assignees = signal<SupportAgentRef[]>([]);
+
+  cannedLoading = signal<boolean>(false);
+  cannedResponses = signal<SupportCannedResponseRead[]>([]);
+  cannedSelectedId = '';
+  cannedLang: 'en' | 'ro' = 'en';
+  showTemplates = signal<boolean>(false);
+
+  templateFormOpen = signal<boolean>(false);
+  templateSaving = signal<boolean>(false);
+  templateEditingId: string | null = null;
+  templateTitle = '';
+  templateBodyEn = '';
+  templateBodyRo = '';
+  templateActive = true;
 
   items = signal<AdminContactSubmissionListItem[]>([]);
   meta = signal<{ page: number; total_pages: number; total_items: number; limit: number }>({
@@ -311,17 +561,184 @@ export class AdminSupportComponent implements OnInit {
 
   editStatus: SupportStatus = 'new';
   editNote = '';
+  editAssigneeId = '';
   replyMessage = '';
 
-  constructor(private api: AdminSupportService, private toast: ToastService, private translate: TranslateService) {}
+  constructor(
+    private api: AdminSupportService,
+    private toast: ToastService,
+    private translate: TranslateService,
+    private route: ActivatedRoute,
+    private router: Router
+  ) {}
 
   ngOnInit(): void {
+    this.cannedLang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    this.loadAssignees();
+    this.loadCanned();
     this.load();
+    const ticketId = this.route.snapshot.queryParamMap.get('ticket');
+    if (ticketId) {
+      this.openTicket(ticketId, false);
+    }
   }
 
   applyFilters(): void {
     this.meta.set({ ...this.meta(), page: 1 });
     this.load();
+  }
+
+  formatAgent(agent: SupportAgentRef): string {
+    const username = (agent?.username || '').trim();
+    const name = (agent?.name || '').trim();
+    const tag = Number.isFinite(agent?.name_tag as any) ? Number(agent?.name_tag) : 0;
+    if (name) return `${username} (${name}#${tag})`;
+    return username || '—';
+  }
+
+  activeCannedResponses(): SupportCannedResponseRead[] {
+    return this.cannedResponses().filter((t) => !!t && t.is_active);
+  }
+
+  toggleTemplates(): void {
+    this.showTemplates.set(!this.showTemplates());
+  }
+
+  loadCanned(): void {
+    if (this.cannedLoading()) return;
+    this.cannedLoading.set(true);
+    this.api.listCannedResponses({ include_inactive: true }).subscribe({
+      next: (rows) => this.cannedResponses.set(rows || []),
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.support.templates.errors.load'));
+        this.cannedLoading.set(false);
+      },
+      complete: () => this.cannedLoading.set(false)
+    });
+  }
+
+  startNewTemplate(): void {
+    this.templateEditingId = null;
+    this.templateTitle = '';
+    this.templateBodyEn = '';
+    this.templateBodyRo = '';
+    this.templateActive = true;
+    this.templateFormOpen.set(true);
+  }
+
+  editTemplate(t: SupportCannedResponseRead): void {
+    this.templateEditingId = t.id;
+    this.templateTitle = t.title || '';
+    this.templateBodyEn = t.body_en || '';
+    this.templateBodyRo = t.body_ro || '';
+    this.templateActive = !!t.is_active;
+    this.templateFormOpen.set(true);
+  }
+
+  cancelTemplateEdit(): void {
+    this.templateFormOpen.set(false);
+    this.templateEditingId = null;
+  }
+
+  saveTemplate(): void {
+    const title = (this.templateTitle || '').trim();
+    const bodyEn = (this.templateBodyEn || '').trim();
+    const bodyRo = (this.templateBodyRo || '').trim();
+    if (!title || !bodyEn || !bodyRo) {
+      this.toast.error(this.translate.instant('adminUi.support.templates.errors.required'));
+      return;
+    }
+    if (this.templateSaving()) return;
+    this.templateSaving.set(true);
+
+    const done = () => {
+      this.templateSaving.set(false);
+      this.templateFormOpen.set(false);
+      this.templateEditingId = null;
+      this.loadCanned();
+      this.toast.success(this.translate.instant('adminUi.support.templates.success.saved'));
+    };
+    const fail = (err: any) => {
+      this.templateSaving.set(false);
+      const msg = err?.error?.detail || this.translate.instant('adminUi.support.templates.errors.save');
+      this.toast.error(msg);
+    };
+
+    if (this.templateEditingId) {
+      this.api
+        .updateCannedResponse(this.templateEditingId, {
+          title,
+          body_en: bodyEn,
+          body_ro: bodyRo,
+          is_active: this.templateActive
+        })
+        .subscribe({ next: () => done(), error: (err) => fail(err) });
+      return;
+    }
+
+    this.api
+      .createCannedResponse({
+        title,
+        body_en: bodyEn,
+        body_ro: bodyRo,
+        is_active: this.templateActive
+      })
+      .subscribe({ next: () => done(), error: (err) => fail(err) });
+  }
+
+  toggleTemplateActive(t: SupportCannedResponseRead): void {
+    this.api.updateCannedResponse(t.id, { is_active: !t.is_active }).subscribe({
+      next: (updated) => {
+        this.cannedResponses.set(this.cannedResponses().map((row) => (row.id === updated.id ? updated : row)));
+      },
+      error: () => this.toast.error(this.translate.instant('adminUi.support.templates.errors.save'))
+    });
+  }
+
+  deleteTemplate(t: SupportCannedResponseRead): void {
+    const ok = confirm(this.translate.instant('adminUi.support.templates.confirmDelete'));
+    if (!ok) return;
+    this.api.deleteCannedResponse(t.id).subscribe({
+      next: () => {
+        this.cannedResponses.set(this.cannedResponses().filter((row) => row.id !== t.id));
+        if (this.templateEditingId === t.id) this.cancelTemplateEdit();
+        this.toast.success(this.translate.instant('adminUi.support.templates.success.deleted'));
+      },
+      error: () => this.toast.error(this.translate.instant('adminUi.support.templates.errors.delete'))
+    });
+  }
+
+  insertCanned(): void {
+    const selected = this.selected();
+    if (!selected) return;
+    const template = this.cannedResponses().find((t) => t.id === this.cannedSelectedId);
+    if (!template) return;
+    const base = this.cannedLang === 'ro' ? template.body_ro : template.body_en;
+    const rendered = this.renderTemplate(base || '', selected).trim();
+    if (!rendered) return;
+    const existing = (this.replyMessage || '').trim();
+    this.replyMessage = existing ? `${existing}\n\n${rendered}` : rendered;
+    this.toast.success(this.translate.instant('adminUi.support.templates.success.inserted'));
+  }
+
+  private renderTemplate(body: string, ticket: AdminContactSubmissionRead): string {
+    return (body || '')
+      .replace(/\\{\\{\\s*customer_name\\s*\\}\\}/gi, ticket.name || '')
+      .replace(/\\{\\{\\s*customer_email\\s*\\}\\}/gi, ticket.email || '')
+      .replace(/\\{\\{\\s*order_reference\\s*\\}\\}/gi, ticket.order_reference || '')
+      .replace(/\\{\\{\\s*ticket_id\\s*\\}\\}/gi, ticket.id || '');
+  }
+
+  private loadAssignees(): void {
+    this.assigneesLoading.set(true);
+    this.api.listAssignees().subscribe({
+      next: (rows) => this.assignees.set(rows || []),
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.support.errors.loadAssignees'));
+        this.assigneesLoading.set(false);
+      },
+      complete: () => this.assigneesLoading.set(false)
+    });
   }
 
   private load(): void {
@@ -331,8 +748,10 @@ export class AdminSupportComponent implements OnInit {
     this.api
       .list({
         q: this.q.trim() || undefined,
-        topic_filter: this.topic || undefined,
+        channel_filter: this.channel || undefined,
         status_filter: this.status || undefined,
+        customer_filter: this.customerFilter.trim() || undefined,
+        assignee_filter: this.assigneeFilter || undefined,
         page: meta.page,
         limit: meta.limit
       })
@@ -344,27 +763,43 @@ export class AdminSupportComponent implements OnInit {
         error: () => {
           this.items.set([]);
           this.error.set(this.translate.instant('adminUi.support.errors.load'));
+          this.loading.set(false);
         },
         complete: () => this.loading.set(false)
       });
   }
 
   select(row: AdminContactSubmissionListItem): void {
-    if (this.selectedId() === row.id) return;
-    this.selectedId.set(row.id);
+    this.openTicket(row.id, true);
+  }
+
+  private openTicket(id: string, pushUrl: boolean): void {
+    if (!id) return;
+    if (this.selectedId() === id) return;
+    this.selectedId.set(id);
     this.selected.set(null);
     this.detailLoading.set(true);
-    this.api.getOne(row.id).subscribe({
+    if (pushUrl) {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { ticket: id },
+        queryParamsHandling: 'merge',
+        replaceUrl: true
+      });
+    }
+    this.api.getOne(id).subscribe({
       next: (detail) => {
         this.selected.set(detail);
         this.editStatus = detail.status;
         this.editNote = detail.admin_note || '';
+        this.editAssigneeId = detail.assignee?.id || '';
         this.replyMessage = '';
       },
       error: () => {
         this.toast.error(this.translate.instant('adminUi.support.errors.loadDetail'));
         this.selectedId.set('');
         this.selected.set(null);
+        this.detailLoading.set(false);
       },
       complete: () => this.detailLoading.set(false)
     });
@@ -376,16 +811,21 @@ export class AdminSupportComponent implements OnInit {
     if (this.saving()) return;
     this.saving.set(true);
     this.api
-      .update(selected.id, { status: this.editStatus, admin_note: this.editNote.trim() || null })
+      .update(selected.id, {
+        status: this.editStatus,
+        admin_note: this.editNote.trim() || null,
+        assignee_id: this.editAssigneeId || null
+      })
       .subscribe({
         next: (updated) => {
           this.selected.set(updated);
           this.editStatus = updated.status;
           this.editNote = updated.admin_note || '';
+          this.editAssigneeId = updated.assignee?.id || '';
           // Update row in list
           this.items.set(
             this.items().map((it) =>
-              it.id === updated.id ? { ...it, status: updated.status, topic: updated.topic } : it
+              it.id === updated.id ? { ...it, status: updated.status, topic: updated.topic, assignee: updated.assignee } : it
             )
           );
           this.toast.success(this.translate.instant('adminUi.support.success.saved'));
@@ -393,6 +833,7 @@ export class AdminSupportComponent implements OnInit {
         error: (err) => {
           const msg = err?.error?.detail || this.translate.instant('adminUi.support.errors.save');
           this.toast.error(msg);
+          this.saving.set(false);
         },
         complete: () => this.saving.set(false)
       });
@@ -418,6 +859,7 @@ export class AdminSupportComponent implements OnInit {
       error: (err) => {
         const msg = err?.error?.detail || this.translate.instant('adminUi.support.errors.reply');
         this.toast.error(msg);
+        this.replying.set(false);
       },
       complete: () => this.replying.set(false)
     });

@@ -1,4 +1,4 @@
-import { Component, EffectRef, EventEmitter, Input, Output, computed, effect, OnDestroy } from '@angular/core';
+import { Component, EffectRef, EventEmitter, Input, Output, computed, effect, OnDestroy, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { NavDrawerComponent, NavLink } from '../shared/nav-drawer.component';
 import { DatePipe, NgClass, NgForOf, NgIf } from '@angular/common';
@@ -9,6 +9,7 @@ import { TranslateModule } from '@ngx-translate/core';
 import { AuthService } from '../core/auth.service';
 import { ThemeSegmentedControlComponent } from '../shared/theme-segmented-control.component';
 import { NotificationsService, UserNotification } from '../core/notifications.service';
+import { MaintenanceBannerPublic, OpsService } from '../core/ops.service';
 
 @Component({
   selector: 'app-header',
@@ -26,6 +27,24 @@ import { NotificationsService, UserNotification } from '../core/notifications.se
   ],
   template: `
     <header class="sticky top-0 z-[100] isolate border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
+      <div
+        *ngIf="bannerText() as bannerMessage"
+        class="border-b border-slate-200 dark:border-slate-800"
+        [ngClass]="bannerClasses()"
+      >
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-3 text-sm">
+          <div class="whitespace-pre-line">{{ bannerMessage }}</div>
+          <a
+            *ngIf="bannerLinkUrl() as href"
+            class="inline-flex items-center gap-1 font-medium underline underline-offset-2 hover:opacity-80"
+            [href]="href"
+            [attr.target]="isExternalLink(href) ? '_blank' : null"
+            [attr.rel]="isExternalLink(href) ? 'noopener noreferrer' : null"
+          >
+            {{ bannerLinkLabel() || ('adminUi.ops.banner.linkDefault' | translate) }}
+          </a>
+        </div>
+      </div>
       <div class="max-w-7xl mx-auto px-4 sm:px-6">
         <div class="py-4 grid grid-cols-[auto,1fr,auto] items-center gap-4">
           <a routerLink="/" class="flex items-center gap-3 min-w-0">
@@ -158,7 +177,7 @@ import { NotificationsService, UserNotification } from '../core/notifications.se
 	                  class="w-full text-left rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
 	                  (click)="signOut()"
 	                >
-	                  {{ 'nav.signOut' | translate }}
+	                  {{ (isImpersonating() ? 'nav.exitImpersonation' : 'nav.signOut') | translate }}
 	                </button>
 	              </div>
             </div>
@@ -240,10 +259,26 @@ import { NotificationsService, UserNotification } from '../core/notifications.se
                         </div>
                       </div>
                     </li>
-                  </ul>
+	                  </ul>
+	                </div>
+                <div class="px-4 py-3 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between gap-3">
+                  <a
+                    routerLink="/account/notifications"
+                    class="text-sm font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200"
+                    (click)="closeNotifications()"
+                  >
+                    {{ 'notifications.viewAll' | translate }}
+                  </a>
+                  <a
+                    routerLink="/account/notifications/settings"
+                    class="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                    (click)="closeNotifications()"
+                  >
+                    {{ 'notifications.settings' | translate }}
+                  </a>
                 </div>
-              </div>
-            </div>
+	              </div>
+	            </div>
             <div class="hidden lg:flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-2 py-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/70">
               <app-theme-segmented-control
                 [preference]="themePreference"
@@ -276,7 +311,7 @@ import { NotificationsService, UserNotification } from '../core/notifications.se
           <a routerLink="/about" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.about' | translate }}</a>
           <a routerLink="/contact" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.contact' | translate }}</a>
           <a
-            *ngIf="isAdmin()"
+            *ngIf="isStaff()"
             routerLink="/admin"
             class="hover:text-slate-900 dark:hover:text-white"
           >
@@ -337,11 +372,15 @@ export class HeaderComponent implements OnDestroy {
   notificationsOpen = false;
   searchQuery = '';
   private unreadPoll?: number;
+  private bannerPoll?: number;
   private authEffect?: EffectRef;
+
+  banner = signal<MaintenanceBannerPublic | null>(null);
 
   readonly isAuthenticated = computed(() => this.auth.isAuthenticated());
   readonly currentUser = computed(() => this.auth.user());
-  readonly isAdmin = computed(() => this.auth.isAdmin());
+  readonly isStaff = computed(() => this.auth.isStaff());
+  readonly isImpersonating = computed(() => this.auth.isImpersonating());
   readonly notifications = computed(() => this.notificationsService.items());
   readonly notificationsLoading = computed(() => this.notificationsService.loading());
   readonly unreadCount = computed(() => this.notificationsService.unreadCount());
@@ -361,7 +400,7 @@ export class HeaderComponent implements OnDestroy {
       links.push({ label: 'nav.signIn', path: '/login' });
       links.push({ label: 'nav.register', path: '/register' });
     }
-    if (authenticated && this.auth.isAdmin()) {
+    if (authenticated && this.auth.isStaff()) {
       links.push({ label: 'nav.admin', path: '/admin' });
     }
     return links;
@@ -371,7 +410,8 @@ export class HeaderComponent implements OnDestroy {
     private cart: CartStore,
     private router: Router,
     private auth: AuthService,
-    private notificationsService: NotificationsService
+    private notificationsService: NotificationsService,
+    private ops: OpsService
   ) {
     this.authEffect = effect(() => {
       const authed = this.isAuthenticated();
@@ -384,6 +424,9 @@ export class HeaderComponent implements OnDestroy {
       this.notificationsService.refreshUnreadCount();
       this.startUnreadPolling();
     });
+
+    this.refreshBanner();
+    this.bannerPoll = window.setInterval(() => this.refreshBanner(), 60_000);
   }
 
   cartCount = this.cart.count;
@@ -443,6 +486,45 @@ export class HeaderComponent implements OnDestroy {
     this.notificationsOpen = false;
   }
 
+  bannerText(): string | null {
+    const banner = this.banner();
+    if (!banner) return null;
+    const preferred = this.language === 'ro' ? banner.message_ro : banner.message_en;
+    const fallback = this.language === 'ro' ? banner.message_en : banner.message_ro;
+    const message = (preferred || fallback || '').trim();
+    return message || null;
+  }
+
+  bannerLinkUrl(): string | null {
+    const url = (this.banner()?.link_url || '').trim();
+    return url || null;
+  }
+
+  bannerLinkLabel(): string | null {
+    const banner = this.banner();
+    if (!banner) return null;
+    const preferred = this.language === 'ro' ? banner.link_label_ro : banner.link_label_en;
+    const fallback = this.language === 'ro' ? banner.link_label_en : banner.link_label_ro;
+    const label = (preferred || fallback || '').trim();
+    return label || null;
+  }
+
+  bannerClasses(): string {
+    const level = (this.banner()?.level || 'info').toLowerCase();
+    if (level === 'warning') {
+      return 'bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100';
+    }
+    if (level === 'promo') {
+      return 'bg-emerald-50 text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100';
+    }
+    return 'bg-indigo-50 text-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-100';
+  }
+
+  isExternalLink(url: string): boolean {
+    const value = (url || '').trim();
+    return value.startsWith('http://') || value.startsWith('https://');
+  }
+
   closeOverlays(): void {
     this.userMenuOpen = false;
     this.notificationsOpen = false;
@@ -470,7 +552,9 @@ export class HeaderComponent implements OnDestroy {
     this.notificationsOpen = false;
     if (n.url) {
       void this.router.navigateByUrl(n.url);
+      return;
     }
+    void this.router.navigateByUrl('/account/notifications');
   }
 
   submitSearch(event: Event): void {
@@ -492,6 +576,7 @@ export class HeaderComponent implements OnDestroy {
   ngOnDestroy(): void {
     this.stopUnreadPolling();
     this.authEffect?.destroy();
+    if (this.bannerPoll) window.clearInterval(this.bannerPoll);
   }
 
   private startUnreadPolling(): void {
@@ -503,5 +588,12 @@ export class HeaderComponent implements OnDestroy {
     if (!this.unreadPoll) return;
     window.clearInterval(this.unreadPoll);
     this.unreadPoll = undefined;
+  }
+
+  private refreshBanner(): void {
+    this.ops.getActiveBanner().subscribe({
+      next: (banner) => this.banner.set(banner),
+      error: () => this.banner.set(null)
+    });
   }
 }

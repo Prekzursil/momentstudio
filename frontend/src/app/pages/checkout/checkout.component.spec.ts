@@ -70,6 +70,8 @@ describe('CheckoutComponent', () => {
     spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
     const fixture = TestBed.createComponent(CheckoutComponent);
     const cmp = fixture.componentInstance;
+    fixture.detectChanges();
+    tick();
     cmp.paymentMethod = 'cod';
     cmp.promo = 'SAVE';
     cmp.saveAddress = false;
@@ -79,11 +81,11 @@ describe('CheckoutComponent', () => {
       line1: '123 St',
       city: 'City',
       postal: '12345',
-      country: 'US',
-      region: 'ST',
+      country: 'RO',
+      region: 'B',
     } as any;
 
-    cmp.shippingCountryInput = 'US';
+    cmp.shippingCountryInput = 'RO';
     cmp.placeOrder({ valid: true, control: { updateValueAndValidity: () => {} } } as any);
     tick();
 

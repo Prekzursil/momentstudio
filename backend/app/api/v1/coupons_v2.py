@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import hashlib
+import re
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
-from app.core.dependencies import get_current_user, require_admin
+from app.core.dependencies import get_current_user, require_admin_section
 from app.db.session import get_session
 from app.models.catalog import Category, Product
 from app.models.coupons_v2 import (
@@ -18,16 +21,22 @@ from app.models.coupons_v2 import (
     CouponBulkJob,
     CouponBulkJobAction,
     CouponBulkJobStatus,
+    CouponRedemption,
+    CouponVisibility,
     Promotion,
     PromotionScope,
     PromotionScopeEntityType,
     PromotionScopeMode,
 )
-from app.models.order import ShippingMethod
+from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod
 from app.models.user import User
 from app.schemas.coupons_v2 import (
     CouponAssignRequest,
     CouponAssignmentRead,
+    CouponAnalyticsDaily,
+    CouponAnalyticsResponse,
+    CouponAnalyticsSummary,
+    CouponAnalyticsTopProduct,
     CouponCreate,
     CouponBulkJobRead,
     CouponBulkAssignRequest,
@@ -36,6 +45,9 @@ from app.schemas.coupons_v2 import (
     CouponBulkSegmentAssignRequest,
     CouponBulkSegmentPreview,
     CouponBulkSegmentRevokeRequest,
+    CouponIssueToUserRequest,
+    CouponCodeGenerateRequest,
+    CouponCodeGenerateResponse,
     CouponUpdate,
     CouponEligibilityResponse,
     CouponOffer,
@@ -49,7 +61,10 @@ from app.schemas.coupons_v2 import (
 from app.services import checkout_settings as checkout_settings_service
 from app.services import coupons_v2 as coupons_service
 from app.services import email as email_service
+from app.services import audit_chain as audit_chain_service
+from app.services import pricing
 from app.services import cart as cart_service
+from app.api.v1 import cart as cart_api
 
 
 router = APIRouter(prefix="/coupons", tags=["coupons"])
@@ -207,13 +222,28 @@ def _to_offer(result: coupons_service.CouponEligibility) -> CouponOffer:
     )
 
 
+def _sanitize_coupon_prefix(value: str) -> str:
+    cleaned = re.sub(r"[^A-Z0-9]+", "", (value or "").upper()).strip("-")
+    return cleaned[:20]
+
+
+def _to_decimal(value: object) -> Decimal:
+    if value is None:
+        return Decimal("0.00")
+    try:
+        return Decimal(str(value))
+    except Exception:
+        return Decimal("0.00")
+
+
 @router.get("/eligibility", response_model=CouponEligibilityResponse)
 async def coupon_eligibility(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
     shipping_method_id: UUID | None = Query(default=None),
+    session_id: str | None = Depends(cart_api.session_header),
 ) -> CouponEligibilityResponse:
-    user_cart = await cart_service.get_cart(session, current_user.id, None)
+    user_cart = await cart_service.get_cart(session, current_user.id, session_id)
     checkout = await checkout_settings_service.get_checkout_settings(session)
     shipping_method = await _get_shipping_method(session, shipping_method_id)
     rate_flat = Decimal(getattr(shipping_method, "rate_flat", None) or 0) if shipping_method else None
@@ -237,12 +267,13 @@ async def validate_coupon(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
     shipping_method_id: UUID | None = Query(default=None),
+    session_id: str | None = Depends(cart_api.session_header),
 ) -> CouponOffer:
     code = (payload.code or "").strip().upper()
     coupon = await coupons_service.get_coupon_by_code(session, code=code)
     if not coupon:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
-    user_cart = await cart_service.get_cart(session, current_user.id, None)
+    user_cart = await cart_service.get_cart(session, current_user.id, session_id)
     checkout = await checkout_settings_service.get_checkout_settings(session)
     shipping_method = await _get_shipping_method(session, shipping_method_id)
     rate_flat = Decimal(getattr(shipping_method, "rate_flat", None) or 0) if shipping_method else None
@@ -276,7 +307,7 @@ async def my_coupons(
 @router.get("/admin/promotions", response_model=list[PromotionRead])
 async def admin_list_promotions(
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> list[PromotionRead]:
     result = await session.execute(
         select(Promotion).options(selectinload(Promotion.scopes)).order_by(Promotion.created_at.desc())
@@ -289,7 +320,7 @@ async def admin_list_promotions(
 async def admin_create_promotion(
     payload: PromotionCreate,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> PromotionRead:
     if payload.discount_type == "percent" and not payload.percentage_off:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="percentage_off is required for percent promotions")
@@ -344,7 +375,7 @@ async def admin_update_promotion(
     promotion_id: UUID,
     payload: PromotionUpdate,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> PromotionRead:
     promo = (
         (await session.execute(select(Promotion).options(selectinload(Promotion.scopes)).where(Promotion.id == promotion_id)))
@@ -392,6 +423,7 @@ async def admin_update_promotion(
         "max_discount_amount",
         "min_subtotal",
         "allow_on_sale_items",
+        "first_order_only",
         "is_active",
         "starts_at",
         "ends_at",
@@ -431,7 +463,7 @@ async def admin_update_promotion(
 @router.get("/admin/coupons", response_model=list[CouponRead])
 async def admin_list_coupons(
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
     promotion_id: UUID | None = Query(default=None),
     q: str | None = Query(default=None),
 ) -> list[CouponRead]:
@@ -455,7 +487,7 @@ async def admin_update_coupon(
     coupon_id: UUID,
     payload: CouponUpdate,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> CouponRead:
     coupon = (
         (
@@ -494,7 +526,7 @@ async def admin_update_coupon(
 async def admin_list_coupon_assignments(
     coupon_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> list[CouponAssignmentRead]:
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
@@ -525,7 +557,7 @@ async def admin_list_coupon_assignments(
 async def admin_create_coupon(
     payload: CouponCreate,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> CouponRead:
     promotion = await session.get(Promotion, payload.promotion_id)
     if not promotion:
@@ -559,6 +591,301 @@ async def admin_create_coupon(
     coupon_read = CouponRead.model_validate(coupon, from_attributes=True)
     coupon_read.promotion = _to_promotion_read(coupon.promotion) if coupon.promotion else None
     return coupon_read
+
+
+@router.post("/admin/coupons/generate-code", response_model=CouponCodeGenerateResponse)
+async def admin_generate_coupon_code(
+    payload: CouponCodeGenerateRequest,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("coupons")),
+) -> CouponCodeGenerateResponse:
+    prefix_source = payload.prefix or "COUPON"
+    prefix = _sanitize_coupon_prefix(prefix_source) or "COUPON"
+    pattern = (payload.pattern or "").strip() or None
+    code = await coupons_service.generate_unique_coupon_code(
+        session,
+        prefix=prefix,
+        length=int(payload.length or 12),
+        pattern=pattern,
+        attempts=50,
+    )
+    return CouponCodeGenerateResponse(code=code)
+
+
+@router.post("/admin/coupons/issue", response_model=CouponRead, status_code=status.HTTP_201_CREATED)
+async def admin_issue_coupon_to_user(
+    payload: CouponIssueToUserRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    actor: User = Depends(require_admin_section("coupons")),
+) -> CouponRead:
+    user = await session.get(User, payload.user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    promotion = (
+        (await session.execute(select(Promotion).options(selectinload(Promotion.scopes)).where(Promotion.id == payload.promotion_id)))
+        .scalars()
+        .first()
+    )
+    if not promotion:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found")
+
+    prefix_source = payload.prefix or promotion.key or promotion.name or "COUPON"
+    prefix = _sanitize_coupon_prefix(prefix_source) or "COUPON"
+    code = await coupons_service.generate_unique_coupon_code(session, prefix=prefix, length=12)
+
+    starts_at = datetime.now(timezone.utc)
+    ends_at = payload.ends_at
+    if ends_at and getattr(ends_at, "tzinfo", None) is None:
+        ends_at = ends_at.replace(tzinfo=timezone.utc)
+    if ends_at is None and payload.validity_days is not None:
+        ends_at = starts_at + timedelta(days=int(payload.validity_days))
+    if ends_at and ends_at < starts_at:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Coupon ends_at must be in the future")
+
+    coupon = Coupon(
+        promotion_id=promotion.id,
+        code=code,
+        visibility=CouponVisibility.assigned,
+        is_active=True,
+        starts_at=starts_at,
+        ends_at=ends_at,
+        global_max_redemptions=None,
+        per_customer_max_redemptions=int(payload.per_customer_max_redemptions or 1),
+    )
+    session.add(coupon)
+    await session.flush()
+    session.add(CouponAssignment(coupon_id=coupon.id, user_id=user.id))
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="coupon_issued",
+        actor_user_id=getattr(actor, "id", None),
+        subject_user_id=user.id,
+        data={
+            "promotion_id": str(promotion.id),
+            "coupon_id": str(coupon.id),
+            "code": coupon.code,
+        },
+    )
+    await session.commit()
+
+    if payload.send_email and user.email:
+        background_tasks.add_task(
+            email_service.send_coupon_assigned,
+            user.email,
+            coupon_code=coupon.code,
+            promotion_name=promotion.name,
+            promotion_description=promotion.description,
+            ends_at=ends_at,
+            lang=user.preferred_language,
+        )
+
+    await session.refresh(coupon, attribute_names=["promotion"])
+    if coupon.promotion:
+        await session.refresh(coupon.promotion, attribute_names=["scopes"])
+    coupon_read = CouponRead.model_validate(coupon, from_attributes=True)
+    coupon_read.promotion = _to_promotion_read(coupon.promotion) if coupon.promotion else None
+    return coupon_read
+
+
+@router.get("/admin/analytics", response_model=CouponAnalyticsResponse)
+async def admin_coupon_analytics(
+    promotion_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("coupons")),
+    coupon_id: UUID | None = Query(default=None),
+    days: int = Query(default=30, ge=1, le=365),
+    top_limit: int = Query(default=10, ge=1, le=50),
+) -> CouponAnalyticsResponse:
+    @dataclass
+    class _TopProductAgg:
+        product_id: UUID
+        slug: str | None
+        name: str
+        orders: set[UUID]
+        quantity: int
+        gross: Decimal
+        allocated: Decimal
+
+    promotion = await session.get(Promotion, promotion_id)
+    if not promotion:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found")
+
+    if coupon_id:
+        coupon = await session.get(Coupon, coupon_id)
+        if not coupon or coupon.promotion_id != promotion_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+
+    end = datetime.now(timezone.utc)
+    start = end - timedelta(days=int(days))
+
+    redemption_filters = [
+        CouponRedemption.voided_at.is_(None),
+        CouponRedemption.redeemed_at >= start,
+        CouponRedemption.redeemed_at <= end,
+        Coupon.promotion_id == promotion_id,
+        Order.status.notin_([OrderStatus.pending_payment, OrderStatus.cancelled, OrderStatus.refunded]),
+    ]
+    if coupon_id:
+        redemption_filters.append(Coupon.id == coupon_id)
+
+    summary_row = (
+        await session.execute(
+            select(
+                func.count(CouponRedemption.id),
+                func.coalesce(func.sum(CouponRedemption.discount_ron), 0),
+                func.coalesce(func.sum(CouponRedemption.shipping_discount_ron), 0),
+                func.avg(Order.total_amount),
+            )
+            .select_from(CouponRedemption)
+            .join(Coupon, CouponRedemption.coupon_id == Coupon.id)
+            .join(Order, CouponRedemption.order_id == Order.id)
+            .where(*redemption_filters)
+        )
+    ).one()
+
+    redemptions_count = int(summary_row[0] or 0)
+    total_discount = pricing.quantize_money(_to_decimal(summary_row[1]))
+    total_shipping_discount = pricing.quantize_money(_to_decimal(summary_row[2]))
+    avg_with_val = summary_row[3]
+    avg_with = pricing.quantize_money(_to_decimal(avg_with_val)) if avg_with_val is not None else None
+
+    baseline_avg_val = (
+        await session.execute(
+            select(func.avg(Order.total_amount)).where(
+                Order.created_at >= start,
+                Order.created_at <= end,
+                Order.status.notin_([OrderStatus.pending_payment, OrderStatus.cancelled, OrderStatus.refunded]),
+                or_(Order.promo_code.is_(None), func.length(func.trim(Order.promo_code)) == 0),
+            )
+        )
+    ).scalar_one()
+    avg_without = pricing.quantize_money(_to_decimal(baseline_avg_val)) if baseline_avg_val is not None else None
+    aov_lift = pricing.quantize_money(avg_with - avg_without) if avg_with is not None and avg_without is not None else None
+
+    daily_rows = (
+        await session.execute(
+            select(
+                func.date(CouponRedemption.redeemed_at).label("day"),
+                func.count(CouponRedemption.id),
+                func.coalesce(func.sum(CouponRedemption.discount_ron), 0),
+                func.coalesce(func.sum(CouponRedemption.shipping_discount_ron), 0),
+            )
+            .select_from(CouponRedemption)
+            .join(Coupon, CouponRedemption.coupon_id == Coupon.id)
+            .join(Order, CouponRedemption.order_id == Order.id)
+            .where(*redemption_filters)
+            .group_by("day")
+            .order_by("day")
+        )
+    ).all()
+
+    daily: list[CouponAnalyticsDaily] = []
+    for day_val, count_val, disc_val, ship_val in daily_rows:
+        daily.append(
+            CouponAnalyticsDaily(
+                date=str(day_val),
+                redemptions=int(count_val or 0),
+                discount_ron=pricing.quantize_money(_to_decimal(disc_val)),
+                shipping_discount_ron=pricing.quantize_money(_to_decimal(ship_val)),
+            )
+        )
+
+    redemption_orders = (
+        await session.execute(
+            select(CouponRedemption.order_id, CouponRedemption.discount_ron)
+            .select_from(CouponRedemption)
+            .join(Coupon, CouponRedemption.coupon_id == Coupon.id)
+            .join(Order, CouponRedemption.order_id == Order.id)
+            .where(*redemption_filters)
+        )
+    ).all()
+    order_discount_by_id: dict[UUID, Decimal] = {
+        order_id: _to_decimal(discount_val) for order_id, discount_val in redemption_orders if order_id
+    }
+    order_ids = list(order_discount_by_id.keys())
+
+    aggregates: dict[UUID, _TopProductAgg] = {}
+    if order_ids:
+        item_rows = (
+            await session.execute(
+                select(
+                    OrderItem.order_id,
+                    OrderItem.product_id,
+                    Product.slug,
+                    Product.name,
+                    OrderItem.quantity,
+                    OrderItem.subtotal,
+                )
+                .select_from(OrderItem)
+                .join(Product, OrderItem.product_id == Product.id)
+                .where(OrderItem.order_id.in_(order_ids))
+            )
+        ).all()
+
+        order_subtotals: dict[UUID, Decimal] = {}
+        for order_id, _, _, _, _, subtotal_val in item_rows:
+            if not order_id:
+                continue
+            order_subtotals[order_id] = order_subtotals.get(order_id, Decimal("0.00")) + _to_decimal(subtotal_val)
+
+        for order_id, product_id, slug, name, qty, subtotal_val in item_rows:
+            if not order_id or not product_id:
+                continue
+            subtotal = _to_decimal(subtotal_val)
+            order_subtotal = order_subtotals.get(order_id, Decimal("0.00"))
+            order_discount = order_discount_by_id.get(order_id, Decimal("0.00"))
+            allocated = Decimal("0.00")
+            if order_discount > 0 and subtotal > 0 and order_subtotal > 0:
+                allocated = order_discount * subtotal / order_subtotal
+
+            bucket = aggregates.get(product_id)
+            if bucket is None:
+                bucket = _TopProductAgg(
+                    product_id=product_id,
+                    slug=(slug or None),
+                    name=(name or str(product_id)),
+                    orders=set(),
+                    quantity=0,
+                    gross=Decimal("0.00"),
+                    allocated=Decimal("0.00"),
+                )
+                aggregates[product_id] = bucket
+
+            bucket.orders.add(order_id)
+            bucket.quantity += int(qty or 0)
+            bucket.gross += subtotal
+            bucket.allocated += allocated
+
+    top_products: list[CouponAnalyticsTopProduct] = []
+    if aggregates:
+        items_sorted = sorted(aggregates.values(), key=lambda item: item.allocated, reverse=True)
+        for bucket in items_sorted[: int(top_limit)]:
+            top_products.append(
+                CouponAnalyticsTopProduct(
+                    product_id=bucket.product_id,
+                    product_slug=bucket.slug,
+                    product_name=bucket.name,
+                    orders_count=len(bucket.orders),
+                    quantity=bucket.quantity,
+                    gross_sales_ron=pricing.quantize_money(bucket.gross),
+                    allocated_discount_ron=pricing.quantize_money(bucket.allocated),
+                )
+            )
+
+    return CouponAnalyticsResponse(
+        summary=CouponAnalyticsSummary(
+            redemptions=redemptions_count,
+            total_discount_ron=total_discount,
+            total_shipping_discount_ron=total_shipping_discount,
+            avg_order_total_with_coupon=avg_with,
+            avg_order_total_without_coupon=avg_without,
+            aov_lift=aov_lift,
+        ),
+        daily=daily,
+        top_products=top_products,
+    )
 
 
 async def _find_user(session: AsyncSession, *, user_id: UUID | None, email: str | None) -> User:
@@ -614,6 +941,35 @@ def _segment_user_filters(payload: object) -> list[object]:
     return filters
 
 
+@dataclass(frozen=True)
+class _BucketConfig:
+    total: int
+    index: int
+    seed: str
+
+
+def _parse_bucket_config(*, bucket_total: object, bucket_index: object, bucket_seed: object) -> _BucketConfig | None:
+    seed = (str(bucket_seed) if bucket_seed is not None else "").strip()
+    if bucket_total is None and bucket_index is None and not seed:
+        return None
+    if bucket_total is None or bucket_index is None or not seed:
+        raise ValueError("Bucket config requires bucket_total, bucket_index, and bucket_seed")
+    total = int(bucket_total)
+    index = int(bucket_index)
+    if total < 2 or total > 100:
+        raise ValueError("bucket_total must be between 2 and 100")
+    if index < 0 or index >= total:
+        raise ValueError("bucket_index must be within bucket_total range")
+    return _BucketConfig(total=total, index=index, seed=seed[:80])
+
+
+def _bucket_index_for_user(*, user_id: UUID, seed: str, total: int) -> int:
+    payload = f"{seed}:{user_id}".encode("utf-8")
+    digest = hashlib.sha256(payload).digest()
+    value = int.from_bytes(digest[:8], "big")
+    return int(value % total)
+
+
 async def _segment_sample_emails(session: AsyncSession, *, filters: list[object], limit: int = 10) -> list[str]:
     rows = (await session.execute(select(User.email).where(*filters).order_by(User.created_at.desc()).limit(limit))).scalars().all()
     return [str(e) for e in rows if e]
@@ -624,7 +980,65 @@ async def _preview_segment_assign(
     *,
     coupon_id: UUID,
     filters: list[object],
+    bucket: _BucketConfig | None = None,
 ) -> CouponBulkSegmentPreview:
+    if bucket is not None:
+        total = 0
+        already_active = 0
+        restored = 0
+        sample: list[str] = []
+
+        last_id: UUID | None = None
+        while True:
+            q = select(User.id, User.email).where(*filters).order_by(User.id).limit(_BULK_SEGMENT_BATCH_SIZE)
+            if last_id is not None:
+                q = q.where(User.id > last_id)
+            rows = (await session.execute(q)).all()
+            if not rows:
+                break
+            last_id = rows[-1][0]
+
+            bucketed = [
+                (user_id, email)
+                for user_id, email in rows
+                if _bucket_index_for_user(user_id=user_id, seed=bucket.seed, total=bucket.total) == bucket.index
+            ]
+            if not bucketed:
+                continue
+
+            user_ids = [user_id for user_id, _ in bucketed]
+            existing = (
+                (
+                    await session.execute(
+                        select(CouponAssignment.user_id, CouponAssignment.revoked_at).where(
+                            CouponAssignment.coupon_id == coupon_id,
+                            CouponAssignment.user_id.in_(user_ids),
+                        )
+                    )
+                )
+                .all()
+            )
+            status_by_user_id = {user_id: revoked_at for user_id, revoked_at in existing}
+
+            for user_id, email in bucketed:
+                total += 1
+                if email and len(sample) < 10:
+                    sample.append(str(email))
+                revoked_at = status_by_user_id.get(user_id)
+                if revoked_at is None and user_id in status_by_user_id:
+                    already_active += 1
+                elif revoked_at is not None:
+                    restored += 1
+
+        created = max(total - already_active - restored, 0)
+        return CouponBulkSegmentPreview(
+            total_candidates=total,
+            sample_emails=sample,
+            created=created,
+            restored=restored,
+            already_active=already_active,
+        )
+
     total = int((await session.execute(select(func.count()).select_from(User).where(*filters))).scalar_one())
     already_active = int(
         (
@@ -662,7 +1076,68 @@ async def _preview_segment_revoke(
     *,
     coupon_id: UUID,
     filters: list[object],
+    bucket: _BucketConfig | None = None,
 ) -> CouponBulkSegmentPreview:
+    if bucket is not None:
+        total = 0
+        revoked = 0
+        already_revoked = 0
+        not_assigned = 0
+        sample: list[str] = []
+
+        last_id: UUID | None = None
+        while True:
+            q = select(User.id, User.email).where(*filters).order_by(User.id).limit(_BULK_SEGMENT_BATCH_SIZE)
+            if last_id is not None:
+                q = q.where(User.id > last_id)
+            rows = (await session.execute(q)).all()
+            if not rows:
+                break
+            last_id = rows[-1][0]
+
+            bucketed = [
+                (user_id, email)
+                for user_id, email in rows
+                if _bucket_index_for_user(user_id=user_id, seed=bucket.seed, total=bucket.total) == bucket.index
+            ]
+            if not bucketed:
+                continue
+
+            user_ids = [user_id for user_id, _ in bucketed]
+            existing = (
+                (
+                    await session.execute(
+                        select(CouponAssignment.user_id, CouponAssignment.revoked_at).where(
+                            CouponAssignment.coupon_id == coupon_id,
+                            CouponAssignment.user_id.in_(user_ids),
+                        )
+                    )
+                )
+                .all()
+            )
+            status_by_user_id = {user_id: revoked_at for user_id, revoked_at in existing}
+
+            for user_id, email in bucketed:
+                total += 1
+                if email and len(sample) < 10:
+                    sample.append(str(email))
+                if user_id not in status_by_user_id:
+                    not_assigned += 1
+                    continue
+                revoked_at = status_by_user_id.get(user_id)
+                if revoked_at is None:
+                    revoked += 1
+                else:
+                    already_revoked += 1
+
+        return CouponBulkSegmentPreview(
+            total_candidates=total,
+            sample_emails=sample,
+            revoked=revoked,
+            already_revoked=already_revoked,
+            not_assigned=not_assigned,
+        )
+
     total = int((await session.execute(select(func.count()).select_from(User).where(*filters))).scalar_one())
     revoked = int(
         (
@@ -720,9 +1195,17 @@ async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
             job.error_message = None
             await session.commit()
 
+            bucket = _parse_bucket_config(
+                bucket_total=getattr(job, "bucket_total", None),
+                bucket_index=getattr(job, "bucket_index", None),
+                bucket_seed=getattr(job, "bucket_seed", None),
+            )
             filters = _segment_user_filters(job)
-            total = int((await session.execute(select(func.count()).select_from(User).where(*filters))).scalar_one())
-            job.total_candidates = total
+            if bucket is None:
+                total = int((await session.execute(select(func.count()).select_from(User).where(*filters))).scalar_one())
+                job.total_candidates = total
+            else:
+                total = int(getattr(job, "total_candidates", 0) or 0)
             job.processed = 0
             job.created = 0
             job.restored = 0
@@ -756,7 +1239,20 @@ async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
                 if not rows:
                     break
 
-                user_ids = [row[0] for row in rows]
+                if bucket is None:
+                    bucketed_rows = rows
+                else:
+                    bucketed_rows = [
+                        (user_id, email, preferred_language)
+                        for user_id, email, preferred_language in rows
+                        if _bucket_index_for_user(user_id=user_id, seed=bucket.seed, total=bucket.total) == bucket.index
+                    ]
+
+                if not bucketed_rows:
+                    last_id = rows[-1][0]
+                    continue
+
+                user_ids = [row[0] for row in bucketed_rows]
                 existing = (
                     (
                         await session.execute(
@@ -773,7 +1269,7 @@ async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
 
                 notify: list[tuple[str, str | None]] = []
 
-                for user_id, email, preferred_language in rows:
+                for user_id, email, preferred_language in bucketed_rows:
                     assignment = assignments_by_user_id.get(user_id)
                     if job.action == CouponBulkJobAction.assign:
                         if assignment and assignment.revoked_at is None:
@@ -863,7 +1359,7 @@ async def admin_assign_coupon(
     payload: CouponAssignRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> Response:
     coupon = (
         (
@@ -916,7 +1412,7 @@ async def admin_bulk_assign_coupon(
     payload: CouponBulkAssignRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> CouponBulkResult:
     requested = len(payload.emails or [])
     emails, invalid = _normalize_bulk_emails(payload.emails or [])
@@ -1010,7 +1506,7 @@ async def admin_revoke_coupon(
     payload: CouponRevokeRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> Response:
     coupon = (
         (
@@ -1058,7 +1554,7 @@ async def admin_bulk_revoke_coupon(
     payload: CouponBulkRevokeRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> CouponBulkResult:
     requested = len(payload.emails or [])
     emails, invalid = _normalize_bulk_emails(payload.emails or [])
@@ -1149,13 +1645,21 @@ async def admin_preview_segment_assign(
     coupon_id: UUID,
     payload: CouponBulkSegmentAssignRequest,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> CouponBulkSegmentPreview:
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+    try:
+        bucket = _parse_bucket_config(
+            bucket_total=payload.bucket_total,
+            bucket_index=payload.bucket_index,
+            bucket_seed=payload.bucket_seed,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     filters = _segment_user_filters(payload)
-    return await _preview_segment_assign(session, coupon_id=coupon_id, filters=filters)
+    return await _preview_segment_assign(session, coupon_id=coupon_id, filters=filters, bucket=bucket)
 
 
 @router.post("/admin/coupons/{coupon_id}/revoke/segment/preview", response_model=CouponBulkSegmentPreview)
@@ -1163,13 +1667,21 @@ async def admin_preview_segment_revoke(
     coupon_id: UUID,
     payload: CouponBulkSegmentRevokeRequest,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> CouponBulkSegmentPreview:
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+    try:
+        bucket = _parse_bucket_config(
+            bucket_total=payload.bucket_total,
+            bucket_index=payload.bucket_index,
+            bucket_seed=payload.bucket_seed,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     filters = _segment_user_filters(payload)
-    return await _preview_segment_revoke(session, coupon_id=coupon_id, filters=filters)
+    return await _preview_segment_revoke(session, coupon_id=coupon_id, filters=filters, bucket=bucket)
 
 
 @router.post("/admin/coupons/{coupon_id}/assign/segment", response_model=CouponBulkJobRead, status_code=status.HTTP_201_CREATED)
@@ -1178,14 +1690,22 @@ async def admin_start_segment_assign_job(
     payload: CouponBulkSegmentAssignRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_admin_section("coupons")),
 ) -> CouponBulkJobRead:
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
 
+    try:
+        bucket = _parse_bucket_config(
+            bucket_total=payload.bucket_total,
+            bucket_index=payload.bucket_index,
+            bucket_seed=payload.bucket_seed,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     filters = _segment_user_filters(payload)
-    preview = await _preview_segment_assign(session, coupon_id=coupon_id, filters=filters)
+    preview = await _preview_segment_assign(session, coupon_id=coupon_id, filters=filters, bucket=bucket)
 
     job = CouponBulkJob(
         coupon_id=coupon_id,
@@ -1194,6 +1714,9 @@ async def admin_start_segment_assign_job(
         status=CouponBulkJobStatus.pending,
         require_marketing_opt_in=payload.require_marketing_opt_in,
         require_email_verified=payload.require_email_verified,
+        bucket_total=payload.bucket_total,
+        bucket_index=payload.bucket_index,
+        bucket_seed=(payload.bucket_seed or "").strip()[:80] or None,
         send_email=payload.send_email,
         total_candidates=preview.total_candidates,
     )
@@ -1214,14 +1737,22 @@ async def admin_start_segment_revoke_job(
     payload: CouponBulkSegmentRevokeRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_admin_section("coupons")),
 ) -> CouponBulkJobRead:
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
 
+    try:
+        bucket = _parse_bucket_config(
+            bucket_total=payload.bucket_total,
+            bucket_index=payload.bucket_index,
+            bucket_seed=payload.bucket_seed,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     filters = _segment_user_filters(payload)
-    preview = await _preview_segment_revoke(session, coupon_id=coupon_id, filters=filters)
+    preview = await _preview_segment_revoke(session, coupon_id=coupon_id, filters=filters, bucket=bucket)
 
     job = CouponBulkJob(
         coupon_id=coupon_id,
@@ -1230,6 +1761,9 @@ async def admin_start_segment_revoke_job(
         status=CouponBulkJobStatus.pending,
         require_marketing_opt_in=payload.require_marketing_opt_in,
         require_email_verified=payload.require_email_verified,
+        bucket_total=payload.bucket_total,
+        bucket_index=payload.bucket_index,
+        bucket_seed=(payload.bucket_seed or "").strip()[:80] or None,
         send_email=payload.send_email,
         revoke_reason=(payload.reason or "").strip()[:255] or None,
         total_candidates=preview.total_candidates,
@@ -1249,7 +1783,7 @@ async def admin_start_segment_revoke_job(
 async def admin_get_bulk_job(
     job_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> CouponBulkJobRead:
     job = await session.get(CouponBulkJob, job_id)
     if not job:
@@ -1262,7 +1796,7 @@ async def admin_list_bulk_jobs(
     coupon_id: UUID,
     session: AsyncSession = Depends(get_session),
     limit: int = Query(default=10, ge=1, le=50),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> list[CouponBulkJobRead]:
     jobs = (
         (
@@ -1283,7 +1817,7 @@ async def admin_list_bulk_jobs(
 async def admin_cancel_bulk_job(
     job_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_section("coupons")),
 ) -> CouponBulkJobRead:
     job = await session.get(CouponBulkJob, job_id)
     if not job:
@@ -1306,7 +1840,7 @@ async def admin_retry_bulk_job(
     job_id: UUID,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_admin_section("coupons")),
 ) -> CouponBulkJobRead:
     job = await session.get(CouponBulkJob, job_id)
     if not job:
@@ -1314,11 +1848,20 @@ async def admin_retry_bulk_job(
     if job.status in (CouponBulkJobStatus.pending, CouponBulkJobStatus.running):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Job is still in progress")
 
+    try:
+        bucket = _parse_bucket_config(
+            bucket_total=getattr(job, "bucket_total", None),
+            bucket_index=getattr(job, "bucket_index", None),
+            bucket_seed=getattr(job, "bucket_seed", None),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
     filters = _segment_user_filters(job)
     if job.action == CouponBulkJobAction.assign:
-        preview = await _preview_segment_assign(session, coupon_id=job.coupon_id, filters=filters)
+        preview = await _preview_segment_assign(session, coupon_id=job.coupon_id, filters=filters, bucket=bucket)
     else:
-        preview = await _preview_segment_revoke(session, coupon_id=job.coupon_id, filters=filters)
+        preview = await _preview_segment_revoke(session, coupon_id=job.coupon_id, filters=filters, bucket=bucket)
 
     new_job = CouponBulkJob(
         coupon_id=job.coupon_id,
@@ -1327,6 +1870,9 @@ async def admin_retry_bulk_job(
         status=CouponBulkJobStatus.pending,
         require_marketing_opt_in=job.require_marketing_opt_in,
         require_email_verified=job.require_email_verified,
+        bucket_total=getattr(job, "bucket_total", None),
+        bucket_index=getattr(job, "bucket_index", None),
+        bucket_seed=getattr(job, "bucket_seed", None),
         send_email=job.send_email,
         revoke_reason=job.revoke_reason,
         total_candidates=preview.total_candidates,

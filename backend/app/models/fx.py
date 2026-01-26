@@ -28,3 +28,17 @@ class FxRate(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+
+class FxOverrideAuditLog(Base):
+    __tablename__ = "fx_override_audit_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    action: Mapped[str] = mapped_column(String(24), nullable=False)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    eur_per_ron: Mapped[float | None] = mapped_column(Numeric(12, 8), nullable=True)
+    usd_per_ron: Mapped[float | None] = mapped_column(Numeric(12, 8), nullable=True)
+    as_of: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

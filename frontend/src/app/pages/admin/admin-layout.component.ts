@@ -1,12 +1,14 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Component, HostListener } from '@angular/core';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
+import { AuthService } from '../../core/auth.service';
 import { ContainerComponent } from '../../layout/container.component';
 
 type AdminNavItem = {
   path: string;
   labelKey: string;
+  section: string;
   exact?: boolean;
 };
 
@@ -42,14 +44,97 @@ type AdminNavItem = {
   `
 })
 export class AdminLayoutComponent {
-  readonly navItems: AdminNavItem[] = [
-    { path: '/admin/dashboard', labelKey: 'adminUi.nav.dashboard', exact: true },
-    { path: '/admin/content', labelKey: 'adminUi.nav.content' },
-    { path: '/admin/products', labelKey: 'adminUi.nav.products' },
-    { path: '/admin/orders', labelKey: 'adminUi.nav.orders' },
-    { path: '/admin/returns', labelKey: 'adminUi.nav.returns' },
-    { path: '/admin/coupons', labelKey: 'adminUi.nav.coupons' },
-    { path: '/admin/users', labelKey: 'adminUi.nav.users' },
-    { path: '/admin/support', labelKey: 'adminUi.nav.support' }
+  constructor(
+    private auth: AuthService,
+    private router: Router
+  ) {}
+
+  private pendingGoAt: number | null = null;
+
+  private readonly allNavItems: AdminNavItem[] = [
+    { path: '/admin/dashboard', labelKey: 'adminUi.nav.dashboard', section: 'dashboard', exact: true },
+    { path: '/admin/content', labelKey: 'adminUi.nav.content', section: 'content' },
+    { path: '/admin/products', labelKey: 'adminUi.nav.products', section: 'products' },
+    { path: '/admin/inventory', labelKey: 'adminUi.nav.inventory', section: 'inventory' },
+    { path: '/admin/orders', labelKey: 'adminUi.nav.orders', section: 'orders' },
+    { path: '/admin/returns', labelKey: 'adminUi.nav.returns', section: 'returns' },
+    { path: '/admin/coupons', labelKey: 'adminUi.nav.coupons', section: 'coupons' },
+    { path: '/admin/users', labelKey: 'adminUi.nav.users', section: 'users' },
+    { path: '/admin/support', labelKey: 'adminUi.nav.support', section: 'support' },
+    { path: '/admin/ops', labelKey: 'adminUi.nav.ops', section: 'ops' }
   ];
+
+  get navItems(): AdminNavItem[] {
+    return this.allNavItems.filter((item) => this.auth.canAccessAdminSection(item.section));
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  onDocumentKeydown(event: KeyboardEvent): void {
+    if (this.shouldIgnoreShortcut(event)) return;
+
+    const key = (event.key || '').toLowerCase();
+
+    if ((event.ctrlKey || event.metaKey) && key === 'k') {
+      event.preventDefault();
+      this.openGlobalSearch();
+      return;
+    }
+
+    if (key === 'escape') {
+      this.pendingGoAt = null;
+      return;
+    }
+
+    if (key === 'g') {
+      this.pendingGoAt = Date.now();
+      return;
+    }
+
+    if (this.pendingGoAt !== null) {
+      if (Date.now() - this.pendingGoAt > 1500) {
+        this.pendingGoAt = null;
+        return;
+      }
+      const destination = this.routeForGoShortcut(key);
+      if (!destination) return;
+      event.preventDefault();
+      this.pendingGoAt = null;
+      void this.router.navigate([destination]);
+    }
+  }
+
+  private openGlobalSearch(): void {
+    if ((this.router.url || '').startsWith('/admin/dashboard')) {
+      const input = document.getElementById('admin-global-search') as HTMLInputElement | null;
+      if (input) {
+        input.focus();
+        input.select();
+      }
+      return;
+    }
+    void this.router.navigate(['/admin/dashboard'], { state: { focusGlobalSearch: true } });
+  }
+
+  private routeForGoShortcut(key: string): string | null {
+    if (key === 'd') return '/admin/dashboard';
+    if (key === 'o') return '/admin/orders';
+    if (key === 'p') return '/admin/products';
+    if (key === 'u') return '/admin/users';
+    if (key === 'c') return '/admin/coupons';
+    if (key === 's') return '/admin/support';
+    if (key === 'x') return '/admin/ops';
+    if (key === 'i') return '/admin/inventory';
+    if (key === 'r') return '/admin/returns';
+    return null;
+  }
+
+  private shouldIgnoreShortcut(event: KeyboardEvent): boolean {
+    if (event.defaultPrevented) return true;
+    const target = event.target as HTMLElement | null;
+    if (!target) return false;
+    const tag = (target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+    if (target.isContentEditable) return true;
+    return false;
+  }
 }

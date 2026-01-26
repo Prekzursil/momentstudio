@@ -17,6 +17,7 @@ export interface PromotionCreatePayload {
   included_category_ids?: string[];
   excluded_category_ids?: string[];
   allow_on_sale_items: boolean;
+  first_order_only?: boolean;
   is_active: boolean;
   starts_at?: string | null;
   ends_at?: string | null;
@@ -53,6 +54,26 @@ export interface CouponAssignPayload {
   user_id?: string | null;
   email?: string | null;
   send_email?: boolean;
+}
+
+export interface CouponIssueToUserPayload {
+  user_id: string;
+  promotion_id: string;
+  prefix?: string | null;
+  validity_days?: number | null;
+  ends_at?: string | null;
+  per_customer_max_redemptions?: number;
+  send_email?: boolean;
+}
+
+export interface CouponCodeGeneratePayload {
+  prefix?: string | null;
+  pattern?: string | null;
+  length?: number | null;
+}
+
+export interface CouponCodeGenerateResponse {
+  code: string;
 }
 
 export interface CouponRevokePayload extends CouponAssignPayload {
@@ -94,6 +115,9 @@ export interface CouponBulkJobRead {
   status: CouponBulkJobStatus;
   require_marketing_opt_in: boolean;
   require_email_verified: boolean;
+  bucket_total?: number | null;
+  bucket_index?: number | null;
+  bucket_seed?: string | null;
   send_email: boolean;
   revoke_reason?: string | null;
   total_candidates: number;
@@ -108,6 +132,38 @@ export interface CouponBulkJobRead {
   created_at: string;
   started_at?: string | null;
   finished_at?: string | null;
+}
+
+export interface CouponAnalyticsSummary {
+  redemptions: number;
+  total_discount_ron: string;
+  total_shipping_discount_ron: string;
+  avg_order_total_with_coupon?: string | null;
+  avg_order_total_without_coupon?: string | null;
+  aov_lift?: string | null;
+}
+
+export interface CouponAnalyticsDaily {
+  date: string;
+  redemptions: number;
+  discount_ron: string;
+  shipping_discount_ron: string;
+}
+
+export interface CouponAnalyticsTopProduct {
+  product_id: string;
+  product_slug?: string | null;
+  product_name: string;
+  orders_count: number;
+  quantity: number;
+  gross_sales_ron: string;
+  allocated_discount_ron: string;
+}
+
+export interface CouponAnalyticsResponse {
+  summary: CouponAnalyticsSummary;
+  daily: CouponAnalyticsDaily[];
+  top_products: CouponAnalyticsTopProduct[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -132,6 +188,14 @@ export class AdminCouponsV2Service {
 
   createCoupon(payload: CouponCreatePayload): Observable<CouponRead> {
     return this.api.post<CouponRead>('/coupons/admin/coupons', payload);
+  }
+
+  generateCouponCode(payload: CouponCodeGeneratePayload): Observable<CouponCodeGenerateResponse> {
+    return this.api.post<CouponCodeGenerateResponse>('/coupons/admin/coupons/generate-code', payload);
+  }
+
+  issueCouponToUser(payload: CouponIssueToUserPayload): Observable<CouponRead> {
+    return this.api.post<CouponRead>('/coupons/admin/coupons/issue', payload);
   }
 
   updateCoupon(couponId: string, payload: CouponUpdatePayload): Observable<CouponRead> {
@@ -163,21 +227,43 @@ export class AdminCouponsV2Service {
 
   previewSegmentAssign(
     couponId: string,
-    payload: { require_marketing_opt_in?: boolean; require_email_verified?: boolean; send_email?: boolean }
+    payload: {
+      require_marketing_opt_in?: boolean;
+      require_email_verified?: boolean;
+      send_email?: boolean;
+      bucket_total?: number | null;
+      bucket_index?: number | null;
+      bucket_seed?: string | null;
+    }
   ): Observable<CouponBulkSegmentPreview> {
     return this.api.post<CouponBulkSegmentPreview>(`/coupons/admin/coupons/${couponId}/assign/segment/preview`, payload);
   }
 
   previewSegmentRevoke(
     couponId: string,
-    payload: { require_marketing_opt_in?: boolean; require_email_verified?: boolean; reason?: string | null; send_email?: boolean }
+    payload: {
+      require_marketing_opt_in?: boolean;
+      require_email_verified?: boolean;
+      reason?: string | null;
+      send_email?: boolean;
+      bucket_total?: number | null;
+      bucket_index?: number | null;
+      bucket_seed?: string | null;
+    }
   ): Observable<CouponBulkSegmentPreview> {
     return this.api.post<CouponBulkSegmentPreview>(`/coupons/admin/coupons/${couponId}/revoke/segment/preview`, payload);
   }
 
   startSegmentAssignJob(
     couponId: string,
-    payload: { require_marketing_opt_in?: boolean; require_email_verified?: boolean; send_email?: boolean }
+    payload: {
+      require_marketing_opt_in?: boolean;
+      require_email_verified?: boolean;
+      send_email?: boolean;
+      bucket_total?: number | null;
+      bucket_index?: number | null;
+      bucket_seed?: string | null;
+    }
   ): Observable<CouponBulkJobRead> {
     return this.api.post<CouponBulkJobRead>(`/coupons/admin/coupons/${couponId}/assign/segment`, payload);
   }
@@ -189,6 +275,9 @@ export class AdminCouponsV2Service {
       require_email_verified?: boolean;
       reason?: string | null;
       send_email?: boolean;
+      bucket_total?: number | null;
+      bucket_index?: number | null;
+      bucket_seed?: string | null;
     }
   ): Observable<CouponBulkJobRead> {
     return this.api.post<CouponBulkJobRead>(`/coupons/admin/coupons/${couponId}/revoke/segment`, payload);
@@ -196,6 +285,10 @@ export class AdminCouponsV2Service {
 
   getBulkJob(jobId: string): Observable<CouponBulkJobRead> {
     return this.api.get<CouponBulkJobRead>(`/coupons/admin/coupons/bulk-jobs/${jobId}`);
+  }
+
+  getAnalytics(params: { promotion_id: string; coupon_id?: string | null; days?: number; top_limit?: number }): Observable<CouponAnalyticsResponse> {
+    return this.api.get<CouponAnalyticsResponse>('/coupons/admin/analytics', params as any);
   }
 
   listBulkJobs(couponId: string, params?: { limit?: number }): Observable<CouponBulkJobRead[]> {
