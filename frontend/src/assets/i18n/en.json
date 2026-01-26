@@ -3592,6 +3592,23 @@
         "stacked": "Stacked",
         "split": "Split"
       },
+      "blockLibrary": {
+        "title": "Block library",
+        "hint": "Click to add a block, or drag it into the editor.",
+        "templateLabel": "Template",
+        "templates": {
+          "starter": "Starter",
+          "blank": "Blank"
+        },
+        "dropHere": "Drop here to insert",
+        "items": {
+          "text": "Text section (markdown / rich editor).",
+          "image": "Single image with optional link and caption.",
+          "gallery": "Multi-image gallery with captions and focal points.",
+          "banner": "Hero banner with headline, CTA, and background image.",
+          "carousel": "Slider with multiple slides and autoplay settings."
+        }
+      },
       "nav": {
         "home": "Home",
         "pages": "Pages",

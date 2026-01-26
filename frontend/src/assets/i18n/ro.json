@@ -3592,6 +3592,23 @@
         "stacked": "Vertical",
         "split": "Împărțit"
       },
+      "blockLibrary": {
+        "title": "Biblioteca de blocuri",
+        "hint": "Apasă pentru a adăuga un bloc sau trage-l în editor.",
+        "templateLabel": "Șablon",
+        "templates": {
+          "starter": "Starter",
+          "blank": "Gol"
+        },
+        "dropHere": "Lasă aici pentru a insera",
+        "items": {
+          "text": "Secțiune de text (markdown / editor rich).",
+          "image": "O singură imagine cu link și legendă opționale.",
+          "gallery": "Galerie cu mai multe imagini, legende și puncte focale.",
+          "banner": "Banner tip hero cu titlu, CTA și imagine de fundal.",
+          "carousel": "Carusel cu mai multe slide-uri și setări de autoplay."
+        }
+      },
       "nav": {
         "home": "Acasă",
         "pages": "Pagini",

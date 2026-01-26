@@ -921,8 +921,8 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS editor: simple/advanced toggle – Default to Simple mode and hide SEO/meta/scheduling behind Advanced.
 - [x] CMS editor: device preview frames – Desktop/tablet/mobile preview with quick toggles and responsive breakpoints.
 - [x] CMS editor: split-view editing – Edit on the left, live preview on the right (with scroll sync).
-- [ ] CMS editor: block library gallery – Visual block picker with thumbnails, descriptions, and “starter” templates.
-- [ ] CMS editor: drag-and-drop insert – Drag blocks into the page with drop targets between sections.
+- [x] CMS editor: block library gallery – Visual block picker with thumbnails, descriptions, and “starter” templates.
+- [x] CMS editor: drag-and-drop insert – Drag blocks into the page with drop targets between sections.
 - [ ] CMS editor: accessible reordering – Keyboard-friendly reorder controls and screen-reader announcements for block moves.
 - [ ] CMS editor: undo/redo – Full undo/redo stack for content edits, including reorder and block adds/removes.
 - [ ] CMS editor: autosave drafts – Autosave with “restore autosave” after refresh/crash and a visible save state.

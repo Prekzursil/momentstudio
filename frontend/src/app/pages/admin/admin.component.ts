@@ -48,6 +48,7 @@ import { AssetLibraryComponent } from './shared/asset-library.component';
 import { BannerBlockComponent } from '../../shared/banner-block.component';
 import { CarouselBlockComponent } from '../../shared/carousel-block.component';
 import { CmsEditorPrefsService } from './shared/cms-editor-prefs.service';
+import { CmsBlockLibraryBlockType, CmsBlockLibraryComponent, CmsBlockLibraryTemplate } from './shared/cms-block-library.component';
 
 type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
 type UiLang = 'en' | 'ro';
@@ -133,6 +134,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
     SkeletonComponent,
     ContentRevisionsComponent,
     AssetLibraryComponent,
+    CmsBlockLibraryComponent,
     BannerBlockComponent,
     CarouselBlockComponent,
     TranslateModule
@@ -876,22 +878,30 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                         [label]="'adminUi.actions.changeUrl' | translate"
                         (action)="renameCustomPageUrl()"
                       ></app-button>
-                      <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                        {{ 'adminUi.site.pages.builder.addBlock' | translate }}
-                        <select
-                          class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                          [(ngModel)]="newPageBlockType"
-                        >
-                          <option [ngValue]="'text'">{{ 'adminUi.home.sections.blocks.text' | translate }}</option>
-                          <option [ngValue]="'image'">{{ 'adminUi.home.sections.blocks.image' | translate }}</option>
-                          <option [ngValue]="'gallery'">{{ 'adminUi.home.sections.blocks.gallery' | translate }}</option>
-                          <option [ngValue]="'banner'">{{ 'adminUi.home.sections.blocks.banner' | translate }}</option>
-                          <option [ngValue]="'carousel'">{{ 'adminUi.home.sections.blocks.carousel' | translate }}</option>
-                        </select>
-                      </label>
-                      <app-button size="sm" [label]="'adminUi.actions.add' | translate" (action)="addPageBlock(pageBlocksKey)"></app-button>
+                      <ng-container *ngIf="cmsAdvanced()">
+                        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                          {{ 'adminUi.site.pages.builder.addBlock' | translate }}
+                          <select
+                            class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                            [(ngModel)]="newPageBlockType"
+                          >
+                            <option [ngValue]="'text'">{{ 'adminUi.home.sections.blocks.text' | translate }}</option>
+                            <option [ngValue]="'image'">{{ 'adminUi.home.sections.blocks.image' | translate }}</option>
+                            <option [ngValue]="'gallery'">{{ 'adminUi.home.sections.blocks.gallery' | translate }}</option>
+                            <option [ngValue]="'banner'">{{ 'adminUi.home.sections.blocks.banner' | translate }}</option>
+                            <option [ngValue]="'carousel'">{{ 'adminUi.home.sections.blocks.carousel' | translate }}</option>
+                          </select>
+                        </label>
+                        <app-button size="sm" [label]="'adminUi.actions.add' | translate" (action)="addPageBlock(pageBlocksKey)"></app-button>
+                      </ng-container>
                     </div>
                   </div>
+
+                  <app-cms-block-library
+                    context="page"
+                    (add)="addPageBlockFromLibrary(pageBlocksKey, $event.type, $event.template)"
+                    (dragActive)="setPageInsertDragActive($event)"
+                  ></app-cms-block-library>
 
                   <div
                     *ngIf="contentPages.length"
@@ -923,29 +933,39 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
 
                   <div class="grid gap-2">
                     <div
-                      *ngFor="let block of (pageBlocks[pageBlocksKey] || [])"
-                      class="rounded-xl border border-dashed border-slate-300 p-3 text-sm bg-white dark:border-slate-700 dark:bg-slate-900"
-                      draggable="true"
-                      (dragstart)="onPageBlockDragStart(pageBlocksKey, block.key)"
+                      *ngIf="pageInsertDragActive"
+                      class="rounded-xl border border-dashed border-slate-300 bg-white/60 px-3 py-2 text-xs font-semibold text-slate-600 flex items-center justify-center dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-300"
                       (dragover)="onPageBlockDragOver($event)"
-                      (drop)="onPageBlockDrop(pageBlocksKey, block.key)"
+                      (drop)="onPageBlockDropZone($event, pageBlocksKey, 0)"
                     >
-                      <div class="flex items-start justify-between gap-3">
-                        <div class="grid gap-1 min-w-0">
-                          <span class="font-semibold text-slate-900 dark:text-slate-50 truncate">
-                            {{ ('adminUi.home.sections.blocks.' + block.type) | translate }}
-                          </span>
-                          <span class="text-[11px] text-slate-500 dark:text-slate-400 truncate">{{ block.type }} · {{ block.key }}</span>
-                        </div>
-                        <div class="flex items-center gap-3 shrink-0">
+                      {{ 'adminUi.content.blockLibrary.dropHere' | translate }}
+                    </div>
+
+                    <ng-container *ngFor="let block of (pageBlocks[pageBlocksKey] || []); let i = index">
+                      <div
+                        class="rounded-xl border border-dashed border-slate-300 p-3 text-sm bg-white dark:border-slate-700 dark:bg-slate-900"
+                        draggable="true"
+                        (dragstart)="onPageBlockDragStart(pageBlocksKey, block.key)"
+                        (dragend)="onPageBlockDragEnd()"
+                        (dragover)="onPageBlockDragOver($event)"
+                        (drop)="onPageBlockDrop($event, pageBlocksKey, block.key)"
+                      >
+                        <div class="flex items-start justify-between gap-3">
+                          <div class="grid gap-1 min-w-0">
+                            <span class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                              {{ ('adminUi.home.sections.blocks.' + block.type) | translate }}
+                            </span>
+                            <span class="text-[11px] text-slate-500 dark:text-slate-400 truncate">{{ block.type }} · {{ block.key }}</span>
+                          </div>
+                          <div class="flex items-center gap-3 shrink-0">
                           <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                             <input type="checkbox" [checked]="block.enabled" (change)="togglePageBlockEnabled(pageBlocksKey, block.key, $event)" />
                             {{ 'adminUi.home.sections.enabled' | translate }}
                           </label>
                           <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.drag' | translate }}</span>
                           <app-button size="sm" variant="ghost" [label]="'adminUi.actions.delete' | translate" (action)="removePageBlock(pageBlocksKey, block.key)"></app-button>
+                          </div>
                         </div>
-                      </div>
 
                       <div class="mt-3 grid gap-3" *ngIf="block.enabled">
                         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -1392,8 +1412,18 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                           </ng-container>
                         </ng-container>
                       </div>
+                    </div>
+
+                    <div
+                      *ngIf="pageInsertDragActive"
+                      class="rounded-xl border border-dashed border-slate-300 bg-white/60 px-3 py-2 text-xs font-semibold text-slate-600 flex items-center justify-center dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-300"
+                      (dragover)="onPageBlockDragOver($event)"
+                      (drop)="onPageBlockDropZone($event, pageBlocksKey, i + 1)"
+                    >
+                      {{ 'adminUi.content.blockLibrary.dropHere' | translate }}
+                    </div>
+                  </ng-container>
                   </div>
-                </div>
 
                 <div class="grid gap-3 md:grid-cols-3 items-end">
                   <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -1482,7 +1512,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                       <p *ngFor="let e of redirectsImportResult.errors" class="text-[11px] text-rose-700 dark:text-rose-300">
                         #{{ e.line }}: {{ e.error }}
                       </p>
-                    </div>
+                      </div>
                   </div>
 
                   <div *ngIf="redirectsError" class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
@@ -1644,7 +1674,13 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
               </div>
             </div>
 
-            <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
+            <app-cms-block-library
+              context="home"
+              (add)="addHomeBlockFromLibrary($event.type, $event.template)"
+              (dragActive)="setHomeInsertDragActive($event)"
+            ></app-cms-block-library>
+
+            <div *ngIf="cmsAdvanced()" class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
               <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                 {{ 'adminUi.home.sections.addBlock' | translate }}
                 <select
@@ -1663,33 +1699,43 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
 
             <div class="grid gap-2">
               <div
-                *ngFor="let block of homeBlocks"
-                class="rounded-xl border border-dashed border-slate-300 p-3 text-sm bg-slate-50 dark:border-slate-700 dark:bg-slate-950/30"
-                draggable="true"
-                (dragstart)="onHomeBlockDragStart(block.key)"
+                *ngIf="homeInsertDragActive"
+                class="rounded-xl border border-dashed border-slate-300 bg-white/60 px-3 py-2 text-xs font-semibold text-slate-600 flex items-center justify-center dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-300"
                 (dragover)="onHomeBlockDragOver($event)"
-                (drop)="onHomeBlockDrop(block.key)"
+                (drop)="onHomeBlockDropZone($event, 0)"
               >
-                <div class="flex items-start justify-between gap-3">
-                  <div class="grid gap-1 min-w-0">
-                    <span class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ homeBlockLabel(block) }}</span>
-                    <span class="text-[11px] text-slate-500 dark:text-slate-400 truncate">{{ block.type }} · {{ block.key }}</span>
+                {{ 'adminUi.content.blockLibrary.dropHere' | translate }}
+              </div>
+
+              <ng-container *ngFor="let block of homeBlocks; let i = index">
+                <div
+                  class="rounded-xl border border-dashed border-slate-300 p-3 text-sm bg-slate-50 dark:border-slate-700 dark:bg-slate-950/30"
+                  draggable="true"
+                  (dragstart)="onHomeBlockDragStart(block.key)"
+                  (dragend)="onHomeBlockDragEnd()"
+                  (dragover)="onHomeBlockDragOver($event)"
+                  (drop)="onHomeBlockDrop($event, block.key)"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="grid gap-1 min-w-0">
+                      <span class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ homeBlockLabel(block) }}</span>
+                      <span class="text-[11px] text-slate-500 dark:text-slate-400 truncate">{{ block.type }} · {{ block.key }}</span>
+                    </div>
+                    <div class="flex items-center gap-3 shrink-0">
+                      <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                        <input type="checkbox" [checked]="block.enabled" (change)="toggleHomeBlockEnabled(block, $event)" />
+                        {{ 'adminUi.home.sections.enabled' | translate }}
+                      </label>
+                      <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.drag' | translate }}</span>
+                      <app-button
+                        *ngIf="isCustomHomeBlock(block)"
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.actions.delete' | translate"
+                        (action)="removeHomeBlock(block.key)"
+                      ></app-button>
+                    </div>
                   </div>
-                  <div class="flex items-center gap-3 shrink-0">
-                    <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                      <input type="checkbox" [checked]="block.enabled" (change)="toggleHomeBlockEnabled(block, $event)" />
-                      {{ 'adminUi.home.sections.enabled' | translate }}
-                    </label>
-                    <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.drag' | translate }}</span>
-                    <app-button
-                      *ngIf="isCustomHomeBlock(block)"
-                      size="sm"
-                      variant="ghost"
-                      [label]="'adminUi.actions.delete' | translate"
-                      (action)="removeHomeBlock(block.key)"
-                    ></app-button>
-                  </div>
-                </div>
 
                 <ng-container *ngIf="isCustomHomeBlock(block)">
                   <div class="mt-3 grid gap-3">
@@ -2197,8 +2243,18 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                     </ng-container>
                   </div>
                 </ng-container>
+                </div>
+
+                <div
+                  *ngIf="homeInsertDragActive"
+                  class="rounded-xl border border-dashed border-slate-300 bg-white/60 px-3 py-2 text-xs font-semibold text-slate-600 flex items-center justify-center dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-300"
+                  (dragover)="onHomeBlockDragOver($event)"
+                  (drop)="onHomeBlockDropZone($event, i + 1)"
+                >
+                  {{ 'adminUi.content.blockLibrary.dropHere' | translate }}
+                </div>
+              </ng-container>
               </div>
-            </div>
 
             <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="sectionsMessage">{{ sectionsMessage }}</span>
           </section>
@@ -2259,13 +2315,13 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
               <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="collectionMessage">{{ collectionMessage }}</span>
             </div>
             <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
-              <div *ngFor="let col of featuredCollections" class="rounded-lg border border-slate-200 p-3 flex items-center justify-between dark:border-slate-700">
-                <div>
-                  <p class="font-semibold text-slate-900 dark:text-slate-50">{{ col.name }}</p>
-                  <p class="text-xs text-slate-500 dark:text-slate-400">{{ col.slug }} · {{ col.description }}</p>
-                </div>
-                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.edit' | translate" (action)="editCollection(col)"></app-button>
-              </div>
+                <div *ngFor="let col of featuredCollections" class="rounded-lg border border-slate-200 p-3 flex items-center justify-between dark:border-slate-700">
+                  <div>
+                    <p class="font-semibold text-slate-900 dark:text-slate-50">{{ col.name }}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ col.slug }} · {{ col.description }}</p>
+                  </div>
+                  <app-button size="sm" variant="ghost" [label]="'adminUi.actions.edit' | translate" (action)="editCollection(col)"></app-button>
+                  </div>
             </div>
           </section>
 
@@ -3906,6 +3962,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   newHomeBlockType: 'text' | 'image' | 'gallery' | 'banner' | 'carousel' = 'text';
   homeBlocks: HomeBlockDraft[] = [];
   draggingHomeBlockKey: string | null = null;
+  homeInsertDragActive = false;
   sectionsMessage = '';
 
   featuredCollections: FeaturedCollection[] = [];
@@ -4159,6 +4216,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   pageBlocksTranslationSaving: Record<string, boolean> = {};
   draggingPageBlockKey: string | null = null;
   draggingPageBlocksKey: string | null = null;
+  pageInsertDragActive = false;
   coupons: AdminCoupon[] = [];
   newCoupon: Partial<AdminCoupon> = { code: '', percentage_off: 0, active: true, currency: 'RON' };
   stockEdits: Record<string, number> = {};
@@ -7160,9 +7218,17 @@ export class AdminComponent implements OnInit, OnDestroy {
     return configured;
   }
 
-  addPageBlock(pageKey: PageBuilderKey): void {
+  setPageInsertDragActive(active: boolean): void {
+    this.pageInsertDragActive = active;
+  }
+
+  addPageBlockFromLibrary(pageKey: PageBuilderKey, type: CmsBlockLibraryBlockType, template: CmsBlockLibraryTemplate): void {
     const current = [...(this.pageBlocks[pageKey] || [])];
-    const type = this.newPageBlockType;
+    this.insertPageBlockAt(pageKey, type, current.length, template);
+  }
+
+  private insertPageBlockAt(pageKey: PageBuilderKey, type: CmsBlockLibraryBlockType, index: number, template: CmsBlockLibraryTemplate): void {
+    const current = [...(this.pageBlocks[pageKey] || [])];
     const existing = new Set(current.map((b) => b.key));
     const base = `${type}_${Date.now()}`;
     let key = base;
@@ -7170,7 +7236,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     while (existing.has(key)) {
       key = `${base}_${suffix++}`;
     }
-    current.push({
+    const draft: PageBlockDraft = {
       key,
       type,
       enabled: true,
@@ -7186,8 +7252,95 @@ export class AdminComponent implements OnInit, OnDestroy {
       slide: this.emptySlideDraft(),
       slides: [this.emptySlideDraft()],
       settings: this.defaultCarouselSettings()
-    });
+    };
+
+    if (template === 'starter') {
+      this.applyStarterTemplateToCustomBlock(type, draft);
+    }
+
+    const safeIndex = Math.max(0, Math.min(index, current.length));
+    current.splice(safeIndex, 0, draft);
     this.pageBlocks[pageKey] = current;
+  }
+
+  private applyStarterTemplateToCustomBlock(type: CmsBlockLibraryBlockType, block: PageBlockDraft | HomeBlockDraft): void {
+    if (type === 'text') {
+      block.title = { en: 'Section title', ro: 'Titlu secțiune' };
+      block.body_markdown = { en: 'Write your content here...', ro: 'Scrie conținutul aici...' };
+      return;
+    }
+
+    if (type === 'image') {
+      block.title = { en: 'Image section', ro: 'Secțiune imagine' };
+      block.alt = { en: 'Image description', ro: 'Descriere imagine' };
+      block.caption = { en: 'Optional caption', ro: 'Legendă opțională' };
+      block.link_url = '/shop';
+      return;
+    }
+
+    if (type === 'gallery') {
+      block.title = { en: 'Gallery', ro: 'Galerie' };
+      const makeImage = (): HomeGalleryImageDraft => ({
+        url: '',
+        alt: { en: 'Image description', ro: 'Descriere imagine' },
+        caption: { en: 'Caption', ro: 'Legendă' },
+        focal_x: 50,
+        focal_y: 50
+      });
+      block.images = [makeImage(), makeImage(), makeImage()];
+      return;
+    }
+
+    if (type === 'banner') {
+      block.title = { en: 'Banner', ro: 'Banner' };
+      block.slide = {
+        ...block.slide,
+        headline: { en: 'Headline', ro: 'Titlu' },
+        subheadline: { en: 'Supporting text', ro: 'Text de suport' },
+        cta_label: { en: 'Shop now', ro: 'Cumpără acum' },
+        cta_url: '/shop',
+        alt: { en: 'Banner image', ro: 'Imagine banner' }
+      };
+      return;
+    }
+
+    const makeSlide = (idx: number): SlideDraft => {
+      const slide = this.emptySlideDraft();
+      const n = idx + 1;
+      slide.headline = { en: `Slide ${n}`, ro: `Slide ${n}` };
+      slide.subheadline = { en: 'Supporting text', ro: 'Text de suport' };
+      slide.cta_label = { en: 'Shop', ro: 'Cumpără' };
+      slide.cta_url = '/shop';
+      slide.alt = { en: 'Carousel image', ro: 'Imagine carusel' };
+      return slide;
+    };
+
+    block.title = { en: 'Carousel', ro: 'Carusel' };
+    block.slides = [makeSlide(0), makeSlide(1), makeSlide(2)];
+    block.settings = { ...block.settings, autoplay: true, interval_ms: 5000 };
+  }
+
+  private readCmsBlockPayload(event: DragEvent): { scope: 'home' | 'page'; type: CmsBlockLibraryBlockType; template: CmsBlockLibraryTemplate } | null {
+    const raw = event.dataTransfer?.getData('text/plain');
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as any;
+      if (!parsed || typeof parsed !== 'object') return null;
+      if (parsed.kind !== 'cms-block') return null;
+      const scope = parsed.scope;
+      if (scope !== 'home' && scope !== 'page') return null;
+      const type = parsed.type;
+      if (type !== 'text' && type !== 'image' && type !== 'gallery' && type !== 'banner' && type !== 'carousel') return null;
+      const template = parsed.template === 'starter' ? 'starter' : 'blank';
+      return { scope, type, template };
+    } catch {
+      return null;
+    }
+  }
+
+  addPageBlock(pageKey: PageBuilderKey): void {
+    const current = [...(this.pageBlocks[pageKey] || [])];
+    this.insertPageBlockAt(pageKey, this.newPageBlockType, current.length, 'blank');
   }
 
   removePageBlock(pageKey: PageBuilderKey, blockKey: string): void {
@@ -7201,15 +7354,64 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   onPageBlockDragStart(pageKey: PageBuilderKey, blockKey: string): void {
+    this.pageInsertDragActive = true;
     this.draggingPageBlocksKey = pageKey;
     this.draggingPageBlockKey = blockKey;
+  }
+
+  onPageBlockDragEnd(): void {
+    this.draggingPageBlocksKey = null;
+    this.draggingPageBlockKey = null;
+    this.pageInsertDragActive = false;
   }
 
   onPageBlockDragOver(event: DragEvent): void {
     event.preventDefault();
   }
 
-  onPageBlockDrop(pageKey: PageBuilderKey, targetKey: string): void {
+  onPageBlockDropZone(event: DragEvent, pageKey: PageBuilderKey, index: number): void {
+    event.preventDefault();
+    const current = [...(this.pageBlocks[pageKey] || [])];
+
+    if (this.draggingPageBlocksKey === pageKey && this.draggingPageBlockKey) {
+      const from = current.findIndex((b) => b.key === this.draggingPageBlockKey);
+      if (from === -1) {
+        this.onPageBlockDragEnd();
+        return;
+      }
+      const safeIndex = Math.max(0, Math.min(index, current.length));
+      const [moved] = current.splice(from, 1);
+      const nextIndex = from < safeIndex ? safeIndex - 1 : safeIndex;
+      current.splice(nextIndex, 0, moved);
+      this.pageBlocks[pageKey] = current;
+      this.onPageBlockDragEnd();
+      return;
+    }
+
+    const payload = this.readCmsBlockPayload(event);
+    if (!payload || payload.scope !== 'page') {
+      this.onPageBlockDragEnd();
+      return;
+    }
+
+    this.insertPageBlockAt(pageKey, payload.type, index, payload.template);
+    this.pageInsertDragActive = false;
+  }
+
+  onPageBlockDrop(event: DragEvent, pageKey: PageBuilderKey, targetKey: string): void {
+    event.preventDefault();
+
+    const payload = this.readCmsBlockPayload(event);
+    if (payload && payload.scope === 'page') {
+      const current = [...(this.pageBlocks[pageKey] || [])];
+      const to = current.findIndex((b) => b.key === targetKey);
+      if (to !== -1) {
+        this.insertPageBlockAt(pageKey, payload.type, to, payload.template);
+      }
+      this.pageInsertDragActive = false;
+      return;
+    }
+
     if (!this.draggingPageBlocksKey || !this.draggingPageBlockKey) return;
     if (this.draggingPageBlocksKey !== pageKey) return;
     if (this.draggingPageBlockKey === targetKey) return;
@@ -7220,10 +7422,10 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (from === -1 || to === -1) return;
 
     const [moved] = current.splice(from, 1);
-    current.splice(to, 0, moved);
+    const nextIndex = from < to ? to - 1 : to;
+    current.splice(nextIndex, 0, moved);
     this.pageBlocks[pageKey] = current;
-    this.draggingPageBlocksKey = null;
-    this.draggingPageBlockKey = null;
+    this.onPageBlockDragEnd();
   }
 
   setPageImageBlockUrl(pageKey: PageBuilderKey, blockKey: string, asset: ContentImageAssetRead): void {
@@ -7696,27 +7898,95 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.homeBlocks = this.homeBlocks.map((b) => (b.key === block.key ? { ...b, enabled } : b));
   }
 
+  setHomeInsertDragActive(active: boolean): void {
+    this.homeInsertDragActive = active;
+  }
+
+  addHomeBlockFromLibrary(type: CmsBlockLibraryBlockType, template: CmsBlockLibraryTemplate): void {
+    this.insertHomeBlockAt(type, this.homeBlocks.length, template);
+  }
+
+  private insertHomeBlockAt(type: CmsBlockLibraryBlockType, index: number, template: CmsBlockLibraryTemplate): void {
+    const key = this.nextCustomBlockKey(type);
+    const draft = this.makeHomeBlockDraft(key, type, true);
+    if (template === 'starter') {
+      this.applyStarterTemplateToCustomBlock(type, draft);
+    }
+    const current = [...this.homeBlocks];
+    const safeIndex = Math.max(0, Math.min(index, current.length));
+    current.splice(safeIndex, 0, draft);
+    this.homeBlocks = current;
+  }
+
   onHomeBlockDragStart(key: string): void {
+    this.homeInsertDragActive = true;
     this.draggingHomeBlockKey = key;
+  }
+
+  onHomeBlockDragEnd(): void {
+    this.draggingHomeBlockKey = null;
+    this.homeInsertDragActive = false;
   }
 
   onHomeBlockDragOver(event: DragEvent): void {
     event.preventDefault();
   }
 
-  onHomeBlockDrop(targetKey: string): void {
+  onHomeBlockDropZone(event: DragEvent, index: number): void {
+    event.preventDefault();
+    const current = [...this.homeBlocks];
+
+    if (this.draggingHomeBlockKey) {
+      const from = current.findIndex((b) => b.key === this.draggingHomeBlockKey);
+      if (from === -1) {
+        this.onHomeBlockDragEnd();
+        return;
+      }
+      const safeIndex = Math.max(0, Math.min(index, current.length));
+      const [moved] = current.splice(from, 1);
+      const nextIndex = from < safeIndex ? safeIndex - 1 : safeIndex;
+      current.splice(nextIndex, 0, moved);
+      this.homeBlocks = current;
+      this.onHomeBlockDragEnd();
+      return;
+    }
+
+    const payload = this.readCmsBlockPayload(event);
+    if (!payload || payload.scope !== 'home') {
+      this.onHomeBlockDragEnd();
+      return;
+    }
+
+    this.insertHomeBlockAt(payload.type, index, payload.template);
+    this.homeInsertDragActive = false;
+  }
+
+  onHomeBlockDrop(event: DragEvent, targetKey: string): void {
+    event.preventDefault();
+
+    const payload = this.readCmsBlockPayload(event);
+    if (payload && payload.scope === 'home') {
+      const to = this.homeBlocks.findIndex((b) => b.key === targetKey);
+      if (to !== -1) {
+        this.insertHomeBlockAt(payload.type, to, payload.template);
+      }
+      this.homeInsertDragActive = false;
+      return;
+    }
+
     if (!this.draggingHomeBlockKey || this.draggingHomeBlockKey === targetKey) return;
     const current = [...this.homeBlocks];
     const from = current.findIndex((b) => b.key === this.draggingHomeBlockKey);
     const to = current.findIndex((b) => b.key === targetKey);
     if (from === -1 || to === -1) {
-      this.draggingHomeBlockKey = null;
+      this.onHomeBlockDragEnd();
       return;
     }
     const [moved] = current.splice(from, 1);
-    current.splice(to, 0, moved);
+    const nextIndex = from < to ? to - 1 : to;
+    current.splice(nextIndex, 0, moved);
     this.homeBlocks = current;
-    this.draggingHomeBlockKey = null;
+    this.onHomeBlockDragEnd();
   }
 
   private nextCustomBlockKey(type: string): string {
@@ -7731,10 +8001,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   addHomeBlock(): void {
-    const type = this.newHomeBlockType;
-    const key = this.nextCustomBlockKey(type);
-    const draft = this.makeHomeBlockDraft(key, type, true);
-    this.homeBlocks = [...this.homeBlocks, draft];
+    this.insertHomeBlockAt(this.newHomeBlockType, this.homeBlocks.length, 'blank');
   }
 
   removeHomeBlock(key: string): void {
