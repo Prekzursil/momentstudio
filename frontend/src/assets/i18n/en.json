@@ -1298,6 +1298,15 @@
     "security": {
       "mfaRequired": "Two-factor authentication or a passkey is required for admin access."
     },
+    "trainingMode": {
+      "title": "Training mode",
+      "on": "On",
+      "off": "Off",
+      "hint": "Read-only: changes are blocked.",
+      "errors": {
+        "save": "Could not update training mode."
+      }
+    },
     "onboarding": {
       "open": "Setup tour",
       "title": "Welcome",
@@ -1649,9 +1658,25 @@
         "date": "Date",
         "topic": "Channel",
         "status": "Status",
+        "sla": "SLA",
         "assignee": "Assignee",
         "from": "From",
         "order": "Order"
+      },
+      "sla": {
+        "title": "SLA settings",
+        "current": "SLA: first reply {{first}}h · resolution {{resolution}}h",
+        "firstReplyHours": "First reply SLA (hours)",
+        "resolutionHours": "Resolution SLA (hours)",
+        "reply": "Reply",
+        "resolve": "Resolve",
+        "due": "due in {{duration}}",
+        "overdue": "overdue by {{duration}}",
+        "success": { "save": "SLA settings saved." },
+        "errors": {
+          "save": "Could not save SLA settings.",
+          "invalid": "Enter valid SLA hours (1–720)."
+        }
       },
       "empty": "No submissions found.",
       "pagination": "Page {{page}} of {{total}} · {{count}} total",
@@ -1934,6 +1959,49 @@
         "errors": {
           "create": "Could not create return request."
         }
+      }
+    },
+    "reports": {
+      "title": "Scheduled reports",
+      "hint": "Weekly/monthly email summaries for sales, top products, and low stock.",
+      "recipients": "Recipients",
+      "recipientsPlaceholder": "owner@example.com, …",
+      "recipientsHint": "Comma-separated emails. Leave empty to send to the owner email.",
+      "weekdays": {
+        "mon": "Monday",
+        "tue": "Tuesday",
+        "wed": "Wednesday",
+        "thu": "Thursday",
+        "fri": "Friday",
+        "sat": "Saturday",
+        "sun": "Sunday"
+      },
+      "weekly": {
+        "title": "Weekly report",
+        "enabled": "Enable weekly report",
+        "weekday": "Day",
+        "hourUtc": "Hour (UTC)",
+        "sendNow": "Send weekly now",
+        "lastSent": "Last sent",
+        "lastError": "Last error"
+      },
+      "monthly": {
+        "title": "Monthly report",
+        "enabled": "Enable monthly report",
+        "day": "Day of month (1–28)",
+        "hourUtc": "Hour (UTC)",
+        "sendNow": "Send monthly now",
+        "lastSent": "Last sent",
+        "lastError": "Last error"
+      },
+      "success": {
+        "save": "Report settings saved.",
+        "sent": "Report sent.",
+        "skipped": "Already sent for this period."
+      },
+      "errors": {
+        "save": "Could not save report settings.",
+        "send": "Could not send report."
       }
     },
     "site": {
@@ -3364,8 +3432,16 @@
         "support": "Support",
         "fulfillment": "Fulfillment",
         "content": "Content",
-        "admin": "Admin",
+        "admin": "Owner basic",
         "owner": "Owner"
+      },
+      "roleHints": {
+        "customer": "Customer only (no admin access).",
+        "support": "Support preset: Dashboard, Users, Support.",
+        "fulfillment": "Fulfillment preset: Dashboard, Orders, Returns, Inventory.",
+        "content": "Content preset: Dashboard, Content, Products, Coupons.",
+        "admin": "Owner basic: Full access (except owner-only actions).",
+        "owner": "Owner: Full access (locked)."
       },
       "success": {
         "revoke": "Sessions revoked",

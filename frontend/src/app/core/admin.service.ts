@@ -72,6 +72,17 @@ export interface AdminChannelBreakdownResponse {
   delivery_types: AdminChannelBreakdownRow[];
 }
 
+export type AdminScheduledReportKind = 'weekly' | 'monthly';
+
+export interface AdminScheduledReportSendResponse {
+  kind: AdminScheduledReportKind;
+  period_start: string;
+  period_end: string;
+  attempted: number;
+  delivered: number;
+  skipped: boolean;
+}
+
 export type AdminDashboardSearchResultType = 'order' | 'product' | 'user';
 
 export interface AdminDashboardSearchResult {
@@ -972,6 +983,10 @@ export class AdminService {
 
   listFeaturedCollections(): Observable<FeaturedCollection[]> {
     return this.api.get<FeaturedCollection[]>('/catalog/collections/featured');
+  }
+
+  sendScheduledReport(payload: { kind: AdminScheduledReportKind; force?: boolean }): Observable<AdminScheduledReportSendResponse> {
+    return this.api.post<AdminScheduledReportSendResponse>('/admin/dashboard/reports/send', payload);
   }
 
   createFeaturedCollection(payload: { name: string; description?: string | null; product_ids?: string[] }): Observable<FeaturedCollection> {

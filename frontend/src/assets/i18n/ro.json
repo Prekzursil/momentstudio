@@ -1298,6 +1298,15 @@
     "security": {
       "mfaRequired": "Autentificarea cu doi factori sau o passkey este necesară pentru accesul de administrare."
     },
+    "trainingMode": {
+      "title": "Mod de instruire",
+      "on": "Pornit",
+      "off": "Oprit",
+      "hint": "Doar citire: modificările sunt blocate.",
+      "errors": {
+        "save": "Nu s-a putut actualiza modul de instruire."
+      }
+    },
     "onboarding": {
       "open": "Tur de configurare",
       "title": "Bun venit",
@@ -1649,9 +1658,25 @@
         "date": "Data",
         "topic": "Subiect",
         "status": "Stare",
+        "sla": "SLA",
         "assignee": "Responsabil",
         "from": "De la",
         "order": "Comandă"
+      },
+      "sla": {
+        "title": "Setări SLA",
+        "current": "SLA: primul răspuns {{first}}h · rezolvare {{resolution}}h",
+        "firstReplyHours": "SLA primul răspuns (ore)",
+        "resolutionHours": "SLA rezolvare (ore)",
+        "reply": "Răspuns",
+        "resolve": "Rezolvare",
+        "due": "în {{duration}}",
+        "overdue": "depășit cu {{duration}}",
+        "success": { "save": "Setări SLA salvate." },
+        "errors": {
+          "save": "Nu am putut salva setările SLA.",
+          "invalid": "Introdu ore valide (1–720)."
+        }
       },
       "empty": "Nu există mesaje.",
       "pagination": "Pagina {{page}} din {{total}} · {{count}} total",
@@ -1934,6 +1959,49 @@
         "errors": {
           "create": "Nu am putut crea cererea de retur."
         }
+      }
+    },
+    "reports": {
+      "title": "Rapoarte programate",
+      "hint": "Rezumat săptămânal/lunar prin email pentru vânzări, top produse și stoc redus.",
+      "recipients": "Destinatari",
+      "recipientsPlaceholder": "owner@example.com, …",
+      "recipientsHint": "Emailuri separate prin virgulă. Dacă e gol, se trimite către emailul proprietarului.",
+      "weekdays": {
+        "mon": "Luni",
+        "tue": "Marți",
+        "wed": "Miercuri",
+        "thu": "Joi",
+        "fri": "Vineri",
+        "sat": "Sâmbătă",
+        "sun": "Duminică"
+      },
+      "weekly": {
+        "title": "Raport săptămânal",
+        "enabled": "Activează raport săptămânal",
+        "weekday": "Zi",
+        "hourUtc": "Ora (UTC)",
+        "sendNow": "Trimite raport săptămânal acum",
+        "lastSent": "Ultima trimitere",
+        "lastError": "Ultima eroare"
+      },
+      "monthly": {
+        "title": "Raport lunar",
+        "enabled": "Activează raport lunar",
+        "day": "Ziua lunii (1–28)",
+        "hourUtc": "Ora (UTC)",
+        "sendNow": "Trimite raport lunar acum",
+        "lastSent": "Ultima trimitere",
+        "lastError": "Ultima eroare"
+      },
+      "success": {
+        "save": "Setări rapoarte salvate.",
+        "sent": "Raport trimis.",
+        "skipped": "Deja trimis pentru această perioadă."
+      },
+      "errors": {
+        "save": "Nu s-au putut salva setările rapoartelor.",
+        "send": "Nu s-a putut trimite raportul."
       }
     },
     "site": {
@@ -3364,8 +3432,16 @@
         "support": "Suport",
         "fulfillment": "Fulfillment",
         "content": "Conținut",
-        "admin": "Administrator",
+        "admin": "Proprietar (basic)",
         "owner": "Proprietar"
+      },
+      "roleHints": {
+        "customer": "Doar client (fără acces admin).",
+        "support": "Preset suport: Panou, Utilizatori, Suport.",
+        "fulfillment": "Preset fulfillment: Panou, Comenzi, Retururi, Stocuri.",
+        "content": "Preset conținut: Panou, Conținut, Produse, Cupoane.",
+        "admin": "Proprietar (basic): acces complet (fără acțiuni doar pentru proprietar).",
+        "owner": "Proprietar: acces complet (blocat)."
       },
       "success": {
         "revoke": "Sesiuni revocate",

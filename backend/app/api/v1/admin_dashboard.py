@@ -66,6 +66,7 @@ from app.models.user_export import UserDataExportJob, UserDataExportStatus
 from app.services import auth as auth_service
 from app.services import audit_chain as audit_chain_service
 from app.services import email as email_service
+from app.services import admin_reports as admin_reports_service
 from app.services import private_storage
 from app.services import user_export as user_export_service
 from app.services import self_service
@@ -499,6 +500,20 @@ async def admin_summary(
         },
         "system": {"db_ready": True, "backup_last_at": settings.backup_last_at},
     }
+
+
+@router.post("/reports/send")
+async def admin_send_scheduled_report(
+    payload: dict = Body(...),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> dict:
+    kind = str(payload.get("kind") or "").strip().lower()
+    force = bool(payload.get("force", False))
+    try:
+        return await admin_reports_service.send_report_now(session, kind=kind, force=force)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.get("/channel-breakdown")
