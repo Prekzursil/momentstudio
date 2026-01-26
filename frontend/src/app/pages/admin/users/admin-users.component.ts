@@ -18,6 +18,8 @@ import type { PromotionRead } from '../../../core/coupons.service';
 import { ToastService } from '../../../core/toast.service';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
+import { ErrorStateComponent } from '../../../shared/error-state.component';
+import { extractRequestId } from '../../../shared/http-error';
 import { InputComponent } from '../../../shared/input.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { formatIdentity } from '../../../shared/user-identity';
@@ -27,7 +29,18 @@ type RoleFilter = 'all' | 'customer' | 'support' | 'fulfillment' | 'content' | '
 @Component({
   selector: 'app-admin-users',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ScrollingModule, TranslateModule, BreadcrumbComponent, ButtonComponent, InputComponent, SkeletonComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    ScrollingModule,
+    TranslateModule,
+    BreadcrumbComponent,
+    ButtonComponent,
+    ErrorStateComponent,
+    InputComponent,
+    SkeletonComponent
+  ],
   template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -77,9 +90,13 @@ type RoleFilter = 'all' | 'customer' | 'support' | 'fulfillment' | 'content' | '
             </div>
           </div>
 
-          <div *ngIf="error()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
-            {{ error() }}
-          </div>
+          <app-error-state
+            *ngIf="error()"
+            [message]="error()!"
+            [requestId]="errorRequestId()"
+            [showRetry]="true"
+            (retry)="retryLoad()"
+          ></app-error-state>
 
           <div *ngIf="loading(); else listTpl">
             <app-skeleton [rows]="8"></app-skeleton>
@@ -797,6 +814,7 @@ export class AdminUsersComponent implements OnInit {
 
   loading = signal(true);
   error = signal<string | null>(null);
+  errorRequestId = signal<string | null>(null);
   users = signal<AdminUserListItem[]>([]);
   meta = signal<AdminUserListResponse['meta'] | null>(null);
   piiReveal = signal(false);
@@ -1301,6 +1319,7 @@ export class AdminUsersComponent implements OnInit {
   private load(): void {
     this.loading.set(true);
     this.error.set(null);
+    this.errorRequestId.set(null);
     this.usersApi
       .search({
         q: this.q.trim() ? this.q.trim() : undefined,
@@ -1342,9 +1361,14 @@ export class AdminUsersComponent implements OnInit {
             return;
           }
           this.error.set(this.t('adminUi.users.errors.load'));
+          this.errorRequestId.set(extractRequestId(err));
           this.loading.set(false);
         }
       });
+  }
+
+  retryLoad(): void {
+    this.load();
   }
 
   private loadAliases(userId: string): void {

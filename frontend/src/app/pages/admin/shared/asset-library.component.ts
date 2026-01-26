@@ -4,11 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AdminService, ContentImageAssetRead } from '../../../core/admin.service';
 import { ToastService } from '../../../core/toast.service';
+import { ErrorStateComponent } from '../../../shared/error-state.component';
+import { extractRequestId } from '../../../shared/http-error';
 
 @Component({
   selector: 'app-asset-library',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule],
+  imports: [CommonModule, FormsModule, TranslateModule, ErrorStateComponent],
   template: `
     <div class="grid gap-3">
       <div class="flex flex-wrap items-center justify-between gap-3">
@@ -71,9 +73,13 @@ import { ToastService } from '../../../core/toast.service';
         </p>
       </div>
 
-      <div *ngIf="error()" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
-        {{ error() }}
-      </div>
+      <app-error-state
+        *ngIf="error()"
+        [message]="error()!"
+        [requestId]="errorRequestId()"
+        [showRetry]="true"
+        (retry)="reload()"
+      ></app-error-state>
 
       <div *ngIf="loading()" class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.site.assets.library.loading' | translate }}</div>
 
@@ -171,6 +177,7 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
 
   loading = signal(false);
   error = signal<string | null>(null);
+  errorRequestId = signal<string | null>(null);
   images = signal<ContentImageAssetRead[]>([]);
   private totalPages = signal(1);
 
@@ -201,6 +208,7 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
     if (reset) this.page = 1;
     this.loading.set(true);
     this.error.set(null);
+    this.errorRequestId.set(null);
     this.admin
       .listContentImages({ q: this.q || undefined, key: this.key || undefined, tag: this.tag || undefined, page: this.page, limit: this.limit })
       .subscribe({
@@ -209,8 +217,9 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
         this.totalPages.set(resp.meta?.total_pages || 1);
         this.loading.set(false);
       },
-      error: () => {
+      error: (err) => {
         this.error.set(this.t('adminUi.site.assets.library.errors.load'));
+        this.errorRequestId.set(extractRequestId(err));
         this.loading.set(false);
       }
     });

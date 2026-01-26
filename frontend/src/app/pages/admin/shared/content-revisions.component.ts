@@ -6,11 +6,13 @@ import { Subscription } from 'rxjs';
 import { AdminService, ContentBlockVersionListItem, ContentBlockVersionRead } from '../../../core/admin.service';
 import { ToastService } from '../../../core/toast.service';
 import { diffLines, Change } from 'diff';
+import { ErrorStateComponent } from '../../../shared/error-state.component';
+import { extractRequestId } from '../../../shared/http-error';
 
 @Component({
   selector: 'app-content-revisions',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule, DatePipe],
+  imports: [CommonModule, FormsModule, TranslateModule, DatePipe, ErrorStateComponent],
   template: `
     <div class="grid gap-3">
       <div class="flex items-center justify-between gap-3">
@@ -29,9 +31,13 @@ import { diffLines, Change } from 'diff';
         </button>
       </div>
 
-      <div *ngIf="error()" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
-        {{ error() }}
-      </div>
+      <app-error-state
+        *ngIf="error()"
+        [message]="error()!"
+        [requestId]="errorRequestId()"
+        [showRetry]="true"
+        (retry)="reload()"
+      ></app-error-state>
 
       <div *ngIf="loading()" class="text-sm text-slate-600 dark:text-slate-300">
         {{ 'adminUi.content.revisions.loading' | translate }}
@@ -88,6 +94,7 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
 
   loading = signal(false);
   error = signal<string | null>(null);
+  errorRequestId = signal<string | null>(null);
   versions = signal<ContentBlockVersionListItem[]>([]);
   selectedRead = signal<ContentBlockVersionRead | null>(null);
   currentRead = signal<ContentBlockVersionRead | null>(null);
@@ -124,6 +131,7 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
     if (!key) return;
     this.loading.set(true);
     this.error.set(null);
+    this.errorRequestId.set(null);
     this.versions.set([]);
     this.selectedRead.set(null);
     this.currentRead.set(null);
@@ -168,6 +176,7 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
             this.versions.set([]);
           } else {
             this.error.set(this.t('adminUi.content.revisions.errors.load'));
+            this.errorRequestId.set(extractRequestId(err));
           }
           pendingVersions = false;
           finish();
@@ -194,8 +203,9 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
                   maybeInitSelection();
                   finish();
                 },
-                error: () => {
+                error: (err) => {
                   this.error.set(this.t('adminUi.content.revisions.errors.loadVersion'));
+                  this.errorRequestId.set(extractRequestId(err));
                   pendingCurrent = false;
                   maybeInitSelection();
                   finish();

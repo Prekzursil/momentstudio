@@ -6,6 +6,7 @@ import { Router } from '@angular/router';
 import { BreadcrumbComponent, Crumb } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
 import { CardComponent } from '../../../shared/card.component';
+import { ErrorStateComponent } from '../../../shared/error-state.component';
 import { InputComponent } from '../../../shared/input.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { AuthService } from '../../../core/auth.service';
@@ -26,6 +27,7 @@ import {
 import { AdminOrdersService } from '../../../core/admin-orders.service';
 import { ToastService } from '../../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
+import { extractRequestId } from '../../../shared/http-error';
 
 type MetricWidgetId = 'kpis' | 'counts' | 'range';
 
@@ -41,15 +43,20 @@ type MetricWidgetId = 'kpis' | 'counts' | 'range';
     ButtonComponent,
     InputComponent,
     SkeletonComponent,
+    ErrorStateComponent,
     LocalizedCurrencyPipe
   ],
   template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
-      <div *ngIf="error()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
-        {{ error() }}
-      </div>
+      <app-error-state
+        *ngIf="error()"
+        [message]="error()!"
+        [requestId]="errorRequestId()"
+        [showRetry]="true"
+        (retry)="retryDashboard()"
+      ></app-error-state>
 
       <div *ngIf="loading(); else dashboardTpl">
         <app-skeleton [rows]="6"></app-skeleton>
@@ -784,7 +791,8 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
   ];
 
   loading = signal(true);
-  error = signal('');
+  error = signal<string | null>(null);
+  errorRequestId = signal<string | null>(null);
   summary = signal<AdminSummary | null>(null);
 
   customizeWidgetsOpen = signal(false);
@@ -872,18 +880,24 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
 
   private loadSummary(): void {
     this.loading.set(true);
-    this.error.set('');
+    this.error.set(null);
+    this.errorRequestId.set(null);
     this.rangeError = '';
     this.admin.summary(this.buildSummaryParams()).subscribe({
       next: (data) => {
         this.summary.set(data);
         this.loading.set(false);
       },
-      error: () => {
+      error: (err) => {
         this.error.set(this.translate.instant('adminUi.errors.generic'));
+        this.errorRequestId.set(extractRequestId(err));
         this.loading.set(false);
       }
     });
+  }
+
+  retryDashboard(): void {
+    this.loadSummary();
   }
 
   loadScheduledTasks(): void {

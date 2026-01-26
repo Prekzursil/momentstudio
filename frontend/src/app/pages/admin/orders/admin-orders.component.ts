@@ -8,6 +8,8 @@ import { from, of } from 'rxjs';
 import { catchError, finalize, map, mergeMap, toArray } from 'rxjs/operators';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
+import { ErrorStateComponent } from '../../../shared/error-state.component';
+import { extractRequestId } from '../../../shared/http-error';
 import { InputComponent } from '../../../shared/input.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { ToastService } from '../../../core/toast.service';
@@ -58,6 +60,7 @@ type AdminOrdersExportTemplate = {
     TranslateModule,
     BreadcrumbComponent,
     ButtonComponent,
+    ErrorStateComponent,
     InputComponent,
     SkeletonComponent,
     LocalizedCurrencyPipe
@@ -166,9 +169,13 @@ type AdminOrdersExportTemplate = {
             </div>
           </div>
 
-	        <div *ngIf="error()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
-	          {{ error() }}
-	        </div>
+	        <app-error-state
+            *ngIf="error()"
+            [message]="error()!"
+            [requestId]="errorRequestId()"
+            [showRetry]="true"
+            (retry)="retryLoad()"
+          ></app-error-state>
 
         <div *ngIf="loading(); else tableTpl">
           <app-skeleton [rows]="8"></app-skeleton>
@@ -557,6 +564,7 @@ export class AdminOrdersComponent implements OnInit {
 
   loading = signal(true);
   error = signal<string | null>(null);
+  errorRequestId = signal<string | null>(null);
   orders = signal<AdminOrderListItem[]>([]);
   meta = signal<AdminOrderListResponse['meta'] | null>(null);
 
@@ -997,6 +1005,7 @@ export class AdminOrdersComponent implements OnInit {
   private load(): void {
     this.loading.set(true);
     this.error.set(null);
+    this.errorRequestId.set(null);
 
     const params: Parameters<AdminOrdersService['search']>[0] = {
       page: this.page,
@@ -1016,11 +1025,16 @@ export class AdminOrdersComponent implements OnInit {
         this.meta.set(res.meta);
         this.loading.set(false);
       },
-      error: () => {
+      error: (err) => {
         this.error.set(this.translate.instant('adminUi.orders.errors.load'));
+        this.errorRequestId.set(extractRequestId(err));
         this.loading.set(false);
       }
     });
+  }
+
+  retryLoad(): void {
+    this.load();
   }
 
   private storageKey(): string {

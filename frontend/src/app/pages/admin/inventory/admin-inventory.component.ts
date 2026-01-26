@@ -5,9 +5,11 @@ import { Router } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { BreadcrumbComponent, Crumb } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
+import { ErrorStateComponent } from '../../../shared/error-state.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { AdminService, RestockListItem, RestockListResponse, RestockNoteUpsert } from '../../../core/admin.service';
 import { ToastService } from '../../../core/toast.service';
+import { extractRequestId } from '../../../shared/http-error';
 
 type RestockRow = RestockListItem & {
   draftSupplier: string;
@@ -20,7 +22,7 @@ type RestockRow = RestockListItem & {
 @Component({
   selector: 'app-admin-inventory',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule, BreadcrumbComponent, ButtonComponent, SkeletonComponent],
+  imports: [CommonModule, FormsModule, TranslateModule, BreadcrumbComponent, ButtonComponent, ErrorStateComponent, SkeletonComponent],
   template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -70,9 +72,13 @@ type RestockRow = RestockListItem & {
           </div>
         </div>
 
-        <div *ngIf="error()" class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200">
-          {{ error() }}
-        </div>
+        <app-error-state
+          *ngIf="error()"
+          [message]="error()!"
+          [requestId]="errorRequestId()"
+          [showRetry]="true"
+          (retry)="retryLoad()"
+        ></app-error-state>
 
         <ng-container *ngIf="loading(); else tableTpl">
           <div class="grid gap-2">
@@ -219,6 +225,7 @@ export class AdminInventoryComponent implements OnInit {
 
   loading = signal(true);
   error = signal<string | null>(null);
+  errorRequestId = signal<string | null>(null);
   rows = signal<RestockRow[]>([]);
   meta = signal<RestockListResponse['meta'] | null>(null);
 
@@ -315,6 +322,7 @@ export class AdminInventoryComponent implements OnInit {
   private load(): void {
     this.loading.set(true);
     this.error.set(null);
+    this.errorRequestId.set(null);
 
     this.admin
       .restockList({
@@ -338,13 +346,17 @@ export class AdminInventoryComponent implements OnInit {
           this.page = resp.meta?.page ?? this.page;
           this.loading.set(false);
         },
-        error: () => {
+        error: (err) => {
           this.error.set(this.translate.instant('adminUi.errors.generic'));
+          this.errorRequestId.set(extractRequestId(err));
           this.rows.set([]);
           this.meta.set(null);
           this.loading.set(false);
         }
       });
   }
-}
 
+  retryLoad(): void {
+    this.load();
+  }
+}

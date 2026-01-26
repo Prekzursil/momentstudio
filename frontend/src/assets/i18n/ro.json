@@ -1275,6 +1275,9 @@
   },
   "adminUi": {
     "errors": {
+      "title": "A apărut o problemă",
+      "requestId": "ID cerere",
+      "copied": "Copiat",
       "generic": "A apărut o problemă. Încearcă din nou."
     },
     "nav": {

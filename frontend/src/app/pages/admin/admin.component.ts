@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
+import { ErrorStateComponent } from '../../shared/error-state.component';
 import { InputComponent } from '../../shared/input.component';
 import { RichEditorComponent } from '../../shared/rich-editor.component';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
@@ -124,6 +125,7 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
     FormsModule,
     BreadcrumbComponent,
     ButtonComponent,
+    ErrorStateComponent,
     InputComponent,
     RichEditorComponent,
     LocalizedCurrencyPipe,
@@ -137,9 +139,13 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
  template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-      <div *ngIf="error()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
-        {{ error() }}
-      </div>
+      <app-error-state
+        *ngIf="error()"
+        [message]="error()!"
+        [requestId]="errorRequestId()"
+        [showRetry]="true"
+        (retry)="retryLoadAll()"
+      ></app-error-state>
       <div class="grid gap-6" *ngIf="!loading(); else loadingTpl">
 	          <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
 	            <div class="flex items-center justify-between">
@@ -3700,6 +3706,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   summary = signal<AdminSummary | null>(null);
   loading = signal<boolean>(true);
   error = signal<string | null>(null);
+  errorRequestId = signal<string | null>(null);
 
   products: AdminProduct[] = [];
   categories: AdminCategory[] = [];
@@ -4076,6 +4083,10 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.loadForSection(this.section());
   }
 
+  retryLoadAll(): void {
+    this.loadAll();
+  }
+
   private normalizeSection(value: unknown): AdminContentSection {
     if (value === 'home' || value === 'pages' || value === 'blog' || value === 'settings') return value;
     return 'home';
@@ -4097,6 +4108,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   private resetSectionState(next: AdminContentSection): void {
     this.error.set(null);
+    this.errorRequestId.set(null);
     if (next !== 'blog') {
       this.closeBlogEditor();
       this.showBlogCreate = false;
@@ -4112,6 +4124,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   private loadForSection(section: AdminContentSection): void {
     this.loading.set(true);
     this.error.set(null);
+    this.errorRequestId.set(null);
 
     if (section === 'home') {
       this.admin.products().subscribe({ next: (p) => (this.products = p), error: () => (this.products = []) });

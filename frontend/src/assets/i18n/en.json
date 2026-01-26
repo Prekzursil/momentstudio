@@ -1275,6 +1275,9 @@
   },
   "adminUi": {
     "errors": {
+      "title": "Something went wrong",
+      "requestId": "Request ID",
+      "copied": "Copied",
       "generic": "Something went wrong. Please try again."
     },
     "nav": {

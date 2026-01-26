@@ -6,6 +6,8 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { forkJoin } from 'rxjs';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
+import { ErrorStateComponent } from '../../../shared/error-state.component';
+import { extractRequestId } from '../../../shared/http-error';
 import { InputComponent } from '../../../shared/input.component';
 import { ModalComponent } from '../../../shared/modal.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
@@ -123,6 +125,7 @@ type PriceHistoryChart = {
     TranslateModule,
     BreadcrumbComponent,
     ButtonComponent,
+    ErrorStateComponent,
     InputComponent,
     ModalComponent,
     SkeletonComponent,
@@ -478,9 +481,13 @@ type PriceHistoryChart = {
             </div>
           </div>
 
-	        <div *ngIf="error()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
-	          {{ error() }}
-	        </div>
+	        <app-error-state
+            *ngIf="error()"
+            [message]="error()!"
+            [requestId]="errorRequestId()"
+            [showRetry]="true"
+            (retry)="retryLoad()"
+          ></app-error-state>
 
         <div *ngIf="loading(); else tableTpl">
           <app-skeleton [rows]="8"></app-skeleton>
@@ -2253,6 +2260,7 @@ export class AdminProductsComponent implements OnInit {
 
   loading = signal(true);
   error = signal<string | null>(null);
+  errorRequestId = signal<string | null>(null);
   products = signal<AdminProductListItem[]>([]);
   meta = signal<AdminProductListResponse['meta'] | null>(null);
   categories = signal<Category[]>([]);
@@ -4152,6 +4160,7 @@ export class AdminProductsComponent implements OnInit {
   private load(): void {
     this.loading.set(true);
     this.error.set(null);
+    this.errorRequestId.set(null);
     this.productsApi
       .search({
         q: this.q.trim() ? this.q.trim() : undefined,
@@ -4171,11 +4180,16 @@ export class AdminProductsComponent implements OnInit {
           this.updateBulkPricePreview();
           this.loading.set(false);
         },
-        error: () => {
+        error: (err) => {
           this.error.set(this.t('adminUi.products.errors.loadList'));
+          this.errorRequestId.set(extractRequestId(err));
           this.loading.set(false);
         }
       });
+  }
+
+  retryLoad(): void {
+    this.load();
   }
 
   private loadCategories(): void {

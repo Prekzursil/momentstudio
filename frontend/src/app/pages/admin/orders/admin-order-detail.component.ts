@@ -5,6 +5,8 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
+import { ErrorStateComponent } from '../../../shared/error-state.component';
+import { extractRequestId } from '../../../shared/http-error';
 import { InputComponent } from '../../../shared/input.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { ToastService } from '../../../core/toast.service';
@@ -56,6 +58,7 @@ type OrderAction =
     TranslateModule,
     BreadcrumbComponent,
     ButtonComponent,
+    ErrorStateComponent,
     InputComponent,
     SkeletonComponent,
     LocalizedCurrencyPipe
@@ -69,9 +72,13 @@ type OrderAction =
       </div>
 
       <ng-template #contentTpl>
-        <div *ngIf="error()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
-          {{ error() }}
-        </div>
+        <app-error-state
+          *ngIf="error()"
+          [message]="error()!"
+          [requestId]="errorRequestId()"
+          [showRetry]="true"
+          (retry)="retryLoad()"
+        ></app-error-state>
 
         <div *ngIf="order(); else notFoundTpl" class="grid gap-6">
           <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
@@ -1328,6 +1335,7 @@ type OrderAction =
 export class AdminOrderDetailComponent implements OnInit {
   loading = signal(true);
   error = signal<string | null>(null);
+  errorRequestId = signal<string | null>(null);
   order = signal<AdminOrderDetail | null>(null);
   piiReveal = signal(false);
   action = signal<OrderAction | null>(null);
@@ -2487,6 +2495,7 @@ export class AdminOrderDetailComponent implements OnInit {
   private load(orderId: string): void {
     this.loading.set(true);
     this.error.set(null);
+    this.errorRequestId.set(null);
     this.receiptShare.set(null);
     this.adminNoteError.set(null);
     this.api.get(orderId, { include_pii: this.piiReveal() }).subscribe({
@@ -2503,11 +2512,18 @@ export class AdminOrderDetailComponent implements OnInit {
         this.loadReturns(o.id);
         this.loading.set(false);
       },
-      error: () => {
+      error: (err) => {
         this.error.set(this.translate.instant('adminUi.orders.errors.load'));
+        this.errorRequestId.set(extractRequestId(err));
         this.loading.set(false);
       }
     });
+  }
+
+  retryLoad(): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    this.load(orderId);
   }
 
   private async copyToClipboard(text: string): Promise<boolean> {
