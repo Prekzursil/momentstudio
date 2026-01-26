@@ -899,6 +899,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin tables: quick density toggle – One-click Compact/Comfortable toggle without opening layout settings.
 - [x] Admin tables: sticky bulk bar – Show a sticky bulk-actions bar when rows are selected (consistent across pages).
 - [x] Admin: recent items – “Recently viewed” (orders/products/users/pages) with one-click reopen.
+- [ ] Admin: recent items per-user – Scope the recent list to the current admin user ID (avoid mixing on shared devices).
 - [ ] Admin: favorites – Pin frequently used pages, filters, and entities (saved in profile).
 - [ ] Admin: background jobs center – Show long-running tasks (exports/imports/emails) with progress + retry/cancel.
 - [ ] Admin: global notifications – Surface important admin-only alerts (failed webhooks, email failures, low stock) with deep links.
