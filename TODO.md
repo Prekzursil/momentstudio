@@ -891,6 +891,60 @@ Below is a structured checklist you can turn into issues.
 - [ ] Admin Categories: bulk import – CSV import for categories (name, parent, sort order, translations) with dry-run validation.
 - [ ] Admin Products: bulk category create+assign – Create a new category and immediately apply it to selected products.
 
+### Admin Dashboard – UX & Workflow (Backlog)
+- [ ] Admin UI: command palette – Add Ctrl/Cmd+K quick launcher for navigation + common actions.
+- [ ] Admin sidebar: nav search – Filter sidebar entries and highlight matches (keyboard friendly).
+- [ ] Admin navigation: breadcrumbs – Add a breadcrumb bar across admin pages with quick back/parent links.
+- [ ] Admin headers: page intro – Add short “what you can do here” copy + primary CTA per page (non-technical friendly).
+- [ ] Admin tables: quick density toggle – One-click Compact/Comfortable toggle without opening layout settings.
+- [ ] Admin tables: sticky bulk bar – Show a sticky bulk-actions bar when rows are selected (consistent across pages).
+- [ ] Admin: recent items – “Recently viewed” (orders/products/users/pages) with one-click reopen.
+- [ ] Admin: favorites – Pin frequently used pages, filters, and entities (saved in profile).
+- [ ] Admin: background jobs center – Show long-running tasks (exports/imports/emails) with progress + retry/cancel.
+- [ ] Admin: global notifications – Surface important admin-only alerts (failed webhooks, email failures, low stock) with deep links.
+- [ ] Admin dashboard: live refresh – Optional auto-refresh with “last updated” timestamp and pause control.
+- [ ] Admin analytics: revenue definitions – Toggle/tooltip for “Gross sales” vs “Net sales (after refunds)” with clear definitions.
+- [ ] Admin analytics: exclude test orders – Add “Mark as test” on orders and exclude test orders from KPIs by default.
+- [ ] Admin analytics: drilldowns – Click KPIs to open the relevant list pre-filtered to the metric (orders/products/users).
+- [ ] Admin analytics: channel breakdown – Break sales/orders down by payment method, courier, and delivery type with filters.
+- [ ] Admin reports: scheduled email – Weekly/monthly email summary (sales, top products, low stock) configurable in admin.
+- [ ] Admin UX: safe training mode – Optional read-only “Training mode” to prevent destructive actions for new staff.
+- [ ] Admin permissions: role presets – “Owner basic / Support / Content / Fulfillment” presets that reduce visible complexity.
+- [ ] Admin support: SLA timers – Add SLA timers and overdue highlighting for tickets/contacts (configurable thresholds).
+- [ ] Admin support: unified timeline – Show customer timeline (orders + tickets + emails) inside order/user views.
+
+### Admin CMS – Visual & Intuitive Editing (Backlog)
+- [ ] CMS editor: simple/advanced toggle – Default to Simple mode and hide SEO/meta/scheduling behind Advanced.
+- [ ] CMS editor: device preview frames – Desktop/tablet/mobile preview with quick toggles and responsive breakpoints.
+- [ ] CMS editor: split-view editing – Edit on the left, live preview on the right (with scroll sync).
+- [ ] CMS editor: block library gallery – Visual block picker with thumbnails, descriptions, and “starter” templates.
+- [ ] CMS editor: drag-and-drop insert – Drag blocks into the page with drop targets between sections.
+- [ ] CMS editor: accessible reordering – Keyboard-friendly reorder controls and screen-reader announcements for block moves.
+- [ ] CMS editor: undo/redo – Full undo/redo stack for content edits, including reorder and block adds/removes.
+- [ ] CMS editor: autosave drafts – Autosave with “restore autosave” after refresh/crash and a visible save state.
+- [ ] CMS editor: publish checklist – Pre-publish checklist (missing translations, missing alt text, broken links, empty sections).
+- [ ] CMS editor: inline style controls – Block inspector for spacing, background, alignment, and max-width (theme-aware).
+- [ ] CMS editor: reusable blocks – Save a section as a reusable snippet and insert it on other pages.
+- [ ] CMS editor: global sections – Manage global blocks (announcement bar, footer promo, header banners) used site-wide.
+- [ ] CMS editor: page templates – Create pages from templates (About/FAQ/Shipping/Returns) with prebuilt sections.
+- [ ] CMS editor: inline media drag-drop – Drag images into the editor to auto-upload and insert with caption + alt.
+- [ ] CMS assets: image editor – Crop/rotate/resize tools in the asset library with non-destructive versions.
+- [ ] CMS assets: “where used” – Show usage references for each asset (pages/sections/posts) before deleting.
+- [ ] CMS assets: focal point preview – Preview focal point across common crops (hero/card/mobile) before saving.
+- [ ] CMS preview: shareable draft links – Tokenized preview links for unpublished drafts (pages + home sections).
+- [ ] CMS preview: language toggle – Preview RO/EN (fallbacks visible) without leaving the editor.
+- [ ] CMS preview: theme toggle – Preview light/dark rendering inside the editor.
+- [ ] CMS scheduling: calendar view – Visual calendar for scheduled publish/unpublish across pages/blog/home banners.
+- [ ] CMS redirects: inline creation – When changing a page URL, offer creating a redirect in the same flow.
+- [ ] CMS navigation: menu builder – Visual editor for header/footer links with drag-drop ordering and per-language labels.
+- [ ] CMS content: side-by-side translation – RO/EN side-by-side editing with “copy from” shortcuts.
+- [ ] CMS content: find & replace – Search/replace across CMS content blocks (with preview of affected pages).
+- [ ] CMS blocks: columns/layout – Add layout blocks (2–3 columns, split hero) with responsive controls.
+- [ ] CMS blocks: testimonials/FAQ – Add visual blocks for testimonials, FAQ accordions, and CTAs.
+- [ ] CMS blocks: product grids – Insert product/category/collection grids into pages (shoppable sections).
+- [ ] CMS blocks: form builder – Basic contact/newsletter form blocks with validation and success messaging.
+- [ ] Storefront admin mode: “Edit this page” – Admin-only button on storefront pages linking to the correct CMS editor/section.
+
 ## Data Portability & Backups (Extended)
 - [x] CLI command `python -m app.cli export-data` exporting users (no passwords), products, categories, orders, addresses to JSON.
 - [x] CLI command `import-data` to bootstrap a new DB from JSON exports with idempotent upserts.
