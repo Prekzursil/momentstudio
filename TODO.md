@@ -351,6 +351,28 @@ Below is a structured checklist you can turn into issues.
 - [ ] Shop: better empty states – Suggest clearing filters / show popular categories when no results.
 - [ ] Shop: skeleton grid – Product card skeletons to reduce layout shift during loading.
 
+### Storefront Admin Quick Edit (No Dashboard) – Next Improvements (Backlog)
+- [ ] Storefront Admin Mode: toggle – Add an “Edit mode” toggle for admins (header button) that reveals inline controls.
+- [ ] Storefront Admin Mode: permissions – Gate edit mode behind admin role + require recent auth for sensitive actions.
+- [ ] Storefront Categories: drag reorder – Reorder nav categories via drag-and-drop directly in the header/category grid.
+- [ ] Storefront Categories: quick rename – Inline rename category (RO/EN) from the category list with optimistic save.
+- [ ] Storefront Categories: quick create – Create a new category from the Shop page (no route change) and insert into nav.
+- [ ] Storefront Categories: quick subcategory – Create a subcategory under the current category from `/shop/:category`.
+- [ ] Storefront Categories: quick image – Upload/change category thumbnail/banner from the category page in edit mode.
+- [ ] Storefront Categories: hide/show – Toggle category visibility (hide from storefront) with a clear “hidden” badge.
+- [ ] Storefront Categories: merge shortcut – “Merge into…” action surfaced from the category page (server-side preview/confirm).
+- [ ] Storefront Categories: safe delete – Delete category from storefront only if unused; otherwise prompt reassignment/merge.
+- [ ] Storefront Products: inline edit badges – Show small “Edit” chips on product cards for admins (price/stock/status).
+- [ ] Storefront Products: quick publish – One-click publish/unpublish/archive from product card or product detail (admin-only).
+- [ ] Storefront Products: quick stock/price – Inline stock + price editing on the Shop grid for admins (spreadsheet-lite).
+- [ ] Storefront Products: bulk select – Multi-select products on Shop page and apply bulk actions (status/category/feature).
+- [ ] Storefront Products: drag reorder (category) – Custom sort order per category with drag-and-drop on the category page.
+- [ ] Storefront Products: pin/feature – Pin products to top of a category (per-category featured list) from storefront.
+- [ ] Storefront Products: quick duplicate – Duplicate a product from product detail in edit mode (clone images, mark draft).
+- [ ] Storefront Products: image manager – Reorder images and edit alt text/captions from product detail in edit mode.
+- [ ] Storefront Admin Mode: undo window – After edits (reorder/publish/price), offer a short “Undo” toast.
+- [ ] Storefront Admin Mode: audit trail – Record all storefront edits in the admin audit log with “source=storefront”.
+
 ## Blog & Community
 - [x] Nav: add “Blog” link between Home and Shop (header + drawer).
 - [x] Backend: add public blog endpoints (list + detail) backed by ContentBlocks with optional translations (fallback to available language).
@@ -802,6 +824,18 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin UX: onboarding tour – First-run guided tour for owner (shipping, payments, content, taxes).
 - [x] Admin UX: saved table layouts – Persist column visibility/order/density per admin table (orders/products/users).
 
+### Admin Dashboard UX – Simplification (Backlog)
+- [ ] Admin UX: simplified mode – Add a “Simple / Advanced” toggle (default Simple) to hide advanced settings and jargon.
+- [ ] Admin UX: progressive disclosure – Collapse rarely used fields behind “Show advanced” per form section.
+- [ ] Admin UX: plain-language labels – Replace technical labels (slug/SKU) with friendly copy + examples and tooltips.
+- [ ] Admin UX: guided wizards – Step-by-step flows for “Add product”, “Add category”, and “Publish product”.
+- [ ] Admin UX: safer defaults – Pre-fill sensible defaults and reduce required fields for first-time product creation.
+- [ ] Admin UX: declutter tables – Reduce visible columns by default; add “Customize columns” for power users.
+- [ ] Admin UX: inline help panels – Contextual “What is this?” help with screenshots/examples per page.
+- [ ] Admin UX: confirmation language – Make destructive/irreversible actions use clear language + consequence checklist.
+- [ ] Admin UX: success feedback – More obvious success states (“Saved”, “Published”, “Hidden”) with next-step CTAs.
+- [ ] Admin UX: role-based presets – Provide “Owner (basic)” preset that hides technical/ops sections for non-technical admins.
+
 ### Admin Catalog – Next Improvements (Backlog)
 - [ ] Admin Products: status selector – Expose draft/published/archived on create/edit with confirmation and audit entry.
 - [ ] Admin Products: status badges – Add table badges for status (draft/published/archived) and active/inactive.
@@ -859,3 +893,5 @@ Below is a structured checklist you can turn into issues.
 - [x] Receipts: improve share link UX (explicit “Copy link” button + visible confirmation for copy action).
 - [x] CI: make compose-smoke E2E resilient (mock locker lookup / disable Overpass fallback to reduce flakiness).
 - [x] Catalog: investigate product detail page sometimes failing to load from listings (route/slug/API error).
+- [x] Admin Dashboard analytics: exclude cancelled/refunded/pending orders from sales totals and “sold” KPIs.
+- [x] Data hygiene: replace any “oz” units in seeded/sample products with metric variants (e.g., ml) and avoid reintroducing.
