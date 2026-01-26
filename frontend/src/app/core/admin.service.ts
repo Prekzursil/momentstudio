@@ -56,6 +56,22 @@ export interface AdminDashboardSystemHealth {
   backup_last_at: string | null;
 }
 
+export interface AdminChannelBreakdownRow {
+  key: string;
+  orders: number;
+  gross_sales: number;
+  net_sales: number;
+}
+
+export interface AdminChannelBreakdownResponse {
+  range_days: number;
+  range_from: string;
+  range_to: string;
+  payment_methods: AdminChannelBreakdownRow[];
+  couriers: AdminChannelBreakdownRow[];
+  delivery_types: AdminChannelBreakdownRow[];
+}
+
 export type AdminDashboardSearchResultType = 'order' | 'product' | 'user';
 
 export interface AdminDashboardSearchResult {
@@ -628,6 +644,10 @@ export class AdminService {
 
   summary(params?: { range_days?: number; range_from?: string; range_to?: string }): Observable<AdminSummary> {
     return this.api.get<AdminSummary>('/admin/dashboard/summary', params);
+  }
+
+  channelBreakdown(params?: { range_days?: number; range_from?: string; range_to?: string }): Observable<AdminChannelBreakdownResponse> {
+    return this.api.get<AdminChannelBreakdownResponse>('/admin/dashboard/channel-breakdown', params);
   }
 
   globalSearch(q: string, opts?: { include_pii?: boolean }): Observable<AdminDashboardSearchResponse> {

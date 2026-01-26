@@ -20,6 +20,7 @@ import {
   AdminDashboardSearchResult,
   AdminDashboardSearchResultType,
   AdminDashboardWindowMetric,
+  AdminChannelBreakdownResponse,
   ScheduledPromoItem,
   ScheduledPublishItem,
   AdminService,
@@ -636,6 +637,109 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
                       (action)="openOrdersRange()"
                     ></app-card>
                   </div>
+
+                  <div class="grid gap-3">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.dashboard.channelBreakdown.title' | translate }}
+                    </p>
+
+                    <div *ngIf="channelBreakdownLoading()">
+                      <app-skeleton [rows]="3"></app-skeleton>
+                    </div>
+
+                    <div
+                      *ngIf="channelBreakdownError()"
+                      class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+                    >
+                      {{ channelBreakdownError() }}
+                    </div>
+
+                    <div
+                      *ngIf="!channelBreakdownLoading() && !channelBreakdownError() && channelBreakdown() as breakdown"
+                      class="grid gap-4 md:grid-cols-3"
+                    >
+                      <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900">
+                        <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                          {{ 'adminUi.dashboard.channelBreakdown.paymentMethods' | translate }}
+                        </div>
+                        <div *ngIf="(breakdown.payment_methods || []).length === 0" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.dashboard.channelBreakdown.empty' | translate }}
+                        </div>
+                        <table *ngIf="(breakdown.payment_methods || []).length" class="mt-3 w-full text-xs">
+                          <thead>
+                            <tr class="text-left text-slate-500 dark:text-slate-400">
+                              <th class="py-1">{{ 'adminUi.dashboard.channelBreakdown.table.channel' | translate }}</th>
+                              <th class="py-1 text-right">{{ 'adminUi.dashboard.channelBreakdown.table.orders' | translate }}</th>
+                              <th class="py-1 text-right">{{ 'adminUi.dashboard.channelBreakdown.table.sales' | translate }}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr *ngFor="let row of breakdown.payment_methods" class="border-t border-slate-100 dark:border-slate-800">
+                              <td class="py-1.5 pr-2 text-slate-700 dark:text-slate-200">{{ formatChannelKey(row.key) }}</td>
+                              <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">{{ row.orders }}</td>
+                              <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">
+                                {{ channelSales(row) | localizedCurrency : 'RON' }}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900">
+                        <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                          {{ 'adminUi.dashboard.channelBreakdown.couriers' | translate }}
+                        </div>
+                        <div *ngIf="(breakdown.couriers || []).length === 0" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.dashboard.channelBreakdown.empty' | translate }}
+                        </div>
+                        <table *ngIf="(breakdown.couriers || []).length" class="mt-3 w-full text-xs">
+                          <thead>
+                            <tr class="text-left text-slate-500 dark:text-slate-400">
+                              <th class="py-1">{{ 'adminUi.dashboard.channelBreakdown.table.channel' | translate }}</th>
+                              <th class="py-1 text-right">{{ 'adminUi.dashboard.channelBreakdown.table.orders' | translate }}</th>
+                              <th class="py-1 text-right">{{ 'adminUi.dashboard.channelBreakdown.table.sales' | translate }}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr *ngFor="let row of breakdown.couriers" class="border-t border-slate-100 dark:border-slate-800">
+                              <td class="py-1.5 pr-2 text-slate-700 dark:text-slate-200">{{ formatChannelKey(row.key) }}</td>
+                              <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">{{ row.orders }}</td>
+                              <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">
+                                {{ channelSales(row) | localizedCurrency : 'RON' }}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900">
+                        <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                          {{ 'adminUi.dashboard.channelBreakdown.deliveryTypes' | translate }}
+                        </div>
+                        <div *ngIf="(breakdown.delivery_types || []).length === 0" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.dashboard.channelBreakdown.empty' | translate }}
+                        </div>
+                        <table *ngIf="(breakdown.delivery_types || []).length" class="mt-3 w-full text-xs">
+                          <thead>
+                            <tr class="text-left text-slate-500 dark:text-slate-400">
+                              <th class="py-1">{{ 'adminUi.dashboard.channelBreakdown.table.channel' | translate }}</th>
+                              <th class="py-1 text-right">{{ 'adminUi.dashboard.channelBreakdown.table.orders' | translate }}</th>
+                              <th class="py-1 text-right">{{ 'adminUi.dashboard.channelBreakdown.table.sales' | translate }}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr *ngFor="let row of breakdown.delivery_types" class="border-t border-slate-100 dark:border-slate-800">
+                              <td class="py-1.5 pr-2 text-slate-700 dark:text-slate-200">{{ formatChannelKey(row.key) }}</td>
+                              <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">{{ row.orders }}</td>
+                              <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">
+                                {{ channelSales(row) | localizedCurrency : 'RON' }}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </ng-container>
             </ng-container>
@@ -1195,6 +1299,9 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   error = signal<string | null>(null);
   errorRequestId = signal<string | null>(null);
   summary = signal<AdminSummary | null>(null);
+  channelBreakdown = signal<AdminChannelBreakdownResponse | null>(null);
+  channelBreakdownLoading = signal(false);
+  channelBreakdownError = signal<string | null>(null);
   lastUpdatedAt = signal<string | null>(null);
   liveRefreshEnabled = signal(false);
   salesMetric = signal<'gross' | 'net'>('net');
@@ -1289,6 +1396,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     this.loadLiveRefreshPreference();
     this.loadSalesMetricPreference();
     this.loadSummary();
+    this.loadChannelBreakdown();
     this.loadScheduledTasks();
     this.loadBackgroundJobs();
     this.loadAudit(1);
@@ -1383,6 +1491,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   refreshNow(): void {
     if (this.loading()) return;
     this.refreshSummarySilent();
+    this.refreshChannelBreakdownSilent();
     this.loadScheduledTasks();
     this.loadBackgroundJobs();
   }
@@ -1428,6 +1537,16 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     const sum = this.summary();
     if (!sum) return 0;
     return this.salesMetric() === 'gross' ? sum.gross_sales_range : sum.net_sales_range;
+  }
+
+  channelSales(row: { gross_sales: number; net_sales: number }): number {
+    return this.salesMetric() === 'gross' ? Number(row?.gross_sales ?? 0) : Number(row?.net_sales ?? 0);
+  }
+
+  formatChannelKey(key: string): string {
+    const cleaned = String(key ?? '').trim();
+    if (!cleaned) return '—';
+    return cleaned.replace(/_/g, ' ');
   }
 
   ngOnDestroy(): void {
@@ -1631,6 +1750,33 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     });
   }
 
+  private loadChannelBreakdown(): void {
+    this.channelBreakdownLoading.set(true);
+    this.channelBreakdownError.set(null);
+    this.admin.channelBreakdown(this.buildSummaryParams()).subscribe({
+      next: (data) => {
+        this.channelBreakdown.set(data);
+        this.channelBreakdownLoading.set(false);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.channelBreakdown.error');
+        this.channelBreakdownError.set(msg);
+        this.channelBreakdownLoading.set(false);
+      }
+    });
+  }
+
+  private refreshChannelBreakdownSilent(): void {
+    this.admin.channelBreakdown(this.buildSummaryParams()).subscribe({
+      next: (data) => {
+        this.channelBreakdown.set(data);
+      },
+      error: () => {
+        // ignore background refresh failures
+      }
+    });
+  }
+
   private startLiveRefresh(): void {
     this.stopLiveRefresh();
     this.refreshNow();
@@ -1690,6 +1836,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
 
   retryDashboard(): void {
     this.loadSummary();
+    this.loadChannelBreakdown();
   }
 
   openOnboarding(): void {
@@ -1766,11 +1913,13 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   onRangePresetChange(): void {
     if (this.rangePreset === 'custom') return;
     this.loadSummary();
+    this.loadChannelBreakdown();
   }
 
   applyRange(): void {
     if (this.rangePreset !== 'custom') {
       this.loadSummary();
+      this.loadChannelBreakdown();
       return;
     }
     const from = (this.rangeFrom || '').trim();
@@ -1784,6 +1933,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       return;
     }
     this.loadSummary();
+    this.loadChannelBreakdown();
   }
 
   private buildSummaryParams(): { range_days?: number; range_from?: string; range_to?: string } | undefined {

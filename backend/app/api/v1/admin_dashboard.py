@@ -501,6 +501,126 @@ async def admin_summary(
     }
 
 
+@router.get("/channel-breakdown")
+async def admin_channel_breakdown(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("dashboard")),
+    range_days: int = Query(default=30, ge=1, le=365),
+    range_from: date | None = Query(default=None),
+    range_to: date | None = Query(default=None),
+) -> dict:
+    now = datetime.now(timezone.utc)
+    successful_statuses = (OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered)
+    sales_statuses = (*successful_statuses, OrderStatus.refunded)
+
+    if (range_from is None) != (range_to is None):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="range_from and range_to must be provided together",
+        )
+
+    if range_from is not None and range_to is not None:
+        if range_to < range_from:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="range_to must be on/after range_from",
+            )
+        start = datetime.combine(range_from, datetime.min.time(), tzinfo=timezone.utc)
+        end = datetime.combine(
+            range_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc
+        )
+        effective_range_days = (range_to - range_from).days + 1
+    else:
+        start = now - timedelta(days=range_days)
+        end = now
+        effective_range_days = range_days
+
+    test_order_ids = select(OrderTag.order_id).where(OrderTag.tag == "test")
+    exclude_test_orders = Order.id.notin_(test_order_ids)
+
+    async def _gross_by(col):
+        rows = await session.execute(
+            select(
+                col,
+                func.count().label("orders"),
+                func.coalesce(func.sum(Order.total_amount), 0).label("gross_sales"),
+            )
+            .select_from(Order)
+            .where(
+                Order.created_at >= start,
+                Order.created_at < end,
+                Order.status.in_(sales_statuses),
+                exclude_test_orders,
+            )
+            .group_by(col)
+        )
+        return rows.all()
+
+    async def _refunds_by(col):
+        rows = await session.execute(
+            select(col, func.coalesce(func.sum(OrderRefund.amount), 0).label("refunds"))
+            .select_from(OrderRefund)
+            .join(Order, OrderRefund.order_id == Order.id)
+            .where(
+                Order.created_at >= start,
+                Order.created_at < end,
+                Order.status.in_(sales_statuses),
+                exclude_test_orders,
+            )
+            .group_by(col)
+        )
+        return rows.all()
+
+    async def _missing_refunds_by(col):
+        rows = await session.execute(
+            select(col, func.coalesce(func.sum(Order.total_amount), 0).label("missing"))
+            .select_from(Order)
+            .outerjoin(OrderRefund, OrderRefund.order_id == Order.id)
+            .where(
+                Order.created_at >= start,
+                Order.created_at < end,
+                Order.status == OrderStatus.refunded,
+                OrderRefund.id.is_(None),
+                exclude_test_orders,
+            )
+            .group_by(col)
+        )
+        return rows.all()
+
+    async def _build(col, label_unknown: str = "unknown") -> list[dict]:
+        gross_rows = await _gross_by(col)
+        refunds_rows = await _refunds_by(col)
+        missing_rows = await _missing_refunds_by(col)
+
+        refunds_map = {row[0]: row[1] for row in refunds_rows}
+        missing_map = {row[0]: row[1] for row in missing_rows}
+
+        items: list[dict] = []
+        for key, orders_count, gross in gross_rows:
+            refunds = refunds_map.get(key, 0) or 0
+            missing = missing_map.get(key, 0) or 0
+            net = (gross or 0) - refunds - missing
+            items.append(
+                {
+                    "key": (key or label_unknown),
+                    "orders": int(orders_count or 0),
+                    "gross_sales": float(gross or 0),
+                    "net_sales": float(net or 0),
+                }
+            )
+        items.sort(key=lambda row: (row.get("orders", 0), row.get("gross_sales", 0)), reverse=True)
+        return items
+
+    return {
+        "range_days": int(effective_range_days),
+        "range_from": start.date().isoformat(),
+        "range_to": (end - timedelta(microseconds=1)).date().isoformat(),
+        "payment_methods": await _build(Order.payment_method),
+        "couriers": await _build(Order.courier),
+        "delivery_types": await _build(Order.delivery_type),
+    }
+
+
 @router.get("/search", response_model=AdminDashboardSearchResponse)
 async def admin_global_search(
     session: AsyncSession = Depends(get_session),

@@ -1403,6 +1403,19 @@
         "gross": "Brut",
         "tooltip": "Vânzări brute: comenzi plătite/expediate/livrate/rambursate. Vânzări nete: scade rambursările (inclusiv rambursări parțiale)."
       },
+      "channelBreakdown": {
+        "title": "Defalcare pe canale",
+        "paymentMethods": "Metode de plată",
+        "couriers": "Curieri",
+        "deliveryTypes": "Tip livrare",
+        "empty": "Nu există date pentru acest interval.",
+        "error": "Nu am putut încărca defalcarea pe canale.",
+        "table": {
+          "channel": "Canal",
+          "orders": "Comenzi",
+          "sales": "Vânzări"
+        }
+      },
       "widgetsTitle": "Widgeturi panou",
       "widgets": {
         "kpis": "KPI astăzi",

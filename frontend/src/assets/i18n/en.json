@@ -1403,6 +1403,19 @@
         "gross": "Gross",
         "tooltip": "Gross sales includes paid/shipped/delivered/refunded orders. Net sales subtracts refunds (including partial refunds)."
       },
+      "channelBreakdown": {
+        "title": "Channel breakdown",
+        "paymentMethods": "Payment methods",
+        "couriers": "Couriers",
+        "deliveryTypes": "Delivery types",
+        "empty": "No data in this range.",
+        "error": "Could not load channel breakdown.",
+        "table": {
+          "channel": "Channel",
+          "orders": "Orders",
+          "sales": "Sales"
+        }
+      },
       "widgetsTitle": "Dashboard widgets",
       "widgets": {
         "kpis": "Today KPIs",
