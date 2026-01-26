@@ -27,6 +27,21 @@ Below is a structured checklist you can turn into issues.
 - [x] Frontend: eliminate Node 24 `DEP0060 util._extend` deprecation warning (identify dependency via `--trace-deprecation` and upgrade/replace).
 - [x] Docs: document seeded owner credentials and that `docker compose down -v` resets the DB (owner needs `bootstrap-owner` again).
 
+## Legal & Compliance (NETOPIA/ANPC/GDPR)
+- [ ] Legal pages: add CMS-backed pages `page.terms` (index), `page.terms-and-conditions`, `page.privacy-policy`, `page.anpc` (RO+EN required).
+- [ ] Legal content: ensure Terms & Conditions covers payment methods + delivery + return/cancellation policy (NETOPIA requirement), or clearly links to those sections/pages.
+- [ ] CMS enforcement: block publishing legal pages unless **both RO + EN** are present (no fallback) + ensure version history/rollback works.
+- [ ] Navigation: add header “Terms & Conditions” link between Contact and View Admin; add footer link under “Handcrafted Art”.
+- [ ] Footer/company info: display full company identification details required by NETOPIA (name, RC number, CUI, address, phone, email) and keep them CMS-configurable.
+- [ ] NETOPIA logos: add Visa/Mastercard/NETOPIA Payments logos (from `Identitate-Parteneri-NETOPIA-Payments.zip`) and display them in footer + checkout.
+- [ ] ANPC content: add bilingual ANPC/ADR info page including required links and consumer guidance.
+- [ ] Consent tracking (DB): store acceptance records with doc key + version + timestamp + (user_id or order_id) + context (register/checkout).
+- [ ] Registration gating: require legal consent checkbox(es) before allowing registration (UI + backend enforcement).
+- [ ] Checkout gating: require legal consent checkbox(es) before placing an order (guest + logged-in; UI + backend enforcement).
+- [ ] Consent UX: checkbox click opens a “read before accept” modal; require scrolling to bottom before enabling Accept.
+- [ ] Re-consent policy: force re-acceptance when legal docs change (by version) for both registration and checkout.
+- [ ] Tests: unit tests for publish enforcement + API validation; Playwright tests for modal gating and register/checkout blocking.
+
 ## Backend - Core & Auth
 - [x] Scaffold FastAPI app with versioned `/api/v1` router.
 - [x] Settings via `pydantic-settings`.
