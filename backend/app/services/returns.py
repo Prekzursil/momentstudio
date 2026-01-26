@@ -10,9 +10,10 @@ from sqlalchemy.orm import selectinload
 
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.returns import ReturnRequest, ReturnRequestItem, ReturnRequestStatus
-from app.models.user import AdminAuditLog, User
+from app.models.user import User
 from app.schemas.returns import ReturnRequestCreate, ReturnRequestUpdate
 from app.services import order as order_service
+from app.services import audit_chain as audit_chain_service
 
 
 ALLOWED_TRANSITIONS: dict[ReturnRequestStatus, set[ReturnRequestStatus]] = {
@@ -124,13 +125,12 @@ async def create_return_request(
     )
     session.add(record)
     await session.flush()
-    session.add(
-        AdminAuditLog(
-            action="return_request_create",
-            actor_user_id=actor.id,
-            subject_user_id=order.user_id,
-            data={"return_request_id": str(record.id), "order_id": str(order.id)},
-        )
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="return_request_create",
+        actor_user_id=actor.id,
+        subject_user_id=order.user_id,
+        data={"return_request_id": str(record.id), "order_id": str(order.id)},
     )
     await session.commit()
     return await get_return_request(session, record.id) or record
@@ -231,18 +231,17 @@ async def update_return_request(
     record.updated_by = actor.id
     record.updated_at = datetime.now(timezone.utc)
     session.add(record)
-    session.add(
-        AdminAuditLog(
-            action="return_request_update",
-            actor_user_id=actor.id,
-            subject_user_id=record.user_id,
-            data={
-                "return_request_id": str(record.id),
-                "order_id": str(record.order_id),
-                "from_status": previous_status.value,
-                "to_status": ReturnRequestStatus(record.status).value,
-            },
-        )
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="return_request_update",
+        actor_user_id=actor.id,
+        subject_user_id=record.user_id,
+        data={
+            "return_request_id": str(record.id),
+            "order_id": str(record.order_id),
+            "from_status": previous_status.value,
+            "to_status": ReturnRequestStatus(record.status).value,
+        },
     )
     await session.commit()
     return await get_return_request(session, record.id) or record

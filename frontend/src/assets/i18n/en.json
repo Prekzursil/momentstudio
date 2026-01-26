@@ -3642,6 +3642,27 @@
       "entityAll": "All",
       "export": "Export CSV",
       "exportLimitNote": "Limited to 5,000 entries",
+      "redactLabel": "Redact PII",
+      "redactLocked": "Only the owner can export unredacted audit logs.",
+      "retention": {
+        "title": "Retention",
+        "hint": "Purge old audit rows based on configured retention days.",
+        "refresh": "Refresh",
+        "enabled": "Keep {{days}} days",
+        "disabled": "Disabled",
+        "counts": "{{total}} total · {{expired}} expired",
+        "confirmLabel": "Type to confirm",
+        "confirmPlaceholder": "PURGE",
+        "dryRun": "Dry run",
+        "run": "Run cleanup",
+        "successTitle": "Audit retention",
+        "successCopy": "Deleted {{deleted}} rows.",
+        "successDryRunCopy": "Dry run: would delete {{deleted}} rows.",
+        "errors": {
+          "load": "Could not load retention status.",
+          "purge": "Could not purge audit logs."
+        }
+      },
       "filters": {
         "entity": "Entity",
         "action": "Action contains",

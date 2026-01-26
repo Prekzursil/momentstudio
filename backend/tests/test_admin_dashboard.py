@@ -493,6 +493,88 @@ def test_admin_audit_entries_filters_and_export(test_app: Dict[str, object]) -> 
     assert csv_resp.status_code == 200, csv_resp.text
     assert "text/csv" in csv_resp.headers.get("content-type", "")
     assert csv_resp.text.splitlines()[0].startswith("created_at,entity,action")
+    assert "admin@example.com" not in csv_resp.text
+    assert "user@example.com" not in csv_resp.text
+
+
+def test_admin_audit_retention_status_and_purge(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]
+    engine = test_app["engine"]
+    asyncio.run(reset_db(engine))
+
+    headers_admin = auth_headers(client, session_factory)
+    headers_owner = owner_headers(client, session_factory)
+    asyncio.run(seed_dashboard_data(session_factory))
+
+    async def _seed_old_audit_rows() -> None:
+        async with session_factory() as session:
+            admin = (
+                await session.execute(select(User).where(User.email == "admin@example.com"))
+            ).scalar_one()
+            product = (await session.execute(select(Product).where(Product.slug == "painting"))).scalar_one()
+            block = (await session.execute(select(ContentBlock).where(ContentBlock.key == "home-hero"))).scalar_one()
+
+            old_at = datetime.now(timezone.utc) - timedelta(days=10)
+            session.add(
+                ProductAuditLog(product_id=product.id, action="retention-old", user_id=admin.id, created_at=old_at)
+            )
+            session.add(
+                ContentAuditLog(
+                    content_block_id=block.id,
+                    action="retention-old",
+                    version=block.version,
+                    user_id=admin.id,
+                    created_at=old_at,
+                )
+            )
+            session.add(
+                AdminAuditLog(action="retention-old", actor_user_id=admin.id, data={"note": "user@example.com"}, created_at=old_at)
+            )
+            await session.commit()
+
+    asyncio.run(_seed_old_audit_rows())
+
+    old_product_days = getattr(settings, "audit_retention_days_product", 0)
+    old_content_days = getattr(settings, "audit_retention_days_content", 0)
+    old_security_days = getattr(settings, "audit_retention_days_security", 0)
+    settings.audit_retention_days_product = 1
+    settings.audit_retention_days_content = 1
+    settings.audit_retention_days_security = 1
+    try:
+        status_resp = client.get("/api/v1/admin/dashboard/audit/retention", headers=headers_admin)
+        assert status_resp.status_code == 200, status_resp.text
+        status_payload = status_resp.json()
+        assert status_payload["counts"]["product"]["expired"] >= 1
+        assert status_payload["counts"]["content"]["expired"] >= 1
+        assert status_payload["counts"]["security"]["expired"] >= 1
+
+        dry_run = client.post(
+            "/api/v1/admin/dashboard/audit/retention/purge",
+            headers=headers_owner,
+            json={"confirm": "PURGE", "dry_run": True},
+        )
+        assert dry_run.status_code == 200, dry_run.text
+        assert dry_run.json()["deleted"]["product"] == 0
+
+        purge_resp = client.post(
+            "/api/v1/admin/dashboard/audit/retention/purge",
+            headers=headers_owner,
+            json={"confirm": "PURGE"},
+        )
+        assert purge_resp.status_code == 200, purge_resp.text
+        assert purge_resp.json()["deleted"]["product"] >= 1
+
+        post_status = client.get("/api/v1/admin/dashboard/audit/retention", headers=headers_admin)
+        assert post_status.status_code == 200, post_status.text
+        post_payload = post_status.json()
+        assert post_payload["counts"]["product"]["expired"] == 0
+        assert post_payload["counts"]["content"]["expired"] == 0
+        assert post_payload["counts"]["security"]["expired"] == 0
+    finally:
+        settings.audit_retention_days_product = old_product_days
+        settings.audit_retention_days_content = old_content_days
+        settings.audit_retention_days_security = old_security_days
 
 
 def test_admin_scheduled_tasks_overview(test_app: Dict[str, object]) -> None:

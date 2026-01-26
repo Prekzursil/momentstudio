@@ -13,6 +13,7 @@ import {
   AdminAuditEntriesResponse,
   AdminAuditEntity,
   AdminAuditEntryUnified,
+  AdminAuditRetentionResponse,
   AdminDashboardScheduledTasksResponse,
   AdminDashboardSearchResult,
   AdminDashboardSearchResultType,
@@ -481,7 +482,17 @@ type MetricWidgetId = 'kpis' | 'counts' | 'range';
 	        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
 	          <div class="flex items-center justify-between gap-3 flex-wrap">
 	            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.audit.title' | translate }}</h2>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-3 flex-wrap">
+              <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 accent-indigo-600"
+                  [(ngModel)]="auditExportRedact"
+                  [disabled]="!isOwner()"
+                />
+                {{ 'adminUi.audit.redactLabel' | translate }}
+              </label>
+              <span *ngIf="!isOwner()" class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.audit.redactLocked' | translate }}</span>
               <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.audit.exportLimitNote' | translate }}</span>
               <app-button size="sm" [label]="'adminUi.audit.export' | translate" (action)="downloadAuditCsv()"></app-button>
             </div>
@@ -602,6 +613,94 @@ type MetricWidgetId = 'kpis' | 'counts' | 'range';
               <div class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.audit.empty' | translate }}</div>
             </ng-template>
           </ng-template>
+
+          <div class="grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.audit.retention.title' | translate }}</h3>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.audit.retention.refresh' | translate"
+                (action)="loadAuditRetention()"
+              ></app-button>
+            </div>
+            <p class="text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.audit.retention.hint' | translate }}</p>
+
+            <div *ngIf="auditRetentionError()" class="text-sm text-rose-700 dark:text-rose-300">
+              {{ auditRetentionError() }}
+            </div>
+
+            <div *ngIf="auditRetentionLoading(); else retentionTpl">
+              <app-skeleton [rows]="3"></app-skeleton>
+            </div>
+
+            <ng-template #retentionTpl>
+              <div *ngIf="auditRetention() as retention" class="grid gap-2 md:grid-cols-3">
+                <div class="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-800">
+                  <div class="font-medium text-slate-900 dark:text-slate-50">{{ 'adminUi.audit.products' | translate }}</div>
+                  <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                    <ng-container *ngIf="retention.policies.product.enabled; else productDisabledTpl">
+                      {{ 'adminUi.audit.retention.enabled' | translate: { days: retention.policies.product.days } }}
+                    </ng-container>
+                    <ng-template #productDisabledTpl>{{ 'adminUi.audit.retention.disabled' | translate }}</ng-template>
+                  </div>
+                  <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.audit.retention.counts' | translate: { total: retention.counts.product.total, expired: retention.counts.product.expired } }}
+                  </div>
+                </div>
+
+                <div class="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-800">
+                  <div class="font-medium text-slate-900 dark:text-slate-50">{{ 'adminUi.audit.content' | translate }}</div>
+                  <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                    <ng-container *ngIf="retention.policies.content.enabled; else contentDisabledTpl">
+                      {{ 'adminUi.audit.retention.enabled' | translate: { days: retention.policies.content.days } }}
+                    </ng-container>
+                    <ng-template #contentDisabledTpl>{{ 'adminUi.audit.retention.disabled' | translate }}</ng-template>
+                  </div>
+                  <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.audit.retention.counts' | translate: { total: retention.counts.content.total, expired: retention.counts.content.expired } }}
+                  </div>
+                </div>
+
+                <div class="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-800">
+                  <div class="font-medium text-slate-900 dark:text-slate-50">{{ 'adminUi.audit.security' | translate }}</div>
+                  <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                    <ng-container *ngIf="retention.policies.security.enabled; else securityDisabledTpl">
+                      {{ 'adminUi.audit.retention.enabled' | translate: { days: retention.policies.security.days } }}
+                    </ng-container>
+                    <ng-template #securityDisabledTpl>{{ 'adminUi.audit.retention.disabled' | translate }}</ng-template>
+                  </div>
+                  <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.audit.retention.counts' | translate: { total: retention.counts.security.total, expired: retention.counts.security.expired } }}
+                  </div>
+                </div>
+
+                <div *ngIf="isOwner()" class="grid gap-3 md:col-span-3">
+                  <div *ngIf="auditRetentionPurgeError" class="text-sm text-rose-700 dark:text-rose-300">
+                    {{ auditRetentionPurgeError }}
+                  </div>
+                  <div class="grid gap-3 md:grid-cols-[1fr_auto_auto] items-end text-sm">
+                    <app-input
+                      [label]="'adminUi.audit.retention.confirmLabel' | translate"
+                      [(value)]="auditRetentionConfirm"
+                      [placeholder]="'adminUi.audit.retention.confirmPlaceholder' | translate"
+                      [ariaLabel]="'adminUi.audit.retention.confirmLabel' | translate"
+                    ></app-input>
+                    <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                      <input type="checkbox" class="h-4 w-4 accent-indigo-600" [(ngModel)]="auditRetentionDryRun" />
+                      {{ 'adminUi.audit.retention.dryRun' | translate }}
+                    </label>
+                    <app-button
+                      size="sm"
+                      [disabled]="auditRetentionPurgeLoading || !auditRetentionConfirmOk()"
+                      [label]="'adminUi.audit.retention.run' | translate"
+                      (action)="purgeAuditRetention()"
+                    ></app-button>
+                  </div>
+                </div>
+              </div>
+            </ng-template>
+          </div>
         </section>
 
         <section
@@ -686,6 +785,14 @@ export class AdminDashboardComponent implements OnInit {
   auditEntity: AdminAuditEntity = 'all';
   auditAction = '';
   auditUser = '';
+  auditExportRedact = true;
+  auditRetentionLoading = signal(false);
+  auditRetentionError = signal('');
+  auditRetention = signal<AdminAuditRetentionResponse | null>(null);
+  auditRetentionConfirm = '';
+  auditRetentionDryRun = true;
+  auditRetentionPurgeLoading = false;
+  auditRetentionPurgeError = '';
 
   scheduledLoading = signal(false);
   scheduledError = signal('');
@@ -711,6 +818,7 @@ export class AdminDashboardComponent implements OnInit {
     this.loadSummary();
     this.loadScheduledTasks();
     this.loadAudit(1);
+    this.loadAuditRetention();
   }
 
   isOwner(): boolean {
@@ -1027,6 +1135,53 @@ export class AdminDashboardComponent implements OnInit {
       });
   }
 
+  loadAuditRetention(): void {
+    this.auditRetentionLoading.set(true);
+    this.auditRetentionError.set('');
+    this.admin.auditRetention().subscribe({
+      next: (resp) => {
+        this.auditRetention.set(resp);
+        this.auditRetentionLoading.set(false);
+      },
+      error: () => {
+        this.auditRetention.set(null);
+        this.auditRetentionError.set(this.translate.instant('adminUi.audit.retention.errors.load'));
+        this.auditRetentionLoading.set(false);
+      }
+    });
+  }
+
+  auditRetentionConfirmOk(): boolean {
+    return (this.auditRetentionConfirm || '').trim().toUpperCase() === 'PURGE';
+  }
+
+  purgeAuditRetention(): void {
+    if (!this.isOwner()) return;
+    this.auditRetentionPurgeError = '';
+    this.auditRetentionPurgeLoading = true;
+    this.admin
+      .purgeAuditRetention({ confirm: this.auditRetentionConfirm, dry_run: this.auditRetentionDryRun })
+      .subscribe({
+        next: (resp) => {
+          this.auditRetentionPurgeLoading = false;
+          this.auditRetention.set(resp);
+          this.auditRetentionConfirm = '';
+          const deleted =
+            (resp.deleted?.product || 0) + (resp.deleted?.content || 0) + (resp.deleted?.security || 0);
+          this.toast.success(
+            this.translate.instant('adminUi.audit.retention.successTitle'),
+            this.translate.instant(resp.dry_run ? 'adminUi.audit.retention.successDryRunCopy' : 'adminUi.audit.retention.successCopy', {
+              deleted
+            })
+          );
+        },
+        error: () => {
+          this.auditRetentionPurgeLoading = false;
+          this.auditRetentionPurgeError = this.translate.instant('adminUi.audit.retention.errors.purge');
+        }
+      });
+  }
+
   applyAuditFilters(): void {
     this.loadAudit(1);
   }
@@ -1103,11 +1258,13 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   downloadAuditCsv(): void {
+    const redact = this.isOwner() ? this.auditExportRedact : true;
     this.admin
       .exportAuditCsv({
         entity: this.auditEntity,
         action: (this.auditAction || '').trim() || undefined,
         user: (this.auditUser || '').trim() || undefined,
+        redact,
       })
       .subscribe({
         next: (blob) => {

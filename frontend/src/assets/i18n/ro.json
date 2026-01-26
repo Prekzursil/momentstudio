@@ -3642,6 +3642,27 @@
       "entityAll": "Toate",
       "export": "Export CSV",
       "exportLimitNote": "Limitare: 5.000 intrări",
+      "redactLabel": "Anonimizează datele personale",
+      "redactLocked": "Doar proprietarul poate exporta jurnalul fără anonimizare.",
+      "retention": {
+        "title": "Retenție",
+        "hint": "Șterge intrările vechi pe baza zilelor de retenție configurate.",
+        "refresh": "Reîncarcă",
+        "enabled": "Păstrează {{days}} zile",
+        "disabled": "Dezactivat",
+        "counts": "{{total}} total · {{expired}} expirate",
+        "confirmLabel": "Tastează pentru confirmare",
+        "confirmPlaceholder": "PURGE",
+        "dryRun": "Simulare",
+        "run": "Rulează curățarea",
+        "successTitle": "Retenție audit",
+        "successCopy": "Șterse {{deleted}} intrări.",
+        "successDryRunCopy": "Simulare: ar șterge {{deleted}} intrări.",
+        "errors": {
+          "load": "Nu am putut încărca statusul retenției.",
+          "purge": "Nu am putut șterge intrările de audit."
+        }
+      },
       "filters": {
         "entity": "Entitate",
         "action": "Acțiune conține",

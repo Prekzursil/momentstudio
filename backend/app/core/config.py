@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     account_deletion_cooldown_hours: int = 24
     gdpr_export_sla_days: int = 30
     gdpr_deletion_sla_days: int = 30
+    audit_retention_days_product: int = 0
+    audit_retention_days_content: int = 0
+    audit_retention_days_security: int = 0
+    audit_hash_chain_enabled: bool = False
+    audit_hash_chain_secret: str | None = None
     secure_cookies: bool = False
     cookie_samesite: str = "lax"
     maintenance_mode: bool = False

@@ -29,7 +29,7 @@ from app.models.coupons_v2 import (
     PromotionScopeMode,
 )
 from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod
-from app.models.user import AdminAuditLog, User
+from app.models.user import User
 from app.schemas.coupons_v2 import (
     CouponAssignRequest,
     CouponAssignmentRead,
@@ -61,6 +61,7 @@ from app.schemas.coupons_v2 import (
 from app.services import checkout_settings as checkout_settings_service
 from app.services import coupons_v2 as coupons_service
 from app.services import email as email_service
+from app.services import audit_chain as audit_chain_service
 from app.services import pricing
 from app.services import cart as cart_service
 from app.api.v1 import cart as cart_api
@@ -656,17 +657,16 @@ async def admin_issue_coupon_to_user(
     session.add(coupon)
     await session.flush()
     session.add(CouponAssignment(coupon_id=coupon.id, user_id=user.id))
-    session.add(
-        AdminAuditLog(
-            action="coupon_issued",
-            actor_user_id=getattr(actor, "id", None),
-            subject_user_id=user.id,
-            data={
-                "promotion_id": str(promotion.id),
-                "coupon_id": str(coupon.id),
-                "code": coupon.code,
-            },
-        )
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="coupon_issued",
+        actor_user_id=getattr(actor, "id", None),
+        subject_user_id=user.id,
+        data={
+            "promotion_id": str(promotion.id),
+            "coupon_id": str(coupon.id),
+            "code": coupon.code,
+        },
     )
     await session.commit()
 

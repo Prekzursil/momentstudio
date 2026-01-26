@@ -124,6 +124,8 @@ class ContentAuditLog(Base):
     action: Mapped[str] = mapped_column(String(120), nullable=False)
     version: Mapped[int] = mapped_column(nullable=False)
     user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    chain_prev_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    chain_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     block: Mapped[ContentBlock] = relationship("ContentBlock", back_populates="audits")

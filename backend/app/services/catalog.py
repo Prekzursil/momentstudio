@@ -32,7 +32,6 @@ from app.models.catalog import (
     ProductReview,
     ProductSlugHistory,
     RecentlyViewedProduct,
-    ProductAuditLog,
     FeaturedCollection,
 )
 from app.models.cart import CartItem
@@ -62,6 +61,7 @@ from app.schemas.catalog import (
 from app.services.storage import get_media_image_stats, regenerate_media_thumbnails
 from app.services import email as email_service
 from app.services import auth as auth_service
+from app.services import audit_chain as audit_chain_service
 from app.services import notifications as notifications_service
 from app.services import pricing
 from app.core.config import settings
@@ -621,13 +621,13 @@ def _sync_sale_fields(product: Product) -> None:
 async def _log_product_action(
     session: AsyncSession, product_id: uuid.UUID, action: str, user_id: uuid.UUID | None, payload: dict | None
 ) -> None:
-    audit = ProductAuditLog(
+    await audit_chain_service.add_product_audit_log(
+        session,
         product_id=product_id,
         user_id=user_id,
         action=action,
         payload=json.dumps(payload, default=str) if payload else None,
     )
-    session.add(audit)
     await session.commit()
 
 

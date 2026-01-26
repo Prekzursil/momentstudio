@@ -247,6 +247,8 @@ class AdminAuditLog(Base):
     actor_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     subject_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    chain_prev_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    chain_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     actor: Mapped[User | None] = relationship("User", foreign_keys=[actor_user_id], lazy="joined")

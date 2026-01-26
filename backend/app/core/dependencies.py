@@ -32,6 +32,7 @@ _SECTION_ROLES: dict[str, set[UserRole]] = {
         UserRole.fulfillment,
         UserRole.content,
     },
+    "audit": {UserRole.owner, UserRole.admin},
     "content": {UserRole.owner, UserRole.admin, UserRole.content},
     "products": {UserRole.owner, UserRole.admin, UserRole.content},
     "inventory": {UserRole.owner, UserRole.admin, UserRole.fulfillment},

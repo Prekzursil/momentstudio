@@ -1,6 +1,8 @@
 import csv
 import io
+import re
 from datetime import date, datetime, timedelta, timezone
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, Request, Response, status
@@ -62,6 +64,7 @@ from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.coupons_v2 import Promotion
 from app.models.user_export import UserDataExportJob, UserDataExportStatus
 from app.services import auth as auth_service
+from app.services import audit_chain as audit_chain_service
 from app.services import email as email_service
 from app.services import private_storage
 from app.services import user_export as user_export_service
@@ -1459,7 +1462,8 @@ async def admin_update_coupon(
 
 @router.get("/audit")
 async def admin_audit(
-    session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("audit")),
 ) -> dict:
     product_audit_stmt = (
         select(ProductAuditLog)
@@ -1647,10 +1651,49 @@ def _audit_filters(
     return filters
 
 
+_AUDIT_EMAIL_RE = re.compile(r"(?i)(?<![\w.+-])([\w.+-]{1,64})@([\w-]{1,255}(?:\.[\w-]{2,})+)")
+_AUDIT_IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+_AUDIT_IPV6_RE = re.compile(r"\b(?:[0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}\b")
+_AUDIT_CSV_FORMULA_PREFIXES = ("=", "+", "-", "@")
+
+
+def _audit_mask_email(value: str) -> str:
+    raw = (value or "").strip()
+    if not raw or "@" not in raw:
+        return raw
+    local, _, domain = raw.partition("@")
+    if not local or not domain:
+        return raw
+    if len(local) <= 1:
+        masked_local = "*"
+    else:
+        masked_local = f"{local[0]}{'*' * (min(len(local) - 1, 8))}"
+    return f"{masked_local}@{domain}"
+
+
+def _audit_redact_text(value: str) -> str:
+    text = value or ""
+
+    def _mask(match: re.Match) -> str:
+        return _audit_mask_email(match.group(0))
+
+    text = _AUDIT_EMAIL_RE.sub(_mask, text)
+    text = _AUDIT_IPV4_RE.sub("***.***.***.***", text)
+    text = _AUDIT_IPV6_RE.sub("****:****:****:****", text)
+    return text
+
+
+def _audit_csv_cell(value: str) -> str:
+    cleaned = (value or "").replace("\n", " ").replace("\r", " ").strip()
+    if cleaned and cleaned[0] in _AUDIT_CSV_FORMULA_PREFIXES:
+        return f"'{cleaned}"
+    return cleaned
+
+
 @router.get("/audit/entries")
 async def admin_audit_entries(
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: User = Depends(require_admin_section("audit")),
     entity: str | None = Query(
         default="all", pattern="^(all|product|content|security)$"
     ),
@@ -1707,13 +1750,20 @@ async def admin_audit_entries(
 @router.get("/audit/export.csv")
 async def admin_audit_export_csv(
     session: AsyncSession = Depends(get_session),
-    _: str = Depends(require_admin),
+    current_user: User = Depends(require_admin_section("audit")),
     entity: str | None = Query(
         default="all", pattern="^(all|product|content|security)$"
     ),
     action: str | None = Query(default=None, max_length=120),
     user: str | None = Query(default=None, max_length=255),
+    redact: bool = Query(default=True),
 ) -> Response:
+    if not redact and current_user.role != UserRole.owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Owner access required for unredacted exports",
+        )
+
     audit = _audit_union_subquery()
     filters = _audit_filters(audit, entity=entity, action=action, user=user)
 
@@ -1743,18 +1793,27 @@ async def admin_audit_export_csv(
     )
     for row in rows:
         created_at = row.get("created_at")
+        actor_email = str(row.get("actor_email") or "")
+        subject_email = str(row.get("subject_email") or "")
+        data_raw = str(row.get("data") or "")
+
+        if redact:
+            actor_email = _audit_mask_email(actor_email)
+            subject_email = _audit_mask_email(subject_email)
+            data_raw = _audit_redact_text(data_raw)
+
         writer.writerow(
             [
                 created_at.isoformat() if isinstance(created_at, datetime) else "",
-                row.get("entity") or "",
-                row.get("action") or "",
-                row.get("actor_email") or "",
-                row.get("subject_email") or "",
-                row.get("ref_key") or "",
-                row.get("ref_id") or "",
-                row.get("actor_user_id") or "",
-                row.get("subject_user_id") or "",
-                (row.get("data") or "").replace("\n", " ").replace("\r", " "),
+                _audit_csv_cell(str(row.get("entity") or "")),
+                _audit_csv_cell(str(row.get("action") or "")),
+                _audit_csv_cell(actor_email),
+                _audit_csv_cell(subject_email),
+                _audit_csv_cell(str(row.get("ref_key") or "")),
+                _audit_csv_cell(str(row.get("ref_id") or "")),
+                _audit_csv_cell(str(row.get("actor_user_id") or "")),
+                _audit_csv_cell(str(row.get("subject_user_id") or "")),
+                _audit_csv_cell(data_raw),
             ]
         )
 
@@ -1766,6 +1825,121 @@ async def admin_audit_export_csv(
             "Content-Disposition": f'attachment; filename="{filename}"',
         },
     )
+
+
+def _audit_retention_policies(now: datetime) -> dict[str, dict]:
+    policies = {
+        "product": int(getattr(settings, "audit_retention_days_product", 0) or 0),
+        "content": int(getattr(settings, "audit_retention_days_content", 0) or 0),
+        "security": int(getattr(settings, "audit_retention_days_security", 0) or 0),
+    }
+    out: dict[str, dict] = {}
+    for key, days in policies.items():
+        enabled = days > 0
+        cutoff = now - timedelta(days=days) if enabled else None
+        out[key] = {"days": days, "enabled": enabled, "cutoff": cutoff.isoformat() if cutoff else None}
+    return out
+
+
+async def _audit_retention_counts(session: AsyncSession, model: Any, cutoff: datetime | None) -> dict:
+    table = model.__table__
+    total = await session.scalar(select(func.count()).select_from(table))
+    total_int = int(total or 0)
+    expired_int = 0
+    if cutoff is not None:
+        expired = await session.scalar(
+            select(func.count()).select_from(table).where(table.c.created_at < cutoff)
+        )
+        expired_int = int(expired or 0)
+    return {"total": total_int, "expired": expired_int}
+
+
+@router.get("/audit/retention")
+async def admin_audit_retention(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("audit")),
+) -> dict:
+    now = datetime.now(timezone.utc)
+    policies = _audit_retention_policies(now)
+    counts = {
+        "product": await _audit_retention_counts(session, ProductAuditLog, _iso_to_dt(policies["product"]["cutoff"])),
+        "content": await _audit_retention_counts(session, ContentAuditLog, _iso_to_dt(policies["content"]["cutoff"])),
+        "security": await _audit_retention_counts(session, AdminAuditLog, _iso_to_dt(policies["security"]["cutoff"])),
+    }
+    return {"now": now.isoformat(), "policies": policies, "counts": counts}
+
+
+def _iso_to_dt(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except Exception:
+        return None
+
+
+@router.post("/audit/retention/purge")
+async def admin_audit_retention_purge(
+    payload: dict = Body(default_factory=dict),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("audit")),
+) -> dict:
+    if current_user.role != UserRole.owner:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner access required")
+    confirm = str(payload.get("confirm") or "").strip()
+    if confirm.upper() != "PURGE":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Type "PURGE" to confirm')
+    dry_run = bool(payload.get("dry_run"))
+
+    now = datetime.now(timezone.utc)
+    policies = _audit_retention_policies(now)
+    cutoffs = {
+        "product": _iso_to_dt(policies["product"]["cutoff"]),
+        "content": _iso_to_dt(policies["content"]["cutoff"]),
+        "security": _iso_to_dt(policies["security"]["cutoff"]),
+    }
+
+    counts = {
+        "product": await _audit_retention_counts(session, ProductAuditLog, cutoffs["product"]),
+        "content": await _audit_retention_counts(session, ContentAuditLog, cutoffs["content"]),
+        "security": await _audit_retention_counts(session, AdminAuditLog, cutoffs["security"]),
+    }
+
+    deleted: dict[str, int] = {"product": 0, "content": 0, "security": 0}
+    if not dry_run:
+        for key, model in (
+            ("product", ProductAuditLog),
+            ("content", ContentAuditLog),
+            ("security", AdminAuditLog),
+        ):
+            cutoff = cutoffs[key]
+            expired = int(counts[key]["expired"] or 0)
+            if cutoff is None or expired <= 0:
+                continue
+            table = model.__table__
+            await session.execute(delete(table).where(table.c.created_at < cutoff))
+            deleted[key] = expired
+
+        await audit_chain_service.add_admin_audit_log(
+            session,
+            action="audit.retention.purge",
+            actor_user_id=current_user.id,
+            subject_user_id=None,
+            data={
+                "dry_run": dry_run,
+                "deleted": deleted,
+                "policies": {k: v["days"] for k, v in policies.items()},
+            },
+        )
+        await session.commit()
+
+    return {
+        "dry_run": dry_run,
+        "now": now.isoformat(),
+        "policies": policies,
+        "counts": counts,
+        "deleted": deleted,
+    }
 
 
 @router.post("/sessions/{user_id}/revoke", status_code=status.HTTP_204_NO_CONTENT)
@@ -1791,17 +1965,16 @@ async def revoke_sessions(
         s.revoked_reason = "admin-forced"
     if sessions:
         session.add_all(sessions)
-        session.add(
-            AdminAuditLog(
-                action="user.sessions.revoke_all",
-                actor_user_id=current_user.id,
-                subject_user_id=user.id,
-                data={
-                    "revoked_count": len(sessions),
-                    "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
-                    "ip_address": (request.client.host if request.client else None),
-                },
-            )
+        await audit_chain_service.add_admin_audit_log(
+            session,
+            action="user.sessions.revoke_all",
+            actor_user_id=current_user.id,
+            subject_user_id=user.id,
+            data={
+                "revoked_count": len(sessions),
+                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+                "ip_address": (request.client.host if request.client else None),
+            },
         )
         await session.commit()
     return None
@@ -1872,17 +2045,16 @@ async def admin_revoke_user_session(
         row.revoked = True
         row.revoked_reason = "admin-forced"
         session.add(row)
-        session.add(
-            AdminAuditLog(
-                action="user.sessions.revoke_one",
-                actor_user_id=current_user.id,
-                subject_user_id=user.id,
-                data={
-                    "refresh_session_id": str(row.id),
-                    "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
-                    "ip_address": (request.client.host if request.client else None),
-                },
-            )
+        await audit_chain_service.add_admin_audit_log(
+            session,
+            action="user.sessions.revoke_one",
+            actor_user_id=current_user.id,
+            subject_user_id=user.id,
+            data={
+                "refresh_session_id": str(row.id),
+                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+                "ip_address": (request.client.host if request.client else None),
+            },
         )
         await session.commit()
 
@@ -2004,17 +2176,16 @@ async def admin_gdpr_retry_export_job(
     job.expires_at = None
     job.file_path = None
     session.add(job)
-    session.add(
-        AdminAuditLog(
-            action="gdpr.export.retry",
-            actor_user_id=current_user.id,
-            subject_user_id=user.id,
-            data={
-                "job_id": str(job.id),
-                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
-                "ip_address": (request.client.host if request.client else None),
-            },
-        )
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="gdpr.export.retry",
+        actor_user_id=current_user.id,
+        subject_user_id=user.id,
+        data={
+            "job_id": str(job.id),
+            "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+            "ip_address": (request.client.host if request.client else None),
+        },
     )
     await session.commit()
 
@@ -2068,17 +2239,16 @@ async def admin_gdpr_download_export_job(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    session.add(
-        AdminAuditLog(
-            action="gdpr.export.download",
-            actor_user_id=current_user.id,
-            subject_user_id=user.id,
-            data={
-                "job_id": str(job.id),
-                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
-                "ip_address": (request.client.host if request.client else None),
-            },
-        )
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="gdpr.export.download",
+        actor_user_id=current_user.id,
+        subject_user_id=user.id,
+        data={
+            "job_id": str(job.id),
+            "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+            "ip_address": (request.client.host if request.client else None),
+        },
     )
     await session.commit()
 
@@ -2181,17 +2351,16 @@ async def admin_gdpr_execute_deletion(
 
     email_before = user.email
     await self_service.execute_account_deletion(session, user)
-    session.add(
-        AdminAuditLog(
-            action="gdpr.deletion.execute",
-            actor_user_id=current_user.id,
-            subject_user_id=user.id,
-            data={
-                "email_before": email_before,
-                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
-                "ip_address": (request.client.host if request.client else None),
-            },
-        )
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="gdpr.deletion.execute",
+        actor_user_id=current_user.id,
+        subject_user_id=user.id,
+        data={
+            "email_before": email_before,
+            "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+            "ip_address": (request.client.host if request.client else None),
+        },
     )
     await session.commit()
     return None
@@ -2221,16 +2390,15 @@ async def admin_gdpr_cancel_deletion(
         user.deletion_requested_at = None
         user.deletion_scheduled_for = None
         session.add(user)
-        session.add(
-            AdminAuditLog(
-                action="gdpr.deletion.cancel",
-                actor_user_id=current_user.id,
-                subject_user_id=user.id,
-                data={
-                    "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
-                    "ip_address": (request.client.host if request.client else None),
-                },
-            )
+        await audit_chain_service.add_admin_audit_log(
+            session,
+            action="gdpr.deletion.cancel",
+            actor_user_id=current_user.id,
+            subject_user_id=user.id,
+            data={
+                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+                "ip_address": (request.client.host if request.client else None),
+            },
         )
         await session.commit()
     return None
@@ -2316,13 +2484,12 @@ async def update_user_internal(
     session.add(user)
     await session.flush()
     if changes:
-        session.add(
-            AdminAuditLog(
-                action="user.internal.update",
-                actor_user_id=current_user.id,
-                subject_user_id=user.id,
-                data={"changes": changes},
-            )
+        await audit_chain_service.add_admin_audit_log(
+            session,
+            action="user.internal.update",
+            actor_user_id=current_user.id,
+            subject_user_id=user.id,
+            data={"changes": changes},
         )
     await session.commit()
 
@@ -2406,17 +2573,16 @@ async def update_user_security(
     session.add(user)
     await session.flush()
     if changes:
-        session.add(
-            AdminAuditLog(
-                action="user.security.update",
-                actor_user_id=current_user.id,
-                subject_user_id=user.id,
-                data={
-                    "changes": changes,
-                    "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
-                    "ip_address": (request.client.host if request.client else None),
-                },
-            )
+        await audit_chain_service.add_admin_audit_log(
+            session,
+            action="user.security.update",
+            actor_user_id=current_user.id,
+            subject_user_id=user.id,
+            data={
+                "changes": changes,
+                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+                "ip_address": (request.client.host if request.client else None),
+            },
         )
     await session.commit()
 
@@ -2488,18 +2654,17 @@ async def resend_email_verification(
         record.token,
         user.preferred_language,
     )
-    session.add(
-        AdminAuditLog(
-            action="user.email_verification.resend",
-            actor_user_id=current_user.id,
-            subject_user_id=user.id,
-            data={
-                "verification_token_id": str(record.id),
-                "expires_at": record.expires_at.isoformat() if record.expires_at else None,
-                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
-                "ip_address": (request.client.host if request.client else None),
-            },
-        )
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="user.email_verification.resend",
+        actor_user_id=current_user.id,
+        subject_user_id=user.id,
+        data={
+            "verification_token_id": str(record.id),
+            "expires_at": record.expires_at.isoformat() if record.expires_at else None,
+            "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+            "ip_address": (request.client.host if request.client else None),
+        },
     )
     await session.commit()
     return {"detail": "Verification email sent"}
@@ -2534,18 +2699,17 @@ async def override_email_verification(
     session.add(user)
     await session.flush()
     if before_verified != bool(getattr(user, "email_verified", False)):
-        session.add(
-            AdminAuditLog(
-                action="user.email_verification.override",
-                actor_user_id=current_user.id,
-                subject_user_id=user.id,
-                data={
-                    "before": before_verified,
-                    "after": bool(getattr(user, "email_verified", False)),
-                    "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
-                    "ip_address": (request.client.host if request.client else None),
-                },
-            )
+        await audit_chain_service.add_admin_audit_log(
+            session,
+            action="user.email_verification.override",
+            actor_user_id=current_user.id,
+            subject_user_id=user.id,
+            data={
+                "before": before_verified,
+                "after": bool(getattr(user, "email_verified", False)),
+                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+                "ip_address": (request.client.host if request.client else None),
+            },
         )
     await session.commit()
 
@@ -2587,17 +2751,16 @@ async def impersonate_user(
         expires_minutes=expires_minutes,
     )
 
-    session.add(
-        AdminAuditLog(
-            action="user.impersonation.start",
-            actor_user_id=current_user.id,
-            subject_user_id=user.id,
-            data={
-                "expires_minutes": expires_minutes,
-                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
-                "ip_address": (request.client.host if request.client else None),
-            },
-        )
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="user.impersonation.start",
+        actor_user_id=current_user.id,
+        subject_user_id=user.id,
+        data={
+            "expires_minutes": expires_minutes,
+            "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+            "ip_address": (request.client.host if request.client else None),
+        },
     )
     await session.commit()
 
@@ -2650,17 +2813,16 @@ async def transfer_owner(
 
     target.role = UserRole.owner
     session.add(target)
-    session.add(
-        AdminAuditLog(
-            action="owner_transfer",
-            actor_user_id=current_owner.id,
-            subject_user_id=target.id,
-            data={
-                "identifier": identifier,
-                "old_owner_id": str(current_owner.id),
-                "new_owner_id": str(target.id),
-            },
-        )
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="owner_transfer",
+        actor_user_id=current_owner.id,
+        subject_user_id=target.id,
+        data={
+            "identifier": identifier,
+            "old_owner_id": str(current_owner.id),
+            "new_owner_id": str(target.id),
+        },
     )
     await session.commit()
     await session.refresh(target)

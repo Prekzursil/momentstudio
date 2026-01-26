@@ -327,6 +327,28 @@ export interface AdminAuditEntriesResponse {
   };
 }
 
+export interface AdminAuditRetentionPolicy {
+  days: number;
+  enabled: boolean;
+  cutoff: string | null;
+}
+
+export interface AdminAuditRetentionCounts {
+  total: number;
+  expired: number;
+}
+
+export interface AdminAuditRetentionResponse {
+  now: string;
+  policies: Record<'product' | 'content' | 'security', AdminAuditRetentionPolicy>;
+  counts: Record<'product' | 'content' | 'security', AdminAuditRetentionCounts>;
+}
+
+export interface AdminAuditRetentionPurgeResponse extends AdminAuditRetentionResponse {
+  dry_run: boolean;
+  deleted: Record<'product' | 'content' | 'security', number>;
+}
+
 export interface AdminAuditItem {
   id: string;
   product_id?: string;
@@ -635,8 +657,16 @@ export class AdminService {
     return this.api.get<AdminAuditEntriesResponse>('/admin/dashboard/audit/entries', params);
   }
 
-  exportAuditCsv(params: { entity?: AdminAuditEntity; action?: string; user?: string }): Observable<Blob> {
+  exportAuditCsv(params: { entity?: AdminAuditEntity; action?: string; user?: string; redact?: boolean }): Observable<Blob> {
     return this.api.getBlob('/admin/dashboard/audit/export.csv', params);
+  }
+
+  auditRetention(): Observable<AdminAuditRetentionResponse> {
+    return this.api.get<AdminAuditRetentionResponse>('/admin/dashboard/audit/retention');
+  }
+
+  purgeAuditRetention(payload: { confirm: string; dry_run?: boolean }): Observable<AdminAuditRetentionPurgeResponse> {
+    return this.api.post<AdminAuditRetentionPurgeResponse>('/admin/dashboard/audit/retention/purge', payload);
   }
 
   transferOwner(payload: { identifier: string; confirm: string; password: string }): Observable<OwnerTransferResponse> {

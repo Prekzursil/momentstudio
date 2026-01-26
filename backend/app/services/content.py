@@ -12,7 +12,6 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.models.content import (
-    ContentAuditLog,
     ContentBlock,
     ContentBlockVersion,
     ContentBlockTranslation,
@@ -23,6 +22,7 @@ from app.models.content import (
 from app.models.catalog import Category, Product, ProductStatus
 from app.schemas.content import ContentLinkCheckIssue, ContentTranslationStatusUpdate
 from app.schemas.content import ContentBlockCreate, ContentBlockUpdate
+from app.services import audit_chain as audit_chain_service
 from app.services import storage
 
 
@@ -241,13 +241,12 @@ async def rename_page_slug(
         session.add(ContentRedirect(from_key=old_key, to_key=new_key))
 
     if actor_id is not None:
-        session.add(
-            ContentAuditLog(
-                content_block_id=block.id,
-                action=f"rename:{old_norm}->{new_norm}",
-                version=block.version,
-                user_id=actor_id,
-            )
+        await audit_chain_service.add_content_audit_log(
+            session,
+            content_block_id=block.id,
+            action=f"rename:{old_norm}->{new_norm}",
+            version=block.version,
+            user_id=actor_id,
         )
 
     await session.commit()
@@ -314,8 +313,14 @@ async def upsert_block(
             published_until=block.published_until,
             translations=[],
         )
-        audit = ContentAuditLog(content_block_id=block.id, action="created", version=block.version, user_id=actor_id)
-        session.add_all([version_row, audit])
+        session.add(version_row)
+        await audit_chain_service.add_content_audit_log(
+            session,
+            content_block_id=block.id,
+            action="created",
+            version=block.version,
+            user_id=actor_id,
+        )
         await session.commit()
         await session.refresh(block)
         return block
@@ -367,8 +372,14 @@ async def upsert_block(
             published_until=block.published_until,
             translations=translations_snapshot,
         )
-        audit = ContentAuditLog(content_block_id=block.id, action=f"translated:{lang}", version=block.version, user_id=actor_id)
-        session.add_all([version_row, audit])
+        session.add(version_row)
+        await audit_chain_service.add_content_audit_log(
+            session,
+            content_block_id=block.id,
+            action=f"translated:{lang}",
+            version=block.version,
+            user_id=actor_id,
+        )
         await session.commit()
         await session.refresh(block)
         await session.refresh(block, attribute_names=["translations"])
@@ -427,8 +438,14 @@ async def upsert_block(
         published_until=block.published_until,
         translations=translations_snapshot,
     )
-    audit = ContentAuditLog(content_block_id=block.id, action="updated", version=block.version, user_id=actor_id)
-    session.add_all([version_row, audit])
+    session.add(version_row)
+    await audit_chain_service.add_content_audit_log(
+        session,
+        content_block_id=block.id,
+        action="updated",
+        version=block.version,
+        user_id=actor_id,
+    )
     await session.commit()
     await session.refresh(block)
     return block
@@ -440,8 +457,14 @@ async def add_image(session: AsyncSession, block: ContentBlock, file, actor_id: 
     )
     next_sort = (max([img.sort_order for img in block.images], default=0) or 0) + 1
     image = ContentImage(content_block_id=block.id, url=path, alt_text=filename, sort_order=next_sort)
-    audit = ContentAuditLog(content_block_id=block.id, action="image_upload", version=block.version, user_id=actor_id)
-    session.add_all([image, audit])
+    session.add(image)
+    await audit_chain_service.add_content_audit_log(
+        session,
+        content_block_id=block.id,
+        action="image_upload",
+        version=block.version,
+        user_id=actor_id,
+    )
     await session.commit()
     await session.refresh(block, attribute_names=["images", "audits"])
     return block
@@ -469,13 +492,12 @@ async def set_translation_status(
 
     session.add(block)
     if actor_id is not None:
-        session.add(
-            ContentAuditLog(
-                content_block_id=block.id,
-                action="translation_status",
-                version=block.version,
-                user_id=actor_id,
-            )
+        await audit_chain_service.add_content_audit_log(
+            session,
+            content_block_id=block.id,
+            action="translation_status",
+            version=block.version,
+            user_id=actor_id,
         )
     await session.commit()
     await session.refresh(block)
@@ -559,13 +581,14 @@ async def rollback_to_version(
         published_until=block.published_until,
         translations=translations_snapshot,
     )
-    audit = ContentAuditLog(
+    session.add(version_row)
+    await audit_chain_service.add_content_audit_log(
+        session,
         content_block_id=block.id,
         action=f"rollback:{snapshot.version}",
         version=block.version,
         user_id=actor_id,
     )
-    session.add_all([version_row, audit])
     await session.commit()
     await session.refresh(block)
     await session.refresh(block, attribute_names=["images", "audits"])
