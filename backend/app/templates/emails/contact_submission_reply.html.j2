@@ -1,0 +1,50 @@
+<h2 style="margin:0 0 12px 0;">
+  {% if lang == "ro" %}Răspuns la mesajul tău{% else %}Reply to your message{% endif %}
+</h2>
+
+<p style="margin:0 0 12px 0;">
+  {% if lang == "ro" %}Salut{% else %}Hi{% endif %} <strong>{{ customer_name }}</strong>,
+</p>
+
+<p style="margin:0 0 12px 0;">
+  {% if lang == "ro" %}
+    Am răspuns la solicitarea ta. Păstrează acest email pentru referință.
+  {% else %}
+    We replied to your request. Keep this email for your records.
+  {% endif %}
+</p>
+
+{% if topic %}
+  <p style="margin:0 0 8px 0;">
+    <strong>{% if lang == "ro" %}Tip{% else %}Topic{% endif %}:</strong>
+    {{ topic }}
+  </p>
+{% endif %}
+
+{% if order_reference %}
+  <p style="margin:0 0 8px 0;">
+    <strong>{% if lang == "ro" %}Comandă{% else %}Order{% endif %}:</strong>
+    {{ order_reference }}
+  </p>
+{% endif %}
+
+{% if reference %}
+  <p style="margin:0 0 8px 0;">
+    <strong>{% if lang == "ro" %}Referință{% else %}Reference{% endif %}:</strong>
+    {{ reference }}
+  </p>
+{% endif %}
+
+<hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0;" />
+
+<pre style="white-space:pre-wrap;margin:0;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">
+{{ reply_message }}
+</pre>
+
+{% if contact_url %}
+  <p style="margin:16px 0 0 0;">
+    <a href="{{ contact_url }}">
+      {% if lang == "ro" %}Trimite un nou mesaj{% else %}Send a new message{% endif %}
+    </a>
+  </p>
+{% endif %}

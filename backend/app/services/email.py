@@ -1094,6 +1094,62 @@ async def send_contact_submission_notification(
     return await send_email(to_email, subject, text_body, html_body)
 
 
+async def send_contact_submission_reply(
+    to_email: str,
+    *,
+    customer_name: str,
+    reply_message: str,
+    topic: str | None = None,
+    order_reference: str | None = None,
+    reference: str | None = None,
+    contact_url: str | None = None,
+    lang: str | None = None,
+) -> bool:
+    subject = _bilingual_subject("Răspuns la solicitarea ta", "Reply to your request", preferred_language=lang)
+    safe_name = (customer_name or "").strip() or "Customer"
+    if env is None:
+        ro_lines = ["Răspuns la mesajul tău", f"Salut {safe_name},", ""]
+        en_lines = ["Reply to your message", f"Hi {safe_name},", ""]
+        if topic:
+            ro_lines.append(f"Tip: {topic}")
+            en_lines.append(f"Topic: {topic}")
+        if order_reference:
+            ro_lines.append(f"Comandă: {order_reference}")
+            en_lines.append(f"Order: {order_reference}")
+        if reference:
+            ro_lines.append(f"Referință: {reference}")
+            en_lines.append(f"Reference: {reference}")
+        ro_lines.extend(["", reply_message])
+        en_lines.extend(["", reply_message])
+        if contact_url:
+            ro_lines.extend(["", f"Ajutor: {contact_url}"])
+            en_lines.extend(["", f"Help: {contact_url}"])
+        text_ro = "\n".join(ro_lines)
+        text_en = "\n".join(en_lines)
+        text_body, html_body = _bilingual_sections(
+            text_ro=text_ro,
+            text_en=text_en,
+            html_ro=_html_pre(text_ro),
+            html_en=_html_pre(text_en),
+            preferred_language=lang,
+        )
+        return await send_email(to_email, subject, text_body, html_body)
+
+    text_body, html_body = render_bilingual_template(
+        "contact_submission_reply.txt.j2",
+        {
+            "customer_name": safe_name,
+            "reply_message": reply_message,
+            "topic": topic,
+            "order_reference": order_reference,
+            "reference": reference,
+            "contact_url": contact_url,
+        },
+        preferred_language=lang,
+    )
+    return await send_email(to_email, subject, text_body, html_body)
+
+
 async def send_return_request_created(to_email: str, return_request, *, lang: str | None = None) -> bool:
     subject = _bilingual_subject("Cerere de retur creată", "Return request created", preferred_language=lang)
     order_ref = getattr(getattr(return_request, "order", None), "reference_code", None) or str(

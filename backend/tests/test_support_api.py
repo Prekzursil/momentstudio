@@ -14,6 +14,7 @@ from app.models.notification import UserNotification
 from app.models.user import UserRole
 from app.schemas.user import UserCreate
 from app.services.auth import create_user, issue_tokens_for_user
+from app.services import email as email_service
 
 
 @pytest.fixture
@@ -134,6 +135,44 @@ def test_support_admin_update_requires_admin(test_app: Dict[str, object]) -> Non
     )
     assert ok.status_code == 200, ok.text
     assert ok.json()["status"] == "resolved"
+
+
+def test_support_guest_reply_sends_email(test_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token, _ = create_user_token(SessionLocal, email="admin-guest@example.com", role=UserRole.admin, username="admin_guest")
+
+    created = client.post(
+        "/api/v1/support/contact",
+        json={
+            "topic": "support",
+            "name": "Guest",
+            "email": "guest@example.com",
+            "message": "Hello",
+            "order_reference": "MS-555",
+        },
+    )
+    assert created.status_code == 201, created.text
+    submission_id = created.json()["id"]
+
+    sent: list[dict] = []
+
+    async def _fake_send_contact_submission_reply(to_email: str, **kwargs) -> bool:
+        sent.append({"to_email": to_email, **kwargs})
+        return True
+
+    monkeypatch.setattr(email_service, "send_contact_submission_reply", _fake_send_contact_submission_reply)
+
+    reply = client.post(
+        f"/api/v1/support/admin/submissions/{submission_id}/messages",
+        headers=auth_headers(admin_token),
+        json={"message": "Reply from staff"},
+    )
+    assert reply.status_code == 200, reply.text
+    assert len(sent) == 1
+    assert sent[0]["to_email"] == "guest@example.com"
+    assert sent[0]["reply_message"] == "Reply from staff"
 
 
 def test_support_ticket_thread_user_and_admin_reply(test_app: Dict[str, object]) -> None:

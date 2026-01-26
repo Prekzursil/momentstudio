@@ -771,7 +771,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Support: unified inbox filters – Filter by status, channel, customer, and assignee.
 - [x] Admin Support: assign/mention – Assign tickets and @mention other admins with notifications.
 - [x] Admin Support: canned responses – Template replies with variables and EN/RO variants.
-- [ ] Support: email guest submissions on staff replies (bilingual) so non-logged-in customers receive updates.
+- [x] Support: email guest submissions on staff replies (bilingual) so non-logged-in customers receive updates.
 - [ ] Admin Returns: RMA status board – Kanban view for returns pipeline (requested/approved/received/refunded).
 - [ ] Admin Returns: return label support – Upload/provide shipping labels for returns.
 - [ ] Admin Ops: maintenance banners – Schedule storefront announcement banners (planned downtime/promos).

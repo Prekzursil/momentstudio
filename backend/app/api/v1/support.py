@@ -327,6 +327,7 @@ async def admin_update_contact_submission(
 async def admin_reply_contact_submission(
     submission_id: UUID,
     payload: TicketMessageCreate,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("support")),
 ) -> ContactSubmissionRead:
@@ -340,4 +341,17 @@ async def admin_reply_contact_submission(
         from_admin=True,
         actor=admin,
     )
+    if not getattr(record, "user_id", None):
+        contact_url = f"{settings.frontend_origin.rstrip('/')}/contact"
+        background_tasks.add_task(
+            email_service.send_contact_submission_reply,
+            record.email,
+            customer_name=record.name,
+            topic=getattr(record.topic, "value", None) or str(record.topic),
+            order_reference=record.order_reference,
+            reference=str(record.id),
+            reply_message=payload.message,
+            contact_url=contact_url,
+            lang=None,
+        )
     return ContactSubmissionRead.model_validate(updated)
