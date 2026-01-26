@@ -8,7 +8,7 @@ from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.dependencies import get_session, require_admin_section
+from app.core.dependencies import get_current_user_optional, get_session, require_admin_section
 from app.models.content import ContentBlock, ContentBlockVersion, ContentImage, ContentRedirect, ContentImageTag
 from app.models.user import User
 from app.schemas.content import (
@@ -41,6 +41,11 @@ from app.services import structured_data as structured_data_service
 from app.services import social_thumbnails
 
 router = APIRouter(prefix="/content", tags=["content"])
+
+
+def _requires_auth(block: ContentBlock) -> bool:
+    meta = getattr(block, "meta", None) or {}
+    return bool(meta.get("requires_auth")) if isinstance(meta, dict) else False
 
 
 def _normalize_image_tags(tags: list[str]) -> list[str]:
@@ -104,6 +109,7 @@ async def get_static_page(
     slug: str,
     session: AsyncSession = Depends(get_session),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+    user: User | None = Depends(get_current_user_optional),
 ) -> ContentBlockRead:
     slug_value = content_service.slugify_page_slug(slug)
     if not slug_value:
@@ -112,6 +118,8 @@ async def get_static_page(
     block = await content_service.get_published_by_key_following_redirects(session, key, lang=lang)
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+    if _requires_auth(block) and not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     return block
 
 
@@ -120,10 +128,13 @@ async def get_content(
     key: str,
     session: AsyncSession = Depends(get_session),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+    user: User | None = Depends(get_current_user_optional),
 ) -> ContentBlockRead:
     block = await content_service.get_published_by_key_following_redirects(session, key, lang=lang)
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+    if getattr(block, "key", "").startswith("page.") and _requires_auth(block) and not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     return block
 
 

@@ -59,6 +59,12 @@
     "metaTitle": "Povestea noastră",
     "metaDescription": "Află povestea momentstudio și detalii despre arta noastră realizată manual."
   },
+  "page": {
+    "restricted": {
+      "title": "Este necesară autentificarea",
+      "copy": "Această pagină este disponibilă doar pentru utilizatorii autentificați."
+    }
+  },
   "contact": {
     "title": "Contact",
     "metaTitle": "Contact | momentstudio",
@@ -1706,6 +1712,8 @@
           "publishAtHint": "Dacă este în viitor și starea este Publicat, pagina va deveni vizibilă la acel moment.",
           "unpublishAtOptional": "Ascunde la (opțional)",
           "unpublishAtHint": "Dacă este setat, pagina va fi ascunsă după acest moment.",
+          "requiresLogin": "Necesită autentificare",
+          "requiresLoginHint": "Când este activat, doar utilizatorii autentificați pot vedea această pagină (nu va apărea în sitemap).",
           "changeUrlPrompt": "Noul URL (slug) pentru această pagină",
           "changeUrlConfirm": "Schimbi URL-ul din /pages/{{old}} în /pages/{{next}}? Linkurile existente vor redirecționa.",
           "addBlock": "Adaugă bloc",
@@ -1929,6 +1937,22 @@
         },
         "errors": {
           "generate": "Nu s-a putut genera linkul de previzualizare",
+          "copy": "Nu s-a putut copia în clipboard"
+        }
+      },
+      "social": {
+        "title": "Previzualizare socială",
+        "hint": "Previzualizează imaginile și URL-urile OpenGraph pe limbă (EN/RO). Pentru distribuire reală, platformele folosesc URL-ul publicat.",
+        "previewTokenTitle": "Token de previzualizare necesar pentru ciorne",
+        "previewTokenCopy": "Generează un link de previzualizare pentru a reda imaginile sociale pentru articole în Ciornă/În revizuire.",
+        "ogAlt": "Imagine previzualizare OpenGraph",
+        "pageUrl": "URL pagină",
+        "previewImageUrl": "URL imagine OG (previzualizare)",
+        "publishedImageUrl": "URL imagine OG (publicat)",
+        "success": {
+          "copied": "Copiat"
+        },
+        "errors": {
           "copy": "Nu s-a putut copia în clipboard"
         }
       },

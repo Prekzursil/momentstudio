@@ -59,6 +59,12 @@
     "metaTitle": "Our story",
     "metaDescription": "Learn about momentstudio and the story behind our handcrafted art."
   },
+  "page": {
+    "restricted": {
+      "title": "Sign in required",
+      "copy": "This page is available to signed-in customers only."
+    }
+  },
   "contact": {
     "title": "Contact",
     "metaTitle": "Contact | momentstudio",
@@ -1706,6 +1712,8 @@
           "publishAtHint": "If this is in the future and status is published, the page will go live at that time.",
           "unpublishAtOptional": "Unpublish at (optional)",
           "unpublishAtHint": "If set, the page will be hidden after this time.",
+          "requiresLogin": "Require login",
+          "requiresLoginHint": "When enabled, only signed-in users can view this page (it will not appear in the sitemap).",
           "changeUrlPrompt": "New URL (slug) for this page",
           "changeUrlConfirm": "Change URL from /pages/{{old}} to /pages/{{next}}? Existing links will redirect.",
           "addBlock": "Add block",
@@ -1929,6 +1937,22 @@
         },
         "errors": {
           "generate": "Could not generate preview link",
+          "copy": "Could not copy to clipboard"
+        }
+      },
+      "social": {
+        "title": "Social preview",
+        "hint": "Preview OpenGraph images and URLs per language (EN/RO). Social platforms require the published URL for real sharing.",
+        "previewTokenTitle": "Preview token needed for drafts",
+        "previewTokenCopy": "Generate a preview link to render social images for draft/review posts.",
+        "ogAlt": "OpenGraph preview image",
+        "pageUrl": "Page URL",
+        "previewImageUrl": "Preview OG image URL",
+        "publishedImageUrl": "Published OG image URL",
+        "success": {
+          "copied": "Copied"
+        },
+        "errors": {
           "copy": "Could not copy to clipboard"
         }
       },

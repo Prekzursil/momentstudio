@@ -35,16 +35,16 @@ async def build_sitemap_urls(session: AsyncSession, *, langs: list[str] | None =
             )
         )
     ).scalars().all()
-    page_keys = (
+    page_rows = (
         await session.execute(
-            select(ContentBlock.key).where(
+            select(ContentBlock.key, ContentBlock.meta).where(
                 ContentBlock.key.like("page.%"),
                 ContentBlock.status == ContentStatus.published,
                 or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
                 or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
             )
         )
-    ).scalars().all()
+    ).all()
 
     by_lang: dict[str, list[str]] = {}
     for lang in languages:
@@ -52,8 +52,6 @@ async def build_sitemap_urls(session: AsyncSession, *, langs: list[str] | None =
         urls.add(f"{base}/?lang={lang}")
         urls.add(f"{base}/shop?lang={lang}")
         urls.add(f"{base}/blog?lang={lang}")
-        urls.add(f"{base}/about?lang={lang}")
-        urls.add(f"{base}/contact?lang={lang}")
 
         for slug in categories:
             urls.add(f"{base}/shop/{slug}?lang={lang}")
@@ -64,7 +62,9 @@ async def build_sitemap_urls(session: AsyncSession, *, langs: list[str] | None =
             slug = key.split(".", 1)[1] if key.startswith("blog.") else key
             urls.add(f"{base}/blog/{slug}?lang={lang}")
 
-        for key in page_keys:
+        for key, meta in page_rows:
+            if isinstance(meta, dict) and meta.get("requires_auth"):
+                continue
             slug = key.split(".", 1)[1] if key.startswith("page.") else key
             if not slug:
                 continue
@@ -79,4 +79,3 @@ async def build_sitemap_urls(session: AsyncSession, *, langs: list[str] | None =
         by_lang[lang] = sorted(urls)
 
     return by_lang
-

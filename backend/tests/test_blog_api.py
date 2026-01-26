@@ -248,6 +248,10 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert preview.status_code == 200, preview.text
     assert preview.json()["title"] == "Scheduled"
 
+    og_preview = client.get("/api/v1/blog/posts/scheduled-post/og-preview.png", params={"lang": "en", "token": token})
+    assert og_preview.status_code == 200, og_preview.text
+    assert og_preview.headers.get("content-type", "").startswith("image/png")
+
     invalid_preview = client.get("/api/v1/blog/posts/scheduled-post/preview", params={"lang": "en", "token": "nope"})
     assert invalid_preview.status_code == 403, invalid_preview.text
 

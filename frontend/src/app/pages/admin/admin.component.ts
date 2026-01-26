@@ -39,6 +39,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { MarkdownService } from '../../core/markdown.service';
 import { AuthService } from '../../core/auth.service';
+import { appConfig } from '../../core/app-config';
 import { diffLines } from 'diff';
 import { formatIdentity } from '../../shared/user-identity';
 import { ContentRevisionsComponent } from './shared/content-revisions.component';
@@ -48,6 +49,7 @@ import { CarouselBlockComponent } from '../../shared/carousel-block.component';
 
 type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
 type UiLang = 'en' | 'ro';
+type ContentStatusUi = 'draft' | 'review' | 'published';
 
 type HomeSectionId =
   | 'featured_products'
@@ -1278,6 +1280,14 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                       [disabled]="pageBlocksStatus[pageBlocksKey] !== 'published'"
                     />
                   </label>
+                </div>
+
+                <div class="grid gap-1">
+                  <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    <input type="checkbox" [(ngModel)]="pageBlocksRequiresAuth[pageBlocksKey]" />
+                    <span>{{ 'adminUi.site.pages.builder.requiresLogin' | translate }}</span>
+                  </label>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.site.pages.builder.requiresLoginHint' | translate }}</p>
                 </div>
 
                 <div class="flex items-center gap-2">
@@ -3166,6 +3176,97 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                   {{ 'adminUi.blog.preview.expires' | translate }} {{ blogPreviewExpiresAt | date: 'short' }}
                 </p>
               </div>
+
+              <details class="rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-900">
+                <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.blog.social.title' | translate }}
+                </summary>
+                <div class="mt-3 grid gap-3">
+                  <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.blog.social.hint' | translate }}</p>
+
+                  <div
+                    *ngIf="!blogPreviewToken"
+                    class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+                  >
+                    <p class="font-semibold">{{ 'adminUi.blog.social.previewTokenTitle' | translate }}</p>
+                    <p class="text-xs">{{ 'adminUi.blog.social.previewTokenCopy' | translate }}</p>
+                    <div class="mt-2">
+                      <app-button size="sm" variant="ghost" [label]="'adminUi.blog.actions.previewLink' | translate" (action)="generateBlogPreviewLink()"></app-button>
+                    </div>
+                  </div>
+
+                  <div class="grid gap-4 md:grid-cols-2">
+                    <div
+                      *ngFor="let lang of blogSocialLangs"
+                      class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30"
+                    >
+                      <div class="flex items-center justify-between gap-2">
+                        <p class="text-xs font-semibold tracking-wide uppercase text-slate-600 dark:text-slate-300">{{ lang.toUpperCase() }}</p>
+                        <div class="flex items-center gap-2">
+                          <a
+                            class="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
+                            [attr.href]="blogPublicUrl(lang)"
+                            target="_blank"
+                            rel="noopener"
+                          >
+                            {{ 'adminUi.blog.actions.view' | translate }}
+                          </a>
+                          <app-button size="sm" variant="ghost" [label]="'adminUi.blog.actions.copy' | translate" (action)="copyText(blogPublicUrl(lang))"></app-button>
+                        </div>
+                      </div>
+
+                      <img
+                        *ngIf="blogPreviewToken || blogForm.status === 'published'"
+                        [src]="blogPreviewOgImageUrl(lang) || blogPublishedOgImageUrl(lang)"
+                        [alt]="'adminUi.blog.social.ogAlt' | translate"
+                        class="w-full rounded-lg border border-slate-200 bg-white object-cover dark:border-slate-800 dark:bg-slate-900"
+                        loading="lazy"
+                      />
+
+                      <div class="grid gap-2">
+                        <label class="grid gap-1 text-xs font-medium text-slate-700 dark:text-slate-200">
+                          {{ 'adminUi.blog.social.pageUrl' | translate }}
+                          <input
+                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                            [value]="blogPublicUrl(lang)"
+                            readonly
+                          />
+                        </label>
+
+                        <label class="grid gap-1 text-xs font-medium text-slate-700 dark:text-slate-200" *ngIf="blogPreviewToken">
+                          {{ 'adminUi.blog.social.previewImageUrl' | translate }}
+                          <div class="flex items-center gap-2">
+                            <input
+                              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                              [value]="blogPreviewOgImageUrl(lang) || ''"
+                              readonly
+                            />
+                            <app-button
+                              size="sm"
+                              variant="ghost"
+                              [label]="'adminUi.blog.actions.copy' | translate"
+                              (action)="copyText(blogPreviewOgImageUrl(lang) || '')"
+                            ></app-button>
+                          </div>
+                        </label>
+
+                        <label class="grid gap-1 text-xs font-medium text-slate-700 dark:text-slate-200">
+                          {{ 'adminUi.blog.social.publishedImageUrl' | translate }}
+                          <div class="flex items-center gap-2">
+                            <input
+                              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                              [value]="blogPublishedOgImageUrl(lang)"
+                              readonly
+                            />
+                            <app-button size="sm" variant="ghost" [label]="'adminUi.blog.actions.copy' | translate" (action)="copyText(blogPublishedOgImageUrl(lang))"></app-button>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </details>
+
               <div class="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-900">
                 <div class="flex items-center justify-between gap-2">
                   <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.blog.revisions.title' | translate }}</p>
@@ -3678,7 +3779,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	  showBlogCreate = false;
 	  blogCreate: {
 	    baseLang: 'en' | 'ro';
-	    status: 'draft' | 'published';
+	    status: ContentStatusUi;
 	    published_at: string;
 	    published_until: string;
 	    title: string;
@@ -3723,7 +3824,9 @@ export class AdminComponent implements OnInit, OnDestroy {
   blogImages: { id: string; url: string; alt_text?: string | null }[] = [];
   showBlogPreview = false;
   useRichBlogEditor = true;
+  blogSocialLangs: UiLang[] = ['en', 'ro'];
   blogPreviewUrl: string | null = null;
+  blogPreviewToken: string | null = null;
   blogPreviewExpiresAt: string | null = null;
   blogVersions: ContentBlockVersionListItem[] = [];
   blogVersionDetail: ContentBlockVersionRead | null = null;
@@ -3823,7 +3926,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   linkCheckError: string | null = null;
   linkCheckIssues: ContentLinkCheckIssue[] = [];
   newCustomPageTitle = '';
-  newCustomPageStatus: 'draft' | 'published' = 'draft';
+  newCustomPageStatus: ContentStatusUi = 'draft';
   newCustomPagePublishedAt = '';
   newCustomPagePublishedUntil = '';
   creatingCustomPage = false;
@@ -3831,7 +3934,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   newPageBlockType: PageBlockType = 'text';
   pageBlocks: Record<string, PageBlockDraft[]> = {};
   pageBlocksMeta: Record<string, Record<string, unknown>> = {};
-  pageBlocksStatus: Record<string, 'draft' | 'published'> = {};
+  pageBlocksRequiresAuth: Record<string, boolean> = {};
+  pageBlocksStatus: Record<string, ContentStatusUi> = {};
   pageBlocksPublishedAt: Record<string, string> = {};
   pageBlocksPublishedUntil: Record<string, string> = {};
   pageBlocksMessage: Record<string, string | null> = {};
@@ -5003,6 +5107,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.selectedBlogKey = null;
     this.blogImages = [];
     this.blogPreviewUrl = null;
+    this.blogPreviewToken = null;
     this.blogPreviewExpiresAt = null;
     this.blogVersions = [];
     this.blogVersionDetail = null;
@@ -5217,6 +5322,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.blog.createPreviewToken(slug, { lang: this.blogEditLang }).subscribe({
       next: (resp) => {
         this.blogPreviewUrl = resp.url;
+        this.blogPreviewToken = resp.token;
         this.blogPreviewExpiresAt = resp.expires_at;
         this.toast.success(this.t('adminUi.blog.preview.success.ready'));
         void this.copyToClipboard(resp.url).then((ok) => {
@@ -5232,6 +5338,36 @@ export class AdminComponent implements OnInit, OnDestroy {
     void this.copyToClipboard(this.blogPreviewUrl).then((ok) => {
       if (ok) this.toast.info(this.t('adminUi.blog.preview.success.copied'));
       else this.toast.error(this.t('adminUi.blog.preview.errors.copy'));
+    });
+  }
+
+  blogPublicUrl(lang: UiLang): string {
+    if (typeof window === 'undefined') return `/blog/${this.currentBlogSlug()}?lang=${lang}`;
+    return `${window.location.origin}/blog/${this.currentBlogSlug()}?lang=${lang}`;
+  }
+
+  blogPublishedOgImageUrl(lang: UiLang): string {
+    const apiBaseUrl = (appConfig.apiBaseUrl || '/api/v1').replace(/\/$/, '');
+    const ogPath = `${apiBaseUrl}/blog/posts/${this.currentBlogSlug()}/og.png?lang=${lang}`;
+    if (ogPath.startsWith('http://') || ogPath.startsWith('https://') || typeof window === 'undefined') return ogPath;
+    return `${window.location.origin}${ogPath}`;
+  }
+
+  blogPreviewOgImageUrl(lang: UiLang): string | null {
+    if (!this.blogPreviewToken) return null;
+    const apiBaseUrl = (appConfig.apiBaseUrl || '/api/v1').replace(/\/$/, '');
+    const token = encodeURIComponent(this.blogPreviewToken);
+    const ogPath = `${apiBaseUrl}/blog/posts/${this.currentBlogSlug()}/og-preview.png?lang=${lang}&token=${token}`;
+    if (ogPath.startsWith('http://') || ogPath.startsWith('https://') || typeof window === 'undefined') return ogPath;
+    return `${window.location.origin}${ogPath}`;
+  }
+
+  copyText(text: string): void {
+    const value = (text || '').trim();
+    if (!value) return;
+    void this.copyToClipboard(value).then((ok) => {
+      if (ok) this.toast.info(this.t('adminUi.blog.social.success.copied'));
+      else this.toast.error(this.t('adminUi.blog.social.errors.copy'));
     });
   }
 
@@ -6227,11 +6363,13 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.rememberContentVersion(pageKey, block);
         this.pageBlocksNeedsTranslationEn[pageKey] = Boolean(block.needs_translation_en);
         this.pageBlocksNeedsTranslationRo[pageKey] = Boolean(block.needs_translation_ro);
-        this.pageBlocksStatus[pageKey] = block.status === 'published' ? 'published' : 'draft';
+        this.pageBlocksStatus[pageKey] =
+          block.status === 'published' ? 'published' : block.status === 'review' ? 'review' : 'draft';
         this.pageBlocksPublishedAt[pageKey] = block.published_at ? this.toLocalDateTime(block.published_at) : '';
         this.pageBlocksPublishedUntil[pageKey] = block.published_until ? this.toLocalDateTime(block.published_until) : '';
         const metaObj = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
         this.pageBlocksMeta[pageKey] = metaObj;
+        this.pageBlocksRequiresAuth[pageKey] = Boolean(metaObj['requires_auth']);
         this.pageBlocks[pageKey] = this.parsePageBlocksDraft(metaObj);
       },
       error: (err) => {
@@ -6243,6 +6381,7 @@ export class AdminComponent implements OnInit, OnDestroy {
           this.pageBlocksPublishedAt[pageKey] = '';
           this.pageBlocksPublishedUntil[pageKey] = '';
           this.pageBlocksMeta[pageKey] = {};
+          this.pageBlocksRequiresAuth[pageKey] = false;
           this.pageBlocks[pageKey] = [];
           return;
         }
@@ -6828,8 +6967,13 @@ export class AdminComponent implements OnInit, OnDestroy {
       return base;
     });
 
-    const meta = { ...(this.pageBlocksMeta[pageKey] || {}), blocks };
-    const status = this.pageBlocksStatus[pageKey] === 'published' ? 'published' : 'draft';
+    const meta = { ...(this.pageBlocksMeta[pageKey] || {}), blocks } as Record<string, unknown>;
+    if (this.pageBlocksRequiresAuth[pageKey]) {
+      meta['requires_auth'] = true;
+    } else {
+      delete meta['requires_auth'];
+    }
+    const status: ContentStatusUi = this.pageBlocksStatus[pageKey] || 'draft';
     const published_at =
       status === 'published'
         ? this.pageBlocksPublishedAt[pageKey]
@@ -6854,10 +6998,12 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.rememberContentVersion(pageKey, block);
         this.pageBlocksNeedsTranslationEn[pageKey] = Boolean(block.needs_translation_en);
         this.pageBlocksNeedsTranslationRo[pageKey] = Boolean(block.needs_translation_ro);
-        this.pageBlocksStatus[pageKey] = block.status === 'published' ? 'published' : 'draft';
+        this.pageBlocksStatus[pageKey] =
+          block.status === 'published' ? 'published' : block.status === 'review' ? 'review' : 'draft';
         this.pageBlocksPublishedAt[pageKey] = block.published_at ? this.toLocalDateTime(block.published_at) : '';
         this.pageBlocksPublishedUntil[pageKey] = block.published_until ? this.toLocalDateTime(block.published_until) : '';
         this.pageBlocksMeta[pageKey] = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
+        this.pageBlocksRequiresAuth[pageKey] = Boolean(this.pageBlocksMeta[pageKey]?.['requires_auth']);
         this.pageBlocksMessage[pageKey] = ok;
         this.pageBlocksError[pageKey] = null;
       },
@@ -6882,10 +7028,12 @@ export class AdminComponent implements OnInit, OnDestroy {
               this.rememberContentVersion(pageKey, created);
               this.pageBlocksNeedsTranslationEn[pageKey] = Boolean(created.needs_translation_en);
               this.pageBlocksNeedsTranslationRo[pageKey] = Boolean(created.needs_translation_ro);
-              this.pageBlocksStatus[pageKey] = created.status === 'published' ? 'published' : 'draft';
+              this.pageBlocksStatus[pageKey] =
+                created.status === 'published' ? 'published' : created.status === 'review' ? 'review' : 'draft';
               this.pageBlocksPublishedAt[pageKey] = created.published_at ? this.toLocalDateTime(created.published_at) : '';
               this.pageBlocksPublishedUntil[pageKey] = created.published_until ? this.toLocalDateTime(created.published_until) : '';
               this.pageBlocksMeta[pageKey] = ((created as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
+              this.pageBlocksRequiresAuth[pageKey] = Boolean(this.pageBlocksMeta[pageKey]?.['requires_auth']);
               this.pageBlocksMessage[pageKey] = ok;
               this.pageBlocksError[pageKey] = null;
             },

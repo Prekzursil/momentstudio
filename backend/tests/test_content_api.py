@@ -70,6 +70,16 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
     admin_token = create_admin_token(SessionLocal)
 
+    async def create_customer_token() -> str:
+        async with SessionLocal() as session:
+            user = await create_user(session, UserCreate(email="user@example.com", password="password123", name="User"))
+            user.role = UserRole.customer
+            await session.commit()
+            tokens = await issue_tokens_for_user(session, user)
+            return tokens["access_token"]
+
+    user_token = asyncio.run(create_customer_token())
+
     # Create
     create = client.post(
         "/api/v1/content/admin/home.hero",
@@ -165,6 +175,23 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert page.status_code == 200
     assert page.json()["title"] == "FAQ"
     assert page.json()["meta"]["priority"] == 1
+
+    restricted = client.post(
+        "/api/v1/content/admin/page.secret",
+        json={"title": "Secret", "body_markdown": "Hidden", "status": "published", "meta": {"requires_auth": True}},
+        headers=auth_headers(admin_token),
+    )
+    assert restricted.status_code == 201, restricted.text
+
+    restricted_public = client.get("/api/v1/content/pages/secret")
+    assert restricted_public.status_code == 401, restricted_public.text
+
+    restricted_authed = client.get("/api/v1/content/pages/secret", headers=auth_headers(user_token))
+    assert restricted_authed.status_code == 200, restricted_authed.text
+
+    sitemap = client.get("/api/v1/sitemap.xml")
+    assert sitemap.status_code == 200
+    assert "pages/secret?lang=en" not in sitemap.text
 
     # Draft not visible publicly
     client.patch(

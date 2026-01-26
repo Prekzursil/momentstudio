@@ -137,6 +137,25 @@ async def blog_post_og_image(
     return Response(content=png, media_type="image/png", headers={"ETag": etag, "Cache-Control": cache_control})
 
 
+@router.get("/posts/{slug}/og-preview.png", response_class=Response)
+async def blog_post_og_preview_image(
+    slug: str,
+    token: str = Query(..., min_length=1, description="Preview token"),
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+) -> Response:
+    key = decode_content_preview_token(token)
+    expected_key = f"blog.{slug}"
+    if not key or key != expected_key:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid preview token")
+    block = await content_service.get_block_by_key(session, expected_key, lang=lang)
+    if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    data = blog_service.to_read(block, lang=lang)
+    png = og_images.render_blog_post_og(title=str(data.get("title") or ""), subtitle=data.get("summary") or None)
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "private, no-store"})
+
+
 @router.get("/posts/{slug}/comments", response_model=BlogCommentListResponse)
 async def list_blog_comments(
     slug: str,
