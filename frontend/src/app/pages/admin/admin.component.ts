@@ -970,10 +970,12 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                               <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
                                 {{ 'adminUi.home.sections.fields.preview' | translate }}
                               </summary>
-                              <div
-                                class="markdown mt-2 text-slate-700 dark:text-slate-200"
-                                [innerHTML]="renderMarkdown(block.body_markdown[infoLang] || '')"
-                              ></div>
+                              <div class="mt-2 mx-auto w-full" [ngClass]="cmsPreviewMaxWidthClass()">
+                                <div
+                                  class="markdown rounded-2xl border border-slate-200 bg-white p-3 text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+                                  [innerHTML]="renderMarkdown(block.body_markdown[infoLang] || '')"
+                                ></div>
+                              </div>
                             </details>
                           </ng-container>
 
@@ -1711,7 +1713,12 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                         </label>
                         <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
                           <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.fields.preview' | translate }}</p>
-                          <div class="markdown mt-2 text-slate-700 dark:text-slate-200" [innerHTML]="renderMarkdown(block.body_markdown[homeBlocksLang])"></div>
+                          <div class="mt-2 mx-auto w-full" [ngClass]="cmsPreviewMaxWidthClass()">
+                            <div
+                              class="markdown rounded-2xl border border-slate-200 bg-white p-3 text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+                              [innerHTML]="renderMarkdown(block.body_markdown[homeBlocksLang])"
+                            ></div>
+                          </div>
                         </div>
                       </ng-container>
 
@@ -3260,18 +3267,27 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                       <input #blogImageInput type="file" accept="image/*" class="hidden" (change)="uploadAndInsertBlogImage(blogBody, $event)" />
                     </div>
 
-                    <textarea
-                      #blogBody
-                      rows="10"
-                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                      [(ngModel)]="blogForm.body_markdown"
-                    ></textarea>
-
                     <div
-                      *ngIf="showBlogPreview"
-                      class="markdown rounded-lg border border-slate-200 p-3 bg-slate-50 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200"
-                      [innerHTML]="renderMarkdown(blogForm.body_markdown || ('adminUi.blog.editing.previewEmpty' | translate))"
-                    ></div>
+                      class="grid gap-3"
+                      [ngClass]="showBlogPreview && cmsPrefs.previewLayout() === 'split' ? 'lg:grid-cols-2' : ''"
+                    >
+                      <textarea
+                        #blogBody
+                        rows="10"
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        [(ngModel)]="blogForm.body_markdown"
+                        (scroll)="syncSplitScroll(blogBody, blogPreview)"
+                      ></textarea>
+
+                      <div class="mx-auto w-full" [ngClass]="cmsPreviewMaxWidthClass()" [class.hidden]="!showBlogPreview">
+                      <div
+                        #blogPreview
+                        class="markdown rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-800 shadow-sm max-h-[520px] overflow-auto dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                        [innerHTML]="showBlogPreview ? renderMarkdown(blogForm.body_markdown || ('adminUi.blog.editing.previewEmpty' | translate)) : ''"
+                        (scroll)="syncSplitScroll(blogPreview, blogBody)"
+                      ></div>
+                    </div>
+                    </div>
                   </ng-template>
                 </div>
               </div>
@@ -3527,19 +3543,37 @@ type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
                   <option value="published">{{ 'adminUi.status.published' | translate }}</option>
                 </select>
               </label>
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.content.body' | translate }}
-                <textarea rows="4" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" [(ngModel)]="contentForm.body_markdown"></textarea>
-              </label>
+              <div
+                class="grid gap-3"
+                [ngClass]="showContentPreview && cmsPrefs.previewLayout() === 'split' ? 'lg:grid-cols-2' : ''"
+              >
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.content.body' | translate }}
+                  <textarea
+                    #contentBody
+                    rows="10"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="contentForm.body_markdown"
+                    (scroll)="syncSplitScroll(contentBody, contentPreview)"
+                  ></textarea>
+                </label>
+
+                <div class="mx-auto w-full" [ngClass]="cmsPreviewMaxWidthClass()" [class.hidden]="!showContentPreview">
+                  <div
+                    #contentPreview
+                    class="markdown rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-800 shadow-sm max-h-[520px] overflow-auto dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                    [innerHTML]="showContentPreview ? renderMarkdown(contentForm.body_markdown || ('adminUi.content.previewEmpty' | translate)) : ''"
+                    (scroll)="syncSplitScroll(contentPreview, contentBody)"
+                  ></div>
+                </div>
+              </div>
+
               <div class="flex gap-2">
                 <app-button size="sm" [label]="'adminUi.content.save' | translate" (action)="saveContent()"></app-button>
                 <app-button size="sm" variant="ghost" [label]="'adminUi.actions.cancel' | translate" (action)="cancelContent()"></app-button>
                 <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                   <input type="checkbox" [(ngModel)]="showContentPreview" /> {{ 'adminUi.content.livePreview' | translate }}
                 </label>
-              </div>
-              <div *ngIf="showContentPreview" class="rounded-lg border border-slate-200 p-3 bg-slate-50 text-sm text-slate-800 whitespace-pre-line dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200">
-                {{ contentForm.body_markdown || ('adminUi.content.previewEmpty' | translate) }}
               </div>
             </div>
           </section>
@@ -4242,6 +4276,36 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   cmsAdvanced(): boolean {
     return this.cmsPrefs.mode() === 'advanced';
+  }
+
+  cmsPreviewMaxWidthClass(): string {
+    switch (this.cmsPrefs.previewDevice()) {
+      case 'mobile':
+        return 'max-w-[390px]';
+      case 'tablet':
+        return 'max-w-[768px]';
+      default:
+        return 'max-w-[1024px]';
+    }
+  }
+
+  private previewScrollSyncActive = false;
+
+  syncSplitScroll(source: HTMLElement, target: HTMLElement): void {
+    if (this.cmsPrefs.previewLayout() !== 'split') return;
+    if (this.previewScrollSyncActive) return;
+
+    const sourceScrollable = source.scrollHeight - source.clientHeight;
+    const targetScrollable = target.scrollHeight - target.clientHeight;
+    if (sourceScrollable <= 0 || targetScrollable <= 0) return;
+
+    const ratio = sourceScrollable ? source.scrollTop / sourceScrollable : 0;
+    this.previewScrollSyncActive = true;
+    target.scrollTop = ratio * targetScrollable;
+
+    requestAnimationFrame(() => {
+      this.previewScrollSyncActive = false;
+    });
   }
 
   ngOnInit(): void {

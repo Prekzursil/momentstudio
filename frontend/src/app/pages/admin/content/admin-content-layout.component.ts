@@ -33,31 +33,100 @@ type ContentNavItem = {
             </a>
           </nav>
 
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.content.editorMode.label' | translate }}</span>
-            <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <button
-                type="button"
-                class="px-3 py-1.5 text-xs font-semibold"
-                [class.bg-slate-900]="prefs.mode() === 'simple'"
-                [class.text-white]="prefs.mode() === 'simple'"
-                [class.text-slate-700]="prefs.mode() !== 'simple'"
-                [class.dark:text-slate-200]="prefs.mode() !== 'simple'"
-                (click)="prefs.setMode('simple')"
-              >
-                {{ 'adminUi.content.editorMode.simple' | translate }}
-              </button>
-              <button
-                type="button"
-                class="px-3 py-1.5 text-xs font-semibold"
-                [class.bg-slate-900]="prefs.mode() === 'advanced'"
-                [class.text-white]="prefs.mode() === 'advanced'"
-                [class.text-slate-700]="prefs.mode() !== 'advanced'"
-                [class.dark:text-slate-200]="prefs.mode() !== 'advanced'"
-                (click)="prefs.setMode('advanced')"
-              >
-                {{ 'adminUi.content.editorMode.advanced' | translate }}
-              </button>
+          <div class="flex flex-wrap items-center gap-4">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.content.editorMode.label' | translate }}</span>
+              <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <button
+                  type="button"
+                  class="px-3 py-1.5 text-xs font-semibold"
+                  [class.bg-slate-900]="prefs.mode() === 'simple'"
+                  [class.text-white]="prefs.mode() === 'simple'"
+                  [class.text-slate-700]="prefs.mode() !== 'simple'"
+                  [class.dark:text-slate-200]="prefs.mode() !== 'simple'"
+                  (click)="prefs.setMode('simple')"
+                >
+                  {{ 'adminUi.content.editorMode.simple' | translate }}
+                </button>
+                <button
+                  type="button"
+                  class="px-3 py-1.5 text-xs font-semibold"
+                  [class.bg-slate-900]="prefs.mode() === 'advanced'"
+                  [class.text-white]="prefs.mode() === 'advanced'"
+                  [class.text-slate-700]="prefs.mode() !== 'advanced'"
+                  [class.dark:text-slate-200]="prefs.mode() !== 'advanced'"
+                  (click)="prefs.setMode('advanced')"
+                >
+                  {{ 'adminUi.content.editorMode.advanced' | translate }}
+                </button>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.content.preview.deviceLabel' | translate }}</span>
+              <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <button
+                  type="button"
+                  class="px-3 py-1.5 text-xs font-semibold"
+                  [class.bg-slate-900]="prefs.previewDevice() === 'desktop'"
+                  [class.text-white]="prefs.previewDevice() === 'desktop'"
+                  [class.text-slate-700]="prefs.previewDevice() !== 'desktop'"
+                  [class.dark:text-slate-200]="prefs.previewDevice() !== 'desktop'"
+                  (click)="prefs.setPreviewDevice('desktop')"
+                >
+                  {{ 'adminUi.content.preview.desktop' | translate }}
+                </button>
+                <button
+                  type="button"
+                  class="px-3 py-1.5 text-xs font-semibold"
+                  [class.bg-slate-900]="prefs.previewDevice() === 'tablet'"
+                  [class.text-white]="prefs.previewDevice() === 'tablet'"
+                  [class.text-slate-700]="prefs.previewDevice() !== 'tablet'"
+                  [class.dark:text-slate-200]="prefs.previewDevice() !== 'tablet'"
+                  (click)="prefs.setPreviewDevice('tablet')"
+                >
+                  {{ 'adminUi.content.preview.tablet' | translate }}
+                </button>
+                <button
+                  type="button"
+                  class="px-3 py-1.5 text-xs font-semibold"
+                  [class.bg-slate-900]="prefs.previewDevice() === 'mobile'"
+                  [class.text-white]="prefs.previewDevice() === 'mobile'"
+                  [class.text-slate-700]="prefs.previewDevice() !== 'mobile'"
+                  [class.dark:text-slate-200]="prefs.previewDevice() !== 'mobile'"
+                  (click)="prefs.setPreviewDevice('mobile')"
+                >
+                  {{ 'adminUi.content.preview.mobile' | translate }}
+                </button>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.content.preview.layoutLabel' | translate }}</span>
+              <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <button
+                  type="button"
+                  class="px-3 py-1.5 text-xs font-semibold"
+                  [class.bg-slate-900]="prefs.previewLayout() === 'stacked'"
+                  [class.text-white]="prefs.previewLayout() === 'stacked'"
+                  [class.text-slate-700]="prefs.previewLayout() !== 'stacked'"
+                  [class.dark:text-slate-200]="prefs.previewLayout() !== 'stacked'"
+                  (click)="prefs.setPreviewLayout('stacked')"
+                >
+                  {{ 'adminUi.content.preview.stacked' | translate }}
+                </button>
+                <button
+                  type="button"
+                  class="px-3 py-1.5 text-xs font-semibold"
+                  [class.bg-slate-900]="prefs.previewLayout() === 'split'"
+                  [class.text-white]="prefs.previewLayout() === 'split'"
+                  [class.text-slate-700]="prefs.previewLayout() !== 'split'"
+                  [class.dark:text-slate-200]="prefs.previewLayout() !== 'split'"
+                  (click)="prefs.setPreviewLayout('split')"
+                >
+                  {{ 'adminUi.content.preview.split' | translate }}
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -919,8 +919,8 @@ Below is a structured checklist you can turn into issues.
 
 ### Admin CMS – Visual & Intuitive Editing (Backlog)
 - [x] CMS editor: simple/advanced toggle – Default to Simple mode and hide SEO/meta/scheduling behind Advanced.
-- [ ] CMS editor: device preview frames – Desktop/tablet/mobile preview with quick toggles and responsive breakpoints.
-- [ ] CMS editor: split-view editing – Edit on the left, live preview on the right (with scroll sync).
+- [x] CMS editor: device preview frames – Desktop/tablet/mobile preview with quick toggles and responsive breakpoints.
+- [x] CMS editor: split-view editing – Edit on the left, live preview on the right (with scroll sync).
 - [ ] CMS editor: block library gallery – Visual block picker with thumbnails, descriptions, and “starter” templates.
 - [ ] CMS editor: drag-and-drop insert – Drag blocks into the page with drop targets between sections.
 - [ ] CMS editor: accessible reordering – Keyboard-friendly reorder controls and screen-reader announcements for block moves.
@@ -938,6 +938,7 @@ Below is a structured checklist you can turn into issues.
 - [ ] CMS preview: shareable draft links – Tokenized preview links for unpublished drafts (pages + home sections).
 - [ ] CMS preview: language toggle – Preview RO/EN (fallbacks visible) without leaving the editor.
 - [ ] CMS preview: theme toggle – Preview light/dark rendering inside the editor.
+- [ ] CMS preview: iframe viewport emulation – Render preview in an iframe at selected device widths so Tailwind breakpoints match.
 - [ ] CMS scheduling: calendar view – Visual calendar for scheduled publish/unpublish across pages/blog/home banners.
 - [ ] CMS redirects: inline creation – When changing a page URL, offer creating a redirect in the same flow.
 - [ ] CMS navigation: menu builder – Visual editor for header/footer links with drag-drop ordering and per-language labels.

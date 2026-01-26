@@ -3583,6 +3583,15 @@
         "simpleHint": "Modul Simplu ascunde SEO și programarea.",
         "advancedHint": "Modul Avansat arată SEO, programarea și controale suplimentare."
       },
+      "preview": {
+        "deviceLabel": "Dimensiune previzualizare",
+        "desktop": "Desktop",
+        "tablet": "Tabletă",
+        "mobile": "Mobil",
+        "layoutLabel": "Aspect",
+        "stacked": "Vertical",
+        "split": "Împărțit"
+      },
       "nav": {
         "home": "Acasă",
         "pages": "Pagini",
