@@ -79,6 +79,11 @@ type MetricWidgetId = 'kpis' | 'counts' | 'range';
 	                  <input
                       #globalSearchInput
                       id="admin-global-search"
+                      role="combobox"
+                      aria-autocomplete="list"
+                      [attr.aria-expanded]="globalSearchOpen() ? 'true' : 'false'"
+                      [attr.aria-controls]="'admin-global-search-listbox'"
+                      [attr.aria-activedescendant]="globalSearchActiveDescendant()"
 	                    class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
 	                    [placeholder]="'adminUi.dashboard.globalSearchPlaceholder' | translate"
 	                    [(ngModel)]="globalSearchQuery"
@@ -92,40 +97,58 @@ type MetricWidgetId = 'kpis' | 'counts' | 'range';
 	                    *ngIf="globalSearchOpen()"
 	                    class="absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900"
 	                  >
-	                    <div *ngIf="globalSearchLoading()" class="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">
-	                      {{ 'adminUi.dashboard.globalSearchLoading' | translate }}
-	                    </div>
-	                    <div *ngIf="globalSearchError" class="px-3 py-2 text-xs text-rose-700 dark:text-rose-300">
-	                      {{ globalSearchError }}
-	                    </div>
+                      <div id="admin-global-search-listbox" role="listbox" class="max-h-72 overflow-auto">
+                        <div
+                          *ngIf="globalSearchLoading()"
+                          role="option"
+                          aria-disabled="true"
+                          class="px-3 py-2 text-xs text-slate-600 dark:text-slate-300"
+                        >
+                          {{ 'adminUi.dashboard.globalSearchLoading' | translate }}
+                        </div>
+                        <div
+                          *ngIf="globalSearchError"
+                          role="option"
+                          aria-disabled="true"
+                          class="px-3 py-2 text-xs text-rose-700 dark:text-rose-300"
+                        >
+                          {{ globalSearchError }}
+                        </div>
 
-	                    <ng-container *ngIf="!globalSearchLoading() && !globalSearchError">
-	                      <div
-	                        *ngIf="globalSearchResults().length === 0 && (globalSearchQuery || '').trim().length >= 2"
-	                        class="px-3 py-2 text-xs text-slate-600 dark:text-slate-300"
-	                      >
-	                        {{ 'adminUi.dashboard.globalSearchEmpty' | translate }}
-	                      </div>
-	                      <div *ngIf="globalSearchResults().length > 0" class="max-h-72 overflow-auto">
-	                        <button
-	                          *ngFor="let item of globalSearchResults()"
-	                          type="button"
-	                          class="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800/60"
-	                          (mousedown)="selectGlobalSearch(item)"
-	                        >
-	                          <div class="flex items-center justify-between gap-3">
-	                            <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-	                              {{ globalSearchTypeLabel(item.type) }}
-	                            </span>
-	                            <span *ngIf="item.slug || item.email" class="text-xs text-slate-500 dark:text-slate-400 truncate">
-	                              {{ item.slug || item.email }}
-	                            </span>
-	                          </div>
-	                          <div class="mt-1 font-medium text-slate-900 dark:text-slate-50 truncate">{{ item.label }}</div>
-	                          <div *ngIf="item.subtitle" class="text-xs text-slate-600 dark:text-slate-300 truncate">{{ item.subtitle }}</div>
-	                        </button>
-	                      </div>
-	                    </ng-container>
+                        <ng-container *ngIf="!globalSearchLoading() && !globalSearchError">
+                          <div
+                            *ngIf="globalSearchResults().length === 0 && (globalSearchQuery || '').trim().length >= 2"
+                            role="option"
+                            aria-disabled="true"
+                            class="px-3 py-2 text-xs text-slate-600 dark:text-slate-300"
+                          >
+                            {{ 'adminUi.dashboard.globalSearchEmpty' | translate }}
+                          </div>
+                          <button
+                            *ngFor="let item of globalSearchResults(); let i = index"
+                            type="button"
+                            role="option"
+                            tabindex="-1"
+                            [id]="'admin-global-search-option-' + i"
+                            [attr.aria-selected]="i === globalSearchActiveIndex() ? 'true' : 'false'"
+                            class="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                            [class.bg-slate-50]="i === globalSearchActiveIndex()"
+                            [class.dark:bg-slate-800/60]="i === globalSearchActiveIndex()"
+                            (mousedown)="selectGlobalSearch(item, $event)"
+                          >
+                            <div class="flex items-center justify-between gap-3">
+                              <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                                {{ globalSearchTypeLabel(item.type) }}
+                              </span>
+                              <span *ngIf="item.slug || item.email" class="text-xs text-slate-500 dark:text-slate-400 truncate">
+                                {{ item.slug || item.email }}
+                              </span>
+                            </div>
+                            <div class="mt-1 font-medium text-slate-900 dark:text-slate-50 truncate">{{ item.label }}</div>
+                            <div *ngIf="item.subtitle" class="text-xs text-slate-600 dark:text-slate-300 truncate">{{ item.subtitle }}</div>
+                          </button>
+                        </ng-container>
+                      </div>
 	                  </div>
 	                </div>
 	              </label>
@@ -777,6 +800,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
   globalSearchLoading = signal(false);
   globalSearchOpen = signal(false);
   globalSearchResults = signal<AdminDashboardSearchResult[]>([]);
+  globalSearchActiveIndex = signal(-1);
   globalSearchError = '';
   private globalSearchDebounceHandle: number | null = null;
   private globalSearchBlurHandle: number | null = null;
@@ -926,12 +950,16 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
       this.globalSearchBlurHandle = null;
     }
     this.globalSearchOpen.set(true);
+    if (this.globalSearchActiveIndex() === -1 && this.globalSearchResults().length > 0) {
+      this.globalSearchActiveIndex.set(0);
+    }
   }
 
   onGlobalSearchBlur(): void {
     if (this.globalSearchBlurHandle !== null) clearTimeout(this.globalSearchBlurHandle);
     this.globalSearchBlurHandle = window.setTimeout(() => {
       this.globalSearchOpen.set(false);
+      this.globalSearchActiveIndex.set(-1);
       this.globalSearchBlurHandle = null;
     }, 150);
   }
@@ -939,18 +967,42 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
   onGlobalSearchKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
       this.globalSearchOpen.set(false);
+      this.globalSearchActiveIndex.set(-1);
+      return;
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      this.openGlobalSearch();
+      this.moveGlobalSearchActive(1);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      this.openGlobalSearch();
+      this.moveGlobalSearchActive(-1);
+      return;
+    }
+    if (event.key === 'Home') {
+      event.preventDefault();
+      this.setGlobalSearchActive(0);
+      return;
+    }
+    if (event.key === 'End') {
+      event.preventDefault();
+      this.setGlobalSearchActive(this.globalSearchResults().length - 1);
       return;
     }
     if (event.key !== 'Enter') return;
-    const first = this.globalSearchResults()[0];
-    if (!first) return;
+    const selected = this.getGlobalSearchActive() || this.globalSearchResults()[0];
+    if (!selected) return;
     event.preventDefault();
-    this.selectGlobalSearch(first);
+    this.selectGlobalSearch(selected);
   }
 
   onGlobalSearchChange(): void {
     const needle = (this.globalSearchQuery || '').trim();
     this.globalSearchError = '';
+    this.globalSearchActiveIndex.set(-1);
 
     if (this.globalSearchDebounceHandle !== null) {
       clearTimeout(this.globalSearchDebounceHandle);
@@ -960,6 +1012,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
     if (needle.length < 2) {
       this.globalSearchResults.set([]);
       this.globalSearchLoading.set(false);
+      this.globalSearchActiveIndex.set(-1);
       return;
     }
 
@@ -976,24 +1029,69 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
     this.admin.globalSearch(needle).subscribe({
       next: (res) => {
         if (requestId !== this.globalSearchRequestId) return;
-        this.globalSearchResults.set(Array.isArray(res?.items) ? res.items : []);
+        const items = Array.isArray(res?.items) ? res.items : [];
+        this.globalSearchResults.set(items);
+        this.globalSearchActiveIndex.set(items.length > 0 ? 0 : -1);
         this.globalSearchLoading.set(false);
       },
       error: () => {
         if (requestId !== this.globalSearchRequestId) return;
         this.globalSearchResults.set([]);
         this.globalSearchLoading.set(false);
+        this.globalSearchActiveIndex.set(-1);
         this.globalSearchError = this.translate.instant('adminUi.errors.generic');
       }
     });
+  }
+
+  globalSearchActiveDescendant(): string | null {
+    if (!this.globalSearchOpen()) return null;
+    const idx = this.globalSearchActiveIndex();
+    if (idx < 0 || idx >= this.globalSearchResults().length) return null;
+    return `admin-global-search-option-${idx}`;
+  }
+
+  private getGlobalSearchActive(): AdminDashboardSearchResult | null {
+    const idx = this.globalSearchActiveIndex();
+    const items = this.globalSearchResults();
+    if (idx < 0 || idx >= items.length) return null;
+    return items[idx];
+  }
+
+  private moveGlobalSearchActive(delta: number): void {
+    const items = this.globalSearchResults();
+    if (items.length === 0) {
+      this.globalSearchActiveIndex.set(-1);
+      return;
+    }
+    const current = this.globalSearchActiveIndex();
+    const next = Math.max(0, Math.min(items.length - 1, (current < 0 ? 0 : current) + delta));
+    this.setGlobalSearchActive(next);
+  }
+
+  private setGlobalSearchActive(index: number): void {
+    const items = this.globalSearchResults();
+    if (items.length === 0) {
+      this.globalSearchActiveIndex.set(-1);
+      return;
+    }
+    const bounded = Math.max(0, Math.min(items.length - 1, index));
+    this.globalSearchActiveIndex.set(bounded);
+    const id = `admin-global-search-option-${bounded}`;
+    window.setTimeout(() => {
+      if (typeof document === 'undefined') return;
+      document.getElementById(id)?.scrollIntoView({ block: 'nearest' });
+    }, 0);
   }
 
   globalSearchTypeLabel(type: AdminDashboardSearchResultType): string {
     return this.translate.instant(`adminUi.dashboard.globalSearchTypes.${type}`);
   }
 
-  selectGlobalSearch(item: AdminDashboardSearchResult): void {
+  selectGlobalSearch(item: AdminDashboardSearchResult, event?: MouseEvent): void {
+    if (event) event.preventDefault();
     this.globalSearchOpen.set(false);
+    this.globalSearchActiveIndex.set(-1);
 
     if (item.type === 'order') {
       void this.router.navigate(['/admin/orders', item.id]);

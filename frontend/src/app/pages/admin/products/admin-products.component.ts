@@ -507,7 +507,7 @@ type PriceHistoryChart = {
                         [checked]="allSelectedOnPage()"
                         (change)="toggleSelectAll($event)"
                         [disabled]="bulkBusy() || inlineBusy() || view === 'deleted'"
-                        aria-label="Select all"
+                        aria-label="Select all products on page"
                       />
                     </th>
                     <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.name' | translate }}</th>
@@ -546,7 +546,7 @@ type PriceHistoryChart = {
 	                      [checked]="allSelectedOnPage()"
 	                      (change)="toggleSelectAll($event)"
 	                      [disabled]="bulkBusy() || inlineBusy() || view === 'deleted'"
-	                      aria-label="Select all"
+	                      aria-label="Select all products on page"
 	                    />
 	                  </th>
                   <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.products.table.name' | translate }}</th>
@@ -574,7 +574,7 @@ type PriceHistoryChart = {
 	                      [checked]="selected.has(product.id)"
 	                      (change)="toggleSelected(product.id, $event)"
 	                      [disabled]="bulkBusy() || inlineBusy() || view === 'deleted'"
-	                      aria-label="Select"
+	                      [attr.aria-label]="'Select product ' + (product.name || product.slug)"
 	                    />
 	                  </td>
 	                  <td class="px-3 py-2 font-medium text-slate-900 dark:text-slate-50">

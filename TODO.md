@@ -786,7 +786,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Security: admin login alerts – Notify owner of new admin login/device.
 - [x] Admin UX: keyboard shortcuts – Add shortcuts for global search, navigation, and common order actions.
 - [x] Admin UX: table virtualization – Improve performance for large lists (orders/products/users).
-- [ ] Admin UX: accessibility audit – Ensure focus management, ARIA labels, and keyboard navigation.
+- [x] Admin UX: accessibility audit – Ensure focus management, ARIA labels, and keyboard navigation.
 - [ ] Admin UX: standardized error UI – Unified error state with retry and copyable correlation ID.
 - [ ] Admin Observability: client error logging – Capture admin UI errors to a backend log endpoint.
 - [ ] Admin UX: onboarding tour – First-run guided tour for owner (shipping, payments, content, taxes).

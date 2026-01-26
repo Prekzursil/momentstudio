@@ -63,6 +63,13 @@ export class ModalComponent implements AfterViewInit, OnChanges {
     if (this.open) this.close();
   }
 
+  @HostListener('document:keydown', ['$event'])
+  handleKeydown(event: KeyboardEvent): void {
+    if (!this.open) return;
+    if (event.key !== 'Tab') return;
+    this.trapFocus(event);
+  }
+
   ngAfterViewInit(): void {
     this.focusDialog();
   }
@@ -100,6 +107,52 @@ export class ModalComponent implements AfterViewInit, OnChanges {
     const active = document.activeElement;
     if (!(active instanceof HTMLElement)) return;
     this.previouslyFocused = active;
+  }
+
+  private trapFocus(event: KeyboardEvent): void {
+    if (typeof document === 'undefined') return;
+    const container = this.dialogRef?.nativeElement;
+    if (!container) return;
+
+    const focusable = this.getFocusableElements(container);
+    if (focusable.length === 0) {
+      event.preventDefault();
+      container.focus();
+      return;
+    }
+
+    const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    if (!active || !container.contains(active) || active === container) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
+      return;
+    }
+
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+      return;
+    }
+
+    if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  private getFocusableElements(container: HTMLElement): HTMLElement[] {
+    const selector =
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const candidates = Array.from(container.querySelectorAll<HTMLElement>(selector));
+    return candidates.filter((el) => {
+      if (el.tabIndex < 0) return false;
+      if (el.getAttribute('aria-hidden') === 'true') return false;
+      if (el.hasAttribute('inert')) return false;
+      return true;
+    });
   }
 
   private restorePreviousFocus(): void {
