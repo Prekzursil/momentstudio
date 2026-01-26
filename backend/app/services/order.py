@@ -329,6 +329,7 @@ async def admin_search_orders(
     session: AsyncSession,
     *,
     q: str | None = None,
+    user_id: UUID | None = None,
     status: OrderStatus | None = None,
     statuses: list[OrderStatus] | None = None,
     pending_any: bool = False,
@@ -352,6 +353,8 @@ async def admin_search_orders(
     offset = (page - 1) * limit
 
     filters: list[ColumnElement[bool]] = []
+    if user_id:
+        filters.append(Order.user_id == user_id)
     if tag_clean:
         filters.append(
             exists(select(OrderTag.id).where(OrderTag.order_id == Order.id, OrderTag.tag == tag_clean))

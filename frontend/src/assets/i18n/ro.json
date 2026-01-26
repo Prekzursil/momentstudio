@@ -1332,6 +1332,17 @@
       "hide": "Ascunde PII",
       "notAuthorized": "Nu ai permisiunea să afișezi date personale."
     },
+    "customerTimeline": {
+      "title": "Cronologia clientului",
+      "subtitle": "Comenzi, tichete de suport și activitate email recente.",
+      "loading": "Se încarcă cronologia clientului…",
+      "empty": "Nu există activitate recentă.",
+      "errors": { "load": "Nu s-a putut încărca cronologia clientului." },
+      "kinds": { "order": "Comandă", "ticket": "Tichet", "email": "Email" },
+      "emailGated": "Afișează PII pentru a încărca activitatea emailurilor.",
+      "noCustomer": "Detaliile clientului nu sunt disponibile pentru cronologie.",
+      "openOps": "Deschide în Ops"
+    },
     "ipBypass": {
       "title": "Acces admin restricționat",
       "copy": "Accesul de administrare este restricționat pe bază de IP. Introdu tokenul de bypass pentru a continua pe acest dispozitiv.",

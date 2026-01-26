@@ -176,7 +176,7 @@ export class OpsService {
     return this.api.get<FailureCount>('/ops/admin/email-failures/stats', params as any);
   }
 
-  listEmailFailures(params?: { limit?: number; since_hours?: number }): Observable<EmailFailureRead[]> {
+  listEmailFailures(params?: { limit?: number; since_hours?: number; to_email?: string }): Observable<EmailFailureRead[]> {
     return this.api.get<EmailFailureRead[]>('/ops/admin/email-failures', params as any);
   }
 }

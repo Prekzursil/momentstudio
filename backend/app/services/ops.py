@@ -285,18 +285,27 @@ async def count_failed_webhooks(session: AsyncSession, *, since_hours: int = 24)
     return int(stripe_failed or 0) + int(paypal_failed or 0)
 
 
-async def list_email_failures(session: AsyncSession, *, limit: int = 50, since_hours: int = 24) -> list[EmailDeliveryFailure]:
+async def list_email_failures(
+    session: AsyncSession,
+    *,
+    limit: int = 50,
+    since_hours: int = 24,
+    to_email: str | None = None,
+) -> list[EmailDeliveryFailure]:
     now = datetime.now(timezone.utc)
     hours = max(1, int(since_hours or 0))
     since = now - timedelta(hours=hours)
 
     limit_clean = max(1, min(int(limit or 0), 200))
+    cleaned_email = (to_email or "").strip().lower()
     stmt = (
         select(EmailDeliveryFailure)
         .where(EmailDeliveryFailure.created_at >= since)
         .order_by(EmailDeliveryFailure.created_at.desc())
         .limit(limit_clean)
     )
+    if cleaned_email:
+        stmt = stmt.where(func.lower(EmailDeliveryFailure.to_email) == cleaned_email)
     rows = (await session.execute(stmt)).scalars().all()
     return list(rows)
 

@@ -16,6 +16,7 @@ import { AdminOrderDetail, AdminOrderEvent, AdminOrderFraudSignal, AdminOrderShi
 import { AdminReturnsService, ReturnRequestRead } from '../../../core/admin-returns.service';
 import { AdminRecentService } from '../../../core/admin-recent.service';
 import { orderStatusChipClass } from '../../../shared/order-status';
+import { CustomerTimelineComponent } from '../shared/customer-timeline.component';
 
 type OrderStatus =
   | 'pending'
@@ -62,7 +63,8 @@ type OrderAction =
     ErrorStateComponent,
     InputComponent,
     SkeletonComponent,
-    LocalizedCurrencyPipe
+    LocalizedCurrencyPipe,
+    CustomerTimelineComponent
   ],
   template: `
     <div class="grid gap-6">
@@ -805,6 +807,15 @@ type OrderAction =
                 (action)="addAdminNote()"
               ></app-button>
             </div>
+          </section>
+
+          <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
+            <app-customer-timeline
+              [userId]="order()!.user_id"
+              [customerEmail]="order()!.customer_email"
+              [includePii]="piiReveal()"
+              [excludeOrderId]="order()!.id"
+            ></app-customer-timeline>
           </section>
 
           <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">

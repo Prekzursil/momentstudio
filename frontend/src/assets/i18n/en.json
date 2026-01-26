@@ -1332,6 +1332,17 @@
       "hide": "Hide PII",
       "notAuthorized": "You don't have permission to reveal PII."
     },
+    "customerTimeline": {
+      "title": "Customer timeline",
+      "subtitle": "Recent orders, support tickets, and email activity.",
+      "loading": "Loading customer timeline…",
+      "empty": "No recent activity found.",
+      "errors": { "load": "Could not load customer timeline." },
+      "kinds": { "order": "Order", "ticket": "Ticket", "email": "Email" },
+      "emailGated": "Reveal PII to load email activity.",
+      "noCustomer": "Customer details unavailable for timeline.",
+      "openOps": "Open in Ops"
+    },
     "ipBypass": {
       "title": "Admin access restricted",
       "copy": "Admin access is restricted by IP. Enter the bypass token to continue on this device.",

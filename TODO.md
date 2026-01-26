@@ -909,11 +909,13 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin analytics: exclude test orders – Add “Mark as test” on orders and exclude test orders from KPIs by default.
 - [x] Admin analytics: drilldowns – Click KPIs to open the relevant list pre-filtered to the metric (orders/products/users).
 - [x] Admin analytics: channel breakdown – Break sales/orders down by payment method, courier, and delivery type with filters.
-- [ ] Admin reports: scheduled email – Weekly/monthly email summary (sales, top products, low stock) configurable in admin.
-- [ ] Admin UX: safe training mode – Optional read-only “Training mode” to prevent destructive actions for new staff.
-- [ ] Admin permissions: role presets – “Owner basic / Support / Content / Fulfillment” presets that reduce visible complexity.
-- [ ] Admin support: SLA timers – Add SLA timers and overdue highlighting for tickets/contacts (configurable thresholds).
-- [ ] Admin support: unified timeline – Show customer timeline (orders + tickets + emails) inside order/user views.
+- [x] Admin reports: scheduled email – Weekly/monthly email summary (sales, top products, low stock) configurable in admin.
+- [x] Admin UX: safe training mode – Optional read-only “Training mode” to prevent destructive actions for new staff.
+- [x] Admin permissions: role presets – “Owner basic / Support / Content / Fulfillment” presets that reduce visible complexity.
+- [x] Admin support: SLA timers – Add SLA timers and overdue highlighting for tickets/contacts (configurable thresholds).
+- [x] Admin support: unified timeline – Show customer timeline (orders + tickets + emails) inside order/user views.
+- [ ] Admin support: unified timeline – Include successful email sends (not just failures) via an email audit log.
+- [ ] Admin ops: email failures – Add recipient filter UI + deep-link support (uses `to_email` filter).
 
 ### Admin CMS – Visual & Intuitive Editing (Backlog)
 - [ ] CMS editor: simple/advanced toggle – Default to Simple mode and hide SEO/meta/scheduling behind Advanced.

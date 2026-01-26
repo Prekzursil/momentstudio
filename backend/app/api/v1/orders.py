@@ -879,6 +879,7 @@ async def admin_list_orders(
 @router.get("/admin/search", response_model=AdminOrderListResponse)
 async def admin_search_orders(
     q: str | None = Query(default=None, max_length=200),
+    user_id: UUID | None = Query(default=None),
     status: str | None = Query(default=None),
     tag: str | None = Query(default=None, max_length=50),
     from_dt: datetime | None = Query(default=None, alias="from"),
@@ -914,6 +915,7 @@ async def admin_search_orders(
     rows, total_items = await order_service.admin_search_orders(
         session,
         q=q,
+        user_id=user_id,
         status=parsed_status,
         statuses=parsed_statuses,
         pending_any=pending_any,

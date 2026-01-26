@@ -76,6 +76,7 @@ export interface AdminOrderShipment {
 }
 
 export interface AdminOrderDetail extends Order {
+  user_id?: string | null;
   payment_retry_count?: number;
   stripe_payment_intent_id?: string | null;
   customer_email?: string | null;
@@ -101,6 +102,7 @@ export class AdminOrdersService {
 
   search(params: {
     q?: string;
+    user_id?: string;
     status?: string;
     tag?: string;
     from?: string;

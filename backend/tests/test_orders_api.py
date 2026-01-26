@@ -398,6 +398,17 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     assert payload["meta"]["total_items"] >= 1
     assert any(item["id"] == order_id for item in payload["items"])
 
+    by_user = client.get(
+        "/api/v1/orders/admin/search",
+        params={"user_id": str(user_id), "page": 1, "limit": 10},
+        headers=auth_headers(admin_token),
+    )
+    assert by_user.status_code == 200, by_user.text
+    by_user_payload = by_user.json()
+    assert by_user_payload["meta"]["total_items"] >= 2
+    assert any(item["id"] == order_id for item in by_user_payload["items"])
+    assert any(item["id"] == order_two_id for item in by_user_payload["items"])
+
     masked_detail = client.get(f"/api/v1/orders/admin/{order_id}", headers=auth_headers(admin_token))
     assert masked_detail.status_code == 200, masked_detail.text
     masked = masked_detail.json()

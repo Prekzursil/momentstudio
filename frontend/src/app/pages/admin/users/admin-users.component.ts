@@ -36,6 +36,7 @@ import {
 } from '../shared/admin-table-layout';
 import { AdminTableLayoutColumnDef, TableLayoutModalComponent } from '../shared/table-layout-modal.component';
 import { adminFilterFavoriteKey } from '../shared/admin-filter-favorites';
+import { CustomerTimelineComponent } from '../shared/customer-timeline.component';
 
 type RoleFilter = 'all' | 'customer' | 'support' | 'fulfillment' | 'content' | 'admin' | 'owner';
 
@@ -62,6 +63,7 @@ const USERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
     ErrorStateComponent,
     InputComponent,
     SkeletonComponent,
+    CustomerTimelineComponent,
     TableLayoutModalComponent
   ],
   template: `
@@ -296,6 +298,14 @@ const USERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
                   {{ 'adminUi.users.vip' | translate }}
                 </span>
               </div>
+            </div>
+
+            <div class="rounded-xl border border-slate-200 p-3 grid gap-2 dark:border-slate-800">
+              <app-customer-timeline
+                [userId]="selectedUser()!.id"
+                [customerEmail]="piiReveal() ? selectedUser()!.email : null"
+                [includePii]="piiReveal()"
+              ></app-customer-timeline>
             </div>
 
             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">

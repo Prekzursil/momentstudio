@@ -173,6 +173,22 @@ def test_ops_banners_and_shipping_simulation(test_app: Dict[str, object]) -> Non
     assert email_rows.status_code == 200, email_rows.text
     assert any(row["to_email"] == "customer@example.com" for row in email_rows.json())
 
+    filtered_email_rows = client.get(
+        "/api/v1/ops/admin/email-failures",
+        params={"limit": 10, "since_hours": 24, "to_email": "customer@example.com"},
+        headers=auth_headers(token),
+    )
+    assert filtered_email_rows.status_code == 200, filtered_email_rows.text
+    assert all(row["to_email"] == "customer@example.com" for row in filtered_email_rows.json())
+
+    filtered_email_rows_none = client.get(
+        "/api/v1/ops/admin/email-failures",
+        params={"limit": 10, "since_hours": 24, "to_email": "nobody@example.com"},
+        headers=auth_headers(token),
+    )
+    assert filtered_email_rows_none.status_code == 200, filtered_email_rows_none.text
+    assert filtered_email_rows_none.json() == []
+
     retried = client.post("/api/v1/ops/admin/webhooks/stripe/evt_test/retry", headers=auth_headers(token))
     assert retried.status_code == 200, retried.text
     assert retried.json()["status"] == "processed"

@@ -165,6 +165,7 @@ async def admin_list_email_failures(
     _: User = Depends(require_admin_section("ops")),
     limit: int = Query(default=50, ge=1, le=200),
     since_hours: int = Query(default=24, ge=1, le=168),
+    to_email: str | None = Query(default=None, max_length=255),
 ) -> list[EmailFailureRead]:
-    rows = await ops_service.list_email_failures(session, limit=limit, since_hours=since_hours)
+    rows = await ops_service.list_email_failures(session, limit=limit, since_hours=since_hours, to_email=to_email)
     return [EmailFailureRead.model_validate(row) for row in rows]
