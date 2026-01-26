@@ -399,6 +399,47 @@ Below is a structured checklist you can turn into issues.
 - [x] Notifications: optional email notifications for new comments (admin/user opt-in).
 - [x] Notifications: localize account notification settings UI + improve email templates.
 
+### Blog – Next Improvements (Backlog)
+- [ ] Blog list: featured hero – Highlight the newest/pinned post with a large, image-forward hero card.
+- [ ] Blog list: pinned posts – Allow pinning 1–3 posts to the top of `/blog` (admin-managed ordering).
+- [ ] Blog list: sort controls – Add sorting (newest/oldest/most viewed/most commented) with persisted selection.
+- [ ] Blog list: filter UX – Sticky filter bar (tags/search) with clear chips and “Reset” action.
+- [ ] Blog list: tag pages – Add `/blog/tag/:tag` landing pages with SEO meta and pagination.
+- [ ] Blog list: series/categories – Add optional blog “series” taxonomy (separate from shop categories) with pages and filters.
+- [ ] Blog list: nicer cards – Improve typography, spacing, hover states, and consistent cover image aspect ratios.
+- [ ] Blog list: image loading polish – Use blur-up placeholders + prevent layout shift for cover images.
+- [ ] Blog list: empty states – Better “no results” UX (suggest clearing filters and show popular tags).
+- [ ] Blog list: reading meta – Show author, publish date, and reading time more prominently on cards.
+- [ ] Blog list: RSS/Atom feed – Provide `/blog/rss.xml` (and/or Atom) with latest posts and translations.
+- [ ] Blog list: JSON feed – Provide `/blog/feed.json` for integrations and modern feed readers.
+- [ ] Blog post: typography refresh – Better line length, font sizes, headings, and spacing for a more premium look.
+- [ ] Blog post: reading progress – Add a top progress bar and “Back to top” affordance.
+- [ ] Blog post: table of contents – Auto-generate TOC from headings with scroll-spy and anchor links.
+- [ ] Blog post: heading permalinks – Add link icons on headings for easy sharing of sections.
+- [ ] Blog post: next/previous nav – Add “Next post / Previous post” navigation at the bottom.
+- [ ] Blog post: related posts – Show related posts by tags/series with thumbnails.
+- [ ] Blog post: share bar – Add share buttons (copy link + WhatsApp/Facebook) with accessible labels.
+- [ ] Blog post: inline image lightbox – Click in-article images to open a gallery/lightbox with captions.
+- [ ] Blog post: rich image layouts – Support wide/left/right aligned images and multi-image galleries in content.
+- [ ] Blog post: code blocks – Syntax highlighting + “Copy” button + line wrapping toggle.
+- [ ] Blog post: callout blocks – Support “Tip/Note/Warning” callouts with icons and theme-aware styling.
+- [ ] Blog post: embedded product cards – Allow inserting product/category/collection cards inside posts (shoppable content).
+- [ ] Blog post: author card – Author bio + avatar + links, plus “More from this author”.
+- [ ] Blog post: print-friendly styles – Clean print stylesheet (no nav, readable typography, proper image sizing).
+- [ ] Blog post: comments UX – Pagination + sorting (newest/oldest/top) and improved empty/loading states.
+- [ ] Blog comments: spam controls – Rate limits + link limits + optional CAPTCHA on comment submit.
+- [ ] Blog: newsletter subscribe – Inline subscribe block and optional “subscribe to comments” on a post.
+- [ ] Storefront admin quick edit: edit buttons – Show “Edit” on blog cards/posts for admins (links to admin editor).
+- [ ] Storefront admin quick edit: publish toggle – Allow publish/unpublish/schedule from the blog page in admin mode.
+- [ ] Storefront admin quick edit: inline meta – Quick edit title/summary/tags from the post page (drawer/modal).
+- [ ] Admin blog list: bulk actions – Bulk publish/unpublish, tag add/remove, and schedule changes with preview.
+- [ ] Admin editor: cover image workflow – Upload/select cover image with crop + focal point + mobile preview.
+- [ ] Admin editor: drag-drop images – Drag-and-drop images into the editor (auto-upload + insert markdown/WYSIWYG block).
+- [ ] Admin editor: accessibility checks – Warn on missing alt text/captions and offer quick fixes before publish.
+- [ ] Admin editor: autosave + recovery – Autosave drafts and offer “restore last autosave” after crashes/refresh.
+- [ ] Admin editor: writing aids – Word count, reading-time recalculation, and headings outline sidebar.
+- [ ] Blog SEO: preview panel – Preview meta/OG/twitter cards per language and validate truncation/warnings.
+- [ ] Blog perf: prefetch + caching – Prefetch post data on hover and add caching for list/detail to speed up loads.
 ## Frontend - Cart & Checkout
 - [x] Cart page/drawer with quantities and totals.
 - [x] Cart UX: make cart item image/title link to the product page (`/products/:slug`).
