@@ -1787,6 +1787,9 @@
       "use": "Folosește",
       "prev": "Anterior",
       "next": "Înainte",
+      "back": "Înapoi",
+      "done": "Gata",
+      "exit": "Ieși",
       "open": "Deschide",
       "up": "Sus",
       "down": "Jos",
@@ -2978,6 +2981,29 @@
       "title": "Produse",
       "hint": "Caută după nume, URL sau cod produs (SKU).",
       "new": "Nou",
+      "wizard": {
+        "start": "Asistent ghidat",
+        "createTitle": "Configurare ghidată: adaugă produs",
+        "publishTitle": "Configurare ghidată: publică produs",
+        "publish": "Asistent publicare",
+        "publishNow": "Publică acum",
+        "steps": {
+          "basics": "Bază",
+          "content": "Conținut",
+          "save": "Salvează",
+          "images": "Imagini",
+          "publish": "Publică",
+          "review": "Revizuire"
+        },
+        "desc": {
+          "basics": "Completează esențialul: nume, categorie, preț și stoc.",
+          "content": "Adaugă o descriere și eventuale traduceri (RO/EN).",
+          "save": "Salvează pentru a crea produsul. Asta deblochează imaginile și traducerile.",
+          "images": "Încarcă cel puțin o fotografie și adaugă text alternativ.",
+          "publish": "Când ești gata, setează Status pe Publicat și salvează din nou.",
+          "review": "Verifică conținutul și traducerile înainte de publicare."
+        }
+      },
       "delete": "Șterge",
       "edit": "Editează produs",
       "inlineEdit": "Editare rapidă",
@@ -3340,6 +3366,19 @@
     "categories": {
       "title": "Categorii",
       "add": "Adaugă categorie",
+      "wizard": {
+        "start": "Asistent ghidat",
+        "title": "Configurare ghidată: adaugă categorie",
+        "addFirst": "Adaugă mai întâi categoria pentru a continua.",
+        "steps": {
+          "basics": "Bază",
+          "translations": "Traduceri"
+        },
+        "desc": {
+          "basics": "Dă un nume categoriei și (opțional) alege un părinte, apoi adaug-o.",
+          "translations": "Adaugă traduceri RO și EN pentru afișare corectă în ambele limbi."
+        }
+      },
       "slug": "Slug",
       "slugAutoHint": "Slug-ul este generat automat din nume.",
       "parent": "Categorie părinte",

@@ -897,8 +897,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin UX: simplified mode – Add a “Simple / Advanced” toggle (default Simple) to hide advanced settings and jargon.
 - [x] Admin UX: progressive disclosure – Collapse rarely used fields behind “Show advanced” per form section.
 - [x] Admin UX: plain-language labels – Replace technical labels (slug/SKU) with friendly copy + examples and tooltips.
-- [ ] Admin UX: guided wizards – Step-by-step flows for “Add product”, “Add category”, and “Publish product”.
-- [ ] Admin UX: safer defaults – Pre-fill sensible defaults and reduce required fields for first-time product creation.
+- [x] Admin UX: guided wizards – Step-by-step flows for “Add product”, “Add category”, and “Publish product”.
+- [x] Admin UX: safer defaults – Pre-fill sensible defaults and reduce required fields for first-time product creation.
 - [ ] Admin UX: declutter tables – Reduce visible columns by default; add “Customize columns” for power users.
 - [ ] Admin UX: inline help panels – Contextual “What is this?” help with screenshots/examples per page.
 - [ ] Admin UX: confirmation language – Make destructive/irreversible actions use clear language + consequence checklist.
@@ -1023,3 +1023,4 @@ Below is a structured checklist you can turn into issues.
 - [x] Catalog: investigate product detail page sometimes failing to load from listings (route/slug/API error).
 - [x] Admin Dashboard analytics: exclude cancelled/refunded/pending orders from sales totals and “sold” KPIs.
 - [x] Data hygiene: replace any “oz” units in seeded/sample products with metric variants (e.g., ml) and avoid reintroducing.
+- [ ] i18n: move category name required message from `adminUi.products.errors.required` to `adminUi.categories.errors.required` and update call sites.

@@ -2923,7 +2923,77 @@ class CmsDraftManager<T> {
           <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.categories.title' | translate }}</h2>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.categories.wizard.start' | translate"
+                (action)="startCategoryWizard()"
+              ></app-button>
             </div>
+
+            <div
+              *ngIf="categoryWizardOpen()"
+              class="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-100"
+            >
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="grid gap-1">
+                  <p class="font-semibold">{{ 'adminUi.categories.wizard.title' | translate }}</p>
+                  <p class="text-xs text-indigo-800 dark:text-indigo-200">{{ categoryWizardDescriptionKey() | translate }}</p>
+                </div>
+                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.exit' | translate" (action)="exitCategoryWizard()"></app-button>
+              </div>
+
+              <div class="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  *ngFor="let step of categoryWizardSteps; let idx = index"
+                  type="button"
+                  class="rounded-full border border-indigo-200 bg-white px-3 py-1 text-xs font-semibold text-indigo-900 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/10 dark:text-indigo-100 dark:hover:bg-indigo-900/30"
+                  [class.bg-indigo-600]="idx === categoryWizardStep()"
+                  [class.text-white]="idx === categoryWizardStep()"
+                  [class.border-indigo-600]="idx === categoryWizardStep()"
+                  [class.hover:bg-indigo-700]="idx === categoryWizardStep()"
+                  [class.dark:bg-indigo-500/30]="idx === categoryWizardStep()"
+                  [class.dark:hover:bg-indigo-500/40]="idx === categoryWizardStep()"
+                  (click)="goToCategoryWizardStep(idx)"
+                >
+                  {{ step.labelKey | translate }}
+                </button>
+              </div>
+
+              <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.actions.back' | translate"
+                  (action)="categoryWizardPrev()"
+                  [disabled]="categoryWizardStep() === 0"
+                ></app-button>
+
+                <div class="flex flex-wrap items-center gap-2">
+                  <app-button
+                    *ngIf="categoryWizardStep() === 0"
+                    size="sm"
+                    [label]="'adminUi.categories.add' | translate"
+                    (action)="addCategory()"
+                    [disabled]="!categoryName.trim()"
+                  ></app-button>
+                  <app-button
+                    *ngIf="categoryWizardStep() === 1 && categoryWizardSlug()"
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.categories.translations.button' | translate"
+                    (action)="openCategoryWizardTranslations()"
+                  ></app-button>
+                  <app-button
+                    size="sm"
+                    [label]="categoryWizardNextLabelKey() | translate"
+                    (action)="categoryWizardNext()"
+                    [disabled]="!categoryWizardCanNext()"
+                  ></app-button>
+                </div>
+              </div>
+            </div>
+
             <div class="grid md:grid-cols-[1fr_260px_auto] gap-2 items-end text-sm">
               <app-input [label]="'adminUi.products.table.name' | translate" [(value)]="categoryName"></app-input>
               <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -4920,6 +4990,21 @@ export class AdminComponent implements OnInit, OnDestroy {
   categories: AdminCategory[] = [];
   categoryName = '';
   categoryParentId = '';
+  categoryWizardOpen = signal(false);
+  categoryWizardStep = signal(0);
+  categoryWizardSlug = signal<string | null>(null);
+  readonly categoryWizardSteps = [
+    {
+      id: 'basics',
+      labelKey: 'adminUi.categories.wizard.steps.basics',
+      descriptionKey: 'adminUi.categories.wizard.desc.basics'
+    },
+    {
+      id: 'translations',
+      labelKey: 'adminUi.categories.wizard.steps.translations',
+      descriptionKey: 'adminUi.categories.wizard.desc.translations'
+    }
+  ];
   categoryTranslationsSlug: string | null = null;
   categoryTranslationsError = signal<string | null>(null);
   categoryTranslationExists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
@@ -6037,6 +6122,77 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
+  startCategoryWizard(): void {
+    this.categoryWizardOpen.set(true);
+    this.categoryWizardStep.set(0);
+    this.categoryWizardSlug.set(null);
+  }
+
+  exitCategoryWizard(): void {
+    this.categoryWizardOpen.set(false);
+    this.categoryWizardStep.set(0);
+    this.categoryWizardSlug.set(null);
+  }
+
+  categoryWizardDescriptionKey(): string {
+    return this.categoryWizardSteps[this.categoryWizardStep()]?.descriptionKey ?? 'adminUi.categories.wizard.desc.basics';
+  }
+
+  categoryWizardNextLabelKey(): string {
+    return this.categoryWizardStep() >= this.categoryWizardSteps.length - 1 ? 'adminUi.actions.done' : 'adminUi.actions.next';
+  }
+
+  categoryWizardCanNext(): boolean {
+    if (!this.categoryWizardOpen()) return false;
+    if (this.categoryWizardStep() >= this.categoryWizardSteps.length - 1) return true;
+    return Boolean(this.categoryWizardSlug());
+  }
+
+  categoryWizardPrev(): void {
+    const next = this.categoryWizardStep() - 1;
+    if (next < 0) return;
+    this.categoryWizardStep.set(next);
+  }
+
+  categoryWizardNext(): void {
+    if (!this.categoryWizardOpen()) return;
+    if (this.categoryWizardStep() >= this.categoryWizardSteps.length - 1) {
+      this.exitCategoryWizard();
+      return;
+    }
+    if (!this.categoryWizardCanNext()) {
+      this.toast.error(this.t('adminUi.categories.wizard.addFirst'));
+      return;
+    }
+    this.categoryWizardStep.set(this.categoryWizardStep() + 1);
+    if (this.categoryWizardStep() === 1) {
+      this.openCategoryWizardTranslations();
+    }
+  }
+
+  goToCategoryWizardStep(index: number): void {
+    if (!this.categoryWizardOpen()) return;
+    if (index < 0 || index >= this.categoryWizardSteps.length) return;
+    if (index > 0 && !this.categoryWizardSlug()) {
+      this.toast.error(this.t('adminUi.categories.wizard.addFirst'));
+      this.categoryWizardStep.set(0);
+      return;
+    }
+    this.categoryWizardStep.set(index);
+    if (index === 1) {
+      this.openCategoryWizardTranslations();
+    }
+  }
+
+  openCategoryWizardTranslations(): void {
+    const slug = this.categoryWizardSlug();
+    if (!slug) return;
+    if (this.categoryTranslationsSlug !== slug) {
+      this.categoryTranslationsSlug = slug;
+      this.loadCategoryTranslations(slug);
+    }
+  }
+
   addCategory(): void {
     if (!this.categoryName) {
       this.toast.error(this.t('adminUi.products.errors.required'));
@@ -6049,6 +6205,14 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.categoryName = '';
         this.categoryParentId = '';
         this.toast.success(this.t('adminUi.categories.success.add'));
+        if (this.categoryWizardOpen() && this.categoryWizardStep() === 0) {
+          const slug = typeof cat?.slug === 'string' ? cat.slug : '';
+          if (slug) {
+            this.categoryWizardSlug.set(slug);
+            this.categoryWizardStep.set(1);
+            this.openCategoryWizardTranslations();
+          }
+        }
       },
       error: () => this.toast.error(this.t('adminUi.categories.errors.add'))
     });

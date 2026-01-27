@@ -1787,6 +1787,9 @@
       "use": "Use",
       "prev": "Prev",
       "next": "Next",
+      "back": "Back",
+      "done": "Done",
+      "exit": "Exit",
       "open": "Open",
       "up": "Up",
       "down": "Down",
@@ -2978,6 +2981,29 @@
       "title": "Products",
       "hint": "Search by name, URL, or product code (SKU).",
       "new": "New",
+      "wizard": {
+        "start": "Guided wizard",
+        "createTitle": "Guided setup: add product",
+        "publishTitle": "Guided setup: publish product",
+        "publish": "Publish wizard",
+        "publishNow": "Publish now",
+        "steps": {
+          "basics": "Basics",
+          "content": "Content",
+          "save": "Save",
+          "images": "Images",
+          "publish": "Publish",
+          "review": "Review"
+        },
+        "desc": {
+          "basics": "Fill out the essentials: name, category, price, and stock.",
+          "content": "Add a description and any translations (RO/EN).",
+          "save": "Save to create the product. This unlocks images and translations.",
+          "images": "Upload at least one photo and add alt text.",
+          "publish": "When you're ready, set Status to Published and save again.",
+          "review": "Check content and translations before publishing."
+        }
+      },
       "delete": "Delete",
       "edit": "Edit product",
       "inlineEdit": "Quick edit",
@@ -3340,6 +3366,19 @@
     "categories": {
       "title": "Categories",
       "add": "Add category",
+      "wizard": {
+        "start": "Guided wizard",
+        "title": "Guided setup: add category",
+        "addFirst": "Add the category first to continue.",
+        "steps": {
+          "basics": "Basics",
+          "translations": "Translations"
+        },
+        "desc": {
+          "basics": "Give the category a name and optional parent, then add it.",
+          "translations": "Add RO and EN translations so the category displays in both languages."
+        }
+      },
       "slug": "Slug",
       "slugAutoHint": "Slug is auto-generated from the name.",
       "parent": "Parent category",

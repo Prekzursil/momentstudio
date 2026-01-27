@@ -52,6 +52,70 @@ type ProductStatusFilter = 'all' | 'draft' | 'published' | 'archived';
 type ProductTranslationFilter = 'all' | 'missing_any' | 'missing_en' | 'missing_ro';
 type ProductView = 'active' | 'deleted';
 
+type ProductWizardKind = 'create' | 'publish';
+type ProductWizardStepId = 'basics' | 'content' | 'save' | 'images' | 'publish';
+
+type ProductWizardStep = {
+  id: ProductWizardStepId;
+  labelKey: string;
+  descriptionKey: string;
+  anchorId: string;
+};
+
+const PRODUCT_CREATE_WIZARD_STEPS: ProductWizardStep[] = [
+  {
+    id: 'basics',
+    labelKey: 'adminUi.products.wizard.steps.basics',
+    descriptionKey: 'adminUi.products.wizard.desc.basics',
+    anchorId: 'product-wizard-top'
+  },
+  {
+    id: 'content',
+    labelKey: 'adminUi.products.wizard.steps.content',
+    descriptionKey: 'adminUi.products.wizard.desc.content',
+    anchorId: 'product-wizard-content'
+  },
+  {
+    id: 'save',
+    labelKey: 'adminUi.products.wizard.steps.save',
+    descriptionKey: 'adminUi.products.wizard.desc.save',
+    anchorId: 'product-wizard-save'
+  },
+  {
+    id: 'images',
+    labelKey: 'adminUi.products.wizard.steps.images',
+    descriptionKey: 'adminUi.products.wizard.desc.images',
+    anchorId: 'product-wizard-images'
+  },
+  {
+    id: 'publish',
+    labelKey: 'adminUi.products.wizard.steps.publish',
+    descriptionKey: 'adminUi.products.wizard.desc.publish',
+    anchorId: 'product-wizard-publish'
+  }
+];
+
+const PRODUCT_PUBLISH_WIZARD_STEPS: ProductWizardStep[] = [
+  {
+    id: 'content',
+    labelKey: 'adminUi.products.wizard.steps.review',
+    descriptionKey: 'adminUi.products.wizard.desc.review',
+    anchorId: 'product-wizard-content'
+  },
+  {
+    id: 'images',
+    labelKey: 'adminUi.products.wizard.steps.images',
+    descriptionKey: 'adminUi.products.wizard.desc.images',
+    anchorId: 'product-wizard-images'
+  },
+  {
+    id: 'publish',
+    labelKey: 'adminUi.products.wizard.steps.publish',
+    descriptionKey: 'adminUi.products.wizard.desc.publish',
+    anchorId: 'product-wizard-publish'
+  }
+];
+
 const PRODUCTS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
   { id: 'select', labelKey: 'adminUi.products.table.select', required: true },
   { id: 'name', labelKey: 'adminUi.products.table.name', required: true },
@@ -175,6 +239,7 @@ type PriceHistoryChart = {
           <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.import' | translate" (action)="openCsvImport()"></app-button>
           <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
           <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
+          <app-button size="sm" variant="ghost" [label]="'adminUi.products.wizard.start' | translate" (action)="startCreateWizard()"></app-button>
           <app-button size="sm" [label]="'adminUi.products.new' | translate" (action)="startNew()"></app-button>
         </div>
       </div>
@@ -875,16 +940,91 @@ type PriceHistoryChart = {
         </ng-template>
       </section>
 
-      <section *ngIf="editorOpen()" class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+      <section
+        *ngIf="editorOpen()"
+        id="product-wizard-top"
+        class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+      >
         <div class="flex items-center justify-between gap-3">
           <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
             {{ editingSlug() ? ('adminUi.products.edit' | translate) : ('adminUi.products.create' | translate) }}
           </h2>
-          <app-button size="sm" variant="ghost" [label]="'adminUi.products.actions.cancel' | translate" (action)="closeEditor()"></app-button>
+          <div class="flex flex-wrap items-center justify-end gap-2">
+            <app-button
+              *ngIf="editingSlug()"
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.products.wizard.publish' | translate"
+              (action)="startPublishWizard()"
+            ></app-button>
+            <app-button size="sm" variant="ghost" [label]="'adminUi.products.actions.cancel' | translate" (action)="closeEditor()"></app-button>
+          </div>
         </div>
 
         <div *ngIf="editorError()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
           {{ editorError() }}
+        </div>
+
+        <div
+          *ngIf="wizardKind()"
+          class="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-100"
+        >
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="grid gap-1">
+              <p class="font-semibold">{{ wizardTitleKey() | translate }}</p>
+              <p class="text-xs text-indigo-800 dark:text-indigo-200">{{ wizardStepDescriptionKey() | translate }}</p>
+            </div>
+            <app-button size="sm" variant="ghost" [label]="'adminUi.actions.exit' | translate" (action)="exitWizard()"></app-button>
+          </div>
+
+          <div class="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              *ngFor="let step of wizardSteps(); let idx = index"
+              type="button"
+              class="rounded-full border border-indigo-200 bg-white px-3 py-1 text-xs font-semibold text-indigo-900 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/10 dark:text-indigo-100 dark:hover:bg-indigo-900/30"
+              [class.bg-indigo-600]="idx === wizardStep()"
+              [class.text-white]="idx === wizardStep()"
+              [class.border-indigo-600]="idx === wizardStep()"
+              [class.hover:bg-indigo-700]="idx === wizardStep()"
+              [class.dark:bg-indigo-500/30]="idx === wizardStep()"
+              [class.dark:hover:bg-indigo-500/40]="idx === wizardStep()"
+              (click)="goToWizardStep(idx)"
+            >
+              {{ step.labelKey | translate }}
+            </button>
+          </div>
+
+          <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.actions.back' | translate"
+              (action)="wizardPrev()"
+              [disabled]="wizardStep() === 0"
+            ></app-button>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <app-button
+                *ngIf="wizardCurrentStepId() === 'save'"
+                size="sm"
+                [label]="'adminUi.products.form.save' | translate"
+                (action)="wizardSave()"
+              ></app-button>
+              <app-button
+                *ngIf="wizardCurrentStepId() === 'publish'"
+                size="sm"
+                [label]="'adminUi.products.wizard.publishNow' | translate"
+                (action)="wizardPublishNow()"
+                [disabled]="!editingSlug()"
+              ></app-button>
+              <app-button
+                size="sm"
+                [label]="wizardNextLabelKey() | translate"
+                (action)="wizardNext()"
+                [disabled]="!wizardCanNext()"
+              ></app-button>
+            </div>
+          </div>
         </div>
 
 	        <div class="grid gap-3 md:grid-cols-2">
@@ -1062,8 +1202,9 @@ type PriceHistoryChart = {
 	          </div>
           <app-input [label]="'adminUi.products.table.stock' | translate" type="number" [(value)]="form.stock_quantity"></app-input>
           <details
+            id="product-wizard-publish"
             class="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
-            [open]="uiPrefs.mode() === 'advanced'"
+            [open]="uiPrefs.mode() === 'advanced' || wizardForcesAdvancedOpen()"
           >
             <summary class="cursor-pointer select-none text-sm font-semibold text-slate-900 dark:text-slate-50">
               {{ 'adminUi.products.form.advancedSettings' | translate }}
@@ -1862,6 +2003,8 @@ type PriceHistoryChart = {
 	          </div>
 	        </div>
 
+          <div id="product-wizard-content" class="h-0 scroll-mt-24"></div>
+
 	        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
 	          {{ 'adminUi.products.form.shortDescription' | translate }}
 	          <textarea
@@ -2160,12 +2303,12 @@ type PriceHistoryChart = {
               </div>
             </div>
 
-		        <div class="flex items-center gap-2">
+		        <div id="product-wizard-save" class="flex items-center gap-2">
 		          <app-button [label]="'adminUi.products.form.save' | translate" (action)="save()"></app-button>
 		          <span *ngIf="editorMessage()" class="text-sm text-emerald-700 dark:text-emerald-300">{{ editorMessage() }}</span>
 		        </div>
 
-	        <div class="grid gap-3">
+	        <div id="product-wizard-images" class="grid gap-3">
 	          <div class="flex items-center justify-between">
 	            <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.products.form.images' | translate }}</p>
 	            <div class="flex flex-wrap items-center gap-2">
@@ -2395,6 +2538,10 @@ export class AdminProductsComponent implements OnInit {
 	  editingCurrency = signal('RON');
 	  editorError = signal<string | null>(null);
 	  editorMessage = signal<string | null>(null);
+	  wizardKind = signal<ProductWizardKind | null>(null);
+	  wizardStep = signal(0);
+    private wizardAdvanceAfterSave = false;
+    private wizardExitAfterPublish = false;
   images = signal<Array<{ id: string; url: string; alt_text?: string | null; caption?: string | null }>>([]);
   deletedImagesOpen = signal(false);
   deletedImages = signal<AdminDeletedProductImage[]>([]);
@@ -3296,7 +3443,131 @@ export class AdminProductsComponent implements OnInit {
     this.translationPreviewSanitized[lang] = sanitized;
   }
 
+  startCreateWizard(): void {
+    this.startNew();
+    this.wizardKind.set('create');
+    this.wizardStep.set(0);
+    this.scrollToWizardAnchor(PRODUCT_CREATE_WIZARD_STEPS[0].anchorId);
+  }
+
+  startPublishWizard(): void {
+    if (!this.editorOpen() || !this.editingSlug()) return;
+    this.wizardKind.set('publish');
+    this.wizardStep.set(0);
+    this.scrollToWizardAnchor(PRODUCT_PUBLISH_WIZARD_STEPS[0].anchorId);
+  }
+
+  exitWizard(): void {
+    this.wizardKind.set(null);
+    this.wizardStep.set(0);
+    this.wizardAdvanceAfterSave = false;
+    this.wizardExitAfterPublish = false;
+  }
+
+  wizardSteps(): ProductWizardStep[] {
+    const kind = this.wizardKind();
+    if (kind === 'publish') return PRODUCT_PUBLISH_WIZARD_STEPS;
+    if (kind === 'create') return PRODUCT_CREATE_WIZARD_STEPS;
+    return [];
+  }
+
+  wizardCurrentStepId(): ProductWizardStepId | null {
+    return this.wizardCurrent()?.id ?? null;
+  }
+
+  wizardTitleKey(): string {
+    return this.wizardKind() === 'publish' ? 'adminUi.products.wizard.publishTitle' : 'adminUi.products.wizard.createTitle';
+  }
+
+  wizardStepDescriptionKey(): string {
+    return this.wizardCurrent()?.descriptionKey ?? 'adminUi.products.wizard.desc.basics';
+  }
+
+  wizardNextLabelKey(): string {
+    const steps = this.wizardSteps();
+    if (!steps.length) return 'adminUi.actions.next';
+    return this.wizardStep() >= steps.length - 1 ? 'adminUi.actions.done' : 'adminUi.actions.next';
+  }
+
+  wizardCanNext(): boolean {
+    const steps = this.wizardSteps();
+    if (!steps.length) return false;
+    if (this.wizardStep() >= steps.length - 1) return true;
+    const current = this.wizardCurrent();
+    if (current?.id === 'save') return Boolean(this.editingSlug());
+    return true;
+  }
+
+  wizardPrev(): void {
+    const next = this.wizardStep() - 1;
+    if (next < 0) return;
+    this.wizardStep.set(next);
+    this.scrollToWizardAnchor(this.wizardCurrent()?.anchorId || 'product-wizard-top');
+  }
+
+  wizardNext(): void {
+    const steps = this.wizardSteps();
+    if (!steps.length) return;
+    if (this.wizardStep() >= steps.length - 1) {
+      this.exitWizard();
+      return;
+    }
+    if (!this.wizardCanNext()) {
+      this.toast.error(this.t('adminUi.products.errors.saveFirst'));
+      this.scrollToWizardAnchor('product-wizard-save');
+      return;
+    }
+    this.wizardStep.set(this.wizardStep() + 1);
+    this.scrollToWizardAnchor(this.wizardCurrent()?.anchorId || 'product-wizard-top');
+  }
+
+  goToWizardStep(index: number): void {
+    const steps = this.wizardSteps();
+    if (!steps.length) return;
+    if (index < 0 || index >= steps.length) return;
+    if (this.wizardKind() === 'create' && index > 2 && !this.editingSlug()) {
+      this.toast.error(this.t('adminUi.products.errors.saveFirst'));
+      this.wizardStep.set(2);
+      this.scrollToWizardAnchor('product-wizard-save');
+      return;
+    }
+    this.wizardStep.set(index);
+    this.scrollToWizardAnchor(steps[index].anchorId);
+  }
+
+  wizardSave(): void {
+    this.wizardAdvanceAfterSave = true;
+    this.save();
+  }
+
+  wizardPublishNow(): void {
+    this.form.status = 'published';
+    this.form.is_active = true;
+    this.wizardExitAfterPublish = true;
+    this.save();
+  }
+
+  wizardForcesAdvancedOpen(): boolean {
+    if (!this.wizardKind()) return false;
+    return this.wizardCurrentStepId() === 'publish';
+  }
+
+  private wizardCurrent(): ProductWizardStep | null {
+    const steps = this.wizardSteps();
+    const idx = this.wizardStep();
+    return steps[idx] ?? null;
+  }
+
+  private scrollToWizardAnchor(anchorId: string): void {
+    window.setTimeout(() => {
+      const el = document.getElementById(anchorId);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
+  }
+
 		  startNew(): void {
+        this.exitWizard();
 		    this.editorOpen.set(true);
 		    this.editingSlug.set(null);
 		    this.editingProductId.set(null);
@@ -3322,6 +3593,7 @@ export class AdminProductsComponent implements OnInit {
   }
 
 		  closeEditor(): void {
+        this.exitWizard();
 		    this.editorOpen.set(false);
 		    this.editingSlug.set(null);
 		    this.editingProductId.set(null);
@@ -3344,6 +3616,7 @@ export class AdminProductsComponent implements OnInit {
   }
 
 		  edit(slug: string): void {
+        this.exitWizard();
 		    this.editorOpen.set(true);
 		    this.editorError.set(null);
 		    this.editorMessage.set(null);
@@ -3786,7 +4059,7 @@ export class AdminProductsComponent implements OnInit {
       is_featured: this.form.is_featured,
       sku: this.form.sku || null,
       long_description: this.form.long_description || null,
-      short_description: this.form.short_description.trim() ? this.form.short_description.trim().slice(0, 280) : null,
+      short_description: this.buildShortDescription(),
       publish_at: this.form.publish_at ? new Date(this.form.publish_at).toISOString() : null,
       tags: this.buildTags(),
       badges
@@ -3810,6 +4083,16 @@ export class AdminProductsComponent implements OnInit {
 	        if (newSlug) this.loadTranslations(newSlug);
 	        if (newSlug) this.loadRelationships(newSlug);
 	        this.load();
+          if (this.wizardExitAfterPublish) {
+            this.wizardExitAfterPublish = false;
+            this.wizardAdvanceAfterSave = false;
+            this.exitWizard();
+          } else if (this.wizardAdvanceAfterSave && this.wizardCurrentStepId() === 'save') {
+            this.wizardAdvanceAfterSave = false;
+            this.wizardNext();
+          } else {
+            this.wizardAdvanceAfterSave = false;
+          }
 	      },
 	      error: () => this.editorError.set(this.t('adminUi.products.errors.save'))
 	    });
@@ -4489,6 +4772,9 @@ export class AdminProductsComponent implements OnInit {
       next: (cats: any[]) => {
         const mapped = (cats || []).map((c) => ({ id: c.id, name: c.name }));
         this.adminCategories.set(mapped);
+        if (this.editorOpen() && !this.editingSlug() && !this.form.category_id && mapped[0]) {
+          this.form.category_id = mapped[0].id;
+        }
         this.openPendingEditor();
       },
       error: () => {
@@ -4926,6 +5212,21 @@ export class AdminProductsComponent implements OnInit {
       seen.delete('bestseller');
     }
     return Array.from(seen);
+  }
+
+  private buildShortDescription(): string | null {
+    const direct = (this.form.short_description || '').trim();
+    if (direct) return direct.slice(0, 280);
+
+    const fallback = (this.form.long_description || '').trim();
+    if (!fallback) return null;
+
+    const firstLine = fallback
+      .split('\n')
+      .map((line) => line.trim())
+      .find((line) => Boolean(line));
+
+    return firstLine ? firstLine.slice(0, 280) : null;
   }
 
   private toLocalDateTime(value: string): string {
