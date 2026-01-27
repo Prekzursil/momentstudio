@@ -1326,6 +1326,7 @@
   "adminUi": {
     "common": {
       "edit": "Edit",
+      "duplicate": "Duplicate",
       "loading": "Loading…",
       "save": "Save",
       "cancel": "Cancel",
@@ -1390,6 +1391,7 @@
         "bulkApply": "Apply",
         "bulkSelectPage": "Select page",
         "bulkClear": "Clear",
+        "pinToTop": "Pin to top",
         "bulkStatus": "Status",
         "bulkStatusPlaceholder": "No status change",
         "bulkCategory": "Category",

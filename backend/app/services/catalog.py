@@ -1757,6 +1757,22 @@ async def duplicate_product(session: AsyncSession, product: Product) -> Product:
             counter += 1
             new_slug = f"{base_slug}-{counter}"
     new_sku = await _generate_unique_sku(session, new_slug)
+    custom_count = await session.scalar(
+        select(func.count(Product.id)).where(
+            Product.is_deleted.is_(False),
+            Product.category_id == product.category_id,
+            Product.sort_order != 0,
+        )
+    )
+    sort_order = 0
+    if int(custom_count or 0) > 0:
+        max_sort = await session.scalar(
+            select(func.max(Product.sort_order)).where(
+                Product.is_deleted.is_(False),
+                Product.category_id == product.category_id,
+            )
+        )
+        sort_order = int(max_sort or 0) + 1
 
     clone = Product(
         category_id=product.category_id,
@@ -1772,6 +1788,7 @@ async def duplicate_product(session: AsyncSession, product: Product) -> Product:
         currency=product.currency,
         is_active=False,
         is_featured=False,
+        sort_order=sort_order,
         stock_quantity=product.stock_quantity,
         status=ProductStatus.draft,
         allow_backorder=product.allow_backorder,
@@ -1786,7 +1803,15 @@ async def duplicate_product(session: AsyncSession, product: Product) -> Product:
         meta_title=product.meta_title,
         meta_description=product.meta_description,
     )
-    clone.images = [ProductImage(url=img.url, alt_text=img.alt_text, sort_order=img.sort_order) for img in product.images]
+    clone.images = [
+        ProductImage(
+            url=img.url,
+            alt_text=img.alt_text,
+            caption=getattr(img, "caption", None),
+            sort_order=img.sort_order,
+        )
+        for img in product.images
+    ]
     clone.variants = [
         ProductVariant(name=variant.name, additional_price_delta=variant.additional_price_delta, stock_quantity=variant.stock_quantity)
         for variant in product.variants

@@ -143,6 +143,14 @@ import { AdminService } from '../core/admin.service';
 	          <p *ngIf="inlineError" class="text-xs text-rose-700 dark:text-rose-300">{{ inlineError }}</p>
 	          <span class="flex-1"></span>
 	          <app-button
+	            *ngIf="showPin"
+	            [label]="'adminUi.storefront.products.pinToTop' | translate"
+	            size="sm"
+	            variant="ghost"
+	            [disabled]="inlineSaving"
+	            (action)="requestPinToTop()"
+	          ></app-button>
+	          <app-button
 	            [label]="inlineSaving ? ('adminUi.common.saving' | translate) : ('adminUi.common.save' | translate)"
 	            size="sm"
 	            [disabled]="inlineSaving"
@@ -168,7 +176,9 @@ export class ProductCardComponent implements OnChanges {
   @Input() tag?: string | null;
   @Input() rememberShopReturn = false;
   @Input() showQuickView = false;
+  @Input() showPin = false;
   @Output() quickView = new EventEmitter<string>();
+  @Output() pinToTop = new EventEmitter<string>();
   statusSaving = false;
   inlineSaving = false;
   inlinePrice = '';
@@ -395,6 +405,14 @@ export class ProductCardComponent implements OnChanges {
         this.toast.error(this.translate.instant('adminUi.products.inline.errors.save'));
       }
     });
+  }
+
+  requestPinToTop(): void {
+    if (!this.showStorefrontEdit()) return;
+    if (!this.showPin) return;
+    const id = String(this.product?.id || '').trim();
+    if (!id) return;
+    this.pinToTop.emit(id);
   }
 
   openQuickView(): void {

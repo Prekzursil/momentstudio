@@ -1326,6 +1326,7 @@
   "adminUi": {
     "common": {
       "edit": "Editează",
+      "duplicate": "Duplică",
       "loading": "Se încarcă…",
       "save": "Salvează",
       "cancel": "Anulează",
@@ -1390,6 +1391,7 @@
         "bulkApply": "Aplică",
         "bulkSelectPage": "Selectează pagina",
         "bulkClear": "Golește",
+        "pinToTop": "Fixează sus",
         "bulkStatus": "Stare",
         "bulkStatusPlaceholder": "Fără schimbare de stare",
         "bulkCategory": "Categorie",

@@ -19,6 +19,8 @@ import { WishlistService } from '../../core/wishlist.service';
 import { AuthService } from '../../core/auth.service';
 import { Router } from '@angular/router';
 import { MarkdownService } from '../../core/markdown.service';
+import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
+import { AdminService } from '../../core/admin.service';
 
 @Component({
   selector: 'app-product-detail',
@@ -181,6 +183,13 @@ import { MarkdownService } from '../../core/markdown.service';
                   variant="ghost"
                   (action)="cancelBackInStock()"
                   [disabled]="backInStockLoading"
+                ></app-button>
+                <app-button
+                  *ngIf="showStorefrontEdit()"
+                  [label]="'adminUi.common.duplicate' | translate"
+                  variant="ghost"
+                  (action)="duplicateFromStorefront()"
+                  [disabled]="duplicateSaving"
                 ></app-button>
                 <app-button [label]="'product.backToShop' | translate" variant="ghost" (action)="backToShop()"></app-button>
                 <app-button
@@ -384,6 +393,7 @@ export class ProductComponent implements OnInit, OnDestroy {
   activeImageIndex = 0;
   previewOpen = false;
   backInStockLoading = false;
+  duplicateSaving = false;
   backInStockRequest: BackInStockRequest | null = null;
   upsellProducts: Product[] = [];
   relatedProducts: Product[] = [];
@@ -415,7 +425,9 @@ export class ProductComponent implements OnInit, OnDestroy {
     private markdown: MarkdownService,
     private wishlist: WishlistService,
     private auth: AuthService,
-    private router: Router
+    private router: Router,
+    private storefrontAdminMode: StorefrontAdminModeService,
+    private admin: AdminService
   ) {}
 
   ngOnDestroy(): void {
@@ -477,6 +489,34 @@ export class ProductComponent implements OnInit, OnDestroy {
 
   retryLoad(): void {
     this.load();
+  }
+
+  showStorefrontEdit(): boolean {
+    if (!this.storefrontAdminMode.enabled()) return false;
+    if (!this.auth.isAdmin()) return false;
+    if (this.auth.isImpersonating()) return false;
+    return Boolean(this.product?.slug);
+  }
+
+  duplicateFromStorefront(): void {
+    if (!this.showStorefrontEdit()) return;
+    if (this.duplicateSaving) return;
+    const slug = (this.product?.slug || '').trim();
+    if (!slug) return;
+    this.duplicateSaving = true;
+    this.admin.duplicateProduct(slug).subscribe({
+      next: (created) => {
+        this.duplicateSaving = false;
+        const newSlug = String((created as any)?.slug || '').trim();
+        this.toast.success(this.translate.instant('adminUi.products.success.duplicate'));
+        if (!newSlug) return;
+        void this.router.navigate(['/admin/products'], { state: { editProductSlug: newSlug } });
+      },
+      error: () => {
+        this.duplicateSaving = false;
+        this.toast.error(this.translate.instant('adminUi.products.errors.duplicate'));
+      }
+    });
   }
 
   private load(): void {

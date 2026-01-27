@@ -731,7 +731,9 @@ interface ShopFilterChip {
                 [product]="product"
                 [rememberShopReturn]="true"
                 [showQuickView]="true"
+                [showPin]="canReorderProducts()"
                 (quickView)="openQuickView($event)"
+                (pinToTop)="pinProductToTop($event)"
               ></app-product-card>
             </div>
           </div>
@@ -1120,6 +1122,36 @@ export class ShopComponent implements OnInit, OnDestroy {
         this.productReorderSaving.set(false);
         this.draggingProductId = null;
         this.dragOverProductId = null;
+        this.restoreProductOrder(previous);
+        this.toast.error(this.translate.instant('adminUi.storefront.products.reorderError'));
+      }
+    });
+  }
+
+  pinProductToTop(productId: string): void {
+    if (!this.canReorderProducts()) return;
+    if (this.productReorderSaving()) return;
+    const desired = String(productId || '').trim();
+    if (!desired) return;
+    const firstId = this.products?.[0]?.id;
+    if (!firstId || desired === firstId) return;
+
+    const previous = this.products.map((p) => p.id);
+    const moved = this.reorderProducts(desired, firstId);
+    if (!moved) return;
+    const updates = this.products
+      .map((p, index) => ({ product_id: p.id, sort_order: index }))
+      .filter((row) => Boolean(row.product_id));
+    if (!updates.length) return;
+
+    this.productReorderSaving.set(true);
+    this.admin.bulkUpdateProducts(updates).subscribe({
+      next: () => {
+        this.productReorderSaving.set(false);
+        this.toast.success(this.translate.instant('adminUi.storefront.products.reorderSuccess'));
+      },
+      error: () => {
+        this.productReorderSaving.set(false);
         this.restoreProductOrder(previous);
         this.toast.error(this.translate.instant('adminUi.storefront.products.reorderError'));
       }

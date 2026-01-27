@@ -391,8 +391,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Storefront Products: drag reorder (category) – Custom sort order per category with drag-and-drop on the category page.
 - [x] Storefront Products: reorder for large categories – Support drag reordering when a category spans multiple pages (load-all mode or cross-page ordering).
 - [x] Catalog: respect hidden categories in listings – Do not allow browsing hidden category products via `/shop/:slug` unless storefront edit mode is enabled.
-- [ ] Storefront Products: pin/feature – Pin products to top of a category (per-category featured list) from storefront.
-- [ ] Storefront Products: quick duplicate – Duplicate a product from product detail in edit mode (clone images, mark draft).
+- [x] Storefront Products: pin/feature – Pin products to top of a category (per-category featured list) from storefront.
+- [x] Storefront Products: quick duplicate – Duplicate a product from product detail in edit mode (clone images, mark draft).
 - [ ] Storefront Products: image manager – Reorder images and edit alt text/captions from product detail in edit mode.
 - [ ] Storefront Admin Mode: undo window – After edits (reorder/publish/price), offer a short “Undo” toast.
 - [ ] Storefront Admin Mode: audit trail – Record all storefront edits in the admin audit log with “source=storefront”.
