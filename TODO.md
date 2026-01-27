@@ -370,6 +370,7 @@ Below is a structured checklist you can turn into issues.
 - [ ] Shop: “Load more” pagination – Optional progressive loading as an alternative to classic pagination.
 - [ ] Shop: better empty states – Suggest clearing filters / show popular categories when no results.
 - [ ] Shop: skeleton grid – Product card skeletons to reduce layout shift during loading.
+- [ ] Shop return UX: make product breadcrumb “Shop” preserve last shop filters/scroll when available.
 
 ### Storefront Admin Quick Edit (No Dashboard) – Next Improvements (Backlog)
 - [ ] Storefront Admin Mode: toggle – Add an “Edit mode” toggle for admins (header button) that reveals inline controls.
