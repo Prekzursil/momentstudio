@@ -23,6 +23,8 @@ import { MarkdownService } from '../../../core/markdown.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import {
   AdminCategory,
+  AdminCategoryDeletePreview,
+  AdminCategoryMergePreview,
   AdminDeletedProductImage,
   AdminProductAuditEntry,
   AdminProductImageOptimizationStats,
@@ -247,6 +249,7 @@ type PriceHistoryChart = {
           <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.import' | translate" (action)="openCsvImport()"></app-button>
           <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
           <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
+          <app-button size="sm" variant="ghost" [label]="'adminUi.categories.title' | translate" (action)="openCategoryManager()"></app-button>
           <app-button size="sm" variant="ghost" [label]="'adminUi.products.wizard.start' | translate" (action)="startCreateWizard()"></app-button>
           <app-button size="sm" [label]="'adminUi.products.new' | translate" (action)="startNew()"></app-button>
         </div>
@@ -433,6 +436,146 @@ type PriceHistoryChart = {
             class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-2 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
           >
             {{ bulkError() }}
+          </div>
+        </div>
+      </app-modal>
+
+      <app-modal
+        [open]="categoryManagerOpen()"
+        [title]="'adminUi.categories.title' | translate"
+        [showActions]="false"
+        [closeLabel]="'adminUi.actions.cancel' | translate"
+        (closed)="closeCategoryManager()"
+      >
+        <div class="grid gap-4">
+          <div class="flex flex-wrap items-end justify-between gap-2">
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 flex-1">
+              {{ 'adminUi.products.table.category' | translate }}
+              <select
+                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                [(ngModel)]="categoryManagerSlug"
+                (ngModelChange)="onCategoryManagerSelect($event)"
+              >
+                <option value="">{{ 'adminUi.products.selectCategory' | translate }}</option>
+                <option *ngFor="let cat of categories()" [value]="cat.slug">{{ cat.name }}</option>
+              </select>
+            </label>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.categories.add' | translate"
+              (action)="openCreateCategoryFromManager()"
+              [disabled]="categoryManagerUpdateBusy() || mergeSaving() || deleteSaving()"
+            ></app-button>
+          </div>
+
+          <div *ngIf="categoryManagerSelectedCategory() as cat" class="grid gap-4">
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+              <p class="font-semibold text-slate-900 dark:text-slate-50">{{ cat.name }}</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.categories.slug' | translate }}: {{ cat.slug }}</p>
+            </div>
+
+            <div class="grid gap-2">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.categories.parent' | translate }}
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="categoryManagerParentId"
+                  [disabled]="categoryManagerUpdateBusy() || mergePreviewLoading() || mergeSaving() || deletePreviewLoading() || deleteSaving()"
+                >
+                  <option value="">{{ 'adminUi.categories.parentNone' | translate }}</option>
+                  <option *ngFor="let parent of categoryParentOptions(cat)" [value]="parent.id">{{ parent.name }}</option>
+                </select>
+              </label>
+              <div class="flex items-center justify-end gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.actions.reset' | translate"
+                  (action)="resetCategoryManagerParent()"
+                  [disabled]="categoryManagerUpdateBusy()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  [label]="categoryManagerUpdateBusy() ? ('adminUi.actions.loading' | translate) : ('adminUi.actions.save' | translate)"
+                  (action)="saveCategoryManagerParent()"
+                  [disabled]="categoryManagerUpdateBusy()"
+                ></app-button>
+              </div>
+              <p *ngIf="categoryManagerUpdateError()" class="text-xs text-rose-700 dark:text-rose-300">
+                {{ categoryManagerUpdateError() }}
+              </p>
+            </div>
+
+            <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+              <p class="text-xs font-semibold text-slate-800 dark:text-slate-100">
+                {{ 'adminUi.storefront.categories.mergeTitle' | translate }}
+              </p>
+              <label class="grid gap-1">
+                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.storefront.categories.mergeInto' | translate }}
+                </span>
+                <select
+                  class="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="mergeTargetSlug"
+                  (ngModelChange)="onMergeTargetChange()"
+                  [disabled]="categoryManagerUpdateBusy() || mergePreviewLoading() || mergeSaving() || deletePreviewLoading() || deleteSaving()"
+                >
+                  <option value="">{{ 'adminUi.storefront.categories.mergeSelectPlaceholder' | translate }}</option>
+                  <option *ngFor="let target of mergeTargetOptions(cat)" [value]="target.slug">{{ target.name }}</option>
+                </select>
+              </label>
+              <p *ngIf="mergePreview() as preview" class="text-xs text-slate-600 dark:text-slate-300">
+                {{
+                  'adminUi.storefront.categories.mergePreviewInfo'
+                    | translate : { products: preview.product_count, children: preview.child_count }
+                }}
+              </p>
+              <p *ngIf="mergeError()" class="text-xs text-rose-700 dark:text-rose-300">{{ mergeError() }}</p>
+              <div class="flex flex-wrap justify-end gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="mergePreviewLoading() ? ('adminUi.actions.loading' | translate) : ('adminUi.storefront.categories.mergePreview' | translate)"
+                  [disabled]="mergePreviewLoading() || mergeSaving() || !mergeTargetSlug"
+                  (action)="previewCategoryMerge()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  [label]="mergeSaving() ? ('adminUi.actions.loading' | translate) : ('adminUi.storefront.categories.mergeAction' | translate)"
+                  [disabled]="mergeSaving() || !(mergePreview()?.can_merge)"
+                  (action)="mergeCategorySelected()"
+                ></app-button>
+              </div>
+            </div>
+
+            <div class="grid gap-3 rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900/40 dark:bg-rose-950/30">
+              <p class="text-xs font-semibold text-rose-900 dark:text-rose-100">
+                {{ 'adminUi.storefront.categories.deleteTitle' | translate }}
+              </p>
+              <p *ngIf="deletePreview() as preview" class="text-xs text-rose-800 dark:text-rose-200">
+                {{
+                  'adminUi.storefront.categories.deletePreviewInfo'
+                    | translate : { products: preview.product_count, children: preview.child_count }
+                }}
+              </p>
+              <p *ngIf="deleteError()" class="text-xs text-rose-800 dark:text-rose-200">{{ deleteError() }}</p>
+              <div class="flex flex-wrap justify-end gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="deletePreviewLoading() ? ('adminUi.actions.loading' | translate) : ('adminUi.storefront.categories.deletePreview' | translate)"
+                  [disabled]="deletePreviewLoading() || deleteSaving()"
+                  (action)="previewCategoryDelete()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  [label]="deleteSaving() ? ('adminUi.actions.loading' | translate) : ('adminUi.storefront.categories.deleteAction' | translate)"
+                  [disabled]="deleteSaving() || !(deletePreview()?.can_delete)"
+                  (action)="deleteCategorySelectedSafe()"
+                ></app-button>
+              </div>
+            </div>
           </div>
         </div>
       </app-modal>
@@ -2939,7 +3082,21 @@ export class AdminProductsComponent implements OnInit {
   createCategoryError = signal<string | null>(null);
   createCategoryName = '';
   createCategoryParentId = '';
-  private createCategoryContext: 'filters' | 'product_form' = 'product_form';
+  private createCategoryContext: 'filters' | 'product_form' | 'manager' = 'product_form';
+  categoryManagerOpen = signal(false);
+  categoryManagerSlug = '';
+  categoryManagerParentId = '';
+  categoryManagerUpdateBusy = signal(false);
+  categoryManagerUpdateError = signal<string | null>(null);
+  mergeTargetSlug = '';
+  mergePreview = signal<AdminCategoryMergePreview | null>(null);
+  mergePreviewLoading = signal(false);
+  mergeSaving = signal(false);
+  mergeError = signal<string | null>(null);
+  deletePreview = signal<AdminCategoryDeletePreview | null>(null);
+  deletePreviewLoading = signal(false);
+  deleteSaving = signal(false);
+  deleteError = signal<string | null>(null);
 
   form: ProductForm = this.blankForm();
   private loadedTagSlugs: string[] = [];
@@ -3388,7 +3545,7 @@ export class AdminProductsComponent implements OnInit {
     });
   }
 
-  openCreateCategory(context: 'filters' | 'product_form'): void {
+  openCreateCategory(context: 'filters' | 'product_form' | 'manager'): void {
     this.createCategoryContext = context;
     this.createCategoryName = '';
     this.createCategoryParentId = '';
@@ -3420,7 +3577,7 @@ export class AdminProductsComponent implements OnInit {
         this.upsertCategoryLists(cat);
         if (this.createCategoryContext === 'product_form') {
           this.form.category_id = cat.id;
-        } else {
+        } else if (this.createCategoryContext === 'filters') {
           this.categorySlug = cat.slug;
         }
       },
@@ -3462,6 +3619,286 @@ export class AdminProductsComponent implements OnInit {
       nextAdminCategories.push(adminItem);
     }
     this.adminCategories.set(nextAdminCategories);
+  }
+
+  openCategoryManager(): void {
+    this.categoryManagerSlug = '';
+    this.categoryManagerParentId = '';
+    this.categoryManagerUpdateBusy.set(false);
+    this.categoryManagerUpdateError.set(null);
+    this.resetCategoryManagerActions();
+    this.categoryManagerOpen.set(true);
+    this.refreshCategoryLists();
+  }
+
+  closeCategoryManager(): void {
+    this.categoryManagerOpen.set(false);
+    this.categoryManagerUpdateBusy.set(false);
+    this.mergePreviewLoading.set(false);
+    this.mergeSaving.set(false);
+    this.deletePreviewLoading.set(false);
+    this.deleteSaving.set(false);
+  }
+
+  openCreateCategoryFromManager(): void {
+    this.closeCategoryManager();
+    this.openCreateCategory('manager');
+  }
+
+  onCategoryManagerSelect(slug: string): void {
+    this.categoryManagerSlug = String(slug ?? '');
+    const cat = this.categoryManagerSelectedCategory();
+    this.categoryManagerParentId = (cat?.parent_id ?? '').trim();
+    this.categoryManagerUpdateError.set(null);
+    this.resetCategoryManagerActions();
+  }
+
+  categoryManagerSelectedCategory(): Category | null {
+    const slug = (this.categoryManagerSlug || '').trim();
+    if (!slug) return null;
+    return this.categories().find((c) => c.slug === slug) ?? null;
+  }
+
+  resetCategoryManagerParent(): void {
+    const cat = this.categoryManagerSelectedCategory();
+    this.categoryManagerUpdateError.set(null);
+    this.categoryManagerParentId = (cat?.parent_id ?? '').trim();
+  }
+
+  saveCategoryManagerParent(): void {
+    const cat = this.categoryManagerSelectedCategory();
+    if (!cat) return;
+    if (this.categoryManagerUpdateBusy()) return;
+
+    const nextParentId = (this.categoryManagerParentId || '').trim() || null;
+    const prevParentId = (cat.parent_id ?? '').trim() || null;
+    if (nextParentId === prevParentId) return;
+
+    this.categoryManagerUpdateBusy.set(true);
+    this.categoryManagerUpdateError.set(null);
+    this.admin.updateCategory(cat.slug, { parent_id: nextParentId }).subscribe({
+      next: (updated) => {
+        this.categoryManagerUpdateBusy.set(false);
+        this.toast.success(this.t('adminUi.categories.success.updateParent'));
+        this.categoryManagerParentId = (updated.parent_id ?? '').trim();
+        this.refreshCategoryLists();
+      },
+      error: (err) => {
+        this.categoryManagerUpdateBusy.set(false);
+        this.categoryManagerUpdateError.set(err?.error?.detail || this.t('adminUi.categories.errors.updateParent'));
+        this.categoryManagerParentId = prevParentId || '';
+      }
+    });
+  }
+
+  categoryParentOptions(cat: Category): Category[] {
+    const currentId = cat.id;
+    const excluded = this.categoryDescendantIds(currentId);
+    excluded.add(currentId);
+    return this.categories()
+      .filter((candidate) => !excluded.has(candidate.id))
+      .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+  }
+
+  private categoryDescendantIds(rootId: string): Set<string> {
+    const childrenByParent = new Map<string, string[]>();
+    for (const cat of this.categories()) {
+      const parentId = (cat.parent_id ?? '').trim();
+      if (!parentId) continue;
+      const bucket = childrenByParent.get(parentId);
+      if (bucket) {
+        bucket.push(cat.id);
+      } else {
+        childrenByParent.set(parentId, [cat.id]);
+      }
+    }
+    const resolved = new Set<string>();
+    const stack = [...(childrenByParent.get(rootId) ?? [])];
+    while (stack.length) {
+      const next = stack.pop()!;
+      if (resolved.has(next)) continue;
+      resolved.add(next);
+      const kids = childrenByParent.get(next);
+      if (kids?.length) stack.push(...kids);
+    }
+    return resolved;
+  }
+
+  mergeTargetOptions(source: Category): Category[] {
+    const parentId = (source.parent_id ?? '').trim() || null;
+    return this.categories()
+      .filter((candidate) => ((candidate.parent_id ?? '').trim() || null) === parentId && candidate.slug !== source.slug)
+      .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+  }
+
+  onMergeTargetChange(): void {
+    this.mergePreview.set(null);
+    this.mergeError.set(null);
+  }
+
+  previewCategoryMerge(): void {
+    const cat = this.categoryManagerSelectedCategory();
+    if (!cat) return;
+    if (this.mergePreviewLoading() || this.mergeSaving()) return;
+
+    const targetSlug = (this.mergeTargetSlug || '').trim();
+    if (!targetSlug) {
+      this.mergeError.set(this.t('adminUi.storefront.categories.mergeSelectTarget'));
+      return;
+    }
+
+    this.mergePreviewLoading.set(true);
+    this.mergeError.set(null);
+    this.mergePreview.set(null);
+    this.admin.previewMergeCategory(cat.slug, targetSlug).subscribe({
+      next: (preview) => {
+        this.mergePreviewLoading.set(false);
+        this.mergePreview.set(preview);
+        if (!preview.can_merge) {
+          this.mergeError.set(this.t(this.mergeReasonKey(preview.reason)));
+        }
+      },
+      error: () => {
+        this.mergePreviewLoading.set(false);
+        this.mergeError.set(this.t('adminUi.storefront.categories.mergePreviewError'));
+      }
+    });
+  }
+
+  mergeCategorySelected(): void {
+    const cat = this.categoryManagerSelectedCategory();
+    if (!cat) return;
+    if (this.mergeSaving()) return;
+
+    const targetSlug = (this.mergeTargetSlug || '').trim();
+    if (!targetSlug) {
+      this.mergeError.set(this.t('adminUi.storefront.categories.mergeSelectTarget'));
+      return;
+    }
+
+    const preview = this.mergePreview();
+    if (!preview) {
+      this.mergeError.set(this.t('adminUi.storefront.categories.mergePreviewRequired'));
+      return;
+    }
+    if (!preview.can_merge) {
+      this.mergeError.set(this.t(this.mergeReasonKey(preview.reason)));
+      return;
+    }
+
+    const targetName = this.categories().find((c) => c.slug === targetSlug)?.name ?? targetSlug;
+    const confirmed = confirm(
+      this.translate.instant('adminUi.storefront.categories.confirmMerge', {
+        source: cat.name,
+        target: targetName,
+        count: preview.product_count
+      })
+    );
+    if (!confirmed) return;
+
+    this.mergeSaving.set(true);
+    this.admin.mergeCategory(cat.slug, targetSlug).subscribe({
+      next: () => {
+        this.mergeSaving.set(false);
+        this.toast.success(this.t('adminUi.storefront.categories.mergeSuccess'));
+        this.categoryManagerSlug = '';
+        this.categoryManagerParentId = '';
+        this.resetCategoryManagerActions();
+        this.refreshCategoryLists();
+      },
+      error: () => {
+        this.mergeSaving.set(false);
+        this.mergeError.set(this.t('adminUi.storefront.categories.mergeError'));
+      }
+    });
+  }
+
+  private mergeReasonKey(reason: string | null | undefined): string {
+    if (reason === 'same_category') return 'adminUi.storefront.categories.mergeReasonSame';
+    if (reason === 'different_parent') return 'adminUi.storefront.categories.mergeReasonParent';
+    if (reason === 'source_has_children') return 'adminUi.storefront.categories.mergeReasonChildren';
+    return 'adminUi.storefront.categories.mergeNotAllowed';
+  }
+
+  previewCategoryDelete(): void {
+    const cat = this.categoryManagerSelectedCategory();
+    if (!cat) return;
+    if (this.deletePreviewLoading() || this.deleteSaving()) return;
+
+    this.deletePreviewLoading.set(true);
+    this.deleteError.set(null);
+    this.deletePreview.set(null);
+    this.admin.previewDeleteCategory(cat.slug).subscribe({
+      next: (preview) => {
+        this.deletePreviewLoading.set(false);
+        this.deletePreview.set(preview);
+        if (!preview.can_delete) {
+          this.deleteError.set(this.t('adminUi.storefront.categories.deleteNotAllowed'));
+        }
+      },
+      error: () => {
+        this.deletePreviewLoading.set(false);
+        this.deleteError.set(this.t('adminUi.storefront.categories.deletePreviewError'));
+      }
+    });
+  }
+
+  deleteCategorySelectedSafe(): void {
+    const cat = this.categoryManagerSelectedCategory();
+    if (!cat) return;
+    if (this.deleteSaving()) return;
+
+    const preview = this.deletePreview();
+    if (!preview) {
+      this.deleteError.set(this.t('adminUi.storefront.categories.deletePreviewRequired'));
+      return;
+    }
+    if (!preview.can_delete) {
+      this.deleteError.set(this.t('adminUi.storefront.categories.deleteNotAllowed'));
+      return;
+    }
+
+    const confirmed = confirm(this.translate.instant('adminUi.storefront.categories.confirmDelete', { name: cat.name }));
+    if (!confirmed) return;
+
+    this.deleteSaving.set(true);
+    this.admin.deleteCategory(cat.slug).subscribe({
+      next: () => {
+        this.deleteSaving.set(false);
+        this.toast.success(this.t('adminUi.storefront.categories.deleteSuccess'));
+        this.categoryManagerSlug = '';
+        this.categoryManagerParentId = '';
+        this.resetCategoryManagerActions();
+        this.refreshCategoryLists();
+      },
+      error: () => {
+        this.deleteSaving.set(false);
+        this.deleteError.set(this.t('adminUi.storefront.categories.deleteError'));
+      }
+    });
+  }
+
+  private resetCategoryManagerActions(): void {
+    this.mergeTargetSlug = '';
+    this.mergePreview.set(null);
+    this.mergePreviewLoading.set(false);
+    this.mergeSaving.set(false);
+    this.mergeError.set(null);
+    this.deletePreview.set(null);
+    this.deletePreviewLoading.set(false);
+    this.deleteSaving.set(false);
+    this.deleteError.set(null);
+  }
+
+  private refreshCategoryLists(): void {
+    this.catalog.listCategories(undefined, { include_hidden: true }).subscribe({
+      next: (cats) => this.categories.set(cats || []),
+      error: () => this.categories.set([])
+    });
+    this.admin.getCategories().subscribe({
+      next: (cats) => this.adminCategories.set((cats || []).map((c) => ({ id: c.id, name: c.name }))),
+      error: () => this.adminCategories.set([])
+    });
   }
 
   quickSetStatus(product: AdminProductListItem, nextStatus: ProductForm['status']): void {
