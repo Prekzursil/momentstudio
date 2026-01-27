@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import case, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -169,6 +169,16 @@ async def list_published_posts(
         or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
         or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
     )
+    pinned_flag = ContentBlock.meta["pinned"].as_boolean().is_(True)
+    pin_order = ContentBlock.meta["pin_order"].as_integer()
+    pinned_rank = case((pinned_flag, 0), else_=1)
+    pin_order_rank = case((pinned_flag, func.coalesce(pin_order, 999)), else_=999)
+    ordering = (
+        pinned_rank.asc(),
+        pin_order_rank.asc(),
+        ContentBlock.published_at.desc().nullslast(),
+        ContentBlock.updated_at.desc(),
+    )
     query_text = (q or "").strip().lower()
     tag_text = (tag or "").strip().lower()
 
@@ -179,7 +189,7 @@ async def list_published_posts(
             select(ContentBlock)
             .options(selectinload(ContentBlock.images))
             .where(*filters)
-            .order_by(ContentBlock.published_at.desc().nullslast(), ContentBlock.updated_at.desc())
+            .order_by(*ordering)
             .limit(limit)
             .offset(offset)
         )
@@ -196,7 +206,7 @@ async def list_published_posts(
         select(ContentBlock)
         .options(selectinload(ContentBlock.images))
         .where(*filters)
-        .order_by(ContentBlock.published_at.desc().nullslast(), ContentBlock.updated_at.desc())
+        .order_by(*ordering)
     )
     if lang:
         query = query.options(selectinload(ContentBlock.translations))

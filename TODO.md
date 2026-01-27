@@ -424,8 +424,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Notifications: localize account notification settings UI + improve email templates.
 
 ### Blog – Next Improvements (Backlog)
-- [ ] Blog list: featured hero – Highlight the newest/pinned post with a large, image-forward hero card.
-- [ ] Blog list: pinned posts – Allow pinning 1–3 posts to the top of `/blog` (admin-managed ordering).
+- [x] Blog list: featured hero – Highlight the newest/pinned post with a large, image-forward hero card.
+- [x] Blog list: pinned posts – Allow pinning 1–3 posts to the top of `/blog` (admin-managed ordering).
 - [ ] Blog list: sort controls – Add sorting (newest/oldest/most viewed/most commented) with persisted selection.
 - [ ] Blog list: filter UX – Sticky filter bar (tags/search) with clear chips and “Reset” action.
 - [ ] Blog list: tag pages – Add `/blog/tag/:tag` landing pages with SEO meta and pagination.
@@ -464,6 +464,7 @@ Below is a structured checklist you can turn into issues.
 - [ ] Admin editor: writing aids – Word count, reading-time recalculation, and headings outline sidebar.
 - [ ] Blog SEO: preview panel – Preview meta/OG/twitter cards per language and validate truncation/warnings.
 - [ ] Blog perf: prefetch + caching – Prefetch post data on hover and add caching for list/detail to speed up loads.
+- [ ] Blog list: pinned posts – Prevent conflicting pin slots (1–3) and surface warnings in admin UI.
 ## Frontend - Cart & Checkout
 - [x] Cart page/drawer with quantities and totals.
 - [x] Cart UX: make cart item image/title link to the product page (`/products/:slug`).

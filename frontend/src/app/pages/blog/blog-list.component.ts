@@ -93,9 +93,54 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
         <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'blog.emptyCopy' | translate }}</p>
       </div>
 
-      <div *ngIf="!loading() && !hasError() && posts.length" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <a
+        *ngIf="!loading() && !hasError() && heroPost"
+        class="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:shadow-none"
+        [routerLink]="['/blog', heroPost.slug]"
+      >
+        <div class="grid md:grid-cols-[1.35fr_1fr]">
+          <div class="relative min-h-[220px] md:min-h-[360px] bg-slate-100 dark:bg-slate-800">
+            <img
+              *ngIf="heroPost.cover_image_url"
+              [src]="heroPost.cover_image_url"
+              [alt]="heroPost.title"
+              class="absolute inset-0 h-full w-full object-cover"
+              loading="lazy"
+            />
+          </div>
+          <div class="p-6 md:p-8 grid gap-3">
+            <p class="text-xs font-semibold tracking-wide uppercase text-indigo-600 dark:text-indigo-300">
+              {{ 'blog.featuredLabel' | translate }}
+            </p>
+            <p class="text-sm text-slate-500 dark:text-slate-400" *ngIf="heroPost.published_at">
+              {{ heroPost.published_at | date: 'mediumDate' }}
+              <ng-container *ngIf="heroPost.reading_time_minutes">
+                · {{ 'blog.minutesRead' | translate : { minutes: heroPost.reading_time_minutes } }}
+              </ng-container>
+            </p>
+            <h2 class="text-2xl md:text-3xl font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-50 dark:group-hover:text-indigo-300">
+              {{ heroPost.title }}
+            </h2>
+            <p class="text-sm md:text-base text-slate-600 dark:text-slate-300 line-clamp-4">
+              {{ heroPost.excerpt }}
+            </p>
+            <div class="flex flex-wrap gap-1 pt-1" *ngIf="heroPost.tags?.length">
+              <button
+                *ngFor="let tag of heroPost.tags"
+                type="button"
+                class="text-xs rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-700 hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200 dark:hover:border-slate-600"
+                (click)="filterByTag($event, tag)"
+              >
+                #{{ tag }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </a>
+
+      <div *ngIf="!loading() && !hasError() && gridPosts.length" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <a
-          *ngFor="let post of posts"
+          *ngFor="let post of gridPosts"
           class="group"
           [routerLink]="['/blog', post.slug]"
         >
@@ -162,6 +207,8 @@ export class BlogListComponent implements OnInit, OnDestroy {
   ];
 
   posts: BlogPostListItem[] = [];
+  heroPost: BlogPostListItem | null = null;
+  gridPosts: BlogPostListItem[] = [];
   pageMeta: PaginationMeta | null = null;
   loading = signal<boolean>(true);
   hasError = signal<boolean>(false);
@@ -213,11 +260,22 @@ export class BlogListComponent implements OnInit, OnDestroy {
   load(page = 1): void {
     this.loading.set(true);
     this.hasError.set(false);
+    this.heroPost = null;
+    this.gridPosts = [];
     this.setCanonical(page);
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     this.blog.listPosts({ lang, page, limit: 9, q: this.searchQuery.trim() || undefined, tag: this.tagQuery.trim() || undefined }).subscribe({
       next: (resp) => {
         this.posts = resp.items;
+        const hasFilters = Boolean(this.searchQuery.trim() || this.tagQuery.trim());
+        const canShowHero = !hasFilters && resp.meta.page === 1 && resp.items.length > 0;
+        if (canShowHero) {
+          this.heroPost = resp.items[0];
+          this.gridPosts = resp.items.slice(1);
+        } else {
+          this.heroPost = null;
+          this.gridPosts = resp.items;
+        }
         this.pageMeta = resp.meta;
         this.loading.set(false);
         this.hasError.set(false);
@@ -225,6 +283,8 @@ export class BlogListComponent implements OnInit, OnDestroy {
       },
       error: () => {
         this.posts = [];
+        this.heroPost = null;
+        this.gridPosts = [];
         this.pageMeta = null;
         this.loading.set(false);
         this.hasError.set(true);

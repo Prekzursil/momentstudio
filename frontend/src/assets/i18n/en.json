@@ -791,6 +791,7 @@
   },
   "blog": {
     "title": "Blog",
+    "featuredLabel": "Featured",
     "searchLabel": "Search",
     "searchPlaceholder": "Search posts",
     "tagLabel": "Tag",
@@ -2517,6 +2518,9 @@
         "coverImageUrlOptional": "Cover image URL (optional)",
         "coverImagePlaceholder": "https://…",
         "readingTimeOptional": "Reading time minutes (optional)",
+        "pinned": "Pin to top of blog",
+        "pinOrder": "Pin order (1–3)",
+        "pinOrderHint": "Pinned posts appear first on /blog.",
         "body": "Body"
       },
       "create": {

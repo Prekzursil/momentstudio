@@ -3526,6 +3526,25 @@ class CmsDraftManager<T> {
                     [(ngModel)]="blogCreate.reading_time_minutes"
                   />
                 </label>
+                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                  <input type="checkbox" [(ngModel)]="blogCreate.pinned" />
+                  {{ 'adminUi.blog.fields.pinned' | translate }}
+                </label>
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.blog.fields.pinOrder' | translate }}
+                  <select
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogCreate.pin_order"
+                    [disabled]="!blogCreate.pinned"
+                  >
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                  </select>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.blog.fields.pinOrderHint' | translate }}
+                  </span>
+                </label>
                 <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
                   {{ 'adminUi.blog.fields.body' | translate }}
                   <app-rich-editor
@@ -3657,6 +3676,25 @@ class CmsDraftManager<T> {
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="blogForm.reading_time_minutes"
                   />
+                </label>
+                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 md:col-span-2">
+                  <input type="checkbox" [(ngModel)]="blogForm.pinned" [disabled]="blogEditLang !== blogBaseLang" />
+                  {{ 'adminUi.blog.fields.pinned' | translate }}
+                </label>
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.blog.fields.pinOrder' | translate }}
+                  <select
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogForm.pin_order"
+                    [disabled]="blogEditLang !== blogBaseLang || !blogForm.pinned"
+                  >
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                  </select>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.blog.fields.pinOrderHint' | translate }}
+                  </span>
                 </label>
                 <div class="grid gap-2 md:col-span-2">
                   <div class="flex flex-wrap items-center justify-between gap-2">
@@ -4462,6 +4500,8 @@ export class AdminComponent implements OnInit, OnDestroy {
     tags: string;
     cover_image_url: string;
     reading_time_minutes: string;
+    pinned: boolean;
+    pin_order: string;
 	    includeTranslation: boolean;
 	    translationTitle: string;
 	    translationBody: string;
@@ -4476,6 +4516,8 @@ export class AdminComponent implements OnInit, OnDestroy {
     tags: '',
     cover_image_url: '',
     reading_time_minutes: '',
+    pinned: false,
+    pin_order: '1',
     includeTranslation: false,
     translationTitle: '',
     translationBody: ''
@@ -4492,7 +4534,9 @@ export class AdminComponent implements OnInit, OnDestroy {
     summary: '',
     tags: '',
     cover_image_url: '',
-    reading_time_minutes: ''
+    reading_time_minutes: '',
+    pinned: false,
+    pin_order: '1'
   };
   blogMeta: Record<string, any> = {};
   blogImages: { id: string; url: string; alt_text?: string | null }[] = [];
@@ -6035,11 +6079,13 @@ export class AdminComponent implements OnInit, OnDestroy {
       tags: '',
       cover_image_url: '',
       reading_time_minutes: '',
+      pinned: false,
+      pin_order: '1',
       includeTranslation: false,
       translationTitle: '',
       translationBody: ''
     };
-  }
+	  }
 
   cancelBlogCreate(): void {
     this.showBlogCreate = false;
@@ -6086,6 +6132,12 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    const rt = Number(String(this.blogCreate.reading_time_minutes || '').trim());
 	    if (Number.isFinite(rt) && rt > 0) {
 	      meta['reading_time_minutes'] = Math.trunc(rt);
+	    }
+	    if (this.blogCreate.pinned) {
+	      meta['pinned'] = true;
+	      const rawOrder = Number(String(this.blogCreate.pin_order || '').trim());
+	      const normalized = Number.isFinite(rawOrder) ? Math.min(3, Math.max(1, Math.trunc(rawOrder))) : 1;
+	      meta['pin_order'] = normalized;
 	    }
 	    const published_at = this.blogCreate.published_at ? new Date(this.blogCreate.published_at).toISOString() : undefined;
 	    const published_until = this.blogCreate.published_until ? new Date(this.blogCreate.published_until).toISOString() : undefined;
@@ -6580,7 +6632,9 @@ export class AdminComponent implements OnInit, OnDestroy {
           summary: '',
           tags: '',
           cover_image_url: '',
-          reading_time_minutes: ''
+          reading_time_minutes: '',
+          pinned: false,
+          pin_order: '1'
         };
         this.syncBlogMetaToForm(this.blogEditLang);
         this.blogImages = (block.images || []).map((img) => ({ id: img.id, url: img.url, alt_text: img.alt_text }));
@@ -6604,7 +6658,9 @@ export class AdminComponent implements OnInit, OnDestroy {
       summary: '',
       tags: '',
       cover_image_url: '',
-      reading_time_minutes: ''
+      reading_time_minutes: '',
+      pinned: false,
+      pin_order: '1'
     };
     this.blogMeta = {};
   }
@@ -6669,6 +6725,15 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.blogForm.cover_image_url = typeof cover === 'string' ? cover : '';
     const rt = meta['reading_time_minutes'] ?? meta['reading_time'] ?? '';
     this.blogForm.reading_time_minutes = rt ? String(rt) : '';
+
+    const pinned = meta['pinned'];
+    this.blogForm.pinned = pinned === true || pinned === 'true';
+    const rawPinOrder = meta['pin_order'];
+    const parsedPinOrder = Number(
+      typeof rawPinOrder === 'number' ? rawPinOrder : typeof rawPinOrder === 'string' ? rawPinOrder.trim() : '1'
+    );
+    const normalized = Number.isFinite(parsedPinOrder) ? Math.min(3, Math.max(1, Math.trunc(parsedPinOrder))) : 1;
+    this.blogForm.pin_order = String(normalized);
   }
 
   private buildBlogMeta(lang: 'en' | 'ro'): Record<string, any> {
@@ -6698,6 +6763,16 @@ export class AdminComponent implements OnInit, OnDestroy {
     else delete summary[lang];
     if (Object.keys(summary).length) meta['summary'] = summary;
     else delete meta['summary'];
+
+    if (this.blogForm.pinned) {
+      meta['pinned'] = true;
+      const rawOrder = Number(String(this.blogForm.pin_order || '').trim());
+      const normalized = Number.isFinite(rawOrder) ? Math.min(3, Math.max(1, Math.trunc(rawOrder))) : 1;
+      meta['pin_order'] = normalized;
+    } else {
+      delete meta['pinned'];
+      delete meta['pin_order'];
+    }
 
     return meta;
   }
