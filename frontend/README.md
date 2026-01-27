@@ -10,8 +10,8 @@ npm start
 ```
 
 Stripe:
-- Set `STRIPE_ENV` and `STRIPE_PUBLISHABLE_KEY_TEST` / `STRIPE_PUBLISHABLE_KEY_LIVE` in `frontend/.env` (or legacy `STRIPE_PUBLISHABLE_KEY`).
-- Backend must have `STRIPE_ENV` and `STRIPE_SECRET_KEY_TEST` / `STRIPE_SECRET_KEY_LIVE` (and webhook secret if used) configured.
+- Set `STRIPE_ENV` and `STRIPE_PUBLISHABLE_KEY_SANDBOX` / `STRIPE_PUBLISHABLE_KEY_LIVE` in `frontend/.env` (or legacy `STRIPE_PUBLISHABLE_KEY` / `*_TEST`).
+- Backend must have `STRIPE_ENV` and `STRIPE_SECRET_KEY_SANDBOX` / `STRIPE_SECRET_KEY_LIVE` (and webhook secret if used) configured.
 
 Performance & bundle budget:
 - Angular budgets are configured in `angular.json`; keep main bundle < 600 kB transfer. Use lazy loading for heavy routes and `ngOptimizedImage` + `loading=\"lazy\"` where possible.
