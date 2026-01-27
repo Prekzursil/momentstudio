@@ -453,6 +453,7 @@ class BulkProductUpdateItem(BaseModel):
     sale_auto_publish: bool | None = None
     stock_quantity: int | None = Field(default=None, ge=0)
     is_featured: bool | None = None
+    sort_order: int | None = Field(default=None, ge=0)
     category_id: UUID | None = None
     publish_scheduled_for: datetime | None = None
     unpublish_scheduled_for: datetime | None = None

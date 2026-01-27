@@ -738,6 +738,23 @@ async def create_product(
     product_data["slug"] = candidate_slug
     product_data["sku"] = sku
     product_data["currency"] = payload.currency.upper()
+    custom_count = await session.scalar(
+        select(func.count(Product.id)).where(
+            Product.is_deleted.is_(False),
+            Product.category_id == payload.category_id,
+            Product.sort_order != 0,
+        )
+    )
+    if int(custom_count or 0) > 0:
+        max_sort = await session.scalar(
+            select(func.max(Product.sort_order)).where(
+                Product.is_deleted.is_(False),
+                Product.category_id == payload.category_id,
+            )
+        )
+        product_data["sort_order"] = int(max_sort or 0) + 1
+    else:
+        product_data["sort_order"] = 0
     product = Product(**product_data)
     _sync_sale_fields(product)
     _set_publish_timestamp(product, payload.status)
@@ -1200,6 +1217,28 @@ async def bulk_update_products(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more categories not found")
     product_result = await session.execute(select(Product).where(Product.id.in_(product_ids)))
     products = {p.id: p for p in product_result.scalars()}
+    category_sort_meta: dict[uuid.UUID, dict[str, int | bool]] = {}
+    if category_ids:
+        stats_rows = (
+            await session.execute(
+                select(
+                    Product.category_id,
+                    func.coalesce(func.max(Product.sort_order), 0),
+                    func.count(Product.id).filter(Product.sort_order != 0),
+                )
+                .where(Product.is_deleted.is_(False), Product.category_id.in_(category_ids))
+                .group_by(Product.category_id)
+            )
+        ).all()
+        for cat_id, max_sort, custom_count in stats_rows:
+            if not cat_id:
+                continue
+            category_sort_meta[cat_id] = {
+                "max": int(max_sort or 0),
+                "has_custom": int(custom_count or 0) > 0,
+            }
+        for cat_id in category_ids:
+            category_sort_meta.setdefault(cat_id, {"max": 0, "has_custom": False})
 
     updated: list[Product] = []
     restocked: set[uuid.UUID] = set()
@@ -1207,6 +1246,7 @@ async def bulk_update_products(
         product = products.get(item.product_id)
         if not product:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Product {item.product_id} not found")
+        before_category_id = product.category_id
         was_out_of_stock = is_out_of_stock(product)
         before_stock_quantity = int(getattr(product, "stock_quantity", 0) or 0)
         before_sale_type = getattr(product, "sale_type", None)
@@ -1221,6 +1261,7 @@ async def bulk_update_products(
             "sale_auto_publish",
             "stock_quantity",
             "is_featured",
+            "sort_order",
             "category_id",
             "publish_scheduled_for",
             "unpublish_scheduled_for",
@@ -1247,6 +1288,15 @@ async def bulk_update_products(
                 continue
             if data[field] is not None:
                 setattr(product, field, data[field])
+
+        if "category_id" in data and product.category_id != before_category_id and "sort_order" not in data:
+            meta = category_sort_meta.get(product.category_id)
+            if meta and bool(meta.get("has_custom")):
+                next_sort = int(meta.get("max") or 0) + 1
+                product.sort_order = next_sort
+                meta["max"] = next_sort
+            else:
+                product.sort_order = 0
 
         publish_scheduled_for = _tz_aware(getattr(product, "publish_scheduled_for", None))
         unpublish_scheduled_for = _tz_aware(getattr(product, "unpublish_scheduled_for", None))
@@ -1303,6 +1353,7 @@ async def bulk_update_products(
                 "sale_price": product.sale_price,
                 "stock_quantity": product.stock_quantity,
                 "is_featured": product.is_featured,
+                "sort_order": getattr(product, "sort_order", 0),
                 "category_id": str(product.category_id) if product.category_id else None,
                 "publish_scheduled_for": getattr(product, "publish_scheduled_for", None),
                 "unpublish_scheduled_for": getattr(product, "unpublish_scheduled_for", None),
@@ -1539,6 +1590,7 @@ async def get_product_price_bounds(
     is_featured: bool | None,
     search: str | None,
     tags: list[str] | None,
+    include_unpublished: bool = False,
 ) -> tuple[float, float, str | None]:
     now_dt = datetime.now(timezone.utc)
     sale_active = _sale_active_clause(now_dt)
@@ -1548,11 +1600,9 @@ async def get_product_price_bounds(
         func.max(effective_price),
         func.count(func.distinct(Product.currency)),
         func.min(Product.currency),
-    ).where(
-        Product.is_deleted.is_(False),
-        Product.is_active.is_(True),
-        Product.status == ProductStatus.published,
-    )
+    ).where(Product.is_deleted.is_(False))
+    if not include_unpublished:
+        query = query.where(Product.is_active.is_(True), Product.status == ProductStatus.published)
 
     if category_slug:
         category_ids = await _get_category_and_descendant_ids_by_slug(session, category_slug)
@@ -1593,6 +1643,7 @@ async def list_products_with_filters(
     limit: int,
     offset: int,
     lang: str | None = None,
+    include_unpublished: bool = False,
 ):
     now_dt = datetime.now(timezone.utc)
     sale_active = _sale_active_clause(now_dt)
@@ -1613,8 +1664,10 @@ async def list_products_with_filters(
     base_query = (
         select(Product)
         .options(*options)
-        .where(Product.is_deleted.is_(False), Product.is_active.is_(True), Product.status == ProductStatus.published)
+        .where(Product.is_deleted.is_(False))
     )
+    if not include_unpublished:
+        base_query = base_query.where(Product.is_active.is_(True), Product.status == ProductStatus.published)
     if category_slug:
         category_ids = await _get_category_and_descendant_ids_by_slug(session, category_slug)
         if category_ids:
@@ -1641,7 +1694,9 @@ async def list_products_with_filters(
     total_result = await session.execute(total_query)
     total_items = total_result.scalar_one()
 
-    if sort == "price_asc":
+    if sort == "recommended":
+        base_query = base_query.order_by(Product.sort_order.asc(), Product.created_at.desc())
+    elif sort == "price_asc":
         base_query = base_query.order_by(effective_price.asc())
     elif sort == "price_desc":
         base_query = base_query.order_by(effective_price.desc())

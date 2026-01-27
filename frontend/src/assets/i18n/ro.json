@@ -929,6 +929,7 @@
     "priceHint": "Ajustează slider-ele sau câmpurile pentru a rafina rezultatele.",
     "tags": "Etichete",
     "sort": "Sortare",
+    "sortRecommended": "Recomandate",
     "sortNew": "Cele mai noi",
     "sortPriceAsc": "Preț: crescător",
     "sortPriceDesc": "Preț: descrescător",
@@ -1398,7 +1399,10 @@
         "bulkFeaturedOn": "Recomandat",
         "bulkFeaturedOff": "Nerecomandat",
         "bulkNoSelection": "Selectează cel puțin un produs.",
-        "bulkNoChanges": "Alege cel puțin o acțiune (stare/categorie/recomandat)."
+        "bulkNoChanges": "Alege cel puțin o acțiune (stare/categorie/recomandat).",
+        "reorderHint": "Trage cardurile produselor pentru a reordona categoria.",
+        "reorderSuccess": "Ordinea produselor a fost actualizată.",
+        "reorderError": "Nu s-au putut reordona produsele."
       }
     },
     "errors": {

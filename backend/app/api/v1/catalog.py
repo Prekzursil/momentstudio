@@ -94,18 +94,23 @@ async def list_products(
     category_slug: str | None = Query(default=None),
     on_sale: bool | None = Query(default=None),
     is_featured: bool | None = Query(default=None),
+    include_unpublished: bool = Query(default=False),
     search: str | None = Query(default=None),
     min_price: float | None = Query(default=None, ge=0),
     max_price: float | None = Query(default=None, ge=0),
     tags: list[str] | None = Query(default=None),
-    sort: str | None = Query(default=None, description="newest|price_asc|price_desc|name_asc|name_desc"),
+    sort: str | None = Query(default=None, description="recommended|newest|price_asc|price_desc|name_asc|name_desc"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+    current_user: User | None = Depends(get_current_user_optional),
 ) -> ProductListResponse:
     if category_slug == "sale" and on_sale is None:
         on_sale = True
         category_slug = None
+
+    is_staff = current_user is not None and current_user.role in {UserRole.admin, UserRole.owner, UserRole.content}
+    include_unpublished = bool(include_unpublished and is_staff)
 
     await catalog_service.auto_publish_due_sales(session)
     await catalog_service.apply_due_product_schedules(session)
@@ -117,6 +122,7 @@ async def list_products(
         is_featured=is_featured,
         search=search,
         tags=tags,
+        include_unpublished=include_unpublished,
     )
     items, total_items = await catalog_service.list_products_with_filters(
         session,
@@ -131,6 +137,7 @@ async def list_products(
         limit,
         offset,
         lang=lang,
+        include_unpublished=include_unpublished,
     )
     payload_items = []
     for item in items:
@@ -152,12 +159,17 @@ async def get_product_price_bounds(
     category_slug: str | None = Query(default=None),
     on_sale: bool | None = Query(default=None),
     is_featured: bool | None = Query(default=None),
+    include_unpublished: bool = Query(default=False),
     search: str | None = Query(default=None),
     tags: list[str] | None = Query(default=None),
+    current_user: User | None = Depends(get_current_user_optional),
 ) -> ProductPriceBounds:
     if category_slug == "sale" and on_sale is None:
         on_sale = True
         category_slug = None
+
+    is_staff = current_user is not None and current_user.role in {UserRole.admin, UserRole.owner, UserRole.content}
+    include_unpublished = bool(include_unpublished and is_staff)
 
     await catalog_service.auto_publish_due_sales(session)
     await catalog_service.apply_due_product_schedules(session)
@@ -168,6 +180,7 @@ async def get_product_price_bounds(
         is_featured=is_featured,
         search=search,
         tags=tags,
+        include_unpublished=include_unpublished,
     )
     return ProductPriceBounds(min_price=min_price, max_price=max_price, currency=currency)
 

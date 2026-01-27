@@ -107,6 +107,7 @@ class Product(Base):
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="RON")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_featured: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     stock_quantity: Mapped[int] = mapped_column(nullable=False, default=0)
     low_stock_threshold: Mapped[int | None] = mapped_column(nullable=True)
     allow_backorder: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

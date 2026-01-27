@@ -4,7 +4,7 @@ import { ApiService } from './api.service';
 import { parseMoney } from '../shared/money';
 import { map } from 'rxjs/operators';
 
-export type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc';
+export type SortOption = 'recommended' | 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc';
 
 export interface Category {
   id: string;
@@ -96,6 +96,7 @@ export interface ProductFilterParams {
   min_price?: number;
   max_price?: number;
   is_featured?: boolean;
+  include_unpublished?: boolean;
   tags?: string[];
   sort?: SortOption;
   page?: number;
@@ -141,6 +142,7 @@ export class CatalogService {
       min_price: params.min_price,
       max_price: params.max_price,
       is_featured: params.is_featured,
+      include_unpublished: params.include_unpublished,
       tags: params.tags?.length ? params.tags : undefined,
       sort: params.sort,
       page: params.page ?? 1,

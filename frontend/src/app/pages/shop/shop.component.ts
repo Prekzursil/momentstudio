@@ -645,6 +645,10 @@ interface ShopFilterChip {
             <p *ngIf="bulkEditError" class="text-xs text-rose-700 dark:text-rose-300">{{ bulkEditError }}</p>
           </div>
 
+          <p *ngIf="canReorderProducts()" class="text-xs text-slate-500 dark:text-slate-400">
+            {{ 'adminUi.storefront.products.reorderHint' | translate }}
+          </p>
+
           <div *ngIf="loading()" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-4">
             <div
               *ngFor="let i of placeholders"
@@ -700,7 +704,19 @@ interface ShopFilterChip {
           </div>
 
           <div *ngIf="!loading() && products.length" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div *ngFor="let product of products" class="relative">
+            <div
+              *ngFor="let product of products"
+              class="relative"
+              [ngClass]="{
+                'cursor-move': canReorderProducts(),
+                'ring-2 ring-indigo-400 rounded-2xl': dragOverProductId === product.id
+              }"
+              [attr.draggable]="canReorderProducts() ? 'true' : null"
+              (dragstart)="onProductDragStart($event, product.id)"
+              (dragover)="onProductDragOver($event, product.id)"
+              (drop)="onProductDrop($event, product.id)"
+              (dragend)="onProductDragEnd()"
+            >
               <input
                 *ngIf="bulkSelectMode()"
                 type="checkbox"
@@ -838,7 +854,7 @@ export class ShopComponent implements OnInit, OnDestroy {
 	    min_price: 1,
 	    max_price: 500,
 	    tags: new Set<string>(),
-	    sort: 'newest',
+	    sort: 'recommended',
     page: 1,
     limit: 12
   };
@@ -904,8 +920,12 @@ export class ShopComponent implements OnInit, OnDestroy {
   bulkCategoryId = '';
   bulkFeatured = '';
   bulkEditError = '';
+  draggingProductId: string | null = null;
+  dragOverProductId: string | null = null;
+  productReorderSaving = signal<boolean>(false);
 
   sortOptions: { label: string; value: SortOption }[] = [
+    { label: 'shop.sortRecommended', value: 'recommended' },
     { label: 'shop.sortNew', value: 'newest' },
     { label: 'shop.sortPriceAsc', value: 'price_asc' },
     { label: 'shop.sortPriceDesc', value: 'price_desc' },
@@ -1009,6 +1029,121 @@ export class ShopComponent implements OnInit, OnDestroy {
 
   canEditProducts(): boolean {
     return this.storefrontAdminMode.enabled();
+  }
+
+  private activeLeafCategorySlug(): string | null {
+    if (!this.activeCategorySlug || this.activeCategorySlug === 'sale') return null;
+    if (this.activeSubcategorySlug) return this.activeSubcategorySlug;
+    const category = this.categoriesBySlug.get(this.activeCategorySlug);
+    if (!category) return null;
+    const children = this.getSubcategories(category);
+    if (children.length) return null;
+    return this.activeCategorySlug;
+  }
+
+  canReorderProducts(): boolean {
+    if (!this.canEditProducts()) return false;
+    if (this.bulkSelectMode()) return false;
+    if (this.productReorderSaving()) return false;
+    if (this.loading() || this.hasError()) return false;
+    if (this.filters.sort !== 'recommended') return false;
+    const leaf = this.activeLeafCategorySlug();
+    if (!leaf) return false;
+    const meta = this.pageMeta;
+    if (!meta) return false;
+    if (Number(meta.total_pages ?? 1) > 1) return false;
+    return this.products.length > 1;
+  }
+
+  onProductDragStart(event: DragEvent, productId: string): void {
+    if (!this.canReorderProducts()) return;
+    const desired = String(productId || '').trim();
+    if (!desired) return;
+    this.draggingProductId = desired;
+    this.dragOverProductId = null;
+    try {
+      event.dataTransfer?.setData('text/plain', desired);
+      event.dataTransfer!.effectAllowed = 'move';
+    } catch {
+      // ignore
+    }
+  }
+
+  onProductDragOver(event: DragEvent, productId: string): void {
+    if (!this.canReorderProducts()) return;
+    if (!this.draggingProductId) return;
+    const over = String(productId || '').trim();
+    if (!over || over === this.draggingProductId) return;
+    event.preventDefault();
+    this.dragOverProductId = over;
+    try {
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    } catch {
+      // ignore
+    }
+  }
+
+  onProductDrop(event: DragEvent, productId: string): void {
+    if (!this.canReorderProducts()) return;
+    const from = this.draggingProductId;
+    if (!from) return;
+    if (this.productReorderSaving()) return;
+    const to = String(productId || '').trim();
+    if (!to || to === from) return;
+    event.preventDefault();
+
+    const previous = this.products.map((p) => p.id);
+    const moved = this.reorderProducts(from, to);
+    if (!moved) return;
+    const updates = this.products
+      .map((p, index) => ({ product_id: p.id, sort_order: index }))
+      .filter((row) => Boolean(row.product_id));
+    if (!updates.length) return;
+
+    this.productReorderSaving.set(true);
+    this.admin.bulkUpdateProducts(updates).subscribe({
+      next: () => {
+        this.productReorderSaving.set(false);
+        this.draggingProductId = null;
+        this.dragOverProductId = null;
+        this.toast.success(this.translate.instant('adminUi.storefront.products.reorderSuccess'));
+      },
+      error: () => {
+        this.productReorderSaving.set(false);
+        this.draggingProductId = null;
+        this.dragOverProductId = null;
+        this.restoreProductOrder(previous);
+        this.toast.error(this.translate.instant('adminUi.storefront.products.reorderError'));
+      }
+    });
+  }
+
+  onProductDragEnd(): void {
+    this.draggingProductId = null;
+    this.dragOverProductId = null;
+  }
+
+  private reorderProducts(fromId: string, toId: string): boolean {
+    const fromIndex = this.products.findIndex((p) => p.id === fromId);
+    const toIndex = this.products.findIndex((p) => p.id === toId);
+    if (fromIndex < 0 || toIndex < 0) return false;
+    if (fromIndex === toIndex) return false;
+    const next = [...this.products];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    this.products = next;
+    return true;
+  }
+
+  private restoreProductOrder(previousIds: string[]): void {
+    if (!previousIds.length) return;
+    const byId = new Map(this.products.map((p) => [p.id, p] as const));
+    const ordered: Product[] = [];
+    for (const id of previousIds) {
+      const item = byId.get(id);
+      if (item) ordered.push(item);
+    }
+    if (ordered.length) this.products = ordered;
   }
 
   toggleBulkSelectMode(): void {
@@ -1777,11 +1912,13 @@ export class ShopComponent implements OnInit, OnDestroy {
   private fetchProducts(append = false): void {
 	    const isSale = this.activeCategorySlug === 'sale';
 	    const categorySlug = isSale ? undefined : (this.activeSubcategorySlug || this.activeCategorySlug || undefined);
+	    const includeUnpublished = this.canEditProducts();
 	    this.catalog
 	      .listProducts({
 	        search: this.filters.search || undefined,
 	        category_slug: categorySlug,
 	        on_sale: isSale ? true : undefined,
+	        include_unpublished: includeUnpublished ? true : undefined,
 	        min_price: this.filters.min_price > this.priceMinBound ? this.filters.min_price : undefined,
 	        max_price: this.filters.max_price < this.priceMaxBound ? this.filters.max_price : undefined,
 	        tags: Array.from(this.filters.tags),
@@ -2090,7 +2227,7 @@ export class ShopComponent implements OnInit, OnDestroy {
       sub: this.activeCategorySlug && this.activeCategorySlug !== 'sale' ? (this.activeSubcategorySlug || undefined) : undefined,
       min: this.filters.min_price > this.priceMinBound ? this.filters.min_price : undefined,
       max: this.filters.max_price < this.priceMaxBound ? this.filters.max_price : undefined,
-      sort: this.filters.sort !== 'newest' ? this.filters.sort : undefined,
+      sort: this.filters.sort !== 'recommended' ? this.filters.sort : undefined,
       page: this.filters.page !== 1 ? this.filters.page : undefined,
       tags: this.filters.tags.size ? Array.from(this.filters.tags).join(',') : undefined
     };
@@ -2107,7 +2244,9 @@ export class ShopComponent implements OnInit, OnDestroy {
     const max = this.parsePrice(params['max']);
     this.filters.min_price = min ?? this.priceMinBound;
     this.filters.max_price = max ?? this.priceMaxBound;
-    this.filters.sort = (params['sort'] as SortOption) ?? 'newest';
+    const rawSort = typeof params['sort'] === 'string' ? params['sort'].trim() : '';
+    const allowedSorts: SortOption[] = ['recommended', 'newest', 'price_asc', 'price_desc', 'name_asc', 'name_desc'];
+    this.filters.sort = allowedSorts.includes(rawSort as SortOption) ? (rawSort as SortOption) : 'recommended';
     this.filters.page = params['page'] ? Number(params['page']) : 1;
     const tagParam = params['tags'];
     this.filters.tags = new Set<string>(

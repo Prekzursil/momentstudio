@@ -802,6 +802,7 @@ export class AdminService {
     sale_value?: number | null;
     stock_quantity?: number | null;
     is_featured?: boolean | null;
+    sort_order?: number | null;
     category_id?: string | null;
     publish_scheduled_for?: string | null;
     unpublish_scheduled_for?: string | null;

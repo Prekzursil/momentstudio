@@ -929,6 +929,7 @@
     "priceHint": "Adjust sliders or inputs to refine results.",
     "tags": "Tags",
     "sort": "Sort",
+    "sortRecommended": "Recommended",
     "sortNew": "Newest",
     "sortPriceAsc": "Price: Low to High",
     "sortPriceDesc": "Price: High to Low",
@@ -1398,7 +1399,10 @@
         "bulkFeaturedOn": "Featured",
         "bulkFeaturedOff": "Not featured",
         "bulkNoSelection": "Select at least one product.",
-        "bulkNoChanges": "Choose at least one action (status/category/featured)."
+        "bulkNoChanges": "Choose at least one action (status/category/featured).",
+        "reorderHint": "Drag product cards to reorder this category.",
+        "reorderSuccess": "Product order updated.",
+        "reorderError": "Could not reorder products."
       }
     },
     "errors": {
