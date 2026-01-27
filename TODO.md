@@ -28,11 +28,12 @@ Below is a structured checklist you can turn into issues.
 - [x] Docs: document seeded owner credentials and that `docker compose down -v` resets the DB (owner needs `bootstrap-owner` again).
 
 ## Legal & Compliance (NETOPIA/ANPC/GDPR)
-- [ ] Legal pages: add CMS-backed pages `page.terms` (index), `page.terms-and-conditions`, `page.privacy-policy`, `page.anpc` (RO+EN required).
-- [ ] Legal content: ensure Terms & Conditions covers payment methods + delivery + return/cancellation policy (NETOPIA requirement), or clearly links to those sections/pages.
-- [ ] CMS enforcement: block publishing legal pages unless **both RO + EN** are present (no fallback) + ensure version history/rollback works.
-- [ ] Navigation: add header “Terms & Conditions” link between Contact and View Admin; add footer link under “Handcrafted Art”.
-- [ ] Footer/company info: display full company identification details required by NETOPIA (name, RC number, CUI, address, phone, email) and keep them CMS-configurable.
+- [x] Legal pages: add CMS-backed pages `page.terms` (index), `page.terms-and-conditions`, `page.privacy-policy`, `page.anpc` (RO+EN required).
+- [x] Legal content: ensure Terms & Conditions covers payment methods + delivery + return/cancellation policy (NETOPIA requirement), or clearly links to those sections/pages.
+- [x] CMS enforcement: block publishing legal pages unless **both RO + EN** are present (no fallback) + ensure version history/rollback works.
+- [x] Navigation: add header “Terms & Conditions” link between Contact and View Admin; add footer link under “Handcrafted Art”.
+- [x] Footer/company info: display full company identification details required by NETOPIA (name, RC number, CUI, address, phone, email) and keep them CMS-configurable.
+- [ ] Admin UX: add a friendly editor for `site.company` (avoid raw JSON meta editing) and validate required fields for production readiness.
 - [ ] NETOPIA logos: add Visa/Mastercard/NETOPIA Payments logos (from `Identitate-Parteneri-NETOPIA-Payments.zip`) and display them in footer + checkout.
 - [ ] ANPC content: add bilingual ANPC/ADR info page including required links and consumer guidance.
 - [ ] Consent tracking (DB): store acceptance records with doc key + version + timestamp + (user_id or order_id) + context (register/checkout).
