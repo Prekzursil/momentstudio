@@ -796,6 +796,8 @@
     "searchPlaceholder": "Search posts",
     "tagLabel": "Tag",
     "tagPlaceholder": "Filter by tag",
+    "seriesLabel": "Series",
+    "seriesPlaceholder": "Filter by series",
     "sortLabel": "Sort",
     "sortNewest": "Newest",
     "sortOldest": "Oldest",
@@ -805,6 +807,8 @@
     "clearFilters": "Reset",
     "chipSearch": "Search: {{q}}",
     "chipTag": "Tag: {{tag}}",
+    "chipSeries": "Series: {{series}}",
+    "seriesPill": "Series: {{series}}",
     "minutesRead": "{{minutes}} min read",
     "preview": {
       "banner": "Preview mode — this post is not published yet."
@@ -819,6 +823,8 @@
     "metaDescription": "Stories, updates, and behind-the-scenes from momentstudio.",
     "tagMetaTitle": "Blog · #{{tag}} | momentstudio",
     "tagMetaDescription": "Latest posts tagged \"{{tag}}\" on momentstudio.",
+    "seriesMetaTitle": "Blog · Series: {{series}} | momentstudio",
+    "seriesMetaDescription": "Posts in the \"{{series}}\" series on momentstudio.",
     "prev": "Prev",
     "next": "Next",
     "post": {
@@ -2524,6 +2530,9 @@
         "summaryOptional": "Summary (optional)",
         "tags": "Tags (comma-separated)",
         "tagsPlaceholder": "e.g. ceramics, studio, news",
+        "seriesOptional": "Series (optional)",
+        "seriesPlaceholder": "e.g. studio-notes",
+        "seriesHint": "Groups posts under /blog/series/…",
         "coverImageUrlOptional": "Cover image URL (optional)",
         "coverImagePlaceholder": "https://…",
         "readingTimeOptional": "Reading time minutes (optional)",

@@ -16,6 +16,7 @@ export interface BlogPostListItem {
   published_at?: string | null;
   cover_image_url?: string | null;
   tags: string[];
+  series?: string | null;
   reading_time_minutes?: number | null;
 }
 
@@ -49,6 +50,7 @@ export interface BlogPost {
   summary?: string | null;
   cover_image_url?: string | null;
   tags?: string[];
+  series?: string | null;
   reading_time_minutes?: number | null;
 }
 
@@ -152,6 +154,7 @@ export class BlogService {
     limit?: number;
     q?: string;
     tag?: string;
+    series?: string;
     sort?: string;
   }): Observable<BlogPostListResponse> {
     return this.api.get<BlogPostListResponse>('/blog/posts', {
@@ -160,6 +163,7 @@ export class BlogService {
       limit: params.limit ?? 10,
       q: params.q,
       tag: params.tag,
+      series: params.series,
       sort: params.sort
     });
   }

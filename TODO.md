@@ -429,9 +429,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Blog list: sort controls – Add sorting (newest/oldest/most viewed/most commented) with persisted selection.
 - [x] Blog list: filter UX – Sticky filter bar (tags/search) with clear chips and “Reset” action.
 - [x] Blog list: tag pages – Add `/blog/tag/:tag` landing pages with SEO meta and pagination.
-- [ ] Blog list: series/categories – Add optional blog “series” taxonomy (separate from shop categories) with pages and filters.
-- [ ] Blog list: nicer cards – Improve typography, spacing, hover states, and consistent cover image aspect ratios.
-- [ ] Blog list: image loading polish – Use blur-up placeholders + prevent layout shift for cover images.
+- [x] Blog list: series/categories – Add optional blog “series” taxonomy (separate from shop categories) with pages and filters.
+- [x] Blog list: nicer cards – Improve typography, spacing, hover states, and consistent cover image aspect ratios.
+- [x] Blog list: image loading polish – Use blur-up placeholders + prevent layout shift for cover images.
 - [ ] Blog list: empty states – Better “no results” UX (suggest clearing filters and show popular tags).
 - [ ] Blog list: reading meta – Show author, publish date, and reading time more prominently on cards.
 - [ ] Blog list: RSS/Atom feed – Provide `/blog/rss.xml` (and/or Atom) with latest posts and translations.
@@ -466,6 +466,7 @@ Below is a structured checklist you can turn into issues.
 - [ ] Blog perf: prefetch + caching – Prefetch post data on hover and add caching for list/detail to speed up loads.
 - [ ] Blog list: pinned posts – Prevent conflicting pin slots (1–3) and surface warnings in admin UI.
 - [ ] Blog stats: view counting – De-dupe per session + bot filtering (current counter increments on each page view).
+- [ ] Blog list: image loading polish – Add real LQIP/blurhash placeholders for cover images (optional).
 ## Frontend - Cart & Checkout
 - [x] Cart page/drawer with quantities and totals.
 - [x] Cart UX: make cart item image/title link to the product page (`/products/:slug`).

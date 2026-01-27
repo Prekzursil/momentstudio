@@ -796,6 +796,8 @@
     "searchPlaceholder": "Caută articole",
     "tagLabel": "Etichetă",
     "tagPlaceholder": "Filtrează după etichetă",
+    "seriesLabel": "Serie",
+    "seriesPlaceholder": "Filtrează după serie",
     "sortLabel": "Sortează",
     "sortNewest": "Cele mai noi",
     "sortOldest": "Cele mai vechi",
@@ -805,6 +807,8 @@
     "clearFilters": "Resetează",
     "chipSearch": "Caută: {{q}}",
     "chipTag": "Etichetă: {{tag}}",
+    "chipSeries": "Serie: {{series}}",
+    "seriesPill": "Serie: {{series}}",
     "minutesRead": "{{minutes}} min citire",
     "preview": {
       "banner": "Mod previzualizare — acest articol nu este încă publicat."
@@ -819,6 +823,8 @@
     "metaDescription": "Povești, noutăți și culise de la momentstudio.",
     "tagMetaTitle": "Blog · #{{tag}} | momentstudio",
     "tagMetaDescription": "Ultimele postări etichetate „{{tag}}” pe momentstudio.",
+    "seriesMetaTitle": "Blog · Serie: {{series}} | momentstudio",
+    "seriesMetaDescription": "Postări din seria „{{series}}” pe momentstudio.",
     "prev": "Înapoi",
     "next": "Înainte",
     "post": {
@@ -2524,6 +2530,9 @@
         "summaryOptional": "Rezumat (opțional)",
         "tags": "Etichete (separate prin virgulă)",
         "tagsPlaceholder": "ex. ceramică, atelier, noutăți",
+        "seriesOptional": "Serie (opțional)",
+        "seriesPlaceholder": "ex. note-din-atelier",
+        "seriesHint": "Grupează postările în /blog/series/…",
         "coverImageUrlOptional": "URL imagine copertă (opțional)",
         "coverImagePlaceholder": "https://…",
         "readingTimeOptional": "Timp de citire (minute) (opțional)",

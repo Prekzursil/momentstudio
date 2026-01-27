@@ -52,6 +52,13 @@ import { formatIdentity } from '../../shared/user-identity';
           {{ post()!.published_at | date: 'mediumDate' }}
           <ng-container *ngIf="post()?.reading_time_minutes"> · {{ 'blog.minutesRead' | translate : { minutes: post()!.reading_time_minutes } }}</ng-container>
         </p>
+        <a
+          *ngIf="post()?.series"
+          [routerLink]="['/blog/series', post()!.series]"
+          class="justify-self-start text-xs font-semibold rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-700 hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200 dark:hover:border-slate-600"
+        >
+          {{ 'blog.seriesPill' | translate : { series: post()!.series } }}
+        </a>
         <p class="text-sm text-slate-600 dark:text-slate-300" *ngIf="post()?.summary">{{ post()!.summary }}</p>
         <div class="flex flex-wrap gap-1" *ngIf="post()?.tags?.length">
           <a

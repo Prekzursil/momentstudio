@@ -13,6 +13,7 @@ class BlogPostListItem(BaseModel):
     published_at: datetime | None = None
     cover_image_url: str | None = None
     tags: list[str] = Field(default_factory=list)
+    series: str | None = None
     reading_time_minutes: int | None = None
 
 
@@ -48,6 +49,7 @@ class BlogPostRead(BaseModel):
     summary: str | None = None
     cover_image_url: str | None = None
     tags: list[str] = Field(default_factory=list)
+    series: str | None = None
     reading_time_minutes: int | None = None
 
 

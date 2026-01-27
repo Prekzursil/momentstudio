@@ -31,6 +31,7 @@ export const routes: Routes = [
   { path: 'contact', component: ContactComponent, title: 'Contact | momentstudio' },
   { path: 'blog', component: BlogListComponent, title: 'Blog | momentstudio' },
   { path: 'blog/tag/:tag', component: BlogListComponent, title: 'Blog | momentstudio' },
+  { path: 'blog/series/:series', component: BlogListComponent, title: 'Blog | momentstudio' },
   { path: 'blog/:slug', component: BlogPostComponent, title: 'Blog | momentstudio' },
   {
     path: 'pages/:slug',

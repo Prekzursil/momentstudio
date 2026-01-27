@@ -3507,16 +3507,22 @@ class CmsDraftManager<T> {
                     [(ngModel)]="blogCreate.summary"
                   ></textarea>
                 </label>
-                <app-input
-                  [label]="'adminUi.blog.fields.tags' | translate"
-                  [(value)]="blogCreate.tags"
-                  [placeholder]="'adminUi.blog.fields.tagsPlaceholder' | translate"
-                ></app-input>
-                <app-input
-                  [label]="'adminUi.blog.fields.coverImageUrlOptional' | translate"
-                  [(value)]="blogCreate.cover_image_url"
-                  [placeholder]="'adminUi.blog.fields.coverImagePlaceholder' | translate"
-                ></app-input>
+	                <app-input
+	                  [label]="'adminUi.blog.fields.tags' | translate"
+	                  [(value)]="blogCreate.tags"
+	                  [placeholder]="'adminUi.blog.fields.tagsPlaceholder' | translate"
+	                ></app-input>
+	                <app-input
+	                  [label]="'adminUi.blog.fields.seriesOptional' | translate"
+	                  [(value)]="blogCreate.series"
+	                  [placeholder]="'adminUi.blog.fields.seriesPlaceholder' | translate"
+	                  [hint]="'adminUi.blog.fields.seriesHint' | translate"
+	                ></app-input>
+	                <app-input
+	                  [label]="'adminUi.blog.fields.coverImageUrlOptional' | translate"
+	                  [(value)]="blogCreate.cover_image_url"
+	                  [placeholder]="'adminUi.blog.fields.coverImagePlaceholder' | translate"
+	                ></app-input>
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                   {{ 'adminUi.blog.fields.readingTimeOptional' | translate }}
                   <input
@@ -3658,16 +3664,23 @@ class CmsDraftManager<T> {
                     {{ 'adminUi.blog.editing.summaryHint' | translate }}
                   </span>
                 </label>
-                <app-input
-                  [label]="'adminUi.blog.fields.tags' | translate"
-                  [(value)]="blogForm.tags"
-                  [placeholder]="'adminUi.blog.fields.tagsPlaceholder' | translate"
-                ></app-input>
-                <app-input
-                  [label]="'adminUi.blog.fields.coverImageUrlOptional' | translate"
-                  [(value)]="blogForm.cover_image_url"
-                  [placeholder]="'adminUi.blog.fields.coverImagePlaceholder' | translate"
-                ></app-input>
+	                <app-input
+	                  [label]="'adminUi.blog.fields.tags' | translate"
+	                  [(value)]="blogForm.tags"
+	                  [placeholder]="'adminUi.blog.fields.tagsPlaceholder' | translate"
+	                ></app-input>
+	                <app-input
+	                  [label]="'adminUi.blog.fields.seriesOptional' | translate"
+	                  [(value)]="blogForm.series"
+	                  [placeholder]="'adminUi.blog.fields.seriesPlaceholder' | translate"
+	                  [hint]="'adminUi.blog.fields.seriesHint' | translate"
+	                  [disabled]="blogEditLang !== blogBaseLang"
+	                ></app-input>
+	                <app-input
+	                  [label]="'adminUi.blog.fields.coverImageUrlOptional' | translate"
+	                  [(value)]="blogForm.cover_image_url"
+	                  [placeholder]="'adminUi.blog.fields.coverImagePlaceholder' | translate"
+	                ></app-input>
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                   {{ 'adminUi.blog.fields.readingTimeOptional' | translate }}
                   <input
@@ -4497,11 +4510,12 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    title: string;
     body_markdown: string;
     summary: string;
-    tags: string;
-    cover_image_url: string;
-    reading_time_minutes: string;
-    pinned: boolean;
-    pin_order: string;
+	    tags: string;
+	    series: string;
+	    cover_image_url: string;
+	    reading_time_minutes: string;
+	    pinned: boolean;
+	    pin_order: string;
 	    includeTranslation: boolean;
 	    translationTitle: string;
 	    translationBody: string;
@@ -4512,12 +4526,13 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    published_until: '',
 	    title: '',
     body_markdown: '',
-    summary: '',
-    tags: '',
-    cover_image_url: '',
-    reading_time_minutes: '',
-    pinned: false,
-    pin_order: '1',
+	    summary: '',
+	    tags: '',
+	    series: '',
+	    cover_image_url: '',
+	    reading_time_minutes: '',
+	    pinned: false,
+	    pin_order: '1',
     includeTranslation: false,
     translationTitle: '',
     translationBody: ''
@@ -4531,13 +4546,14 @@ export class AdminComponent implements OnInit, OnDestroy {
     status: 'draft',
     published_at: '',
     published_until: '',
-    summary: '',
-    tags: '',
-    cover_image_url: '',
-    reading_time_minutes: '',
-    pinned: false,
-    pin_order: '1'
-  };
+	    summary: '',
+	    tags: '',
+	    series: '',
+	    cover_image_url: '',
+	    reading_time_minutes: '',
+	    pinned: false,
+	    pin_order: '1'
+	  };
   blogMeta: Record<string, any> = {};
   blogImages: { id: string; url: string; alt_text?: string | null }[] = [];
   showBlogPreview = false;
@@ -6075,11 +6091,12 @@ export class AdminComponent implements OnInit, OnDestroy {
 	      published_until: '',
 	      title: '',
       body_markdown: '',
-      summary: '',
-      tags: '',
-      cover_image_url: '',
-      reading_time_minutes: '',
-      pinned: false,
+	      summary: '',
+	      tags: '',
+	      series: '',
+	      cover_image_url: '',
+	      reading_time_minutes: '',
+	      pinned: false,
       pin_order: '1',
       includeTranslation: false,
       translationTitle: '',
@@ -6121,14 +6138,18 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (summary) {
       meta['summary'] = { [baseLang]: summary };
     }
-    const tags = this.parseTags(this.blogCreate.tags);
-    if (tags.length) {
-      meta['tags'] = tags;
-    }
-    const cover = this.blogCreate.cover_image_url.trim();
-    if (cover) {
-      meta['cover_image_url'] = cover;
-    }
+	    const tags = this.parseTags(this.blogCreate.tags);
+	    if (tags.length) {
+	      meta['tags'] = tags;
+	    }
+	    const series = this.blogCreate.series.trim();
+	    if (series) {
+	      meta['series'] = series;
+	    }
+	    const cover = this.blogCreate.cover_image_url.trim();
+	    if (cover) {
+	      meta['cover_image_url'] = cover;
+	    }
 	    const rt = Number(String(this.blogCreate.reading_time_minutes || '').trim());
 	    if (Number.isFinite(rt) && rt > 0) {
 	      meta['reading_time_minutes'] = Math.trunc(rt);
@@ -6623,19 +6644,20 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.blogBaseLang = (block.lang === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
         this.blogEditLang = this.blogBaseLang;
         this.blogMeta = block.meta || {};
-        this.blogForm = {
-          title: block.title,
-          body_markdown: block.body_markdown,
-          status: block.status,
-          published_at: block.published_at ? this.toLocalDateTime(block.published_at) : '',
-          published_until: block.published_until ? this.toLocalDateTime(block.published_until) : '',
-          summary: '',
-          tags: '',
-          cover_image_url: '',
-          reading_time_minutes: '',
-          pinned: false,
-          pin_order: '1'
-        };
+	        this.blogForm = {
+	          title: block.title,
+	          body_markdown: block.body_markdown,
+	          status: block.status,
+	          published_at: block.published_at ? this.toLocalDateTime(block.published_at) : '',
+	          published_until: block.published_until ? this.toLocalDateTime(block.published_until) : '',
+	          summary: '',
+	          tags: '',
+	          series: '',
+	          cover_image_url: '',
+	          reading_time_minutes: '',
+	          pinned: false,
+	          pin_order: '1'
+	        };
         this.syncBlogMetaToForm(this.blogEditLang);
         this.blogImages = (block.images || []).map((img) => ({ id: img.id, url: img.url, alt_text: img.alt_text }));
         this.loadBlogVersions();
@@ -6649,19 +6671,20 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   private resetBlogForm(): void {
-    this.blogForm = {
-      title: '',
-      body_markdown: '',
-      status: 'draft',
-      published_at: '',
-      published_until: '',
-      summary: '',
-      tags: '',
-      cover_image_url: '',
-      reading_time_minutes: '',
-      pinned: false,
-      pin_order: '1'
-    };
+	    this.blogForm = {
+	      title: '',
+	      body_markdown: '',
+	      status: 'draft',
+	      published_at: '',
+	      published_until: '',
+	      summary: '',
+	      tags: '',
+	      series: '',
+	      cover_image_url: '',
+	      reading_time_minutes: '',
+	      pinned: false,
+	      pin_order: '1'
+	    };
     this.blogMeta = {};
   }
 
@@ -6717,14 +6740,17 @@ export class AdminComponent implements OnInit, OnDestroy {
       this.blogForm.tags = tags.join(', ');
     } else if (typeof tags === 'string') {
       this.blogForm.tags = tags;
-    } else {
-      this.blogForm.tags = '';
-    }
+	    } else {
+	      this.blogForm.tags = '';
+	    }
 
-    const cover = meta['cover_image_url'] || meta['cover_image'] || '';
-    this.blogForm.cover_image_url = typeof cover === 'string' ? cover : '';
-    const rt = meta['reading_time_minutes'] ?? meta['reading_time'] ?? '';
-    this.blogForm.reading_time_minutes = rt ? String(rt) : '';
+	    const series = meta['series'];
+	    this.blogForm.series = typeof series === 'string' ? series : '';
+
+	    const cover = meta['cover_image_url'] || meta['cover_image'] || '';
+	    this.blogForm.cover_image_url = typeof cover === 'string' ? cover : '';
+	    const rt = meta['reading_time_minutes'] ?? meta['reading_time'] ?? '';
+	    this.blogForm.reading_time_minutes = rt ? String(rt) : '';
 
     const pinned = meta['pinned'];
     this.blogForm.pinned = pinned === true || pinned === 'true';
@@ -6739,13 +6765,17 @@ export class AdminComponent implements OnInit, OnDestroy {
   private buildBlogMeta(lang: 'en' | 'ro'): Record<string, any> {
     const meta: Record<string, any> = { ...(this.blogMeta || {}) };
 
-    const tags = this.parseTags(this.blogForm.tags);
-    if (tags.length) meta['tags'] = tags;
-    else delete meta['tags'];
+	    const tags = this.parseTags(this.blogForm.tags);
+	    if (tags.length) meta['tags'] = tags;
+	    else delete meta['tags'];
 
-    const cover = this.blogForm.cover_image_url.trim();
-    if (cover) meta['cover_image_url'] = cover;
-    else delete meta['cover_image_url'];
+	    const series = this.blogForm.series.trim();
+	    if (series) meta['series'] = series;
+	    else delete meta['series'];
+
+	    const cover = this.blogForm.cover_image_url.trim();
+	    if (cover) meta['cover_image_url'] = cover;
+	    else delete meta['cover_image_url'];
 
     const rt = Number(String(this.blogForm.reading_time_minutes || '').trim());
     if (Number.isFinite(rt) && rt > 0) meta['reading_time_minutes'] = Math.trunc(rt);

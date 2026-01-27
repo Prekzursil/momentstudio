@@ -165,6 +165,7 @@ async def list_published_posts(
     limit: int,
     q: str | None = None,
     tag: str | None = None,
+    series: str | None = None,
     sort: str | None = None,
 ) -> tuple[list[ContentBlock], int]:
     now = datetime.now(timezone.utc)
@@ -227,8 +228,9 @@ async def list_published_posts(
         )
     query_text = (q or "").strip().lower()
     tag_text = (tag or "").strip().lower()
+    series_text = (series or "").strip().lower()
 
-    if not query_text and not tag_text:
+    if not query_text and not tag_text and not series_text:
         offset = (page - 1) * limit
         total = await session.scalar(select(func.count()).select_from(ContentBlock).where(*filters))
         query = select(ContentBlock).options(selectinload(ContentBlock.images)).where(*filters)
@@ -256,13 +258,17 @@ async def list_published_posts(
     for block in blocks:
         _apply_translation(block, lang)
 
-    if query_text or tag_text:
+    if query_text or tag_text or series_text:
         filtered: list[ContentBlock] = []
         for block in blocks:
             meta = getattr(block, "meta", None) or {}
             if tag_text:
                 tags = _normalize_tags(meta.get("tags"))
                 if tag_text not in {t.lower() for t in tags}:
+                    continue
+            if series_text:
+                series_value = meta.get("series")
+                if not isinstance(series_value, str) or series_text != series_value.strip().lower():
                     continue
             if query_text:
                 haystack = f"{block.title}\n{_plain_text_from_markdown(block.body_markdown)}".lower()
@@ -315,6 +321,7 @@ def to_list_item(block: ContentBlock, *, lang: str | None = None) -> dict:
     reading_time_minutes = override_minutes or _compute_reading_time_minutes(block.body_markdown)
     summary = _meta_summary(meta, lang=lang, base_lang=getattr(block, "lang", None))
     excerpt = summary or _excerpt(_plain_text_from_markdown(block.body_markdown))
+    series = meta.get("series")
     return {
         "slug": _extract_slug(block.key),
         "title": block.title,
@@ -322,6 +329,7 @@ def to_list_item(block: ContentBlock, *, lang: str | None = None) -> dict:
         "published_at": block.published_at,
         "cover_image_url": cover,
         "tags": _normalize_tags(meta.get("tags")),
+        "series": series.strip() if isinstance(series, str) and series.strip() else None,
         "reading_time_minutes": reading_time_minutes,
     }
 
@@ -333,6 +341,7 @@ def to_read(block: ContentBlock, *, lang: str | None = None) -> dict:
     override_minutes = _coerce_positive_int(meta.get("reading_time_minutes") or meta.get("reading_time"))
     reading_time_minutes = override_minutes or _compute_reading_time_minutes(block.body_markdown)
     summary = _meta_summary(meta, lang=lang, base_lang=getattr(block, "lang", None))
+    series = meta.get("series")
     return {
         "slug": _extract_slug(block.key),
         "title": block.title,
@@ -345,6 +354,7 @@ def to_read(block: ContentBlock, *, lang: str | None = None) -> dict:
         "summary": summary,
         "cover_image_url": cover,
         "tags": _normalize_tags(meta.get("tags")),
+        "series": series.strip() if isinstance(series, str) and series.strip() else None,
         "reading_time_minutes": reading_time_minutes,
     }
 

@@ -44,6 +44,7 @@ async def list_blog_posts(
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
     q: str | None = Query(default=None, max_length=200),
     tag: str | None = Query(default=None, max_length=50),
+    series: str | None = Query(default=None, max_length=80),
     sort: str = Query(default="newest", pattern="^(newest|oldest|most_viewed|most_commented)$"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=50),
@@ -55,6 +56,7 @@ async def list_blog_posts(
         limit=limit,
         q=q,
         tag=tag,
+        series=series,
         sort=sort,
     )
     total_pages = (total_items + limit - 1) // limit if total_items else 1
