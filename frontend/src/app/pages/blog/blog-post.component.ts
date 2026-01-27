@@ -152,6 +152,15 @@ import { formatIdentity } from '../../shared/user-identity';
         </div>
       </div>
 
+      <section *ngIf="post()" class="grid gap-2">
+        <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.post.shareTitle' | translate }}</p>
+        <div class="flex flex-wrap gap-2">
+          <app-button size="sm" variant="ghost" [label]="'blog.post.shareCopy' | translate" (action)="copyShareLink()"></app-button>
+          <app-button size="sm" variant="ghost" [label]="'blog.post.shareWhatsApp' | translate" (action)="shareWhatsApp()"></app-button>
+          <app-button size="sm" variant="ghost" [label]="'blog.post.shareFacebook' | translate" (action)="shareFacebook()"></app-button>
+        </div>
+      </section>
+
       <section *ngIf="neighbors().previous || neighbors().next" class="grid gap-3">
         <div class="grid gap-3 sm:grid-cols-2">
           <a
@@ -619,6 +628,63 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     this.activeHeadingId.set(id);
   }
 
+  copyShareLink(): void {
+    const w = this.document?.defaultView;
+    if (!w) return;
+    const url = this.buildShareUrl();
+    if (!url) return;
+
+    const toastTitle = this.translate.instant('blog.post.shareCopiedTitle');
+    const toastCopy = this.translate.instant('blog.post.shareCopiedCopy');
+    const errorTitle = this.translate.instant('blog.post.shareCopyErrorTitle');
+    const errorCopy = this.translate.instant('blog.post.shareCopyErrorCopy');
+
+    if (w.navigator?.clipboard?.writeText) {
+      w.navigator.clipboard
+        .writeText(url)
+        .then(() => this.toast.success(toastTitle, toastCopy))
+        .catch(() => this.toast.error(errorTitle, errorCopy));
+      return;
+    }
+
+    try {
+      const input = this.document.createElement('textarea');
+      input.value = url;
+      input.setAttribute('readonly', 'true');
+      input.style.position = 'fixed';
+      input.style.left = '-9999px';
+      this.document.body.appendChild(input);
+      input.select();
+      const ok = this.document.execCommand('copy');
+      input.remove();
+      if (ok) {
+        this.toast.success(toastTitle, toastCopy);
+      } else {
+        this.toast.error(errorTitle, errorCopy);
+      }
+    } catch {
+      this.toast.error(errorTitle, errorCopy);
+    }
+  }
+
+  shareWhatsApp(): void {
+    const w = this.document?.defaultView;
+    if (!w) return;
+    const url = this.buildShareUrl();
+    if (!url) return;
+    const title = this.post()?.title || '';
+    const text = title ? `${title} ${url}` : url;
+    w.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+  }
+
+  shareFacebook(): void {
+    const w = this.document?.defaultView;
+    if (!w) return;
+    const url = this.buildShareUrl();
+    if (!url) return;
+    w.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank', 'noopener,noreferrer');
+  }
+
   loadComments(): void {
     if (!this.slug) return;
     this.loadingComments.set(true);
@@ -841,6 +907,14 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       }
     }
     this.activeHeadingId.set(active);
+  }
+
+  private buildShareUrl(): string {
+    const w = this.document?.defaultView;
+    if (!w || !this.slug) return '';
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    const hash = w.location.hash || '';
+    return `${w.location.origin}/blog/${encodeURIComponent(this.slug)}?lang=${lang}${hash}`;
   }
 
   private renderPostBody(markdown: string): { html: string; toc: Array<{ id: string; title: string; level: 2 | 3 }> } {
