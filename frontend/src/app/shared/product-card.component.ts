@@ -17,7 +17,11 @@ import { Router } from '@angular/router';
   imports: [CommonModule, RouterLink, NgOptimizedImage, LocalizedCurrencyPipe, ButtonComponent, TranslateModule, ImgFallbackDirective],
   template: `
     <article class="group grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm hover:-translate-y-1 hover:shadow-md transition dark:bg-slate-900 dark:border-slate-800 dark:shadow-none">
-      <a [routerLink]="['/products', product.slug]" class="block overflow-hidden rounded-xl bg-slate-50 relative dark:bg-slate-800">
+      <a
+        [routerLink]="['/products', product.slug]"
+        class="block overflow-hidden rounded-xl bg-slate-50 relative dark:bg-slate-800"
+        (click)="rememberShopReturnContext($event)"
+      >
         <img
           [ngSrc]="primaryImage"
           [alt]="product.name"
@@ -55,7 +59,11 @@ import { Router } from '@angular/router';
       </a>
       <div class="grid gap-1">
         <div class="flex items-center justify-between gap-2">
-          <a [routerLink]="['/products', product.slug]" class="font-semibold text-slate-900 line-clamp-1 dark:text-slate-50">
+          <a
+            [routerLink]="['/products', product.slug]"
+            class="font-semibold text-slate-900 line-clamp-1 dark:text-slate-50"
+            (click)="rememberShopReturnContext($event)"
+          >
             {{ product.name }}
           </a>
           <span class="text-sm text-slate-500 dark:text-slate-300">{{ product.currency }}</span>
@@ -79,13 +87,14 @@ import { Router } from '@angular/router';
           {{ 'product.reviews' | translate : { count: product.rating_count } }}
         </div>
       </div>
-      <app-button [label]="'product.viewDetails' | translate" size="sm" variant="ghost" [routerLink]="['/products', product.slug]"></app-button>
+      <app-button [label]="'product.viewDetails' | translate" size="sm" variant="ghost" (action)="goToDetails()"></app-button>
     </article>
   `
 })
 export class ProductCardComponent {
   @Input({ required: true }) product!: Product;
   @Input() tag?: string | null;
+  @Input() rememberShopReturn = false;
   constructor(
     private translate: TranslateService,
     private wishlist: WishlistService,
@@ -181,5 +190,30 @@ export class ProductCardComponent {
         );
       }
     });
+  }
+
+  goToDetails(): void {
+    this.rememberShopReturnContext();
+    if (!this.product?.slug) return;
+    void this.router.navigate(['/products', this.product.slug]);
+  }
+
+  rememberShopReturnContext(event?: MouseEvent): void {
+    if (!this.rememberShopReturn) return;
+    if (event) {
+      if (event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    }
+    if (typeof sessionStorage === 'undefined') return;
+    try {
+      const url = `${window.location.pathname}${window.location.search || ''}`;
+      if (!url.startsWith('/shop')) return;
+      sessionStorage.setItem('shop_return_pending', '1');
+      sessionStorage.setItem('shop_return_url', url);
+      sessionStorage.setItem('shop_return_scroll_y', String(window.scrollY || 0));
+      sessionStorage.setItem('shop_return_at', String(Date.now()));
+    } catch {
+      // best-effort
+    }
   }
 }

@@ -57,7 +57,7 @@ import { MarkdownService } from '../../core/markdown.service';
             <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ 'product.loadErrorCopy' | translate }}</p>
             <div class="mt-6 flex items-center justify-center gap-3">
               <app-button [label]="'product.retry' | translate" variant="ghost" (action)="retryLoad()"></app-button>
-              <app-button [label]="'product.backToShop' | translate" variant="ghost" [routerLink]="['/shop']"></app-button>
+              <app-button [label]="'product.backToShop' | translate" variant="ghost" (action)="backToShop()"></app-button>
             </div>
           </div>
         </ng-container>
@@ -182,7 +182,7 @@ import { MarkdownService } from '../../core/markdown.service';
                   (action)="cancelBackInStock()"
                   [disabled]="backInStockLoading"
                 ></app-button>
-                <app-button [label]="'product.backToShop' | translate" variant="ghost" [routerLink]="['/shop']"></app-button>
+                <app-button [label]="'product.backToShop' | translate" variant="ghost" (action)="backToShop()"></app-button>
                 <app-button
                   [label]="wishlisted ? ('wishlist.saved' | translate) : ('wishlist.save' | translate)"
                   variant="ghost"
@@ -211,7 +211,13 @@ import { MarkdownService } from '../../core/markdown.service';
 		      <div *ngIf="upsellProducts.length" class="mt-12 grid gap-4">
 		        <div class="flex items-center justify-between">
 		          <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.upsells' | translate }}</h3>
-		          <a routerLink="/shop" class="text-sm font-medium text-indigo-600 dark:text-indigo-300">{{ 'product.backToShop' | translate }}</a>
+		          <button
+                type="button"
+                class="bg-transparent p-0 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+                (click)="backToShop()"
+              >
+                {{ 'product.backToShop' | translate }}
+              </button>
 		        </div>
 		        <div class="flex gap-4 overflow-x-auto pb-2">
 	          <app-button
@@ -245,7 +251,13 @@ import { MarkdownService } from '../../core/markdown.service';
 		      <div *ngIf="relatedProducts.length" class="mt-12 grid gap-4">
 		        <div class="flex items-center justify-between">
 		          <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.relatedProducts' | translate }}</h3>
-		          <a routerLink="/shop" class="text-sm font-medium text-indigo-600 dark:text-indigo-300">{{ 'product.backToShop' | translate }}</a>
+		          <button
+                type="button"
+                class="bg-transparent p-0 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+                (click)="backToShop()"
+              >
+                {{ 'product.backToShop' | translate }}
+              </button>
 		        </div>
 		        <div class="flex gap-4 overflow-x-auto pb-2">
 	          <app-button
@@ -279,7 +291,13 @@ import { MarkdownService } from '../../core/markdown.service';
 		      <div *ngIf="recentlyViewed.length" class="mt-12 grid gap-4">
 		        <div class="flex items-center justify-between">
 		          <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.recentlyViewed' | translate }}</h3>
-		          <a routerLink="/shop" class="text-sm font-medium text-indigo-600 dark:text-indigo-300">{{ 'product.backToShop' | translate }}</a>
+		          <button
+                type="button"
+                class="bg-transparent p-0 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+                (click)="backToShop()"
+              >
+                {{ 'product.backToShop' | translate }}
+              </button>
 	        </div>
 	        <div class="flex gap-4 overflow-x-auto pb-2">
           <app-button
@@ -342,7 +360,13 @@ import { MarkdownService } from '../../core/markdown.service';
 	      <ng-template #missing>
 	        <div class="border border-dashed border-slate-200 rounded-2xl p-10 text-center dark:border-slate-800">
 	          <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.notFound' | translate }}</p>
-	          <a routerLink="/shop" class="text-indigo-600 dark:text-indigo-300 font-medium">{{ 'product.backToShop' | translate }}</a>
+	          <button
+              type="button"
+              class="bg-transparent p-0 font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+              (click)="backToShop()"
+            >
+              {{ 'product.backToShop' | translate }}
+            </button>
         </div>
       </ng-template>
       </ng-template>
@@ -373,6 +397,7 @@ export class ProductComponent implements OnInit, OnDestroy {
   private canonicalEl?: HTMLLinkElement;
   private document: Document = inject(DOCUMENT);
   private slug: string | null = null;
+  private shopReturnUrl: string | null = null;
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'nav.shop', url: '/shop' }
@@ -406,6 +431,7 @@ export class ProductComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.wishlist.ensureLoaded();
+    this.shopReturnUrl = this.readShopReturnUrl();
     this.routeSub = this.route.paramMap.subscribe((params) => {
       const slug = params.get('slug');
       if (slug === this.slug) {
@@ -421,6 +447,28 @@ export class ProductComponent implements OnInit, OnDestroy {
         this.updateMeta(this.product);
       }
     });
+  }
+
+  backToShop(): void {
+    const url = this.shopReturnUrl;
+    if (url) {
+      void this.router.navigateByUrl(url);
+      return;
+    }
+    void this.router.navigate(['/shop']);
+  }
+
+  private readShopReturnUrl(): string | null {
+    if (typeof sessionStorage === 'undefined') return null;
+    try {
+      const pending = sessionStorage.getItem('shop_return_pending');
+      if (pending !== '1') return null;
+      const url = (sessionStorage.getItem('shop_return_url') || '').trim();
+      if (!url.startsWith('/shop')) return null;
+      return url;
+    } catch {
+      return null;
+    }
   }
 
   retryLoad(): void {

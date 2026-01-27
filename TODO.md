@@ -362,9 +362,9 @@ Below is a structured checklist you can turn into issues.
 - [x] A11y: localize shop filter aria labels and improve keyboard affordances for price range inputs.
 
 ### Storefront Catalog – Next Improvements (Backlog)
-- [ ] Shop: active filter chips – Show selected category/price/tags as removable chips + “Clear all”.
-- [ ] Shop: preserve scroll position – When returning from product detail, restore catalog scroll and filters.
-- [ ] Shop: result count – Display “X results” and current page range above the grid.
+- [x] Shop: active filter chips – Show selected category/price/tags as removable chips + “Clear all”.
+- [x] Shop: preserve scroll position – When returning from product detail, restore catalog scroll and filters.
+- [x] Shop: result count – Display “X results” and current page range above the grid.
 - [ ] Shop: quick view modal – Open product quick view from card (gallery + key details + add to cart).
 - [ ] Shop: mobile sticky actions – Keep filter/sort controls accessible while scrolling on mobile.
 - [ ] Shop: “Load more” pagination – Optional progressive loading as an alternative to classic pagination.

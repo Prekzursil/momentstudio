@@ -14,6 +14,15 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription, combineLatest } from 'rxjs';
 import { Meta, Title } from '@angular/platform-browser';
 
+type ShopFilterChipType = 'category' | 'subcategory' | 'price' | 'tag' | 'search';
+
+interface ShopFilterChip {
+  id: string;
+  type: ShopFilterChipType;
+  label: string;
+  value?: string;
+}
+
 @Component({
   selector: 'app-shop',
   standalone: true,
@@ -218,6 +227,37 @@ import { Meta, Title } from '@angular/platform-browser';
             </label>
           </div>
 
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+            <ng-container *ngIf="filterChips() as chips">
+              <div *ngIf="chips.length" class="flex flex-wrap items-center gap-2">
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                  {{ 'shop.activeFilters' | translate }}
+                </p>
+                <button
+                  *ngFor="let chip of chips; trackBy: trackChip"
+                  type="button"
+                  class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-800 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-800"
+                  (click)="removeChip(chip)"
+                  [attr.aria-label]="'shop.removeFilter' | translate : { filter: chip.label }"
+                >
+                  <span>{{ chip.label }}</span>
+                  <span aria-hidden="true" class="text-slate-500 dark:text-slate-400">×</span>
+                </button>
+                <button
+                  type="button"
+                  class="ml-1 text-xs font-semibold text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200"
+                  (click)="resetFilters()"
+                >
+                  {{ 'shop.clearAll' | translate }}
+                </button>
+              </div>
+            </ng-container>
+
+            <div *ngIf="!loading() && !hasError() && resultsMetaParams() as meta" class="text-sm text-slate-600 dark:text-slate-300">
+              {{ 'shop.resultsMeta' | translate : meta }}
+            </div>
+          </div>
+
           <div *ngIf="loading()" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-4">
             <app-skeleton *ngFor="let i of placeholders" height="260px"></app-skeleton>
           </div>
@@ -241,7 +281,7 @@ import { Meta, Title } from '@angular/platform-browser';
           </div>
 
           <div *ngIf="!loading() && products.length" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <app-product-card *ngFor="let product of products" [product]="product"></app-product-card>
+            <app-product-card *ngFor="let product of products" [product]="product" [rememberShopReturn]="true"></app-product-card>
           </div>
 
           <div *ngIf="pageMeta" class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-300">
@@ -311,6 +351,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   private filterDebounce?: ReturnType<typeof setTimeout>;
   private readonly filterDebounceMs = 350;
 	  private suppressNextUrlSync = false;
+    private restoreScrollY: number | null = null;
 
   sortOptions: { label: string; value: SortOption }[] = [
     { label: 'shop.sortNew', value: 'newest' },
@@ -335,6 +376,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.setMetaTags();
     this.langSub = this.translate.onLangChange.subscribe(() => this.setMetaTags());
+    this.initScrollRestoreFromSession();
     const dataCategories = (this.route.snapshot.data['categories'] as Category[]) ?? [];
     if (dataCategories.length) {
       this.categories = dataCategories;
@@ -379,7 +421,7 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.fetchProducts();
   }
 
-	  private fetchProducts(): void {
+  private fetchProducts(): void {
 	    const isSale = this.activeCategorySlug === 'sale';
 	    const categorySlug = isSale ? undefined : (this.activeSubcategorySlug || this.activeCategorySlug || undefined);
 	    this.catalog
@@ -441,6 +483,7 @@ export class ShopComponent implements OnInit, OnDestroy {
           this.setMetaTags();
           this.loading.set(false);
           this.hasError.set(false);
+          this.restoreScrollIfNeeded();
         },
         error: () => {
           this.loading.set(false);
@@ -734,5 +777,167 @@ export class ShopComponent implements OnInit, OnDestroy {
     const clamped = Math.min(Math.max(value, this.priceMinBound), this.priceMaxBound);
     const stepped = Math.round(clamped / this.priceStep) * this.priceStep;
     return Math.min(Math.max(stepped, this.priceMinBound), this.priceMaxBound);
+  }
+
+  filterChips(): ShopFilterChip[] {
+    const chips: ShopFilterChip[] = [];
+    if (this.activeCategorySlug) {
+      if (this.activeCategorySlug === 'sale') {
+        chips.push({ id: 'category:sale', type: 'category', label: this.translate.instant('shop.sale') });
+      } else {
+        const category = this.categoriesBySlug.get(this.activeCategorySlug);
+        chips.push({
+          id: `category:${this.activeCategorySlug}`,
+          type: 'category',
+          label: category?.name || this.activeCategorySlug
+        });
+      }
+    }
+    if (this.activeSubcategorySlug) {
+      const sub = this.categoriesBySlug.get(this.activeSubcategorySlug);
+      chips.push({
+        id: `subcategory:${this.activeSubcategorySlug}`,
+        type: 'subcategory',
+        label: sub?.name || this.activeSubcategorySlug
+      });
+    }
+
+    const hasMin = this.filters.min_price > this.priceMinBound;
+    const hasMax = this.filters.max_price < this.priceMaxBound;
+    if (hasMin || hasMax) {
+      chips.push({
+        id: `price:${this.filters.min_price}-${this.filters.max_price}`,
+        type: 'price',
+        label: this.translate.instant('shop.priceChip', { min: this.filters.min_price, max: this.filters.max_price })
+      });
+    }
+
+    if (this.filters.search.trim()) {
+      chips.push({
+        id: `search:${this.filters.search.trim()}`,
+        type: 'search',
+        label: this.translate.instant('shop.searchChip', { q: this.filters.search.trim() })
+      });
+    }
+
+    for (const slug of Array.from(this.filters.tags)) {
+      const tagName = this.allTags.find((t) => t.slug === slug)?.name || slug;
+      chips.push({
+        id: `tag:${slug}`,
+        type: 'tag',
+        label: tagName,
+        value: slug
+      });
+    }
+
+    return chips;
+  }
+
+  trackChip(_: number, chip: ShopFilterChip): string {
+    return chip.id;
+  }
+
+  removeChip(chip: ShopFilterChip): void {
+    this.cancelFilterDebounce();
+    this.filters.page = 1;
+
+    if (chip.type === 'category') {
+      this.activeCategorySlug = '';
+      this.activeSubcategorySlug = '';
+      this.categorySelection = '';
+      this.loadProducts();
+      return;
+    }
+    if (chip.type === 'subcategory') {
+      this.activeSubcategorySlug = '';
+      this.loadProducts();
+      return;
+    }
+    if (chip.type === 'price') {
+      this.filters.min_price = this.priceMinBound;
+      this.filters.max_price = this.priceMaxBound;
+      this.applyFilters();
+      return;
+    }
+    if (chip.type === 'search') {
+      this.filters.search = '';
+      this.applyFilters();
+      return;
+    }
+    if (chip.type === 'tag' && chip.value) {
+      this.filters.tags.delete(chip.value);
+      this.applyFilters();
+      return;
+    }
+  }
+
+  resultsMetaParams(): { total: number; from: number; to: number } | null {
+    const meta = this.pageMeta;
+    if (!meta) return null;
+
+    const total = Number(meta.total_items ?? 0);
+    const page = Number(meta.page ?? 1);
+    const limit = Number(meta.limit ?? this.filters.limit);
+    if (!Number.isFinite(total) || !Number.isFinite(page) || !Number.isFinite(limit) || limit <= 0) return null;
+    if (total <= 0) return { total: 0, from: 0, to: 0 };
+
+    const from = (page - 1) * limit + 1;
+    const to = Math.min(total, page * limit);
+    return { total, from, to };
+  }
+
+  private initScrollRestoreFromSession(): void {
+    if (typeof sessionStorage === 'undefined') return;
+    try {
+      const pending = sessionStorage.getItem('shop_return_pending');
+      if (pending !== '1') return;
+
+      const url = sessionStorage.getItem('shop_return_url') || '';
+      const scrollRaw = sessionStorage.getItem('shop_return_scroll_y') || '';
+      const atRaw = sessionStorage.getItem('shop_return_at') || '';
+      const at = Number(atRaw);
+
+      const now = Date.now();
+      if (!Number.isFinite(at) || now - at > 10 * 60 * 1000) {
+        this.clearShopReturnContext();
+        return;
+      }
+
+      const currentUrl = this.router.url;
+      if (!url || url !== currentUrl) {
+        this.clearShopReturnContext();
+        return;
+      }
+
+      const y = Number(scrollRaw);
+      if (!Number.isFinite(y) || y < 0) {
+        this.clearShopReturnContext();
+        return;
+      }
+
+      this.restoreScrollY = y;
+    } catch {
+      // ignore
+    }
+  }
+
+  private clearShopReturnContext(): void {
+    if (typeof sessionStorage === 'undefined') return;
+    try {
+      sessionStorage.removeItem('shop_return_pending');
+      sessionStorage.removeItem('shop_return_url');
+      sessionStorage.removeItem('shop_return_scroll_y');
+      sessionStorage.removeItem('shop_return_at');
+    } catch {
+      // ignore
+    }
+  }
+
+  private restoreScrollIfNeeded(): void {
+    const y = this.restoreScrollY;
+    if (y == null) return;
+    this.restoreScrollY = null;
+    this.clearShopReturnContext();
+    requestAnimationFrame(() => window.scrollTo({ top: y, behavior: 'auto' }));
   }
 }
