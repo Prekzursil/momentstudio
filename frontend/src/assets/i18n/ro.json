@@ -796,8 +796,15 @@
     "searchPlaceholder": "Caută articole",
     "tagLabel": "Etichetă",
     "tagPlaceholder": "Filtrează după etichetă",
+    "sortLabel": "Sortează",
+    "sortNewest": "Cele mai noi",
+    "sortOldest": "Cele mai vechi",
+    "sortMostViewed": "Cele mai vizualizate",
+    "sortMostCommented": "Cele mai comentate",
     "searchCta": "Căutare",
-    "clearFilters": "Șterge",
+    "clearFilters": "Resetează",
+    "chipSearch": "Caută: {{q}}",
+    "chipTag": "Etichetă: {{tag}}",
     "minutesRead": "{{minutes}} min citire",
     "preview": {
       "banner": "Mod previzualizare — acest articol nu este încă publicat."
@@ -810,6 +817,8 @@
     "pageMeta": "Pagina {{page}} din {{totalPages}} · {{totalItems}} postări",
     "metaTitle": "Blog | momentstudio",
     "metaDescription": "Povești, noutăți și culise de la momentstudio.",
+    "tagMetaTitle": "Blog · #{{tag}} | momentstudio",
+    "tagMetaDescription": "Ultimele postări etichetate „{{tag}}” pe momentstudio.",
     "prev": "Înapoi",
     "next": "Înainte",
     "post": {

@@ -25,6 +25,7 @@ class ContentBlock(Base):
     status: Mapped[ContentStatus] = mapped_column(Enum(ContentStatus), nullable=False, default=ContentStatus.draft)
     version: Mapped[int] = mapped_column(nullable=False, default=1)
     meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    view_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     lang: Mapped[str | None] = mapped_column(String(10), nullable=True, index=True)
     needs_translation_en: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

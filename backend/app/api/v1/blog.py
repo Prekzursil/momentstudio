@@ -44,10 +44,19 @@ async def list_blog_posts(
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
     q: str | None = Query(default=None, max_length=200),
     tag: str | None = Query(default=None, max_length=50),
+    sort: str = Query(default="newest", pattern="^(newest|oldest|most_viewed|most_commented)$"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=50),
 ) -> BlogPostListResponse:
-    blocks, total_items = await blog_service.list_published_posts(session, lang=lang, page=page, limit=limit, q=q, tag=tag)
+    blocks, total_items = await blog_service.list_published_posts(
+        session,
+        lang=lang,
+        page=page,
+        limit=limit,
+        q=q,
+        tag=tag,
+        sort=sort,
+    )
     total_pages = (total_items + limit - 1) // limit if total_items else 1
     return BlogPostListResponse(
         items=[blog_service.to_list_item(b, lang=lang) for b in blocks],
@@ -64,6 +73,15 @@ async def get_blog_post(
     block = await blog_service.get_published_post(session, slug=slug, lang=lang)
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    try:
+        await session.execute(
+            sa.update(ContentBlock)
+            .where(ContentBlock.id == block.id)
+            .values(view_count=ContentBlock.view_count + 1)
+        )
+        await session.commit()
+    except Exception:
+        await session.rollback()
     return BlogPostRead.model_validate(blog_service.to_read(block, lang=lang))
 
 

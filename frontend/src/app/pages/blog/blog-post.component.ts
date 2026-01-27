@@ -56,8 +56,7 @@ import { formatIdentity } from '../../shared/user-identity';
         <div class="flex flex-wrap gap-1" *ngIf="post()?.tags?.length">
           <a
             *ngFor="let tag of post()!.tags"
-            [routerLink]="['/blog']"
-            [queryParams]="{ tag: tag }"
+            [routerLink]="['/blog/tag', tag]"
             class="text-xs rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-700 hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200 dark:hover:border-slate-600"
           >
             #{{ tag }}

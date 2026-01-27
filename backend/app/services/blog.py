@@ -24,6 +24,8 @@ _MD_LINK_RE = re.compile(r"\[([^\]]+)\]\([^)]+\)")
 _MD_STRIP_PREFIX_RE = re.compile(r"(^|\n)(#{1,6}\s*|>\\s*|[-*]\\s+)")
 _MD_MULTI_SPACE_RE = re.compile(r"\s+")
 
+_BLOG_SORT_VALUES = {"newest", "oldest", "most_viewed", "most_commented"}
+
 
 def _extract_slug(key: str) -> str:
     if not key.startswith(BLOG_KEY_PREFIX):
@@ -150,6 +152,11 @@ def _meta_summary(meta: dict | None, *, lang: str | None, base_lang: str | None)
     return None
 
 
+def _normalize_blog_sort(raw: str | None) -> str:
+    value = (raw or "").strip().lower()
+    return value if value in _BLOG_SORT_VALUES else "newest"
+
+
 async def list_published_posts(
     session: AsyncSession,
     *,
@@ -158,6 +165,7 @@ async def list_published_posts(
     limit: int,
     q: str | None = None,
     tag: str | None = None,
+    sort: str | None = None,
 ) -> tuple[list[ContentBlock], int]:
     now = datetime.now(timezone.utc)
     page = max(1, page)
@@ -173,26 +181,60 @@ async def list_published_posts(
     pin_order = ContentBlock.meta["pin_order"].as_integer()
     pinned_rank = case((pinned_flag, 0), else_=1)
     pin_order_rank = case((pinned_flag, func.coalesce(pin_order, 999)), else_=999)
-    ordering = (
-        pinned_rank.asc(),
-        pin_order_rank.asc(),
-        ContentBlock.published_at.desc().nullslast(),
-        ContentBlock.updated_at.desc(),
-    )
+    sort_key = _normalize_blog_sort(sort)
+    comment_counts = None
+    if sort_key == "oldest":
+        ordering = (
+            pinned_rank.asc(),
+            pin_order_rank.asc(),
+            ContentBlock.published_at.asc().nullslast(),
+            ContentBlock.updated_at.asc(),
+        )
+    elif sort_key == "most_viewed":
+        ordering = (
+            pinned_rank.asc(),
+            pin_order_rank.asc(),
+            ContentBlock.view_count.desc(),
+            ContentBlock.published_at.desc().nullslast(),
+            ContentBlock.updated_at.desc(),
+        )
+    elif sort_key == "most_commented":
+        comment_counts = (
+            select(
+                BlogComment.content_block_id.label("content_block_id"),
+                func.count(BlogComment.id).label("comment_count"),
+            )
+            .where(
+                BlogComment.is_deleted.is_(False),
+                BlogComment.is_hidden.is_(False),
+            )
+            .group_by(BlogComment.content_block_id)
+            .subquery()
+        )
+        ordering = (
+            pinned_rank.asc(),
+            pin_order_rank.asc(),
+            func.coalesce(comment_counts.c.comment_count, 0).desc(),
+            ContentBlock.published_at.desc().nullslast(),
+            ContentBlock.updated_at.desc(),
+        )
+    else:
+        ordering = (
+            pinned_rank.asc(),
+            pin_order_rank.asc(),
+            ContentBlock.published_at.desc().nullslast(),
+            ContentBlock.updated_at.desc(),
+        )
     query_text = (q or "").strip().lower()
     tag_text = (tag or "").strip().lower()
 
     if not query_text and not tag_text:
         offset = (page - 1) * limit
         total = await session.scalar(select(func.count()).select_from(ContentBlock).where(*filters))
-        query = (
-            select(ContentBlock)
-            .options(selectinload(ContentBlock.images))
-            .where(*filters)
-            .order_by(*ordering)
-            .limit(limit)
-            .offset(offset)
-        )
+        query = select(ContentBlock).options(selectinload(ContentBlock.images)).where(*filters)
+        if comment_counts is not None:
+            query = query.outerjoin(comment_counts, comment_counts.c.content_block_id == ContentBlock.id)
+        query = query.order_by(*ordering).limit(limit).offset(offset)
         if lang:
             query = query.options(selectinload(ContentBlock.translations))
 
@@ -202,12 +244,10 @@ async def list_published_posts(
             _apply_translation(block, lang)
         return blocks, int(total or 0)
 
-    query = (
-        select(ContentBlock)
-        .options(selectinload(ContentBlock.images))
-        .where(*filters)
-        .order_by(*ordering)
-    )
+    query = select(ContentBlock).options(selectinload(ContentBlock.images)).where(*filters)
+    if comment_counts is not None:
+        query = query.outerjoin(comment_counts, comment_counts.c.content_block_id == ContentBlock.id)
+    query = query.order_by(*ordering)
     if lang:
         query = query.options(selectinload(ContentBlock.translations))
 

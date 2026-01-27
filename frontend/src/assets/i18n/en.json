@@ -796,8 +796,15 @@
     "searchPlaceholder": "Search posts",
     "tagLabel": "Tag",
     "tagPlaceholder": "Filter by tag",
+    "sortLabel": "Sort",
+    "sortNewest": "Newest",
+    "sortOldest": "Oldest",
+    "sortMostViewed": "Most viewed",
+    "sortMostCommented": "Most commented",
     "searchCta": "Search",
-    "clearFilters": "Clear",
+    "clearFilters": "Reset",
+    "chipSearch": "Search: {{q}}",
+    "chipTag": "Tag: {{tag}}",
     "minutesRead": "{{minutes}} min read",
     "preview": {
       "banner": "Preview mode — this post is not published yet."
@@ -810,6 +817,8 @@
     "pageMeta": "Page {{page}} of {{totalPages}} · {{totalItems}} posts",
     "metaTitle": "Blog | momentstudio",
     "metaDescription": "Stories, updates, and behind-the-scenes from momentstudio.",
+    "tagMetaTitle": "Blog · #{{tag}} | momentstudio",
+    "tagMetaDescription": "Latest posts tagged \"{{tag}}\" on momentstudio.",
     "prev": "Prev",
     "next": "Next",
     "post": {

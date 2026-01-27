@@ -146,13 +146,21 @@ export interface BlogMyCommentListResponse {
 export class BlogService {
   constructor(private api: ApiService) {}
 
-  listPosts(params: { lang?: string; page?: number; limit?: number; q?: string; tag?: string }): Observable<BlogPostListResponse> {
+  listPosts(params: {
+    lang?: string;
+    page?: number;
+    limit?: number;
+    q?: string;
+    tag?: string;
+    sort?: string;
+  }): Observable<BlogPostListResponse> {
     return this.api.get<BlogPostListResponse>('/blog/posts', {
       lang: params.lang,
       page: params.page ?? 1,
       limit: params.limit ?? 10,
       q: params.q,
-      tag: params.tag
+      tag: params.tag,
+      sort: params.sort
     });
   }
 

@@ -426,9 +426,9 @@ Below is a structured checklist you can turn into issues.
 ### Blog – Next Improvements (Backlog)
 - [x] Blog list: featured hero – Highlight the newest/pinned post with a large, image-forward hero card.
 - [x] Blog list: pinned posts – Allow pinning 1–3 posts to the top of `/blog` (admin-managed ordering).
-- [ ] Blog list: sort controls – Add sorting (newest/oldest/most viewed/most commented) with persisted selection.
-- [ ] Blog list: filter UX – Sticky filter bar (tags/search) with clear chips and “Reset” action.
-- [ ] Blog list: tag pages – Add `/blog/tag/:tag` landing pages with SEO meta and pagination.
+- [x] Blog list: sort controls – Add sorting (newest/oldest/most viewed/most commented) with persisted selection.
+- [x] Blog list: filter UX – Sticky filter bar (tags/search) with clear chips and “Reset” action.
+- [x] Blog list: tag pages – Add `/blog/tag/:tag` landing pages with SEO meta and pagination.
 - [ ] Blog list: series/categories – Add optional blog “series” taxonomy (separate from shop categories) with pages and filters.
 - [ ] Blog list: nicer cards – Improve typography, spacing, hover states, and consistent cover image aspect ratios.
 - [ ] Blog list: image loading polish – Use blur-up placeholders + prevent layout shift for cover images.
@@ -465,6 +465,7 @@ Below is a structured checklist you can turn into issues.
 - [ ] Blog SEO: preview panel – Preview meta/OG/twitter cards per language and validate truncation/warnings.
 - [ ] Blog perf: prefetch + caching – Prefetch post data on hover and add caching for list/detail to speed up loads.
 - [ ] Blog list: pinned posts – Prevent conflicting pin slots (1–3) and surface warnings in admin UI.
+- [ ] Blog stats: view counting – De-dupe per session + bot filtering (current counter increments on each page view).
 ## Frontend - Cart & Checkout
 - [x] Cart page/drawer with quantities and totals.
 - [x] Cart UX: make cart item image/title link to the product page (`/products/:slug`).
