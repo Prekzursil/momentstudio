@@ -420,6 +420,55 @@ type PriceHistoryChart = {
             </ul>
           </app-help-panel>
 
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <button
+                type="button"
+                class="px-3 py-1.5 text-xs font-semibold"
+                [class.bg-slate-900]="status === 'all'"
+                [class.text-white]="status === 'all'"
+                [class.text-slate-700]="status !== 'all'"
+                [class.dark:text-slate-200]="status !== 'all'"
+                (click)="setStatusFilter('all')"
+              >
+                {{ 'adminUi.products.all' | translate }}
+              </button>
+              <button
+                type="button"
+                class="px-3 py-1.5 text-xs font-semibold"
+                [class.bg-slate-900]="status === 'draft'"
+                [class.text-white]="status === 'draft'"
+                [class.text-slate-700]="status !== 'draft'"
+                [class.dark:text-slate-200]="status !== 'draft'"
+                (click)="setStatusFilter('draft')"
+              >
+                {{ 'adminUi.status.draft' | translate }}
+              </button>
+              <button
+                type="button"
+                class="px-3 py-1.5 text-xs font-semibold"
+                [class.bg-slate-900]="status === 'published'"
+                [class.text-white]="status === 'published'"
+                [class.text-slate-700]="status !== 'published'"
+                [class.dark:text-slate-200]="status !== 'published'"
+                (click)="setStatusFilter('published')"
+              >
+                {{ 'adminUi.status.published' | translate }}
+              </button>
+              <button
+                type="button"
+                class="px-3 py-1.5 text-xs font-semibold"
+                [class.bg-slate-900]="status === 'archived'"
+                [class.text-white]="status === 'archived'"
+                [class.text-slate-700]="status !== 'archived'"
+                [class.dark:text-slate-200]="status !== 'archived'"
+                (click)="setStatusFilter('archived')"
+              >
+                {{ 'adminUi.status.archived' | translate }}
+              </button>
+            </div>
+          </div>
+
 		        <div class="grid gap-3 lg:grid-cols-[1fr_180px_220px_240px_220px_auto] items-end">
 		          <app-input [label]="'adminUi.products.search' | translate" [(value)]="q"></app-input>
 
@@ -900,9 +949,18 @@ type PriceHistoryChart = {
                     </ng-template>
                   </td>
                   <td *ngSwitchCase="'status'" [ngClass]="cellPaddingClass()">
-                    <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="statusPillClass(product.status)">
-                      {{ ('adminUi.status.' + product.status) | translate }}
-                    </span>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="statusPillClass(product.status)">
+                        {{ ('adminUi.status.' + product.status) | translate }}
+                      </span>
+                      <span
+                        *ngIf="product.status === 'published'"
+                        class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                        [ngClass]="product.is_active ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'"
+                      >
+                        {{ product.is_active ? ('adminUi.products.active' | translate) : ('adminUi.products.inactive' | translate) }}
+                      </span>
+                    </div>
                     <div
                       *ngIf="product.publish_scheduled_for || product.unpublish_scheduled_for"
                       class="mt-1 grid gap-0.5 text-xs text-slate-500 dark:text-slate-400"
@@ -2918,6 +2976,12 @@ export class AdminProductsComponent implements OnInit {
     this.clearSelection();
     this.cancelInlineEdit();
     this.load();
+  }
+
+  setStatusFilter(next: ProductStatusFilter): void {
+    if (this.status === next) return;
+    this.status = next;
+    this.applyFilters();
   }
 
   resetFilters(): void {
