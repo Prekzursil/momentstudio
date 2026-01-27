@@ -460,8 +460,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin blog list: bulk actions – Bulk publish/unpublish, tag add/remove, and schedule changes with preview.
 - [x] Admin editor: cover image workflow – Upload/select cover image with crop + focal point + mobile preview.
 - [x] Admin editor: drag-drop images – Drag-and-drop images into the editor (auto-upload + insert markdown/WYSIWYG block).
-- [ ] Admin editor: accessibility checks – Warn on missing alt text/captions and offer quick fixes before publish.
-- [ ] Admin editor: autosave + recovery – Autosave drafts and offer “restore last autosave” after crashes/refresh.
+- [x] Admin editor: accessibility checks – Warn on missing alt text/captions and offer quick fixes before publish.
+- [x] Admin editor: autosave + recovery – Autosave drafts and offer “restore last autosave” after crashes/refresh.
 - [ ] Admin editor: writing aids – Word count, reading-time recalculation, and headings outline sidebar.
 - [ ] Blog SEO: preview panel – Preview meta/OG/twitter cards per language and validate truncation/warnings.
 - [ ] Blog perf: prefetch + caching – Prefetch post data on hover and add caching for list/detail to speed up loads.

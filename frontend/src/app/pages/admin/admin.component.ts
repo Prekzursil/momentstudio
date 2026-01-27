@@ -128,6 +128,21 @@ type PageBlocksDraftState = {
   requiresAuth: boolean;
 };
 
+type BlogDraftState = {
+  title: string;
+  body_markdown: string;
+  status: ContentStatusUi;
+  published_at: string;
+  published_until: string;
+  summary: string;
+  tags: string;
+  series: string;
+  cover_image_url: string;
+  reading_time_minutes: string;
+  pinned: boolean;
+  pin_order: string;
+};
+
 type CmsAutosaveEnvelope = {
   v: 1;
   ts: string;
@@ -4093,6 +4108,38 @@ class CmsDraftManager<T> {
                 </div>
               </div>
 
+              <ng-container *ngIf="blogA11yIssues() as issues">
+                <details
+                  *ngIf="issues.length"
+                  class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900/50 dark:bg-amber-950/30"
+                  [open]="blogA11yOpen"
+                >
+                  <summary class="cursor-pointer select-none font-semibold text-amber-900 dark:text-amber-100">
+                    {{ 'adminUi.blog.a11y.title' | translate }} ({{ issues.length }})
+                  </summary>
+                  <div class="mt-2 grid gap-2">
+                    <p class="text-xs text-amber-900/80 dark:text-amber-100/80">{{ 'adminUi.blog.a11y.hint' | translate }}</p>
+                    <div
+                      *ngFor="let issue of issues"
+                      class="flex flex-wrap items-center justify-between gap-2 rounded border border-amber-200 bg-white p-2 text-xs dark:border-amber-900/50 dark:bg-slate-900"
+                    >
+                      <a class="text-indigo-600 dark:text-indigo-300 hover:underline truncate" [href]="issue.url" target="_blank" rel="noopener">
+                        {{ issue.url }}
+                      </a>
+                      <div class="flex items-center gap-2">
+                        <span class="text-slate-600 dark:text-slate-300">{{ issue.alt || '—' }}</span>
+                        <app-button
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.blog.a11y.fixAlt' | translate"
+                          (action)="promptFixBlogImageAlt(issue.index)"
+                        ></app-button>
+                      </div>
+                    </div>
+                  </div>
+                </details>
+              </ng-container>
+
               <div class="grid gap-2">
                 <div *ngIf="blogImages.length" class="grid gap-2">
                   <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.blog.images.title' | translate }}</p>
@@ -4110,6 +4157,20 @@ class CmsDraftManager<T> {
                 </div>
               </div>
 
+              <div
+                *ngIf="blogDraftHasRestore()"
+                class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+              >
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-semibold">{{ 'adminUi.content.autosave.restoreFound' | translate }}</span>
+                  <span *ngIf="blogDraftRestoreAt()" class="text-amber-700 dark:text-amber-200">{{ blogDraftRestoreAt() | date: 'short' }}</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <app-button size="sm" variant="ghost" [label]="'adminUi.actions.restore' | translate" (action)="restoreBlogDraftAutosave()"></app-button>
+                  <app-button size="sm" variant="ghost" [label]="'adminUi.actions.dismiss' | translate" (action)="dismissBlogDraftAutosave()"></app-button>
+                </div>
+              </div>
+
               <div class="flex flex-wrap gap-2">
                 <app-button [label]="'adminUi.actions.save' | translate" (action)="saveBlogPost()"></app-button>
                 <app-button size="sm" variant="ghost" [label]="'adminUi.blog.actions.previewLink' | translate" (action)="generateBlogPreviewLink()"></app-button>
@@ -4121,6 +4182,20 @@ class CmsDraftManager<T> {
                 >
                   {{ 'adminUi.blog.actions.view' | translate }}
                 </a>
+                <span *ngIf="blogDraftReady()" class="text-xs text-slate-500 dark:text-slate-400">
+                  <ng-container *ngIf="!blogDraftDirty()">
+                    {{ 'adminUi.content.autosave.state.saved' | translate }}
+                  </ng-container>
+                  <ng-container *ngIf="blogDraftDirty() && blogDraftAutosaving()">
+                    {{ 'adminUi.content.autosave.state.autosaving' | translate }}
+                  </ng-container>
+                  <ng-container *ngIf="blogDraftDirty() && !blogDraftAutosaving() && blogDraftLastAutosavedAt()">
+                    {{ 'adminUi.content.autosave.state.autosaved' | translate }} {{ blogDraftLastAutosavedAt() | date: 'shortTime' }}
+                  </ng-container>
+                  <ng-container *ngIf="blogDraftDirty() && !blogDraftAutosaving() && !blogDraftLastAutosavedAt()">
+                    {{ 'adminUi.content.autosave.state.unsaved' | translate }}
+                  </ng-container>
+                </span>
               </div>
               <div *ngIf="blogPreviewUrl" class="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-950/30">
                 <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.blog.preview.title' | translate }}</p>
@@ -4822,6 +4897,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   blogBulkError = '';
   showBlogCoverLibrary = false;
   showBlogPreview = false;
+  blogA11yOpen = false;
   useRichBlogEditor = true;
   blogImageLayout: 'default' | 'wide' | 'left' | 'right' | 'gallery' = 'default';
   blogSocialLangs: UiLang[] = ['en', 'ro'];
@@ -5002,6 +5078,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	  private cmsDraftPoller: number | null = null;
 	  private cmsHomeDraft = new CmsDraftManager<HomeBlockDraft[]>('adrianaart.cms.autosave.home.sections');
 	  private cmsPageDrafts = new Map<string, CmsDraftManager<PageBlocksDraftState>>();
+	  private cmsBlogDrafts = new Map<string, CmsDraftManager<BlogDraftState>>();
 	  coupons: AdminCoupon[] = [];
 	  newCoupon: Partial<AdminCoupon> = { code: '', percentage_off: 0, active: true, currency: 'RON' };
 	  stockEdits: Record<string, number> = {};
@@ -5061,6 +5138,15 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    if (pageDraft.isReady()) {
 	      pageDraft.observe(this.currentPageDraftState(pageKey));
 	    }
+
+	    const blogKey = this.selectedBlogKey;
+	    if (blogKey) {
+	      const id = this.blogDraftId(blogKey, this.blogEditLang);
+	      const manager = this.cmsBlogDrafts.get(id);
+	      if (manager?.isReady()) {
+	        manager.observe(this.currentBlogDraftState());
+	      }
+	    }
 	  }
 
 	  private ensurePageDraft(pageKey: PageBuilderKey): CmsDraftManager<PageBlocksDraftState> {
@@ -5087,6 +5173,98 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    this.pageBlocksPublishedAt[pageKey] = draft?.publishedAt || '';
 	    this.pageBlocksPublishedUntil[pageKey] = draft?.publishedUntil || '';
 	    this.pageBlocksRequiresAuth[pageKey] = Boolean(draft?.requiresAuth);
+	  }
+
+	  private blogDraftId(key: string, lang: UiLang): string {
+	    return `${key}.${lang}`;
+	  }
+
+	  private ensureBlogDraft(key: string, lang: UiLang): CmsDraftManager<BlogDraftState> {
+	    const id = this.blogDraftId(key, lang);
+	    const existing = this.cmsBlogDrafts.get(id);
+	    if (existing) return existing;
+	    const created = new CmsDraftManager<BlogDraftState>(`adrianaart.cms.autosave.${id}`);
+	    this.cmsBlogDrafts.set(id, created);
+	    return created;
+	  }
+
+	  private currentBlogDraftState(): BlogDraftState {
+	    return {
+	      title: this.blogForm.title,
+	      body_markdown: this.blogForm.body_markdown,
+	      status:
+	        this.blogForm.status === 'published'
+	          ? 'published'
+	          : this.blogForm.status === 'review'
+	            ? 'review'
+	            : 'draft',
+	      published_at: this.blogForm.published_at,
+	      published_until: this.blogForm.published_until,
+	      summary: this.blogForm.summary,
+	      tags: this.blogForm.tags,
+	      series: this.blogForm.series,
+	      cover_image_url: this.blogForm.cover_image_url,
+	      reading_time_minutes: this.blogForm.reading_time_minutes,
+	      pinned: Boolean(this.blogForm.pinned),
+	      pin_order: this.blogForm.pin_order
+	    };
+	  }
+
+	  private applyBlogDraftState(draft: BlogDraftState): void {
+	    this.blogForm = {
+	      ...this.blogForm,
+	      ...draft
+	    };
+	  }
+
+	  blogDraftReady(): boolean {
+	    if (!this.selectedBlogKey) return false;
+	    const id = this.blogDraftId(this.selectedBlogKey, this.blogEditLang);
+	    const manager = this.cmsBlogDrafts.get(id);
+	    return manager?.isReady() ?? false;
+	  }
+
+	  blogDraftDirty(): boolean {
+	    if (!this.selectedBlogKey) return false;
+	    const id = this.blogDraftId(this.selectedBlogKey, this.blogEditLang);
+	    return this.cmsBlogDrafts.get(id)?.dirty ?? false;
+	  }
+
+	  blogDraftAutosaving(): boolean {
+	    if (!this.selectedBlogKey) return false;
+	    const id = this.blogDraftId(this.selectedBlogKey, this.blogEditLang);
+	    return this.cmsBlogDrafts.get(id)?.autosavePending ?? false;
+	  }
+
+	  blogDraftLastAutosavedAt(): string | null {
+	    if (!this.selectedBlogKey) return null;
+	    const id = this.blogDraftId(this.selectedBlogKey, this.blogEditLang);
+	    return this.cmsBlogDrafts.get(id)?.lastAutosavedAt ?? null;
+	  }
+
+	  blogDraftHasRestore(): boolean {
+	    if (!this.selectedBlogKey) return false;
+	    const manager = this.ensureBlogDraft(this.selectedBlogKey, this.blogEditLang);
+	    return manager.hasRestorableAutosave && !manager.dirty;
+	  }
+
+	  blogDraftRestoreAt(): string | null {
+	    if (!this.selectedBlogKey) return null;
+	    const manager = this.ensureBlogDraft(this.selectedBlogKey, this.blogEditLang);
+	    return manager.restorableAutosaveAt;
+	  }
+
+	  restoreBlogDraftAutosave(): void {
+	    if (!this.selectedBlogKey) return;
+	    const manager = this.ensureBlogDraft(this.selectedBlogKey, this.blogEditLang);
+	    const next = manager.restoreAutosave(this.currentBlogDraftState());
+	    if (next) this.applyBlogDraftState(next);
+	  }
+
+	  dismissBlogDraftAutosave(): void {
+	    if (!this.selectedBlogKey) return;
+	    const manager = this.ensureBlogDraft(this.selectedBlogKey, this.blogEditLang);
+	    manager.discardAutosave();
 	  }
 
 	  homeDraftReady(): boolean {
@@ -5332,6 +5510,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    }
 	    this.cmsHomeDraft.dispose();
 	    for (const manager of this.cmsPageDrafts.values()) manager.dispose();
+	    for (const manager of this.cmsBlogDrafts.values()) manager.dispose();
 	    for (const key of Object.keys(this.contentVersions)) {
 	      delete this.contentVersions[key];
 	    }
@@ -6654,6 +6833,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.blogForm.published_until = block.published_until ? this.toLocalDateTime(block.published_until) : '';
         this.blogMeta = block.meta || this.blogMeta || {};
         this.syncBlogMetaToForm(lang);
+        this.ensureBlogDraft(key, lang).initFromServer(this.currentBlogDraftState());
       },
       error: () => this.toast.error(this.t('adminUi.blog.errors.loadContent'))
     });
@@ -6670,6 +6850,14 @@ export class AdminComponent implements OnInit, OnDestroy {
     const nextMeta = this.buildBlogMeta(this.blogEditLang);
     const metaChanged = JSON.stringify(nextMeta) !== JSON.stringify(this.blogMeta || {});
     const isBase = this.blogEditLang === this.blogBaseLang;
+    if (isBase && this.blogForm.status === 'published') {
+      const issues = this.blogA11yIssues();
+      if (issues.length) {
+        this.blogA11yOpen = true;
+        const ok = confirm(this.t('adminUi.blog.a11y.confirmPublishAnyway', { count: issues.length }));
+        if (!ok) return;
+      }
+    }
     const published_at = isBase
       ? this.blogForm.published_at
         ? new Date(this.blogForm.published_at).toISOString()
@@ -6693,6 +6881,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         next: (block) => {
           this.rememberContentVersion(key, block);
           this.blogMeta = nextMeta;
+          this.ensureBlogDraft(key, this.blogEditLang).markServerSaved(this.currentBlogDraftState());
           this.toast.success(this.t('adminUi.blog.success.saved'));
           this.reloadContentBlocks();
           this.loadBlogEditor(key);
@@ -6721,6 +6910,7 @@ export class AdminComponent implements OnInit, OnDestroy {
           this.setBlogEditLang(this.blogEditLang);
         };
         if (!metaChanged) {
+          this.ensureBlogDraft(key, this.blogEditLang).markServerSaved(this.currentBlogDraftState());
           onDone();
           return;
         }
@@ -6728,6 +6918,7 @@ export class AdminComponent implements OnInit, OnDestroy {
           next: (metaBlock) => {
             this.rememberContentVersion(key, metaBlock);
             this.blogMeta = nextMeta;
+            this.ensureBlogDraft(key, this.blogEditLang).markServerSaved(this.currentBlogDraftState());
             onDone();
           },
           error: (err) => {
@@ -7086,6 +7277,77 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.toast.info(this.t('adminUi.blog.images.success.insertedMarkdown'));
   }
 
+  blogA11yIssues(): Array<{ index: number; url: string; alt: string }> {
+    const markdown = this.blogForm.body_markdown || '';
+    const issues: Array<{ index: number; url: string; alt: string }> = [];
+    const re = /!\[([^\]]*)\]\(([^)\s]+)([^)]*)\)/g;
+    let match: RegExpExecArray | null;
+    let idx = 0;
+    while ((match = re.exec(markdown))) {
+      const alt = String(match[1] || '').trim();
+      const url = String(match[2] || '').trim();
+      const altKey = alt.toLowerCase();
+      const missing = !alt || altKey === 'image' || altKey === 'photo' || altKey === 'picture';
+      if (url && missing) issues.push({ index: idx, url, alt });
+      idx += 1;
+    }
+    return issues;
+  }
+
+  promptFixBlogImageAlt(imageIndex: number): void {
+    const markdown = this.blogForm.body_markdown || '';
+    const re = /!\[([^\]]*)\]\(([^)\s]+)([^)]*)\)/g;
+    let match: RegExpExecArray | null;
+    let idx = 0;
+    while ((match = re.exec(markdown))) {
+      if (idx !== imageIndex) {
+        idx += 1;
+        continue;
+      }
+      const url = String(match[2] || '').trim();
+      const suggestion = this.suggestAltFromUrl(url);
+      const next = (prompt(this.t('adminUi.blog.a11y.promptAlt'), suggestion) || '').trim();
+      if (!next) return;
+      this.setBlogMarkdownImageAlt(imageIndex, next);
+      this.toast.success(this.t('adminUi.blog.a11y.fixed'));
+      this.blogA11yOpen = true;
+      return;
+    }
+  }
+
+  private suggestAltFromUrl(url: string): string {
+    const cleaned = String(url || '').split('?')[0].split('#')[0].trim();
+    const filename = cleaned.split('/').pop() || '';
+    const base = filename.replace(/\.[^.]+$/, '');
+    return base.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim() || 'image';
+  }
+
+  private setBlogMarkdownImageAlt(imageIndex: number, alt: string): void {
+    const markdown = this.blogForm.body_markdown || '';
+    const safeAlt = String(alt || '').replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!safeAlt) return;
+
+    const re = /!\[([^\]]*)\]\(([^)\s]+)([^)]*)\)/g;
+    let match: RegExpExecArray | null;
+    let idx = 0;
+    let out = '';
+    let lastIndex = 0;
+    while ((match = re.exec(markdown))) {
+      const start = match.index;
+      const end = re.lastIndex;
+      out += markdown.slice(lastIndex, start);
+      if (idx === imageIndex) {
+        out += `![${safeAlt}](${match[2]}${match[3]})`;
+      } else {
+        out += markdown.slice(start, end);
+      }
+      lastIndex = end;
+      idx += 1;
+    }
+    out += markdown.slice(lastIndex);
+    this.blogForm.body_markdown = out;
+  }
+
   blogCoverPreviewUrl(): string | null {
     const explicit = (this.blogForm.cover_image_url || '').trim();
     if (explicit) return explicit;
@@ -7266,6 +7528,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	          pin_order: '1'
 	        };
         this.syncBlogMetaToForm(this.blogEditLang);
+        this.ensureBlogDraft(key, this.blogEditLang).initFromServer(this.currentBlogDraftState());
         const images = (block.images || [])
           .map((img) => ({
             id: img.id,

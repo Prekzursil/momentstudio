@@ -2700,6 +2700,14 @@
           "upload": "Could not upload image"
         }
       },
+      "a11y": {
+        "title": "Accessibility checks",
+        "hint": "Add meaningful alt text for images (used for captions and screen readers) before publishing.",
+        "fixAlt": "Set alt text",
+        "promptAlt": "Alt text for this image:",
+        "fixed": "Alt text updated",
+        "confirmPublishAnyway": "This post has {{count}} image(s) without meaningful alt text. Publish anyway?"
+      },
       "preview": {
         "title": "Preview link",
         "expires": "Expires",

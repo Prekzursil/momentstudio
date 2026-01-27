@@ -2700,6 +2700,14 @@
           "upload": "Nu s-a putut încărca imaginea"
         }
       },
+      "a11y": {
+        "title": "Verificări de accesibilitate",
+        "hint": "Adaugă text alternativ relevant pentru imagini (folosit ca legendă și pentru cititoare de ecran) înainte de publicare.",
+        "fixAlt": "Setează text alternativ",
+        "promptAlt": "Text alternativ pentru această imagine:",
+        "fixed": "Textul alternativ a fost actualizat",
+        "confirmPublishAnyway": "Acest articol are {{count}} imagini fără text alternativ relevant. Publici oricum?"
+      },
       "preview": {
         "title": "Link previzualizare",
         "expires": "Expiră",
