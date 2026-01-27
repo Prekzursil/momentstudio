@@ -1051,7 +1051,15 @@ export class ShopComponent implements OnInit, OnDestroy {
     if (!leaf) return false;
     const meta = this.pageMeta;
     if (!meta) return false;
-    if (Number(meta.total_pages ?? 1) > 1) return false;
+    const totalPages = Number(meta.total_pages ?? 1);
+    const page = Number(meta.page ?? 1);
+    const totalItems = Number(meta.total_items ?? 0);
+    if (!Number.isFinite(totalPages) || totalPages < 1) return false;
+    if (!Number.isFinite(page) || page < 1) return false;
+    if (!Number.isFinite(totalItems) || totalItems < 0) return false;
+    const loadedAll =
+      totalPages === 1 || (this.paginationMode === 'load_more' && page >= totalPages && this.products.length >= totalItems);
+    if (!loadedAll) return false;
     return this.products.length > 1;
   }
 

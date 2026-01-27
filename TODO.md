@@ -389,8 +389,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Storefront Products: bulk select – Multi-select products on Shop page and apply bulk actions (status/category/feature).
 - [x] Storefront Products: include drafts in edit mode – Allow admins to see/edit draft/archived items on `/shop` when edit mode is enabled.
 - [x] Storefront Products: drag reorder (category) – Custom sort order per category with drag-and-drop on the category page.
-- [ ] Storefront Products: reorder for large categories – Support drag reordering when a category spans multiple pages (load-all mode or cross-page ordering).
-- [ ] Catalog: respect hidden categories in listings – Do not allow browsing hidden category products via `/shop/:slug` unless storefront edit mode is enabled.
+- [x] Storefront Products: reorder for large categories – Support drag reordering when a category spans multiple pages (load-all mode or cross-page ordering).
+- [x] Catalog: respect hidden categories in listings – Do not allow browsing hidden category products via `/shop/:slug` unless storefront edit mode is enabled.
 - [ ] Storefront Products: pin/feature – Pin products to top of a category (per-category featured list) from storefront.
 - [ ] Storefront Products: quick duplicate – Duplicate a product from product detail in edit mode (clone images, mark draft).
 - [ ] Storefront Products: image manager – Reorder images and edit alt text/captions from product detail in edit mode.

@@ -1606,6 +1606,13 @@ async def get_product_price_bounds(
 
     if category_slug:
         category_ids = await _get_category_and_descendant_ids_by_slug(session, category_slug)
+        if category_ids and not include_unpublished:
+            visible_ids = (
+                await session.execute(
+                    select(Category.id).where(Category.id.in_(category_ids), Category.is_visible.is_(True))
+                )
+            ).scalars().all()
+            category_ids = list(visible_ids)
         if category_ids:
             query = query.where(Product.category_id.in_(category_ids))
         else:
@@ -1670,6 +1677,13 @@ async def list_products_with_filters(
         base_query = base_query.where(Product.is_active.is_(True), Product.status == ProductStatus.published)
     if category_slug:
         category_ids = await _get_category_and_descendant_ids_by_slug(session, category_slug)
+        if category_ids and not include_unpublished:
+            visible_ids = (
+                await session.execute(
+                    select(Category.id).where(Category.id.in_(category_ids), Category.is_visible.is_(True))
+                )
+            ).scalars().all()
+            category_ids = list(visible_ids)
         if category_ids:
             base_query = base_query.where(Product.category_id.in_(category_ids))
         else:
