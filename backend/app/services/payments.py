@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Literal, cast
+from uuid import uuid4
 
 import stripe
 from fastapi import HTTPException, status
@@ -13,6 +14,7 @@ from app.models.cart import Cart
 from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.webhook import StripeWebhookEvent
 from app.core import metrics
+from app.services.payment_provider import is_mock_payments
 
 stripe = cast(Any, stripe)
 
@@ -187,6 +189,12 @@ async def create_checkout_session(
     metadata includes our provided metadata so webhooks/confirm endpoints can map
     back to internal entities.
     """
+    if is_mock_payments():
+        session_id = f"cs_mock_{uuid4().hex}"
+        base = settings.frontend_origin.rstrip("/")
+        checkout_url = f"{base}/checkout/mock/stripe?session_id={session_id}"
+        return {"session_id": session_id, "checkout_url": checkout_url}
+
     if not is_stripe_configured():
         metrics.record_payment_failure()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")

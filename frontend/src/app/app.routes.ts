@@ -52,6 +52,16 @@ export const routes: Routes = [
     }
   },
   {
+    path: 'checkout/mock/paypal',
+    loadComponent: () => import('./pages/checkout/paypal-mock.component').then((m) => m.PayPalMockComponent),
+    title: 'PayPal (Mock) | momentstudio'
+  },
+  {
+    path: 'checkout/mock/stripe',
+    loadComponent: () => import('./pages/checkout/stripe-mock.component').then((m) => m.StripeMockComponent),
+    title: 'Stripe (Mock) | momentstudio'
+  },
+  {
     path: 'checkout/paypal/return',
     loadComponent: () => import('./pages/checkout/paypal-return.component').then((m) => m.PayPalReturnComponent),
     title: 'PayPal | momentstudio'

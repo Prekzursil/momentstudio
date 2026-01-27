@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/adrianaart"
     backup_last_at: str | None = None
     secret_key: str = "dev-secret-key"
+    # Payments provider mode used by our API endpoints.
+    # - real: use Stripe/PayPal APIs (default)
+    # - mock: deterministic local-only provider for CI/E2E (never use in production)
+    payments_provider: str = "real"
     stripe_secret_key: str = "sk_test_placeholder"
     stripe_publishable_key: str | None = None
     stripe_webhook_secret: str | None = None

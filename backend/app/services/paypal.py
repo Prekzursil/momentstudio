@@ -3,12 +3,14 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
+from uuid import uuid4
 
 import httpx
 from fastapi import HTTPException, status
 
 from app.core.config import settings
 from app.services import fx_rates
+from app.services.payment_provider import is_mock_payments
 
 _token_cache: dict[str, dict[str, object]] = {}
 _SUPPORTED_CURRENCIES = {"EUR", "USD", "RON"}
@@ -132,6 +134,12 @@ async def create_order(
     fx_usd_per_ron: float | None = None,
 ) -> tuple[str, str]:
     """Create a PayPal order and return (paypal_order_id, approval_url)."""
+    if is_mock_payments():
+        order_id = f"paypal_mock_{uuid4().hex}"
+        base = settings.frontend_origin.rstrip("/")
+        approval_url = f"{base}/checkout/mock/paypal?token={order_id}"
+        return order_id, approval_url
+
     return await create_order_itemized(
         total_ron=total_ron,
         reference=reference,

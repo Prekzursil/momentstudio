@@ -1,8 +1,11 @@
 from datetime import date
+from typing import Literal
 from uuid import UUID
 from pydantic import BaseModel, EmailStr, Field
 
 from app.models.order import OrderStatus
+
+MockPaymentOutcome = Literal["success", "decline"]
 
 
 class GuestEmailVerificationRequest(BaseModel):
@@ -82,6 +85,7 @@ class GuestCheckoutResponse(BaseModel):
 class PayPalCaptureRequest(BaseModel):
     paypal_order_id: str = Field(min_length=1, max_length=255)
     order_id: UUID | None = None
+    mock: MockPaymentOutcome | None = Field(default=None, description="Mock outcome (only when PAYMENTS_PROVIDER=mock)")
 
 
 class PayPalCaptureResponse(BaseModel):
@@ -94,6 +98,7 @@ class PayPalCaptureResponse(BaseModel):
 class StripeConfirmRequest(BaseModel):
     session_id: str = Field(min_length=1, max_length=255)
     order_id: UUID | None = None
+    mock: MockPaymentOutcome | None = Field(default=None, description="Mock outcome (only when PAYMENTS_PROVIDER=mock)")
 
 
 class StripeConfirmResponse(BaseModel):

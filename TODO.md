@@ -9,8 +9,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Add frontend `.env.example` (API_BASE_URL, STRIPE_ENV + publishable keys, APP_ENV).
 - [x] Payments config: add `STRIPE_ENV` toggle (sandbox/live) + env-specific keys for backend/frontend/docker.
 - [x] Payments config: allow `PAYPAL_CURRENCY=RON` (skip FX conversion when using RON).
-- [ ] E2E: add Playwright flow for Stripe Checkout success + decline/cancel (sandbox/test mode).
-- [ ] E2E: add PayPal sandbox e2e for success + decline/cancel (with a stable CI strategy or feature flag).
+- [x] E2E: add Playwright flow for Stripe Checkout success + decline/cancel (sandbox/test mode).
+- [x] E2E: add PayPal sandbox e2e for success + decline/cancel (with a stable CI strategy or feature flag).
 - [x] Add `.gitignore` for Python, Node, env files, build artifacts.
 - [x] GitHub Actions for backend (lint, tests, type-checks).
 - [x] GitHub Actions for frontend (lint, tests, build).
