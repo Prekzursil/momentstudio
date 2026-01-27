@@ -19,6 +19,17 @@ import { TranslateModule } from '@ngx-translate/core';
         <p *ngIf="subtitleKey" class="text-xs text-slate-600 dark:text-slate-300">
           {{ subtitleKey | translate }}
         </p>
+        <figure *ngIf="mediaSrc" class="grid gap-1">
+          <img
+            [src]="mediaSrc"
+            [alt]="mediaAltKey ? (mediaAltKey | translate) : ''"
+            class="w-full max-w-2xl rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+            loading="lazy"
+          />
+          <figcaption *ngIf="mediaCaptionKey" class="text-xs text-slate-600 dark:text-slate-300">
+            {{ mediaCaptionKey | translate }}
+          </figcaption>
+        </figure>
         <ng-content></ng-content>
       </div>
     </details>
@@ -27,6 +38,8 @@ import { TranslateModule } from '@ngx-translate/core';
 export class HelpPanelComponent {
   @Input() titleKey = 'adminUi.help.title';
   @Input() subtitleKey = '';
+  @Input() mediaSrc = '';
+  @Input() mediaAltKey = '';
+  @Input() mediaCaptionKey = '';
   @Input() open = false;
 }
-

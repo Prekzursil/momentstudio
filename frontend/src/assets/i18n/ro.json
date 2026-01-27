@@ -3015,6 +3015,7 @@
       },
       "help": {
         "subtitle": "Ghid rapid pentru administrarea produselor.",
+        "mediaAlt": "Exemplu: lista de produse (taburi, acțiuni în masă, acțiuni rapide).",
         "points": {
           "search": "Folosește Căutare + filtre pentru a găsi produse după nume, URL sau SKU.",
           "bulk": "Selectează rânduri pentru a debloca acțiuni în masă (reduceri, categorie, programare, preț).",
@@ -3045,6 +3046,16 @@
       "delete": "Șterge",
       "edit": "Editează produs",
       "inlineEdit": "Editare rapidă",
+      "quickStatus": {
+        "publish": "Publică",
+        "unpublish": "Retrage",
+        "archive": "Arhivează",
+        "unarchive": "Dezarhivează",
+        "success": "Status actualizat pentru {{name}}.",
+        "error": "Nu am putut actualiza statusul.",
+        "undoSuccess": "Am revenit la statusul anterior.",
+        "undoError": "Nu am putut anula schimbarea de status."
+      },
       "create": "Creează produs",
       "selectCategory": "Selectează categoria",
       "search": "Caută",
@@ -3439,6 +3450,7 @@
       },
       "help": {
         "subtitle": "Ghid rapid pentru administrarea categoriilor.",
+        "mediaAlt": "Exemplu: managerul de categorii (arbore, câmpuri, traduceri).",
         "points": {
           "slug": "Slug-urile se generează din nume și sunt folosite în URL-uri.",
           "parent": "Folosește categoria părinte pentru ierarhie (opțional).",
@@ -3495,6 +3507,7 @@
       "export": "Exportă CSV",
       "help": {
         "subtitle": "Ghid rapid pentru administrarea comenzilor.",
+        "mediaAlt": "Exemplu: lista de comenzi (căutare, filtre de status, export).",
         "points": {
           "status": "Folosește Status pentru a te concentra pe stări precum în așteptare/plată/livrat.",
           "tags": "Folosește etichete precum vip/gift/test pentru triere și filtre rapide.",
@@ -3880,6 +3893,7 @@
       "hint": "Caută după email, utilizator sau nume afișat.",
       "help": {
         "subtitle": "Ghid rapid pentru administrarea utilizatorilor.",
+        "mediaAlt": "Exemplu: lista de utilizatori (căutare, filtru rol, toggle PII).",
         "points": {
           "search": "Folosește Căutare + Rol pentru a restrânge lista (clienți/admini).",
           "pii": "Folosește „Afișează PII” doar când e necesar (poate debloca date suplimentare).",

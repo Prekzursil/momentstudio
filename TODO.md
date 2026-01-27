@@ -904,14 +904,14 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin UX: confirmation language – Make destructive/irreversible actions use clear language + consequence checklist.
 - [x] Admin UX: success feedback – More obvious success states (“Saved”, “Published”, “Hidden”) with next-step CTAs.
 - [x] Admin UX: role-based presets – Provide “Owner (basic)” preset that hides technical/ops sections for non-technical admins.
-- [ ] Admin UX: help panel screenshots – Add optional screenshot/example media for help panels (products/orders/users/categories).
+- [x] Admin UX: help panel screenshots – Add optional screenshot/example media for help panels (products/orders/users/categories).
 
 ### Admin Catalog – Next Improvements (Backlog)
 - [x] Admin Products: status selector – Expose draft/published/archived on create/edit with confirmation and audit entry.
 - [x] Admin Products: status badges – Add table badges for status (draft/published/archived) and active/inactive.
 - [x] Admin Products: status filters – Filter products list by status and include an “Archived” tab/view.
 - [x] Admin Products: bulk status updates – Apply draft/publish/archive to selected products with preview and optional undo window.
-- [ ] Admin Products: quick status toggle – One-click publish/unpublish/archive from the products table row actions.
+- [x] Admin Products: quick status toggle – One-click publish/unpublish/archive from the products table row actions.
 - [ ] Admin Products: create category inline (product form) – “Add category” from the category selector without navigating away.
 - [ ] Admin Products: create category inline (filters) – Allow creating a category while filtering/browsing products.
 - [ ] Admin Products: category CRUD shortcut – Open category manager as a drawer/modal from `/admin/products` (avoid separate route hop).

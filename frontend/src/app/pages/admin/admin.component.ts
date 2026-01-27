@@ -2935,7 +2935,12 @@ class CmsDraftManager<T> {
               ></app-button>
             </div>
 
-            <app-help-panel [titleKey]="'adminUi.help.title'" [subtitleKey]="'adminUi.categories.help.subtitle'">
+            <app-help-panel
+              [titleKey]="'adminUi.help.title'"
+              [subtitleKey]="'adminUi.categories.help.subtitle'"
+              [mediaSrc]="'assets/help/admin-categories-help.svg'"
+              [mediaAltKey]="'adminUi.categories.help.mediaAlt'"
+            >
               <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
                 <li>{{ 'adminUi.categories.help.points.slug' | translate }}</li>
                 <li>{{ 'adminUi.categories.help.points.parent' | translate }}</li>

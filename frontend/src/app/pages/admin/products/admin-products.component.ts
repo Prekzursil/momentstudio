@@ -468,7 +468,12 @@ type PriceHistoryChart = {
       </app-modal>
 
 	      <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
-          <app-help-panel [titleKey]="'adminUi.help.title'" [subtitleKey]="'adminUi.products.help.subtitle'">
+          <app-help-panel
+            [titleKey]="'adminUi.help.title'"
+            [subtitleKey]="'adminUi.products.help.subtitle'"
+            [mediaSrc]="'assets/help/admin-products-help.svg'"
+            [mediaAltKey]="'adminUi.products.help.mediaAlt'"
+          >
             <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
               <li>{{ 'adminUi.products.help.points.search' | translate }}</li>
               <li>{{ 'adminUi.products.help.points.bulk' | translate }}</li>
@@ -1116,6 +1121,29 @@ type PriceHistoryChart = {
 	                          ></app-button>
 	                        </ng-container>
 	                        <ng-template #activeRowActions>
+                            <app-button
+                              *ngIf="product.status !== 'archived'"
+                              size="sm"
+                              variant="ghost"
+                              [label]="
+                                product.status === 'published'
+                                  ? ('adminUi.products.quickStatus.unpublish' | translate)
+                                  : ('adminUi.products.quickStatus.publish' | translate)
+                              "
+                              (action)="quickSetStatus(product, product.status === 'published' ? 'draft' : 'published')"
+                              [disabled]="bulkBusy() || inlineBusy() || quickStatusBusyId()"
+                            ></app-button>
+                            <app-button
+                              size="sm"
+                              variant="ghost"
+                              [label]="
+                                product.status === 'archived'
+                                  ? ('adminUi.products.quickStatus.unarchive' | translate)
+                                  : ('adminUi.products.quickStatus.archive' | translate)
+                              "
+                              (action)="quickSetStatus(product, product.status === 'archived' ? 'draft' : 'archived')"
+                              [disabled]="bulkBusy() || inlineBusy() || quickStatusBusyId()"
+                            ></app-button>
 	                          <app-button
 	                            size="sm"
 	                            variant="ghost"
@@ -2873,6 +2901,7 @@ export class AdminProductsComponent implements OnInit {
   bulkBusy = signal(false);
   bulkError = signal<string | null>(null);
   restoringProductId = signal<string | null>(null);
+  quickStatusBusyId = signal<string | null>(null);
 
   inlineEditId: string | null = null;
   inlineBasePrice = '';
@@ -3288,6 +3317,48 @@ export class AdminProductsComponent implements OnInit {
         this.load();
       },
       error: () => this.toast.error(this.translate.instant('adminUi.products.bulk.status.undoError'))
+    });
+  }
+
+  quickSetStatus(product: AdminProductListItem, nextStatus: ProductForm['status']): void {
+    const productId = product.id;
+    const prevStatus = product.status;
+    if (prevStatus === nextStatus) return;
+    if (this.quickStatusBusyId()) return;
+
+    this.quickStatusBusyId.set(productId);
+    this.admin.bulkUpdateProducts([{ product_id: productId, status: nextStatus }]).subscribe({
+      next: () => {
+        this.quickStatusBusyId.set(null);
+        const displayName = product.name || product.slug;
+        this.toast.action(
+          this.translate.instant('adminUi.products.quickStatus.success', { name: displayName }),
+          this.translate.instant('adminUi.actions.undo'),
+          () => this.undoQuickStatusChange(productId, prevStatus),
+          { tone: 'success', durationMs: 8000 }
+        );
+        if (this.selected.has(productId)) {
+          const nextSelected = new Set(this.selected);
+          nextSelected.delete(productId);
+          this.selected = nextSelected;
+          this.updateBulkPricePreview();
+        }
+        this.load();
+      },
+      error: () => {
+        this.quickStatusBusyId.set(null);
+        this.toast.error(this.translate.instant('adminUi.products.quickStatus.error'));
+      }
+    });
+  }
+
+  private undoQuickStatusChange(productId: string, status: string): void {
+    this.admin.bulkUpdateProducts([{ product_id: productId, status }]).subscribe({
+      next: () => {
+        this.toast.success(this.translate.instant('adminUi.products.quickStatus.undoSuccess'));
+        this.load();
+      },
+      error: () => this.toast.error(this.translate.instant('adminUi.products.quickStatus.undoError'))
     });
   }
 

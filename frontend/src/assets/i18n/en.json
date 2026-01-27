@@ -3015,6 +3015,7 @@
       },
       "help": {
         "subtitle": "Quick guide to managing products.",
+        "mediaAlt": "Example view of the products list (tabs, bulk actions, quick actions).",
         "points": {
           "search": "Use Search + filters to find products by name, URL, or SKU.",
           "bulk": "Select rows to unlock bulk actions (sale, category, scheduling, price changes).",
@@ -3045,6 +3046,16 @@
       "delete": "Delete",
       "edit": "Edit product",
       "inlineEdit": "Quick edit",
+      "quickStatus": {
+        "publish": "Publish",
+        "unpublish": "Unpublish",
+        "archive": "Archive",
+        "unarchive": "Unarchive",
+        "success": "Updated status for {{name}}.",
+        "error": "Could not update status.",
+        "undoSuccess": "Reverted status change.",
+        "undoError": "Could not undo status change."
+      },
       "create": "Create product",
       "selectCategory": "Select category",
       "search": "Search",
@@ -3439,6 +3450,7 @@
       },
       "help": {
         "subtitle": "Quick guide to managing categories.",
+        "mediaAlt": "Example view of the categories manager (tree, fields, translations).",
         "points": {
           "slug": "Slugs are generated from the name and used in URLs.",
           "parent": "Use Parent category to build a hierarchy (optional).",
@@ -3495,6 +3507,7 @@
       "export": "Export CSV",
       "help": {
         "subtitle": "Quick guide to managing orders.",
+        "mediaAlt": "Example view of the orders list (search, status filters, export).",
         "points": {
           "status": "Use Status to focus on pending/payment/shipped states.",
           "tags": "Use Tags like vip/gift/test to triage and filter faster.",
@@ -3880,6 +3893,7 @@
       "hint": "Search by email, username, or display name.",
       "help": {
         "subtitle": "Quick guide to managing users.",
+        "mediaAlt": "Example view of the users list (search, role filter, PII toggle).",
         "points": {
           "search": "Use Search + Role to narrow down customers and admins.",
           "pii": "Use “Reveal PII” only when needed (it may unlock additional data like email activity).",

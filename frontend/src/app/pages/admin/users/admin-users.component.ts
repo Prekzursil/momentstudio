@@ -108,7 +108,12 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
 
       <div class="grid gap-6 lg:grid-cols-[1.25fr_0.75fr] items-start">
         <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
-          <app-help-panel [titleKey]="'adminUi.help.title'" [subtitleKey]="'adminUi.users.help.subtitle'">
+          <app-help-panel
+            [titleKey]="'adminUi.help.title'"
+            [subtitleKey]="'adminUi.users.help.subtitle'"
+            [mediaSrc]="'assets/help/admin-users-help.svg'"
+            [mediaAltKey]="'adminUi.users.help.mediaAlt'"
+          >
             <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
               <li>{{ 'adminUi.users.help.points.search' | translate }}</li>
               <li>{{ 'adminUi.users.help.points.pii' | translate }}</li>
