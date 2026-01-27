@@ -56,7 +56,51 @@ _LOCKED_PAGE_SLUGS = {
     "shipping",
 }
 
+_LEGAL_PAGE_KEYS = {
+    "page.terms",
+    "page.terms-and-conditions",
+    "page.privacy-policy",
+    "page.anpc",
+}
+
 _SUPPORTED_LANGS = {"en", "ro"}
+
+
+def _present_langs_for_bilingual(block: ContentBlock) -> set[str]:
+    present: set[str] = set()
+
+    base_lang = (block.lang or "").strip().lower()
+    if base_lang in _SUPPORTED_LANGS and (block.title or "").strip() and (block.body_markdown or "").strip():
+        present.add(base_lang)
+
+    for tr in getattr(block, "translations", None) or []:
+        lang = (getattr(tr, "lang", None) or "").strip().lower()
+        title = (getattr(tr, "title", None) or "").strip()
+        body = (getattr(tr, "body_markdown", None) or "").strip()
+        if lang in _SUPPORTED_LANGS and title and body:
+            present.add(lang)
+
+    return present
+
+
+def _enforce_legal_pages_bilingual(key: str, block: ContentBlock) -> None:
+    if key not in _LEGAL_PAGE_KEYS:
+        return
+    if block.status != ContentStatus.published:
+        return
+    base_lang = (block.lang or "").strip().lower()
+    if base_lang not in _SUPPORTED_LANGS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Legal pages must set a base language (en/ro) before publishing",
+        )
+    present = _present_langs_for_bilingual(block)
+    missing = sorted(_SUPPORTED_LANGS - present)
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Legal pages require both EN and RO content before publishing (missing: {', '.join(missing)})",
+        )
 
 
 def _clear_needs_translation(block: ContentBlock, lang: str) -> None:
@@ -268,6 +312,11 @@ async def upsert_block(
     published_until = _ensure_utc(data.get("published_until"))
     if not block:
         validate_page_key_for_create(key)
+        if data.get("status") == ContentStatus.published and key in _LEGAL_PAGE_KEYS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Legal pages must be created as draft, translated (EN+RO), then published",
+            )
         wants_published_at = None
         wants_published_until = None
         if data.get("status") == ContentStatus.published:
@@ -355,6 +404,8 @@ async def upsert_block(
             session.add(translation)
             block.translations.append(translation)
 
+        _enforce_legal_pages_bilingual(key, block)
+
         block.version += 1
         if translation_changed:
             _clear_needs_translation(block, lang)
@@ -424,6 +475,7 @@ async def upsert_block(
                 detail="Unpublish time must be after publish time",
             )
     await session.refresh(block, attribute_names=["translations"])
+    _enforce_legal_pages_bilingual(key, block)
     session.add(block)
     translations_snapshot = _snapshot_translations(block)
     version_row = ContentBlockVersion(
@@ -568,6 +620,7 @@ async def rollback_to_version(
     session.add(block)
 
     await session.refresh(block, attribute_names=["translations"])
+    _enforce_legal_pages_bilingual(key, block)
     translations_snapshot = _snapshot_translations(block)
     version_row = ContentBlockVersion(
         content_block_id=block.id,

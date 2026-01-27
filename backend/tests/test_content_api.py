@@ -442,3 +442,47 @@ def test_admin_fetch_social_thumbnail(monkeypatch: pytest.MonkeyPatch, test_app:
         headers=auth_headers(admin_token),
     )
     assert bad.status_code == 400
+
+
+def test_legal_pages_require_bilingual_before_publish(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal)
+
+    create = client.post(
+        "/api/v1/content/admin/page.terms",
+        json={"title": "Terms", "body_markdown": "Terms placeholder", "status": "draft", "lang": "en"},
+        headers=auth_headers(admin_token),
+    )
+    assert create.status_code == 201, create.text
+
+    publish_missing_ro = client.patch(
+        "/api/v1/content/admin/page.terms",
+        json={"status": "published"},
+        headers=auth_headers(admin_token),
+    )
+    assert publish_missing_ro.status_code == 400, publish_missing_ro.text
+    assert "EN and RO" in str(publish_missing_ro.json().get("detail"))
+
+    add_ro = client.patch(
+        "/api/v1/content/admin/page.terms",
+        json={"title": "Termeni", "body_markdown": "Șablon termeni", "lang": "ro"},
+        headers=auth_headers(admin_token),
+    )
+    assert add_ro.status_code == 200, add_ro.text
+
+    publish_ok = client.patch(
+        "/api/v1/content/admin/page.terms",
+        json={"status": "published"},
+        headers=auth_headers(admin_token),
+    )
+    assert publish_ok.status_code == 200, publish_ok.text
+    assert publish_ok.json()["status"] == "published"
+
+    clear_ro = client.patch(
+        "/api/v1/content/admin/page.terms",
+        json={"title": "", "body_markdown": "", "lang": "ro"},
+        headers=auth_headers(admin_token),
+    )
+    assert clear_ro.status_code == 400, clear_ro.text
+    assert "EN and RO" in str(clear_ro.json().get("detail"))
