@@ -75,6 +75,11 @@ const ORDERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
   { id: 'actions', labelKey: 'adminUi.orders.table.actions', required: true }
 ];
 
+const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
+  ...defaultAdminTableLayout(ORDERS_TABLE_COLUMNS),
+  hidden: ['tags']
+});
+
 @Component({
   selector: 'app-admin-orders',
   standalone: true,
@@ -111,6 +116,7 @@ const ORDERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
         [open]="layoutModalOpen()"
         [columns]="tableColumns"
         [layout]="tableLayout()"
+        [defaults]="tableDefaults"
         (closed)="closeLayoutModal()"
         (applied)="applyTableLayout($event)"
       ></app-table-layout-modal>
@@ -627,9 +633,10 @@ export class AdminOrdersComponent implements OnInit {
 
   readonly orderRowHeight = 44;
   readonly tableColumns = ORDERS_TABLE_COLUMNS;
+  readonly tableDefaults = defaultOrdersTableLayout();
 
   layoutModalOpen = signal(false);
-  tableLayout = signal<AdminTableLayoutV1>(defaultAdminTableLayout(ORDERS_TABLE_COLUMNS));
+  tableLayout = signal<AdminTableLayoutV1>(defaultOrdersTableLayout());
 
   loading = signal(true);
   error = signal<string | null>(null);
@@ -699,7 +706,7 @@ export class AdminOrdersComponent implements OnInit {
 
   ngOnInit(): void {
     this.favorites.init();
-    this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns));
+    this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns, this.tableDefaults));
     this.presets = this.loadPresets();
     this.loadExportState();
     this.maybeApplyFiltersFromState();

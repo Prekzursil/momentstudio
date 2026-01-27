@@ -49,6 +49,11 @@ const USERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
   { id: 'actions', labelKey: 'adminUi.users.table.actions', required: true }
 ];
 
+const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
+  ...defaultAdminTableLayout(USERS_TABLE_COLUMNS),
+  hidden: ['email']
+});
+
 @Component({
   selector: 'app-admin-users',
   standalone: true,
@@ -94,6 +99,7 @@ const USERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
         [open]="layoutModalOpen()"
         [columns]="tableColumns"
         [layout]="tableLayout()"
+        [defaults]="tableDefaults"
         (closed)="closeLayoutModal()"
         (applied)="applyTableLayout($event)"
       ></app-table-layout-modal>
@@ -878,9 +884,10 @@ export class AdminUsersComponent implements OnInit {
 
   readonly userRowHeight = 44;
   readonly tableColumns = USERS_TABLE_COLUMNS;
+  readonly tableDefaults = defaultUsersTableLayout();
 
   layoutModalOpen = signal(false);
-  tableLayout = signal<AdminTableLayoutV1>(defaultAdminTableLayout(USERS_TABLE_COLUMNS));
+  tableLayout = signal<AdminTableLayoutV1>(defaultUsersTableLayout());
 
   loading = signal(true);
   error = signal<string | null>(null);
@@ -955,7 +962,7 @@ export class AdminUsersComponent implements OnInit {
 
   ngOnInit(): void {
     this.favorites.init();
-    this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns));
+    this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns, this.tableDefaults));
     const state = history.state as any;
     const appliedSavedView = this.maybeApplyFiltersFromState(state);
     if (!appliedSavedView) {

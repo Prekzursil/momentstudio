@@ -128,6 +128,11 @@ const PRODUCTS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
   { id: 'actions', labelKey: 'adminUi.products.table.actions', required: true }
 ];
 
+const defaultProductsTableLayout = (): AdminTableLayoutV1 => ({
+  ...defaultAdminTableLayout(PRODUCTS_TABLE_COLUMNS),
+  hidden: ['category', 'active', 'updated']
+});
+
 type ProductBadgeKey = 'new' | 'limited' | 'handmade';
 
 type BadgeForm = {
@@ -248,6 +253,7 @@ type PriceHistoryChart = {
         [open]="layoutModalOpen()"
         [columns]="tableColumns"
         [layout]="tableLayout()"
+        [defaults]="tableDefaults"
         (closed)="closeLayoutModal()"
         (applied)="applyTableLayout($event)"
       ></app-table-layout-modal>
@@ -2513,9 +2519,10 @@ export class AdminProductsComponent implements OnInit {
 
   readonly productRowHeight = 96;
   readonly tableColumns = PRODUCTS_TABLE_COLUMNS;
+  readonly tableDefaults = defaultProductsTableLayout();
 
   layoutModalOpen = signal(false);
-  tableLayout = signal<AdminTableLayoutV1>(defaultAdminTableLayout(PRODUCTS_TABLE_COLUMNS));
+  tableLayout = signal<AdminTableLayoutV1>(defaultProductsTableLayout());
 
   loading = signal(true);
   error = signal<string | null>(null);
@@ -2666,7 +2673,7 @@ export class AdminProductsComponent implements OnInit {
 
   ngOnInit(): void {
     this.favorites.init();
-    this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns));
+    this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns, this.tableDefaults));
     const state = history.state as any;
     const editSlug = typeof state?.editProductSlug === 'string' ? state.editProductSlug : '';
     this.pendingEditProductSlug = editSlug.trim() ? editSlug.trim() : null;

@@ -899,7 +899,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin UX: plain-language labels – Replace technical labels (slug/SKU) with friendly copy + examples and tooltips.
 - [x] Admin UX: guided wizards – Step-by-step flows for “Add product”, “Add category”, and “Publish product”.
 - [x] Admin UX: safer defaults – Pre-fill sensible defaults and reduce required fields for first-time product creation.
-- [ ] Admin UX: declutter tables – Reduce visible columns by default; add “Customize columns” for power users.
+- [x] Admin UX: declutter tables – Reduce visible columns by default; add “Customize columns” for power users.
 - [ ] Admin UX: inline help panels – Contextual “What is this?” help with screenshots/examples per page.
 - [ ] Admin UX: confirmation language – Make destructive/irreversible actions use clear language + consequence checklist.
 - [ ] Admin UX: success feedback – More obvious success states (“Saved”, “Published”, “Hidden”) with next-step CTAs.

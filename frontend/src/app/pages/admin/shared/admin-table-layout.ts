@@ -36,11 +36,15 @@ export function defaultAdminTableLayout(columns: AdminTableColumn[]): AdminTable
   };
 }
 
-export function sanitizeAdminTableLayout(input: unknown, columns: AdminTableColumn[]): AdminTableLayoutV1 {
+export function sanitizeAdminTableLayout(
+  input: unknown,
+  columns: AdminTableColumn[],
+  fallbackLayout?: AdminTableLayoutV1
+): AdminTableLayoutV1 {
   const ids = columns.map((c) => c.id);
   const allowed = new Set(ids);
   const required = new Set(columns.filter((c) => c.required).map((c) => c.id));
-  const fallback = defaultAdminTableLayout(columns);
+  const fallback = fallbackLayout ?? defaultAdminTableLayout(columns);
 
   if (!input || typeof input !== 'object') return fallback;
   const obj = input as Record<string, unknown>;
@@ -79,13 +83,14 @@ export function sanitizeAdminTableLayout(input: unknown, columns: AdminTableColu
   return { version: 1, order, hidden, density, updated_at };
 }
 
-export function loadAdminTableLayout(storageKey: string, columns: AdminTableColumn[]): AdminTableLayoutV1 {
+export function loadAdminTableLayout(storageKey: string, columns: AdminTableColumn[], fallbackLayout?: AdminTableLayoutV1): AdminTableLayoutV1 {
+  const fallback = fallbackLayout ?? defaultAdminTableLayout(columns);
   try {
     const raw = localStorage.getItem(storageKey);
-    if (!raw) return defaultAdminTableLayout(columns);
-    return sanitizeAdminTableLayout(JSON.parse(raw), columns);
+    if (!raw) return fallback;
+    return sanitizeAdminTableLayout(JSON.parse(raw), columns, fallback);
   } catch {
-    return defaultAdminTableLayout(columns);
+    return fallback;
   }
 }
 
