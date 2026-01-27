@@ -6,11 +6,12 @@ from xml.etree import ElementTree
 
 import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
-from app.core.dependencies import require_admin_section, require_complete_profile
+from app.core.dependencies import require_admin_section, require_complete_profile, require_verified_email
 from app.core.security import create_content_preview_token, decode_content_preview_token
 from app.db.session import get_session
 from app.models.blog import BlogComment
@@ -43,6 +44,10 @@ from app.services import notifications as notification_service
 from app.services import og_images
 
 router = APIRouter(prefix="/blog", tags=["blog"])
+
+
+class BlogCommentSubscriptionRequest(BaseModel):
+    enabled: bool = True
 
 
 @router.get("/posts", response_model=BlogPostListResponse)
@@ -366,6 +371,35 @@ async def list_blog_comment_threads(
     )
 
 
+@router.get("/posts/{slug}/comment-subscription")
+async def get_blog_comment_subscription(
+    slug: str,
+    current_user: User = Depends(require_complete_profile),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    post = await blog_service.get_published_post(session, slug=slug, lang=None)
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    enabled = await blog_service.is_comment_subscription_enabled(session, content_block_id=post.id, user_id=current_user.id)
+    return {"enabled": enabled}
+
+
+@router.put("/posts/{slug}/comment-subscription")
+async def set_blog_comment_subscription(
+    slug: str,
+    payload: BlogCommentSubscriptionRequest,
+    current_user: User = Depends(require_verified_email),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    post = await blog_service.get_published_post(session, slug=slug, lang=None)
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    enabled = await blog_service.set_comment_subscription(
+        session, content_block_id=post.id, user_id=current_user.id, enabled=bool(payload.enabled)
+    )
+    return {"enabled": enabled}
+
+
 @router.get("/me/comments", response_model=BlogMyCommentListResponse)
 async def list_my_blog_comments(
     current_user: User = Depends(require_complete_profile),
@@ -461,6 +495,23 @@ async def create_blog_comment(
                     ),
                     body=post.title,
                     url=f"/blog/{slug}",
+                )
+
+        if payload.parent_id is None:
+            subscribers = await blog_service.list_comment_subscription_recipients(session, content_block_id=post.id)
+            for subscriber in subscribers:
+                if not subscriber.email:
+                    continue
+                if subscriber.id == current_user.id:
+                    continue
+                background_tasks.add_task(
+                    email_service.send_blog_comment_subscriber_notification,
+                    subscriber.email,
+                    post_title=post.title,
+                    post_url=post_url,
+                    commenter_name=current_user.name or current_user.email,
+                    comment_body=snippet,
+                    lang=subscriber.preferred_language,
                 )
     return BlogCommentRead.model_validate(blog_service.to_comment_read(comment))
 

@@ -7,6 +7,7 @@ import { Meta, Title } from '@angular/platform-browser';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 import { BlogPostListItem, BlogService, PaginationMeta } from '../../core/blog.service';
+import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { CardComponent } from '../../shared/card.component';
@@ -174,9 +175,17 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
 
       <a
         *ngIf="!loading() && !hasError() && heroPost"
-        class="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:shadow-none"
+        class="group relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:shadow-none"
         [routerLink]="['/blog', heroPost.slug]"
       >
+        <button
+          *ngIf="canEditBlog()"
+          type="button"
+          class="absolute top-4 right-4 z-10 rounded-full border border-slate-200 bg-white/95 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-200 dark:hover:border-slate-600"
+          (click)="editBlogPost($event, heroPost.slug)"
+        >
+          {{ 'blog.admin.edit' | translate }}
+        </button>
         <div class="grid md:grid-cols-[1.35fr_1fr]">
           <div class="relative min-h-[220px] md:min-h-[360px] bg-slate-100 dark:bg-slate-800">
             <img
@@ -237,13 +246,22 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
           class="group block"
           [routerLink]="['/blog', post.slug]"
         >
-          <div class="h-full transition-transform duration-200 ease-out group-hover:-translate-y-0.5">
-            <app-card class="h-full">
-              <div class="grid gap-3">
-                <div
-                  *ngIf="post.cover_image_url"
-                  class="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800"
-                >
+	          <div class="h-full transition-transform duration-200 ease-out group-hover:-translate-y-0.5">
+	            <app-card class="h-full">
+	              <div class="relative">
+                  <button
+                    *ngIf="canEditBlog()"
+                    type="button"
+                    class="absolute top-3 right-3 z-10 rounded-full border border-slate-200 bg-white/95 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-200 dark:hover:border-slate-600"
+                    (click)="editBlogPost($event, post.slug)"
+                  >
+                    {{ 'blog.admin.edit' | translate }}
+                  </button>
+                  <div class="grid gap-3">
+	                <div
+	                  *ngIf="post.cover_image_url"
+	                  class="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800"
+	                >
                   <img
                     [src]="post.cover_image_url"
                     [alt]="post.title"
@@ -287,12 +305,13 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
                     >
                       #{{ tag }}
                     </button>
+	                  </div>
+	                </div>
                   </div>
-                </div>
-              </div>
-            </app-card>
-          </div>
-        </a>
+	              </div>
+	            </app-card>
+	          </div>
+	        </a>
       </div>
 
       <div *ngIf="pageMeta" class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-300">
@@ -347,6 +366,7 @@ export class BlogListComponent implements OnInit, OnDestroy {
     private blog: BlogService,
     private route: ActivatedRoute,
     private router: Router,
+    private storefrontAdminMode: StorefrontAdminModeService,
     private translate: TranslateService,
     private title: Title,
     private meta: Meta
@@ -622,6 +642,18 @@ export class BlogListComponent implements OnInit, OnDestroy {
 
   hasActiveFilters(): boolean {
     return Boolean(this.searchQuery.trim() || this.tagQuery.trim() || this.seriesQuery.trim());
+  }
+
+  canEditBlog(): boolean {
+    return this.storefrontAdminMode.enabled();
+  }
+
+  editBlogPost(event: Event, slug: string): void {
+    event.preventDefault();
+    event.stopPropagation();
+    const desired = String(slug || '').trim();
+    if (!desired) return;
+    void this.router.navigate(['/admin/content/blog'], { queryParams: { edit: desired } });
   }
 }
 

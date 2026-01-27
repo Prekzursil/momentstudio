@@ -895,6 +895,14 @@
       "pageMeta": "Page {{page}} of {{totalPages}}",
       "prev": "Prev",
       "next": "Next",
+      "follow": "Email me about new comments",
+      "followTitle": "Comment updates",
+      "followEnabledCopy": "You'll get emails when new comments are posted on this article.",
+      "followDisabledCopy": "You won’t receive comment update emails for this article.",
+      "followVerifyTitle": "Verify your email",
+      "followVerifyCopy": "Verify your email address to subscribe to comment updates.",
+      "followErrorTitle": "Could not update subscription",
+      "followErrorCopy": "Please try again.",
       "errorTitle": "Could not load comments.",
       "errorCopy": "Please try again.",
       "empty": "No comments yet. Be the first to start the discussion.",
@@ -927,6 +935,20 @@
       "confirmDelete": "Delete this comment?",
       "deleteErrorTitle": "Could not delete comment",
       "deleteErrorCopy": "Please try again."
+    },
+    "newsletter": {
+      "title": "Newsletter",
+      "copy": "Get occasional updates from momentstudio. No spam.",
+      "emailLabel": "Email",
+      "emailPlaceholder": "you@example.com",
+      "subscribe": "Subscribe",
+      "successCopy": "Thanks — please check your inbox for updates.",
+      "alreadyCopy": "You’re already subscribed.",
+      "errorTitle": "Could not subscribe",
+      "errorCopy": "Please try again."
+    },
+    "admin": {
+      "edit": "Edit"
     }
   },
   "home": {

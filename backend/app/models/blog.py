@@ -91,3 +91,27 @@ class BlogCommentFlag(Base):
     comment: Mapped[BlogComment] = relationship("BlogComment", back_populates="flags")
     flagger = relationship("User", foreign_keys=[user_id])
     resolver = relationship("User", foreign_keys=[resolved_by])
+
+
+class BlogCommentSubscription(Base):
+    __tablename__ = "blog_comment_subscriptions"
+    __table_args__ = (UniqueConstraint("content_block_id", "user_id", name="uq_blog_comment_subscriptions_post_user"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    content_block_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("content_blocks.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    unsubscribed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    subscriber = relationship("User", foreign_keys=[user_id])
+    post = relationship("ContentBlock")

@@ -4,8 +4,6 @@ import { NotFoundComponent } from './pages/not-found/not-found.component';
 import { ErrorComponent } from './pages/error/error.component';
 import { ShopComponent } from './pages/shop/shop.component';
 import { AboutComponent } from './pages/about/about.component';
-import { BlogListComponent } from './pages/blog/blog-list.component';
-import { BlogPostComponent } from './pages/blog/blog-post.component';
 import { ContactComponent } from './pages/contact/contact.component';
 import { adminGuard, adminSectionGuard, authGuard } from './core/auth.guard';
 import { unsavedChangesGuard } from './core/unsaved-changes.guard';
@@ -29,10 +27,26 @@ export const routes: Routes = [
   },
   { path: 'about', component: AboutComponent, title: 'About | momentstudio' },
   { path: 'contact', component: ContactComponent, title: 'Contact | momentstudio' },
-  { path: 'blog', component: BlogListComponent, title: 'Blog | momentstudio' },
-  { path: 'blog/tag/:tag', component: BlogListComponent, title: 'Blog | momentstudio' },
-  { path: 'blog/series/:series', component: BlogListComponent, title: 'Blog | momentstudio' },
-  { path: 'blog/:slug', component: BlogPostComponent, title: 'Blog | momentstudio' },
+  {
+    path: 'blog',
+    loadComponent: () => import('./pages/blog/blog-list.component').then((m) => m.BlogListComponent),
+    title: 'Blog | momentstudio'
+  },
+  {
+    path: 'blog/tag/:tag',
+    loadComponent: () => import('./pages/blog/blog-list.component').then((m) => m.BlogListComponent),
+    title: 'Blog | momentstudio'
+  },
+  {
+    path: 'blog/series/:series',
+    loadComponent: () => import('./pages/blog/blog-list.component').then((m) => m.BlogListComponent),
+    title: 'Blog | momentstudio'
+  },
+  {
+    path: 'blog/:slug',
+    loadComponent: () => import('./pages/blog/blog-post.component').then((m) => m.BlogPostComponent),
+    title: 'Blog | momentstudio'
+  },
   {
     path: 'pages/:slug',
     loadComponent: () => import('./pages/page/page.component').then((m) => m.CmsPageComponent),

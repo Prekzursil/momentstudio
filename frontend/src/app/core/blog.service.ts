@@ -101,6 +101,10 @@ export interface BlogCommentThreadListResponse {
   total_comments: number;
 }
 
+export interface BlogCommentSubscriptionResponse {
+  enabled: boolean;
+}
+
 export interface BlogCommentFlag {
   id: string;
   user_id: string;
@@ -230,6 +234,14 @@ export class BlogService {
       page: params.page ?? 1,
       limit: params.limit ?? 10
     }, { 'X-Silent': '1' });
+  }
+
+  getCommentSubscription(slug: string): Observable<BlogCommentSubscriptionResponse> {
+    return this.api.get<BlogCommentSubscriptionResponse>(`/blog/posts/${slug}/comment-subscription`, {}, { 'X-Silent': '1' });
+  }
+
+  setCommentSubscription(slug: string, enabled: boolean): Observable<BlogCommentSubscriptionResponse> {
+    return this.api.put<BlogCommentSubscriptionResponse>(`/blog/posts/${slug}/comment-subscription`, { enabled }, { 'X-Silent': '1' });
   }
 
   createComment(slug: string, payload: { body: string; parent_id?: string | null; captcha_token?: string | null }): Observable<BlogComment> {

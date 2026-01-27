@@ -4,6 +4,7 @@ from typing import Dict
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core.config import settings
@@ -11,6 +12,7 @@ from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
 from app.models.passkeys import UserPasskey
+from app.models.user import User
 from app.models.user import UserRole
 from app.schemas.user import UserCreate
 from app.services.auth import create_user, issue_tokens_for_user
@@ -556,3 +558,58 @@ def test_blog_comment_spam_controls(test_app: Dict[str, object]) -> None:
         settings.blog_comments_rate_limit_count = old_rate_limit
         settings.blog_comments_rate_limit_window_seconds = old_rate_window
         settings.blog_comments_max_links = old_max_links
+
+
+def test_blog_comment_subscription_toggle(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token = create_user_token(SessionLocal, email="admin@example.com", role=UserRole.admin)
+    user_token = create_user_token(SessionLocal, email="user@example.com", role=UserRole.customer)
+
+    async def verify_user() -> None:
+        async with SessionLocal() as session:
+            user = await session.scalar(select(User).where(User.email == "user@example.com"))
+            assert user is not None
+            user.email_verified = True
+            session.add(user)
+            await session.commit()
+
+    asyncio.run(verify_user())
+
+    create_post = client.post(
+        "/api/v1/content/admin/blog.first-post",
+        json={
+            "title": "Salut",
+            "body_markdown": "Postare RO",
+            "status": "published",
+            "lang": "ro",
+            "meta": {"summary": {"ro": "Rezumat RO", "en": "Summary EN"}},
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert create_post.status_code == 201, create_post.text
+
+    initial = client.get("/api/v1/blog/posts/first-post/comment-subscription", headers=auth_headers(user_token))
+    assert initial.status_code == 200, initial.text
+    assert initial.json()["enabled"] is False
+
+    enabled = client.put(
+        "/api/v1/blog/posts/first-post/comment-subscription",
+        json={"enabled": True},
+        headers=auth_headers(user_token),
+    )
+    assert enabled.status_code == 200, enabled.text
+    assert enabled.json()["enabled"] is True
+
+    after_enable = client.get("/api/v1/blog/posts/first-post/comment-subscription", headers=auth_headers(user_token))
+    assert after_enable.status_code == 200, after_enable.text
+    assert after_enable.json()["enabled"] is True
+
+    disabled = client.put(
+        "/api/v1/blog/posts/first-post/comment-subscription",
+        json={"enabled": False},
+        headers=auth_headers(user_token),
+    )
+    assert disabled.status_code == 200, disabled.text
+    assert disabled.json()["enabled"] is False

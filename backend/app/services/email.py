@@ -1096,6 +1096,40 @@ async def send_blog_comment_admin_notification(
     return await send_email(to_email, subject, text_body, html_body)
 
 
+async def send_blog_comment_subscriber_notification(
+    to_email: str,
+    *,
+    post_title: str,
+    post_url: str,
+    commenter_name: str,
+    comment_body: str,
+    lang: str | None = None,
+) -> bool:
+    subject = _bilingual_subject(
+        "Comentariu nou la un articol urmărit",
+        "New comment on a post you follow",
+        preferred_language=lang,
+    )
+    if env is None:
+        text_ro = f"Comentariu nou la: {post_title}\nDe la: {commenter_name}\n\n{comment_body}\n\nVezi: {post_url}"
+        text_en = f"New comment on: {post_title}\nFrom: {commenter_name}\n\n{comment_body}\n\nView: {post_url}"
+        text_body, html_body = _bilingual_sections(
+            text_ro=text_ro,
+            text_en=text_en,
+            html_ro=_html_pre(text_ro),
+            html_en=_html_pre(text_en),
+            preferred_language=lang,
+        )
+        return await send_email(to_email, subject, text_body, html_body)
+
+    text_body, html_body = render_bilingual_template(
+        "blog_comment_subscriber.txt.j2",
+        {"post_title": post_title, "post_url": post_url, "commenter_name": commenter_name, "comment_body": comment_body},
+        preferred_language=lang,
+    )
+    return await send_email(to_email, subject, text_body, html_body)
+
+
 async def send_blog_comment_reply_notification(
     to_email: str,
     *,

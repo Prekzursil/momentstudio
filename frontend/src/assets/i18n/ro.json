@@ -895,6 +895,14 @@
       "pageMeta": "Pagina {{page}} din {{totalPages}}",
       "prev": "Înapoi",
       "next": "Înainte",
+      "follow": "Trimite-mi email când apar comentarii noi",
+      "followTitle": "Actualizări comentarii",
+      "followEnabledCopy": "Vei primi email când apar comentarii noi la acest articol.",
+      "followDisabledCopy": "Nu vei mai primi email pentru comentarii la acest articol.",
+      "followVerifyTitle": "Verifică emailul",
+      "followVerifyCopy": "Verifică adresa de email pentru a te abona la actualizările de comentarii.",
+      "followErrorTitle": "Nu am putut actualiza abonarea",
+      "followErrorCopy": "Încearcă din nou.",
       "errorTitle": "Nu am putut încărca comentariile.",
       "errorCopy": "Încearcă din nou.",
       "empty": "Nu există comentarii încă. Fii primul care începe discuția.",
@@ -927,6 +935,20 @@
       "confirmDelete": "Ștergi acest comentariu?",
       "deleteErrorTitle": "Nu am putut șterge comentariul",
       "deleteErrorCopy": "Încearcă din nou."
+    },
+    "newsletter": {
+      "title": "Newsletter",
+      "copy": "Primește ocazional noutăți de la momentstudio. Fără spam.",
+      "emailLabel": "Email",
+      "emailPlaceholder": "tu@exemplu.com",
+      "subscribe": "Abonează-te",
+      "successCopy": "Mulțumim — vei primi noutăți pe email.",
+      "alreadyCopy": "Ești deja abonat(ă).",
+      "errorTitle": "Nu am putut face abonarea",
+      "errorCopy": "Încearcă din nou."
+    },
+    "admin": {
+      "edit": "Editează"
     }
   },
   "home": {

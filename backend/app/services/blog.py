@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import set_committed_value
 
 from app.core.config import settings
-from app.models.blog import BlogComment, BlogCommentFlag
+from app.models.blog import BlogComment, BlogCommentFlag, BlogCommentSubscription
 from app.models.content import ContentBlock, ContentStatus
 from app.models.user import User, UserRole
 
@@ -949,3 +949,76 @@ async def resolve_comment_flags(session: AsyncSession, *, comment_id: UUID, acto
     )
     await session.commit()
     return int(result.rowcount or 0)
+
+
+async def list_comment_subscription_recipients(
+    session: AsyncSession,
+    *,
+    content_block_id: UUID,
+) -> list[User]:
+    result = await session.execute(
+        select(User)
+        .join(BlogCommentSubscription, BlogCommentSubscription.user_id == User.id)
+        .where(
+            BlogCommentSubscription.content_block_id == content_block_id,
+            BlogCommentSubscription.unsubscribed_at.is_(None),
+            User.email.isnot(None),
+            User.email_verified.is_(True),
+        )
+    )
+    return list(result.scalars().unique())
+
+
+async def is_comment_subscription_enabled(
+    session: AsyncSession,
+    *,
+    content_block_id: UUID,
+    user_id: UUID,
+) -> bool:
+    row = await session.scalar(
+        select(BlogCommentSubscription).where(
+            BlogCommentSubscription.content_block_id == content_block_id,
+            BlogCommentSubscription.user_id == user_id,
+        )
+    )
+    return bool(row and row.unsubscribed_at is None)
+
+
+async def set_comment_subscription(
+    session: AsyncSession,
+    *,
+    content_block_id: UUID,
+    user_id: UUID,
+    enabled: bool,
+) -> bool:
+    existing = await session.scalar(
+        select(BlogCommentSubscription).where(
+            BlogCommentSubscription.content_block_id == content_block_id,
+            BlogCommentSubscription.user_id == user_id,
+        )
+    )
+    now = datetime.now(timezone.utc)
+    if enabled:
+        if existing:
+            if existing.unsubscribed_at is None:
+                return True
+            existing.unsubscribed_at = None
+            session.add(existing)
+            await session.commit()
+            return True
+        session.add(
+            BlogCommentSubscription(
+                content_block_id=content_block_id,
+                user_id=user_id,
+                created_at=now,
+                unsubscribed_at=None,
+            )
+        )
+        await session.commit()
+        return True
+
+    if existing and existing.unsubscribed_at is None:
+        existing.unsubscribed_at = now
+        session.add(existing)
+        await session.commit()
+    return False

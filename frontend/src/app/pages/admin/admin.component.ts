@@ -37,7 +37,7 @@ import { FxAdminService, FxAdminStatus, FxOverrideAuditEntry } from '../../core/
 import { TaxGroupRead, TaxesAdminService } from '../../core/taxes-admin.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { firstValueFrom, Subscription } from 'rxjs';
+import { combineLatest, firstValueFrom, Subscription } from 'rxjs';
 import { MarkdownService } from '../../core/markdown.service';
 import { AuthService } from '../../core/auth.service';
 import { appConfig } from '../../core/app-config';
@@ -5110,9 +5110,16 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
 	  ngOnInit(): void {
-	    this.routeSub = this.route.data.subscribe((data) => {
+	    this.routeSub = combineLatest([this.route.data, this.route.queryParams]).subscribe(([data, query]) => {
 	      const next = this.normalizeSection(data['section']);
 	      this.applySection(next);
+        if (next !== 'blog') return;
+        const raw = typeof query['edit'] === 'string' ? query['edit'] : '';
+        const cleaned = raw.trim();
+        if (!cleaned) return;
+        const key = cleaned.startsWith('blog.') ? cleaned : `blog.${cleaned}`;
+        if (this.selectedBlogKey === key) return;
+        this.loadBlogEditor(key);
 	    });
 	    if (typeof window !== 'undefined') {
 	      this.cmsDraftPoller = window.setInterval(() => this.observeCmsDrafts(), 250);

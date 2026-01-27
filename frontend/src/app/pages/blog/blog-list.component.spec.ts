@@ -7,6 +7,7 @@ import { of } from 'rxjs';
 
 import { BlogListComponent } from './blog-list.component';
 import { BlogService } from '../../core/blog.service';
+import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 
 describe('BlogListComponent SEO', () => {
   let meta: jasmine.SpyObj<Meta>;
@@ -37,6 +38,7 @@ describe('BlogListComponent SEO', () => {
         { provide: BlogService, useValue: blog },
         { provide: ActivatedRoute, useValue: { queryParams: of({}) } },
         { provide: Router, useValue: router },
+        { provide: StorefrontAdminModeService, useValue: { enabled: () => false } },
         { provide: DOCUMENT, useValue: doc }
       ]
     });

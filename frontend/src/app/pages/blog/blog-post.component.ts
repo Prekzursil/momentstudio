@@ -18,8 +18,10 @@ import { appConfig } from '../../core/app-config';
 import { AuthService } from '../../core/auth.service';
 import { CatalogService, Category, FeaturedCollection, Product } from '../../core/catalog.service';
 import { MarkdownService } from '../../core/markdown.service';
+import { NewsletterService } from '../../core/newsletter.service';
 import { ToastService } from '../../core/toast.service';
 import { BlogComment, BlogCommentSort, BlogPost, BlogPostListItem, BlogService, PaginationMeta } from '../../core/blog.service';
+import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 import { ContainerComponent } from '../../layout/container.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
@@ -70,6 +72,10 @@ hljs.registerLanguage('typescript', typescript);
 
     <app-container classes="py-10 grid gap-6 max-w-4xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
+
+      <div *ngIf="canEditBlog()" class="flex justify-end no-print">
+        <app-button size="sm" variant="ghost" [label]="'blog.admin.edit' | translate" (action)="editBlogPost()"></app-button>
+      </div>
 
       <div
         *ngIf="isPreview()"
@@ -322,15 +328,70 @@ hljs.registerLanguage('typescript', typescript);
         </div>
       </section>
 
+      <section class="no-print">
+        <app-card>
+          <form class="grid gap-3" (submit)="submitNewsletter($event)">
+            <div class="grid gap-1">
+              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.newsletter.title' | translate }}</p>
+              <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'blog.newsletter.copy' | translate }}</p>
+            </div>
+
+            <div *ngIf="newsletterSubscribed()" class="text-sm text-emerald-700 dark:text-emerald-300">
+              {{
+                (newsletterAlreadySubscribed() ? 'blog.newsletter.alreadyCopy' : 'blog.newsletter.successCopy')
+                  | translate
+              }}
+            </div>
+
+            <div class="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'blog.newsletter.emailLabel' | translate }}
+                <input
+                  type="email"
+                  name="newsletterEmail"
+                  required
+                  autocomplete="email"
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  [placeholder]="'blog.newsletter.emailPlaceholder' | translate"
+                  [(ngModel)]="newsletterEmail"
+                />
+              </label>
+              <app-button
+                size="sm"
+                type="submit"
+                [label]="'blog.newsletter.subscribe' | translate"
+                [disabled]="newsletterLoading() || !newsletterEmail.trim() || (captchaEnabled && !newsletterCaptchaToken)"
+              ></app-button>
+            </div>
+
+            <app-captcha-turnstile
+              #newsletterCaptcha
+              *ngIf="captchaEnabled"
+              [siteKey]="captchaSiteKey"
+              (tokenChange)="newsletterCaptchaToken = $event"
+            ></app-captcha-turnstile>
+          </form>
+        </app-card>
+      </section>
+
       <section class="grid gap-3 no-print">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">
             {{ 'blog.comments.title' | translate : { count: commentsTotal() } }}
           </h2>
-          <div class="flex flex-wrap items-center justify-end gap-2">
-            <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-              <span class="font-medium">{{ 'blog.comments.sortLabel' | translate }}</span>
-              <select
+	          <div class="flex flex-wrap items-center justify-end gap-2">
+              <label *ngIf="auth.isAuthenticated()" class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  [checked]="commentSubscribed()"
+                  [disabled]="commentSubscriptionLoading() || !canSubscribeToComments()"
+                  (change)="toggleCommentSubscription($event)"
+                />
+                <span>{{ 'blog.comments.follow' | translate }}</span>
+              </label>
+	            <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+	              <span class="font-medium">{{ 'blog.comments.sortLabel' | translate }}</span>
+	              <select
                 class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 [disabled]="loadingComments()"
                 [ngModel]="commentSort()"
@@ -543,11 +604,12 @@ hljs.registerLanguage('typescript', typescript);
               <span *ngIf="submitting()" class="text-xs text-slate-500 dark:text-slate-400">{{ 'blog.comments.submitting' | translate }}</span>
             </div>
 
-            <app-captcha-turnstile
-              *ngIf="captchaEnabled"
-              [siteKey]="captchaSiteKey"
-              (tokenChange)="commentCaptchaToken = $event"
-            ></app-captcha-turnstile>
+	            <app-captcha-turnstile
+                #commentCaptcha
+	              *ngIf="captchaEnabled"
+	              [siteKey]="captchaSiteKey"
+	              (tokenChange)="commentCaptchaToken = $event"
+	            ></app-captcha-turnstile>
           </form>
         </app-card>
       </section>
@@ -650,6 +712,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   commentsTotal = signal<number>(0);
   commentSort = signal<BlogCommentSort>('newest');
   commentPage = signal<number>(1);
+  commentSubscribed = signal<boolean>(false);
+  commentSubscriptionLoading = signal<boolean>(false);
   private readonly commentThreadsLimit = 10;
   commentSkeletons = Array.from({ length: 3 });
 
@@ -659,6 +723,11 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   captchaSiteKey = appConfig.captchaSiteKey;
   captchaEnabled = Boolean(this.captchaSiteKey);
   commentCaptchaToken: string | null = null;
+  newsletterEmail = '';
+  newsletterLoading = signal<boolean>(false);
+  newsletterSubscribed = signal<boolean>(false);
+  newsletterAlreadySubscribed = signal<boolean>(false);
+  newsletterCaptchaToken: string | null = null;
   isPreview = signal<boolean>(false);
   readingProgress = signal<number>(0);
   showBackToTop = signal<boolean>(false);
@@ -700,7 +769,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   });
 
   @ViewChild('articleContent') articleContent?: ElementRef<HTMLElement>;
-  @ViewChild(CaptchaTurnstileComponent) commentCaptcha?: CaptchaTurnstileComponent;
+  @ViewChild('commentCaptcha') commentCaptcha?: CaptchaTurnstileComponent;
+  @ViewChild('newsletterCaptcha') newsletterCaptcha?: CaptchaTurnstileComponent;
 
   private slug = '';
   private previewToken = '';
@@ -737,9 +807,11 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     private blog: BlogService,
     private route: ActivatedRoute,
     private router: Router,
+    private storefrontAdminMode: StorefrontAdminModeService,
     private translate: TranslateService,
     private title: Title,
     private meta: Meta,
+    private newsletter: NewsletterService,
     private toast: ToastService,
     private markdown: MarkdownService,
     private catalog: CatalogService,
@@ -797,12 +869,21 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     this.commentsTotal.set(0);
     this.commentSort.set('newest');
     this.commentPage.set(1);
+    this.commentSubscribed.set(false);
+    this.commentSubscriptionLoading.set(false);
     this.loadingComments.set(true);
     this.hasCommentsError.set(false);
     this.replyTo.set(null);
     this.commentBody = '';
     this.commentCaptchaToken = null;
     this.commentCaptcha?.reset();
+    const currentEmail = this.auth.user()?.email || '';
+    this.newsletterEmail = currentEmail;
+    this.newsletterLoading.set(false);
+    this.newsletterSubscribed.set(false);
+    this.newsletterAlreadySubscribed.set(false);
+    this.newsletterCaptchaToken = null;
+    this.newsletterCaptcha?.reset();
 
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     const req = this.previewToken
@@ -829,6 +910,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.loadRelatedPosts(lang, post);
         this.loadMoreFromAuthor(lang, post);
         this.loadComments();
+        this.loadCommentSubscription();
       },
       error: () => {
         this.post.set(null);
@@ -850,8 +932,20 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.commentsTotal.set(0);
         this.loadingComments.set(false);
         this.hasCommentsError.set(false);
+        this.commentSubscribed.set(false);
+        this.commentSubscriptionLoading.set(false);
       }
     });
+  }
+
+  canEditBlog(): boolean {
+    return this.storefrontAdminMode.enabled();
+  }
+
+  editBlogPost(): void {
+    const desired = String(this.slug || '').trim();
+    if (!desired) return;
+    void this.router.navigate(['/admin/content/blog'], { queryParams: { edit: desired } });
   }
 
   private loadNeighbors(lang: string): void {
@@ -1166,6 +1260,60 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     });
   }
 
+  loadCommentSubscription(): void {
+    if (!this.slug) return;
+    if (!this.auth.isAuthenticated()) {
+      this.commentSubscribed.set(false);
+      return;
+    }
+    this.commentSubscriptionLoading.set(true);
+    this.blog.getCommentSubscription(this.slug).subscribe({
+      next: (resp) => {
+        this.commentSubscribed.set(Boolean(resp?.enabled));
+        this.commentSubscriptionLoading.set(false);
+      },
+      error: () => {
+        this.commentSubscribed.set(false);
+        this.commentSubscriptionLoading.set(false);
+      }
+    });
+  }
+
+  canSubscribeToComments(): boolean {
+    if (!this.auth.isAuthenticated()) return false;
+    return Boolean(this.auth.user()?.email_verified);
+  }
+
+  toggleCommentSubscription(event: Event): void {
+    const target = event?.target as HTMLInputElement | null;
+    const desired = Boolean(target?.checked);
+    if (!this.slug) return;
+    if (!this.auth.isAuthenticated()) return;
+    if (!this.canSubscribeToComments()) {
+      this.toast.error(this.translate.instant('blog.comments.followVerifyTitle'), this.translate.instant('blog.comments.followVerifyCopy'));
+      if (target) target.checked = this.commentSubscribed();
+      return;
+    }
+    const previous = this.commentSubscribed();
+    this.commentSubscribed.set(desired);
+    this.commentSubscriptionLoading.set(true);
+    this.blog.setCommentSubscription(this.slug, desired).subscribe({
+      next: (resp) => {
+        const enabled = Boolean(resp?.enabled);
+        this.commentSubscribed.set(enabled);
+        this.commentSubscriptionLoading.set(false);
+        const toastKey = enabled ? 'blog.comments.followEnabledCopy' : 'blog.comments.followDisabledCopy';
+        this.toast.success(this.translate.instant('blog.comments.followTitle'), this.translate.instant(toastKey));
+      },
+      error: () => {
+        this.commentSubscribed.set(previous);
+        this.commentSubscriptionLoading.set(false);
+        if (target) target.checked = previous;
+        this.toast.error(this.translate.instant('blog.comments.followErrorTitle'), this.translate.instant('blog.comments.followErrorCopy'));
+      }
+    });
+  }
+
   setCommentSort(sort: BlogCommentSort): void {
     const next = (sort || '').toLowerCase();
     if (next !== 'newest' && next !== 'oldest' && next !== 'top') return;
@@ -1278,6 +1426,37 @@ export class BlogPostComponent implements OnInit, OnDestroy {
           return;
         }
         this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), this.translate.instant('blog.comments.createErrorCopy'));
+      }
+    });
+  }
+
+  submitNewsletter(event?: Event): void {
+    if (event) event.preventDefault();
+    const email = this.newsletterEmail.trim();
+    if (!email) return;
+    if (this.captchaEnabled && !this.newsletterCaptchaToken) {
+      this.toast.error(this.translate.instant('blog.newsletter.errorTitle'), this.translate.instant('auth.captchaRequired'));
+      return;
+    }
+    this.newsletterLoading.set(true);
+    this.newsletterSubscribed.set(false);
+    this.newsletterAlreadySubscribed.set(false);
+    this.newsletter.subscribe(email, { source: 'blog', captcha_token: this.newsletterCaptchaToken }).subscribe({
+      next: (resp) => {
+        const already = Boolean(resp?.already_subscribed);
+        this.newsletterSubscribed.set(true);
+        this.newsletterAlreadySubscribed.set(already);
+        this.newsletterLoading.set(false);
+        this.newsletterCaptchaToken = null;
+        this.newsletterCaptcha?.reset();
+        const copyKey = already ? 'blog.newsletter.alreadyCopy' : 'blog.newsletter.successCopy';
+        this.toast.success(this.translate.instant('blog.newsletter.title'), this.translate.instant(copyKey));
+      },
+      error: () => {
+        this.newsletterLoading.set(false);
+        this.newsletterCaptchaToken = null;
+        this.newsletterCaptcha?.reset();
+        this.toast.error(this.translate.instant('blog.newsletter.errorTitle'), this.translate.instant('blog.newsletter.errorCopy'));
       }
     });
   }
