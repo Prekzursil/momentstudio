@@ -917,8 +917,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Products: category CRUD shortcut – Open category manager as a drawer/modal from `/admin/products` (avoid separate route hop).
 - [x] Admin Categories: merge tool – Merge categories (optionally include subcategories) and reassign products with preview.
 - [x] Admin Categories: safe delete – Block deleting in-use categories; require reassignment or merge.
-- [ ] Admin Categories: bulk import – CSV import for categories (name, parent, sort order, translations) with dry-run validation.
-- [ ] Admin Products: bulk category create+assign – Create a new category and immediately apply it to selected products.
+- [x] Admin Categories: bulk import – CSV import for categories (name, parent, sort order, translations) with dry-run validation.
+- [x] Admin Products: bulk category create+assign – Create a new category and immediately apply it to selected products.
+- [ ] Admin Categories: CSV export/template – Download a template/export of categories to streamline bulk edits + re-import.
 
 ### Admin Dashboard – UX & Workflow (Backlog)
 - [x] Admin UI: command palette – Add Ctrl/Cmd+K quick launcher for navigation + common actions.
