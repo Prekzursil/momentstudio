@@ -948,7 +948,14 @@
       "errorCopy": "Please try again."
     },
     "admin": {
-      "edit": "Edit"
+      "edit": "Edit",
+      "quickEdit": "Quick edit",
+      "quickEditClose": "Close quick edit",
+      "loadErrorCopy": "Could not load admin post details.",
+      "savedTitle": "Saved",
+      "savedCopy": "Changes applied.",
+      "saveErrorTitle": "Could not save",
+      "saveErrorCopy": "Please try again."
     }
   },
   "home": {

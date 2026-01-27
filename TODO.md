@@ -455,8 +455,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Blog comments: spam controls – Rate limits + link limits + optional CAPTCHA on comment submit.
 - [x] Blog: newsletter subscribe – Inline subscribe block and optional “subscribe to comments” on a post.
 - [x] Storefront admin quick edit: edit buttons – Show “Edit” on blog cards/posts for admins (links to admin editor).
-- [ ] Storefront admin quick edit: publish toggle – Allow publish/unpublish/schedule from the blog page in admin mode.
-- [ ] Storefront admin quick edit: inline meta – Quick edit title/summary/tags from the post page (drawer/modal).
+- [x] Storefront admin quick edit: publish toggle – Allow publish/unpublish/schedule from the blog page in admin mode.
+- [x] Storefront admin quick edit: inline meta – Quick edit title/summary/tags from the post page (drawer/modal).
 - [ ] Admin blog list: bulk actions – Bulk publish/unpublish, tag add/remove, and schedule changes with preview.
 - [ ] Admin editor: cover image workflow – Upload/select cover image with crop + focal point + mobile preview.
 - [ ] Admin editor: drag-drop images – Drag-and-drop images into the editor (auto-upload + insert markdown/WYSIWYG block).

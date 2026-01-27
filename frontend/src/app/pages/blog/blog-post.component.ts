@@ -15,6 +15,7 @@ import python from 'highlight.js/lib/languages/python';
 import typescript from 'highlight.js/lib/languages/typescript';
 
 import { appConfig } from '../../core/app-config';
+import { AdminService, ContentBlock } from '../../core/admin.service';
 import { AuthService } from '../../core/auth.service';
 import { CatalogService, Category, FeaturedCollection, Product } from '../../core/catalog.service';
 import { MarkdownService } from '../../core/markdown.service';
@@ -73,8 +74,122 @@ hljs.registerLanguage('typescript', typescript);
     <app-container classes="py-10 grid gap-6 max-w-4xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
-      <div *ngIf="canEditBlog()" class="flex justify-end no-print">
-        <app-button size="sm" variant="ghost" [label]="'blog.admin.edit' | translate" (action)="editBlogPost()"></app-button>
+      <div *ngIf="canEditBlog()" class="flex flex-col items-end gap-2 no-print">
+        <div class="flex items-center gap-2">
+          <app-button size="sm" variant="ghost" [label]="'blog.admin.edit' | translate" (action)="editBlogPost()"></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="quickEditOpen() ? ('blog.admin.quickEditClose' | translate) : ('blog.admin.quickEdit' | translate)"
+            (action)="toggleQuickEdit()"
+          ></app-button>
+        </div>
+
+        <div
+          *ngIf="quickEditOpen()"
+          class="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-soft dark:border-slate-800 dark:bg-slate-900"
+        >
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="grid gap-1">
+              <p class="font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.admin.quickEdit' | translate }}</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400" *ngIf="adminBlock() as blk">
+                {{ 'adminUi.blog.fields.status' | translate }}: {{ ('adminUi.status.' + blk.status) | translate }}
+              </p>
+              <p class="text-xs text-slate-500 dark:text-slate-400" *ngIf="adminBlockLoading()">
+                {{ 'adminUi.common.loading' | translate }}
+              </p>
+              <p class="text-xs text-rose-600 dark:text-rose-300" *ngIf="adminBlockError()">
+                {{ 'blog.admin.loadErrorCopy' | translate }}
+              </p>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.common.cancel' | translate"
+                (action)="resetQuickEdit()"
+                [disabled]="quickEditSaving() || adminBlockLoading() || !adminBlock()"
+              ></app-button>
+              <app-button
+                size="sm"
+                [label]="quickEditSaving() ? ('adminUi.common.saving' | translate) : ('adminUi.common.save' | translate)"
+                (action)="saveQuickEdit()"
+                [disabled]="quickEditSaving() || adminBlockLoading() || !adminBlock()"
+              ></app-button>
+            </div>
+          </div>
+
+          <div class="mt-4 grid gap-3" *ngIf="adminBlock() as blk">
+            <div class="grid gap-3 md:grid-cols-3">
+              <label class="grid gap-1">
+                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.blog.fields.status' | translate }}</span>
+                <select
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="quickEditStatus"
+                >
+                  <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+                  <option value="review">{{ 'adminUi.status.review' | translate }}</option>
+                  <option value="published">{{ 'adminUi.status.published' | translate }}</option>
+                </select>
+              </label>
+
+              <label class="grid gap-1">
+                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{
+                  'adminUi.blog.fields.publishAtOptional' | translate
+                }}</span>
+                <input
+                  type="datetime-local"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="quickEditPublishAt"
+                />
+              </label>
+
+              <label class="grid gap-1">
+                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{
+                  'adminUi.blog.fields.unpublishAtOptional' | translate
+                }}</span>
+                <input
+                  type="datetime-local"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="quickEditUnpublishAt"
+                />
+              </label>
+            </div>
+
+            <div class="grid gap-3 md:grid-cols-3">
+              <label class="grid gap-1 md:col-span-1">
+                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.blog.fields.title' | translate }}</span>
+                <input
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="quickEditTitle"
+                />
+              </label>
+
+              <label class="grid gap-1 md:col-span-1">
+                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{
+                  'adminUi.blog.editing.summaryOptional' | translate : { lang: activeLang() }
+                }}</span>
+                <textarea
+                  rows="2"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="quickEditSummary"
+                ></textarea>
+              </label>
+
+              <label class="grid gap-1 md:col-span-1">
+                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.blog.fields.tags' | translate }}</span>
+                <input
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [placeholder]="'adminUi.blog.fields.tagsPlaceholder' | translate"
+                  [(ngModel)]="quickEditTags"
+                />
+              </label>
+            </div>
+
+            <p class="text-xs text-rose-600 dark:text-rose-300" *ngIf="quickEditError()">{{ quickEditError() }}</p>
+          </div>
+        </div>
       </div>
 
       <div
@@ -733,6 +848,20 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   showBackToTop = signal<boolean>(false);
   progressPercent = computed(() => Math.round(this.readingProgress() * 100));
 
+  adminBlock = signal<ContentBlock | null>(null);
+  adminBlockLoading = signal<boolean>(false);
+  adminBlockError = signal<boolean>(false);
+
+  quickEditOpen = signal<boolean>(false);
+  quickEditSaving = signal<boolean>(false);
+  quickEditError = signal<string>('');
+  quickEditStatus = 'draft';
+  quickEditPublishAt = '';
+  quickEditUnpublishAt = '';
+  quickEditTitle = '';
+  quickEditSummary = '';
+  quickEditTags = '';
+
   authorDisplayName = computed(() => {
     const post = this.post();
     return post?.author_name || post?.author?.name || post?.author?.username || '';
@@ -807,6 +936,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     private blog: BlogService,
     private route: ActivatedRoute,
     private router: Router,
+    private admin: AdminService,
     private storefrontAdminMode: StorefrontAdminModeService,
     private translate: TranslateService,
     private title: Title,
@@ -885,6 +1015,22 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     this.newsletterCaptchaToken = null;
     this.newsletterCaptcha?.reset();
 
+    this.adminBlock.set(null);
+    this.adminBlockLoading.set(false);
+    this.adminBlockError.set(false);
+    this.quickEditOpen.set(false);
+    this.quickEditSaving.set(false);
+    this.quickEditError.set('');
+    this.quickEditStatus = 'draft';
+    this.quickEditPublishAt = '';
+    this.quickEditUnpublishAt = '';
+    this.quickEditTitle = '';
+    this.quickEditSummary = '';
+    this.quickEditTags = '';
+    if (this.canEditBlog()) {
+      this.loadAdminBlock();
+    }
+
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     const req = this.previewToken
       ? this.blog.getPreviewPost(this.slug, this.previewToken, lang)
@@ -911,6 +1057,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.loadMoreFromAuthor(lang, post);
         this.loadComments();
         this.loadCommentSubscription();
+        this.hydrateQuickEditFromState();
       },
       error: () => {
         this.post.set(null);
@@ -934,6 +1081,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.hasCommentsError.set(false);
         this.commentSubscribed.set(false);
         this.commentSubscriptionLoading.set(false);
+        this.hydrateQuickEditFromState();
       }
     });
   }
@@ -942,10 +1090,262 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     return this.storefrontAdminMode.enabled();
   }
 
+  activeLang(): 'en' | 'ro' {
+    return this.translate.currentLang === 'ro' ? 'ro' : 'en';
+  }
+
+  toggleQuickEdit(): void {
+    const next = !this.quickEditOpen();
+    this.quickEditOpen.set(next);
+    this.quickEditError.set('');
+    if (!next) return;
+    if (!this.adminBlock() && !this.adminBlockLoading()) {
+      this.loadAdminBlock();
+      return;
+    }
+    this.hydrateQuickEditFromState();
+  }
+
+  resetQuickEdit(): void {
+    this.quickEditError.set('');
+    this.hydrateQuickEditFromState();
+  }
+
+  saveQuickEdit(): void {
+    const key = `blog.${this.slug}`;
+    const block = this.adminBlock();
+    if (!this.slug || !block) return;
+
+    const desiredStatus = (this.quickEditStatus || '').trim();
+    const desiredTitle = (this.quickEditTitle || '').trim();
+    const desiredSummary = (this.quickEditSummary || '').trim();
+    const desiredTags = this.normalizeTagsInput(this.quickEditTags);
+    const desiredLang = this.activeLang();
+
+    const meta = this.cloneMeta(block.meta);
+    const payload: any = { expected_version: block.version };
+
+    if (desiredStatus && desiredStatus !== block.status) {
+      payload.status = desiredStatus;
+    }
+
+    const currentPublishLocal = this.toDateTimeLocal(block.published_at);
+    const desiredPublishLocal = (this.quickEditPublishAt || '').trim();
+    if (desiredPublishLocal && desiredPublishLocal !== currentPublishLocal) {
+      payload.published_at = this.toIsoFromDateTimeLocal(desiredPublishLocal);
+    } else if (!desiredPublishLocal && currentPublishLocal && this.isFutureIso(block.published_at)) {
+      // Treat clearing a scheduled publish time as “publish now”.
+      payload.published_at = null;
+    }
+
+    const currentUnpublishLocal = this.toDateTimeLocal(block.published_until);
+    const desiredUnpublishLocal = (this.quickEditUnpublishAt || '').trim();
+    if (desiredUnpublishLocal !== currentUnpublishLocal) {
+      payload.published_until = desiredUnpublishLocal ? this.toIsoFromDateTimeLocal(desiredUnpublishLocal) : null;
+    }
+
+    let metaChanged = false;
+    const currentTags = this.normalizeTags(meta['tags']);
+    if (!this.sameStringSet(desiredTags, currentTags)) {
+      metaChanged = true;
+      if (desiredTags.length) meta['tags'] = desiredTags;
+      else delete meta['tags'];
+    }
+
+    const currentSummary = this.getMetaSummary(meta, desiredLang);
+    if (desiredSummary !== currentSummary) {
+      metaChanged = true;
+      const existing = meta['summary'];
+      if (desiredSummary) {
+        if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
+          meta['summary'] = { ...(existing as Record<string, unknown>), [desiredLang]: desiredSummary };
+        } else {
+          meta['summary'] = { [desiredLang]: desiredSummary };
+        }
+      } else if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
+        const nextSummary: Record<string, unknown> = { ...(existing as Record<string, unknown>) };
+        delete nextSummary[desiredLang];
+        if (Object.keys(nextSummary).length) meta['summary'] = nextSummary;
+        else delete meta['summary'];
+      } else {
+        delete meta['summary'];
+      }
+    }
+
+    if (metaChanged) {
+      payload.meta = meta;
+    }
+
+    const requests = [];
+    if (Object.keys(payload).length > 1) {
+      requests.push(this.admin.updateContentBlock(key, payload));
+    }
+
+    const titleChanged = desiredTitle && desiredTitle !== (this.post()?.title || '').trim();
+    if (titleChanged) {
+      requests.push(this.admin.updateContentBlock(key, { title: desiredTitle, lang: desiredLang }));
+    }
+
+    if (!requests.length) {
+      this.toggleQuickEdit();
+      return;
+    }
+
+    this.quickEditSaving.set(true);
+    this.quickEditError.set('');
+    forkJoin(requests).subscribe({
+      next: (blocks) => {
+        const latest = blocks[blocks.length - 1];
+        this.adminBlock.set(latest);
+        this.adminBlockError.set(false);
+        this.adminBlockLoading.set(false);
+
+        const currentPost = this.post();
+        if (currentPost) {
+          const nextPost = { ...currentPost };
+          if (titleChanged) nextPost.title = desiredTitle;
+          if (metaChanged) {
+            nextPost.tags = desiredTags;
+            nextPost.summary = desiredSummary || undefined;
+          }
+          this.post.set(nextPost);
+          this.crumbs = [
+            { label: 'nav.home', url: '/' },
+            { label: 'nav.blog', url: '/blog' },
+            { label: nextPost.title }
+          ];
+          this.setMetaTags(nextPost);
+        }
+
+        this.quickEditSaving.set(false);
+        this.toast.success(this.translate.instant('blog.admin.savedTitle'), this.translate.instant('blog.admin.savedCopy'));
+      },
+      error: (err) => {
+        this.quickEditSaving.set(false);
+        const detail = err?.error?.detail;
+        const msg = typeof detail === 'string' && detail.trim() ? detail.trim() : this.translate.instant('blog.admin.saveErrorCopy');
+        this.quickEditError.set(msg);
+        this.toast.error(this.translate.instant('blog.admin.saveErrorTitle'), msg);
+      }
+    });
+  }
+
   editBlogPost(): void {
     const desired = String(this.slug || '').trim();
     if (!desired) return;
     void this.router.navigate(['/admin/content/blog'], { queryParams: { edit: desired } });
+  }
+
+  private loadAdminBlock(): void {
+    if (!this.slug || !this.canEditBlog()) return;
+    const key = `blog.${this.slug}`;
+    this.adminBlockLoading.set(true);
+    this.adminBlockError.set(false);
+    this.admin.getContent(key).subscribe({
+      next: (block) => {
+        this.adminBlock.set(block);
+        this.adminBlockLoading.set(false);
+        this.adminBlockError.set(false);
+        this.hydrateQuickEditFromState();
+      },
+      error: () => {
+        this.adminBlockLoading.set(false);
+        this.adminBlockError.set(true);
+        this.adminBlock.set(null);
+      }
+    });
+  }
+
+  private hydrateQuickEditFromState(): void {
+    const lang = this.activeLang();
+    const post = this.post();
+    const block = this.adminBlock();
+    if (!post && !block) return;
+
+    if (block) {
+      this.quickEditStatus = String(block.status || 'draft');
+      this.quickEditPublishAt = this.toDateTimeLocal(block.published_at);
+      this.quickEditUnpublishAt = this.toDateTimeLocal(block.published_until);
+    }
+
+    const meta = (block?.meta || post?.meta || {}) as Record<string, unknown>;
+    const tags = (post?.tags?.length ? post.tags : this.normalizeTags(meta['tags'])) || [];
+    this.quickEditTitle = String(post?.title ?? block?.title ?? '').trim();
+    this.quickEditSummary = String(post?.summary ?? this.getMetaSummary(meta, lang) ?? '').trim();
+    this.quickEditTags = tags.join(', ');
+  }
+
+  private toDateTimeLocal(value: string | null | undefined): string {
+    if (!value) return '';
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return '';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  private toIsoFromDateTimeLocal(value: string): string | null {
+    const trimmed = (value || '').trim();
+    if (!trimmed) return null;
+    const date = new Date(trimmed);
+    if (!Number.isFinite(date.getTime())) return null;
+    return date.toISOString();
+  }
+
+  private isFutureIso(value: string | null | undefined): boolean {
+    if (!value) return false;
+    const ts = new Date(value).getTime();
+    if (!Number.isFinite(ts)) return false;
+    return ts > Date.now() + 1000;
+  }
+
+  private cloneMeta(meta: Record<string, any> | null | undefined): Record<string, any> {
+    if (!meta) return {};
+    try {
+      return JSON.parse(JSON.stringify(meta));
+    } catch {
+      return { ...meta };
+    }
+  }
+
+  private normalizeTags(raw: unknown): string[] {
+    if (raw === null || raw === undefined) return [];
+    const values = Array.isArray(raw) ? raw.map((v) => String(v)) : typeof raw === 'string' ? raw.split(',') : [];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const item of values) {
+      const trimmed = String(item || '').trim();
+      if (!trimmed) continue;
+      const key = trimmed.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(trimmed);
+    }
+    return out;
+  }
+
+  private normalizeTagsInput(raw: string): string[] {
+    return this.normalizeTags(raw);
+  }
+
+  private sameStringSet(a: string[], b: string[]): boolean {
+    const aSet = new Set(a.map((v) => String(v || '').trim().toLowerCase()).filter(Boolean));
+    const bSet = new Set(b.map((v) => String(v || '').trim().toLowerCase()).filter(Boolean));
+    if (aSet.size !== bSet.size) return false;
+    for (const value of aSet) {
+      if (!bSet.has(value)) return false;
+    }
+    return true;
+  }
+
+  private getMetaSummary(meta: Record<string, unknown>, lang: 'en' | 'ro'): string {
+    const raw = meta['summary'];
+    if (!raw) return '';
+    if (typeof raw === 'string') return raw.trim();
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      const value = (raw as any)[lang];
+      if (typeof value === 'string') return value.trim();
+    }
+    return '';
   }
 
   private loadNeighbors(lang: string): void {

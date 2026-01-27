@@ -948,7 +948,14 @@
       "errorCopy": "Încearcă din nou."
     },
     "admin": {
-      "edit": "Editează"
+      "edit": "Editează",
+      "quickEdit": "Editare rapidă",
+      "quickEditClose": "Închide editarea rapidă",
+      "loadErrorCopy": "Nu am putut încărca detaliile de admin ale articolului.",
+      "savedTitle": "Salvat",
+      "savedCopy": "Modificările au fost aplicate.",
+      "saveErrorTitle": "Nu am putut salva",
+      "saveErrorCopy": "Încearcă din nou."
     }
   },
   "home": {

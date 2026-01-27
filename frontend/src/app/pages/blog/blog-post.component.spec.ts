@@ -7,6 +7,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 
 import { BlogPostComponent } from './blog-post.component';
+import { AdminService } from '../../core/admin.service';
 import { BlogService, BlogPost } from '../../core/blog.service';
 import { CatalogService } from '../../core/catalog.service';
 import { NewsletterService } from '../../core/newsletter.service';
@@ -70,6 +71,7 @@ describe('BlogPostComponent', () => {
         { provide: Title, useValue: title },
         { provide: Meta, useValue: meta },
         { provide: BlogService, useValue: blog },
+        { provide: AdminService, useValue: jasmine.createSpyObj<AdminService>('AdminService', ['getContent', 'updateContentBlock']) },
         { provide: CatalogService, useValue: jasmine.createSpyObj<CatalogService>('CatalogService', ['getProduct', 'listCategories', 'listFeaturedCollections']) },
         { provide: NewsletterService, useValue: jasmine.createSpyObj<NewsletterService>('NewsletterService', ['subscribe']) },
         { provide: ToastService, useValue: toast },
