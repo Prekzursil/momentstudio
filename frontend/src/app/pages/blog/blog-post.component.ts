@@ -106,7 +106,7 @@ import { formatIdentity } from '../../shared/user-identity';
       <div *ngIf="!loadingPost() && !hasPostError() && post()">
         <div class="grid gap-6 lg:grid-cols-[1fr_260px] lg:items-start">
           <app-card>
-            <div #articleContent class="grid gap-6">
+            <div #articleContent class="grid gap-6" (click)="handleArticleClick($event)">
               <img
                 *ngIf="post()!.cover_image_url"
                 [src]="post()!.cover_image_url"
@@ -408,6 +408,58 @@ import { formatIdentity } from '../../shared/user-identity';
       </section>
     </app-container>
 
+    <div
+      *ngIf="lightboxOpen()"
+      class="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm p-4 grid place-items-center"
+      (click)="closeLightbox()"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="relative w-full max-w-5xl" (click)="$event.stopPropagation()">
+        <button
+          type="button"
+          class="absolute -top-3 -right-3 h-10 w-10 rounded-full bg-white text-slate-900 shadow-soft hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-50 dark:hover:bg-slate-800"
+          (click)="closeLightbox()"
+          [attr.aria-label]="'blog.post.lightbox.close' | translate"
+        >
+          ✕
+        </button>
+
+        <img
+          *ngIf="lightboxImage() as img"
+          [src]="img.src"
+          [alt]="img.alt || ''"
+          class="w-full max-h-[78vh] object-contain rounded-2xl bg-black"
+        />
+
+        <div class="pt-3 grid gap-2 text-center">
+          <p *ngIf="lightboxImage()?.alt" class="text-sm text-white/80">{{ lightboxImage()!.alt }}</p>
+          <p *ngIf="galleryImages().length > 1" class="text-xs text-white/60">
+            {{ (lightboxIndex() ?? 0) + 1 }} / {{ galleryImages().length }}
+          </p>
+        </div>
+
+        <div *ngIf="galleryImages().length > 1" class="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-2">
+          <button
+            type="button"
+            class="h-10 w-10 rounded-full bg-black/40 text-white hover:bg-black/55"
+            (click)="prevLightbox($event)"
+            [attr.aria-label]="'blog.post.lightbox.previous' | translate"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            class="h-10 w-10 rounded-full bg-black/40 text-white hover:bg-black/55"
+            (click)="nextLightbox($event)"
+            [attr.aria-label]="'blog.post.lightbox.next' | translate"
+          >
+            ›
+          </button>
+        </div>
+      </div>
+    </div>
+
     <button
       *ngIf="showBackToTop()"
       type="button"
@@ -434,6 +486,15 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   activeHeadingId = signal<string | null>(null);
   neighbors = signal<{ previous: BlogPostListItem | null; next: BlogPostListItem | null }>({ previous: null, next: null });
   relatedPosts = signal<BlogPostListItem[]>([]);
+  galleryImages = signal<Array<{ src: string; alt: string }>>([]);
+  lightboxIndex = signal<number | null>(null);
+  lightboxImage = computed(() => {
+    const idx = this.lightboxIndex();
+    if (idx === null) return null;
+    const images = this.galleryImages();
+    return images[idx] ?? null;
+  });
+  lightboxOpen = computed(() => this.lightboxIndex() !== null && !!this.lightboxImage());
 
   comments = signal<BlogComment[]>([]);
   loadingComments = signal<boolean>(true);
@@ -459,6 +520,24 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   private scrollStartY = 0;
   private scrollEndY = 1;
   private tocHeadingEls: HTMLElement[] = [];
+  private previousBodyOverflow: string | null = null;
+  private lightboxKeyListener = (event: KeyboardEvent) => {
+    if (!this.lightboxOpen()) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.closeLightbox();
+      return;
+    }
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      this.nextLightbox();
+      return;
+    }
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      this.prevLightbox();
+    }
+  };
   private scrollListener = () => this.updateReadingProgress();
   private resizeListener = () => this.measureReadingProgressSoon();
 
@@ -497,6 +576,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       w.removeEventListener('scroll', this.scrollListener);
       w.removeEventListener('resize', this.resizeListener);
     }
+    this.closeLightbox();
   }
 
   load(): void {
@@ -510,6 +590,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     this.activeHeadingId.set(null);
     this.neighbors.set({ previous: null, next: null });
     this.relatedPosts.set([]);
+    this.galleryImages.set([]);
+    this.lightboxIndex.set(null);
     this.scrollStartY = 0;
     this.scrollEndY = 1;
     this.tocHeadingEls = [];
@@ -626,6 +708,60 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     w.scrollTo({ top, behavior: 'smooth' });
     w.history.replaceState(null, '', `${w.location.pathname}${w.location.search}#${encodeURIComponent(id)}`);
     this.activeHeadingId.set(id);
+  }
+
+  handleArticleClick(event: MouseEvent): void {
+    const target = event.target as HTMLElement | null;
+    const img = target?.closest('img') as HTMLImageElement | null;
+    if (!img) return;
+    const images = this.galleryImages();
+    if (!images.length) return;
+    const src = img.currentSrc || img.src;
+    if (!src) return;
+    const idx = images.findIndex((candidate) => candidate.src === src);
+    if (idx < 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.openLightbox(idx);
+  }
+
+  openLightbox(index: number): void {
+    const images = this.galleryImages();
+    if (!images.length) return;
+    const clamped = Math.min(Math.max(0, index), images.length - 1);
+    this.lightboxIndex.set(clamped);
+    const w = this.document?.defaultView;
+    if (w) w.addEventListener('keydown', this.lightboxKeyListener);
+    if (this.previousBodyOverflow === null) {
+      this.previousBodyOverflow = this.document.body.style.overflow || '';
+      this.document.body.style.overflow = 'hidden';
+    }
+  }
+
+  closeLightbox(): void {
+    const w = this.document?.defaultView;
+    if (w) w.removeEventListener('keydown', this.lightboxKeyListener);
+    this.lightboxIndex.set(null);
+    if (this.previousBodyOverflow !== null) {
+      this.document.body.style.overflow = this.previousBodyOverflow;
+      this.previousBodyOverflow = null;
+    }
+  }
+
+  nextLightbox(event?: Event): void {
+    if (event) event.stopPropagation();
+    const images = this.galleryImages();
+    const idx = this.lightboxIndex();
+    if (idx === null || images.length < 2) return;
+    this.lightboxIndex.set((idx + 1) % images.length);
+  }
+
+  prevLightbox(event?: Event): void {
+    if (event) event.stopPropagation();
+    const images = this.galleryImages();
+    const idx = this.lightboxIndex();
+    if (idx === null || images.length < 2) return;
+    this.lightboxIndex.set((idx - 1 + images.length) % images.length);
   }
 
   copyShareLink(): void {
@@ -866,6 +1002,16 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     this.scrollStartY = start;
     this.scrollEndY = Math.max(start + 1, end);
     this.tocHeadingEls = Array.from(el.querySelectorAll('h2[id], h3[id]')) as HTMLElement[];
+    const imgs = Array.from(el.querySelectorAll('img')) as HTMLImageElement[];
+    const gallery: Array<{ src: string; alt: string }> = [];
+    const seen = new Set<string>();
+    for (const img of imgs) {
+      const src = img.currentSrc || img.src;
+      if (!src || seen.has(src)) continue;
+      seen.add(src);
+      gallery.push({ src, alt: img.getAttribute('alt') || '' });
+    }
+    this.galleryImages.set(gallery);
     this.updateActiveHeading();
   }
 

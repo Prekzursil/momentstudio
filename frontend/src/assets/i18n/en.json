@@ -848,6 +848,11 @@
       "shareCopiedCopy": "Link copied to clipboard.",
       "shareCopyErrorTitle": "Could not copy link",
       "shareCopyErrorCopy": "Please copy the URL from the address bar.",
+      "lightbox": {
+        "close": "Close image viewer",
+        "previous": "Previous image",
+        "next": "Next image"
+      },
       "loadingTitle": "Loading…",
       "errorTitle": "Could not load this post.",
       "errorCopy": "Please try again in a moment.",

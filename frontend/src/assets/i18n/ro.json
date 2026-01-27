@@ -848,6 +848,11 @@
       "shareCopiedCopy": "Link copiat în clipboard.",
       "shareCopyErrorTitle": "Nu am putut copia link-ul",
       "shareCopyErrorCopy": "Copiază URL-ul din bara de adrese.",
+      "lightbox": {
+        "close": "Închide vizualizatorul",
+        "previous": "Imaginea anterioară",
+        "next": "Imaginea următoare"
+      },
       "loadingTitle": "Se încarcă…",
       "errorTitle": "Nu am putut încărca acest articol.",
       "errorCopy": "Încearcă din nou în câteva momente.",
