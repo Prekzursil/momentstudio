@@ -912,8 +912,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Products: status filters – Filter products list by status and include an “Archived” tab/view.
 - [x] Admin Products: bulk status updates – Apply draft/publish/archive to selected products with preview and optional undo window.
 - [x] Admin Products: quick status toggle – One-click publish/unpublish/archive from the products table row actions.
-- [ ] Admin Products: create category inline (product form) – “Add category” from the category selector without navigating away.
-- [ ] Admin Products: create category inline (filters) – Allow creating a category while filtering/browsing products.
+- [x] Admin Products: create category inline (product form) – “Add category” from the category selector without navigating away.
+- [x] Admin Products: create category inline (filters) – Allow creating a category while filtering/browsing products.
 - [ ] Admin Products: category CRUD shortcut – Open category manager as a drawer/modal from `/admin/products` (avoid separate route hop).
 - [ ] Admin Categories: merge tool – Merge categories (optionally include subcategories) and reassign products with preview.
 - [ ] Admin Categories: safe delete – Block deleting in-use categories; require reassignment or merge.

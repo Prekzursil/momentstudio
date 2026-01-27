@@ -22,6 +22,7 @@ import { CatalogService, Category } from '../../../core/catalog.service';
 import { MarkdownService } from '../../../core/markdown.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import {
+  AdminCategory,
   AdminDeletedProductImage,
   AdminProductAuditEntry,
   AdminProductImageOptimizationStats,
@@ -437,6 +438,49 @@ type PriceHistoryChart = {
       </app-modal>
 
       <app-modal
+        [open]="createCategoryOpen()"
+        [title]="'adminUi.categories.add' | translate"
+        [subtitle]="'adminUi.categories.slugAutoHint' | translate"
+        [closeLabel]="'adminUi.actions.cancel' | translate"
+        [cancelLabel]="'adminUi.actions.cancel' | translate"
+        [confirmLabel]="createCategoryBusy() ? ('adminUi.actions.loading' | translate) : ('adminUi.categories.add' | translate)"
+        [confirmDisabled]="createCategoryBusy() || !createCategoryName.trim()"
+        (closed)="closeCreateCategory()"
+        (confirm)="confirmCreateCategory()"
+      >
+        <div class="grid gap-3">
+          <app-input
+            [label]="'adminUi.products.table.name' | translate"
+            [(value)]="createCategoryName"
+            [disabled]="createCategoryBusy()"
+          ></app-input>
+
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.categories.parent' | translate }}
+            <select
+              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              [(ngModel)]="createCategoryParentId"
+              [disabled]="createCategoryBusy()"
+            >
+              <option value="">{{ 'adminUi.categories.parentNone' | translate }}</option>
+              <option *ngFor="let cat of categories()" [value]="cat.id">{{ cat.name }}</option>
+            </select>
+          </label>
+
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            {{ 'adminUi.categories.wizard.desc.translations' | translate }}
+          </p>
+
+          <div
+            *ngIf="createCategoryError()"
+            class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-2 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+          >
+            {{ createCategoryError() }}
+          </div>
+        </div>
+      </app-modal>
+
+      <app-modal
         [open]="deleteImageConfirmOpen()"
         [title]="'adminUi.products.confirmDeleteImage.title' | translate"
         [subtitle]="'adminUi.products.confirmDeleteImage.subtitle' | translate"
@@ -558,8 +602,17 @@ type PriceHistoryChart = {
             </select>
           </label>
 
-          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            {{ 'adminUi.products.table.category' | translate }}
+          <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            <div class="flex items-center justify-between gap-2">
+              <span>{{ 'adminUi.products.table.category' | translate }}</span>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.categories.add' | translate"
+                (action)="openCreateCategory('filters')"
+                [disabled]="loading()"
+              ></app-button>
+            </div>
             <select
               class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               [(ngModel)]="categorySlug"
@@ -567,7 +620,7 @@ type PriceHistoryChart = {
               <option value="">{{ 'adminUi.products.allCategories' | translate }}</option>
               <option *ngFor="let cat of categories()" [value]="cat.slug">{{ cat.name }}</option>
             </select>
-          </label>
+          </div>
 
           <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
             {{ 'adminUi.products.table.translations' | translate }}
@@ -1364,8 +1417,17 @@ type PriceHistoryChart = {
               </ng-container>
             </div>
 
-	          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	            {{ 'adminUi.products.table.category' | translate }}
+	          <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              <div class="flex items-center justify-between gap-2">
+                <span>{{ 'adminUi.products.table.category' | translate }}</span>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.categories.add' | translate"
+                  (action)="openCreateCategory('product_form')"
+                  [disabled]="createCategoryOpen()"
+                ></app-button>
+              </div>
 	            <select
 	              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               [(ngModel)]="form.category_id"
@@ -1373,7 +1435,7 @@ type PriceHistoryChart = {
               <option value="" disabled>{{ 'adminUi.products.selectCategory' | translate }}</option>
               <option *ngFor="let cat of adminCategories()" [value]="cat.id">{{ cat.name }}</option>
             </select>
-          </label>
+          </div>
 
           <app-input
             [label]="'adminUi.products.table.price' | translate"
@@ -2872,6 +2934,12 @@ export class AdminProductsComponent implements OnInit {
   imageMetaExists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
   imageStats: AdminProductImageOptimizationStats | null = null;
   adminCategories = signal<Array<{ id: string; name: string }>>([]);
+  createCategoryOpen = signal(false);
+  createCategoryBusy = signal(false);
+  createCategoryError = signal<string | null>(null);
+  createCategoryName = '';
+  createCategoryParentId = '';
+  private createCategoryContext: 'filters' | 'product_form' = 'product_form';
 
   form: ProductForm = this.blankForm();
   private loadedTagSlugs: string[] = [];
@@ -3318,6 +3386,82 @@ export class AdminProductsComponent implements OnInit {
       },
       error: () => this.toast.error(this.translate.instant('adminUi.products.bulk.status.undoError'))
     });
+  }
+
+  openCreateCategory(context: 'filters' | 'product_form'): void {
+    this.createCategoryContext = context;
+    this.createCategoryName = '';
+    this.createCategoryParentId = '';
+    this.createCategoryError.set(null);
+    this.createCategoryBusy.set(false);
+    this.createCategoryOpen.set(true);
+  }
+
+  closeCreateCategory(): void {
+    this.createCategoryOpen.set(false);
+    this.createCategoryBusy.set(false);
+    this.createCategoryError.set(null);
+  }
+
+  confirmCreateCategory(): void {
+    const name = (this.createCategoryName || '').trim();
+    if (!name || this.createCategoryBusy()) return;
+    const parentId = (this.createCategoryParentId || '').trim();
+    const parent_id = parentId ? parentId : null;
+
+    this.createCategoryBusy.set(true);
+    this.createCategoryError.set(null);
+    this.admin.createCategory({ name, parent_id }).subscribe({
+      next: (cat) => {
+        this.createCategoryBusy.set(false);
+        this.createCategoryOpen.set(false);
+        this.toast.success(this.t('adminUi.categories.success.add'));
+
+        this.upsertCategoryLists(cat);
+        if (this.createCategoryContext === 'product_form') {
+          this.form.category_id = cat.id;
+        } else {
+          this.categorySlug = cat.slug;
+        }
+      },
+      error: (err) => {
+        this.createCategoryBusy.set(false);
+        this.createCategoryError.set(err?.error?.detail || this.t('adminUi.categories.errors.add'));
+      }
+    });
+  }
+
+  private upsertCategoryLists(cat: AdminCategory): void {
+    const currentCategories = this.categories();
+    const nextCategory: Category = {
+      id: cat.id,
+      slug: cat.slug,
+      name: cat.name,
+      parent_id: cat.parent_id ?? null,
+      sort_order: cat.sort_order ?? undefined,
+      thumbnail_url: cat.thumbnail_url ?? null,
+      banner_url: cat.banner_url ?? null,
+      is_visible: cat.is_visible
+    };
+    const nextCategories = [...currentCategories];
+    const existingIdx = nextCategories.findIndex((c) => c.id === nextCategory.id);
+    if (existingIdx >= 0) {
+      nextCategories[existingIdx] = { ...nextCategories[existingIdx], ...nextCategory };
+    } else {
+      nextCategories.push(nextCategory);
+    }
+    this.categories.set(nextCategories);
+
+    const currentAdminCategories = this.adminCategories();
+    const nextAdminCategories = [...currentAdminCategories];
+    const existingAdminIdx = nextAdminCategories.findIndex((c) => c.id === cat.id);
+    const adminItem = { id: cat.id, name: cat.name };
+    if (existingAdminIdx >= 0) {
+      nextAdminCategories[existingAdminIdx] = adminItem;
+    } else {
+      nextAdminCategories.push(adminItem);
+    }
+    this.adminCategories.set(nextAdminCategories);
   }
 
   quickSetStatus(product: AdminProductListItem, nextStatus: ProductForm['status']): void {
