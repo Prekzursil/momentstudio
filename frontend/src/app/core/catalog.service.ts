@@ -48,6 +48,9 @@ export interface Product {
   sale_type?: 'percent' | 'amount' | null;
   sale_value?: number | null;
   currency: string;
+  status?: 'draft' | 'published' | 'archived' | string;
+  is_active?: boolean;
+  is_featured?: boolean;
   stock_quantity?: number | null;
   allow_backorder?: boolean | null;
   rating_average?: number;

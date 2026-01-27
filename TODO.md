@@ -383,8 +383,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Storefront Categories: hide/show – Toggle category visibility (hide from storefront) with a clear “hidden” badge.
 - [x] Storefront Categories: merge shortcut – “Merge into…” action surfaced from the category page (server-side preview/confirm).
 - [x] Storefront Categories: safe delete – Delete category from storefront only if unused; otherwise prompt reassignment/merge.
-- [ ] Storefront Products: inline edit badges – Show small “Edit” chips on product cards for admins (price/stock/status).
-- [ ] Storefront Products: quick publish – One-click publish/unpublish/archive from product card or product detail (admin-only).
+- [x] Storefront Products: inline edit badges – Show small “Edit” chips on product cards for admins (price/stock/status).
+- [x] Storefront Products: quick publish – One-click publish/unpublish/archive from product card or product detail (admin-only).
 - [ ] Storefront Products: quick stock/price – Inline stock + price editing on the Shop grid for admins (spreadsheet-lite).
 - [ ] Storefront Products: bulk select – Multi-select products on Shop page and apply bulk actions (status/category/feature).
 - [ ] Storefront Products: drag reorder (category) – Custom sort order per category with drag-and-drop on the category page.

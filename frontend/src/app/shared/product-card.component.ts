@@ -11,6 +11,7 @@ import { AuthService } from '../core/auth.service';
 import { ToastService } from '../core/toast.service';
 import { Router } from '@angular/router';
 import { StorefrontAdminModeService } from '../core/storefront-admin-mode.service';
+import { AdminService } from '../core/admin.service';
 
 @Component({
   selector: 'app-product-card',
@@ -18,22 +19,20 @@ import { StorefrontAdminModeService } from '../core/storefront-admin-mode.servic
   imports: [CommonModule, RouterLink, NgOptimizedImage, LocalizedCurrencyPipe, ButtonComponent, TranslateModule, ImgFallbackDirective],
   template: `
     <article class="group grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm hover:-translate-y-1 hover:shadow-md transition dark:bg-slate-900 dark:border-slate-800 dark:shadow-none">
-      <a
-        [routerLink]="['/products', product.slug]"
-        class="block overflow-hidden rounded-xl bg-slate-50 relative dark:bg-slate-800"
-        (click)="rememberShopReturnContext($event)"
-      >
-        <img
-          [ngSrc]="primaryImage"
-          [alt]="product.name"
-          class="aspect-square w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-          width="640"
-          height="640"
-          loading="lazy"
-          decoding="async"
-          sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw"
-          [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
-        />
+      <div class="block overflow-hidden rounded-xl bg-slate-50 relative dark:bg-slate-800">
+        <a [routerLink]="['/products', product.slug]" class="block" (click)="rememberShopReturnContext($event)">
+          <img
+            [ngSrc]="primaryImage"
+            [alt]="product.name"
+            class="aspect-square w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            width="640"
+            height="640"
+            loading="lazy"
+            decoding="async"
+            sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw"
+            [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
+          />
+        </a>
         <button
           type="button"
           class="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white/90 text-slate-700 shadow-sm transition hover:bg-white dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
@@ -57,15 +56,26 @@ import { StorefrontAdminModeService } from '../core/storefront-admin-mode.servic
         >
           {{ badge }}
         </span>
-        <button
-          *ngIf="showStorefrontEdit()"
-          type="button"
-          class="absolute left-3 bottom-3 rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm transition hover:bg-white dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
-          (click)="openAdminEdit($event)"
-        >
-          {{ 'adminUi.common.edit' | translate }}
-        </button>
-      </a>
+	        <button
+	          *ngIf="showStorefrontEdit()"
+	          type="button"
+	          class="absolute left-3 bottom-3 rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm transition hover:bg-white dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
+	          (click)="openAdminEdit($event)"
+	        >
+	          {{ 'adminUi.common.edit' | translate }}
+	        </button>
+	        <select
+	          *ngIf="showStorefrontEdit()"
+	          class="absolute right-3 bottom-3 h-8 rounded-full border border-slate-200 bg-white/90 px-3 text-xs font-semibold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
+	          [disabled]="statusSaving"
+	          [value]="product.status ?? 'published'"
+	          (change)="onStatusChange($event)"
+	        >
+	          <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+	          <option value="published">{{ 'adminUi.status.published' | translate }}</option>
+	          <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
+	        </select>
+	      </div>
       <div class="grid gap-1">
         <div class="flex items-center justify-between gap-2">
           <a
@@ -115,13 +125,15 @@ export class ProductCardComponent {
   @Input() rememberShopReturn = false;
   @Input() showQuickView = false;
   @Output() quickView = new EventEmitter<string>();
+  statusSaving = false;
   constructor(
     private translate: TranslateService,
     private wishlist: WishlistService,
     private auth: AuthService,
     private toast: ToastService,
     private router: Router,
-    private storefrontAdminMode: StorefrontAdminModeService
+    private storefrontAdminMode: StorefrontAdminModeService,
+    private admin: AdminService
   ) {
     this.wishlist.ensureLoaded();
   }
@@ -232,6 +244,42 @@ export class ProductCardComponent {
     const slug = (this.product?.slug || '').trim();
     if (!slug) return;
     void this.router.navigate(['/admin/products'], { state: { editProductSlug: slug } });
+  }
+
+  onStatusChange(event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!this.showStorefrontEdit()) return;
+    const select = event.target as HTMLSelectElement | null;
+    const desired = (select?.value || '').trim();
+    if (!desired) return;
+    const current = String(this.product?.status || '').trim() || 'published';
+    if (desired === current) return;
+    if (this.statusSaving) {
+      if (select) select.value = current;
+      return;
+    }
+    const slug = (this.product?.slug || '').trim();
+    if (!slug) return;
+
+    this.statusSaving = true;
+    this.admin.updateProduct(slug, { status: desired }).subscribe({
+      next: (updated) => {
+        this.statusSaving = false;
+        if (updated?.status) {
+          this.product.status = updated.status;
+          if (select) select.value = updated.status;
+        } else {
+          this.product.status = desired;
+        }
+        this.toast.success(this.translate.instant('adminUi.products.inline.success'));
+      },
+      error: () => {
+        this.statusSaving = false;
+        if (select) select.value = current;
+        this.toast.error(this.translate.instant('adminUi.products.inline.errors.save'));
+      }
+    });
   }
 
   openQuickView(): void {
