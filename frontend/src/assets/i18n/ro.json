@@ -3202,6 +3202,7 @@
           "label": "Categorie",
           "placeholder": "Selectează categoria",
           "apply": "Aplică categoria",
+          "addAndApply": "Adaugă și aplică categoria",
           "valueRequired": "Selectează o categorie."
         },
         "schedule": {

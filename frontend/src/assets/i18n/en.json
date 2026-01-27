@@ -3202,6 +3202,7 @@
           "label": "Category",
           "placeholder": "Select category",
           "apply": "Apply category",
+          "addAndApply": "Add & apply category",
           "valueRequired": "Select a category."
         },
         "schedule": {

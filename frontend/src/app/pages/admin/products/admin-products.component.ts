@@ -969,12 +969,21 @@ type PriceHistoryChart = {
                 </select>
               </label>
 
-              <app-button
-                size="sm"
-                [label]="'adminUi.products.bulk.category.apply' | translate"
-                (action)="applyCategoryToSelected()"
-                [disabled]="bulkBusy() || inlineBusy()"
-              ></app-button>
+              <div class="flex flex-wrap items-center justify-end gap-2">
+                <app-button
+                  size="sm"
+                  [label]="'adminUi.products.bulk.category.apply' | translate"
+                  (action)="applyCategoryToSelected()"
+                  [disabled]="bulkBusy() || inlineBusy()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.products.bulk.category.addAndApply' | translate"
+                  (action)="openCreateCategoryFromBulkAssign()"
+                  [disabled]="bulkBusy() || inlineBusy()"
+                ></app-button>
+              </div>
             </div>
 
             <div class="h-px bg-slate-200 dark:bg-slate-800/70"></div>
@@ -3144,7 +3153,7 @@ export class AdminProductsComponent implements OnInit {
   createCategoryError = signal<string | null>(null);
   createCategoryName = '';
   createCategoryParentId = '';
-  private createCategoryContext: 'filters' | 'product_form' | 'manager' = 'product_form';
+  private createCategoryContext: 'filters' | 'product_form' | 'manager' | 'bulk_assign' = 'product_form';
   categoryManagerOpen = signal(false);
   categoryManagerSlug = '';
   categoryManagerParentId = '';
@@ -3612,7 +3621,7 @@ export class AdminProductsComponent implements OnInit {
     });
   }
 
-  openCreateCategory(context: 'filters' | 'product_form' | 'manager'): void {
+  openCreateCategory(context: 'filters' | 'product_form' | 'manager' | 'bulk_assign'): void {
     this.createCategoryContext = context;
     this.createCategoryName = '';
     this.createCategoryParentId = '';
@@ -3646,6 +3655,9 @@ export class AdminProductsComponent implements OnInit {
           this.form.category_id = cat.id;
         } else if (this.createCategoryContext === 'filters') {
           this.categorySlug = cat.slug;
+        } else if (this.createCategoryContext === 'bulk_assign') {
+          this.bulkCategoryId = cat.id;
+          this.applyCategoryToSelected();
         }
       },
       error: (err) => {
@@ -3710,6 +3722,10 @@ export class AdminProductsComponent implements OnInit {
   openCreateCategoryFromManager(): void {
     this.closeCategoryManager();
     this.openCreateCategory('manager');
+  }
+
+  openCreateCategoryFromBulkAssign(): void {
+    this.openCreateCategory('bulk_assign');
   }
 
   onCategoryManagerSelect(slug: string): void {
