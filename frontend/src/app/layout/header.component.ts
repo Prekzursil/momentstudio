@@ -310,6 +310,7 @@ import { MaintenanceBannerPublic, OpsService } from '../core/ops.service';
           <a routerLink="/shop" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.shop' | translate }}</a>
           <a routerLink="/about" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.about' | translate }}</a>
           <a routerLink="/contact" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.contact' | translate }}</a>
+          <a routerLink="/pages/terms" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.terms' | translate }}</a>
           <a
             *ngIf="isStaff()"
             routerLink="/admin"
@@ -392,7 +393,8 @@ export class HeaderComponent implements OnDestroy {
       { label: 'nav.blog', path: '/blog' },
       { label: 'nav.shop', path: '/shop' },
       { label: 'nav.about', path: '/about' },
-      { label: 'nav.contact', path: '/contact' }
+      { label: 'nav.contact', path: '/contact' },
+      { label: 'nav.terms', path: '/pages/terms' }
     ];
     if (authenticated) {
       links.push({ label: 'nav.account', path: '/account' });
