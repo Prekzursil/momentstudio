@@ -2632,6 +2632,18 @@
         "pinOrderHint": "Articolele fixate apar primele în /blog.",
         "body": "Conținut"
       },
+      "cover": {
+        "title": "Imagine copertă",
+        "hint": "Dacă e lăsat gol, prima imagine încărcată va fi folosită ca imagine de copertă.",
+        "choose": "Alege din încărcări",
+        "upload": "Încarcă copertă",
+        "clear": "Șterge coperta setată",
+        "editFocal": "Editează punctul de focalizare",
+        "focalLabel": "Focal: {{x}}, {{y}}",
+        "previewDesktop": "Previzualizare desktop",
+        "previewMobile": "Previzualizare mobil",
+        "libraryTitle": "Imagini copertă"
+      },
       "create": {
         "title": "Creează articol de blog",
         "addTranslation": "Adaugă traducere opțională",
@@ -2765,6 +2777,33 @@
           "hide": "Nu am putut ascunde comentariul",
           "delete": "Nu am putut șterge comentariul"
         }
+      },
+      "bulk": {
+        "selectAll": "Selectează tot",
+        "selected": "{{count}} selectate",
+        "clear": "Golește selecția",
+        "actionLabel": "Acțiune în masă",
+        "actionPublish": "Publică acum",
+        "actionUnpublish": "Anulează publicarea (draft)",
+        "actionSchedule": "Programează publicare/anulare",
+        "actionTagsAdd": "Adaugă etichete",
+        "actionTagsRemove": "Elimină etichete",
+        "publishAt": "Publică la",
+        "unpublishAt": "Ascunde la (opțional)",
+        "tagsLabel": "Etichete",
+        "tagsPlaceholder": "ex. ceramică, studio",
+        "apply": "Aplică",
+        "previewEmpty": "Selectează articole și alege o acțiune pentru a vedea previzualizarea.",
+        "previewPublish": "Va publica {{count}} articole acum.",
+        "previewUnpublish": "Va anula publicarea pentru {{count}} articole.",
+        "previewSchedule": "Va programa {{count}} articole: publică {{publish}}, ascunde {{unpublish}}.",
+        "previewTagsAdd": "Va adăuga etichete la {{count}} articole: {{tags}}.",
+        "previewTagsRemove": "Va elimina etichete de la {{count}} articole: {{tags}}.",
+        "invalidSchedule": "Data de ascundere trebuie să fie după data de publicare.",
+        "noChanges": "Nu există modificări de aplicat.",
+        "loadError": "Nu am putut încărca unele articole pentru actualizarea în masă.",
+        "success": "Actualizate {{count}} articole.",
+        "errors": "{{count}} articole nu au putut fi actualizate."
       },
       "success": {
         "created": "Articol creat",

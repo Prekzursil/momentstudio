@@ -253,6 +253,7 @@ hljs.registerLanguage('typescript', typescript);
                 [src]="post()!.cover_image_url"
                 [alt]="post()!.title"
                 class="w-full aspect-[16/9] rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+                [style.object-position]="focalPosition(post()!.cover_focal_x, post()!.cover_focal_y)"
                 loading="lazy"
               />
               <div class="markdown blog-markdown text-slate-700 dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
@@ -344,6 +345,7 @@ hljs.registerLanguage('typescript', typescript);
                       [src]="related.cover_image_url"
                       [alt]="related.title"
                       class="w-full aspect-[16/9] object-cover"
+                      [style.object-position]="focalPosition(related.cover_focal_x, related.cover_focal_y)"
                       loading="lazy"
                       decoding="async"
                     />
@@ -1088,6 +1090,12 @@ export class BlogPostComponent implements OnInit, OnDestroy {
 
   canEditBlog(): boolean {
     return this.storefrontAdminMode.enabled();
+  }
+
+  focalPosition(focalX?: number | null, focalY?: number | null): string {
+    const x = Math.max(0, Math.min(100, Math.round(Number(focalX ?? 50))));
+    const y = Math.max(0, Math.min(100, Math.round(Number(focalY ?? 50))));
+    return `${x}% ${y}%`;
   }
 
   activeLang(): 'en' | 'ro' {

@@ -398,10 +398,14 @@ async def get_post_neighbors(
 
 def to_list_item(block: ContentBlock, *, lang: str | None = None) -> dict:
     meta = getattr(block, "meta", None) or {}
+    images = sorted(getattr(block, "images", []) or [], key=lambda img: img.sort_order)
     cover = _meta_cover_image_url(meta)
-    if not cover and getattr(block, "images", None):
-        first = sorted(block.images, key=lambda img: img.sort_order)[0] if block.images else None
-        cover = first.url if first else None
+    cover_image = None
+    if cover:
+        cover_image = next((img for img in images if img.url == cover), None)
+    elif images:
+        cover_image = images[0]
+        cover = cover_image.url
 
     override_minutes = _coerce_positive_int(meta.get("reading_time_minutes") or meta.get("reading_time"))
     reading_time_minutes = override_minutes or _compute_reading_time_minutes(block.body_markdown)
@@ -415,6 +419,8 @@ def to_list_item(block: ContentBlock, *, lang: str | None = None) -> dict:
         "excerpt": excerpt,
         "published_at": block.published_at,
         "cover_image_url": cover,
+        "cover_focal_x": getattr(cover_image, "focal_x", None) if cover_image else None,
+        "cover_focal_y": getattr(cover_image, "focal_y", None) if cover_image else None,
         "tags": _normalize_tags(meta.get("tags")),
         "series": series.strip() if isinstance(series, str) and series.strip() else None,
         "author_name": author_name,
@@ -426,6 +432,7 @@ def to_read(block: ContentBlock, *, lang: str | None = None) -> dict:
     images = sorted(getattr(block, "images", []) or [], key=lambda img: img.sort_order)
     meta = getattr(block, "meta", None) or {}
     cover = _meta_cover_image_url(meta) or (images[0].url if images else None)
+    cover_image = next((img for img in images if img.url == cover), None) if cover else None
     override_minutes = _coerce_positive_int(meta.get("reading_time_minutes") or meta.get("reading_time"))
     reading_time_minutes = override_minutes or _compute_reading_time_minutes(block.body_markdown)
     summary = _meta_summary(meta, lang=lang, base_lang=getattr(block, "lang", None))
@@ -443,6 +450,8 @@ def to_read(block: ContentBlock, *, lang: str | None = None) -> dict:
         "meta": block.meta,
         "summary": summary,
         "cover_image_url": cover,
+        "cover_focal_x": getattr(cover_image, "focal_x", None) if cover_image else None,
+        "cover_focal_y": getattr(cover_image, "focal_y", None) if cover_image else None,
         "tags": _normalize_tags(meta.get("tags")),
         "series": series.strip() if isinstance(series, str) and series.strip() else None,
         "author_name": author_name,

@@ -457,9 +457,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Storefront admin quick edit: edit buttons – Show “Edit” on blog cards/posts for admins (links to admin editor).
 - [x] Storefront admin quick edit: publish toggle – Allow publish/unpublish/schedule from the blog page in admin mode.
 - [x] Storefront admin quick edit: inline meta – Quick edit title/summary/tags from the post page (drawer/modal).
-- [ ] Admin blog list: bulk actions – Bulk publish/unpublish, tag add/remove, and schedule changes with preview.
-- [ ] Admin editor: cover image workflow – Upload/select cover image with crop + focal point + mobile preview.
-- [ ] Admin editor: drag-drop images – Drag-and-drop images into the editor (auto-upload + insert markdown/WYSIWYG block).
+- [x] Admin blog list: bulk actions – Bulk publish/unpublish, tag add/remove, and schedule changes with preview.
+- [x] Admin editor: cover image workflow – Upload/select cover image with crop + focal point + mobile preview.
+- [x] Admin editor: drag-drop images – Drag-and-drop images into the editor (auto-upload + insert markdown/WYSIWYG block).
 - [ ] Admin editor: accessibility checks – Warn on missing alt text/captions and offer quick fixes before publish.
 - [ ] Admin editor: autosave + recovery – Autosave drafts and offer “restore last autosave” after crashes/refresh.
 - [ ] Admin editor: writing aids – Word count, reading-time recalculation, and headings outline sidebar.

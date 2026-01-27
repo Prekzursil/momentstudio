@@ -15,6 +15,8 @@ export interface BlogPostListItem {
   excerpt: string;
   published_at?: string | null;
   cover_image_url?: string | null;
+  cover_focal_x?: number | null;
+  cover_focal_y?: number | null;
   tags: string[];
   series?: string | null;
   author_name?: string | null;
@@ -55,6 +57,8 @@ export interface BlogPost {
   meta?: Record<string, unknown> | null;
   summary?: string | null;
   cover_image_url?: string | null;
+  cover_focal_x?: number | null;
+  cover_focal_y?: number | null;
   tags?: string[];
   series?: string | null;
   author?: BlogCommentAuthor | null;

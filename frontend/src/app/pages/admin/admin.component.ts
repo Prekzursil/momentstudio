@@ -37,7 +37,8 @@ import { FxAdminService, FxAdminStatus, FxOverrideAuditEntry } from '../../core/
 import { TaxGroupRead, TaxesAdminService } from '../../core/taxes-admin.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { combineLatest, firstValueFrom, Subscription } from 'rxjs';
+import { combineLatest, firstValueFrom, forkJoin, of, Subscription } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 import { MarkdownService } from '../../core/markdown.service';
 import { AuthService } from '../../core/auth.service';
 import { appConfig } from '../../core/app-config';
@@ -3409,14 +3410,100 @@ class CmsDraftManager<T> {
               </div>
             </div>
 
+            <div class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/40">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-3">
+                  <label class="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    <input
+                      type="checkbox"
+                      [checked]="areAllBlogSelected()"
+                      [disabled]="blogPosts().length === 0"
+                      (change)="toggleSelectAllBlogs($event)"
+                    />
+                    {{ 'adminUi.blog.bulk.selectAll' | translate }}
+                  </label>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.blog.bulk.selected' | translate : { count: blogBulkSelection.size } }}
+                  </span>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.blog.bulk.clear' | translate"
+                    (action)="clearBlogBulkSelection()"
+                    [disabled]="blogBulkSelection.size === 0"
+                  ></app-button>
+                </div>
+                <div class="text-xs text-rose-600 dark:text-rose-300" *ngIf="blogBulkError">
+                  {{ blogBulkError }}
+                </div>
+              </div>
+
+              <div class="grid gap-3 md:grid-cols-4">
+                <label class="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.blog.bulk.actionLabel' | translate }}
+                  <select
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogBulkAction"
+                  >
+                    <option value="publish">{{ 'adminUi.blog.bulk.actionPublish' | translate }}</option>
+                    <option value="unpublish">{{ 'adminUi.blog.bulk.actionUnpublish' | translate }}</option>
+                    <option value="schedule">{{ 'adminUi.blog.bulk.actionSchedule' | translate }}</option>
+                    <option value="tags_add">{{ 'adminUi.blog.bulk.actionTagsAdd' | translate }}</option>
+                    <option value="tags_remove">{{ 'adminUi.blog.bulk.actionTagsRemove' | translate }}</option>
+                  </select>
+                </label>
+
+                <label *ngIf="blogBulkAction === 'schedule'" class="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.blog.bulk.publishAt' | translate }}
+                  <input
+                    type="datetime-local"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogBulkPublishAt"
+                  />
+                </label>
+
+                <label *ngIf="blogBulkAction === 'schedule'" class="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.blog.bulk.unpublishAt' | translate }}
+                  <input
+                    type="datetime-local"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogBulkUnpublishAt"
+                  />
+                </label>
+
+                <label *ngIf="blogBulkAction === 'tags_add' || blogBulkAction === 'tags_remove'" class="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300 md:col-span-2">
+                  {{ 'adminUi.blog.bulk.tagsLabel' | translate }}
+                  <input
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [placeholder]="'adminUi.blog.bulk.tagsPlaceholder' | translate"
+                    [(ngModel)]="blogBulkTags"
+                  />
+                </label>
+              </div>
+
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="text-xs text-slate-500 dark:text-slate-400">{{ blogBulkPreview() }}</p>
+                <app-button
+                  size="sm"
+                  [label]="blogBulkSaving ? ('adminUi.common.saving' | translate) : ('adminUi.blog.bulk.apply' | translate)"
+                  (action)="applyBlogBulkAction()"
+                  [disabled]="!canApplyBlogBulk() || blogBulkSaving"
+                ></app-button>
+              </div>
+            </div>
+
             <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
               <div *ngIf="blogPosts().length === 0" class="text-sm text-slate-500 dark:text-slate-400">
                 {{ 'adminUi.blog.empty' | translate }}
               </div>
               <div
                 *ngFor="let post of blogPosts()"
-                class="flex items-center justify-between rounded-lg border border-slate-200 p-3 dark:border-slate-700"
+                class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700"
+                [ngClass]="isBlogSelected(post.key) ? 'bg-indigo-50/60 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-900' : ''"
               >
+                <label class="flex items-center gap-2">
+                  <input type="checkbox" [checked]="isBlogSelected(post.key)" (change)="toggleBlogSelection(post.key, $event)" />
+                </label>
                 <div>
                   <p class="font-semibold text-slate-900 dark:text-slate-50">{{ post.title }}</p>
                   <p class="text-xs text-slate-500 dark:text-slate-400">
@@ -3669,22 +3756,120 @@ class CmsDraftManager<T> {
 	                  [(value)]="blogForm.tags"
 	                  [placeholder]="'adminUi.blog.fields.tagsPlaceholder' | translate"
 	                ></app-input>
-	                <app-input
-	                  [label]="'adminUi.blog.fields.seriesOptional' | translate"
-	                  [(value)]="blogForm.series"
-	                  [placeholder]="'adminUi.blog.fields.seriesPlaceholder' | translate"
-	                  [hint]="'adminUi.blog.fields.seriesHint' | translate"
-	                  [disabled]="blogEditLang !== blogBaseLang"
-	                ></app-input>
-	                <app-input
-	                  [label]="'adminUi.blog.fields.coverImageUrlOptional' | translate"
-	                  [(value)]="blogForm.cover_image_url"
-	                  [placeholder]="'adminUi.blog.fields.coverImagePlaceholder' | translate"
-	                ></app-input>
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.blog.fields.readingTimeOptional' | translate }}
-                  <input
-                    type="number"
+		                <app-input
+		                  [label]="'adminUi.blog.fields.seriesOptional' | translate"
+		                  [(value)]="blogForm.series"
+		                  [placeholder]="'adminUi.blog.fields.seriesPlaceholder' | translate"
+		                  [hint]="'adminUi.blog.fields.seriesHint' | translate"
+		                  [disabled]="blogEditLang !== blogBaseLang"
+		                ></app-input>
+                    <div class="grid gap-2 md:col-span-2">
+                      <div class="flex flex-wrap items-center justify-between gap-2">
+                        <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ 'adminUi.blog.cover.title' | translate }}</p>
+                        <div class="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-600"
+                            [disabled]="blogEditLang !== blogBaseLang"
+                            (click)="blogCoverUploadInput.click()"
+                          >
+                            {{ 'adminUi.blog.cover.upload' | translate }}
+                          </button>
+                          <input #blogCoverUploadInput type="file" accept="image/*" class="hidden" (change)="uploadBlogCoverImage($event)" />
+                          <button
+                            type="button"
+                            class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-600"
+                            [disabled]="blogEditLang !== blogBaseLang"
+                            (click)="showBlogCoverLibrary = !showBlogCoverLibrary"
+                          >
+                            {{ showBlogCoverLibrary ? ('adminUi.common.close' | translate) : ('adminUi.blog.cover.choose' | translate) }}
+                          </button>
+                          <button
+                            type="button"
+                            class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-600"
+                            [disabled]="blogEditLang !== blogBaseLang || !blogForm.cover_image_url.trim()"
+                            (click)="clearBlogCoverOverride()"
+                          >
+                            {{ 'adminUi.blog.cover.clear' | translate }}
+                          </button>
+                        </div>
+                      </div>
+
+                      <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                        {{ 'adminUi.blog.fields.coverImageUrlOptional' | translate }}
+                        <input
+                          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          [(ngModel)]="blogForm.cover_image_url"
+                          [placeholder]="'adminUi.blog.fields.coverImagePlaceholder' | translate"
+                          [disabled]="blogEditLang !== blogBaseLang"
+                        />
+                        <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.blog.cover.hint' | translate }}</span>
+                      </label>
+
+                      <div *ngIf="blogCoverPreviewUrl() as coverUrl" class="grid gap-3 sm:grid-cols-2">
+                        <div class="grid gap-2">
+                          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                            {{ 'adminUi.blog.cover.previewDesktop' | translate }}
+                          </p>
+                          <div class="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800">
+                            <img
+                              [src]="coverUrl"
+                              [alt]="blogForm.title || 'cover'"
+                              class="w-full aspect-[16/9] object-cover"
+                              [style.object-position]="blogCoverPreviewFocalPosition()"
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          </div>
+                        </div>
+                        <div class="grid gap-2">
+                          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                            {{ 'adminUi.blog.cover.previewMobile' | translate }}
+                          </p>
+                          <div class="max-w-[280px] relative overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800">
+                            <img
+                              [src]="coverUrl"
+                              [alt]="blogForm.title || 'cover'"
+                              class="w-full aspect-[1/1] object-cover"
+                              [style.object-position]="blogCoverPreviewFocalPosition()"
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div *ngIf="blogCoverPreviewAsset() as coverAsset" class="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                        <span>{{ 'adminUi.blog.cover.focalLabel' | translate: { x: coverAsset.focal_x, y: coverAsset.focal_y } }}</span>
+                        <button
+                          type="button"
+                          class="text-xs text-slate-700 hover:underline disabled:opacity-60 dark:text-slate-200"
+                          [disabled]="blogEditLang !== blogBaseLang"
+                          (click)="editBlogCoverFocalPoint()"
+                        >
+                          {{ 'adminUi.blog.cover.editFocal' | translate }}
+                        </button>
+                      </div>
+
+                      <div
+                        *ngIf="showBlogCoverLibrary && selectedBlogKey"
+                        class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
+                      >
+                        <app-asset-library
+                          titleKey="adminUi.blog.cover.libraryTitle"
+                          [allowUpload]="false"
+                          [allowSelect]="true"
+                          [scopedKeys]="[selectedBlogKey]"
+                          [initialKey]="selectedBlogKey"
+                          [uploadKey]="selectedBlogKey"
+                          (selectAsset)="selectBlogCoverAsset($event)"
+                        ></app-asset-library>
+                      </div>
+                    </div>
+	                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                  {{ 'adminUi.blog.fields.readingTimeOptional' | translate }}
+	                  <input
+	                    type="number"
                     min="1"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="blogForm.reading_time_minutes"
@@ -3776,13 +3961,15 @@ class CmsDraftManager<T> {
                       />
                     </div>
 
-                    <app-rich-editor
-                      #blogEditor
-                      [(value)]="blogForm.body_markdown"
-                      [initialEditType]="'wysiwyg'"
-                      [height]="'520px'"
-                    ></app-rich-editor>
-                  </ng-container>
+	                    <div (dragover)="onBlogImageDragOver($event)" (drop)="onBlogImageDrop(blogEditor, $event)">
+	                      <app-rich-editor
+	                        #blogEditor
+	                        [(value)]="blogForm.body_markdown"
+	                        [initialEditType]="'wysiwyg'"
+	                        [height]="'520px'"
+	                      ></app-rich-editor>
+	                    </div>
+	                  </ng-container>
 
                   <ng-template #markdownBlogEditor>
                     <div class="flex flex-wrap items-center gap-2 text-xs">
@@ -3883,13 +4070,15 @@ class CmsDraftManager<T> {
                       class="grid gap-3"
                       [ngClass]="showBlogPreview && cmsPrefs.previewLayout() === 'split' ? 'lg:grid-cols-2' : ''"
                     >
-                      <textarea
-                        #blogBody
-                        rows="10"
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        [(ngModel)]="blogForm.body_markdown"
-                        (scroll)="syncSplitScroll(blogBody, blogPreview)"
-                      ></textarea>
+	                      <textarea
+	                        #blogBody
+	                        rows="10"
+	                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                        (dragover)="onBlogImageDragOver($event)"
+	                        (drop)="onBlogImageDrop(blogBody, $event)"
+	                        [(ngModel)]="blogForm.body_markdown"
+	                        (scroll)="syncSplitScroll(blogBody, blogPreview)"
+	                      ></textarea>
 
                       <div class="mx-auto w-full" [ngClass]="cmsPreviewMaxWidthClass()" [class.hidden]="!showBlogPreview">
                       <div
@@ -4623,7 +4812,15 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    pin_order: '1'
 	  };
   blogMeta: Record<string, any> = {};
-  blogImages: { id: string; url: string; alt_text?: string | null }[] = [];
+  blogImages: { id: string; url: string; alt_text?: string | null; sort_order: number; focal_x: number; focal_y: number }[] = [];
+  blogBulkSelection = new Set<string>();
+  blogBulkAction: 'publish' | 'unpublish' | 'schedule' | 'tags_add' | 'tags_remove' = 'publish';
+  blogBulkPublishAt = '';
+  blogBulkUnpublishAt = '';
+  blogBulkTags = '';
+  blogBulkSaving = false;
+  blogBulkError = '';
+  showBlogCoverLibrary = false;
   showBlogPreview = false;
   useRichBlogEditor = true;
   blogImageLayout: 'default' | 'wide' | 'left' | 'right' | 'gallery' = 'default';
@@ -5205,14 +5402,14 @@ export class AdminComponent implements OnInit, OnDestroy {
     }
 
     if (section === 'blog') {
-      this.admin.content().subscribe({ next: (c) => (this.contentBlocks = c), error: () => (this.contentBlocks = []) });
+      this.reloadContentBlocks();
       this.loadFlaggedComments();
       this.loading.set(false);
       return;
     }
 
     // settings
-    this.admin.content().subscribe({ next: (c) => (this.contentBlocks = c), error: () => (this.contentBlocks = []) });
+    this.reloadContentBlocks();
     this.admin.coupons().subscribe({ next: (c) => (this.coupons = c), error: () => (this.coupons = []) });
     this.admin.lowStock().subscribe({ next: (items) => (this.lowStock = items), error: () => (this.lowStock = []) });
     this.admin.audit().subscribe({
@@ -6148,6 +6345,144 @@ export class AdminComponent implements OnInit, OnDestroy {
     return this.contentBlocks.filter((c) => c.key.startsWith('blog.'));
   }
 
+  isBlogSelected(key: string): boolean {
+    return this.blogBulkSelection.has(key);
+  }
+
+  toggleBlogSelection(key: string, event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    if (target?.checked) {
+      this.blogBulkSelection.add(key);
+    } else {
+      this.blogBulkSelection.delete(key);
+    }
+    this.blogBulkError = '';
+  }
+
+  areAllBlogSelected(): boolean {
+    const posts = this.blogPosts();
+    if (!posts.length) return false;
+    return posts.every((post) => this.blogBulkSelection.has(post.key));
+  }
+
+  toggleSelectAllBlogs(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    if (!target) return;
+    if (target.checked) {
+      this.blogPosts().forEach((post) => this.blogBulkSelection.add(post.key));
+    } else {
+      this.blogBulkSelection.clear();
+    }
+    this.blogBulkError = '';
+  }
+
+  clearBlogBulkSelection(): void {
+    this.blogBulkSelection.clear();
+    this.blogBulkError = '';
+  }
+
+  canApplyBlogBulk(): boolean {
+    if (this.blogBulkSelection.size === 0) return false;
+    if (this.blogBulkAction === 'schedule') {
+      const publishIso = this.toIsoFromLocal(this.blogBulkPublishAt);
+      if (!publishIso) return false;
+      if (this.blogBulkUnpublishAt) {
+        const unpublishIso = this.toIsoFromLocal(this.blogBulkUnpublishAt);
+        if (!unpublishIso) return false;
+        if (new Date(unpublishIso).getTime() <= new Date(publishIso).getTime()) return false;
+      }
+    }
+    if (this.blogBulkAction === 'tags_add' || this.blogBulkAction === 'tags_remove') {
+      return this.parseTags(this.blogBulkTags).length > 0;
+    }
+    return true;
+  }
+
+  blogBulkPreview(): string {
+    const count = this.blogBulkSelection.size;
+    if (!count) return this.t('adminUi.blog.bulk.previewEmpty');
+    switch (this.blogBulkAction) {
+      case 'publish':
+        return this.t('adminUi.blog.bulk.previewPublish', { count });
+      case 'unpublish':
+        return this.t('adminUi.blog.bulk.previewUnpublish', { count });
+      case 'schedule': {
+        const publishIso = this.toIsoFromLocal(this.blogBulkPublishAt);
+        const publishLabel = publishIso ? new Date(publishIso).toLocaleString() : '—';
+        const unpublishIso = this.toIsoFromLocal(this.blogBulkUnpublishAt);
+        const unpublishLabel = unpublishIso ? new Date(unpublishIso).toLocaleString() : '—';
+        return this.t('adminUi.blog.bulk.previewSchedule', { count, publish: publishLabel, unpublish: unpublishLabel });
+      }
+      case 'tags_add':
+        return this.t('adminUi.blog.bulk.previewTagsAdd', { count, tags: this.parseTags(this.blogBulkTags).join(', ') });
+      case 'tags_remove':
+        return this.t('adminUi.blog.bulk.previewTagsRemove', { count, tags: this.parseTags(this.blogBulkTags).join(', ') });
+      default:
+        return this.t('adminUi.blog.bulk.previewEmpty');
+    }
+  }
+
+  applyBlogBulkAction(): void {
+    if (!this.canApplyBlogBulk()) return;
+    this.blogBulkSaving = true;
+    this.blogBulkError = '';
+    const keys = Array.from(this.blogBulkSelection);
+    const detailRequests = keys.map((key) =>
+      this.admin.getContent(key).pipe(
+        map((block) => ({ key, block })),
+        catchError(() => of({ key, block: null }))
+      )
+    );
+    forkJoin(detailRequests).subscribe({
+      next: (rows) => {
+        const updates = rows
+          .map(({ key, block }) => {
+            if (!block) return { key, update$: null };
+            this.rememberContentVersion(key, block);
+            const payload = this.buildBlogBulkPayload(block);
+            if (!payload) return { key, update$: null };
+            return {
+              key,
+              update$: this.admin.updateContentBlock(key, this.withExpectedVersion(key, payload)).pipe(
+                map((res) => ({ key, res })),
+                catchError((error) => of({ key, error }))
+              )
+            };
+          })
+          .filter((row) => row.update$ !== null) as Array<{ key: string; update$: any }>;
+
+        if (!updates.length) {
+          this.blogBulkSaving = false;
+          this.blogBulkError = this.t('adminUi.blog.bulk.noChanges');
+          return;
+        }
+
+        forkJoin(updates.map((row) => row.update$)).subscribe({
+          next: (results) => {
+            const failures = results.filter((r: any) => r?.error);
+            const successCount = results.length - failures.length;
+            if (successCount) {
+              this.toast.success(this.t('adminUi.blog.bulk.success', { count: successCount }));
+            }
+            if (failures.length) {
+              this.toast.error(this.t('adminUi.blog.bulk.errors', { count: failures.length }));
+            }
+            this.blogBulkSaving = false;
+            this.reloadContentBlocks();
+          },
+          error: () => {
+            this.blogBulkSaving = false;
+            this.blogBulkError = this.t('adminUi.blog.bulk.errors', { count: keys.length });
+          }
+        });
+      },
+      error: () => {
+        this.blogBulkSaving = false;
+        this.blogBulkError = this.t('adminUi.blog.bulk.loadError');
+      }
+    });
+  }
+
   extractBlogSlug(key: string): string {
     return key.startsWith('blog.') ? key.slice('blog.'.length) : key;
   }
@@ -6160,6 +6495,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    this.showBlogCreate = true;
 	    this.selectedBlogKey = null;
 	    this.blogImages = [];
+	    this.showBlogCoverLibrary = false;
 	    this.blogCreate = {
 	      baseLang: 'en',
 	      status: 'draft',
@@ -6187,6 +6523,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   closeBlogEditor(): void {
     this.selectedBlogKey = null;
     this.blogImages = [];
+    this.showBlogCoverLibrary = false;
     this.blogPreviewUrl = null;
     this.blogPreviewToken = null;
     this.blogPreviewExpiresAt = null;
@@ -6657,9 +6994,16 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.admin.uploadContentImage(this.selectedBlogKey, file).subscribe({
       next: (block) => {
         const images = (block.images || [])
-          .map((img) => ({ id: img.id, url: img.url, alt_text: img.alt_text, sort_order: img.sort_order ?? 0 }))
+          .map((img) => ({
+            id: img.id,
+            url: img.url,
+            alt_text: img.alt_text,
+            sort_order: img.sort_order ?? 0,
+            focal_x: img.focal_x ?? 50,
+            focal_y: img.focal_y ?? 50
+          }))
           .sort((a, b) => a.sort_order - b.sort_order);
-        this.blogImages = images.map((img) => ({ id: img.id, url: img.url, alt_text: img.alt_text }));
+        this.blogImages = images;
         this.toast.success(this.t('adminUi.blog.images.success.uploaded'));
         const inserted = images[images.length - 1];
         if (inserted?.url) {
@@ -6679,11 +7023,178 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
+  onBlogImageDragOver(event: DragEvent): void {
+    const transfer = event?.dataTransfer;
+    const types = Array.from(transfer?.types || []);
+    if (!types.includes('Files')) return;
+    event.preventDefault();
+    if (transfer) transfer.dropEffect = 'copy';
+  }
+
+  async onBlogImageDrop(target: HTMLTextAreaElement | RichEditorComponent, event: DragEvent): Promise<void> {
+    const transfer = event?.dataTransfer;
+    const files = Array.from(transfer?.files || []).filter((file) => file && file.type.startsWith('image/'));
+    if (!files.length) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!this.selectedBlogKey) return;
+    let insertedCount = 0;
+
+    for (const file of files) {
+      try {
+        const block = await firstValueFrom(this.admin.uploadContentImage(this.selectedBlogKey, file));
+        const images = (block.images || [])
+          .map((img) => ({
+            id: img.id,
+            url: img.url,
+            alt_text: img.alt_text,
+            sort_order: img.sort_order ?? 0,
+            focal_x: img.focal_x ?? 50,
+            focal_y: img.focal_y ?? 50
+          }))
+          .sort((a, b) => a.sort_order - b.sort_order);
+        this.blogImages = images;
+        const inserted = images[images.length - 1];
+        if (!inserted?.url) continue;
+
+        const alt = file.name.replace(/\.[^.]+$/, '').replace(/[\r\n]+/g, ' ').trim() || 'image';
+        const layoutToken = this.blogImageLayout === 'default' ? '' : this.blogImageLayout;
+        const snippet = layoutToken ? `![${alt}](${inserted.url} "${layoutToken}")` : `![${alt}](${inserted.url})`;
+        if (target instanceof HTMLTextAreaElement) {
+          this.insertAtCursor(target, snippet);
+        } else {
+          target.insertMarkdown(snippet);
+        }
+        insertedCount += 1;
+      } catch {
+        this.toast.error(this.t('adminUi.blog.images.errors.upload'));
+        return;
+      }
+    }
+
+    if (insertedCount) {
+      this.toast.success(this.t('adminUi.blog.images.success.uploaded'));
+      this.toast.info(this.t('adminUi.blog.images.success.insertedMarkdown'));
+    }
+  }
+
   insertBlogImageMarkdown(url: string, altText?: string | null): void {
     const alt = (altText || 'image').replace(/[\r\n]+/g, ' ').trim();
     const snippet = `\n\n![${alt}](${url})\n`;
     this.blogForm.body_markdown = (this.blogForm.body_markdown || '').trimEnd() + snippet;
     this.toast.info(this.t('adminUi.blog.images.success.insertedMarkdown'));
+  }
+
+  blogCoverPreviewUrl(): string | null {
+    const explicit = (this.blogForm.cover_image_url || '').trim();
+    if (explicit) return explicit;
+    const first = this.blogImages[0];
+    return first?.url ? String(first.url) : null;
+  }
+
+  blogCoverPreviewAsset():
+    | { id: string; url: string; sort_order: number; focal_x: number; focal_y: number; alt_text?: string | null }
+    | null {
+    const url = this.blogCoverPreviewUrl();
+    if (!url) return null;
+    return this.blogImages.find((img) => img.url === url) ?? null;
+  }
+
+  blogCoverPreviewFocalPosition(): string {
+    const img = this.blogCoverPreviewAsset();
+    const x = Math.max(0, Math.min(100, Math.round(Number(img?.focal_x ?? 50))));
+    const y = Math.max(0, Math.min(100, Math.round(Number(img?.focal_y ?? 50))));
+    return `${x}% ${y}%`;
+  }
+
+  clearBlogCoverOverride(): void {
+    this.blogForm.cover_image_url = '';
+  }
+
+  uploadBlogCoverImage(event: Event): void {
+    if (!this.selectedBlogKey) return;
+    if (this.blogEditLang !== this.blogBaseLang) return;
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    this.admin.uploadContentImage(this.selectedBlogKey, file).subscribe({
+      next: (block) => {
+        const images = (block.images || [])
+          .map((img) => ({
+            id: img.id,
+            url: img.url,
+            alt_text: img.alt_text,
+            sort_order: img.sort_order ?? 0,
+            focal_x: img.focal_x ?? 50,
+            focal_y: img.focal_y ?? 50
+          }))
+          .sort((a, b) => a.sort_order - b.sort_order);
+        this.blogImages = images;
+        const inserted = images[images.length - 1];
+        if (inserted?.url) {
+          this.blogForm.cover_image_url = inserted.url;
+        }
+        this.toast.success(this.t('adminUi.blog.images.success.uploaded'));
+        input.value = '';
+      },
+      error: () => this.toast.error(this.t('adminUi.blog.images.errors.upload'))
+    });
+  }
+
+  selectBlogCoverAsset(asset: ContentImageAssetRead): void {
+    const url = (asset?.url || '').trim();
+    if (!url) return;
+    if (this.blogEditLang !== this.blogBaseLang) return;
+    this.blogForm.cover_image_url = url;
+    const id = String(asset.id || '').trim();
+    if (!id) return;
+    const next = [...this.blogImages];
+    const idx = next.findIndex((img) => img.id === id);
+    const row = {
+      id,
+      url,
+      alt_text: asset.alt_text ?? null,
+      sort_order: Number.isFinite(asset.sort_order as any) ? Number(asset.sort_order) : 0,
+      focal_x: Number.isFinite(asset.focal_x as any) ? Number(asset.focal_x) : 50,
+      focal_y: Number.isFinite(asset.focal_y as any) ? Number(asset.focal_y) : 50
+    };
+    if (idx >= 0) next[idx] = { ...next[idx], ...row };
+    else next.push(row);
+    next.sort((a, b) => a.sort_order - b.sort_order);
+    this.blogImages = next;
+    this.showBlogCoverLibrary = false;
+  }
+
+  editBlogCoverFocalPoint(): void {
+    if (this.blogEditLang !== this.blogBaseLang) return;
+    const img = this.blogCoverPreviewAsset();
+    if (!img) return;
+    const entered = window.prompt(this.t('adminUi.site.assets.library.focalPrompt'), `${img.focal_x}, ${img.focal_y}`);
+    if (entered === null) return;
+    const parts = entered
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (parts.length < 2) {
+      this.toast.error(this.t('adminUi.site.assets.library.focalErrorsFormat'));
+      return;
+    }
+    const focalX = Math.max(0, Math.min(100, Math.round(Number(parts[0]))));
+    const focalY = Math.max(0, Math.min(100, Math.round(Number(parts[1]))));
+    if (!Number.isFinite(focalX) || !Number.isFinite(focalY)) {
+      this.toast.error(this.t('adminUi.site.assets.library.focalErrorsFormat'));
+      return;
+    }
+    this.admin.updateContentImageFocalPoint(img.id, focalX, focalY).subscribe({
+      next: (updated) => {
+        this.blogImages = this.blogImages.map((item) =>
+          item.id === img.id ? { ...item, focal_x: updated.focal_x, focal_y: updated.focal_y } : item
+        );
+        this.toast.success(this.t('adminUi.site.assets.library.focalSaved'));
+      },
+      error: () => this.toast.error(this.t('adminUi.site.assets.library.focalErrorsSave'))
+    });
   }
 
   private prefixBlogLines(textarea: HTMLTextAreaElement, prefix: string): void {
@@ -6728,6 +7239,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   private loadBlogEditor(key: string): void {
     this.selectedBlogKey = key;
     this.resetBlogForm();
+    this.showBlogCoverLibrary = false;
     this.blogPreviewUrl = null;
     this.blogPreviewExpiresAt = null;
     this.blogVersions = [];
@@ -6754,7 +7266,17 @@ export class AdminComponent implements OnInit, OnDestroy {
 	          pin_order: '1'
 	        };
         this.syncBlogMetaToForm(this.blogEditLang);
-        this.blogImages = (block.images || []).map((img) => ({ id: img.id, url: img.url, alt_text: img.alt_text }));
+        const images = (block.images || [])
+          .map((img) => ({
+            id: img.id,
+            url: img.url,
+            alt_text: img.alt_text,
+            sort_order: img.sort_order ?? 0,
+            focal_x: img.focal_x ?? 50,
+            focal_y: img.focal_y ?? 50
+          }))
+          .sort((a, b) => a.sort_order - b.sort_order);
+        this.blogImages = images;
         this.loadBlogVersions();
       },
       error: () => this.toast.error(this.t('adminUi.blog.errors.loadPost'))
@@ -6762,7 +7284,13 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   private reloadContentBlocks(): void {
-    this.admin.content().subscribe({ next: (c) => (this.contentBlocks = c) });
+    this.admin.content().subscribe({
+      next: (c) => {
+        this.contentBlocks = c;
+        this.syncContentVersions(c);
+        this.pruneBlogBulkSelection();
+      }
+    });
   }
 
   private resetBlogForm(): void {
@@ -6813,6 +7341,85 @@ export class AdminComponent implements OnInit, OnDestroy {
       out.push(part);
     }
     return out;
+  }
+
+  private toIsoFromLocal(value: string): string | null {
+    const trimmed = (value || '').trim();
+    if (!trimmed) return null;
+    const date = new Date(trimmed);
+    if (!Number.isFinite(date.getTime())) return null;
+    return date.toISOString();
+  }
+
+  private buildBlogBulkPayload(block: { meta?: Record<string, any> | null }): Record<string, unknown> | null {
+    switch (this.blogBulkAction) {
+      case 'publish':
+        return { status: 'published', published_at: null };
+      case 'unpublish':
+        return { status: 'draft' };
+      case 'schedule': {
+        const publishIso = this.toIsoFromLocal(this.blogBulkPublishAt);
+        if (!publishIso) return null;
+        const unpublishIso = this.toIsoFromLocal(this.blogBulkUnpublishAt);
+        if (unpublishIso && new Date(unpublishIso).getTime() <= new Date(publishIso).getTime()) {
+          this.blogBulkError = this.t('adminUi.blog.bulk.invalidSchedule');
+          return null;
+        }
+        return {
+          status: 'published',
+          published_at: publishIso,
+          published_until: unpublishIso ?? null
+        };
+      }
+      case 'tags_add':
+      case 'tags_remove': {
+        const tagsInput = this.parseTags(this.blogBulkTags);
+        if (!tagsInput.length) return null;
+        const meta = { ...(block.meta || {}) } as Record<string, unknown>;
+        const existingRaw = meta['tags'];
+        const existing = Array.isArray(existingRaw)
+          ? existingRaw.map((t) => String(t))
+          : typeof existingRaw === 'string'
+          ? this.parseTags(existingRaw)
+          : [];
+        const merged = this.blogBulkAction === 'tags_add' ? this.mergeTags(existing, tagsInput) : this.removeTags(existing, tagsInput);
+        if (merged.length) meta['tags'] = merged;
+        else delete meta['tags'];
+        return { meta };
+      }
+      default:
+        return null;
+    }
+  }
+
+  private mergeTags(existing: string[], incoming: string[]): string[] {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const value of [...existing, ...incoming]) {
+      const trimmed = String(value || '').trim();
+      if (!trimmed) continue;
+      const key = trimmed.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(trimmed);
+    }
+    return out;
+  }
+
+  private removeTags(existing: string[], remove: string[]): string[] {
+    const removeSet = new Set(remove.map((t) => String(t || '').trim().toLowerCase()).filter(Boolean));
+    return existing.filter((t) => !removeSet.has(String(t || '').trim().toLowerCase()));
+  }
+
+  private pruneBlogBulkSelection(): void {
+    const blogKeys = new Set(this.blogPosts().map((p) => p.key));
+    for (const key of Array.from(this.blogBulkSelection)) {
+      if (!blogKeys.has(key)) this.blogBulkSelection.delete(key);
+    }
+  }
+
+  private syncContentVersions(blocks: AdminContent[]): void {
+    blocks.forEach((block) => this.rememberContentVersion(block.key, block));
   }
 
   private getBlogSummary(meta: Record<string, any>, lang: 'en' | 'ro'): string {

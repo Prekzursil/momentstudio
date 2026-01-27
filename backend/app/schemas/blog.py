@@ -12,6 +12,8 @@ class BlogPostListItem(BaseModel):
     excerpt: str
     published_at: datetime | None = None
     cover_image_url: str | None = None
+    cover_focal_x: int | None = None
+    cover_focal_y: int | None = None
     tags: list[str] = Field(default_factory=list)
     series: str | None = None
     author_name: str | None = None
@@ -62,6 +64,8 @@ class BlogPostRead(BaseModel):
     meta: dict | None = None
     summary: str | None = None
     cover_image_url: str | None = None
+    cover_focal_x: int | None = None
+    cover_focal_y: int | None = None
     tags: list[str] = Field(default_factory=list)
     series: str | None = None
     author_name: str | None = None

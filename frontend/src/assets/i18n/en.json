@@ -2632,6 +2632,18 @@
         "pinOrderHint": "Pinned posts appear first on /blog.",
         "body": "Body"
       },
+      "cover": {
+        "title": "Cover image",
+        "hint": "If left empty, the first uploaded image will be used as the cover.",
+        "choose": "Choose from uploads",
+        "upload": "Upload cover",
+        "clear": "Clear cover override",
+        "editFocal": "Edit focal point",
+        "focalLabel": "Focal: {{x}}, {{y}}",
+        "previewDesktop": "Desktop preview",
+        "previewMobile": "Mobile preview",
+        "libraryTitle": "Cover images"
+      },
       "create": {
         "title": "Create blog post",
         "addTranslation": "Add optional translation",
@@ -2765,6 +2777,33 @@
           "hide": "Could not hide comment",
           "delete": "Could not delete comment"
         }
+      },
+      "bulk": {
+        "selectAll": "Select all",
+        "selected": "{{count}} selected",
+        "clear": "Clear selection",
+        "actionLabel": "Bulk action",
+        "actionPublish": "Publish now",
+        "actionUnpublish": "Unpublish (set draft)",
+        "actionSchedule": "Schedule publish/unpublish",
+        "actionTagsAdd": "Add tags",
+        "actionTagsRemove": "Remove tags",
+        "publishAt": "Publish at",
+        "unpublishAt": "Unpublish at (optional)",
+        "tagsLabel": "Tags",
+        "tagsPlaceholder": "e.g. ceramics, studio",
+        "apply": "Apply",
+        "previewEmpty": "Select posts and choose an action to preview changes.",
+        "previewPublish": "Will publish {{count}} posts now.",
+        "previewUnpublish": "Will unpublish {{count}} posts.",
+        "previewSchedule": "Will schedule {{count}} posts: publish {{publish}}, unpublish {{unpublish}}.",
+        "previewTagsAdd": "Will add tags to {{count}} posts: {{tags}}.",
+        "previewTagsRemove": "Will remove tags from {{count}} posts: {{tags}}.",
+        "invalidSchedule": "Unpublish time must be after publish time.",
+        "noChanges": "No changes to apply.",
+        "loadError": "Could not load some posts for bulk update.",
+        "success": "Updated {{count}} posts.",
+        "errors": "{{count}} posts failed to update."
       },
       "success": {
         "created": "Blog post created",

@@ -193,6 +193,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
               [src]="heroPost.cover_image_url"
               [alt]="heroPost.title"
               class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
+              [style.object-position]="focalPosition(heroPost.cover_focal_x, heroPost.cover_focal_y)"
               [class.opacity-0]="!isImageLoaded(heroPost.cover_image_url)"
               (load)="markImageLoaded(heroPost.cover_image_url)"
               loading="lazy"
@@ -266,6 +267,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
                     [src]="post.cover_image_url"
                     [alt]="post.title"
                     class="w-full aspect-[16/9] object-cover transition-opacity duration-300"
+                    [style.object-position]="focalPosition(post.cover_focal_x, post.cover_focal_y)"
                     [class.opacity-0]="!isImageLoaded(post.cover_image_url)"
                     (load)="markImageLoaded(post.cover_image_url)"
                     loading="lazy"
@@ -646,6 +648,12 @@ export class BlogListComponent implements OnInit, OnDestroy {
 
   canEditBlog(): boolean {
     return this.storefrontAdminMode.enabled();
+  }
+
+  focalPosition(focalX?: number | null, focalY?: number | null): string {
+    const x = Math.max(0, Math.min(100, Math.round(Number(focalX ?? 50))));
+    const y = Math.max(0, Math.min(100, Math.round(Number(focalY ?? 50))));
+    return `${x}% ${y}%`;
   }
 
   editBlogPost(event: Event, slug: string): void {

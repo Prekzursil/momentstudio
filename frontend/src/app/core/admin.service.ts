@@ -531,7 +531,7 @@ export interface ContentBlock {
   published_until?: string | null;
   needs_translation_en?: boolean;
   needs_translation_ro?: boolean;
-  images?: { id: string; url: string; alt_text?: string | null; sort_order?: number }[];
+  images?: { id: string; url: string; alt_text?: string | null; sort_order?: number; focal_x?: number; focal_y?: number }[];
 }
 
 export interface ContentBlockVersionListItem {
