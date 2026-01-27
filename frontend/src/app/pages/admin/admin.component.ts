@@ -6,6 +6,8 @@ import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { ErrorStateComponent } from '../../shared/error-state.component';
 import { InputComponent } from '../../shared/input.component';
+import { HelpPanelComponent } from '../../shared/help-panel.component';
+import { ModalComponent } from '../../shared/modal.component';
 import { RichEditorComponent } from '../../shared/rich-editor.component';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { SkeletonComponent } from '../../shared/skeleton.component';
@@ -392,6 +394,8 @@ class CmsDraftManager<T> {
     ButtonComponent,
     ErrorStateComponent,
     InputComponent,
+    HelpPanelComponent,
+    ModalComponent,
     RichEditorComponent,
     LocalizedCurrencyPipe,
     SkeletonComponent,
@@ -2931,6 +2935,46 @@ class CmsDraftManager<T> {
               ></app-button>
             </div>
 
+            <app-help-panel [titleKey]="'adminUi.help.title'" [subtitleKey]="'adminUi.categories.help.subtitle'">
+              <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
+                <li>{{ 'adminUi.categories.help.points.slug' | translate }}</li>
+                <li>{{ 'adminUi.categories.help.points.parent' | translate }}</li>
+                <li>{{ 'adminUi.categories.help.points.translations' | translate }}</li>
+              </ul>
+            </app-help-panel>
+
+            <app-modal
+              [open]="categoryDeleteConfirmOpen()"
+              [title]="'adminUi.categories.confirmDelete.title' | translate: { name: categoryDeleteConfirmTarget()?.name || '' }"
+              [subtitle]="'adminUi.categories.confirmDelete.subtitle' | translate"
+              [closeLabel]="'adminUi.actions.cancel' | translate"
+              [cancelLabel]="'adminUi.actions.cancel' | translate"
+              [confirmLabel]="
+                categoryDeleteConfirmBusy()
+                  ? ('adminUi.actions.loading' | translate)
+                  : ('adminUi.actions.delete' | translate)
+              "
+              [confirmDisabled]="categoryDeleteConfirmBusy()"
+              (closed)="closeCategoryDeleteConfirm()"
+              (confirm)="confirmDeleteCategory()"
+            >
+              <div class="grid gap-3">
+                <div
+                  *ngIf="categoryDeleteConfirmTarget() as cat"
+                  class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+                >
+                  <p class="font-semibold text-slate-900 dark:text-slate-50">{{ cat.name }}</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">Slug: {{ cat.slug }}</p>
+                </div>
+
+                <ul class="list-disc pl-5 text-sm text-slate-700 dark:text-slate-200">
+                  <li>{{ 'adminUi.categories.confirmDelete.points.permanent' | translate }}</li>
+                  <li>{{ 'adminUi.categories.confirmDelete.points.inUse' | translate }}</li>
+                  <li>{{ 'adminUi.categories.confirmDelete.points.urls' | translate }}</li>
+                </ul>
+              </div>
+            </app-modal>
+
             <div
               *ngIf="categoryWizardOpen()"
               class="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-100"
@@ -3032,14 +3076,14 @@ class CmsDraftManager<T> {
 	                      [label]="'adminUi.categories.translations.button' | translate"
 	                      (action)="toggleCategoryTranslations(cat.slug)"
 	                    ></app-button>
-	                    <app-button
-	                      size="sm"
-	                      variant="ghost"
-	                      [label]="'adminUi.actions.delete' | translate"
-	                      (action)="deleteCategory(cat.slug)"
-	                    ></app-button>
-	                  </div>
-	                </div>
+		                    <app-button
+		                      size="sm"
+		                      variant="ghost"
+		                      [label]="'adminUi.actions.delete' | translate"
+		                      (action)="openCategoryDeleteConfirm(cat)"
+		                    ></app-button>
+		                  </div>
+		                </div>
                   <label class="mt-2 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                     <span class="font-semibold">{{ 'adminUi.categories.parent' | translate }}:</span>
                     <select
@@ -5012,6 +5056,9 @@ export class AdminComponent implements OnInit, OnDestroy {
     en: this.blankCategoryTranslation(),
     ro: this.blankCategoryTranslation()
   };
+  categoryDeleteConfirmOpen = signal(false);
+  categoryDeleteConfirmBusy = signal(false);
+  categoryDeleteConfirmTarget = signal<AdminCategory | null>(null);
   taxGroups: TaxGroupRead[] = [];
   taxGroupsLoading = false;
   taxGroupsError: string | null = null;
@@ -6427,14 +6474,43 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  deleteCategory(slug: string): void {
+  openCategoryDeleteConfirm(cat: AdminCategory): void {
+    this.categoryDeleteConfirmTarget.set(cat);
+    this.categoryDeleteConfirmBusy.set(false);
+    this.categoryDeleteConfirmOpen.set(true);
+  }
+
+  closeCategoryDeleteConfirm(): void {
+    this.categoryDeleteConfirmOpen.set(false);
+    this.categoryDeleteConfirmBusy.set(false);
+    this.categoryDeleteConfirmTarget.set(null);
+  }
+
+  confirmDeleteCategory(): void {
+    const target = this.categoryDeleteConfirmTarget();
+    if (!target) return;
+    if (this.categoryDeleteConfirmBusy()) return;
+    this.categoryDeleteConfirmBusy.set(true);
+    this.deleteCategory(target.slug, {
+      done: (ok) => {
+        this.categoryDeleteConfirmBusy.set(false);
+        if (ok) this.closeCategoryDeleteConfirm();
+      }
+    });
+  }
+
+  deleteCategory(slug: string, opts?: { done?: (ok: boolean) => void }): void {
     this.admin.deleteCategory(slug).subscribe({
       next: () => {
         this.categories = this.categories.filter((c) => c.slug !== slug);
         if (this.categoryTranslationsSlug === slug) this.closeCategoryTranslations();
         this.toast.success(this.t('adminUi.categories.success.delete'));
+        opts?.done?.(true);
       },
-      error: () => this.toast.error(this.t('adminUi.categories.errors.delete'))
+      error: () => {
+        this.toast.error(this.t('adminUi.categories.errors.delete'));
+        opts?.done?.(false);
+      }
     });
   }
 

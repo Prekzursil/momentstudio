@@ -9,6 +9,7 @@ import { ButtonComponent } from '../../../shared/button.component';
 import { ErrorStateComponent } from '../../../shared/error-state.component';
 import { extractRequestId } from '../../../shared/http-error';
 import { InputComponent } from '../../../shared/input.component';
+import { HelpPanelComponent } from '../../../shared/help-panel.component';
 import { ModalComponent } from '../../../shared/modal.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import {
@@ -225,6 +226,7 @@ type PriceHistoryChart = {
     ButtonComponent,
     ErrorStateComponent,
     InputComponent,
+    HelpPanelComponent,
     ModalComponent,
     SkeletonComponent,
     LocalizedCurrencyPipe,
@@ -336,7 +338,47 @@ type PriceHistoryChart = {
         </div>
       </app-modal>
 
+      <app-modal
+        [open]="deleteImageConfirmOpen()"
+        [title]="'adminUi.products.confirmDeleteImage.title' | translate"
+        [subtitle]="'adminUi.products.confirmDeleteImage.subtitle' | translate"
+        [closeLabel]="'adminUi.actions.cancel' | translate"
+        [cancelLabel]="'adminUi.actions.cancel' | translate"
+        [confirmLabel]="deleteImageConfirmBusy() ? ('adminUi.actions.loading' | translate) : ('adminUi.actions.delete' | translate)"
+        [confirmDisabled]="deleteImageConfirmBusy()"
+        (closed)="closeDeleteImageConfirm()"
+        (confirm)="confirmDeleteImage()"
+      >
+        <div class="grid gap-3">
+          <div
+            *ngIf="deleteImageConfirmTarget() as target"
+            class="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+          >
+            <img [src]="target.url" [alt]="target.alt" class="h-12 w-12 rounded object-cover" />
+            <div class="min-w-0">
+              <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ target.alt }}</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ target.url }}</p>
+            </div>
+          </div>
+
+          <ul class="list-disc pl-5 text-sm text-slate-700 dark:text-slate-200">
+            <li>{{ 'adminUi.products.confirmDeleteImage.points.storefront' | translate }}</li>
+            <li>{{ 'adminUi.products.confirmDeleteImage.points.restore' | translate }}</li>
+            <li>{{ 'adminUi.products.confirmDeleteImage.points.metadata' | translate }}</li>
+          </ul>
+        </div>
+      </app-modal>
+
 	      <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+          <app-help-panel [titleKey]="'adminUi.help.title'" [subtitleKey]="'adminUi.products.help.subtitle'">
+            <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
+              <li>{{ 'adminUi.products.help.points.search' | translate }}</li>
+              <li>{{ 'adminUi.products.help.points.bulk' | translate }}</li>
+              <li>{{ 'adminUi.products.help.points.columns' | translate }}</li>
+              <li>{{ 'adminUi.products.help.points.wizard' | translate }}</li>
+            </ul>
+          </app-help-panel>
+
 		        <div class="grid gap-3 lg:grid-cols-[1fr_180px_220px_240px_220px_auto] items-end">
 		          <app-input [label]="'adminUi.products.search' | translate" [(value)]="q"></app-input>
 
@@ -2309,9 +2351,51 @@ type PriceHistoryChart = {
               </div>
             </div>
 
-		        <div id="product-wizard-save" class="flex items-center gap-2">
-		          <app-button [label]="'adminUi.products.form.save' | translate" (action)="save()"></app-button>
-		          <span *ngIf="editorMessage()" class="text-sm text-emerald-700 dark:text-emerald-300">{{ editorMessage() }}</span>
+		        <div id="product-wizard-save" class="grid gap-2">
+              <div class="flex flex-wrap items-center gap-2">
+		            <app-button [label]="'adminUi.products.form.save' | translate" (action)="save()"></app-button>
+
+                <ng-container *ngIf="editorMessage()">
+                  <span
+                    class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
+                  >
+                    {{ 'adminUi.products.successFeedback.saved' | translate }}
+                  </span>
+                  <span
+                    class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  >
+                    {{ successStatusLabelKey() | translate }}
+                  </span>
+                  <span
+                    class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  >
+                    {{ successVisibilityLabelKey() | translate }}
+                  </span>
+                </ng-container>
+              </div>
+
+              <div *ngIf="editorMessage() && editingSlug() as slug" class="flex flex-wrap items-center gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.products.successFeedback.cta.images' | translate"
+                  (action)="scrollToImagesSection()"
+                ></app-button>
+                <app-button
+                  *ngIf="savedStatus() !== 'published'"
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.products.successFeedback.cta.publish' | translate"
+                  (action)="startPublishWizard()"
+                ></app-button>
+                <app-button
+                  *ngIf="savedIsVisible()"
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.products.successFeedback.cta.view' | translate"
+                  [routerLink]="['/products', slug]"
+                ></app-button>
+              </div>
 		        </div>
 
 	        <div id="product-wizard-images" class="grid gap-3">
@@ -2355,7 +2439,12 @@ type PriceHistoryChart = {
 	                    [label]="'adminUi.actions.edit' | translate"
 	                    (action)="toggleImageMeta(img.id)"
 	                  ></app-button>
-	                  <app-button size="sm" variant="ghost" [label]="'adminUi.actions.delete' | translate" (action)="deleteImage(img.id)"></app-button>
+	                  <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.actions.delete' | translate"
+                      (action)="openDeleteImageConfirm(img.id)"
+                    ></app-button>
 	                </div>
 	              </div>
 
@@ -2545,10 +2634,14 @@ export class AdminProductsComponent implements OnInit {
 	  editingCurrency = signal('RON');
 	  editorError = signal<string | null>(null);
 	  editorMessage = signal<string | null>(null);
+    lastSavedState = signal<{ status: ProductForm['status']; isActive: boolean } | null>(null);
 	  wizardKind = signal<ProductWizardKind | null>(null);
 	  wizardStep = signal(0);
     private wizardAdvanceAfterSave = false;
     private wizardExitAfterPublish = false;
+    deleteImageConfirmOpen = signal(false);
+    deleteImageConfirmBusy = signal(false);
+    deleteImageConfirmTarget = signal<{ id: string; url: string; alt: string } | null>(null);
   images = signal<Array<{ id: string; url: string; alt_text?: string | null; caption?: string | null }>>([]);
   deletedImagesOpen = signal(false);
   deletedImages = signal<AdminDeletedProductImage[]>([]);
@@ -2721,6 +2814,29 @@ export class AdminProductsComponent implements OnInit {
       const focusable = el.querySelector<HTMLElement>('select, input, button, [href], [tabindex]:not([tabindex="-1"])');
       focusable?.focus();
     }, 0);
+  }
+
+  successStatusLabelKey(): string {
+    return `adminUi.status.${this.savedStatus()}`;
+  }
+
+  successVisibilityLabelKey(): string {
+    return this.savedIsVisible() ? 'adminUi.products.successFeedback.visible' : 'adminUi.products.successFeedback.hidden';
+  }
+
+  savedStatus(): ProductForm['status'] {
+    return this.lastSavedState()?.status ?? this.form.status;
+  }
+
+  savedIsVisible(): boolean {
+    const snap = this.lastSavedState();
+    const status = snap?.status ?? this.form.status;
+    const isActive = snap?.isActive ?? this.form.is_active;
+    return status === 'published' && isActive;
+  }
+
+  scrollToImagesSection(): void {
+    this.scrollToWizardAnchor('product-wizard-images');
   }
 
   visibleColumnIds(): string[] {
@@ -3581,6 +3697,7 @@ export class AdminProductsComponent implements OnInit {
 		    this.editingCurrency.set('RON');
 		    this.editorError.set(null);
 		    this.editorMessage.set(null);
+        this.lastSavedState.set(null);
         this.loadedTagSlugs = [];
 		    this.resetDuplicateCheck();
 		    this.resetRelationships();
@@ -3607,6 +3724,7 @@ export class AdminProductsComponent implements OnInit {
 		    this.editingCurrency.set('RON');
 		    this.editorError.set(null);
 		    this.editorMessage.set(null);
+        this.lastSavedState.set(null);
         this.loadedTagSlugs = [];
 		    this.resetDuplicateCheck();
 		    this.resetRelationships();
@@ -3627,6 +3745,7 @@ export class AdminProductsComponent implements OnInit {
 		    this.editorOpen.set(true);
 		    this.editorError.set(null);
 		    this.editorMessage.set(null);
+        this.lastSavedState.set(null);
 		    this.editingSlug.set(slug);
 		    this.editingProductId.set(null);
 		    this.editingCurrency.set('RON');
@@ -4087,6 +4206,8 @@ export class AdminProductsComponent implements OnInit {
         }
         this.images.set(Array.isArray(prod?.images) ? prod.images : this.images());
 	        if (prod?.status) this.form.status = prod.status;
+          if (typeof prod?.is_active === 'boolean') this.form.is_active = prod.is_active;
+          this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
 	        if (newSlug) this.loadTranslations(newSlug);
 	        if (newSlug) this.loadRelationships(newSlug);
 	        this.load();
@@ -4583,9 +4704,41 @@ export class AdminProductsComponent implements OnInit {
     });
   }
 
-  deleteImage(imageId: string): void {
+  openDeleteImageConfirm(imageId: string): void {
+    const img = this.images().find((i) => i.id === imageId);
+    if (!img) return;
+    const alt = (img.alt_text || this.t('adminUi.products.form.image')).toString();
+    this.deleteImageConfirmTarget.set({ id: imageId, url: img.url, alt });
+    this.deleteImageConfirmBusy.set(false);
+    this.deleteImageConfirmOpen.set(true);
+  }
+
+  closeDeleteImageConfirm(): void {
+    this.deleteImageConfirmOpen.set(false);
+    this.deleteImageConfirmBusy.set(false);
+    this.deleteImageConfirmTarget.set(null);
+  }
+
+  confirmDeleteImage(): void {
     const slug = this.editingSlug();
-    if (!slug) return;
+    const target = this.deleteImageConfirmTarget();
+    if (!slug || !target) return;
+    if (this.deleteImageConfirmBusy()) return;
+    this.deleteImageConfirmBusy.set(true);
+    this.deleteImage(target.id, {
+      done: (ok) => {
+        this.deleteImageConfirmBusy.set(false);
+        if (ok) this.closeDeleteImageConfirm();
+      }
+    });
+  }
+
+  deleteImage(imageId: string, opts?: { done?: (ok: boolean) => void }): void {
+    const slug = this.editingSlug();
+    if (!slug) {
+      opts?.done?.(false);
+      return;
+    }
     this.admin.deleteProductImage(slug, imageId).subscribe({
       next: (prod: any) => {
         this.toast.success(this.t('adminUi.products.success.imageDelete'));
@@ -4596,8 +4749,12 @@ export class AdminProductsComponent implements OnInit {
         if (this.deletedImagesOpen()) {
           this.loadDeletedImages(slug);
         }
+        opts?.done?.(true);
       },
-      error: () => this.toast.error(this.t('adminUi.products.errors.deleteImage'))
+      error: () => {
+        this.toast.error(this.t('adminUi.products.errors.deleteImage'));
+        opts?.done?.(false);
+      }
     });
   }
 

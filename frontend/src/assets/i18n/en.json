@@ -1797,6 +1797,9 @@
       "hide": "Hide",
       "bulkActions": "Bulk actions"
     },
+    "help": {
+      "title": "What is this?"
+    },
     "recent": {
       "title": "Recently viewed",
       "hint": "Quickly reopen pages and items you visited.",
@@ -3004,6 +3007,24 @@
           "review": "Check content and translations before publishing."
         }
       },
+      "help": {
+        "subtitle": "Quick guide to managing products.",
+        "points": {
+          "search": "Use Search + filters to find products by name, URL, or SKU.",
+          "bulk": "Select rows to unlock bulk actions (sale, category, scheduling, price changes).",
+          "columns": "Use “Table layout” to show/hide columns and switch density.",
+          "wizard": "Use “Guided wizard” when creating or publishing to follow a step-by-step flow."
+        }
+      },
+      "confirmDeleteImage": {
+        "title": "Delete this image?",
+        "subtitle": "This hides the image from the product gallery.",
+        "points": {
+          "storefront": "It will no longer appear on the storefront (gallery and social previews).",
+          "restore": "You can restore it later from “Show deleted”.",
+          "metadata": "Alt text and captions for this image will be removed from the gallery."
+        }
+      },
       "delete": "Delete",
       "edit": "Edit product",
       "inlineEdit": "Quick edit",
@@ -3187,6 +3208,16 @@
         "imageUpload": "Image uploaded",
         "imageDelete": "Image deleted",
         "imageRestore": "Image restored"
+      },
+      "successFeedback": {
+        "saved": "Saved",
+        "visible": "Visible",
+        "hidden": "Hidden",
+        "cta": {
+          "images": "Next: images",
+          "publish": "Next: publish",
+          "view": "View product"
+        }
       },
       "errors": {
         "loadList": "Could not load products.",
@@ -3379,6 +3410,23 @@
           "translations": "Add RO and EN translations so the category displays in both languages."
         }
       },
+      "help": {
+        "subtitle": "Quick guide to managing categories.",
+        "points": {
+          "slug": "Slugs are generated from the name and used in URLs.",
+          "parent": "Use Parent category to build a hierarchy (optional).",
+          "translations": "Add RO/EN translations for storefront navigation and filtering."
+        }
+      },
+      "confirmDelete": {
+        "title": "Delete category \"{{name}}\"?",
+        "subtitle": "This permanently removes the category from the storefront.",
+        "points": {
+          "permanent": "This cannot be undone.",
+          "inUse": "If products still use this category, deletion may fail — reassign products first.",
+          "urls": "Links that include this category slug may break."
+        }
+      },
       "slug": "Slug",
       "slugAutoHint": "Slug is auto-generated from the name.",
       "parent": "Parent category",
@@ -3418,6 +3466,14 @@
       "title": "Orders",
       "hint": "Search by reference, id, email, or username.",
       "export": "Export CSV",
+      "help": {
+        "subtitle": "Quick guide to managing orders.",
+        "points": {
+          "status": "Use Status to focus on pending/payment/shipped states.",
+          "tags": "Use Tags like vip/gift/test to triage and filter faster.",
+          "export": "Use Export CSV to download orders, or save templates for recurring exports."
+        }
+      },
       "exportModal": {
         "title": "Export orders",
         "hint": "Pick columns or use a saved template.",
@@ -3795,6 +3851,14 @@
     "users": {
       "title": "Users",
       "hint": "Search by email, username, or display name.",
+      "help": {
+        "subtitle": "Quick guide to managing users.",
+        "points": {
+          "search": "Use Search + Role to narrow down customers and admins.",
+          "pii": "Use “Reveal PII” only when needed (it may unlock additional data like email activity).",
+          "roles": "Changing roles and sensitive actions may require password confirmation."
+        }
+      },
       "gdprQueue": "GDPR queue",
       "segments": "Segments",
       "setRole": "Set role",

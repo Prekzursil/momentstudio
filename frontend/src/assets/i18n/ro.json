@@ -1797,6 +1797,9 @@
       "hide": "Ascunde",
       "bulkActions": "Acțiuni în masă"
     },
+    "help": {
+      "title": "Ce este asta?"
+    },
     "recent": {
       "title": "Vizualizate recent",
       "hint": "Redeschide rapid pagini și elemente vizitate.",
@@ -3004,6 +3007,24 @@
           "review": "Verifică conținutul și traducerile înainte de publicare."
         }
       },
+      "help": {
+        "subtitle": "Ghid rapid pentru administrarea produselor.",
+        "points": {
+          "search": "Folosește Căutare + filtre pentru a găsi produse după nume, URL sau SKU.",
+          "bulk": "Selectează rânduri pentru a debloca acțiuni în masă (reduceri, categorie, programare, preț).",
+          "columns": "Folosește „Aspect tabel” pentru a afișa/ascunde coloane și a schimba densitatea.",
+          "wizard": "Folosește „Asistent ghidat” la creare/publicare pentru un flux pas-cu-pas."
+        }
+      },
+      "confirmDeleteImage": {
+        "title": "Ștergi această imagine?",
+        "subtitle": "Imaginea va fi ascunsă din galeria produsului.",
+        "points": {
+          "storefront": "Nu va mai apărea în magazin (galerie și previzualizări sociale).",
+          "restore": "O poți restaura ulterior din „Arată șterse”.",
+          "metadata": "Textul alternativ și descrierile imaginii vor fi eliminate din galerie."
+        }
+      },
       "delete": "Șterge",
       "edit": "Editează produs",
       "inlineEdit": "Editare rapidă",
@@ -3187,6 +3208,16 @@
         "imageUpload": "Imagine încărcată",
         "imageDelete": "Imagine ștearsă",
         "imageRestore": "Imagine restabilită"
+      },
+      "successFeedback": {
+        "saved": "Salvat",
+        "visible": "Vizibil",
+        "hidden": "Ascuns",
+        "cta": {
+          "images": "Următorul pas: imagini",
+          "publish": "Următorul pas: publică",
+          "view": "Vezi produsul"
+        }
       },
       "errors": {
         "loadList": "Nu am putut încărca produsele.",
@@ -3379,6 +3410,23 @@
           "translations": "Adaugă traduceri RO și EN pentru afișare corectă în ambele limbi."
         }
       },
+      "help": {
+        "subtitle": "Ghid rapid pentru administrarea categoriilor.",
+        "points": {
+          "slug": "Slug-urile se generează din nume și sunt folosite în URL-uri.",
+          "parent": "Folosește categoria părinte pentru ierarhie (opțional).",
+          "translations": "Adaugă traduceri RO/EN pentru navigare și filtrare în magazin."
+        }
+      },
+      "confirmDelete": {
+        "title": "Ștergi categoria „{{name}}”?",
+        "subtitle": "Aceasta va elimina permanent categoria din magazin.",
+        "points": {
+          "permanent": "Acțiunea nu poate fi anulată.",
+          "inUse": "Dacă există produse care folosesc categoria, ștergerea poate eșua — reasignează produsele înainte.",
+          "urls": "Linkurile care includ slug-ul categoriei pot să nu mai funcționeze."
+        }
+      },
       "slug": "Slug",
       "slugAutoHint": "Slug-ul este generat automat din nume.",
       "parent": "Categorie părinte",
@@ -3418,6 +3466,14 @@
       "title": "Comenzi",
       "hint": "Caută după referință, ID, email sau utilizator.",
       "export": "Exportă CSV",
+      "help": {
+        "subtitle": "Ghid rapid pentru administrarea comenzilor.",
+        "points": {
+          "status": "Folosește Status pentru a te concentra pe stări precum în așteptare/plată/livrat.",
+          "tags": "Folosește etichete precum vip/gift/test pentru triere și filtre rapide.",
+          "export": "Folosește Export CSV pentru descărcări și salvează șabloane pentru exporturi recurente."
+        }
+      },
       "exportModal": {
         "title": "Export comenzi",
         "hint": "Alege coloanele sau folosește un șablon salvat.",
@@ -3795,6 +3851,14 @@
     "users": {
       "title": "Utilizatori",
       "hint": "Caută după email, utilizator sau nume afișat.",
+      "help": {
+        "subtitle": "Ghid rapid pentru administrarea utilizatorilor.",
+        "points": {
+          "search": "Folosește Căutare + Rol pentru a restrânge lista (clienți/admini).",
+          "pii": "Folosește „Afișează PII” doar când e necesar (poate debloca date suplimentare).",
+          "roles": "Schimbarea rolurilor și acțiunile sensibile pot cere confirmarea parolei."
+        }
+      },
       "gdprQueue": "Coada GDPR",
       "segments": "Segmente",
       "setRole": "Setează rol",
