@@ -2976,7 +2976,7 @@
     },
     "products": {
       "title": "Products",
-      "hint": "Search by name, slug, or SKU.",
+      "hint": "Search by name, URL, or product code (SKU).",
       "new": "New",
       "delete": "Delete",
       "edit": "Edit product",
@@ -3011,10 +3011,12 @@
         "deleted": "Deleted"
       },
       "form": {
-        "slug": "Slug",
+        "slug": "Product URL",
         "slugAutoHint": "Auto-generated after save.",
+        "slugHelp": "Auto-generated from the name. Used in the product link.",
         "priceFormatHint": "Use numbers and a dot with up to 2 decimals (example: 123.45).",
-        "sku": "SKU",
+        "sku": "Product code (SKU)",
+        "skuHint": "Optional. Useful for inventory, exports, and internal tracking.",
         "shortDescription": "Short description",
         "shortDescriptionHint": "Shown in product cards and listings (max 280 characters).",
         "imageUrl": "Image URL",

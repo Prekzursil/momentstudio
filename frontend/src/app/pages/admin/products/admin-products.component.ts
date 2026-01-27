@@ -904,6 +904,9 @@ type PriceHistoryChart = {
                   </ng-template>
 	              </ng-template>
 	            </div>
+              <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.products.form.slugHelp' | translate }}
+              </span>
 	          </div>
 
             <div
@@ -1103,6 +1106,7 @@ type PriceHistoryChart = {
                 [label]="'adminUi.products.form.sku' | translate"
                 [value]="form.sku"
                 (valueChange)="onSkuChange($event)"
+                [hint]="'adminUi.products.form.skuHint' | translate"
               ></app-input>
 
               <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">

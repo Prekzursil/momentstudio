@@ -2976,7 +2976,7 @@
     },
     "products": {
       "title": "Produse",
-      "hint": "Caută după nume, slug sau SKU.",
+      "hint": "Caută după nume, URL sau cod produs (SKU).",
       "new": "Nou",
       "delete": "Șterge",
       "edit": "Editează produs",
@@ -3011,10 +3011,12 @@
         "deleted": "Șterse"
       },
       "form": {
-        "slug": "Slug",
+        "slug": "URL produs",
         "slugAutoHint": "Generat automat după salvare.",
+        "slugHelp": "Se generează automat din nume. Folosit în linkul produsului.",
         "priceFormatHint": "Folosește doar cifre și punct, cu maxim 2 zecimale (exemplu: 123.45).",
-        "sku": "SKU",
+        "sku": "Cod produs (SKU)",
+        "skuHint": "Opțional. Util pentru stoc, exporturi și evidență internă.",
         "shortDescription": "Descriere scurtă",
         "shortDescriptionHint": "Apare în carduri și liste (max 280 caractere).",
         "imageUrl": "URL imagine",

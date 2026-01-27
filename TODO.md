@@ -896,7 +896,7 @@ Below is a structured checklist you can turn into issues.
 ### Admin Dashboard UX – Simplification (Backlog)
 - [x] Admin UX: simplified mode – Add a “Simple / Advanced” toggle (default Simple) to hide advanced settings and jargon.
 - [x] Admin UX: progressive disclosure – Collapse rarely used fields behind “Show advanced” per form section.
-- [ ] Admin UX: plain-language labels – Replace technical labels (slug/SKU) with friendly copy + examples and tooltips.
+- [x] Admin UX: plain-language labels – Replace technical labels (slug/SKU) with friendly copy + examples and tooltips.
 - [ ] Admin UX: guided wizards – Step-by-step flows for “Add product”, “Add category”, and “Publish product”.
 - [ ] Admin UX: safer defaults – Pre-fill sensible defaults and reduce required fields for first-time product creation.
 - [ ] Admin UX: declutter tables – Reduce visible columns by default; add “Customize columns” for power users.
