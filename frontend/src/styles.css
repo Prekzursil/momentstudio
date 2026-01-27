@@ -96,31 +96,31 @@
   }
 
   .blog-markdown p {
-    @apply my-4;
+    @apply my-4 max-w-prose mx-auto;
   }
 
   .blog-markdown h1 {
-    @apply mt-10 mb-4 text-3xl font-semibold text-slate-900 dark:text-slate-50;
+    @apply mt-10 mb-4 text-3xl font-semibold text-slate-900 dark:text-slate-50 max-w-prose mx-auto;
   }
 
   .blog-markdown h2 {
-    @apply mt-9 mb-3 text-2xl font-semibold text-slate-900 dark:text-slate-50 scroll-mt-28;
+    @apply mt-9 mb-3 text-2xl font-semibold text-slate-900 dark:text-slate-50 scroll-mt-28 max-w-prose mx-auto;
   }
 
   .blog-markdown h3 {
-    @apply mt-7 mb-2 text-xl font-semibold text-slate-900 dark:text-slate-50 scroll-mt-28;
+    @apply mt-7 mb-2 text-xl font-semibold text-slate-900 dark:text-slate-50 scroll-mt-28 max-w-prose mx-auto;
   }
 
   .blog-markdown hr {
-    @apply my-8 border-slate-200 dark:border-slate-800;
+    @apply my-8 border-slate-200 dark:border-slate-800 max-w-prose mx-auto;
   }
 
   .blog-markdown img {
-    @apply my-6 rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900;
+    @apply my-6 rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900 max-w-prose mx-auto cursor-zoom-in;
   }
 
   .blog-markdown blockquote {
-    @apply my-6 border-l-4 border-slate-200 pl-5 text-slate-700 dark:border-slate-700 dark:text-slate-200;
+    @apply my-6 border-l-4 border-slate-200 pl-5 text-slate-700 dark:border-slate-700 dark:text-slate-200 max-w-prose mx-auto;
   }
 
   .blog-heading-anchor {
@@ -130,6 +130,63 @@
   .blog-markdown h2:hover .blog-heading-anchor,
   .blog-markdown h3:hover .blog-heading-anchor {
     @apply opacity-100;
+  }
+
+  .blog-markdown ul,
+  .blog-markdown ol,
+  .blog-markdown pre {
+    @apply max-w-prose mx-auto;
+  }
+
+  .blog-img-wide {
+    @apply max-w-none w-full;
+  }
+
+  .blog-gallery {
+    display: grid;
+    gap: 0.75rem;
+    margin: 1.5rem auto;
+    max-width: 100%;
+  }
+
+  .blog-gallery img {
+    margin: 0 !important;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+  }
+
+  @media (min-width: 40rem) {
+    .blog-gallery {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .blog-gallery {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .blog-img-left,
+  .blog-img-right {
+    width: 100%;
+    max-width: 100%;
+    float: none;
+  }
+
+  @media (min-width: 48rem) {
+    .blog-img-left {
+      float: left;
+      width: 45%;
+      margin: 0.25rem 1.5rem 1rem 0;
+    }
+
+    .blog-img-right {
+      float: right;
+      width: 45%;
+      margin: 0.25rem 0 1rem 1.5rem;
+    }
   }
 }
 

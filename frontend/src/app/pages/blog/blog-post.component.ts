@@ -114,10 +114,8 @@ import { formatIdentity } from '../../shared/user-identity';
                 class="w-full aspect-[16/9] rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
                 loading="lazy"
               />
-              <div class="mx-auto w-full max-w-[72ch]">
-                <div class="markdown blog-markdown text-slate-700 dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
-              </div>
-              <div class="mx-auto w-full max-w-[72ch]">
+              <div class="markdown blog-markdown text-slate-700 dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
+              <div class="mx-auto w-full max-w-prose">
                 <a
                   routerLink="/blog"
                   class="text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
@@ -1098,6 +1096,62 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       heading.appendChild(anchor);
 
       toc.push({ id, title, level: level as 2 | 3 });
+    }
+
+    const images = Array.from(doc.body.querySelectorAll('img')) as HTMLImageElement[];
+    for (const img of images) {
+      const title = (img.getAttribute('title') || '').trim().toLowerCase();
+      if (!title) continue;
+      const tokens = title.split(/[\s,]+/).filter(Boolean);
+      const hasLayoutToken = tokens.some((t) => t === 'wide' || t === 'full' || t === 'left' || t === 'right' || t === 'gallery');
+      if (!hasLayoutToken) continue;
+
+      if (tokens.includes('wide') || tokens.includes('full')) img.classList.add('blog-img-wide');
+      if (tokens.includes('left')) img.classList.add('blog-img-left');
+      if (tokens.includes('right')) img.classList.add('blog-img-right');
+      if (tokens.includes('gallery')) img.classList.add('blog-img-gallery');
+      img.removeAttribute('title');
+    }
+
+    let idx = 0;
+    while (idx < doc.body.children.length) {
+      const node = doc.body.children[idx];
+      if (node.tagName !== 'P') {
+        idx += 1;
+        continue;
+      }
+      const img = node.querySelector('img');
+      if (!img || !img.classList.contains('blog-img-gallery') || node.children.length !== 1) {
+        idx += 1;
+        continue;
+      }
+      const group: Element[] = [];
+      let j = idx;
+      while (j < doc.body.children.length) {
+        const candidate = doc.body.children[j];
+        if (candidate.tagName !== 'P') break;
+        const candidateImg = candidate.querySelector('img');
+        if (!candidateImg || !candidateImg.classList.contains('blog-img-gallery') || candidate.children.length !== 1) break;
+        group.push(candidate);
+        j += 1;
+      }
+      if (group.length < 2) {
+        idx += 1;
+        continue;
+      }
+      const gallery = doc.createElement('div');
+      gallery.className = 'blog-gallery';
+      for (const para of group) {
+        const galleryImg = para.querySelector('img');
+        if (!galleryImg) continue;
+        galleryImg.classList.remove('blog-img-gallery');
+        gallery.appendChild(galleryImg);
+      }
+      group[0].replaceWith(gallery);
+      for (const extra of group.slice(1)) {
+        extra.remove();
+      }
+      idx += 1;
     }
 
     return { html: doc.body.innerHTML, toc };

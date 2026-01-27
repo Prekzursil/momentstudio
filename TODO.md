@@ -444,7 +444,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Blog post: related posts – Show related posts by tags/series with thumbnails.
 - [x] Blog post: share bar – Add share buttons (copy link + WhatsApp/Facebook) with accessible labels.
 - [x] Blog post: inline image lightbox – Click in-article images to open a gallery/lightbox with captions.
-- [ ] Blog post: rich image layouts – Support wide/left/right aligned images and multi-image galleries in content.
+- [x] Blog post: rich image layouts – Support wide/left/right aligned images and multi-image galleries in content.
+- [ ] Blog editor: image layout hints – Document supported image title hints (`"wide"`, `"left"`, `"right"`, `"gallery"`) and add quick-insert helpers in the editor UI.
 - [ ] Blog post: code blocks – Syntax highlighting + “Copy” button + line wrapping toggle.
 - [ ] Blog post: callout blocks – Support “Tip/Note/Warning” callouts with icons and theme-aware styling.
 - [ ] Blog post: embedded product cards – Allow inserting product/category/collection cards inside posts (shoppable content).
