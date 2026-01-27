@@ -1,5 +1,5 @@
 import { CommonModule, NgOptimizedImage } from '@angular/common';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Product } from '../core/catalog.service';
 import { ButtonComponent } from './button.component';
@@ -74,7 +74,7 @@ import { AdminService } from '../core/admin.service';
 	          <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
 	          <option value="published">{{ 'adminUi.status.published' | translate }}</option>
 	          <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
-	        </select>
+	    </select>
 	      </div>
       <div class="grid gap-1">
         <div class="flex items-center justify-between gap-2">
@@ -101,15 +101,59 @@ import { AdminService } from '../core/admin.service';
         <p *ngIf="product.short_description" class="text-sm text-slate-600 line-clamp-2 dark:text-slate-300">
           {{ product.short_description }}
         </p>
-        <div class="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400" *ngIf="product.rating_count">
-          ★ {{ product.rating_average?.toFixed(1) ?? '0.0' }} ·
-          {{ 'product.reviews' | translate : { count: product.rating_count } }}
-        </div>
-      </div>
-      <div class="flex flex-wrap items-center gap-2">
-        <app-button
-          *ngIf="showQuickView"
-          [label]="'shop.quickView' | translate"
+	        <div class="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400" *ngIf="product.rating_count">
+	          ★ {{ product.rating_average?.toFixed(1) ?? '0.0' }} ·
+	          {{ 'product.reviews' | translate : { count: product.rating_count } }}
+	        </div>
+	      </div>
+	      <div
+	        *ngIf="showStorefrontEdit()"
+	        class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/40"
+	        (click)="$event.stopPropagation()"
+	      >
+	        <div class="grid grid-cols-2 gap-2">
+	          <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+	            <span>{{ 'adminUi.products.table.price' | translate }}</span>
+	            <input
+	              type="number"
+	              inputmode="decimal"
+	              step="0.01"
+	              min="0"
+	              class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+	              [disabled]="inlineSaving"
+	              [value]="inlinePrice"
+	              (input)="inlinePrice = $any($event.target).value"
+	            />
+	          </label>
+	          <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+	            <span>{{ 'adminUi.products.table.stock' | translate }}</span>
+	            <input
+	              type="number"
+	              inputmode="numeric"
+	              step="1"
+	              min="0"
+	              class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+	              [disabled]="inlineSaving"
+	              [value]="inlineStock"
+	              (input)="inlineStock = $any($event.target).value"
+	            />
+	          </label>
+	        </div>
+	        <div class="flex items-center justify-between gap-3">
+	          <p *ngIf="inlineError" class="text-xs text-rose-700 dark:text-rose-300">{{ inlineError }}</p>
+	          <span class="flex-1"></span>
+	          <app-button
+	            [label]="inlineSaving ? ('adminUi.common.saving' | translate) : ('adminUi.common.save' | translate)"
+	            size="sm"
+	            [disabled]="inlineSaving"
+	            (action)="saveInline()"
+	          ></app-button>
+	        </div>
+	      </div>
+	      <div class="flex flex-wrap items-center gap-2">
+	        <app-button
+	          *ngIf="showQuickView"
+	          [label]="'shop.quickView' | translate"
           size="sm"
           variant="ghost"
           (action)="openQuickView()"
@@ -119,13 +163,18 @@ import { AdminService } from '../core/admin.service';
     </article>
   `
 })
-export class ProductCardComponent {
+export class ProductCardComponent implements OnChanges {
   @Input({ required: true }) product!: Product;
   @Input() tag?: string | null;
   @Input() rememberShopReturn = false;
   @Input() showQuickView = false;
   @Output() quickView = new EventEmitter<string>();
   statusSaving = false;
+  inlineSaving = false;
+  inlinePrice = '';
+  inlineStock = '';
+  inlineError = '';
+  private lastInlineProductId: string | null = null;
   constructor(
     private translate: TranslateService,
     private wishlist: WishlistService,
@@ -136,6 +185,20 @@ export class ProductCardComponent {
     private admin: AdminService
   ) {
     this.wishlist.ensureLoaded();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (!changes['product']) return;
+    const currentId = this.product?.id ?? null;
+    if (!currentId) return;
+    if (this.lastInlineProductId === currentId) return;
+    this.lastInlineProductId = currentId;
+    const price = typeof this.product?.base_price === 'number' && Number.isFinite(this.product.base_price) ? this.product.base_price : 0;
+    this.inlinePrice = price.toFixed(2);
+    const stock = this.product?.stock_quantity ?? 0;
+    this.inlineStock = String(Number.isFinite(Number(stock)) ? stock : 0);
+    this.inlineError = '';
+    this.inlineSaving = false;
   }
 
   get wishlisted(): boolean {
@@ -277,6 +340,58 @@ export class ProductCardComponent {
       error: () => {
         this.statusSaving = false;
         if (select) select.value = current;
+        this.toast.error(this.translate.instant('adminUi.products.inline.errors.save'));
+      }
+    });
+  }
+
+  saveInline(): void {
+    if (!this.showStorefrontEdit()) return;
+    if (this.inlineSaving) return;
+    this.inlineError = '';
+
+    const rawPrice = String(this.inlinePrice ?? '').trim();
+    if (!rawPrice) {
+      this.inlineError = this.translate.instant('adminUi.products.inline.errors.priceRequired');
+      return;
+    }
+    const price = Number(rawPrice.replace(',', '.'));
+    if (!Number.isFinite(price) || price < 0) {
+      this.inlineError = this.translate.instant('adminUi.products.inline.errors.priceInvalid');
+      return;
+    }
+
+    const rawStock = String(this.inlineStock ?? '').trim();
+    if (!rawStock) {
+      this.inlineError = this.translate.instant('adminUi.products.inline.errors.stockRequired');
+      return;
+    }
+    const stock = Number(rawStock);
+    if (!Number.isFinite(stock) || !Number.isInteger(stock) || stock < 0) {
+      this.inlineError = this.translate.instant('adminUi.products.inline.errors.stockInvalid');
+      return;
+    }
+
+    const currentPrice = typeof this.product?.base_price === 'number' ? this.product.base_price : 0;
+    const currentStock = this.product?.stock_quantity ?? 0;
+    const priceChanged = Math.abs(price - currentPrice) > 1e-9;
+    const stockChanged = stock !== currentStock;
+    if (!priceChanged && !stockChanged) return;
+
+    const update: { product_id: string; base_price?: number; stock_quantity?: number } = { product_id: this.product.id };
+    if (priceChanged) update.base_price = Number(price.toFixed(2));
+    if (stockChanged) update.stock_quantity = stock;
+
+    this.inlineSaving = true;
+    this.admin.bulkUpdateProducts([update]).subscribe({
+      next: () => {
+        this.inlineSaving = false;
+        if (priceChanged) this.product.base_price = Number(price.toFixed(2));
+        if (stockChanged) this.product.stock_quantity = stock;
+        this.toast.success(this.translate.instant('adminUi.products.inline.success'));
+      },
+      error: () => {
+        this.inlineSaving = false;
         this.toast.error(this.translate.instant('adminUi.products.inline.errors.save'));
       }
     });

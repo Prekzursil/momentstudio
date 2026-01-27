@@ -1382,6 +1382,23 @@
         "saveError": "Could not save category.",
         "reorderSuccess": "Category order updated.",
         "reorderError": "Could not reorder categories."
+      },
+      "products": {
+        "bulkSelect": "Bulk select",
+        "bulkDone": "Done",
+        "bulkApply": "Apply",
+        "bulkSelectPage": "Select page",
+        "bulkClear": "Clear",
+        "bulkStatus": "Status",
+        "bulkStatusPlaceholder": "No status change",
+        "bulkCategory": "Category",
+        "bulkCategoryPlaceholder": "No category change",
+        "bulkFeatured": "Featured",
+        "bulkFeaturedPlaceholder": "No featured change",
+        "bulkFeaturedOn": "Featured",
+        "bulkFeaturedOff": "Not featured",
+        "bulkNoSelection": "Select at least one product.",
+        "bulkNoChanges": "Choose at least one action (status/category/featured)."
       }
     },
     "errors": {
@@ -2883,6 +2900,8 @@
         "success": "Product updated.",
         "errors": {
           "save": "Inline update failed.",
+          "priceRequired": "Price is required.",
+          "priceInvalid": "Price must be a number ≥ 0.",
           "stockRequired": "Stock is required.",
           "stockInvalid": "Stock must be a whole number ≥ 0."
         }

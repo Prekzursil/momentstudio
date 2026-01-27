@@ -385,8 +385,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Storefront Categories: safe delete – Delete category from storefront only if unused; otherwise prompt reassignment/merge.
 - [x] Storefront Products: inline edit badges – Show small “Edit” chips on product cards for admins (price/stock/status).
 - [x] Storefront Products: quick publish – One-click publish/unpublish/archive from product card or product detail (admin-only).
-- [ ] Storefront Products: quick stock/price – Inline stock + price editing on the Shop grid for admins (spreadsheet-lite).
-- [ ] Storefront Products: bulk select – Multi-select products on Shop page and apply bulk actions (status/category/feature).
+- [x] Storefront Products: quick stock/price – Inline stock + price editing on the Shop grid for admins (spreadsheet-lite).
+- [x] Storefront Products: bulk select – Multi-select products on Shop page and apply bulk actions (status/category/feature).
+- [ ] Storefront Products: include drafts in edit mode – Allow admins to see/edit draft/archived items on `/shop` when edit mode is enabled.
 - [ ] Storefront Products: drag reorder (category) – Custom sort order per category with drag-and-drop on the category page.
 - [ ] Storefront Products: pin/feature – Pin products to top of a category (per-category featured list) from storefront.
 - [ ] Storefront Products: quick duplicate – Duplicate a product from product detail in edit mode (clone images, mark draft).

@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, EffectRef, OnDestroy, OnInit, effect, signal } from '@angular/core';
+import { Component, EffectRef, OnDestroy, OnInit, computed, effect, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { CatalogService, Category, PaginationMeta, Product, SortOption } from '../../core/catalog.service';
@@ -512,17 +512,28 @@ interface ShopFilterChip {
               />
               <app-button [label]="'shop.search' | translate" size="sm" (action)="onSearch()"></app-button>
             </div>
-            <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-              <span>{{ 'shop.sort' | translate }}</span>
-              <select
-                id="shop-sort-select"
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                [(ngModel)]="filters.sort"
-                (change)="applyFilters()"
+            <div class="flex flex-wrap items-center justify-end gap-3">
+              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <span>{{ 'shop.sort' | translate }}</span>
+                <select
+                  id="shop-sort-select"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="filters.sort"
+                  (change)="applyFilters()"
+                >
+                  <option *ngFor="let option of sortOptions" [value]="option.value">{{ option.label | translate }}</option>
+                </select>
+              </label>
+              <button
+                *ngIf="canEditProducts()"
+                type="button"
+                class="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                [disabled]="bulkSaving()"
+                (click)="toggleBulkSelectMode()"
               >
-                <option *ngFor="let option of sortOptions" [value]="option.value">{{ option.label | translate }}</option>
-              </select>
-            </label>
+                {{ bulkSelectMode() ? ('adminUi.storefront.products.bulkDone' | translate) : ('adminUi.storefront.products.bulkSelect' | translate) }}
+              </button>
+            </div>
           </div>
 
           <div class="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
@@ -554,6 +565,84 @@ interface ShopFilterChip {
             <div *ngIf="!loading() && !hasError() && resultsMetaParams() as meta" class="text-sm text-slate-600 dark:text-slate-300">
               {{ 'shop.resultsMeta' | translate : meta }}
             </div>
+          </div>
+
+          <div
+            *ngIf="canEditProducts() && bulkSelectMode()"
+            class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+          >
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="flex flex-wrap items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                <span class="font-semibold">{{ 'adminUi.products.bulk.selected' | translate : { count: bulkSelectedCount() } }}</span>
+                <button
+                  type="button"
+                  class="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  [disabled]="bulkSaving() || products.length === 0"
+                  (click)="selectAllProductsOnPage()"
+                >
+                  {{ 'adminUi.storefront.products.bulkSelectPage' | translate }}
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  [disabled]="bulkSaving() || bulkSelectedCount() === 0"
+                  (click)="clearBulkSelection()"
+                >
+                  {{ 'adminUi.storefront.products.bulkClear' | translate }}
+                </button>
+              </div>
+              <app-button
+                [label]="'adminUi.storefront.products.bulkApply' | translate"
+                size="sm"
+                [disabled]="bulkSaving() || bulkSelectedCount() === 0 || !bulkHasPendingEdits()"
+                (action)="applyBulkProductEdits()"
+              ></app-button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                <span>{{ 'adminUi.storefront.products.bulkStatus' | translate }}</span>
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [disabled]="bulkSaving()"
+                  [(ngModel)]="bulkStatus"
+                >
+                  <option value="">{{ 'adminUi.storefront.products.bulkStatusPlaceholder' | translate }}</option>
+                  <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+                  <option value="published">{{ 'adminUi.status.published' | translate }}</option>
+                  <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
+                </select>
+              </label>
+
+              <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                <span>{{ 'adminUi.storefront.products.bulkCategory' | translate }}</span>
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [disabled]="bulkSaving()"
+                  [(ngModel)]="bulkCategoryId"
+                >
+                  <option value="">{{ 'adminUi.storefront.products.bulkCategoryPlaceholder' | translate }}</option>
+                  <option *ngFor="let category of bulkCategoryOptions()" [value]="category.id">
+                    {{ bulkCategoryLabel(category) }}
+                  </option>
+                </select>
+              </label>
+
+              <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                <span>{{ 'adminUi.storefront.products.bulkFeatured' | translate }}</span>
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [disabled]="bulkSaving()"
+                  [(ngModel)]="bulkFeatured"
+                >
+                  <option value="">{{ 'adminUi.storefront.products.bulkFeaturedPlaceholder' | translate }}</option>
+                  <option value="true">{{ 'adminUi.storefront.products.bulkFeaturedOn' | translate }}</option>
+                  <option value="false">{{ 'adminUi.storefront.products.bulkFeaturedOff' | translate }}</option>
+                </select>
+              </label>
+            </div>
+
+            <p *ngIf="bulkEditError" class="text-xs text-rose-700 dark:text-rose-300">{{ bulkEditError }}</p>
           </div>
 
           <div *ngIf="loading()" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-4">
@@ -611,13 +700,24 @@ interface ShopFilterChip {
           </div>
 
           <div *ngIf="!loading() && products.length" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <app-product-card
-              *ngFor="let product of products"
-              [product]="product"
-              [rememberShopReturn]="true"
-              [showQuickView]="true"
-              (quickView)="openQuickView($event)"
-            ></app-product-card>
+            <div *ngFor="let product of products" class="relative">
+              <input
+                *ngIf="bulkSelectMode()"
+                type="checkbox"
+                class="absolute left-3 top-3 z-20 h-5 w-5 rounded border-slate-300 bg-white/90 shadow-sm accent-indigo-600 dark:border-slate-600 dark:bg-slate-900/80"
+                [checked]="bulkIsSelected(product.id)"
+                [disabled]="bulkSaving()"
+                [attr.aria-label]="'adminUi.products.table.select' | translate"
+                (click)="$event.stopPropagation()"
+                (change)="toggleBulkSelected($event, product.id)"
+              />
+              <app-product-card
+                [product]="product"
+                [rememberShopReturn]="true"
+                [showQuickView]="true"
+                (quickView)="openQuickView($event)"
+              ></app-product-card>
+            </div>
           </div>
 
           <div *ngIf="pageMeta" class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm text-slate-700 dark:text-slate-300">
@@ -791,10 +891,19 @@ export class ShopComponent implements OnInit, OnDestroy {
 	  mergeSaving = false;
 	  mergeError = '';
 
-	  deletePreviewLoading = false;
-	  deletePreview: AdminCategoryDeletePreview | null = null;
-	  deleteSaving = false;
-	  deleteError = '';
+  deletePreviewLoading = false;
+  deletePreview: AdminCategoryDeletePreview | null = null;
+  deleteSaving = false;
+  deleteError = '';
+
+  bulkSelectMode = signal<boolean>(false);
+  bulkSaving = signal<boolean>(false);
+  bulkSelectedProductIds = signal<Set<string>>(new Set());
+  readonly bulkSelectedCount = computed(() => this.bulkSelectedProductIds().size);
+  bulkStatus = '';
+  bulkCategoryId = '';
+  bulkFeatured = '';
+  bulkEditError = '';
 
   sortOptions: { label: string; value: SortOption }[] = [
     { label: 'shop.sortNew', value: 'newest' },
@@ -836,6 +945,12 @@ export class ShopComponent implements OnInit, OnDestroy {
 	      }
 	      if (this.lastStorefrontEditMode === enabled) return;
 	      this.lastStorefrontEditMode = enabled;
+	      if (!enabled) {
+	        this.bulkSelectMode.set(false);
+	        this.resetBulkEdits();
+	        this.clearBulkSelection();
+	        this.bulkEditError = '';
+	      }
 	      this.cancelCreateCategory();
 	      this.cancelRenameCategory();
 	      this.fetchCategories();
@@ -890,6 +1005,150 @@ export class ShopComponent implements OnInit, OnDestroy {
 
   canEditCategories(): boolean {
     return this.storefrontAdminMode.enabled();
+  }
+
+  canEditProducts(): boolean {
+    return this.storefrontAdminMode.enabled();
+  }
+
+  toggleBulkSelectMode(): void {
+    if (!this.canEditProducts()) return;
+    const next = !this.bulkSelectMode();
+    this.bulkSelectMode.set(next);
+    this.bulkEditError = '';
+    if (!next) {
+      this.resetBulkEdits();
+      this.clearBulkSelection();
+    }
+  }
+
+  bulkHasPendingEdits(): boolean {
+    return Boolean((this.bulkStatus || '').trim() || (this.bulkCategoryId || '').trim() || String(this.bulkFeatured || '').trim());
+  }
+
+  bulkIsSelected(productId: string): boolean {
+    return this.bulkSelectedProductIds().has(productId);
+  }
+
+  toggleBulkSelected(event: Event, productId: string): void {
+    if (!this.bulkSelectMode()) return;
+    if (this.bulkSaving()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const input = event.target as HTMLInputElement | null;
+    const next = new Set(this.bulkSelectedProductIds());
+    if (input?.checked) {
+      next.add(productId);
+    } else {
+      next.delete(productId);
+    }
+    this.bulkSelectedProductIds.set(next);
+  }
+
+  clearBulkSelection(): void {
+    this.bulkSelectedProductIds.set(new Set());
+  }
+
+  selectAllProductsOnPage(): void {
+    if (!this.bulkSelectMode()) return;
+    if (!this.products.length) return;
+    const next = new Set(this.bulkSelectedProductIds());
+    for (const product of this.products) {
+      if (product?.id) next.add(product.id);
+    }
+    this.bulkSelectedProductIds.set(next);
+  }
+
+  applyBulkProductEdits(): void {
+    if (!this.canEditProducts()) return;
+    if (!this.bulkSelectMode()) return;
+    if (this.bulkSaving()) return;
+    this.bulkEditError = '';
+
+    const ids = Array.from(this.bulkSelectedProductIds());
+    if (!ids.length) {
+      this.bulkEditError = this.translate.instant('adminUi.storefront.products.bulkNoSelection');
+      return;
+    }
+    if (!this.bulkHasPendingEdits()) {
+      this.bulkEditError = this.translate.instant('adminUi.storefront.products.bulkNoChanges');
+      return;
+    }
+
+    const status = (this.bulkStatus || '').trim() || null;
+    const categoryId = (this.bulkCategoryId || '').trim() || null;
+    const featuredRaw = String(this.bulkFeatured || '').trim();
+    const featured =
+      featuredRaw === ''
+        ? null
+        : featuredRaw === 'true'
+          ? true
+          : featuredRaw === 'false'
+            ? false
+            : null;
+
+    const updates = ids.map((id) => ({
+      product_id: id,
+      ...(status ? { status } : {}),
+      ...(categoryId ? { category_id: categoryId } : {}),
+      ...(featured === null ? {} : { is_featured: featured })
+    }));
+
+    this.bulkSaving.set(true);
+    this.admin.bulkUpdateProducts(updates).subscribe({
+      next: () => {
+        this.bulkSaving.set(false);
+        for (const product of this.products) {
+          if (!product?.id) continue;
+          if (!this.bulkSelectedProductIds().has(product.id)) continue;
+          if (status) product.status = status;
+          if (featured !== null) product.is_featured = featured;
+        }
+        this.toast.success(this.translate.instant('adminUi.products.bulk.success'));
+        this.resetBulkEdits();
+        this.clearBulkSelection();
+      },
+      error: () => {
+        this.bulkSaving.set(false);
+        this.toast.error(this.translate.instant('adminUi.products.bulk.error'));
+      }
+    });
+  }
+
+  private resetBulkEdits(): void {
+    this.bulkStatus = '';
+    this.bulkCategoryId = '';
+    this.bulkFeatured = '';
+  }
+
+  bulkCategoryOptions(): Category[] {
+    return this.rootCategories
+      .flatMap((root) => [root, ...this.getDescendants(root)])
+      .filter((c) => Boolean(c?.id && c?.name));
+  }
+
+  bulkCategoryLabel(category: Category): string {
+    const parts: string[] = [];
+    const visited = new Set<string>();
+    let current: Category | undefined = category;
+    while (current && current.id && !visited.has(current.id)) {
+      visited.add(current.id);
+      parts.unshift(current.name);
+      if (!current.parent_id) break;
+      current = this.categoriesById.get(current.parent_id);
+    }
+    return parts.join(' / ');
+  }
+
+  private getDescendants(root: Category): Category[] {
+    const parentId = root?.id || '';
+    const children = parentId ? this.childrenByParentId.get(parentId) ?? [] : [];
+    const out: Category[] = [];
+    for (const child of children) {
+      out.push(child);
+      out.push(...this.getDescendants(child));
+    }
+    return out;
   }
 
 	  onRootCategoryDragStart(event: DragEvent, slug: string): void {
@@ -1534,6 +1793,10 @@ export class ShopComponent implements OnInit, OnDestroy {
         next: (response) => {
           const incoming = response.items ?? [];
           this.products = append && this.products.length ? [...this.products, ...incoming] : incoming;
+          if (!append) {
+            this.clearBulkSelection();
+            this.bulkEditError = '';
+          }
           this.pageMeta = response.meta;
           const previousMaxBound = this.priceMaxBound;
           const max = response.bounds?.max_price;
@@ -1591,6 +1854,8 @@ export class ShopComponent implements OnInit, OnDestroy {
           }
           this.products = [];
           this.pageMeta = null;
+          this.clearBulkSelection();
+          this.bulkEditError = '';
           this.hasError.set(true);
           this.toast.error(this.translate.instant('shop.errorTitle'), this.translate.instant('shop.errorCopy'));
         }

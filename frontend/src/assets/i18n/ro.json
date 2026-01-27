@@ -1382,6 +1382,23 @@
         "saveError": "Nu s-a putut salva categoria.",
         "reorderSuccess": "Ordinea categoriilor a fost actualizată.",
         "reorderError": "Nu s-au putut reordona categoriile."
+      },
+      "products": {
+        "bulkSelect": "Selectare în masă",
+        "bulkDone": "Gata",
+        "bulkApply": "Aplică",
+        "bulkSelectPage": "Selectează pagina",
+        "bulkClear": "Golește",
+        "bulkStatus": "Stare",
+        "bulkStatusPlaceholder": "Fără schimbare de stare",
+        "bulkCategory": "Categorie",
+        "bulkCategoryPlaceholder": "Fără schimbare de categorie",
+        "bulkFeatured": "Recomandat",
+        "bulkFeaturedPlaceholder": "Fără schimbare",
+        "bulkFeaturedOn": "Recomandat",
+        "bulkFeaturedOff": "Nerecomandat",
+        "bulkNoSelection": "Selectează cel puțin un produs.",
+        "bulkNoChanges": "Alege cel puțin o acțiune (stare/categorie/recomandat)."
       }
     },
     "errors": {
@@ -2883,6 +2900,8 @@
         "success": "Produs actualizat.",
         "errors": {
           "save": "Actualizarea rapidă a eșuat.",
+          "priceRequired": "Prețul este obligatoriu.",
+          "priceInvalid": "Prețul trebuie să fie un număr ≥ 0.",
           "stockRequired": "Stocul este obligatoriu.",
           "stockInvalid": "Stocul trebuie să fie un număr întreg ≥ 0."
         }
