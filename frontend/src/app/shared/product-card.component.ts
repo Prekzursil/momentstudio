@@ -10,6 +10,7 @@ import { WishlistService } from '../core/wishlist.service';
 import { AuthService } from '../core/auth.service';
 import { ToastService } from '../core/toast.service';
 import { Router } from '@angular/router';
+import { StorefrontAdminModeService } from '../core/storefront-admin-mode.service';
 
 @Component({
   selector: 'app-product-card',
@@ -56,6 +57,14 @@ import { Router } from '@angular/router';
         >
           {{ badge }}
         </span>
+        <button
+          *ngIf="showStorefrontEdit()"
+          type="button"
+          class="absolute left-3 bottom-3 rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm transition hover:bg-white dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
+          (click)="openAdminEdit($event)"
+        >
+          {{ 'adminUi.common.edit' | translate }}
+        </button>
       </a>
       <div class="grid gap-1">
         <div class="flex items-center justify-between gap-2">
@@ -111,7 +120,8 @@ export class ProductCardComponent {
     private wishlist: WishlistService,
     private auth: AuthService,
     private toast: ToastService,
-    private router: Router
+    private router: Router,
+    private storefrontAdminMode: StorefrontAdminModeService
   ) {
     this.wishlist.ensureLoaded();
   }
@@ -207,6 +217,21 @@ export class ProductCardComponent {
     this.rememberShopReturnContext();
     if (!this.product?.slug) return;
     void this.router.navigate(['/products', this.product.slug]);
+  }
+
+  showStorefrontEdit(): boolean {
+    if (!this.storefrontAdminMode.enabled()) return false;
+    if (!this.auth.isAdmin()) return false;
+    if (this.auth.isImpersonating()) return false;
+    return Boolean(this.product?.slug);
+  }
+
+  openAdminEdit(event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    const slug = (this.product?.slug || '').trim();
+    if (!slug) return;
+    void this.router.navigate(['/admin/products'], { state: { editProductSlug: slug } });
   }
 
   openQuickView(): void {

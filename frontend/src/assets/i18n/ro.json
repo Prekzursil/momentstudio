@@ -28,7 +28,8 @@
     "menu": "Meniu",
     "preferences": "Preferințe",
     "theme": "Temă",
-    "language": "Limbă"
+    "language": "Limbă",
+    "editMode": "Mod editare"
   },
   "notifications": {
     "title": "Notificări",
@@ -1322,6 +1323,9 @@
     "save": "Salvează"
   },
   "adminUi": {
+    "common": {
+      "edit": "Editează"
+    },
     "errors": {
       "title": "A apărut o problemă",
       "requestId": "ID cerere",

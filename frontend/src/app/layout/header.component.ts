@@ -5,11 +5,13 @@ import { DatePipe, NgClass, NgForOf, NgIf } from '@angular/common';
 import { CartStore } from '../core/cart.store';
 import { ThemePreference } from '../core/theme.service';
 import { FormsModule } from '@angular/forms';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthService } from '../core/auth.service';
+import { StorefrontAdminModeService } from '../core/storefront-admin-mode.service';
 import { ThemeSegmentedControlComponent } from '../shared/theme-segmented-control.component';
 import { NotificationsService, UserNotification } from '../core/notifications.service';
 import { MaintenanceBannerPublic, OpsService } from '../core/ops.service';
+import { ToastService } from '../core/toast.service';
 
 @Component({
   selector: 'app-header',
@@ -304,17 +306,27 @@ import { MaintenanceBannerPublic, OpsService } from '../core/ops.service';
             </div>
           </div>
         </div>
-        <nav class="hidden lg:flex items-center gap-6 border-t border-slate-200/60 py-2 text-sm font-medium text-slate-700 dark:border-slate-800/60 dark:text-slate-200 overflow-x-auto whitespace-nowrap">
-          <a routerLink="/" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.home' | translate }}</a>
-          <a routerLink="/blog" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.blog' | translate }}</a>
-          <a routerLink="/shop" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.shop' | translate }}</a>
-          <a routerLink="/about" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.about' | translate }}</a>
-          <a routerLink="/contact" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.contact' | translate }}</a>
-          <a routerLink="/pages/terms" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.terms' | translate }}</a>
-          <a
-            *ngIf="isStaff()"
-            routerLink="/admin"
-            class="hover:text-slate-900 dark:hover:text-white"
+	        <nav class="hidden lg:flex items-center gap-6 border-t border-slate-200/60 py-2 text-sm font-medium text-slate-700 dark:border-slate-800/60 dark:text-slate-200 overflow-x-auto whitespace-nowrap">
+	          <a routerLink="/" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.home' | translate }}</a>
+	          <a routerLink="/blog" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.blog' | translate }}</a>
+	          <a routerLink="/shop" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.shop' | translate }}</a>
+	          <a routerLink="/about" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.about' | translate }}</a>
+	          <a routerLink="/contact" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.contact' | translate }}</a>
+	          <a routerLink="/pages/terms" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.terms' | translate }}</a>
+	          <button
+	            *ngIf="isAdmin() && !isImpersonating()"
+	            type="button"
+	            class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition"
+	            [ngClass]="storefrontEditMode() ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'"
+	            (click)="toggleStorefrontEditMode()"
+	            [attr.aria-pressed]="storefrontEditMode()"
+	          >
+	            {{ 'nav.editMode' | translate }}
+	          </button>
+	          <a
+	            *ngIf="isStaff()"
+	            routerLink="/admin"
+	            class="hover:text-slate-900 dark:hover:text-white"
           >
             {{ 'nav.viewAdmin' | translate }}
           </a>
@@ -378,13 +390,15 @@ export class HeaderComponent implements OnDestroy {
 
   banner = signal<MaintenanceBannerPublic | null>(null);
 
-  readonly isAuthenticated = computed(() => this.auth.isAuthenticated());
-  readonly currentUser = computed(() => this.auth.user());
-  readonly isStaff = computed(() => this.auth.isStaff());
-  readonly isImpersonating = computed(() => this.auth.isImpersonating());
-  readonly notifications = computed(() => this.notificationsService.items());
-  readonly notificationsLoading = computed(() => this.notificationsService.loading());
-  readonly unreadCount = computed(() => this.notificationsService.unreadCount());
+	  readonly isAuthenticated = computed(() => this.auth.isAuthenticated());
+	  readonly currentUser = computed(() => this.auth.user());
+	  readonly isStaff = computed(() => this.auth.isStaff());
+	  readonly isAdmin = computed(() => this.auth.isAdmin());
+	  readonly isImpersonating = computed(() => this.auth.isImpersonating());
+	  readonly storefrontEditMode = this.storefrontAdminMode.enabled;
+	  readonly notifications = computed(() => this.notificationsService.items());
+	  readonly notificationsLoading = computed(() => this.notificationsService.loading());
+	  readonly unreadCount = computed(() => this.notificationsService.unreadCount());
 
   readonly navLinks = computed<NavLink[]>(() => {
     const authenticated = this.isAuthenticated();
@@ -408,13 +422,16 @@ export class HeaderComponent implements OnDestroy {
     return links;
   });
 
-  constructor(
-    private cart: CartStore,
-    private router: Router,
-    private auth: AuthService,
-    private notificationsService: NotificationsService,
-    private ops: OpsService
-  ) {
+	  constructor(
+	    private cart: CartStore,
+	    private router: Router,
+	    private auth: AuthService,
+	    private storefrontAdminMode: StorefrontAdminModeService,
+	    private notificationsService: NotificationsService,
+	    private ops: OpsService,
+	    private toast: ToastService,
+	    private translate: TranslateService
+	  ) {
     this.authEffect = effect(() => {
       const authed = this.isAuthenticated();
       if (!authed) {
@@ -433,15 +450,47 @@ export class HeaderComponent implements OnDestroy {
 
   cartCount = this.cart.count;
 
-  onThemeChange(pref: ThemePreference): void {
-    this.themeChange.emit(pref);
-  }
+	  onThemeChange(pref: ThemePreference): void {
+	    this.themeChange.emit(pref);
+	  }
 
-  toggleDrawer(): void {
-    this.drawerOpen = !this.drawerOpen;
-    if (this.drawerOpen) {
-      this.searchOpen = false;
-      this.userMenuOpen = false;
+	  toggleStorefrontEditMode(): void {
+	    if (this.storefrontEditMode()) {
+	      this.storefrontAdminMode.setEnabled(false);
+	      return;
+	    }
+	    if (!this.auth.isAdmin() || this.auth.isImpersonating()) return;
+
+	    this.auth.checkAdminAccess({ silent: true }).subscribe({
+	      next: () => {
+	        this.storefrontAdminMode.setEnabled(true);
+	      },
+	      error: (err) => {
+	        const detail = err?.error?.detail;
+	        if (detail === 'Two-factor authentication or passkey required for admin access') {
+	          this.toast.error(this.translate.instant('adminUi.security.mfaRequired'));
+	          void this.router.navigateByUrl('/account/security');
+	          return;
+	        }
+	        if (
+	          detail === 'Admin access is blocked from this IP address' ||
+	          detail === 'Admin access is restricted to approved IP addresses'
+	        ) {
+	          this.toast.error(this.translate.instant('adminUi.ipBypass.restricted'));
+	          const nextUrl = encodeURIComponent(this.router.url || '/admin/dashboard');
+	          void this.router.navigateByUrl(`/admin/ip-bypass?returnUrl=${nextUrl}`);
+	          return;
+	        }
+	        this.toast.error(detail || this.translate.instant('adminUi.errors.generic'));
+	      }
+	    });
+	  }
+
+	  toggleDrawer(): void {
+	    this.drawerOpen = !this.drawerOpen;
+	    if (this.drawerOpen) {
+	      this.searchOpen = false;
+	      this.userMenuOpen = false;
       this.notificationsOpen = false;
     }
   }

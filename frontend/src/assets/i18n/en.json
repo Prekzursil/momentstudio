@@ -28,7 +28,8 @@
     "menu": "Menu",
     "preferences": "Preferences",
     "theme": "Theme",
-    "language": "Language"
+    "language": "Language",
+    "editMode": "Edit mode"
   },
   "notifications": {
     "title": "Notifications",
@@ -1322,6 +1323,9 @@
     "save": "Save"
   },
   "adminUi": {
+    "common": {
+      "edit": "Edit"
+    },
     "errors": {
       "title": "Something went wrong",
       "requestId": "Request ID",
