@@ -432,6 +432,10 @@ export class ProductComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.wishlist.ensureLoaded();
     this.shopReturnUrl = this.readShopReturnUrl();
+    this.crumbs = [
+      { label: 'nav.home', url: '/' },
+      { label: 'nav.shop', url: this.shopReturnUrl || '/shop' }
+    ];
     this.routeSub = this.route.paramMap.subscribe((params) => {
       const slug = params.get('slug');
       if (slug === this.slug) {
@@ -504,7 +508,7 @@ export class ProductComponent implements OnInit, OnDestroy {
         this.loadError = false;
         this.crumbs = [
           { label: 'nav.home', url: '/' },
-          { label: 'nav.shop', url: '/shop' },
+          { label: 'nav.shop', url: this.shopReturnUrl || '/shop' },
           { label: product.name, url: `/products/${product.slug}` }
         ];
         this.updateMeta(product);

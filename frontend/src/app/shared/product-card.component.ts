@@ -1,5 +1,5 @@
 import { CommonModule, NgOptimizedImage } from '@angular/common';
-import { Component, Input } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Product } from '../core/catalog.service';
 import { ButtonComponent } from './button.component';
@@ -87,7 +87,16 @@ import { Router } from '@angular/router';
           {{ 'product.reviews' | translate : { count: product.rating_count } }}
         </div>
       </div>
-      <app-button [label]="'product.viewDetails' | translate" size="sm" variant="ghost" (action)="goToDetails()"></app-button>
+      <div class="flex flex-wrap items-center gap-2">
+        <app-button
+          *ngIf="showQuickView"
+          [label]="'shop.quickView' | translate"
+          size="sm"
+          variant="ghost"
+          (action)="openQuickView()"
+        ></app-button>
+        <app-button [label]="'product.viewDetails' | translate" size="sm" variant="ghost" (action)="goToDetails()"></app-button>
+      </div>
     </article>
   `
 })
@@ -95,6 +104,8 @@ export class ProductCardComponent {
   @Input({ required: true }) product!: Product;
   @Input() tag?: string | null;
   @Input() rememberShopReturn = false;
+  @Input() showQuickView = false;
+  @Output() quickView = new EventEmitter<string>();
   constructor(
     private translate: TranslateService,
     private wishlist: WishlistService,
@@ -196,6 +207,11 @@ export class ProductCardComponent {
     this.rememberShopReturnContext();
     if (!this.product?.slug) return;
     void this.router.navigate(['/products', this.product.slug]);
+  }
+
+  openQuickView(): void {
+    if (!this.product?.slug) return;
+    this.quickView.emit(this.product.slug);
   }
 
   rememberShopReturnContext(event?: MouseEvent): void {

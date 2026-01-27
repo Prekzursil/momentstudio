@@ -365,12 +365,12 @@ Below is a structured checklist you can turn into issues.
 - [x] Shop: active filter chips – Show selected category/price/tags as removable chips + “Clear all”.
 - [x] Shop: preserve scroll position – When returning from product detail, restore catalog scroll and filters.
 - [x] Shop: result count – Display “X results” and current page range above the grid.
-- [ ] Shop: quick view modal – Open product quick view from card (gallery + key details + add to cart).
-- [ ] Shop: mobile sticky actions – Keep filter/sort controls accessible while scrolling on mobile.
-- [ ] Shop: “Load more” pagination – Optional progressive loading as an alternative to classic pagination.
-- [ ] Shop: better empty states – Suggest clearing filters / show popular categories when no results.
-- [ ] Shop: skeleton grid – Product card skeletons to reduce layout shift during loading.
-- [ ] Shop return UX: make product breadcrumb “Shop” preserve last shop filters/scroll when available.
+- [x] Shop: quick view modal – Open product quick view from card (gallery + key details + add to cart).
+- [x] Shop: mobile sticky actions – Keep filter/sort controls accessible while scrolling on mobile.
+- [x] Shop: “Load more” pagination – Optional progressive loading as an alternative to classic pagination.
+- [x] Shop: better empty states – Suggest clearing filters / show popular categories when no results.
+- [x] Shop: skeleton grid – Product card skeletons to reduce layout shift during loading.
+- [x] Shop return UX: make product breadcrumb “Shop” preserve last shop filters/scroll when available.
 
 ### Storefront Admin Quick Edit (No Dashboard) – Next Improvements (Backlog)
 - [ ] Storefront Admin Mode: toggle – Add an “Edit mode” toggle for admins (header button) that reveals inline controls.

@@ -7,6 +7,7 @@ import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { InputComponent } from '../../shared/input.component';
 import { ProductCardComponent } from '../../shared/product-card.component';
+import { ProductQuickViewModalComponent } from '../../shared/product-quick-view-modal.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
 import { ToastService } from '../../core/toast.service';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
@@ -34,15 +35,16 @@ interface ShopFilterChip {
     ButtonComponent,
     InputComponent,
     ProductCardComponent,
+    ProductQuickViewModalComponent,
     SkeletonComponent,
     BreadcrumbComponent,
     TranslateModule
   ],
   template: `
-    <app-container classes="py-10 grid gap-6">
+	    <app-container classes="pt-10 pb-24 lg:pb-10 grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
       <div class="grid gap-8 lg:grid-cols-[280px_1fr]">
-        <aside class="border border-slate-200 rounded-2xl p-4 bg-white h-fit space-y-6 dark:border-slate-800 dark:bg-slate-900">
+        <aside id="shop-filters" class="border border-slate-200 rounded-2xl p-4 bg-white h-fit space-y-6 scroll-mt-24 dark:border-slate-800 dark:bg-slate-900">
           <div class="space-y-3">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'shop.filters' | translate }}</h2>
@@ -205,7 +207,7 @@ interface ShopFilterChip {
         </aside>
 
         <section class="grid gap-6">
-          <div class="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+          <div id="shop-actions" class="flex flex-col sm:flex-row sm:items-center gap-3 justify-between scroll-mt-24">
             <div class="flex items-center gap-3">
               <input
                 class="w-64 max-w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
@@ -218,6 +220,7 @@ interface ShopFilterChip {
             <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
               <span>{{ 'shop.sort' | translate }}</span>
               <select
+                id="shop-sort-select"
                 class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 [(ngModel)]="filters.sort"
                 (change)="applyFilters()"
@@ -259,7 +262,17 @@ interface ShopFilterChip {
           </div>
 
           <div *ngIf="loading()" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-4">
-            <app-skeleton *ngFor="let i of placeholders" height="260px"></app-skeleton>
+            <div
+              *ngFor="let i of placeholders"
+              class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:bg-slate-900 dark:border-slate-800 dark:shadow-none"
+            >
+              <app-skeleton height="200px"></app-skeleton>
+              <div class="grid gap-2">
+                <app-skeleton height="16px" width="80%"></app-skeleton>
+                <app-skeleton height="16px" width="55%"></app-skeleton>
+                <app-skeleton height="14px" width="92%"></app-skeleton>
+              </div>
+            </div>
           </div>
 
           <div *ngIf="hasError()" class="border border-amber-200 bg-amber-50 rounded-2xl p-6 text-center grid gap-3 dark:border-amber-900/40 dark:bg-amber-950/30">
@@ -274,6 +287,28 @@ interface ShopFilterChip {
           <div *ngIf="!loading() && !hasError() && products.length === 0" class="border border-dashed border-slate-200 rounded-2xl p-10 text-center grid gap-2 dark:border-slate-800">
             <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'shop.noResults' | translate }}</p>
             <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'shop.tryAdjust' | translate }}</p>
+            <div *ngIf="rootCategories.length" class="mt-4 grid gap-2">
+              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                {{ 'shop.suggestedCategories' | translate }}
+              </p>
+              <div class="flex flex-wrap justify-center gap-2">
+                <button
+                  type="button"
+                  class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-800 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-800"
+                  (click)="quickSelectCategory('sale')"
+                >
+                  {{ 'shop.sale' | translate }}
+                </button>
+                <button
+                  *ngFor="let category of rootCategories"
+                  type="button"
+                  class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-800 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-800"
+                  (click)="quickSelectCategory(category.slug)"
+                >
+                  {{ category.name }}
+                </button>
+              </div>
+            </div>
             <div class="flex justify-center gap-3">
               <app-button [label]="'shop.reset' | translate" size="sm" variant="ghost" (action)="resetFilters()"></app-button>
               <app-button [label]="'shop.backHome' | translate" size="sm" variant="ghost" routerLink="/"></app-button>
@@ -281,18 +316,57 @@ interface ShopFilterChip {
           </div>
 
           <div *ngIf="!loading() && products.length" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <app-product-card *ngFor="let product of products" [product]="product" [rememberShopReturn]="true"></app-product-card>
+            <app-product-card
+              *ngFor="let product of products"
+              [product]="product"
+              [rememberShopReturn]="true"
+              [showQuickView]="true"
+              (quickView)="openQuickView($event)"
+            ></app-product-card>
           </div>
 
-          <div *ngIf="pageMeta" class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-300">
-            <div>
-              {{ 'shop.pageMeta' | translate : { page: pageMeta.page, totalPages: pageMeta.total_pages, totalItems: pageMeta.total_items } }}
+          <div *ngIf="pageMeta" class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm text-slate-700 dark:text-slate-300">
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="inline-flex items-center overflow-hidden rounded-full border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+                <button
+                  type="button"
+                  class="px-3 py-2 text-xs font-semibold transition"
+                  [ngClass]="paginationMode === 'pages' ? 'bg-slate-900 text-white dark:bg-slate-50 dark:text-slate-900' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'"
+                  (click)="setPaginationMode('pages')"
+                  [attr.aria-pressed]="paginationMode === 'pages'"
+                >
+                  {{ 'shop.paginationPages' | translate }}
+                </button>
+                <button
+                  type="button"
+                  class="px-3 py-2 text-xs font-semibold transition"
+                  [ngClass]="paginationMode === 'load_more' ? 'bg-slate-900 text-white dark:bg-slate-50 dark:text-slate-900' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'"
+                  (click)="setPaginationMode('load_more')"
+                  [attr.aria-pressed]="paginationMode === 'load_more'"
+                >
+                  {{ 'shop.loadMore' | translate }}
+                </button>
+              </div>
+
+              <div *ngIf="paginationMode === 'pages'">
+                {{ 'shop.pageMeta' | translate : { page: pageMeta.page, totalPages: pageMeta.total_pages, totalItems: pageMeta.total_items } }}
+              </div>
+              <div *ngIf="paginationMode === 'load_more'">
+                {{ 'shop.loadedCount' | translate : { shown: products.length, total: pageMeta.total_items } }}
+              </div>
             </div>
-            <div class="flex gap-2">
-              <app-button label="Prev" size="sm" variant="ghost" [disabled]="pageMeta.page <= 1" (action)="changePage(-1)">
+
+            <div *ngIf="paginationMode === 'pages'" class="flex gap-2">
+              <app-button
+                [label]="'shop.prev' | translate"
+                size="sm"
+                variant="ghost"
+                [disabled]="pageMeta.page <= 1"
+                (action)="changePage(-1)"
+              >
               </app-button>
               <app-button
-                label="Next"
+                [label]="'shop.next' | translate"
                 size="sm"
                 variant="ghost"
                 [disabled]="pageMeta.page >= pageMeta.total_pages"
@@ -300,10 +374,47 @@ interface ShopFilterChip {
               >
               </app-button>
             </div>
+
+            <div *ngIf="paginationMode === 'load_more'" class="flex">
+              <button
+                type="button"
+                class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:bg-slate-800"
+                [disabled]="loadingMore() || pageMeta.page >= pageMeta.total_pages"
+                (click)="loadMore()"
+              >
+                {{ loadingMore() ? ('shop.loadingMore' | translate) : ('shop.loadMore' | translate) }}
+              </button>
+            </div>
           </div>
-        </section>
-      </div>
-    </app-container>
+	        </section>
+	      </div>
+	    </app-container>
+
+	    <div class="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80 lg:hidden">
+	      <div class="mx-auto max-w-6xl px-4 sm:px-6 py-3 grid grid-cols-2 gap-3">
+	        <button
+	          type="button"
+	          class="h-11 w-full rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-white"
+	          (click)="scrollToFilters()"
+	        >
+	          {{ 'shop.filters' | translate }}
+	        </button>
+	        <button
+	          type="button"
+	          class="h-11 w-full rounded-full border border-slate-200 bg-white text-slate-900 text-sm font-semibold hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:bg-slate-800"
+	          (click)="scrollToSort()"
+	        >
+	          {{ 'shop.sort' | translate }}
+	        </button>
+	      </div>
+	    </div>
+
+	    <app-product-quick-view-modal
+	      [open]="quickViewOpen"
+	      [slug]="quickViewSlug"
+	      (closed)="closeQuickView()"
+      (view)="viewProduct($event)"
+    ></app-product-quick-view-modal>
   `
 })
 export class ShopComponent implements OnInit, OnDestroy {
@@ -350,8 +461,13 @@ export class ShopComponent implements OnInit, OnDestroy {
   readonly priceStep = 1;
   private filterDebounce?: ReturnType<typeof setTimeout>;
   private readonly filterDebounceMs = 350;
-	  private suppressNextUrlSync = false;
-    private restoreScrollY: number | null = null;
+  private suppressNextUrlSync = false;
+  private restoreScrollY: number | null = null;
+
+  quickViewOpen = false;
+  quickViewSlug = '';
+  paginationMode: 'pages' | 'load_more' = 'pages';
+  loadingMore = signal<boolean>(false);
 
   sortOptions: { label: string; value: SortOption }[] = [
     { label: 'shop.sortNew', value: 'newest' },
@@ -403,6 +519,73 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.cancelFilterDebounce();
   }
 
+  openQuickView(slug: string): void {
+    const desired = String(slug || '').trim();
+    if (!desired) return;
+    this.quickViewSlug = desired;
+    this.quickViewOpen = true;
+  }
+
+  closeQuickView(): void {
+    this.quickViewOpen = false;
+    this.quickViewSlug = '';
+  }
+
+  viewProduct(slug: string): void {
+    const desired = String(slug || '').trim();
+    if (!desired) return;
+    this.rememberShopReturnContext();
+    this.closeQuickView();
+    void this.router.navigate(['/products', desired]);
+  }
+
+  scrollToFilters(): void {
+    if (typeof document === 'undefined') return;
+    const el = document.getElementById('shop-filters');
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  scrollToSort(): void {
+    if (typeof document === 'undefined') return;
+    const el = document.getElementById('shop-actions');
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => {
+      const select = document.getElementById('shop-sort-select') as HTMLSelectElement | null;
+      select?.focus();
+    }, 350);
+  }
+
+  quickSelectCategory(slug: string): void {
+    this.categorySelection = String(slug || '');
+    this.onCategorySelected();
+    if (typeof window === 'undefined') return;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  setPaginationMode(mode: 'pages' | 'load_more'): void {
+    if (this.paginationMode === mode) return;
+    this.cancelFilterDebounce();
+    this.paginationMode = mode;
+    this.filters.page = 1;
+    this.loadProducts();
+  }
+
+  loadMore(): void {
+    if (this.paginationMode !== 'load_more') return;
+    if (this.loadingMore()) return;
+    const meta = this.pageMeta;
+    if (!meta) return;
+    const nextPage = Number(meta.page ?? this.filters.page) + 1;
+    if (!Number.isFinite(nextPage) || nextPage < 2 || nextPage > meta.total_pages) return;
+    this.cancelFilterDebounce();
+    this.filters.page = nextPage;
+    this.loadingMore.set(true);
+    this.hasError.set(false);
+    this.fetchProducts(true);
+  }
+
   fetchCategories(): void {
     this.catalog.listCategories().subscribe((data) => {
       this.categories = data;
@@ -421,7 +604,7 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.fetchProducts();
   }
 
-  private fetchProducts(): void {
+  private fetchProducts(append = false): void {
 	    const isSale = this.activeCategorySlug === 'sale';
 	    const categorySlug = isSale ? undefined : (this.activeSubcategorySlug || this.activeCategorySlug || undefined);
 	    this.catalog
@@ -438,7 +621,8 @@ export class ShopComponent implements OnInit, OnDestroy {
       })
       .subscribe({
         next: (response) => {
-          this.products = response.items;
+          const incoming = response.items ?? [];
+          this.products = append && this.products.length ? [...this.products, ...incoming] : incoming;
           this.pageMeta = response.meta;
           const previousMaxBound = this.priceMaxBound;
           const max = response.bounds?.max_price;
@@ -474,7 +658,7 @@ export class ShopComponent implements OnInit, OnDestroy {
             ];
           }
           const tagMap = new Map<string, string>();
-          response.items.forEach((p) => {
+          this.products.forEach((p) => {
             (p.tags ?? []).forEach((tag) => tagMap.set(tag.slug, tag.name));
           });
           this.allTags = Array.from(tagMap.entries())
@@ -482,16 +666,38 @@ export class ShopComponent implements OnInit, OnDestroy {
             .sort((a, b) => a.name.localeCompare(b.name));
           this.setMetaTags();
           this.loading.set(false);
+          this.loadingMore.set(false);
           this.hasError.set(false);
-          this.restoreScrollIfNeeded();
+          if (!append) this.restoreScrollIfNeeded();
         },
         error: () => {
           this.loading.set(false);
+          this.loadingMore.set(false);
+          if (append) {
+            this.filters.page = Math.max(1, this.filters.page - 1);
+            this.toast.error(this.translate.instant('shop.errorTitle'), this.translate.instant('shop.errorCopy'));
+            return;
+          }
           this.products = [];
+          this.pageMeta = null;
           this.hasError.set(true);
           this.toast.error(this.translate.instant('shop.errorTitle'), this.translate.instant('shop.errorCopy'));
         }
       });
+  }
+
+  private rememberShopReturnContext(): void {
+    if (typeof sessionStorage === 'undefined') return;
+    try {
+      const url = `${window.location.pathname}${window.location.search || ''}`;
+      if (!url.startsWith('/shop')) return;
+      sessionStorage.setItem('shop_return_pending', '1');
+      sessionStorage.setItem('shop_return_url', url);
+      sessionStorage.setItem('shop_return_scroll_y', String(window.scrollY || 0));
+      sessionStorage.setItem('shop_return_at', String(Date.now()));
+    } catch {
+      // best-effort
+    }
   }
 
   applyFilters(): void {
@@ -542,6 +748,7 @@ export class ShopComponent implements OnInit, OnDestroy {
 
   changePage(delta: number): void {
     this.cancelFilterDebounce();
+    if (this.paginationMode !== 'pages') return;
     if (!this.pageMeta) return;
     const nextPage = this.pageMeta.page + delta;
     if (nextPage < 1 || nextPage > this.pageMeta.total_pages) return;
@@ -880,6 +1087,12 @@ export class ShopComponent implements OnInit, OnDestroy {
     const limit = Number(meta.limit ?? this.filters.limit);
     if (!Number.isFinite(total) || !Number.isFinite(page) || !Number.isFinite(limit) || limit <= 0) return null;
     if (total <= 0) return { total: 0, from: 0, to: 0 };
+
+    if (this.paginationMode === 'load_more') {
+      const shown = Math.max(0, this.products.length);
+      if (shown <= 0) return { total, from: 0, to: 0 };
+      return { total, from: 1, to: Math.min(total, shown) };
+    }
 
     const from = (page - 1) * limit + 1;
     const to = Math.min(total, page * limit);
