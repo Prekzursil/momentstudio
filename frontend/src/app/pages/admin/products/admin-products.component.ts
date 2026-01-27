@@ -380,6 +380,63 @@ type PriceHistoryChart = {
       </app-modal>
 
       <app-modal
+        [open]="bulkStatusConfirmOpen()"
+        [title]="'adminUi.products.bulk.status.title' | translate: { count: selected.size }"
+        [subtitle]="'adminUi.products.bulk.status.subtitle' | translate"
+        [closeLabel]="'adminUi.actions.cancel' | translate"
+        [cancelLabel]="'adminUi.actions.cancel' | translate"
+        [confirmLabel]="bulkStatusConfirmBusy() ? ('adminUi.actions.loading' | translate) : ('adminUi.products.bulk.status.apply' | translate)"
+        [confirmDisabled]="bulkStatusConfirmBusy()"
+        (closed)="closeBulkStatusConfirm()"
+        (confirm)="confirmBulkStatusChange()"
+      >
+        <div class="grid gap-3">
+          <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              {{ 'adminUi.products.bulk.status.target' | translate }}
+            </p>
+            <p class="mt-1 text-sm text-slate-900 dark:text-slate-50">
+              <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="statusPillClass(bulkStatusTarget)">
+                {{ ('adminUi.status.' + bulkStatusTarget) | translate }}
+              </span>
+            </p>
+          </div>
+
+          <div class="grid gap-2">
+            <div
+              *ngFor="let product of selectedProductsOnPage(); trackBy: trackProductId"
+              class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div class="min-w-0">
+                <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ product.name }}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ product.slug }}</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="statusPillClass(product.status)">
+                  {{ ('adminUi.status.' + product.status) | translate }}
+                </span>
+                <span class="text-slate-400">→</span>
+                <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="statusPillClass(bulkStatusTarget)">
+                  {{ ('adminUi.status.' + bulkStatusTarget) | translate }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            {{ 'adminUi.products.bulk.status.undoHint' | translate }}
+          </p>
+
+          <div
+            *ngIf="bulkError()"
+            class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-2 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+          >
+            {{ bulkError() }}
+          </div>
+        </div>
+      </app-modal>
+
+      <app-modal
         [open]="deleteImageConfirmOpen()"
         [title]="'adminUi.products.confirmDeleteImage.title' | translate"
         [subtitle]="'adminUi.products.confirmDeleteImage.subtitle' | translate"
@@ -607,11 +664,28 @@ type PriceHistoryChart = {
                   (action)="clearSaleForSelected()"
                   [disabled]="bulkBusy() || inlineBusy()"
                 ></app-button>
+              </div>
+            </div>
+
+            <div class="grid gap-3 lg:grid-cols-[240px_auto] items-end">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.products.table.status' | translate }}
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="bulkStatusTarget"
+                  [disabled]="bulkBusy() || inlineBusy()"
+                >
+                  <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+                  <option value="published">{{ 'adminUi.status.published' | translate }}</option>
+                  <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
+                </select>
+              </label>
+
+              <div class="flex flex-wrap items-center justify-end gap-2">
                 <app-button
                   size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.products.bulk.publish' | translate"
-                  (action)="publishSelected()"
+                  [label]="'adminUi.products.bulk.status.apply' | translate"
+                  (action)="openBulkStatusConfirm()"
                   [disabled]="bulkBusy() || inlineBusy()"
                 ></app-button>
               </div>
@@ -2791,6 +2865,9 @@ export class AdminProductsComponent implements OnInit {
   bulkSaleType: 'percent' | 'amount' = 'percent';
   bulkSaleValue = '';
   bulkCategoryId = '';
+  bulkStatusTarget: ProductForm['status'] = 'published';
+  bulkStatusConfirmOpen = signal(false);
+  bulkStatusConfirmBusy = signal(false);
   bulkPublishScheduledFor = '';
   bulkUnpublishScheduledFor = '';
   bulkBusy = signal(false);
@@ -3147,6 +3224,71 @@ export class AdminProductsComponent implements OnInit {
     }
     this.selected = next;
     this.updateBulkPricePreview();
+  }
+
+  selectedProductsOnPage(): AdminProductListItem[] {
+    const selected = this.selected;
+    return this.products().filter((p) => selected.has(p.id));
+  }
+
+  openBulkStatusConfirm(): void {
+    this.bulkError.set(null);
+    if (!this.selected.size) return;
+    this.bulkStatusConfirmBusy.set(false);
+    this.bulkStatusConfirmOpen.set(true);
+  }
+
+  closeBulkStatusConfirm(): void {
+    this.bulkStatusConfirmOpen.set(false);
+    this.bulkStatusConfirmBusy.set(false);
+  }
+
+  confirmBulkStatusChange(): void {
+    const items = this.selectedProductsOnPage();
+    if (!items.length) {
+      this.closeBulkStatusConfirm();
+      return;
+    }
+
+    const nextStatus = this.bulkStatusTarget;
+    const payload = items.map((p) => ({ product_id: p.id, status: nextStatus }));
+    const undoPayload = items.map((p) => ({ product_id: p.id, status: p.status }));
+
+    this.bulkError.set(null);
+    this.bulkStatusConfirmBusy.set(true);
+    this.bulkBusy.set(true);
+    this.admin.bulkUpdateProducts(payload).subscribe({
+      next: () => {
+        const count = payload.length;
+        this.bulkBusy.set(false);
+        this.bulkStatusConfirmBusy.set(false);
+        this.closeBulkStatusConfirm();
+        this.toast.action(
+          this.translate.instant('adminUi.products.bulk.status.success', { count }),
+          this.translate.instant('adminUi.actions.undo'),
+          () => this.undoBulkStatusChange(undoPayload),
+          { tone: 'success', durationMs: 8000 }
+        );
+        this.clearSelection();
+        this.load();
+      },
+      error: () => {
+        this.bulkBusy.set(false);
+        this.bulkStatusConfirmBusy.set(false);
+        this.bulkError.set(this.t('adminUi.products.bulk.error'));
+      }
+    });
+  }
+
+  private undoBulkStatusChange(payload: Array<{ product_id: string; status: string }>): void {
+    if (!payload.length) return;
+    this.admin.bulkUpdateProducts(payload).subscribe({
+      next: () => {
+        this.toast.success(this.translate.instant('adminUi.products.bulk.status.undoSuccess'));
+        this.load();
+      },
+      error: () => this.toast.error(this.translate.instant('adminUi.products.bulk.status.undoError'))
+    });
   }
 
   onBulkSaleValueChange(next: string | number): void {

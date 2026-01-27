@@ -910,7 +910,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Products: status selector – Expose draft/published/archived on create/edit with confirmation and audit entry.
 - [x] Admin Products: status badges – Add table badges for status (draft/published/archived) and active/inactive.
 - [x] Admin Products: status filters – Filter products list by status and include an “Archived” tab/view.
-- [ ] Admin Products: bulk status updates – Apply draft/publish/archive to selected products with preview and optional undo window.
+- [x] Admin Products: bulk status updates – Apply draft/publish/archive to selected products with preview and optional undo window.
 - [ ] Admin Products: quick status toggle – One-click publish/unpublish/archive from the products table row actions.
 - [ ] Admin Products: create category inline (product form) – “Add category” from the category selector without navigating away.
 - [ ] Admin Products: create category inline (filters) – Allow creating a category while filtering/browsing products.

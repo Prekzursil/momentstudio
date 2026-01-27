@@ -3172,7 +3172,17 @@
         "applySale": "Aplică reducerea",
         "clearSale": "Șterge reducerea",
         "publish": "Publică",
-        "note": "Aplicarea reducerii mută produsele în Draft. Folosește „Publică” când ești gata.",
+        "note": "Aplicarea reducerii mută produsele în Draft. Folosește „Aplică status” când ești gata.",
+        "status": {
+          "apply": "Aplică status",
+          "title": "Schimbi statusul pentru {{count}} produse?",
+          "subtitle": "Aceasta afectează vizibilitatea în magazin.",
+          "target": "Status nou",
+          "undoHint": "Sfat: după aplicare, poți folosi „Anulează” pentru scurt timp.",
+          "success": "Status actualizat pentru {{count}} produse.",
+          "undoSuccess": "Schimbarea de status a fost anulată.",
+          "undoError": "Nu am putut anula schimbarea de status."
+        },
         "valueRequired": "Introdu valoarea reducerii.",
         "success": "Produsele selectate au fost actualizate.",
         "published": "Produsele selectate au fost publicate.",

@@ -3172,7 +3172,17 @@
         "applySale": "Apply sale",
         "clearSale": "Clear sale",
         "publish": "Publish",
-        "note": "Applying sale pricing forces products back to Draft. Use “Publish” once you're ready.",
+        "note": "Applying sale pricing forces products back to Draft. Use “Apply status” once you're ready.",
+        "status": {
+          "apply": "Apply status",
+          "title": "Change status for {{count}} products?",
+          "subtitle": "This updates storefront visibility.",
+          "target": "New status",
+          "undoHint": "Tip: after applying, you can Undo for a short time.",
+          "success": "Updated status for {{count}} products.",
+          "undoSuccess": "Reverted status change.",
+          "undoError": "Could not undo status change."
+        },
         "valueRequired": "Enter a sale value.",
         "success": "Updated selected products.",
         "published": "Published selected products.",
