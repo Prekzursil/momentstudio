@@ -903,11 +903,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin UX: inline help panels – Contextual “What is this?” help with screenshots/examples per page.
 - [x] Admin UX: confirmation language – Make destructive/irreversible actions use clear language + consequence checklist.
 - [x] Admin UX: success feedback – More obvious success states (“Saved”, “Published”, “Hidden”) with next-step CTAs.
-- [ ] Admin UX: role-based presets – Provide “Owner (basic)” preset that hides technical/ops sections for non-technical admins.
+- [x] Admin UX: role-based presets – Provide “Owner (basic)” preset that hides technical/ops sections for non-technical admins.
 - [ ] Admin UX: help panel screenshots – Add optional screenshot/example media for help panels (products/orders/users/categories).
 
 ### Admin Catalog – Next Improvements (Backlog)
-- [ ] Admin Products: status selector – Expose draft/published/archived on create/edit with confirmation and audit entry.
+- [x] Admin Products: status selector – Expose draft/published/archived on create/edit with confirmation and audit entry.
 - [ ] Admin Products: status badges – Add table badges for status (draft/published/archived) and active/inactive.
 - [ ] Admin Products: status filters – Filter products list by status and include an “Archived” tab/view.
 - [ ] Admin Products: bulk status updates – Apply draft/publish/archive to selected products with preview and optional undo window.

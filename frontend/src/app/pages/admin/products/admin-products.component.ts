@@ -339,6 +339,47 @@ type PriceHistoryChart = {
       </app-modal>
 
       <app-modal
+        [open]="statusConfirmOpen()"
+        [title]="'adminUi.products.confirmStatus.title' | translate"
+        [subtitle]="'adminUi.products.confirmStatus.subtitle' | translate"
+        [closeLabel]="'adminUi.actions.cancel' | translate"
+        [cancelLabel]="'adminUi.actions.cancel' | translate"
+        [confirmLabel]="statusConfirmBusy() ? ('adminUi.actions.loading' | translate) : ('adminUi.actions.save' | translate)"
+        [confirmDisabled]="statusConfirmBusy()"
+        (closed)="closeStatusConfirm()"
+        (confirm)="confirmStatusChange()"
+      >
+        <div class="grid gap-3">
+          <div
+            *ngIf="statusConfirmPrev() as prev"
+            class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+          >
+            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              {{ 'adminUi.products.confirmStatus.summary' | translate }}
+            </p>
+            <p class="mt-1 text-sm text-slate-900 dark:text-slate-50">
+              <span class="font-semibold">{{ ('adminUi.status.' + prev.status) | translate }}</span>
+              →
+              <span class="font-semibold">{{ ('adminUi.status.' + (statusConfirmTarget()?.status || form.status)) | translate }}</span>
+            </p>
+          </div>
+
+          <ul class="list-disc pl-5 text-sm text-slate-700 dark:text-slate-200">
+            <li *ngIf="(statusConfirmTarget()?.status || form.status) === 'published'">
+              {{ 'adminUi.products.confirmStatus.points.published' | translate }}
+            </li>
+            <li *ngIf="(statusConfirmTarget()?.status || form.status) === 'draft'">
+              {{ 'adminUi.products.confirmStatus.points.draft' | translate }}
+            </li>
+            <li *ngIf="(statusConfirmTarget()?.status || form.status) === 'archived'">
+              {{ 'adminUi.products.confirmStatus.points.archived' | translate }}
+            </li>
+            <li>{{ 'adminUi.products.confirmStatus.points.audit' | translate }}</li>
+          </ul>
+        </div>
+      </app-modal>
+
+      <app-modal
         [open]="deleteImageConfirmOpen()"
         [title]="'adminUi.products.confirmDeleteImage.title' | translate"
         [subtitle]="'adminUi.products.confirmDeleteImage.subtitle' | translate"
@@ -2355,6 +2396,18 @@ type PriceHistoryChart = {
               <div class="flex flex-wrap items-center gap-2">
 		            <app-button [label]="'adminUi.products.form.save' | translate" (action)="save()"></app-button>
 
+                <label class="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.products.table.status' | translate }}
+                  <select
+                    class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="form.status"
+                  >
+                    <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+                    <option value="published">{{ 'adminUi.status.published' | translate }}</option>
+                    <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
+                  </select>
+                </label>
+
                 <ng-container *ngIf="editorMessage()">
                   <span
                     class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
@@ -2639,6 +2692,10 @@ export class AdminProductsComponent implements OnInit {
 	  wizardStep = signal(0);
     private wizardAdvanceAfterSave = false;
     private wizardExitAfterPublish = false;
+    statusConfirmOpen = signal(false);
+    statusConfirmBusy = signal(false);
+    statusConfirmPrev = signal<{ status: ProductForm['status']; isActive: boolean } | null>(null);
+    statusConfirmTarget = signal<{ status: ProductForm['status']; isActive: boolean } | null>(null);
     deleteImageConfirmOpen = signal(false);
     deleteImageConfirmBusy = signal(false);
     deleteImageConfirmTarget = signal<{ id: string; url: string; alt: string } | null>(null);
@@ -3707,6 +3764,7 @@ export class AdminProductsComponent implements OnInit {
 	    this.resetDeletedImages();
 		    this.resetImageMeta();
 		    this.form = this.blankForm();
+        this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
 		    this.basePriceError = '';
 		    this.saleValueError = '';
 	    this.resetTranslations();
@@ -3845,6 +3903,7 @@ export class AdminProductsComponent implements OnInit {
           is_bestseller: tagSlugs.includes('bestseller'),
           badges: badgesState
         };
+        this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
         this.images.set(Array.isArray(prod.images) ? prod.images : []);
         this.setVariantsFromProduct(prod);
 	        const productId = this.editingProductId();
@@ -4062,10 +4121,55 @@ export class AdminProductsComponent implements OnInit {
     this.saleValueError = changed ? this.t('adminUi.products.sale.valueHint') : '';
   }
 
-  save(): void {
+  private shouldConfirmStatusChange(): boolean {
+    const prev = this.lastSavedState();
+    if (!prev) return false;
+    return prev.status !== this.form.status;
+  }
+
+  private openStatusConfirm(): void {
+    const prev = this.lastSavedState();
+    if (!prev) return;
+    this.statusConfirmPrev.set(prev);
+    this.statusConfirmTarget.set({ status: this.form.status, isActive: this.form.is_active });
+    this.statusConfirmBusy.set(false);
+    this.statusConfirmOpen.set(true);
+  }
+
+  closeStatusConfirm(): void {
+    this.statusConfirmOpen.set(false);
+    this.statusConfirmBusy.set(false);
+    this.statusConfirmPrev.set(null);
+    this.statusConfirmTarget.set(null);
+  }
+
+  confirmStatusChange(): void {
+    const target = this.statusConfirmTarget();
+    if (!target) return;
+    if (this.statusConfirmBusy()) return;
+    this.form.status = target.status;
+    this.form.is_active = target.isActive;
+    this.statusConfirmBusy.set(true);
+    this.save({
+      skipStatusConfirm: true,
+      done: () => {
+        this.statusConfirmBusy.set(false);
+        this.closeStatusConfirm();
+      }
+    });
+  }
+
+  save(opts?: { skipStatusConfirm?: boolean; done?: (ok: boolean) => void }): void {
+    if (!opts?.skipStatusConfirm && this.shouldConfirmStatusChange()) {
+      this.openStatusConfirm();
+      opts?.done?.(false);
+      return;
+    }
+
     const basePrice = this.parseMoneyInput(this.form.base_price);
     if (basePrice === null) {
       this.editorError.set(this.t('adminUi.products.form.priceFormatHint'));
+      opts?.done?.(false);
       return;
     }
 
@@ -4077,6 +4181,7 @@ export class AdminProductsComponent implements OnInit {
         const amount = this.parseMoneyInput(this.form.sale_value);
         if (amount === null) {
           this.editorError.set(this.t('adminUi.products.sale.valueHint'));
+          opts?.done?.(false);
           return;
         }
         sale_value = amount;
@@ -4084,6 +4189,7 @@ export class AdminProductsComponent implements OnInit {
         const percent = this.parseMoneyInput(this.form.sale_value);
         if (percent === null || percent < 0 || percent > 100) {
           this.editorError.set(this.t('adminUi.products.sale.percentHint'));
+          opts?.done?.(false);
           return;
         }
         sale_value = percent;
@@ -4092,6 +4198,7 @@ export class AdminProductsComponent implements OnInit {
 
     if (this.form.sale_enabled && this.form.sale_auto_publish && !this.form.sale_start_at) {
       this.editorError.set(this.t('adminUi.products.sale.startRequired'));
+      opts?.done?.(false);
       return;
     }
 
@@ -4101,6 +4208,7 @@ export class AdminProductsComponent implements OnInit {
       const parsed = Number(lowStockRaw);
       if (!Number.isFinite(parsed) || parsed < 0) {
         this.editorError.set(this.t('adminUi.lowStock.thresholdError'));
+        opts?.done?.(false);
         return;
       }
       low_stock_threshold = parsed;
@@ -4112,6 +4220,7 @@ export class AdminProductsComponent implements OnInit {
       const parsed = Number(weightRaw);
       if (!Number.isFinite(parsed) || parsed < 0 || !Number.isInteger(parsed)) {
         this.editorError.set(this.t('adminUi.products.shipping.weightHint'));
+        opts?.done?.(false);
         return;
       }
       weight_grams = parsed;
@@ -4130,6 +4239,7 @@ export class AdminProductsComponent implements OnInit {
     const depth_cm = parseDim(this.form.depth_cm);
     if ([width_cm, height_cm, depth_cm].some((val) => typeof val === 'number' && Number.isNaN(val))) {
       this.editorError.set(this.t('adminUi.products.shipping.dimensionsHint'));
+      opts?.done?.(false);
       return;
     }
 
@@ -4145,14 +4255,17 @@ export class AdminProductsComponent implements OnInit {
       const endDate = state.end_at ? new Date(state.end_at) : null;
       if (startDate && Number.isNaN(startDate.getTime())) {
         this.editorError.set(this.t('adminUi.products.badges.errors.invalidDate'));
+        opts?.done?.(false);
         return;
       }
       if (endDate && Number.isNaN(endDate.getTime())) {
         this.editorError.set(this.t('adminUi.products.badges.errors.invalidDate'));
+        opts?.done?.(false);
         return;
       }
       if (startDate && endDate && endDate.getTime() < startDate.getTime()) {
         this.editorError.set(this.t('adminUi.products.badges.errors.endBeforeStart'));
+        opts?.done?.(false);
         return;
       }
       badges.push({
@@ -4210,7 +4323,9 @@ export class AdminProductsComponent implements OnInit {
           this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
 	        if (newSlug) this.loadTranslations(newSlug);
 	        if (newSlug) this.loadRelationships(newSlug);
+          if (newSlug) this.loadAudit(newSlug);
 	        this.load();
+          opts?.done?.(true);
           if (this.wizardExitAfterPublish) {
             this.wizardExitAfterPublish = false;
             this.wizardAdvanceAfterSave = false;
@@ -4222,7 +4337,10 @@ export class AdminProductsComponent implements OnInit {
             this.wizardAdvanceAfterSave = false;
           }
 	      },
-	      error: () => this.editorError.set(this.t('adminUi.products.errors.save'))
+	      error: () => {
+          this.editorError.set(this.t('adminUi.products.errors.save'));
+          opts?.done?.(false);
+        }
 	    });
 	  }
 

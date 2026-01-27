@@ -60,6 +60,41 @@ type AdminNavItem = {
             {{ 'adminUi.nav.searchEmpty' | translate }}
           </div>
 
+          <div *ngIf="auth.role() === 'owner'" class="px-3 pb-2">
+            <div class="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+              <span>{{ 'adminUi.uiPreset.title' | translate }}</span>
+            </div>
+            <div class="mt-1 flex items-center justify-between gap-3">
+              <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <button
+                  type="button"
+                  class="px-3 py-1.5 text-xs font-semibold"
+                  [class.bg-slate-900]="uiPrefs.preset() === 'owner_basic'"
+                  [class.text-white]="uiPrefs.preset() === 'owner_basic'"
+                  [class.text-slate-700]="uiPrefs.preset() !== 'owner_basic'"
+                  [class.dark:text-slate-200]="uiPrefs.preset() !== 'owner_basic'"
+                  (click)="uiPrefs.setPreset('owner_basic')"
+                >
+                  {{ 'adminUi.uiPreset.ownerBasic' | translate }}
+                </button>
+                <button
+                  type="button"
+                  class="px-3 py-1.5 text-xs font-semibold"
+                  [class.bg-slate-900]="uiPrefs.preset() === 'custom'"
+                  [class.text-white]="uiPrefs.preset() === 'custom'"
+                  [class.text-slate-700]="uiPrefs.preset() !== 'custom'"
+                  [class.dark:text-slate-200]="uiPrefs.preset() !== 'custom'"
+                  (click)="uiPrefs.setPreset('custom')"
+                >
+                  {{ 'adminUi.uiPreset.custom' | translate }}
+                </button>
+              </div>
+            </div>
+            <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {{ 'adminUi.uiPreset.hint' | translate }}
+            </div>
+          </div>
+
           <div class="px-3 pb-2">
             <div class="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
               <span>{{ 'adminUi.uiMode.title' | translate }}</span>
@@ -270,6 +305,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     { path: '/admin/support', labelKey: 'adminUi.nav.support', section: 'support' },
     { path: '/admin/ops', labelKey: 'adminUi.nav.ops', section: 'ops' }
   ];
+  private readonly ownerBasicSections = new Set(['dashboard', 'content', 'products', 'orders', 'returns', 'support']);
 
   get navItems(): AdminNavItem[] {
     return this.allNavItems.filter((item) => this.auth.canAccessAdminSection(item.section));
@@ -296,12 +332,14 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
   filteredNavItems(): AdminNavItem[] {
     const items = this.navItems;
     const query = this.navQuery.trim().toLowerCase();
+    const isOwnerBasic = this.uiPrefs.preset() === 'owner_basic';
     if (!query) {
-      if (this.uiPrefs.mode() === 'advanced') return items;
-      const coreSections = new Set(['dashboard', 'content', 'products', 'orders', 'returns', 'support']);
-      return items.filter((item) => coreSections.has(item.section));
+      if (this.uiPrefs.mode() === 'advanced' && !isOwnerBasic) return items;
+      return items.filter((item) => this.ownerBasicSections.has(item.section));
     }
-    return items.filter((item) => {
+
+    const haystack = isOwnerBasic ? items.filter((item) => this.ownerBasicSections.has(item.section)) : items;
+    return haystack.filter((item) => {
       const label = this.navLabel(item).toLowerCase();
       return label.includes(query) || item.section.includes(query);
     });
@@ -333,7 +371,11 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
       .filter((item) => item?.type === 'page')
       .map((item) => (item?.url || '').trim())
       .filter(Boolean);
-    const byPath = new Map(this.navItems.map((item) => [item.path, item]));
+    const items =
+      this.uiPrefs.preset() === 'owner_basic'
+        ? this.navItems.filter((item) => this.ownerBasicSections.has(item.section))
+        : this.navItems;
+    const byPath = new Map(items.map((item) => [item.path, item]));
     return urls.map((url) => byPath.get(url)).filter((item): item is AdminNavItem => Boolean(item));
   }
 
@@ -373,6 +415,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
   }
 
   shouldShowAlerts(): boolean {
+    if (this.uiPrefs.preset() === 'owner_basic') return false;
     if (this.alertsLoading) return true;
     if (this.alertsError) return true;
     if (this.lowStockCount > 0 && this.auth.canAccessAdminSection('inventory')) return true;

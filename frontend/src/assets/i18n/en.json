@@ -1557,6 +1557,12 @@
       "simpleHint": "Hide advanced tools and settings.",
       "advancedHint": "Show all tools and settings."
     },
+    "uiPreset": {
+      "title": "Preset",
+      "ownerBasic": "Owner (basic)",
+      "custom": "Custom",
+      "hint": "Owner (basic) hides inventory, ops, users, and other technical areas."
+    },
     "security": {
       "mfaRequired": "Two-factor authentication or a passkey is required for admin access."
     },
@@ -3023,6 +3029,17 @@
           "storefront": "It will no longer appear on the storefront (gallery and social previews).",
           "restore": "You can restore it later from “Show deleted”.",
           "metadata": "Alt text and captions for this image will be removed from the gallery."
+        }
+      },
+      "confirmStatus": {
+        "title": "Confirm status change",
+        "subtitle": "This affects storefront visibility.",
+        "summary": "Status",
+        "points": {
+          "published": "Publishing can make this product visible to customers (if Active is enabled).",
+          "draft": "Draft products are hidden from the storefront.",
+          "archived": "Archived products are hidden from the storefront but remain in admin history.",
+          "audit": "This change will be recorded in the audit trail."
         }
       },
       "delete": "Delete",

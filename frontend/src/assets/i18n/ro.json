@@ -1557,6 +1557,12 @@
       "simpleHint": "Ascunde uneltele și setările avansate.",
       "advancedHint": "Arată toate uneltele și setările."
     },
+    "uiPreset": {
+      "title": "Preset",
+      "ownerBasic": "Owner (de bază)",
+      "custom": "Personalizat",
+      "hint": "Owner (de bază) ascunde inventarul, operațiunile, utilizatorii și alte zone tehnice."
+    },
     "security": {
       "mfaRequired": "Autentificarea cu doi factori sau o passkey este necesară pentru accesul de administrare."
     },
@@ -3023,6 +3029,17 @@
           "storefront": "Nu va mai apărea în magazin (galerie și previzualizări sociale).",
           "restore": "O poți restaura ulterior din „Arată șterse”.",
           "metadata": "Textul alternativ și descrierile imaginii vor fi eliminate din galerie."
+        }
+      },
+      "confirmStatus": {
+        "title": "Confirmă schimbarea statusului",
+        "subtitle": "Aceasta afectează vizibilitatea în magazin.",
+        "summary": "Status",
+        "points": {
+          "published": "Publicarea poate face produsul vizibil pentru clienți (dacă „Activ” este bifat).",
+          "draft": "Produsele în ciornă sunt ascunse din magazin.",
+          "archived": "Produsele arhivate sunt ascunse din magazin, dar rămân în istoricul de administrare.",
+          "audit": "Schimbarea va fi înregistrată în istoricul de modificări."
         }
       },
       "delete": "Șterge",
