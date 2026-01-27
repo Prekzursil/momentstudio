@@ -1333,10 +1333,14 @@
     "storefront": {
       "categories": {
         "dragHint": "Trage pentru a reordona categoriile. Apasă Editează pentru a redenumi (RO/EN).",
+        "addRoot": "Adaugă categorie",
+        "addSub": "Adaugă subcategorie",
         "nameRo": "Nume (RO)",
         "nameEn": "Nume (EN)",
         "loadError": "Nu s-au putut încărca traducerile categoriei.",
         "namesRequired": "Te rog completează numele în RO și EN.",
+        "createSuccess": "Categoria a fost creată.",
+        "createError": "Nu s-a putut crea categoria.",
         "saveSuccess": "Categoria a fost actualizată.",
         "saveError": "Nu s-a putut salva categoria.",
         "reorderSuccess": "Ordinea categoriilor a fost actualizată.",

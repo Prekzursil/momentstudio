@@ -377,8 +377,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Storefront Admin Mode: permissions – Gate edit mode behind admin role + require recent auth for sensitive actions.
 - [x] Storefront Categories: drag reorder – Reorder nav categories via drag-and-drop directly in the header/category grid.
 - [x] Storefront Categories: quick rename – Inline rename category (RO/EN) from the category list with optimistic save.
-- [ ] Storefront Categories: quick create – Create a new category from the Shop page (no route change) and insert into nav.
-- [ ] Storefront Categories: quick subcategory – Create a subcategory under the current category from `/shop/:category`.
+- [x] Storefront Categories: quick create – Create a new category from the Shop page (no route change) and insert into nav.
+- [x] Storefront Categories: quick subcategory – Create a subcategory under the current category from `/shop/:category`.
 - [ ] Storefront Categories: quick image – Upload/change category thumbnail/banner from the category page in edit mode.
 - [ ] Storefront Categories: hide/show – Toggle category visibility (hide from storefront) with a clear “hidden” badge.
 - [ ] Storefront Categories: merge shortcut – “Merge into…” action surfaced from the category page (server-side preview/confirm).

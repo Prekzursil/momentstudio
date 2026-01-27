@@ -14,7 +14,7 @@ import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.ser
 import { ToastService } from '../../core/toast.service';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { Subscription, combineLatest, forkJoin, switchMap } from 'rxjs';
+import { Subscription, combineLatest, forkJoin, map, switchMap } from 'rxjs';
 import { Meta, Title } from '@angular/platform-browser';
 
 type ShopFilterChipType = 'category' | 'subcategory' | 'price' | 'tag' | 'search';
@@ -64,7 +64,18 @@ interface ShopFilterChip {
           </div>
 
 		          <div class="space-y-3">
-		            <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ 'shop.categories' | translate }}</p>
+		            <div class="flex items-center justify-between gap-2">
+		              <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ 'shop.categories' | translate }}</p>
+		              <button
+		                *ngIf="canEditCategories()"
+		                type="button"
+		                class="rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+		                [disabled]="reorderSaving() || renameSaving || renameLoading || createSaving"
+		                (click)="toggleCreateRootCategory()"
+		              >
+		                {{ isCreatingRootCategory() ? ('adminUi.common.cancel' | translate) : ('adminUi.storefront.categories.addRoot' | translate) }}
+		              </button>
+		            </div>
 		            <p *ngIf="canEditCategories()" class="text-xs text-slate-500 dark:text-slate-400">
 		              {{ 'adminUi.storefront.categories.dragHint' | translate }}
 		            </p>
@@ -91,11 +102,44 @@ interface ShopFilterChip {
 	                />
 	                <span>{{ 'shop.sale' | translate }}</span>
 	              </label>
+		              <div
+		                *ngIf="isCreatingRootCategory()"
+		                class="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
+		              >
+		                <app-input
+		                  [label]="'adminUi.storefront.categories.nameRo' | translate"
+		                  [value]="createNameRo"
+		                  [disabled]="createSaving"
+		                  (valueChange)="createNameRo = String($event ?? '')"
+		                ></app-input>
+		                <app-input
+		                  [label]="'adminUi.storefront.categories.nameEn' | translate"
+		                  [value]="createNameEn"
+		                  [disabled]="createSaving"
+		                  (valueChange)="createNameEn = String($event ?? '')"
+		                ></app-input>
+		                <p *ngIf="createError" class="text-xs text-rose-700 dark:text-rose-300">{{ createError }}</p>
+		                <div class="flex flex-wrap justify-end gap-2">
+		                  <app-button
+		                    [label]="'adminUi.common.cancel' | translate"
+		                    size="sm"
+		                    variant="ghost"
+		                    [disabled]="createSaving"
+		                    (action)="cancelCreateCategory()"
+		                  ></app-button>
+		                  <app-button
+		                    [label]="createSaving ? ('adminUi.common.saving' | translate) : ('adminUi.common.save' | translate)"
+		                    size="sm"
+		                    [disabled]="createSaving || !canSaveCreateCategory()"
+		                    (action)="saveCreateCategory()"
+		                  ></app-button>
+		                </div>
+		              </div>
 		              <label
 		                *ngFor="let category of rootCategories"
 		                class="grid gap-2"
 		                [ngClass]="dragOverRootCategorySlug === category.slug ? 'rounded-lg bg-slate-50 dark:bg-slate-800/60' : ''"
-		                [attr.draggable]="canEditCategories() && editingCategorySlug !== category.slug ? 'true' : null"
+		                [attr.draggable]="canEditCategories() && editingCategorySlug !== category.slug && !isCreatingAnyCategory() ? 'true' : null"
 		                (dragstart)="onRootCategoryDragStart($event, category.slug)"
 		                (dragover)="onRootCategoryDragOver($event, category.slug)"
 		                (drop)="onRootCategoryDrop($event, category.slug)"
@@ -169,33 +213,78 @@ interface ShopFilterChip {
 		                  </div>
 		                </div>
 		                <div
-		                  *ngIf="categorySelection === category.slug && getSubcategories(category).length"
+		                  *ngIf="categorySelection === category.slug && (getSubcategories(category).length || canEditCategories())"
 		                  class="ml-6 grid gap-2"
 		                >
-	                  <p class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'shop.subcategories' | translate }}</p>
-	                  <div class="flex flex-wrap gap-2">
-	                    <button
-	                      type="button"
-	                      class="rounded-full border px-3 py-1 text-xs font-medium transition"
-	                      [ngClass]="!activeSubcategorySlug ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:border-slate-50' : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-slate-50'"
-	                      (click)="setSubcategory('')"
-	                    >
-	                      {{ 'shop.all' | translate }}
-	                    </button>
-	                    <button
-	                      *ngFor="let sub of getSubcategories(category)"
-	                      type="button"
-	                      class="rounded-full border px-3 py-1 text-xs font-medium transition"
-	                      [ngClass]="activeSubcategorySlug === sub.slug ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:border-slate-50' : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-slate-50'"
-	                      (click)="setSubcategory(sub.slug)"
-	                    >
-	                      {{ sub.name }}
-	                    </button>
-	                  </div>
-	                </div>
-	              </label>
-	            </div>
-	          </div>
+		                  <div class="flex items-center justify-between gap-2">
+		                    <p class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'shop.subcategories' | translate }}</p>
+		                    <button
+		                      *ngIf="canEditCategories()"
+		                      type="button"
+		                      class="rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+		                      [disabled]="reorderSaving() || renameSaving || renameLoading || createSaving"
+		                      (click)="toggleCreateSubcategory($event, category)"
+		                    >
+		                      {{ isCreatingSubcategory(category.slug) ? ('adminUi.common.cancel' | translate) : ('adminUi.storefront.categories.addSub' | translate) }}
+		                    </button>
+		                  </div>
+		                  <div
+		                    *ngIf="isCreatingSubcategory(category.slug)"
+		                    class="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
+		                    (click)="$event.stopPropagation()"
+		                  >
+		                    <app-input
+		                      [label]="'adminUi.storefront.categories.nameRo' | translate"
+		                      [value]="createNameRo"
+		                      [disabled]="createSaving"
+		                      (valueChange)="createNameRo = String($event ?? '')"
+		                    ></app-input>
+		                    <app-input
+		                      [label]="'adminUi.storefront.categories.nameEn' | translate"
+		                      [value]="createNameEn"
+		                      [disabled]="createSaving"
+		                      (valueChange)="createNameEn = String($event ?? '')"
+		                    ></app-input>
+		                    <p *ngIf="createError" class="text-xs text-rose-700 dark:text-rose-300">{{ createError }}</p>
+		                    <div class="flex flex-wrap justify-end gap-2">
+		                      <app-button
+		                        [label]="'adminUi.common.cancel' | translate"
+		                        size="sm"
+		                        variant="ghost"
+		                        [disabled]="createSaving"
+		                        (action)="cancelCreateCategory()"
+		                      ></app-button>
+		                      <app-button
+		                        [label]="createSaving ? ('adminUi.common.saving' | translate) : ('adminUi.common.save' | translate)"
+		                        size="sm"
+		                        [disabled]="createSaving || !canSaveCreateCategory()"
+		                        (action)="saveCreateCategory()"
+		                      ></app-button>
+		                    </div>
+		                  </div>
+		                  <div *ngIf="getSubcategories(category).length" class="flex flex-wrap gap-2">
+		                    <button
+		                      type="button"
+		                      class="rounded-full border px-3 py-1 text-xs font-medium transition"
+		                      [ngClass]="!activeSubcategorySlug ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:border-slate-50' : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-slate-50'"
+		                      (click)="setSubcategory('')"
+		                    >
+		                      {{ 'shop.all' | translate }}
+		                    </button>
+		                    <button
+		                      *ngFor="let sub of getSubcategories(category)"
+		                      type="button"
+		                      class="rounded-full border px-3 py-1 text-xs font-medium transition"
+		                      [ngClass]="activeSubcategorySlug === sub.slug ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:border-slate-50' : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-slate-50'"
+		                      (click)="setSubcategory(sub.slug)"
+		                    >
+		                      {{ sub.name }}
+		                    </button>
+		                  </div>
+		                </div>
+		              </label>
+		            </div>
+		          </div>
 
           <div class="space-y-3">
             <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ 'shop.priceRange' | translate }}</p>
@@ -543,9 +632,15 @@ export class ShopComponent implements OnInit, OnDestroy {
   editingCategorySlug = '';
   renameLoading = false;
   renameSaving = false;
-  renameNameRo = '';
-  renameNameEn = '';
-  renameError = '';
+	  renameNameRo = '';
+	  renameNameEn = '';
+	  renameError = '';
+
+	  creatingCategoryParentSlug: string | null = null;
+	  createSaving = false;
+	  createNameRo = '';
+	  createNameEn = '';
+	  createError = '';
 
   sortOptions: { label: string; value: SortOption }[] = [
     { label: 'shop.sortNew', value: 'newest' },
@@ -571,11 +666,12 @@ export class ShopComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.setMetaTags();
-    this.langSub = this.translate.onLangChange.subscribe(() => {
-      this.setMetaTags();
-      this.cancelRenameCategory();
-      this.fetchCategories();
-    });
+	    this.langSub = this.translate.onLangChange.subscribe(() => {
+	      this.setMetaTags();
+	      this.cancelCreateCategory();
+	      this.cancelRenameCategory();
+	      this.fetchCategories();
+	    });
     this.initScrollRestoreFromSession();
     const dataCategories = (this.route.snapshot.data['categories'] as Category[]) ?? [];
     if (dataCategories.length) {
@@ -627,13 +723,14 @@ export class ShopComponent implements OnInit, OnDestroy {
     return this.storefrontAdminMode.enabled();
   }
 
-  onRootCategoryDragStart(event: DragEvent, slug: string): void {
-    if (!this.canEditCategories()) return;
-    if (this.reorderSaving()) return;
-    if (this.renameSaving || this.renameLoading) return;
-    if (this.editingCategorySlug) return;
-    const desired = (slug || '').trim();
-    if (!desired) return;
+	  onRootCategoryDragStart(event: DragEvent, slug: string): void {
+	    if (!this.canEditCategories()) return;
+	    if (this.reorderSaving()) return;
+	    if (this.renameSaving || this.renameLoading) return;
+	    if (this.isCreatingAnyCategory()) return;
+	    if (this.editingCategorySlug) return;
+	    const desired = (slug || '').trim();
+	    if (!desired) return;
     this.draggingRootCategorySlug = desired;
     this.dragOverRootCategorySlug = null;
     try {
@@ -680,11 +777,12 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.dragOverRootCategorySlug = null;
   }
 
-  startRenameCategory(event: MouseEvent, category: Category): void {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!this.canEditCategories()) return;
-    if (this.reorderSaving()) return;
+	  startRenameCategory(event: MouseEvent, category: Category): void {
+	    event.preventDefault();
+	    event.stopPropagation();
+	    if (!this.canEditCategories()) return;
+	    if (this.reorderSaving()) return;
+	    this.cancelCreateCategory();
 
     const slug = (category?.slug || '').trim();
     if (!slug) return;
@@ -723,10 +821,10 @@ export class ShopComponent implements OnInit, OnDestroy {
     });
   }
 
-  cancelRenameCategory(): void {
-    this.editingCategorySlug = '';
-    this.renameLoading = false;
-    this.renameSaving = false;
+	  cancelRenameCategory(): void {
+	    this.editingCategorySlug = '';
+	    this.renameLoading = false;
+	    this.renameSaving = false;
     this.renameError = '';
     this.renameNameRo = '';
     this.renameNameEn = '';
@@ -739,10 +837,10 @@ export class ShopComponent implements OnInit, OnDestroy {
     return Boolean(ro && en);
   }
 
-  saveRenameCategory(): void {
-    if (!this.canEditCategories()) return;
-    if (this.renameSaving || this.renameLoading) return;
-    const slug = (this.editingCategorySlug || '').trim();
+	  saveRenameCategory(): void {
+	    if (!this.canEditCategories()) return;
+	    if (this.renameSaving || this.renameLoading) return;
+	    const slug = (this.editingCategorySlug || '').trim();
     if (!slug) return;
 
     const nameRo = (this.renameNameRo || '').trim();
@@ -779,7 +877,7 @@ export class ShopComponent implements OnInit, OnDestroy {
       });
   }
 
-  scrollToFilters(): void {
+	  scrollToFilters(): void {
     if (typeof document === 'undefined') return;
     const el = document.getElementById('shop-filters');
     if (!el) return;
@@ -826,13 +924,138 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.fetchProducts(true);
   }
 
-  fetchCategories(): void {
-    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-    this.catalog.listCategories(lang).subscribe((data) => {
-      this.categories = data;
-      this.rebuildCategoryTree();
-    });
-  }
+	  fetchCategories(): void {
+	    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+	    this.catalog.listCategories(lang).subscribe((data) => {
+	      this.categories = data;
+	      this.rebuildCategoryTree();
+	    });
+	  }
+
+	  isCreatingAnyCategory(): boolean {
+	    return this.creatingCategoryParentSlug !== null;
+	  }
+
+	  isCreatingRootCategory(): boolean {
+	    return this.creatingCategoryParentSlug === '';
+	  }
+
+	  isCreatingSubcategory(slug: string): boolean {
+	    return this.creatingCategoryParentSlug === slug;
+	  }
+
+	  toggleCreateRootCategory(): void {
+	    if (!this.canEditCategories()) return;
+	    if (this.reorderSaving()) return;
+	    if (this.renameSaving || this.renameLoading) return;
+	    if (this.isCreatingRootCategory()) {
+	      this.cancelCreateCategory();
+	      return;
+	    }
+	    this.cancelRenameCategory();
+	    this.creatingCategoryParentSlug = '';
+	    this.createSaving = false;
+	    this.createError = '';
+	    this.createNameRo = '';
+	    this.createNameEn = '';
+	  }
+
+	  toggleCreateSubcategory(event: MouseEvent, category: Category): void {
+	    event.preventDefault();
+	    event.stopPropagation();
+	    if (!this.canEditCategories()) return;
+	    if (this.reorderSaving()) return;
+	    if (this.renameSaving || this.renameLoading) return;
+	    const slug = (category?.slug || '').trim();
+	    if (!slug) return;
+	    if (this.isCreatingSubcategory(slug)) {
+	      this.cancelCreateCategory();
+	      return;
+	    }
+	    this.cancelRenameCategory();
+	    this.creatingCategoryParentSlug = slug;
+	    this.createSaving = false;
+	    this.createError = '';
+	    this.createNameRo = '';
+	    this.createNameEn = '';
+	  }
+
+	  cancelCreateCategory(): void {
+	    this.creatingCategoryParentSlug = null;
+	    this.createSaving = false;
+	    this.createError = '';
+	    this.createNameRo = '';
+	    this.createNameEn = '';
+	  }
+
+	  canSaveCreateCategory(): boolean {
+	    if (this.createSaving) return false;
+	    const ro = (this.createNameRo || '').trim();
+	    const en = (this.createNameEn || '').trim();
+	    return Boolean(ro && en);
+	  }
+
+	  saveCreateCategory(): void {
+	    if (!this.canEditCategories()) return;
+	    if (this.createSaving) return;
+	    const parentSlug = this.creatingCategoryParentSlug;
+	    if (parentSlug === null) return;
+
+	    const nameRo = (this.createNameRo || '').trim();
+	    const nameEn = (this.createNameEn || '').trim();
+	    if (!nameRo || !nameEn) {
+	      this.createError = this.translate.instant('adminUi.storefront.categories.namesRequired');
+	      return;
+	    }
+
+	    let parentId: string | null = null;
+	    let sortOrder = 0;
+	    if (parentSlug) {
+	      const parent = this.categoriesBySlug.get(parentSlug);
+	      if (!parent) {
+	        this.createError = this.translate.instant('adminUi.storefront.categories.createError');
+	        return;
+	      }
+	      parentId = parent.id;
+	      const siblings = this.getSubcategories(parent);
+	      const maxSortOrder = Math.max(
+	        -1,
+	        ...siblings.map((c) => (typeof c.sort_order === 'number' && Number.isFinite(c.sort_order) ? c.sort_order : 0))
+	      );
+	      sortOrder = maxSortOrder + 1;
+	    } else {
+	      const maxSortOrder = Math.max(
+	        -1,
+	        ...this.rootCategories.map((c) => (typeof c.sort_order === 'number' && Number.isFinite(c.sort_order) ? c.sort_order : 0))
+	      );
+	      sortOrder = maxSortOrder + 1;
+	    }
+
+	    this.createSaving = true;
+	    this.createError = '';
+	    this.admin
+	      .createCategory({ name: nameRo, sort_order: sortOrder, parent_id: parentId })
+	      .pipe(
+	        switchMap((created) =>
+	          forkJoin([
+	            this.admin.upsertCategoryTranslation(created.slug, 'ro', { name: nameRo }),
+	            this.admin.upsertCategoryTranslation(created.slug, 'en', { name: nameEn })
+	          ]).pipe(map(() => created))
+	        )
+	      )
+	      .subscribe({
+	        next: () => {
+	          this.createSaving = false;
+	          this.toast.success(this.translate.instant('adminUi.storefront.categories.createSuccess'));
+	          this.cancelCreateCategory();
+	          this.fetchCategories();
+	        },
+	        error: () => {
+	          this.createSaving = false;
+	          this.createError = this.translate.instant('adminUi.storefront.categories.createError');
+	        }
+	      });
+	  }
 
   private reorderRootCategories(fromSlug: string, toSlug: string): boolean {
     const list = [...this.rootCategories];
