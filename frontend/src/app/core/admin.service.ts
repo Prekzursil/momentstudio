@@ -241,6 +241,9 @@ export interface AdminCategory {
   name: string;
   slug: string;
   description?: string | null;
+  thumbnail_url?: string | null;
+  banner_url?: string | null;
+  is_visible?: boolean;
   low_stock_threshold?: number | null;
   parent_id?: string | null;
   tax_group_id?: string | null;
@@ -794,6 +797,12 @@ export class AdminService {
 
   updateCategory(slug: string, payload: Partial<AdminCategory>): Observable<AdminCategory> {
     return this.api.patch<AdminCategory>(`/catalog/categories/${slug}`, payload);
+  }
+
+  uploadCategoryImage(slug: string, kind: 'thumbnail' | 'banner', file: File): Observable<AdminCategory> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.api.post<AdminCategory>(`/catalog/categories/${slug}/images/${kind}`, form);
   }
 
   getCategoryTranslations(slug: string): Observable<AdminCategoryTranslation[]> {

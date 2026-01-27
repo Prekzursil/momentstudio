@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, signal } from '@angular/core';
+import { Component, EffectRef, OnDestroy, OnInit, effect, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { CatalogService, Category, PaginationMeta, Product, SortOption } from '../../core/catalog.service';
@@ -153,24 +153,46 @@ interface ShopFilterChip {
 		                  >
 		                    ⋮⋮
 		                  </span>
-		                  <input
-		                    type="radio"
-		                    name="category"
-		                    class="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
-		                    [value]="category.slug"
-		                    [(ngModel)]="categorySelection"
-		                    (change)="onCategorySelected()"
-		                  />
-		                  <span class="truncate">{{ category.name }}</span>
-		                  <button
-		                    *ngIf="canEditCategories()"
-		                    type="button"
-		                    class="ml-auto rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-		                    (click)="startRenameCategory($event, category)"
-		                  >
-		                    {{ 'adminUi.common.edit' | translate }}
-		                  </button>
-		                </span>
+			                  <input
+			                    type="radio"
+			                    name="category"
+			                    class="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
+			                    [value]="category.slug"
+			                    [(ngModel)]="categorySelection"
+			                    (change)="onCategorySelected()"
+			                  />
+			                  <span class="truncate">{{ category.name }}</span>
+			                  <span
+			                    *ngIf="canEditCategories() && category.is_visible === false"
+			                    class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-200"
+			                  >
+			                    {{ 'adminUi.storefront.categories.hidden' | translate }}
+			                  </span>
+			                  <div *ngIf="canEditCategories()" class="ml-auto flex items-center gap-2">
+			                    <button
+			                      type="button"
+			                      class="rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+			                      [disabled]="reorderSaving() || renameSaving || renameLoading || createSaving || visibilitySavingSlug === category.slug"
+			                      (click)="toggleCategoryVisibility($event, category)"
+			                    >
+			                      {{
+			                        visibilitySavingSlug === category.slug
+			                          ? ('adminUi.common.saving' | translate)
+			                          : (category.is_visible === false
+			                            ? ('adminUi.storefront.categories.show' | translate)
+			                            : ('adminUi.storefront.categories.hide' | translate))
+			                      }}
+			                    </button>
+			                    <button
+			                      type="button"
+			                      class="rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+			                      [disabled]="reorderSaving() || createSaving || visibilitySavingSlug === category.slug"
+			                      (click)="startRenameCategory($event, category)"
+			                    >
+			                      {{ 'adminUi.common.edit' | translate }}
+			                    </button>
+			                  </div>
+			                </span>
 
 		                <div
 		                  *ngIf="editingCategorySlug === category.slug"
@@ -181,21 +203,64 @@ interface ShopFilterChip {
 		                    {{ 'adminUi.common.loading' | translate }}
 		                  </div>
 
-		                  <div *ngIf="!renameLoading" class="grid gap-3">
-		                    <app-input
-		                      [label]="'adminUi.storefront.categories.nameRo' | translate"
-		                      [value]="renameNameRo"
-		                      [disabled]="renameSaving"
-		                      (valueChange)="renameNameRo = String($event ?? '')"
-		                    ></app-input>
-		                    <app-input
-		                      [label]="'adminUi.storefront.categories.nameEn' | translate"
-		                      [value]="renameNameEn"
-		                      [disabled]="renameSaving"
-		                      (valueChange)="renameNameEn = String($event ?? '')"
-		                    ></app-input>
-		                    <p *ngIf="renameError" class="text-xs text-rose-700 dark:text-rose-300">{{ renameError }}</p>
-		                    <div class="flex flex-wrap justify-end gap-2">
+			                  <div *ngIf="!renameLoading" class="grid gap-3">
+			                    <app-input
+			                      [label]="'adminUi.storefront.categories.nameRo' | translate"
+			                      [value]="renameNameRo"
+			                      [disabled]="renameSaving"
+			                      (valueChange)="renameNameRo = String($event ?? '')"
+			                    ></app-input>
+			                    <app-input
+			                      [label]="'adminUi.storefront.categories.nameEn' | translate"
+			                      [value]="renameNameEn"
+			                      [disabled]="renameSaving"
+			                      (valueChange)="renameNameEn = String($event ?? '')"
+			                    ></app-input>
+			                    <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/40">
+			                      <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+			                        {{ 'adminUi.storefront.categories.images' | translate }}
+			                      </p>
+			                      <div class="grid gap-3">
+			                        <div class="grid gap-2">
+			                          <p class="text-xs font-semibold text-slate-600 dark:text-slate-300">
+			                            {{ 'adminUi.storefront.categories.thumbnail' | translate }}
+			                          </p>
+			                          <div class="flex items-center gap-3">
+			                            <img
+			                              *ngIf="category.thumbnail_url"
+			                              [src]="category.thumbnail_url"
+			                              class="h-12 w-12 rounded-lg border border-slate-200 object-cover dark:border-slate-700"
+			                              [alt]="category.name"
+			                            />
+			                            <input
+			                              type="file"
+			                              accept="image/*"
+			                              class="block w-full text-xs text-slate-700 file:mr-3 file:rounded-full file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white hover:file:bg-slate-800 dark:text-slate-200 dark:file:bg-slate-50 dark:file:text-slate-900 dark:hover:file:bg-white"
+			                              [disabled]="renameSaving || createSaving || categoryImageSavingSlug === category.slug"
+			                              (change)="onCategoryImageSelected($event, category.slug, 'thumbnail')"
+			                            />
+			                          </div>
+			                        </div>
+			                        <div class="grid gap-2">
+			                          <p class="text-xs font-semibold text-slate-600 dark:text-slate-300">
+			                            {{ 'adminUi.storefront.categories.banner' | translate }}
+			                          </p>
+			                          <input
+			                            type="file"
+			                            accept="image/*"
+			                            class="block w-full text-xs text-slate-700 file:mr-3 file:rounded-full file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white hover:file:bg-slate-800 dark:text-slate-200 dark:file:bg-slate-50 dark:file:text-slate-900 dark:hover:file:bg-white"
+			                            [disabled]="renameSaving || createSaving || categoryImageSavingSlug === category.slug"
+			                            (change)="onCategoryImageSelected($event, category.slug, 'banner')"
+			                          />
+			                          <p *ngIf="category.banner_url" class="text-xs text-slate-600 dark:text-slate-300">
+			                            {{ 'adminUi.storefront.categories.currentBanner' | translate }}
+			                          </p>
+			                        </div>
+			                      </div>
+			                      <p *ngIf="categoryImageError" class="text-xs text-rose-700 dark:text-rose-300">{{ categoryImageError }}</p>
+			                    </div>
+			                    <p *ngIf="renameError" class="text-xs text-rose-700 dark:text-rose-300">{{ renameError }}</p>
+			                    <div class="flex flex-wrap justify-end gap-2">
 		                      <app-button
 		                        [label]="'adminUi.common.cancel' | translate"
 		                        size="sm"
@@ -637,10 +702,14 @@ export class ShopComponent implements OnInit, OnDestroy {
 	  renameError = '';
 
 	  creatingCategoryParentSlug: string | null = null;
-	  createSaving = false;
-	  createNameRo = '';
-	  createNameEn = '';
-	  createError = '';
+		  createSaving = false;
+		  createNameRo = '';
+		  createNameEn = '';
+		  createError = '';
+
+	  visibilitySavingSlug: string | null = null;
+	  categoryImageSavingSlug: string | null = null;
+	  categoryImageError = '';
 
   sortOptions: { label: string; value: SortOption }[] = [
     { label: 'shop.sortNew', value: 'newest' },
@@ -650,7 +719,9 @@ export class ShopComponent implements OnInit, OnDestroy {
     { label: 'shop.sortNameDesc', value: 'name_desc' }
   ];
 
-  private langSub?: Subscription;
+	  private langSub?: Subscription;
+	  private storefrontEditModeEffect?: EffectRef;
+	  private lastStorefrontEditMode: boolean | null = null;
 
   constructor(
     private catalog: CatalogService,
@@ -664,16 +735,28 @@ export class ShopComponent implements OnInit, OnDestroy {
     private metaService: Meta
   ) {}
 
-  ngOnInit(): void {
-    this.setMetaTags();
-	    this.langSub = this.translate.onLangChange.subscribe(() => {
-	      this.setMetaTags();
+	  ngOnInit(): void {
+	    this.setMetaTags();
+		    this.langSub = this.translate.onLangChange.subscribe(() => {
+		      this.setMetaTags();
+		      this.cancelCreateCategory();
+		      this.cancelRenameCategory();
+		      this.fetchCategories();
+		    });
+	    this.storefrontEditModeEffect = effect(() => {
+	      const enabled = this.storefrontAdminMode.enabled();
+	      if (this.lastStorefrontEditMode === null) {
+	        this.lastStorefrontEditMode = enabled;
+	        return;
+	      }
+	      if (this.lastStorefrontEditMode === enabled) return;
+	      this.lastStorefrontEditMode = enabled;
 	      this.cancelCreateCategory();
 	      this.cancelRenameCategory();
 	      this.fetchCategories();
 	    });
-    this.initScrollRestoreFromSession();
-    const dataCategories = (this.route.snapshot.data['categories'] as Category[]) ?? [];
+	    this.initScrollRestoreFromSession();
+	    const dataCategories = (this.route.snapshot.data['categories'] as Category[]) ?? [];
     if (dataCategories.length) {
       this.categories = dataCategories;
       this.rebuildCategoryTree();
@@ -694,10 +777,11 @@ export class ShopComponent implements OnInit, OnDestroy {
     });
   }
 
-  ngOnDestroy(): void {
-    this.langSub?.unsubscribe();
-    this.cancelFilterDebounce();
-  }
+	  ngOnDestroy(): void {
+	    this.langSub?.unsubscribe();
+	    this.storefrontEditModeEffect?.destroy();
+	    this.cancelFilterDebounce();
+	  }
 
   openQuickView(slug: string): void {
     const desired = String(slug || '').trim();
@@ -777,12 +861,40 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.dragOverRootCategorySlug = null;
   }
 
-	  startRenameCategory(event: MouseEvent, category: Category): void {
-	    event.preventDefault();
-	    event.stopPropagation();
-	    if (!this.canEditCategories()) return;
-	    if (this.reorderSaving()) return;
-	    this.cancelCreateCategory();
+  toggleCategoryVisibility(event: MouseEvent, category: Category): void {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!this.canEditCategories()) return;
+    if (this.reorderSaving()) return;
+    if (this.renameSaving || this.renameLoading) return;
+    if (this.createSaving) return;
+    if (this.visibilitySavingSlug) return;
+
+    const slug = (category?.slug || '').trim();
+    if (!slug) return;
+    const currentlyVisible = category.is_visible !== false;
+    this.visibilitySavingSlug = slug;
+    this.admin.updateCategory(slug, { is_visible: !currentlyVisible }).subscribe({
+      next: () => {
+        this.visibilitySavingSlug = null;
+        this.toast.success(this.translate.instant('adminUi.storefront.categories.visibilitySuccess'));
+        this.fetchCategories();
+      },
+      error: () => {
+        this.visibilitySavingSlug = null;
+        this.toast.error(this.translate.instant('adminUi.storefront.categories.visibilityError'));
+      }
+    });
+  }
+
+  startRenameCategory(event: MouseEvent, category: Category): void {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!this.canEditCategories()) return;
+    if (this.reorderSaving()) return;
+    this.cancelCreateCategory();
+    this.categoryImageSavingSlug = null;
+    this.categoryImageError = '';
 
     const slug = (category?.slug || '').trim();
     if (!slug) return;
@@ -821,13 +933,15 @@ export class ShopComponent implements OnInit, OnDestroy {
     });
   }
 
-	  cancelRenameCategory(): void {
-	    this.editingCategorySlug = '';
-	    this.renameLoading = false;
-	    this.renameSaving = false;
+  cancelRenameCategory(): void {
+    this.editingCategorySlug = '';
+    this.renameLoading = false;
+    this.renameSaving = false;
     this.renameError = '';
     this.renameNameRo = '';
     this.renameNameEn = '';
+    this.categoryImageSavingSlug = null;
+    this.categoryImageError = '';
   }
 
   canSaveRename(): boolean {
@@ -837,7 +951,7 @@ export class ShopComponent implements OnInit, OnDestroy {
     return Boolean(ro && en);
   }
 
-	  saveRenameCategory(): void {
+  saveRenameCategory(): void {
 	    if (!this.canEditCategories()) return;
 	    if (this.renameSaving || this.renameLoading) return;
 	    const slug = (this.editingCategorySlug || '').trim();
@@ -875,6 +989,35 @@ export class ShopComponent implements OnInit, OnDestroy {
           this.renameError = this.translate.instant('adminUi.storefront.categories.saveError');
         }
       });
+  }
+
+  onCategoryImageSelected(event: Event, slug: string, kind: 'thumbnail' | 'banner'): void {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.[0];
+    if (input) input.value = '';
+    if (!file) return;
+
+    if (!this.canEditCategories()) return;
+    if (this.reorderSaving()) return;
+    if (this.renameSaving || this.renameLoading) return;
+    if (this.createSaving) return;
+    const desired = (slug || '').trim();
+    if (!desired) return;
+    if (this.categoryImageSavingSlug) return;
+
+    this.categoryImageSavingSlug = desired;
+    this.categoryImageError = '';
+    this.admin.uploadCategoryImage(desired, kind, file).subscribe({
+      next: () => {
+        this.categoryImageSavingSlug = null;
+        this.toast.success(this.translate.instant('adminUi.storefront.categories.imageUploadSuccess'));
+        this.fetchCategories();
+      },
+      error: () => {
+        this.categoryImageSavingSlug = null;
+        this.categoryImageError = this.translate.instant('adminUi.storefront.categories.imageUploadError');
+      }
+    });
   }
 
 	  scrollToFilters(): void {
@@ -926,7 +1069,7 @@ export class ShopComponent implements OnInit, OnDestroy {
 
 	  fetchCategories(): void {
 	    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-	    this.catalog.listCategories(lang).subscribe((data) => {
+	    this.catalog.listCategories(lang, { include_hidden: this.canEditCategories() }).subscribe((data) => {
 	      this.categories = data;
 	      this.rebuildCategoryTree();
 	    });

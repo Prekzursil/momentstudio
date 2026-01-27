@@ -65,9 +65,15 @@ router = APIRouter(prefix="/catalog", tags=["catalog"])
 
 @router.get("/categories", response_model=list[CategoryRead])
 async def list_categories(
-    session: AsyncSession = Depends(get_session), lang: str | None = Query(default=None, pattern="^(en|ro)$")
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+    include_hidden: bool = Query(default=False),
+    current_user: User | None = Depends(get_current_user_optional),
 ) -> list[Category]:
+    is_staff = current_user is not None and current_user.role in {UserRole.admin, UserRole.owner, UserRole.content}
     query = select(Category).order_by(Category.sort_order, Category.name)
+    if not (include_hidden and is_staff):
+        query = query.where(Category.is_visible.is_(True))
     if lang:
         query = query.options(selectinload(Category.translations))
     result = await session.execute(query)
@@ -269,6 +275,40 @@ async def reorder_categories(
 ) -> list[CategoryRead]:
     updated = await catalog_service.reorder_categories(session, payload)
     return updated
+
+
+@router.post("/categories/{slug}/images/{kind}", response_model=CategoryRead)
+async def upload_category_image(
+    slug: str,
+    kind: str = Path(pattern="^(thumbnail|banner)$"),
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("products")),
+) -> Category:
+    category = await catalog_service.get_category_by_slug(session, slug)
+    if not category:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+
+    media_root = storage.ensure_media_root()
+    dest = media_root / "catalog" / "categories" / slug
+    path, _filename = storage.save_upload(
+        file,
+        root=dest,
+        allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif"),
+        max_bytes=5 * 1024 * 1024,
+        generate_thumbnails=True,
+    )
+
+    field = "thumbnail_url" if kind == "thumbnail" else "banner_url"
+    previous = getattr(category, field, None)
+    if isinstance(previous, str) and previous.startswith("/media/"):
+        storage.delete_file(previous)
+
+    setattr(category, field, path)
+    session.add(category)
+    await session.commit()
+    await session.refresh(category)
+    return category
 
 
 @router.post("/products", response_model=ProductRead, status_code=status.HTTP_201_CREATED)

@@ -379,8 +379,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Storefront Categories: quick rename – Inline rename category (RO/EN) from the category list with optimistic save.
 - [x] Storefront Categories: quick create – Create a new category from the Shop page (no route change) and insert into nav.
 - [x] Storefront Categories: quick subcategory – Create a subcategory under the current category from `/shop/:category`.
-- [ ] Storefront Categories: quick image – Upload/change category thumbnail/banner from the category page in edit mode.
-- [ ] Storefront Categories: hide/show – Toggle category visibility (hide from storefront) with a clear “hidden” badge.
+- [x] Storefront Categories: quick image – Upload/change category thumbnail/banner from the category page in edit mode.
+- [x] Storefront Categories: hide/show – Toggle category visibility (hide from storefront) with a clear “hidden” badge.
 - [ ] Storefront Categories: merge shortcut – “Merge into…” action surfaced from the category page (server-side preview/confirm).
 - [ ] Storefront Categories: safe delete – Delete category from storefront only if unused; otherwise prompt reassignment/merge.
 - [ ] Storefront Products: inline edit badges – Show small “Edit” chips on product cards for admins (price/stock/status).

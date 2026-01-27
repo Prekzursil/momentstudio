@@ -4457,12 +4457,12 @@ export class AdminProductsComponent implements OnInit {
     this.load();
   }
 
-  private loadCategories(): void {
-    this.catalog.listCategories().subscribe({
-      next: (cats) => this.categories.set(cats || []),
-      error: () => this.categories.set([])
-    });
-  }
+	  private loadCategories(): void {
+	    this.catalog.listCategories(undefined, { include_hidden: true }).subscribe({
+	      next: (cats) => this.categories.set(cats || []),
+	      error: () => this.categories.set([])
+	    });
+	  }
 
   private loadAdminCategories(): void {
     this.admin.getCategories().subscribe({

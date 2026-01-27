@@ -23,6 +23,9 @@ class Category(Base):
     slug: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    thumbnail_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    banner_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    is_visible: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     low_stock_threshold: Mapped[int | None] = mapped_column(nullable=True)
     sort_order: Mapped[int] = mapped_column(nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(

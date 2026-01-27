@@ -654,6 +654,9 @@ async def create_category(session: AsyncSession, payload: CategoryCreate) -> Cat
         slug=candidate,
         name=payload.name,
         description=payload.description,
+        thumbnail_url=getattr(payload, "thumbnail_url", None),
+        banner_url=getattr(payload, "banner_url", None),
+        is_visible=getattr(payload, "is_visible", True),
         sort_order=payload.sort_order,
         parent_id=payload.parent_id,
         tax_group_id=payload.tax_group_id,
@@ -706,20 +709,7 @@ async def reorder_categories(session: AsyncSession, payload: list[CategoryReorde
         return []
     session.add_all(updated)
     await session.commit()
-    return [
-        CategoryRead(
-            id=cat.id,
-            slug=cat.slug,
-            name=cat.name,
-            description=cat.description,
-            sort_order=cat.sort_order,
-            parent_id=cat.parent_id,
-            tax_group_id=getattr(cat, "tax_group_id", None),
-            created_at=cat.created_at,
-            updated_at=cat.updated_at,
-        )
-        for cat in updated
-    ]
+    return [CategoryRead.model_validate(cat) for cat in updated]
 
 
 async def create_product(

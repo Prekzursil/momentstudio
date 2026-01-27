@@ -12,6 +12,9 @@ export interface Category {
   name: string;
   parent_id?: string | null;
   sort_order?: number;
+  thumbnail_url?: string | null;
+  banner_url?: string | null;
+  is_visible?: boolean;
 }
 
 export interface ProductImage {
@@ -122,8 +125,8 @@ export class CatalogService {
     } as Product;
   }
 
-  listCategories(lang?: 'en' | 'ro'): Observable<Category[]> {
-    return this.api.get<Category[]>('/catalog/categories', { lang });
+  listCategories(lang?: 'en' | 'ro', opts?: { include_hidden?: boolean }): Observable<Category[]> {
+    return this.api.get<Category[]>('/catalog/categories', { lang, include_hidden: opts?.include_hidden });
   }
 
   listProducts(params: ProductFilterParams): Observable<ProductListResponse> {

@@ -42,6 +42,9 @@ def _validate_disallowed_couriers(value: object | None) -> list[str]:
 class CategoryFields(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     description: str | None = None
+    thumbnail_url: str | None = Field(default=None, max_length=500)
+    banner_url: str | None = Field(default=None, max_length=500)
+    is_visible: bool = True
     low_stock_threshold: int | None = Field(default=None, ge=0)
     sort_order: int = 0
     parent_id: UUID | None = None
@@ -63,6 +66,9 @@ class CategoryUpdate(BaseModel):
     slug: str | None = Field(default=None, min_length=1, max_length=120)
     name: str | None = Field(default=None, max_length=120)
     description: str | None = None
+    thumbnail_url: str | None = Field(default=None, max_length=500)
+    banner_url: str | None = Field(default=None, max_length=500)
+    is_visible: bool | None = None
     low_stock_threshold: int | None = Field(default=None, ge=0)
     sort_order: int | None = None
     parent_id: UUID | None = None
