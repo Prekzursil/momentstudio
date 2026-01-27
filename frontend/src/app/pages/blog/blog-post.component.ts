@@ -104,28 +104,52 @@ import { formatIdentity } from '../../shared/user-identity';
       </div>
 
       <div *ngIf="!loadingPost() && !hasPostError() && post()">
-        <app-card>
-          <div #articleContent class="grid gap-6">
-            <img
-              *ngIf="post()!.cover_image_url"
-              [src]="post()!.cover_image_url"
-              [alt]="post()!.title"
-              class="w-full aspect-[16/9] rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
-              loading="lazy"
-            />
-            <div class="mx-auto w-full max-w-[72ch]">
-              <div class="markdown blog-markdown text-slate-700 dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
+        <div class="grid gap-6 lg:grid-cols-[1fr_260px] lg:items-start">
+          <app-card>
+            <div #articleContent class="grid gap-6">
+              <img
+                *ngIf="post()!.cover_image_url"
+                [src]="post()!.cover_image_url"
+                [alt]="post()!.title"
+                class="w-full aspect-[16/9] rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+                loading="lazy"
+              />
+              <div class="mx-auto w-full max-w-[72ch]">
+                <div class="markdown blog-markdown text-slate-700 dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
+              </div>
+              <div class="mx-auto w-full max-w-[72ch]">
+                <a
+                  routerLink="/blog"
+                  class="text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
+                >
+                  ← {{ 'blog.post.backToBlog' | translate }}
+                </a>
+              </div>
             </div>
-            <div class="mx-auto w-full max-w-[72ch]">
-              <a
-                routerLink="/blog"
-                class="text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
-              >
-                ← {{ 'blog.post.backToBlog' | translate }}
-              </a>
-            </div>
-          </div>
-        </app-card>
+          </app-card>
+
+          <aside *ngIf="toc().length > 1" class="hidden lg:block lg:sticky lg:top-24">
+            <app-card>
+              <nav class="grid gap-3" [attr.aria-label]="'blog.post.tocTitle' | translate">
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.post.tocTitle' | translate }}</p>
+                <div class="grid gap-1">
+                  <a
+                    *ngFor="let item of toc()"
+                    class="text-sm rounded-md px-2 py-1 transition-colors"
+                    [ngClass]="
+                      (item.id === activeHeadingId() ? 'text-indigo-600 bg-indigo-50 dark:text-indigo-300 dark:bg-indigo-950/40' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-slate-50 dark:hover:bg-slate-950/40') +
+                      (item.level === 3 ? ' pl-5' : '')
+                    "
+                    [attr.href]="'#' + item.id"
+                    (click)="scrollToHeading($event, item.id)"
+                  >
+                    {{ item.title }}
+                  </a>
+                </div>
+              </nav>
+            </app-card>
+          </aside>
+        </div>
       </div>
 
       <section class="grid gap-3">
@@ -328,6 +352,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   loadingPost = signal<boolean>(true);
   hasPostError = signal<boolean>(false);
   bodyHtml = signal<string>('');
+  toc = signal<Array<{ id: string; title: string; level: 2 | 3 }>>([]);
+  activeHeadingId = signal<string | null>(null);
 
   comments = signal<BlogComment[]>([]);
   loadingComments = signal<boolean>(true);
@@ -352,6 +378,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   private document: Document = inject(DOCUMENT);
   private scrollStartY = 0;
   private scrollEndY = 1;
+  private tocHeadingEls: HTMLElement[] = [];
   private scrollListener = () => this.updateReadingProgress();
   private resizeListener = () => this.measureReadingProgressSoon();
 
@@ -399,8 +426,11 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     this.post.set(null);
     this.readingProgress.set(0);
     this.showBackToTop.set(false);
+    this.toc.set([]);
+    this.activeHeadingId.set(null);
     this.scrollStartY = 0;
     this.scrollEndY = 1;
+    this.tocHeadingEls = [];
     this.setCanonical();
 
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
@@ -410,7 +440,9 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     req.subscribe({
       next: (post) => {
         this.post.set(post);
-        this.bodyHtml.set(this.markdown.render(post.body_markdown));
+        const rendered = this.renderPostBody(post.body_markdown);
+        this.bodyHtml.set(rendered.html);
+        this.toc.set(rendered.toc);
         this.loadingPost.set(false);
         this.hasPostError.set(false);
         this.crumbs = [
@@ -425,6 +457,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       error: () => {
         this.post.set(null);
         this.bodyHtml.set('');
+        this.toc.set([]);
+        this.activeHeadingId.set(null);
         this.loadingPost.set(false);
         this.hasPostError.set(true);
         this.setErrorMetaTags();
@@ -439,6 +473,19 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const w = this.document?.defaultView;
     if (!w) return;
     w.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  scrollToHeading(event: Event, id: string): void {
+    event.preventDefault();
+    const w = this.document?.defaultView;
+    if (!w) return;
+    const target = this.document.getElementById(id);
+    if (!target) return;
+    const offset = 112;
+    const top = target.getBoundingClientRect().top + (w.scrollY || 0) - offset;
+    w.scrollTo({ top, behavior: 'smooth' });
+    w.history.replaceState(null, '', `${w.location.pathname}${w.location.search}#${encodeURIComponent(id)}`);
+    this.activeHeadingId.set(id);
   }
 
   loadComments(): void {
@@ -621,6 +668,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const end = rect.bottom + scrollTop - w.innerHeight;
     this.scrollStartY = start;
     this.scrollEndY = Math.max(start + 1, end);
+    this.tocHeadingEls = Array.from(el.querySelectorAll('h2[id], h3[id]')) as HTMLElement[];
+    this.updateActiveHeading();
   }
 
   private updateReadingProgress(): void {
@@ -629,6 +678,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     if (!this.articleContent?.nativeElement) {
       this.readingProgress.set(0);
       this.showBackToTop.set(false);
+      this.activeHeadingId.set(null);
       return;
     }
     if (!this.scrollEndY || this.scrollEndY <= this.scrollStartY + 1) {
@@ -639,5 +689,76 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const progress = Math.min(1, Math.max(0, raw));
     this.readingProgress.set(progress);
     this.showBackToTop.set(scrollTop > this.scrollStartY + 600);
+    this.updateActiveHeading();
+  }
+
+  private updateActiveHeading(): void {
+    if (!this.tocHeadingEls.length) {
+      this.activeHeadingId.set(null);
+      return;
+    }
+    const w = this.document?.defaultView;
+    if (!w) return;
+    const offset = 120;
+    let active: string | null = null;
+    for (const heading of this.tocHeadingEls) {
+      const top = heading.getBoundingClientRect().top;
+      if (top - offset <= 0) {
+        active = heading.id;
+      } else {
+        break;
+      }
+    }
+    this.activeHeadingId.set(active);
+  }
+
+  private renderPostBody(markdown: string): { html: string; toc: Array<{ id: string; title: string; level: 2 | 3 }> } {
+    const html = this.markdown.render(markdown || '');
+    const w = this.document?.defaultView;
+    if (!w?.DOMParser) return { html, toc: [] };
+
+    const parser = new w.DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const headings = Array.from(doc.body.querySelectorAll('h2, h3')) as HTMLElement[];
+
+    const toc: Array<{ id: string; title: string; level: 2 | 3 }> = [];
+    const used = new Set<string>();
+    const linkLabel = this.translate.instant('blog.post.sectionLinkLabel');
+
+    for (const heading of headings) {
+      const level = heading.tagName.toLowerCase() === 'h3' ? 3 : 2;
+      const title = (heading.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!title) continue;
+      const baseId = this.slugifyHeading(title) || 'section';
+      let id = baseId;
+      let i = 2;
+      while (used.has(id)) {
+        id = `${baseId}-${i}`;
+        i += 1;
+      }
+      used.add(id);
+      heading.id = id;
+
+      const anchor = doc.createElement('a');
+      anchor.className = 'blog-heading-anchor';
+      anchor.href = `#${id}`;
+      anchor.setAttribute('aria-label', linkLabel);
+      anchor.textContent = '#';
+      heading.appendChild(anchor);
+
+      toc.push({ id, title, level: level as 2 | 3 });
+    }
+
+    return { html: doc.body.innerHTML, toc };
+  }
+
+  private slugifyHeading(value: string): string {
+    return (value || '')
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+      .slice(0, 80);
   }
 }

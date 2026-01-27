@@ -835,6 +835,8 @@
       "backToBlog": "Înapoi la blog",
       "backToTop": "Înapoi sus",
       "progressLabel": "Progres de citire",
+      "tocTitle": "Cuprins",
+      "sectionLinkLabel": "Link către această secțiune",
       "loadingTitle": "Se încarcă…",
       "errorTitle": "Nu am putut încărca acest articol.",
       "errorCopy": "Încearcă din nou în câteva momente.",

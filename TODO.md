@@ -438,8 +438,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Blog list: JSON feed – Provide `/blog/feed.json` for integrations and modern feed readers.
 - [x] Blog post: typography refresh – Better line length, font sizes, headings, and spacing for a more premium look.
 - [x] Blog post: reading progress – Add a top progress bar and “Back to top” affordance.
-- [ ] Blog post: table of contents – Auto-generate TOC from headings with scroll-spy and anchor links.
-- [ ] Blog post: heading permalinks – Add link icons on headings for easy sharing of sections.
+- [x] Blog post: table of contents – Auto-generate TOC from headings with scroll-spy and anchor links.
+- [x] Blog post: heading permalinks – Add link icons on headings for easy sharing of sections.
 - [ ] Blog post: next/previous nav – Add “Next post / Previous post” navigation at the bottom.
 - [ ] Blog post: related posts – Show related posts by tags/series with thumbnails.
 - [ ] Blog post: share bar – Add share buttons (copy link + WhatsApp/Facebook) with accessible labels.
