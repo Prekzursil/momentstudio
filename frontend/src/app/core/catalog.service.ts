@@ -122,8 +122,8 @@ export class CatalogService {
     } as Product;
   }
 
-  listCategories(): Observable<Category[]> {
-    return this.api.get<Category[]>('/catalog/categories');
+  listCategories(lang?: 'en' | 'ro'): Observable<Category[]> {
+    return this.api.get<Category[]>('/catalog/categories', { lang });
   }
 
   listProducts(params: ProductFilterParams): Observable<ProductListResponse> {

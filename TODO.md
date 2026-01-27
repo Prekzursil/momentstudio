@@ -375,8 +375,8 @@ Below is a structured checklist you can turn into issues.
 ### Storefront Admin Quick Edit (No Dashboard) – Next Improvements (Backlog)
 - [x] Storefront Admin Mode: toggle – Add an “Edit mode” toggle for admins (header button) that reveals inline controls.
 - [x] Storefront Admin Mode: permissions – Gate edit mode behind admin role + require recent auth for sensitive actions.
-- [ ] Storefront Categories: drag reorder – Reorder nav categories via drag-and-drop directly in the header/category grid.
-- [ ] Storefront Categories: quick rename – Inline rename category (RO/EN) from the category list with optimistic save.
+- [x] Storefront Categories: drag reorder – Reorder nav categories via drag-and-drop directly in the header/category grid.
+- [x] Storefront Categories: quick rename – Inline rename category (RO/EN) from the category list with optimistic save.
 - [ ] Storefront Categories: quick create – Create a new category from the Shop page (no route change) and insert into nav.
 - [ ] Storefront Categories: quick subcategory – Create a subcategory under the current category from `/shop/:category`.
 - [ ] Storefront Categories: quick image – Upload/change category thumbnail/banner from the category page in edit mode.

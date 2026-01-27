@@ -1324,7 +1324,24 @@
   },
   "adminUi": {
     "common": {
-      "edit": "Edit"
+      "edit": "Edit",
+      "loading": "Loading…",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saving": "Saving…"
+    },
+    "storefront": {
+      "categories": {
+        "dragHint": "Drag to reorder categories. Click Edit to rename (RO/EN).",
+        "nameRo": "Name (RO)",
+        "nameEn": "Name (EN)",
+        "loadError": "Could not load category translations.",
+        "namesRequired": "Please provide both RO and EN names.",
+        "saveSuccess": "Category updated.",
+        "saveError": "Could not save category.",
+        "reorderSuccess": "Category order updated.",
+        "reorderError": "Could not reorder categories."
+      }
     },
     "errors": {
       "title": "Something went wrong",

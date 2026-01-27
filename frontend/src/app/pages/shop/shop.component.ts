@@ -9,10 +9,12 @@ import { InputComponent } from '../../shared/input.component';
 import { ProductCardComponent } from '../../shared/product-card.component';
 import { ProductQuickViewModalComponent } from '../../shared/product-quick-view-modal.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
+import { AdminService } from '../../core/admin.service';
+import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 import { ToastService } from '../../core/toast.service';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { Subscription, combineLatest } from 'rxjs';
+import { Subscription, combineLatest, forkJoin, switchMap } from 'rxjs';
 import { Meta, Title } from '@angular/platform-browser';
 
 type ShopFilterChipType = 'category' | 'subcategory' | 'price' | 'tag' | 'search';
@@ -61,12 +63,15 @@ interface ShopFilterChip {
             </app-input>
           </div>
 
-	          <div class="space-y-3">
-	            <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ 'shop.categories' | translate }}</p>
-	            <div class="space-y-2 max-h-48 overflow-auto pr-1">
-	              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-	                <input
-	                  type="radio"
+		          <div class="space-y-3">
+		            <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ 'shop.categories' | translate }}</p>
+		            <p *ngIf="canEditCategories()" class="text-xs text-slate-500 dark:text-slate-400">
+		              {{ 'adminUi.storefront.categories.dragHint' | translate }}
+		            </p>
+		            <div class="space-y-2 max-h-48 overflow-auto pr-1">
+		              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+		                <input
+		                  type="radio"
 	                  name="category"
 	                  class="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
 	                  value=""
@@ -86,25 +91,87 @@ interface ShopFilterChip {
 	                />
 	                <span>{{ 'shop.sale' | translate }}</span>
 	              </label>
-	              <label
-	                *ngFor="let category of rootCategories"
-	                class="grid gap-2"
-	              >
-	                <span class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-	                  <input
-	                    type="radio"
-	                    name="category"
-	                    class="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
-	                    [value]="category.slug"
-	                    [(ngModel)]="categorySelection"
-	                    (change)="onCategorySelected()"
-	                  />
-	                  <span>{{ category.name }}</span>
-	                </span>
-	                <div
-	                  *ngIf="categorySelection === category.slug && getSubcategories(category).length"
-	                  class="ml-6 grid gap-2"
-	                >
+		              <label
+		                *ngFor="let category of rootCategories"
+		                class="grid gap-2"
+		                [ngClass]="dragOverRootCategorySlug === category.slug ? 'rounded-lg bg-slate-50 dark:bg-slate-800/60' : ''"
+		                [attr.draggable]="canEditCategories() && editingCategorySlug !== category.slug ? 'true' : null"
+		                (dragstart)="onRootCategoryDragStart($event, category.slug)"
+		                (dragover)="onRootCategoryDragOver($event, category.slug)"
+		                (drop)="onRootCategoryDrop($event, category.slug)"
+		                (dragend)="onRootCategoryDragEnd()"
+		              >
+		                <span class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+		                  <span
+		                    *ngIf="canEditCategories()"
+		                    class="text-slate-400 dark:text-slate-500 select-none cursor-grab"
+		                    aria-hidden="true"
+		                  >
+		                    ⋮⋮
+		                  </span>
+		                  <input
+		                    type="radio"
+		                    name="category"
+		                    class="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
+		                    [value]="category.slug"
+		                    [(ngModel)]="categorySelection"
+		                    (change)="onCategorySelected()"
+		                  />
+		                  <span class="truncate">{{ category.name }}</span>
+		                  <button
+		                    *ngIf="canEditCategories()"
+		                    type="button"
+		                    class="ml-auto rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+		                    (click)="startRenameCategory($event, category)"
+		                  >
+		                    {{ 'adminUi.common.edit' | translate }}
+		                  </button>
+		                </span>
+
+		                <div
+		                  *ngIf="editingCategorySlug === category.slug"
+		                  class="ml-6 grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
+		                  (click)="$event.stopPropagation()"
+		                >
+		                  <div *ngIf="renameLoading" class="text-xs text-slate-600 dark:text-slate-300">
+		                    {{ 'adminUi.common.loading' | translate }}
+		                  </div>
+
+		                  <div *ngIf="!renameLoading" class="grid gap-3">
+		                    <app-input
+		                      [label]="'adminUi.storefront.categories.nameRo' | translate"
+		                      [value]="renameNameRo"
+		                      [disabled]="renameSaving"
+		                      (valueChange)="renameNameRo = String($event ?? '')"
+		                    ></app-input>
+		                    <app-input
+		                      [label]="'adminUi.storefront.categories.nameEn' | translate"
+		                      [value]="renameNameEn"
+		                      [disabled]="renameSaving"
+		                      (valueChange)="renameNameEn = String($event ?? '')"
+		                    ></app-input>
+		                    <p *ngIf="renameError" class="text-xs text-rose-700 dark:text-rose-300">{{ renameError }}</p>
+		                    <div class="flex flex-wrap justify-end gap-2">
+		                      <app-button
+		                        [label]="'adminUi.common.cancel' | translate"
+		                        size="sm"
+		                        variant="ghost"
+		                        [disabled]="renameSaving"
+		                        (action)="cancelRenameCategory()"
+		                      ></app-button>
+		                      <app-button
+		                        [label]="renameSaving ? ('adminUi.common.saving' | translate) : ('adminUi.common.save' | translate)"
+		                        size="sm"
+		                        [disabled]="renameSaving || !canSaveRename()"
+		                        (action)="saveRenameCategory()"
+		                      ></app-button>
+		                    </div>
+		                  </div>
+		                </div>
+		                <div
+		                  *ngIf="categorySelection === category.slug && getSubcategories(category).length"
+		                  class="ml-6 grid gap-2"
+		                >
 	                  <p class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'shop.subcategories' | translate }}</p>
 	                  <div class="flex flex-wrap gap-2">
 	                    <button
@@ -469,6 +536,17 @@ export class ShopComponent implements OnInit, OnDestroy {
   paginationMode: 'pages' | 'load_more' = 'pages';
   loadingMore = signal<boolean>(false);
 
+  draggingRootCategorySlug: string | null = null;
+  dragOverRootCategorySlug: string | null = null;
+  reorderSaving = signal<boolean>(false);
+
+  editingCategorySlug = '';
+  renameLoading = false;
+  renameSaving = false;
+  renameNameRo = '';
+  renameNameEn = '';
+  renameError = '';
+
   sortOptions: { label: string; value: SortOption }[] = [
     { label: 'shop.sortNew', value: 'newest' },
     { label: 'shop.sortPriceAsc', value: 'price_asc' },
@@ -483,6 +561,8 @@ export class ShopComponent implements OnInit, OnDestroy {
     private catalog: CatalogService,
     private route: ActivatedRoute,
     private router: Router,
+    private admin: AdminService,
+    private storefrontAdminMode: StorefrontAdminModeService,
     private toast: ToastService,
     private translate: TranslateService,
     private title: Title,
@@ -491,7 +571,11 @@ export class ShopComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.setMetaTags();
-    this.langSub = this.translate.onLangChange.subscribe(() => this.setMetaTags());
+    this.langSub = this.translate.onLangChange.subscribe(() => {
+      this.setMetaTags();
+      this.cancelRenameCategory();
+      this.fetchCategories();
+    });
     this.initScrollRestoreFromSession();
     const dataCategories = (this.route.snapshot.data['categories'] as Category[]) ?? [];
     if (dataCategories.length) {
@@ -537,6 +621,162 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.rememberShopReturnContext();
     this.closeQuickView();
     void this.router.navigate(['/products', desired]);
+  }
+
+  canEditCategories(): boolean {
+    return this.storefrontAdminMode.enabled();
+  }
+
+  onRootCategoryDragStart(event: DragEvent, slug: string): void {
+    if (!this.canEditCategories()) return;
+    if (this.reorderSaving()) return;
+    if (this.renameSaving || this.renameLoading) return;
+    if (this.editingCategorySlug) return;
+    const desired = (slug || '').trim();
+    if (!desired) return;
+    this.draggingRootCategorySlug = desired;
+    this.dragOverRootCategorySlug = null;
+    try {
+      event.dataTransfer?.setData('text/plain', desired);
+      event.dataTransfer?.setDragImage?.((event.target as HTMLElement) ?? new Image(), 0, 0);
+      event.dataTransfer!.effectAllowed = 'move';
+    } catch {
+      // ignore
+    }
+  }
+
+  onRootCategoryDragOver(event: DragEvent, slug: string): void {
+    if (!this.canEditCategories()) return;
+    if (!this.draggingRootCategorySlug) return;
+    if (this.reorderSaving()) return;
+    const over = (slug || '').trim();
+    if (!over || over === this.draggingRootCategorySlug) return;
+    event.preventDefault();
+    this.dragOverRootCategorySlug = over;
+    try {
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    } catch {
+      // ignore
+    }
+  }
+
+  onRootCategoryDrop(event: DragEvent, slug: string): void {
+    if (!this.canEditCategories()) return;
+    const from = this.draggingRootCategorySlug;
+    if (!from) return;
+    if (this.reorderSaving()) return;
+    const to = (slug || '').trim();
+    if (!to || to === from) return;
+    event.preventDefault();
+
+    const previous = this.rootCategories.map((c) => c.slug);
+    const moved = this.reorderRootCategories(from, to);
+    if (!moved) return;
+    this.persistRootCategoryOrder(previous);
+  }
+
+  onRootCategoryDragEnd(): void {
+    this.draggingRootCategorySlug = null;
+    this.dragOverRootCategorySlug = null;
+  }
+
+  startRenameCategory(event: MouseEvent, category: Category): void {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!this.canEditCategories()) return;
+    if (this.reorderSaving()) return;
+
+    const slug = (category?.slug || '').trim();
+    if (!slug) return;
+
+    if (this.editingCategorySlug === slug) {
+      this.cancelRenameCategory();
+      return;
+    }
+
+    this.editingCategorySlug = slug;
+    this.renameLoading = true;
+    this.renameSaving = false;
+    this.renameError = '';
+    this.renameNameRo = '';
+    this.renameNameEn = '';
+
+    this.admin.getCategoryTranslations(slug).subscribe({
+      next: (rows) => {
+        const ro = rows.find((r) => r.lang === 'ro')?.name?.trim() ?? '';
+        const en = rows.find((r) => r.lang === 'en')?.name?.trim() ?? '';
+        const currentLang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+        this.renameNameRo = ro || (currentLang === 'ro' ? (category.name || '').trim() : '');
+        this.renameNameEn = en || (currentLang === 'en' ? (category.name || '').trim() : '');
+        if (!this.renameNameRo && !this.renameNameEn) {
+          this.renameNameRo = (category.name || '').trim();
+        }
+        this.renameLoading = false;
+      },
+      error: () => {
+        const currentLang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+        this.renameNameRo = currentLang === 'ro' ? (category.name || '').trim() : '';
+        this.renameNameEn = currentLang === 'en' ? (category.name || '').trim() : '';
+        this.renameLoading = false;
+        this.renameError = this.translate.instant('adminUi.storefront.categories.loadError');
+      }
+    });
+  }
+
+  cancelRenameCategory(): void {
+    this.editingCategorySlug = '';
+    this.renameLoading = false;
+    this.renameSaving = false;
+    this.renameError = '';
+    this.renameNameRo = '';
+    this.renameNameEn = '';
+  }
+
+  canSaveRename(): boolean {
+    if (this.renameLoading || this.renameSaving) return false;
+    const ro = (this.renameNameRo || '').trim();
+    const en = (this.renameNameEn || '').trim();
+    return Boolean(ro && en);
+  }
+
+  saveRenameCategory(): void {
+    if (!this.canEditCategories()) return;
+    if (this.renameSaving || this.renameLoading) return;
+    const slug = (this.editingCategorySlug || '').trim();
+    if (!slug) return;
+
+    const nameRo = (this.renameNameRo || '').trim();
+    const nameEn = (this.renameNameEn || '').trim();
+    if (!nameRo || !nameEn) {
+      this.renameError = this.translate.instant('adminUi.storefront.categories.namesRequired');
+      return;
+    }
+
+    this.renameSaving = true;
+    this.renameError = '';
+
+    this.admin
+      .updateCategory(slug, { name: nameRo })
+      .pipe(
+        switchMap(() =>
+          forkJoin([
+            this.admin.upsertCategoryTranslation(slug, 'ro', { name: nameRo }),
+            this.admin.upsertCategoryTranslation(slug, 'en', { name: nameEn })
+          ])
+        )
+      )
+      .subscribe({
+        next: () => {
+          this.renameSaving = false;
+          this.toast.success(this.translate.instant('adminUi.storefront.categories.saveSuccess'));
+          this.cancelRenameCategory();
+          this.fetchCategories();
+        },
+        error: () => {
+          this.renameSaving = false;
+          this.renameError = this.translate.instant('adminUi.storefront.categories.saveError');
+        }
+      });
   }
 
   scrollToFilters(): void {
@@ -587,9 +827,71 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   fetchCategories(): void {
-    this.catalog.listCategories().subscribe((data) => {
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    this.catalog.listCategories(lang).subscribe((data) => {
       this.categories = data;
       this.rebuildCategoryTree();
+    });
+  }
+
+  private reorderRootCategories(fromSlug: string, toSlug: string): boolean {
+    const list = [...this.rootCategories];
+    const from = list.findIndex((c) => c.slug === fromSlug);
+    const to = list.findIndex((c) => c.slug === toSlug);
+    if (from < 0 || to < 0) return false;
+    const [moved] = list.splice(from, 1);
+    list.splice(to, 0, moved);
+
+    const order = new Map<string, number>();
+    list.forEach((c, idx) => order.set(c.slug, idx));
+    for (const cat of this.categories) {
+      if (cat.parent_id) continue;
+      const next = order.get(cat.slug);
+      if (next == null) continue;
+      cat.sort_order = next;
+    }
+
+    this.rebuildCategoryTree();
+    return true;
+  }
+
+  private restoreRootCategoryOrder(slugs: string[]): void {
+    const order = new Map<string, number>();
+    slugs.forEach((slug, idx) => order.set(slug, idx));
+    for (const cat of this.categories) {
+      if (cat.parent_id) continue;
+      const next = order.get(cat.slug);
+      if (next == null) continue;
+      cat.sort_order = next;
+    }
+    this.rebuildCategoryTree();
+  }
+
+  private persistRootCategoryOrder(previousSlugs: string[]): void {
+    if (this.reorderSaving()) return;
+    const payload = this.rootCategories.map((c, idx) => ({ slug: c.slug, sort_order: idx }));
+    if (!payload.length) return;
+    this.reorderSaving.set(true);
+    this.admin.reorderCategories(payload).subscribe({
+      next: (updated) => {
+        const bySlug = new Map<string, number>();
+        (updated || []).forEach((c) => {
+          if (c?.slug && typeof c.sort_order === 'number') bySlug.set(c.slug, c.sort_order);
+        });
+        for (const cat of this.categories) {
+          const next = bySlug.get(cat.slug);
+          if (next == null) continue;
+          cat.sort_order = next;
+        }
+        this.rebuildCategoryTree();
+        this.reorderSaving.set(false);
+        this.toast.success(this.translate.instant('adminUi.storefront.categories.reorderSuccess'));
+      },
+      error: () => {
+        this.reorderSaving.set(false);
+        this.restoreRootCategoryOrder(previousSlugs);
+        this.toast.error(this.translate.instant('adminUi.storefront.categories.reorderError'));
+      }
     });
   }
 

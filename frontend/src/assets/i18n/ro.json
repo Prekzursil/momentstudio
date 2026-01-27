@@ -1324,7 +1324,24 @@
   },
   "adminUi": {
     "common": {
-      "edit": "Editează"
+      "edit": "Editează",
+      "loading": "Se încarcă…",
+      "save": "Salvează",
+      "cancel": "Anulează",
+      "saving": "Se salvează…"
+    },
+    "storefront": {
+      "categories": {
+        "dragHint": "Trage pentru a reordona categoriile. Apasă Editează pentru a redenumi (RO/EN).",
+        "nameRo": "Nume (RO)",
+        "nameEn": "Nume (EN)",
+        "loadError": "Nu s-au putut încărca traducerile categoriei.",
+        "namesRequired": "Te rog completează numele în RO și EN.",
+        "saveSuccess": "Categoria a fost actualizată.",
+        "saveError": "Nu s-a putut salva categoria.",
+        "reorderSuccess": "Ordinea categoriilor a fost actualizată.",
+        "reorderError": "Nu s-au putut reordona categoriile."
+      }
     },
     "errors": {
       "title": "A apărut o problemă",
