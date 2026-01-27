@@ -23,6 +23,7 @@ import { MarkdownService } from '../../../core/markdown.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import {
   AdminCategory,
+  AdminCategoriesImportResult,
   AdminCategoryDeletePreview,
   AdminCategoryMergePreview,
   AdminDeletedProductImage,
@@ -577,6 +578,67 @@ type PriceHistoryChart = {
               </div>
             </div>
           </div>
+
+          <details
+            class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/20 dark:text-slate-200"
+          >
+            <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.categories.csv.title' | translate }}
+            </summary>
+
+            <div class="mt-3 grid gap-3">
+              <p class="text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.categories.csv.hint' | translate }}</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.categories.csv.formatHint' | translate }}</p>
+
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.categories.csv.file' | translate }}
+                <input
+                  type="file"
+                  accept=".csv"
+                  (change)="onCategoryImportFileChange($event)"
+                  class="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-700 dark:file:bg-slate-100 dark:file:text-slate-900 dark:hover:file:bg-slate-200"
+                />
+              </label>
+
+              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                <input type="checkbox" [(ngModel)]="categoryImportDryRun" [disabled]="categoryImportBusy()" />
+                {{ 'adminUi.categories.csv.dryRun' | translate }}
+              </label>
+
+              <div class="flex justify-end">
+                <app-button
+                  size="sm"
+                  [label]="categoryImportBusy() ? ('adminUi.actions.loading' | translate) : ('adminUi.categories.csv.run' | translate)"
+                  (action)="runCategoryImport()"
+                  [disabled]="categoryImportBusy() || !categoryImportFile"
+                ></app-button>
+              </div>
+
+              <p *ngIf="categoryImportError()" class="text-sm text-rose-700 dark:text-rose-300">{{ categoryImportError() }}</p>
+
+              <div *ngIf="categoryImportResult() as result" class="grid gap-2">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.categories.csv.result' | translate }}
+                </p>
+                <div class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+                  <div>{{ 'adminUi.categories.csv.created' | translate }}: {{ result.created }}</div>
+                  <div>{{ 'adminUi.categories.csv.updated' | translate }}: {{ result.updated }}</div>
+                </div>
+
+                <div *ngIf="(result.errors || []).length > 0; else categoryCsvNoErrors" class="grid gap-2">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    {{ 'adminUi.categories.csv.errorsTitle' | translate }}
+                  </p>
+                  <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
+                    <li *ngFor="let err of result.errors">{{ err }}</li>
+                  </ul>
+                </div>
+                <ng-template #categoryCsvNoErrors>
+                  <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.categories.csv.noErrors' | translate }}</p>
+                </ng-template>
+              </div>
+            </div>
+          </details>
         </div>
       </app-modal>
 
@@ -3097,6 +3159,11 @@ export class AdminProductsComponent implements OnInit {
   deletePreviewLoading = signal(false);
   deleteSaving = signal(false);
   deleteError = signal<string | null>(null);
+  categoryImportFile: File | null = null;
+  categoryImportDryRun = true;
+  categoryImportBusy = signal(false);
+  categoryImportError = signal<string | null>(null);
+  categoryImportResult = signal<AdminCategoriesImportResult | null>(null);
 
   form: ProductForm = this.blankForm();
   private loadedTagSlugs: string[] = [];
@@ -3898,6 +3965,40 @@ export class AdminProductsComponent implements OnInit {
     this.admin.getCategories().subscribe({
       next: (cats) => this.adminCategories.set((cats || []).map((c) => ({ id: c.id, name: c.name }))),
       error: () => this.adminCategories.set([])
+    });
+  }
+
+  onCategoryImportFileChange(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    this.categoryImportFile = input?.files?.[0] ?? null;
+    this.categoryImportError.set(null);
+    this.categoryImportResult.set(null);
+  }
+
+  runCategoryImport(): void {
+    const file = this.categoryImportFile;
+    if (!file) return;
+    if (this.categoryImportBusy()) return;
+
+    this.categoryImportBusy.set(true);
+    this.categoryImportError.set(null);
+    this.categoryImportResult.set(null);
+
+    this.admin.importCategoriesCsv(file, this.categoryImportDryRun).subscribe({
+      next: (result) => {
+        this.categoryImportBusy.set(false);
+        this.categoryImportResult.set(result);
+        if ((result.errors || []).length) {
+          this.toast.error(this.t('adminUi.categories.csv.error'));
+          return;
+        }
+        this.toast.success(this.t('adminUi.categories.csv.success'));
+        if (!this.categoryImportDryRun) this.refreshCategoryLists();
+      },
+      error: (err) => {
+        this.categoryImportBusy.set(false);
+        this.categoryImportError.set(err?.error?.detail || this.t('adminUi.categories.csv.error'));
+      }
     });
   }
 

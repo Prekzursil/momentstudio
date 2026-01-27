@@ -357,6 +357,24 @@ async def reorder_categories(
     return updated
 
 
+@router.post("/categories/import", response_model=ImportResult)
+async def import_categories_csv(
+    file: UploadFile = File(...),
+    dry_run: bool = Query(default=True),
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("products")),
+) -> ImportResult:
+    if not file.filename.endswith(".csv"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSV file required")
+    raw = await file.read()
+    try:
+        content = raw.decode()
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to decode CSV")
+    result = await catalog_service.import_categories_csv(session, content, dry_run=dry_run)
+    return ImportResult(**result)
+
+
 @router.post("/categories/{slug}/images/{kind}", response_model=CategoryRead)
 async def upload_category_image(
     slug: str,

@@ -3457,6 +3457,21 @@
           "translations": "Adaugă traduceri RO/EN pentru navigare și filtrare în magazin."
         }
       },
+      "csv": {
+        "title": "Import în masă (CSV)",
+        "hint": "Încarcă un CSV pentru a crea/actualiza categorii. Folosește Previzualizare mai întâi pentru validare.",
+        "formatHint": "Coloane: slug, name, parent_slug, sort_order, is_visible, description, name_ro, description_ro, name_en, description_en.",
+        "file": "Fișier CSV",
+        "dryRun": "Previzualizare (fără schimbări)",
+        "run": "Rulează importul",
+        "result": "Rezultat import",
+        "created": "Create",
+        "updated": "Actualizate",
+        "errorsTitle": "Erori",
+        "noErrors": "Fără erori.",
+        "success": "Importul categoriilor a fost finalizat.",
+        "error": "Importul categoriilor a eșuat."
+      },
       "confirmDelete": {
         "title": "Ștergi categoria „{{name}}”?",
         "subtitle": "Aceasta va elimina permanent categoria din magazin.",

@@ -2296,6 +2296,218 @@ async def import_products_csv(session: AsyncSession, content: str, dry_run: bool
     return {"created": created, "updated": updated, "errors": errors}
 
 
+async def import_categories_csv(session: AsyncSession, content: str, dry_run: bool = True):
+    reader = csv.DictReader(io.StringIO(content))
+    created = 0
+    updated = 0
+    errors: list[str] = []
+    rows: list[dict] = []
+    seen: set[str] = set()
+
+    for idx, row in enumerate(reader, start=2):
+        slug = (row.get("slug") or "").strip()
+        name = (row.get("name") or "").strip()
+        if not slug or not name:
+            errors.append(f"Row {idx}: missing slug or name")
+            continue
+        if slug != slugify(slug):
+            errors.append(f"Row {idx}: invalid slug {slug}")
+            continue
+        if slug in seen:
+            errors.append(f"Row {idx}: duplicate slug {slug}")
+            continue
+        seen.add(slug)
+
+        parent_slug = (row.get("parent_slug") or "").strip() or None
+        if parent_slug and parent_slug == slug:
+            errors.append(f"Row {idx}: parent_slug cannot match slug")
+            continue
+
+        sort_order_raw = str(row.get("sort_order") or "").strip()
+        sort_order = 0
+        if sort_order_raw:
+            try:
+                sort_order = int(sort_order_raw)
+            except Exception:
+                errors.append(f"Row {idx}: invalid sort_order {sort_order_raw}")
+                continue
+
+        is_visible_raw = str(row.get("is_visible") or "").strip()
+        is_visible: bool | None = None
+        if is_visible_raw:
+            is_visible = is_visible_raw.lower() not in {"false", "0", "no"}
+
+        description = (row.get("description") or "").strip() or None
+        name_ro = (row.get("name_ro") or "").strip()
+        name_en = (row.get("name_en") or "").strip()
+        description_ro = (row.get("description_ro") or "").strip() or None
+        description_en = (row.get("description_en") or "").strip() or None
+        if description_ro and not name_ro:
+            errors.append(f"Row {idx}: description_ro provided without name_ro")
+            continue
+        if description_en and not name_en:
+            errors.append(f"Row {idx}: description_en provided without name_en")
+            continue
+
+        rows.append(
+            {
+                "idx": idx,
+                "slug": slug,
+                "name": name,
+                "description": description,
+                "parent_slug": parent_slug,
+                "sort_order": sort_order,
+                "is_visible": is_visible,
+                "name_ro": name_ro,
+                "name_en": name_en,
+                "description_ro": description_ro,
+                "description_en": description_en,
+            }
+        )
+
+    file_slugs = {r["slug"] for r in rows}
+    if file_slugs:
+        result = await session.execute(select(Category.slug).where(Category.slug.in_(file_slugs)))
+        existing_slugs = set(result.scalars().all())
+        created = len(file_slugs - existing_slugs)
+        updated = len(file_slugs & existing_slugs)
+    else:
+        existing_slugs = set()
+
+    if rows:
+        parent_candidates = {r["parent_slug"] for r in rows if r["parent_slug"] and r["parent_slug"] not in file_slugs}
+        if parent_candidates:
+            result = await session.execute(select(Category.slug).where(Category.slug.in_(parent_candidates)))
+            found = set(result.scalars().all())
+            missing = parent_candidates - found
+            if missing:
+                missing_set = set(missing)
+                for row in rows:
+                    parent_slug = row["parent_slug"]
+                    if parent_slug and parent_slug in missing_set:
+                        errors.append(f"Row {row['idx']}: parent category {parent_slug} not found")
+
+    if dry_run and rows:
+        result = await session.execute(select(Category.id, Category.slug, Category.parent_id))
+        category_rows = result.all()
+        id_to_slug = {cat_id: slug for cat_id, slug, _parent_id in category_rows}
+        parent_slug_by_slug = {slug: id_to_slug.get(parent_id) if parent_id else None for _id, slug, parent_id in category_rows}
+        proposed_parent_by_slug = {r["slug"]: r["parent_slug"] for r in rows}
+
+        for row in rows:
+            slug = row["slug"]
+            current = row["parent_slug"]
+            seen_slugs: set[str] = set()
+            while current is not None:
+                if current == slug:
+                    errors.append(f"Row {row['idx']}: Category parent would create a cycle")
+                    break
+                if current in seen_slugs:
+                    errors.append(f"Row {row['idx']}: Invalid category hierarchy")
+                    break
+                seen_slugs.add(current)
+                if current in proposed_parent_by_slug:
+                    current = proposed_parent_by_slug[current]
+                else:
+                    current = parent_slug_by_slug.get(current)
+
+    if dry_run:
+        return {"created": created, "updated": updated, "errors": errors}
+
+    if errors:
+        await session.rollback()
+        return {"created": created, "updated": updated, "errors": errors}
+
+    all_slugs = set(file_slugs)
+    all_slugs.update(r["parent_slug"] for r in rows if r["parent_slug"])
+    result = await session.execute(select(Category).where(Category.slug.in_(all_slugs)))
+    by_slug = {c.slug: c for c in result.scalars().all()}
+
+    for row in rows:
+        slug = row["slug"]
+        category = by_slug.get(slug)
+        if category:
+            category.name = row["name"]
+            category.description = row["description"]
+            category.sort_order = row["sort_order"]
+            if row["is_visible"] is not None:
+                category.is_visible = row["is_visible"]
+            session.add(category)
+            continue
+
+        category = Category(
+            slug=slug,
+            name=row["name"],
+            description=row["description"],
+            sort_order=row["sort_order"],
+            is_visible=row["is_visible"] if row["is_visible"] is not None else True,
+            parent_id=None,
+        )
+        session.add(category)
+        by_slug[slug] = category
+
+    await session.flush()
+
+    for row in rows:
+        slug = row["slug"]
+        category = by_slug.get(slug)
+        if not category:
+            errors.append(f"Row {row['idx']}: category {slug} not found after upsert")
+            continue
+
+        parent_slug = row["parent_slug"]
+        parent = by_slug.get(parent_slug) if parent_slug else None
+        parent_id = parent.id if parent is not None else None
+        try:
+            await _validate_category_parent_assignment(session, category_id=category.id, parent_id=parent_id)
+        except HTTPException as exc:
+            errors.append(f"Row {row['idx']}: {exc.detail}")
+            continue
+        category.parent_id = parent_id
+        session.add(category)
+
+    if errors:
+        await session.rollback()
+        return {"created": created, "updated": updated, "errors": errors}
+
+    for row in rows:
+        category = by_slug.get(row["slug"])
+        if not category:
+            continue
+
+        for lang in ("ro", "en"):
+            name_key = f"name_{lang}"
+            desc_key = f"description_{lang}"
+            raw_name = (row.get(name_key) or "").strip()
+            raw_desc = row.get(desc_key)
+            if not raw_name:
+                continue
+            description_value = (raw_desc or "").strip() or None
+
+            existing = await session.scalar(
+                select(CategoryTranslation).where(
+                    CategoryTranslation.category_id == category.id,
+                    CategoryTranslation.lang == lang,
+                )
+            )
+            if existing:
+                existing.name = raw_name
+                existing.description = description_value
+                session.add(existing)
+            else:
+                session.add(
+                    CategoryTranslation(
+                        category_id=category.id,
+                        lang=lang,
+                        name=raw_name,
+                        description=description_value,
+                    )
+                )
+
+    await session.commit()
+    return {"created": created, "updated": updated, "errors": errors}
+
+
 async def _record_slug_history(session: AsyncSession, product: Product, old_slug: str) -> None:
     history = ProductSlugHistory(product_id=product.id, slug=old_slug)
     session.add(history)

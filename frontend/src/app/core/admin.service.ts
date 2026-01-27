@@ -354,6 +354,12 @@ export interface AdminProductsImportResult {
   errors: string[];
 }
 
+export interface AdminCategoriesImportResult {
+  created: number;
+  updated: number;
+  errors: string[];
+}
+
 export interface AdminProductVariant {
   id: string;
   name: string;
@@ -865,6 +871,12 @@ export class AdminService {
 
   reorderCategories(items: { slug: string; sort_order: number }[], opts?: AdminRequestOptions): Observable<AdminCategory[]> {
     return this.api.post<AdminCategory[]>('/catalog/categories/reorder', items, undefined, opts?.source ? { source: opts.source } : undefined);
+  }
+
+  importCategoriesCsv(file: File, dryRun = true): Observable<AdminCategoriesImportResult> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.api.post<AdminCategoriesImportResult>('/catalog/categories/import', form, undefined, { dry_run: dryRun });
   }
 
   getProduct(slug: string): Observable<AdminProductDetail> {
