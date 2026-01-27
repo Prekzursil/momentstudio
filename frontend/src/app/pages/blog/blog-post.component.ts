@@ -1223,6 +1223,86 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       idx += 1;
     }
 
+    const calloutTipLabel = this.translate.instant('blog.post.callout.tip');
+    const calloutNoteLabel = this.translate.instant('blog.post.callout.note');
+    const calloutWarningLabel = this.translate.instant('blog.post.callout.warning');
+    const calloutMarker = /^\s*\[!(TIP|NOTE|WARNING|CAUTION|IMPORTANT|INFO)\]\s*/i;
+
+    const createCalloutIcon = (kind: 'tip' | 'note' | 'warning'): Element => {
+      const ns = 'http://www.w3.org/2000/svg';
+      const svg = doc.createElementNS(ns, 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '2');
+      svg.setAttribute('stroke-linecap', 'round');
+      svg.setAttribute('stroke-linejoin', 'round');
+      svg.setAttribute('width', '18');
+      svg.setAttribute('height', '18');
+      svg.setAttribute('aria-hidden', 'true');
+      svg.setAttribute('class', 'blog-callout-icon');
+
+      const addPath = (d: string): void => {
+        const path = doc.createElementNS(ns, 'path');
+        path.setAttribute('d', d);
+        svg.appendChild(path);
+      };
+
+      if (kind === 'tip') {
+        addPath('M9 18h6');
+        addPath('M10 22h4');
+        addPath('M12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2z');
+      } else if (kind === 'warning') {
+        addPath('M12 9v4');
+        addPath('M12 17h.01');
+        addPath('M10.29 3.86 1.82 18.53A1 1 0 0 0 2.68 20h18.64a1 1 0 0 0 .86-1.47L13.71 3.86a1 1 0 0 0-1.72 0z');
+      } else {
+        addPath('M12 17h.01');
+        addPath('M11 10h1v4h1');
+        addPath('M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z');
+      }
+
+      return svg;
+    };
+
+    const callouts = Array.from(doc.body.querySelectorAll('blockquote')) as HTMLElement[];
+    for (const blockquote of callouts) {
+      const firstPara = blockquote.querySelector('p') as HTMLElement | null;
+      if (!firstPara) continue;
+      const text = (firstPara.textContent || '').trimStart();
+      const match = text.match(/^\[!(TIP|NOTE|WARNING|CAUTION|IMPORTANT|INFO)\]/i);
+      if (!match) continue;
+      const marker = match[1].toLowerCase();
+      const kind = marker === 'tip' ? 'tip' : marker === 'warning' || marker === 'caution' ? 'warning' : 'note';
+
+      const firstChild = firstPara.firstChild;
+      if (firstChild?.nodeType === w.Node.TEXT_NODE) {
+        firstChild.textContent = (firstChild.textContent || '').replace(calloutMarker, '');
+      } else {
+        firstPara.innerHTML = firstPara.innerHTML.replace(calloutMarker, '');
+      }
+      if ((firstPara.textContent || '').trim().length === 0) {
+        firstPara.remove();
+      }
+
+      const labelText = kind === 'tip' ? calloutTipLabel : kind === 'warning' ? calloutWarningLabel : calloutNoteLabel;
+      const header = doc.createElement('div');
+      header.className = 'blog-callout-header';
+      header.appendChild(createCalloutIcon(kind));
+      const headerLabel = doc.createElement('span');
+      headerLabel.textContent = labelText;
+      header.appendChild(headerLabel);
+
+      const body = doc.createElement('div');
+      body.className = 'blog-callout-body';
+      while (blockquote.firstChild) {
+        body.appendChild(blockquote.firstChild);
+      }
+      blockquote.classList.add('blog-callout', `blog-callout--${kind}`);
+      blockquote.appendChild(header);
+      blockquote.appendChild(body);
+    }
+
     const codeCopyLabel = this.translate.instant('blog.post.code.copy');
     const codeWrapLabel = this.translate.instant('blog.post.code.wrap');
     const codeUnwrapLabel = this.translate.instant('blog.post.code.unwrap');

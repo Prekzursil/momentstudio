@@ -447,7 +447,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Blog post: rich image layouts – Support wide/left/right aligned images and multi-image galleries in content.
 - [x] Blog editor: image layout hints – Document supported image title hints (`"wide"`, `"left"`, `"right"`, `"gallery"`) and add quick-insert helpers in the editor UI.
 - [x] Blog post: code blocks – Syntax highlighting + “Copy” button + line wrapping toggle.
-- [ ] Blog post: callout blocks – Support “Tip/Note/Warning” callouts with icons and theme-aware styling.
+- [x] Blog post: callout blocks – Support “Tip/Note/Warning” callouts with icons and theme-aware styling.
 - [ ] Blog post: embedded product cards – Allow inserting product/category/collection cards inside posts (shoppable content).
 - [ ] Blog post: author card – Author bio + avatar + links, plus “More from this author”.
 - [ ] Blog post: print-friendly styles – Clean print stylesheet (no nav, readable typography, proper image sizing).

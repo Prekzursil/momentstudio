@@ -853,6 +853,11 @@
         "previous": "Imaginea anterioară",
         "next": "Imaginea următoare"
       },
+      "callout": {
+        "tip": "Sfat",
+        "note": "Notă",
+        "warning": "Atenție"
+      },
       "code": {
         "copy": "Copiază",
         "wrap": "Împachetează",
