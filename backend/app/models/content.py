@@ -60,7 +60,7 @@ class ContentBlock(Base):
         lazy="selectin",
         order_by="ContentAuditLog.created_at",
     )
-    author = relationship("User", foreign_keys=[author_id])
+    author = relationship("User", foreign_keys=[author_id], lazy="selectin")
     translations: Mapped[list["ContentBlockTranslation"]] = relationship(
         "ContentBlockTranslation", back_populates="block", cascade="all, delete-orphan", lazy="selectin"
     )

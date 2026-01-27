@@ -17,6 +17,7 @@ export interface BlogPostListItem {
   cover_image_url?: string | null;
   tags: string[];
   series?: string | null;
+  author_name?: string | null;
   reading_time_minutes?: number | null;
 }
 
@@ -51,6 +52,7 @@ export interface BlogPost {
   cover_image_url?: string | null;
   tags?: string[];
   series?: string | null;
+  author_name?: string | null;
   reading_time_minutes?: number | null;
 }
 

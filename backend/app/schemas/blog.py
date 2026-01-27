@@ -14,6 +14,7 @@ class BlogPostListItem(BaseModel):
     cover_image_url: str | None = None
     tags: list[str] = Field(default_factory=list)
     series: str | None = None
+    author_name: str | None = None
     reading_time_minutes: int | None = None
 
 
@@ -50,6 +51,7 @@ class BlogPostRead(BaseModel):
     cover_image_url: str | None = None
     tags: list[str] = Field(default_factory=list)
     series: str | None = None
+    author_name: str | None = None
     reading_time_minutes: int | None = None
 
 

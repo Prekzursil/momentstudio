@@ -9,6 +9,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import case, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.models.blog import BlogComment, BlogCommentFlag
 from app.models.content import ContentBlock, ContentStatus
@@ -38,8 +39,8 @@ def _apply_translation(block: ContentBlock, lang: str | None) -> None:
         return
     match = next((t for t in block.translations if t.lang == lang), None)
     if match:
-        block.title = match.title
-        block.body_markdown = match.body_markdown
+        set_committed_value(block, "title", match.title)
+        set_committed_value(block, "body_markdown", match.body_markdown)
 
 
 def _plain_text_from_markdown(body: str) -> str:
@@ -61,6 +62,14 @@ def _author_display(author: User | None) -> str | None:
     tag = getattr(author, "name_tag", None)
     if name and username and tag is not None:
         return f"{name}#{tag} ({username})"
+    return name or username or None
+
+
+def _author_public_name(author: User | None) -> str | None:
+    if not author:
+        return None
+    name = (getattr(author, "name", None) or "").strip()
+    username = getattr(author, "username", None)
     return name or username or None
 
 
@@ -233,7 +242,11 @@ async def list_published_posts(
     if not query_text and not tag_text and not series_text:
         offset = (page - 1) * limit
         total = await session.scalar(select(func.count()).select_from(ContentBlock).where(*filters))
-        query = select(ContentBlock).options(selectinload(ContentBlock.images)).where(*filters)
+        query = (
+            select(ContentBlock)
+            .options(selectinload(ContentBlock.images), selectinload(ContentBlock.author))
+            .where(*filters)
+        )
         if comment_counts is not None:
             query = query.outerjoin(comment_counts, comment_counts.c.content_block_id == ContentBlock.id)
         query = query.order_by(*ordering).limit(limit).offset(offset)
@@ -246,7 +259,11 @@ async def list_published_posts(
             _apply_translation(block, lang)
         return blocks, int(total or 0)
 
-    query = select(ContentBlock).options(selectinload(ContentBlock.images)).where(*filters)
+    query = (
+        select(ContentBlock)
+        .options(selectinload(ContentBlock.images), selectinload(ContentBlock.author))
+        .where(*filters)
+    )
     if comment_counts is not None:
         query = query.outerjoin(comment_counts, comment_counts.c.content_block_id == ContentBlock.id)
     query = query.order_by(*ordering)
@@ -293,7 +310,7 @@ async def get_published_post(
     key = f"{BLOG_KEY_PREFIX}{slug}"
     query = (
         select(ContentBlock)
-        .options(selectinload(ContentBlock.images))
+        .options(selectinload(ContentBlock.images), selectinload(ContentBlock.author))
         .where(
             ContentBlock.key == key,
             ContentBlock.status == ContentStatus.published,
@@ -322,6 +339,7 @@ def to_list_item(block: ContentBlock, *, lang: str | None = None) -> dict:
     summary = _meta_summary(meta, lang=lang, base_lang=getattr(block, "lang", None))
     excerpt = summary or _excerpt(_plain_text_from_markdown(block.body_markdown))
     series = meta.get("series")
+    author_name = _author_public_name(getattr(block, "author", None))
     return {
         "slug": _extract_slug(block.key),
         "title": block.title,
@@ -330,6 +348,7 @@ def to_list_item(block: ContentBlock, *, lang: str | None = None) -> dict:
         "cover_image_url": cover,
         "tags": _normalize_tags(meta.get("tags")),
         "series": series.strip() if isinstance(series, str) and series.strip() else None,
+        "author_name": author_name,
         "reading_time_minutes": reading_time_minutes,
     }
 
@@ -342,6 +361,7 @@ def to_read(block: ContentBlock, *, lang: str | None = None) -> dict:
     reading_time_minutes = override_minutes or _compute_reading_time_minutes(block.body_markdown)
     summary = _meta_summary(meta, lang=lang, base_lang=getattr(block, "lang", None))
     series = meta.get("series")
+    author_name = _author_public_name(getattr(block, "author", None))
     return {
         "slug": _extract_slug(block.key),
         "title": block.title,
@@ -355,6 +375,7 @@ def to_read(block: ContentBlock, *, lang: str | None = None) -> dict:
         "cover_image_url": cover,
         "tags": _normalize_tags(meta.get("tags")),
         "series": series.strip() if isinstance(series, str) and series.strip() else None,
+        "author_name": author_name,
         "reading_time_minutes": reading_time_minutes,
     }
 

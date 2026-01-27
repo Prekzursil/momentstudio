@@ -51,6 +51,7 @@ import { formatIdentity } from '../../shared/user-identity';
         <p class="text-sm text-slate-500 dark:text-slate-400" *ngIf="post()?.published_at">
           {{ post()!.published_at | date: 'mediumDate' }}
           <ng-container *ngIf="post()?.reading_time_minutes"> · {{ 'blog.minutesRead' | translate : { minutes: post()!.reading_time_minutes } }}</ng-container>
+          <ng-container *ngIf="post()?.author_name"> · {{ 'blog.byAuthor' | translate : { author: post()!.author_name } }}</ng-container>
         </p>
         <a
           *ngIf="post()?.series"

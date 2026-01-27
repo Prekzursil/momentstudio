@@ -809,6 +809,7 @@
     "chipTag": "Etichetă: {{tag}}",
     "chipSeries": "Serie: {{series}}",
     "seriesPill": "Serie: {{series}}",
+    "byAuthor": "de {{author}}",
     "minutesRead": "{{minutes}} min citire",
     "preview": {
       "banner": "Mod previzualizare — acest articol nu este încă publicat."
@@ -818,6 +819,8 @@
     "retry": "Reîncearcă",
     "emptyTitle": "Nu există postări încă",
     "emptyCopy": "Revino curând pentru articole noi.",
+    "noResultsTitle": "Niciun rezultat",
+    "noResultsCopy": "Încearcă să resetezi filtrele sau să cauți altceva.",
     "pageMeta": "Pagina {{page}} din {{totalPages}} · {{totalItems}} postări",
     "metaTitle": "Blog | momentstudio",
     "metaDescription": "Povești, noutăți și culise de la momentstudio.",

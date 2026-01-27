@@ -159,8 +159,17 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
         *ngIf="!loading() && !hasError() && posts.length === 0"
         class="border border-dashed border-slate-200 rounded-2xl p-10 text-center grid gap-2 dark:border-slate-800"
       >
-        <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.emptyTitle' | translate }}</p>
-        <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'blog.emptyCopy' | translate }}</p>
+        <ng-container *ngIf="hasActiveFilters(); else blogEmptyAllTpl">
+          <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.noResultsTitle' | translate }}</p>
+          <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'blog.noResultsCopy' | translate }}</p>
+          <div class="flex justify-center pt-2">
+            <app-button size="sm" variant="ghost" [label]="'blog.clearFilters' | translate" (action)="clearFilters()"></app-button>
+          </div>
+        </ng-container>
+        <ng-template #blogEmptyAllTpl>
+          <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.emptyTitle' | translate }}</p>
+          <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'blog.emptyCopy' | translate }}</p>
+        </ng-template>
       </div>
 
       <a
@@ -189,6 +198,9 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
               {{ heroPost.published_at | date: 'mediumDate' }}
               <ng-container *ngIf="heroPost.reading_time_minutes">
                 · {{ 'blog.minutesRead' | translate : { minutes: heroPost.reading_time_minutes } }}
+              </ng-container>
+              <ng-container *ngIf="heroPost.author_name">
+                · {{ 'blog.byAuthor' | translate : { author: heroPost.author_name } }}
               </ng-container>
             </p>
             <button
@@ -247,6 +259,9 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
                     {{ post.published_at | date: 'mediumDate' }}
                     <ng-container *ngIf="post.reading_time_minutes">
                       · {{ 'blog.minutesRead' | translate : { minutes: post.reading_time_minutes } }}
+                    </ng-container>
+                    <ng-container *ngIf="post.author_name">
+                      · {{ 'blog.byAuthor' | translate : { author: post.author_name } }}
                     </ng-container>
                   </p>
                   <button
@@ -603,6 +618,10 @@ export class BlogListComponent implements OnInit, OnDestroy {
   isImageLoaded(src: string | null | undefined): boolean {
     if (!src) return true;
     return this.loadedImages.has(src);
+  }
+
+  hasActiveFilters(): boolean {
+    return Boolean(this.searchQuery.trim() || this.tagQuery.trim() || this.seriesQuery.trim());
   }
 }
 

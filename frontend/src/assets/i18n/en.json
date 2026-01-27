@@ -809,6 +809,7 @@
     "chipTag": "Tag: {{tag}}",
     "chipSeries": "Series: {{series}}",
     "seriesPill": "Series: {{series}}",
+    "byAuthor": "By {{author}}",
     "minutesRead": "{{minutes}} min read",
     "preview": {
       "banner": "Preview mode — this post is not published yet."
@@ -818,6 +819,8 @@
     "retry": "Retry",
     "emptyTitle": "No posts yet",
     "emptyCopy": "Check back soon for new articles.",
+    "noResultsTitle": "No results",
+    "noResultsCopy": "Try clearing filters or searching for something else.",
     "pageMeta": "Page {{page}} of {{totalPages}} · {{totalItems}} posts",
     "metaTitle": "Blog | momentstudio",
     "metaDescription": "Stories, updates, and behind-the-scenes from momentstudio.",

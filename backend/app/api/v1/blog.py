@@ -1,5 +1,8 @@
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
+from email.utils import format_datetime
+from xml.etree import ElementTree
 
 import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response, status
@@ -66,6 +69,117 @@ async def list_blog_posts(
     )
 
 
+@router.get("/rss.xml", response_class=Response)
+async def blog_rss_feed(
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+) -> Response:
+    base = settings.frontend_origin.rstrip("/")
+    chosen_lang = lang or "en"
+    blocks, _ = await blog_service.list_published_posts(session, lang=lang, page=1, limit=50, sort="newest")
+    blocks = sorted(
+        blocks,
+        key=lambda b: (
+            b.published_at or datetime.min.replace(tzinfo=timezone.utc),
+            b.updated_at or datetime.min.replace(tzinfo=timezone.utc),
+        ),
+        reverse=True,
+    )[:20]
+
+    ns_atom = "http://www.w3.org/2005/Atom"
+    ElementTree.register_namespace("atom", ns_atom)
+
+    rss = ElementTree.Element("rss", {"version": "2.0"})
+    channel = ElementTree.SubElement(rss, "channel")
+
+    feed_url = f"{base}/api/v1/blog/rss.xml?lang={chosen_lang}"
+    ElementTree.SubElement(channel, f"{{{ns_atom}}}link", {"href": feed_url, "rel": "self", "type": "application/rss+xml"})
+    ElementTree.SubElement(channel, "title").text = "momentstudio Blog"
+    ElementTree.SubElement(channel, "link").text = f"{base}/blog?lang={chosen_lang}"
+    ElementTree.SubElement(channel, "description").text = "Latest posts from momentstudio."
+    ElementTree.SubElement(channel, "language").text = "ro-RO" if chosen_lang == "ro" else "en-US"
+    if blocks:
+        latest = max(
+            (b.updated_at or b.published_at or datetime.now(timezone.utc) for b in blocks),
+            default=datetime.now(timezone.utc),
+        )
+        ElementTree.SubElement(channel, "lastBuildDate").text = format_datetime(latest)
+
+    for block in blocks:
+        item = ElementTree.SubElement(channel, "item")
+        data = blog_service.to_list_item(block, lang=lang)
+        slug = str(data.get("slug") or "")
+        title = str(data.get("title") or "")
+        excerpt = str(data.get("excerpt") or "")
+        link = f"{base}/blog/{slug}?lang={chosen_lang}"
+
+        ElementTree.SubElement(item, "title").text = title
+        ElementTree.SubElement(item, "link").text = link
+        ElementTree.SubElement(item, "guid").text = link
+        if block.published_at:
+            ElementTree.SubElement(item, "pubDate").text = format_datetime(block.published_at)
+        ElementTree.SubElement(item, "description").text = excerpt
+
+    payload = ElementTree.tostring(rss, encoding="utf-8", xml_declaration=True)
+    return Response(content=payload, media_type="application/rss+xml; charset=utf-8")
+
+
+@router.get("/feed.json", response_class=Response)
+async def blog_json_feed(
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+) -> Response:
+    base = settings.frontend_origin.rstrip("/")
+    chosen_lang = lang or "en"
+    blocks, _ = await blog_service.list_published_posts(session, lang=lang, page=1, limit=50, sort="newest")
+    blocks = sorted(
+        blocks,
+        key=lambda b: (
+            b.published_at or datetime.min.replace(tzinfo=timezone.utc),
+            b.updated_at or datetime.min.replace(tzinfo=timezone.utc),
+        ),
+        reverse=True,
+    )[:20]
+
+    items: list[dict] = []
+    for block in blocks:
+        data = blog_service.to_list_item(block, lang=lang)
+        slug = str(data.get("slug") or "")
+        url = f"{base}/blog/{slug}?lang={chosen_lang}"
+        published = block.published_at or block.updated_at
+        item: dict = {
+            "id": url,
+            "url": url,
+            "title": data.get("title") or "",
+            "summary": data.get("excerpt") or "",
+        }
+        if published:
+            item["date_published"] = published.isoformat()
+        author_name = data.get("author_name")
+        if author_name:
+            item["authors"] = [{"name": author_name}]
+        image = data.get("cover_image_url")
+        if image:
+            item["image"] = image
+        tags = data.get("tags") or []
+        if tags:
+            item["tags"] = tags
+        series = data.get("series")
+        if series:
+            item["_series"] = series
+        items.append(item)
+
+    feed = {
+        "version": "https://jsonfeed.org/version/1.1",
+        "title": "momentstudio Blog",
+        "home_page_url": f"{base}/blog?lang={chosen_lang}",
+        "feed_url": f"{base}/api/v1/blog/feed.json?lang={chosen_lang}",
+        "language": "ro-RO" if chosen_lang == "ro" else "en-US",
+        "items": items,
+    }
+    return Response(content=json.dumps(feed, ensure_ascii=False), media_type="application/feed+json; charset=utf-8")
+
+
 @router.get("/posts/{slug}", response_model=BlogPostRead)
 async def get_blog_post(
     slug: str,
@@ -75,16 +189,21 @@ async def get_blog_post(
     block = await blog_service.get_published_post(session, slug=slug, lang=lang)
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    payload = blog_service.to_read(block, lang=lang)
     try:
         await session.execute(
             sa.update(ContentBlock)
             .where(ContentBlock.id == block.id)
-            .values(view_count=ContentBlock.view_count + 1)
+            .values(
+                view_count=ContentBlock.view_count + 1,
+                updated_at=ContentBlock.updated_at,
+            )
+            .execution_options(synchronize_session=False)
         )
         await session.commit()
     except Exception:
         await session.rollback()
-    return BlogPostRead.model_validate(blog_service.to_read(block, lang=lang))
+    return BlogPostRead.model_validate(payload)
 
 
 @router.get("/posts/{slug}/preview", response_model=BlogPostRead)
