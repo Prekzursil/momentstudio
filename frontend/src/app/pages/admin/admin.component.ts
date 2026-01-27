@@ -3726,6 +3726,19 @@ class CmsDraftManager<T> {
 
                   <ng-container *ngIf="useRichBlogEditor; else markdownBlogEditor">
                     <div class="flex flex-wrap items-center gap-2 text-xs">
+                      <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                        {{ 'adminUi.blog.images.layout.label' | translate }}
+                        <select
+                          class="rounded-md border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          [(ngModel)]="blogImageLayout"
+                        >
+                          <option value="default">{{ 'adminUi.blog.images.layout.default' | translate }}</option>
+                          <option value="wide">{{ 'adminUi.blog.images.layout.wide' | translate }}</option>
+                          <option value="left">{{ 'adminUi.blog.images.layout.left' | translate }}</option>
+                          <option value="right">{{ 'adminUi.blog.images.layout.right' | translate }}</option>
+                          <option value="gallery">{{ 'adminUi.blog.images.layout.gallery' | translate }}</option>
+                        </select>
+                      </label>
                       <button
                         type="button"
                         class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
@@ -3801,6 +3814,19 @@ class CmsDraftManager<T> {
                       >
                         {{ 'adminUi.blog.toolbar.list' | translate }}
                       </button>
+                      <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                        {{ 'adminUi.blog.images.layout.label' | translate }}
+                        <select
+                          class="rounded-md border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          [(ngModel)]="blogImageLayout"
+                        >
+                          <option value="default">{{ 'adminUi.blog.images.layout.default' | translate }}</option>
+                          <option value="wide">{{ 'adminUi.blog.images.layout.wide' | translate }}</option>
+                          <option value="left">{{ 'adminUi.blog.images.layout.left' | translate }}</option>
+                          <option value="right">{{ 'adminUi.blog.images.layout.right' | translate }}</option>
+                          <option value="gallery">{{ 'adminUi.blog.images.layout.gallery' | translate }}</option>
+                        </select>
+                      </label>
                       <button
                         type="button"
                         class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
@@ -4558,6 +4584,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   blogImages: { id: string; url: string; alt_text?: string | null }[] = [];
   showBlogPreview = false;
   useRichBlogEditor = true;
+  blogImageLayout: 'default' | 'wide' | 'left' | 'right' | 'gallery' = 'default';
   blogSocialLangs: UiLang[] = ['en', 'ro'];
   blogPreviewUrl: string | null = null;
   blogPreviewToken: string | null = null;
@@ -6570,7 +6597,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         const inserted = images[images.length - 1];
         if (inserted?.url) {
           const alt = file.name.replace(/\.[^.]+$/, '').replace(/[\r\n]+/g, ' ').trim() || 'image';
-          const snippet = `![${alt}](${inserted.url})`;
+          const layoutToken = this.blogImageLayout === 'default' ? '' : this.blogImageLayout;
+          const snippet = layoutToken ? `![${alt}](${inserted.url} "${layoutToken}")` : `![${alt}](${inserted.url})`;
           if (target instanceof HTMLTextAreaElement) {
             this.insertAtCursor(target, snippet);
           } else {

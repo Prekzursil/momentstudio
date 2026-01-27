@@ -2594,7 +2594,7 @@
         "richEditor": "Editor bogat",
         "livePreview": "Previzualizare live",
         "previewEmpty": "Nimic de previzualizat încă.",
-        "toolbarTip": "Sfat: Folosește bara de instrumente pentru a formata markdown și a insera imagini (încărcările merg în imaginile de conținut ale articolului)."
+        "toolbarTip": "Sfat: Folosește bara de instrumente pentru a formata markdown și a insera imagini (încărcările merg în imaginile de conținut ale articolului). Layout-ul imaginilor folosește token-ul din titlul imaginii: \"wide\", \"left\", \"right\", \"gallery\" (ex: ![alt](url \"wide\"))."
       },
       "toolbar": {
         "link": "Link",
@@ -2604,6 +2604,14 @@
       "images": {
         "title": "Imagini",
         "insertMarkdown": "Inserează markdown",
+        "layout": {
+          "label": "Aspect imagine",
+          "default": "Implicit",
+          "wide": "Lată",
+          "left": "Stânga",
+          "right": "Dreapta",
+          "gallery": "Galerie"
+        },
         "success": {
           "uploaded": "Imagine încărcată",
           "insertedMarkdown": "Markdown pentru imagine inserat"

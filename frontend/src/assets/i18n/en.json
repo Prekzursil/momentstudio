@@ -2594,7 +2594,7 @@
         "richEditor": "Rich editor",
         "livePreview": "Live preview",
         "previewEmpty": "Nothing to preview yet.",
-        "toolbarTip": "Tip: Use the toolbar to format markdown and insert images (uploads go to the post's content images)."
+        "toolbarTip": "Tip: Use the toolbar to format markdown and insert images (uploads go to the post's content images). Image layouts use the image title token: \"wide\", \"left\", \"right\", \"gallery\" (e.g. ![alt](url \"wide\"))."
       },
       "toolbar": {
         "link": "Link",
@@ -2604,6 +2604,14 @@
       "images": {
         "title": "Images",
         "insertMarkdown": "Insert markdown",
+        "layout": {
+          "label": "Image layout",
+          "default": "Default",
+          "wide": "Wide",
+          "left": "Left",
+          "right": "Right",
+          "gallery": "Gallery"
+        },
         "success": {
           "uploaded": "Image uploaded",
           "insertedMarkdown": "Inserted image markdown"
