@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Dict
 from uuid import UUID
@@ -13,6 +14,7 @@ from app.db.base import Base
 from app.db.session import get_session
 from app.models.cart import Cart
 from app.models.catalog import Category, Product, ProductImage, ProductStatus
+from app.models.content import ContentBlock, ContentStatus
 from app.models.order import Order
 from app.models.user import User
 from app.core import security
@@ -34,6 +36,28 @@ def checkout_app() -> Dict[str, object]:
     async def init_models() -> None:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+        async with SessionLocal() as session:
+            session.add_all(
+                [
+                    ContentBlock(
+                        key="page.terms-and-conditions",
+                        title="Terms",
+                        body_markdown="Terms",
+                        status=ContentStatus.published,
+                        version=1,
+                        published_at=datetime.now(timezone.utc),
+                    ),
+                    ContentBlock(
+                        key="page.privacy-policy",
+                        title="Privacy",
+                        body_markdown="Privacy",
+                        status=ContentStatus.published,
+                        version=1,
+                        published_at=datetime.now(timezone.utc),
+                    ),
+                ]
+            )
+            await session.commit()
 
     asyncio.run(init_models())
 
@@ -440,6 +464,8 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
             "last_name": "User",
             "date_of_birth": "2000-01-01",
             "phone": "+40723204204",
+            "accept_terms": True,
+            "accept_privacy": True,
         },
     )
     assert register.status_code == 201, register.text
@@ -604,6 +630,8 @@ def test_checkout_respects_product_delivery_exceptions(checkout_app: Dict[str, o
             "last_name": "User",
             "date_of_birth": "2000-01-01",
             "phone": "+40723204204",
+            "accept_terms": True,
+            "accept_privacy": True,
         },
     )
     assert register.status_code == 201, register.text
@@ -721,6 +749,8 @@ def test_authenticated_checkout_creates_separate_billing_address(
             "last_name": "Buyer",
             "date_of_birth": "2000-01-01",
             "phone": "+40723204204",
+            "accept_terms": True,
+            "accept_privacy": True,
         },
     )
     assert register.status_code == 201, register.text
@@ -816,6 +846,8 @@ def test_authenticated_checkout_cod_skips_payment_intent(checkout_app: Dict[str,
             "last_name": "Buyer",
             "date_of_birth": "2000-01-01",
             "phone": "+40723204204",
+            "accept_terms": True,
+            "accept_privacy": True,
         },
     )
     assert register.status_code == 201, register.text
@@ -954,6 +986,8 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
             "last_name": "Buyer",
             "date_of_birth": "2000-01-01",
             "phone": "+40723204204",
+            "accept_terms": True,
+            "accept_privacy": True,
         },
     )
     assert register.status_code == 201, register.text
@@ -1110,6 +1144,8 @@ def test_paypal_webhook_captures_order_without_return(
             "last_name": "Buyer",
             "date_of_birth": "2000-01-01",
             "phone": "+40723204204",
+            "accept_terms": True,
+            "accept_privacy": True,
         },
     )
     assert register.status_code == 201, register.text
@@ -1220,6 +1256,8 @@ def test_checkout_sends_admin_alert_fallback_when_no_owner(
             "last_name": "Two",
             "date_of_birth": "2000-01-01",
             "phone": "+40723204204",
+            "accept_terms": True,
+            "accept_privacy": True,
         },
     )
     assert register.status_code == 201, register.text

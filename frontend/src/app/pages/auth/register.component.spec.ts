@@ -50,6 +50,8 @@ describe('RegisterComponent', () => {
     cmp.dateOfBirth = '2000-01-01';
     cmp.phoneCountry = 'RO';
     cmp.phoneNational = '723204204';
+    cmp.acceptTerms = true;
+    cmp.acceptPrivacy = true;
 
     cmp.onSubmit({ valid: true, form: { markAllAsTouched: () => {} } } as any);
 
@@ -63,7 +65,9 @@ describe('RegisterComponent', () => {
       last_name: 'Test',
       date_of_birth: '2000-01-01',
       phone: '+40723204204',
-      preferred_language: 'en'
+      preferred_language: 'en',
+      accept_terms: true,
+      accept_privacy: true
     });
     expect(router.navigateByUrl).toHaveBeenCalledWith('/account');
     expect(toast.success).toHaveBeenCalled();

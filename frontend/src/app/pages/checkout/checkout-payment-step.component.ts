@@ -111,6 +111,18 @@ import { ButtonComponent } from '../../shared/button.component';
           {{ 'checkout.paymentHelpLink' | translate }}
         </a>
       </p>
+
+      <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-300">
+        <span class="uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'checkout.acceptedCards' | translate }}</span>
+        <div class="rounded-lg bg-white px-2 py-1 shadow-sm ring-1 ring-slate-200 dark:bg-slate-50 dark:ring-slate-200">
+          <img
+            src="assets/payments/netopia-visa-mastercard.png"
+            [alt]="'checkout.acceptedCardsAlt' | translate"
+            class="h-7 w-auto"
+            loading="lazy"
+          />
+        </div>
+      </div>
       <div *ngIf="vm.paymentNotReady" class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
         <span class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-indigo-600 dark:border-slate-700 dark:border-t-indigo-300"></span>
         <span>{{ 'checkout.paymentNotReady' | translate }}</span>
@@ -135,4 +147,3 @@ import { ButtonComponent } from '../../shared/button.component';
 export class CheckoutPaymentStepComponent {
   @Input({ required: true }) vm!: any;
 }
-

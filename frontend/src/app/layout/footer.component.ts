@@ -138,6 +138,18 @@ import { ImgFallbackDirective } from '../shared/img-fallback.directive';
           <p *ngIf="companyInfo.phone">{{ 'footer.phone' | translate }}: {{ companyInfo.phone }}</p>
           <p *ngIf="companyInfo.email">{{ 'footer.email' | translate }}: {{ companyInfo.email }}</p>
         </div>
+
+        <div class="lg:col-span-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200 pt-6 dark:border-slate-800">
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'footer.paymentsAccepted' | translate }}</p>
+          <div class="rounded-xl bg-white px-3 py-2 shadow-sm ring-1 ring-slate-200 dark:bg-slate-50 dark:ring-slate-200">
+            <img
+              src="assets/payments/netopia-visa-mastercard.png"
+              [alt]="'footer.paymentsAcceptedAlt' | translate"
+              class="h-8 w-auto"
+              loading="lazy"
+            />
+          </div>
+        </div>
       </div>
     </footer>
   `

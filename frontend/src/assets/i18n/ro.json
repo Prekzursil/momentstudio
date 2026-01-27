@@ -59,6 +59,8 @@
     "address": "Adresă",
     "phone": "Telefon",
     "email": "Email",
+    "paymentsAccepted": "Plăți acceptate",
+    "paymentsAcceptedAlt": "Plăți acceptate: Netopia, Visa, Mastercard",
     "instagram": "Instagram",
     "facebook": "Facebook",
     "contact": "Contact"
@@ -1095,6 +1097,8 @@
     "paymentMethodUnavailable": "Această metodă de plată nu este disponibilă pentru coșul curent.",
     "paymentPayPalHint": "Plătește cu PayPal (vei fi redirecționat).",
     "paymentCashHint": "Plătești în numerar la livrare (RON).",
+    "acceptedCards": "Acceptat",
+    "acceptedCardsAlt": "Carduri acceptate: Netopia, Visa, Mastercard",
     "paymentHelpLink": "Contact",
     "paypalReturnTitle": "PayPal",
     "paypalCapturing": "Confirmăm plata PayPal…",
@@ -1241,6 +1245,10 @@
     "captchaUnavailable": "CAPTCHA nu este disponibilă.",
     "captchaFailedTryAgain": "CAPTCHA a eșuat. Încearcă din nou.",
     "captchaFailedLoad": "CAPTCHA nu a putut fi încărcată.",
+    "acceptTermsPrefix": "Am citit și accept",
+    "acceptTermsLink": "Termenii și condițiile",
+    "acceptPrivacyPrefix": "Am citit și accept",
+    "acceptPrivacyLink": "Politica de confidențialitate",
     "currentPasswordRequired": "Parola curentă este necesară pentru a schimba numele de utilizator.",
     "twoFactorRequired": "Este necesară verificarea în doi pași.",
     "twoFactorTitle": "Verificare în doi pași",
@@ -2101,6 +2109,28 @@
           "urlRequired": "URL-ul este obligatoriu.",
           "noThumbnail": "Nu s-a găsit nicio miniatură.",
           "fetchFailed": "Nu s-a putut prelua miniatura."
+        }
+      },
+      "company": {
+        "title": "Informații companie",
+        "hint": "Afișate în subsolul magazinului și folosite pentru conformitate. Completează toate câmpurile înainte de publicare.",
+        "fields": {
+          "name": "Denumire companie",
+          "registrationNumber": "Nr. Registrul Comerțului",
+          "cui": "CUI / TVA",
+          "address": "Adresă",
+          "phone": "Telefon",
+          "email": "Email"
+        },
+        "missing": {
+          "title": "Câmpuri obligatorii lipsă"
+        },
+        "success": {
+          "save": "Salvat."
+        },
+        "errors": {
+          "save": "Nu am putut salva.",
+          "required": "Completează toate câmpurile obligatorii."
         }
       },
       "checkout": {

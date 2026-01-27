@@ -50,6 +50,8 @@ async def test_postgres_core_flow_wishlist() -> None:
                 "last_name": "User",
                 "date_of_birth": "2000-01-01",
                 "phone": "+40723204204",
+                "accept_terms": True,
+                "accept_privacy": True,
             },
         )
         assert register.status_code == 201, register.text
@@ -273,6 +275,8 @@ async def test_postgres_blog_flow() -> None:
                 "last_name": "Blog",
                 "date_of_birth": "2000-01-01",
                 "phone": "+40723204204",
+                "accept_terms": True,
+                "accept_privacy": True,
             },
         )
         assert register.status_code == 201, register.text

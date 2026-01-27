@@ -142,19 +142,27 @@ ANPC_EN_TITLE = "ANPC / Consumer information"
 ANPC_RO_TITLE = "ANPC / Informații pentru consumatori"
 ANPC_EN_BODY = """## ANPC / Consumer information
 
-If you have a complaint, please contact us first via [Contact](/contact).
+If you have a complaint, please contact us first via [Contact](/contact) so we can try to resolve it quickly.
+
+If we cannot resolve your complaint, you may be able to use Alternative Dispute Resolution (ADR) procedures.
 
 Alternative dispute resolution (ADR) information:
 - https://legislatie.just.ro/Public/DetaliiDocument/257649?fs=e&s=cl
 - https://anpc.ro/noi-reglementari-de-la-anpc-in-ceea-ce-priveste-procedurile-de-solutionaare-alternativa-a-litigiilor-si-insolventa-a-persoanelor-fizice/
+
+> Note: This page is informational and does not replace legal advice.
 """
 ANPC_RO_BODY = """## ANPC / Informații pentru consumatori
 
-Dacă ai o reclamație, te rugăm să ne contactezi mai întâi prin [Contact](/contact).
+Dacă ai o reclamație, te rugăm să ne contactezi mai întâi prin [Contact](/contact), pentru a încerca să o soluționăm rapid.
+
+Dacă nu reușim să soluționăm reclamația, poți avea la dispoziție proceduri de soluționare alternativă a litigiilor (SAL/ADR).
 
 Informații privind soluționarea alternativă a litigiilor (SAL/ADR):
 - https://legislatie.just.ro/Public/DetaliiDocument/257649?fs=e&s=cl
 - https://anpc.ro/noi-reglementari-de-la-anpc-in-ceea-ce-priveste-procedurile-de-solutionaare-alternativa-a-litigiilor-si-insolventa-a-persoanelor-fizice/
+
+> Notă: Această pagină are rol informativ și nu înlocuiește consultanța juridică.
 """
 
 
@@ -346,4 +354,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Intentionally no-op: removing seeded CMS content can delete user edits.
     return
-

@@ -33,11 +33,11 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS enforcement: block publishing legal pages unless **both RO + EN** are present (no fallback) + ensure version history/rollback works.
 - [x] Navigation: add header “Terms & Conditions” link between Contact and View Admin; add footer link under “Handcrafted Art”.
 - [x] Footer/company info: display full company identification details required by NETOPIA (name, RC number, CUI, address, phone, email) and keep them CMS-configurable.
-- [ ] Admin UX: add a friendly editor for `site.company` (avoid raw JSON meta editing) and validate required fields for production readiness.
-- [ ] NETOPIA logos: add Visa/Mastercard/NETOPIA Payments logos (from `Identitate-Parteneri-NETOPIA-Payments.zip`) and display them in footer + checkout.
-- [ ] ANPC content: add bilingual ANPC/ADR info page including required links and consumer guidance.
-- [ ] Consent tracking (DB): store acceptance records with doc key + version + timestamp + (user_id or order_id) + context (register/checkout).
-- [ ] Registration gating: require legal consent checkbox(es) before allowing registration (UI + backend enforcement).
+- [x] Admin UX: add a friendly editor for `site.company` (avoid raw JSON meta editing) and validate required fields for production readiness.
+- [x] NETOPIA logos: add Visa/Mastercard/NETOPIA Payments logos (from `Identitate-Parteneri-NETOPIA-Payments.zip`) and display them in footer + checkout.
+- [x] ANPC content: add bilingual ANPC/ADR info page including required links and consumer guidance.
+- [x] Consent tracking (DB): store acceptance records with doc key + version + timestamp + (user_id or order_id) + context (register/checkout).
+- [x] Registration gating: require legal consent checkbox(es) before allowing registration (UI + backend enforcement).
 - [ ] Checkout gating: require legal consent checkbox(es) before placing an order (guest + logged-in; UI + backend enforcement).
 - [ ] Consent UX: checkbox click opens a “read before accept” modal; require scrolling to bottom before enabling Accept.
 - [ ] Re-consent policy: force re-acceptance when legal docs change (by version) for both registration and checkout.

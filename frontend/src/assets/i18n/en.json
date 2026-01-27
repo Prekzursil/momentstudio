@@ -59,6 +59,8 @@
     "address": "Address",
     "phone": "Phone",
     "email": "Email",
+    "paymentsAccepted": "Payments accepted",
+    "paymentsAcceptedAlt": "Accepted payments: Netopia, Visa, Mastercard",
     "instagram": "Instagram",
     "facebook": "Facebook",
     "contact": "Contact"
@@ -1095,6 +1097,8 @@
     "paymentMethodUnavailable": "This payment method is not available for your current cart.",
     "paymentPayPalHint": "Pay with PayPal (you’ll be redirected).",
     "paymentCashHint": "Pay in cash upon delivery (RON).",
+    "acceptedCards": "Accepted",
+    "acceptedCardsAlt": "Accepted cards: Netopia, Visa, Mastercard",
     "paymentHelpLink": "Contact us",
     "paypalReturnTitle": "PayPal",
     "paypalCapturing": "Confirming your PayPal payment…",
@@ -1241,6 +1245,10 @@
     "captchaUnavailable": "CAPTCHA unavailable.",
     "captchaFailedTryAgain": "CAPTCHA failed. Please try again.",
     "captchaFailedLoad": "CAPTCHA failed to load.",
+    "acceptTermsPrefix": "I have read and accept the",
+    "acceptTermsLink": "Terms & Conditions",
+    "acceptPrivacyPrefix": "I have read and accept the",
+    "acceptPrivacyLink": "Privacy Policy",
     "currentPasswordRequired": "Current password is required to change your username.",
     "twoFactorRequired": "Two-factor verification required.",
     "twoFactorTitle": "Two-factor verification",
@@ -2101,6 +2109,28 @@
           "urlRequired": "URL is required.",
           "noThumbnail": "No thumbnail found.",
           "fetchFailed": "Could not fetch thumbnail."
+        }
+      },
+      "company": {
+        "title": "Company info",
+        "hint": "Displayed in the storefront footer and used for compliance. Fill in all fields before going live.",
+        "fields": {
+          "name": "Company name",
+          "registrationNumber": "Registration number (RC)",
+          "cui": "CUI / VAT",
+          "address": "Address",
+          "phone": "Phone",
+          "email": "Email"
+        },
+        "missing": {
+          "title": "Missing required fields"
+        },
+        "success": {
+          "save": "Saved."
+        },
+        "errors": {
+          "save": "Could not save.",
+          "required": "Please fill in all required fields."
         }
       },
       "checkout": {

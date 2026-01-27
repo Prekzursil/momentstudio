@@ -267,6 +267,38 @@ import { appConfig } from '../../core/app-config';
             </span>
           </div>
 
+          <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
+            <div class="grid gap-1">
+              <label class="flex items-start gap-2">
+                <input #acceptTermsCtrl="ngModel" type="checkbox" name="acceptTerms" required [(ngModel)]="acceptTerms" />
+                <span>
+                  {{ 'auth.acceptTermsPrefix' | translate }}
+                  <a routerLink="/pages/terms-and-conditions" class="text-indigo-600 dark:text-indigo-300 font-medium">{{
+                    'auth.acceptTermsLink' | translate
+                  }}</a>
+                </span>
+              </label>
+              <span *ngIf="acceptTermsCtrl.touched && acceptTermsCtrl.invalid" class="text-xs font-normal text-rose-700 dark:text-rose-300">
+                {{ 'validation.required' | translate }}
+              </span>
+            </div>
+
+            <div class="grid gap-1">
+              <label class="flex items-start gap-2">
+                <input #acceptPrivacyCtrl="ngModel" type="checkbox" name="acceptPrivacy" required [(ngModel)]="acceptPrivacy" />
+                <span>
+                  {{ 'auth.acceptPrivacyPrefix' | translate }}
+                  <a routerLink="/pages/privacy-policy" class="text-indigo-600 dark:text-indigo-300 font-medium">{{
+                    'auth.acceptPrivacyLink' | translate
+                  }}</a>
+                </span>
+              </label>
+              <span *ngIf="acceptPrivacyCtrl.touched && acceptPrivacyCtrl.invalid" class="text-xs font-normal text-rose-700 dark:text-rose-300">
+                {{ 'validation.required' | translate }}
+              </span>
+            </div>
+          </div>
+
           <app-captcha-turnstile
             *ngIf="!completionMode && captchaEnabled"
             [siteKey]="captchaSiteKey"
@@ -312,6 +344,8 @@ export class RegisterComponent implements OnInit, OnDestroy {
   phoneCountry: CountryCode = 'RO';
   phoneNational = '';
   countries: PhoneCountryOption[] = [];
+  acceptTerms = false;
+  acceptPrivacy = false;
   error = '';
   loading = false;
   private googleCompletionToken: string | null = null;
@@ -448,7 +482,9 @@ export class RegisterComponent implements OnInit, OnDestroy {
           date_of_birth: dob,
           phone: e164,
           password: this.password,
-          preferred_language: preferredLanguage
+          preferred_language: preferredLanguage,
+          accept_terms: this.acceptTerms,
+          accept_privacy: this.acceptPrivacy
         })
         .pipe(
           finalize(() => {
@@ -484,6 +520,8 @@ export class RegisterComponent implements OnInit, OnDestroy {
         date_of_birth: dob,
         phone: e164,
         preferred_language: preferredLanguage,
+        accept_terms: this.acceptTerms,
+        accept_privacy: this.acceptPrivacy,
         ...(this.captchaToken ? { captcha_token: this.captchaToken } : {})
       })
       .pipe(

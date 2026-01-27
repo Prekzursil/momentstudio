@@ -255,6 +255,8 @@ export class AuthService {
     phone: string;
     preferred_language?: string;
     captcha_token?: string | null;
+    accept_terms: boolean;
+    accept_privacy: boolean;
   }, opts?: { remember?: boolean }): Observable<AuthResponse> {
     return this.api
       .post<AuthResponse>('/auth/register', payload)
@@ -300,6 +302,8 @@ export class AuthService {
       phone: string;
       password: string;
       preferred_language?: string;
+      accept_terms: boolean;
+      accept_privacy: boolean;
     }
   ): Observable<AuthResponse> {
     return this.api
