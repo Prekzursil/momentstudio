@@ -57,6 +57,7 @@ export interface BlogPost {
   cover_image_url?: string | null;
   tags?: string[];
   series?: string | null;
+  author?: BlogCommentAuthor | null;
   author_name?: string | null;
   reading_time_minutes?: number | null;
 }
@@ -162,6 +163,7 @@ export class BlogService {
     q?: string;
     tag?: string;
     series?: string;
+    author_id?: string;
     sort?: string;
   }): Observable<BlogPostListResponse> {
     return this.api.get<BlogPostListResponse>('/blog/posts', {
@@ -171,6 +173,7 @@ export class BlogService {
       q: params.q,
       tag: params.tag,
       series: params.series,
+      author_id: params.author_id,
       sort: params.sort
     });
   }

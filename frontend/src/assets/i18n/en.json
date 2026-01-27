@@ -858,6 +858,17 @@
         "note": "Note",
         "warning": "Warning"
       },
+      "embed": {
+        "categoryLabel": "Category",
+        "collectionLabel": "Collection",
+        "notFoundProduct": "Product not found.",
+        "notFoundCategory": "Category not found.",
+        "notFoundCollection": "Collection not found."
+      },
+      "author": {
+        "title": "About the author",
+        "moreFrom": "More from {{author}}"
+      },
       "code": {
         "copy": "Copy",
         "wrap": "Wrap",
@@ -2599,12 +2610,22 @@
         "richEditor": "Rich editor",
         "livePreview": "Live preview",
         "previewEmpty": "Nothing to preview yet.",
-        "toolbarTip": "Tip: Use the toolbar to format markdown and insert images (uploads go to the post's content images). Image layouts use the image title token: \"wide\", \"left\", \"right\", \"gallery\" (e.g. ![alt](url \"wide\"))."
+        "toolbarTip": "Tip: Use the toolbar to format markdown and insert images (uploads go to the post's content images). Image layouts use the image title token: \"wide\", \"left\", \"right\", \"gallery\" (e.g. ![alt](url \"wide\")). Embeds: {{product:slug}}, {{category:slug}}, {{collection:slug}}."
       },
       "toolbar": {
         "link": "Link",
         "code": "Code",
+        "product": "Product",
+        "category": "Category",
+        "collection": "Collection",
         "list": "List"
+      },
+      "embeds": {
+        "prompt": {
+          "product": "Enter product slug (e.g. my-product):",
+          "category": "Enter category slug (e.g. ceramics):",
+          "collection": "Enter featured collection slug (e.g. studio-favorites):"
+        }
       },
       "images": {
         "title": "Images",

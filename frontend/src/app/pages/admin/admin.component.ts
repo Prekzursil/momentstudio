@@ -3746,6 +3746,27 @@ class CmsDraftManager<T> {
                       >
                         {{ 'adminUi.blog.actions.image' | translate }}
                       </button>
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="insertBlogEmbed(blogEditor, 'product')"
+                      >
+                        {{ 'adminUi.blog.toolbar.product' | translate }}
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="insertBlogEmbed(blogEditor, 'category')"
+                      >
+                        {{ 'adminUi.blog.toolbar.category' | translate }}
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="insertBlogEmbed(blogEditor, 'collection')"
+                      >
+                        {{ 'adminUi.blog.toolbar.collection' | translate }}
+                      </button>
                       <input
                         #blogImageInputRich
                         type="file"
@@ -3806,6 +3827,27 @@ class CmsDraftManager<T> {
                         (click)="insertBlogCodeBlock(blogBody)"
                       >
                         {{ 'adminUi.blog.toolbar.code' | translate }}
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="insertBlogEmbed(blogBody, 'product')"
+                      >
+                        {{ 'adminUi.blog.toolbar.product' | translate }}
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="insertBlogEmbed(blogBody, 'category')"
+                      >
+                        {{ 'adminUi.blog.toolbar.category' | translate }}
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="insertBlogEmbed(blogBody, 'collection')"
+                      >
+                        {{ 'adminUi.blog.toolbar.collection' | translate }}
                       </button>
                       <button
                         type="button"
@@ -6580,6 +6622,24 @@ export class AdminComponent implements OnInit, OnDestroy {
     const next = value.slice(0, start) + snippet + value.slice(end);
     const codeStart = start + 5;
     this.updateBlogBody(textarea, next, codeStart, codeStart + selected.length);
+  }
+
+  insertBlogEmbed(target: HTMLTextAreaElement | RichEditorComponent, kind: 'product' | 'category' | 'collection'): void {
+    const hintKey =
+      kind === 'product'
+        ? 'adminUi.blog.embeds.prompt.product'
+        : kind === 'category'
+          ? 'adminUi.blog.embeds.prompt.category'
+          : 'adminUi.blog.embeds.prompt.collection';
+    const raw = prompt(this.t(hintKey), '') || '';
+    const slug = raw.trim();
+    if (!slug) return;
+    const snippet = `{{${kind}:${slug}}}`;
+    if (target instanceof HTMLTextAreaElement) {
+      this.insertAtCursor(target, snippet);
+    } else {
+      target.insertMarkdown(snippet);
+    }
   }
 
   uploadAndInsertBlogImage(target: HTMLTextAreaElement | RichEditorComponent, event: Event): void {

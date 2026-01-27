@@ -1,9 +1,9 @@
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
-import { Subscription, combineLatest } from 'rxjs';
+import { Subscription, combineLatest, forkJoin, of } from 'rxjs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import hljs from 'highlight.js/lib/core';
 import bash from 'highlight.js/lib/languages/bash';
@@ -16,6 +16,7 @@ import typescript from 'highlight.js/lib/languages/typescript';
 
 import { appConfig } from '../../core/app-config';
 import { AuthService } from '../../core/auth.service';
+import { CatalogService, Category, FeaturedCollection, Product } from '../../core/catalog.service';
 import { MarkdownService } from '../../core/markdown.service';
 import { ToastService } from '../../core/toast.service';
 import { BlogComment, BlogPost, BlogPostListItem, BlogService } from '../../core/blog.service';
@@ -25,6 +26,7 @@ import { ButtonComponent } from '../../shared/button.component';
 import { CardComponent } from '../../shared/card.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
 import { formatIdentity } from '../../shared/user-identity';
+import { catchError } from 'rxjs/operators';
 
 hljs.registerLanguage('bash', bash);
 hljs.registerLanguage('css', css);
@@ -51,7 +53,7 @@ hljs.registerLanguage('typescript', typescript);
   template: `
     <div
       *ngIf="post()"
-      class="fixed left-0 right-0 top-0 z-[110] h-1 bg-transparent"
+      class="fixed left-0 right-0 top-0 z-[110] h-1 bg-transparent no-print"
       role="progressbar"
       [attr.aria-label]="'blog.post.progressLabel' | translate"
       [attr.aria-valuemin]="0"
@@ -131,7 +133,7 @@ hljs.registerLanguage('typescript', typescript);
                 loading="lazy"
               />
               <div class="markdown blog-markdown text-slate-700 dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
-              <div class="mx-auto w-full max-w-prose">
+              <div class="mx-auto w-full max-w-prose no-print">
                 <a
                   routerLink="/blog"
                   class="text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
@@ -142,7 +144,7 @@ hljs.registerLanguage('typescript', typescript);
             </div>
           </app-card>
 
-          <aside *ngIf="toc().length > 1" class="hidden lg:block lg:sticky lg:top-24">
+          <aside *ngIf="toc().length > 1" class="hidden lg:block lg:sticky lg:top-24 no-print">
             <app-card>
               <nav class="grid gap-3" [attr.aria-label]="'blog.post.tocTitle' | translate">
                 <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.post.tocTitle' | translate }}</p>
@@ -166,7 +168,7 @@ hljs.registerLanguage('typescript', typescript);
         </div>
       </div>
 
-      <section *ngIf="post()" class="grid gap-2">
+      <section *ngIf="post()" class="grid gap-2 no-print">
         <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.post.shareTitle' | translate }}</p>
         <div class="flex flex-wrap gap-2">
           <app-button size="sm" variant="ghost" [label]="'blog.post.shareCopy' | translate" (action)="copyShareLink()"></app-button>
@@ -175,7 +177,7 @@ hljs.registerLanguage('typescript', typescript);
         </div>
       </section>
 
-      <section *ngIf="neighbors().previous || neighbors().next" class="grid gap-3">
+      <section *ngIf="neighbors().previous || neighbors().next" class="grid gap-3 no-print">
         <div class="grid gap-3 sm:grid-cols-2">
           <a
             *ngIf="neighbors().previous as prev"
@@ -204,7 +206,7 @@ hljs.registerLanguage('typescript', typescript);
         </div>
       </section>
 
-      <section *ngIf="relatedPosts().length" class="grid gap-3">
+      <section *ngIf="relatedPosts().length" class="grid gap-3 no-print">
         <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.post.relatedTitle' | translate }}</h2>
         <div class="grid gap-4 sm:grid-cols-2">
           <a *ngFor="let related of relatedPosts()" [routerLink]="['/blog', related.slug]" class="group block">
@@ -244,7 +246,81 @@ hljs.registerLanguage('typescript', typescript);
         </div>
       </section>
 
-      <section class="grid gap-3">
+      <section *ngIf="authorDisplayName()" class="grid gap-3">
+        <app-card>
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <ng-container *ngIf="post()?.author?.avatar_url; else authorAvatarFallback">
+              <img
+                [src]="post()!.author!.avatar_url"
+                [alt]="authorDisplayName()"
+                class="h-16 w-16 rounded-full border border-slate-200 object-cover dark:border-slate-800"
+                loading="lazy"
+                decoding="async"
+              />
+            </ng-container>
+            <ng-template #authorAvatarFallback>
+              <div
+                class="h-16 w-16 rounded-full border border-slate-200 bg-slate-50 grid place-items-center text-lg font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-950/20 dark:text-slate-200"
+              >
+                {{ authorInitials() }}
+              </div>
+            </ng-template>
+
+            <div class="grid gap-1 flex-1">
+              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {{ 'blog.post.author.title' | translate }}
+              </p>
+              <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                {{ authorDisplayName() }}
+              </p>
+              <p *ngIf="authorBio()" class="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line">
+                {{ authorBio() }}
+              </p>
+              <div *ngIf="authorLinks().length" class="flex flex-wrap gap-3 pt-1 text-sm">
+                <a
+                  *ngFor="let link of authorLinks()"
+                  [href]="link.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-indigo-600 underline underline-offset-4 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
+                >
+                  {{ link.label }}
+                </a>
+              </div>
+            </div>
+          </div>
+        </app-card>
+
+        <div *ngIf="loadingMoreFromAuthor()" class="grid gap-2 sm:grid-cols-2">
+          <app-skeleton height="86px"></app-skeleton>
+          <app-skeleton height="86px"></app-skeleton>
+        </div>
+
+        <div *ngIf="!loadingMoreFromAuthor() && moreFromAuthor().length" class="grid gap-2">
+          <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+            {{ 'blog.post.author.moreFrom' | translate : { author: authorDisplayName() } }}
+          </p>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <a
+              *ngFor="let item of moreFromAuthor()"
+              [routerLink]="['/blog', item.slug]"
+              class="block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:shadow-none"
+            >
+              <p class="text-xs text-slate-500 dark:text-slate-400" *ngIf="item.published_at">
+                {{ item.published_at | date: 'mediumDate' }}
+                <ng-container *ngIf="item.reading_time_minutes">
+                  · {{ 'blog.minutesRead' | translate : { minutes: item.reading_time_minutes } }}
+                </ng-container>
+              </p>
+              <p class="pt-1 text-base font-semibold text-slate-900 hover:text-indigo-600 dark:text-slate-50 dark:hover:text-indigo-300">
+                {{ item.title }}
+              </p>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section class="grid gap-3 no-print">
         <div class="flex items-center justify-between gap-4">
           <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">
             {{ 'blog.comments.title' | translate : { count: comments().length } }}
@@ -477,7 +553,7 @@ hljs.registerLanguage('typescript', typescript);
     <button
       *ngIf="showBackToTop()"
       type="button"
-      class="fixed bottom-6 right-6 z-50 h-11 w-11 rounded-full bg-slate-900 text-white shadow-soft hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+      class="fixed bottom-6 right-6 z-50 h-11 w-11 rounded-full bg-slate-900 text-white shadow-soft hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white no-print"
       (click)="scrollToTop()"
       [attr.aria-label]="'blog.post.backToTop' | translate"
     >
@@ -500,6 +576,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   activeHeadingId = signal<string | null>(null);
   neighbors = signal<{ previous: BlogPostListItem | null; next: BlogPostListItem | null }>({ previous: null, next: null });
   relatedPosts = signal<BlogPostListItem[]>([]);
+  moreFromAuthor = signal<BlogPostListItem[]>([]);
+  loadingMoreFromAuthor = signal<boolean>(false);
   galleryImages = signal<Array<{ src: string; alt: string }>>([]);
   lightboxIndex = signal<number | null>(null);
   lightboxImage = computed(() => {
@@ -523,6 +601,41 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   showBackToTop = signal<boolean>(false);
   progressPercent = computed(() => Math.round(this.readingProgress() * 100));
 
+  authorDisplayName = computed(() => {
+    const post = this.post();
+    return post?.author_name || post?.author?.name || post?.author?.username || '';
+  });
+  authorInitials = computed(() => {
+    const name = this.authorDisplayName().trim();
+    if (!name) return '?';
+    const parts = name.split(/\s+/g).filter(Boolean);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return `${parts[0][0] || ''}${parts[parts.length - 1][0] || ''}`.toUpperCase();
+  });
+  authorBio = computed(() => {
+    const post = this.post();
+    const meta = (post?.meta as any) || {};
+    const author = meta?.author;
+    const bio = author?.bio;
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    if (typeof bio === 'string') return bio.trim();
+    if (bio && typeof bio === 'object' && typeof bio[lang] === 'string') return String(bio[lang]).trim();
+    return '';
+  });
+  authorLinks = computed(() => {
+    const post = this.post();
+    const meta = (post?.meta as any) || {};
+    const author = meta?.author;
+    const links = author?.links;
+    if (!Array.isArray(links)) return [] as Array<{ label: string; url: string }>;
+    return links
+      .map((row: any) => ({
+        label: typeof row?.label === 'string' ? row.label.trim() : '',
+        url: typeof row?.url === 'string' ? row.url.trim() : ''
+      }))
+      .filter((row) => row.label && row.url);
+  });
+
   @ViewChild('articleContent') articleContent?: ElementRef<HTMLElement>;
 
   private slug = '';
@@ -534,6 +647,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   private scrollStartY = 0;
   private scrollEndY = 1;
   private tocHeadingEls: HTMLElement[] = [];
+  private embedRevision = 0;
   private previousBodyOverflow: string | null = null;
   private lightboxKeyListener = (event: KeyboardEvent) => {
     if (!this.lightboxOpen()) return;
@@ -558,11 +672,13 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   constructor(
     private blog: BlogService,
     private route: ActivatedRoute,
+    private router: Router,
     private translate: TranslateService,
     private title: Title,
     private meta: Meta,
     private toast: ToastService,
     private markdown: MarkdownService,
+    private catalog: CatalogService,
     public auth: AuthService
   ) {}
 
@@ -604,6 +720,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     this.activeHeadingId.set(null);
     this.neighbors.set({ previous: null, next: null });
     this.relatedPosts.set([]);
+    this.moreFromAuthor.set([]);
+    this.loadingMoreFromAuthor.set(false);
     this.galleryImages.set([]);
     this.lightboxIndex.set(null);
     this.scrollStartY = 0;
@@ -621,6 +739,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         const rendered = this.renderPostBody(post.body_markdown);
         this.bodyHtml.set(rendered.html);
         this.toc.set(rendered.toc);
+        this.embedRevision += 1;
+        this.hydrateEmbeds(rendered.embeds, this.embedRevision, lang);
         this.loadingPost.set(false);
         this.hasPostError.set(false);
         this.crumbs = [
@@ -632,6 +752,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.measureReadingProgressSoon();
         this.loadNeighbors(lang);
         this.loadRelatedPosts(lang, post);
+        this.loadMoreFromAuthor(lang, post);
         this.loadComments();
       },
       error: () => {
@@ -641,6 +762,9 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.activeHeadingId.set(null);
         this.neighbors.set({ previous: null, next: null });
         this.relatedPosts.set([]);
+        this.moreFromAuthor.set([]);
+        this.loadingMoreFromAuthor.set(false);
+        this.embedRevision += 1;
         this.loadingPost.set(false);
         this.hasPostError.set(true);
         this.setErrorMetaTags();
@@ -705,6 +829,35 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       });
   }
 
+  private loadMoreFromAuthor(lang: string, post: BlogPost): void {
+    const authorId = post.author?.id;
+    if (!authorId) {
+      this.moreFromAuthor.set([]);
+      this.loadingMoreFromAuthor.set(false);
+      return;
+    }
+    this.loadingMoreFromAuthor.set(true);
+    this.blog
+      .listPosts({
+        lang,
+        page: 1,
+        limit: 8,
+        sort: 'newest',
+        author_id: authorId
+      })
+      .subscribe({
+        next: (resp) => {
+          const items = (resp.items || []).filter((item) => item.slug !== post.slug).slice(0, 4);
+          this.moreFromAuthor.set(items);
+          this.loadingMoreFromAuthor.set(false);
+        },
+        error: () => {
+          this.moreFromAuthor.set([]);
+          this.loadingMoreFromAuthor.set(false);
+        }
+      });
+  }
+
   scrollToTop(): void {
     const w = this.document?.defaultView;
     if (!w) return;
@@ -726,6 +879,16 @@ export class BlogPostComponent implements OnInit, OnDestroy {
 
   handleArticleClick(event: MouseEvent): void {
     const target = event.target as HTMLElement | null;
+    const link = target?.closest('a[data-router-link]') as HTMLAnchorElement | null;
+    if (link) {
+      const to = link.getAttribute('data-router-link') || '';
+      if (to && !event.defaultPrevented && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        void this.router.navigateByUrl(to);
+        return;
+      }
+    }
     const codeButton = target?.closest('button[data-code-action]') as HTMLButtonElement | null;
     if (codeButton) {
       const action = codeButton.getAttribute('data-code-action');
@@ -1073,6 +1236,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const gallery: Array<{ src: string; alt: string }> = [];
     const seen = new Set<string>();
     for (const img of imgs) {
+      if (img.closest('.blog-embed')) continue;
       const src = img.currentSrc || img.src;
       if (!src || seen.has(src)) continue;
       seen.add(src);
@@ -1130,16 +1294,21 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     return `${w.location.origin}/blog/${encodeURIComponent(this.slug)}?lang=${lang}${hash}`;
   }
 
-  private renderPostBody(markdown: string): { html: string; toc: Array<{ id: string; title: string; level: 2 | 3 }> } {
+  private renderPostBody(markdown: string): {
+    html: string;
+    toc: Array<{ id: string; title: string; level: 2 | 3 }>;
+    embeds: Array<{ type: 'product' | 'category' | 'collection'; slug: string }>;
+  } {
     const html = this.markdown.render(markdown || '');
     const w = this.document?.defaultView;
-    if (!w?.DOMParser) return { html, toc: [] };
+    if (!w?.DOMParser) return { html, toc: [], embeds: [] };
 
     const parser = new w.DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
     const headings = Array.from(doc.body.querySelectorAll('h2, h3')) as HTMLElement[];
 
     const toc: Array<{ id: string; title: string; level: 2 | 3 }> = [];
+    const embeds: Array<{ type: 'product' | 'category' | 'collection'; slug: string }> = [];
     const used = new Set<string>();
     const linkLabel = this.translate.instant('blog.post.sectionLinkLabel');
 
@@ -1221,6 +1390,27 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         extra.remove();
       }
       idx += 1;
+    }
+
+    const embedRe = /^\{\{\s*(product|category|collection)\s*:\s*([a-z0-9_-]+)\s*\}\}$/i;
+    const embedParas = Array.from(doc.body.querySelectorAll('p')) as HTMLElement[];
+    for (const para of embedParas) {
+      const text = (para.textContent || '').trim();
+      const match = text.match(embedRe);
+      if (!match) continue;
+      const rawType = (match[1] || '').toLowerCase();
+      const type = rawType === 'product' || rawType === 'category' || rawType === 'collection' ? rawType : null;
+      if (!type) continue;
+      const slug = (match[2] || '').trim();
+      if (!slug) continue;
+      embeds.push({ type, slug });
+
+      const embed = doc.createElement('div');
+      embed.className = `blog-embed blog-embed--${type}`;
+      embed.setAttribute('data-embed-type', type);
+      embed.setAttribute('data-embed-slug', slug);
+      embed.textContent = this.translate.instant('blog.post.loadingTitle');
+      para.replaceWith(embed);
     }
 
     const calloutTipLabel = this.translate.instant('blog.post.callout.tip');
@@ -1372,7 +1562,231 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       wrapper.appendChild(pre);
     }
 
-    return { html: doc.body.innerHTML, toc };
+    return { html: doc.body.innerHTML, toc, embeds };
+  }
+
+  private hydrateEmbeds(
+    embeds: Array<{ type: 'product' | 'category' | 'collection'; slug: string }>,
+    revision: number,
+    lang: string
+  ): void {
+    const html = this.bodyHtml();
+    if (!html || !embeds.length) return;
+    const deduped: Array<{ type: 'product' | 'category' | 'collection'; slug: string }> = [];
+    const seen = new Set<string>();
+    for (const embed of embeds) {
+      const key = `${embed.type}:${embed.slug}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(embed);
+    }
+
+    const productSlugs = deduped.filter((e) => e.type === 'product').map((e) => e.slug);
+    const categorySlugs = deduped.filter((e) => e.type === 'category').map((e) => e.slug);
+    const collectionSlugs = deduped.filter((e) => e.type === 'collection').map((e) => e.slug);
+
+    const productCalls: Record<string, any> = {};
+    for (const slug of productSlugs) {
+      productCalls[slug] = this.catalog.getProduct(slug).pipe(catchError(() => of(null)));
+    }
+
+    const req = forkJoin({
+      products: Object.keys(productCalls).length ? forkJoin(productCalls) : of({}),
+      categories: categorySlugs.length ? this.catalog.listCategories(lang as any).pipe(catchError(() => of([]))) : of([]),
+      collections: collectionSlugs.length ? this.catalog.listFeaturedCollections().pipe(catchError(() => of([]))) : of([])
+    });
+
+    req.subscribe({
+      next: ({ products, categories, collections }: { products: Record<string, Product | null>; categories: Category[]; collections: FeaturedCollection[] }) => {
+        if (revision !== this.embedRevision) return;
+        const nextHtml = this.applyEmbedData(html, { products, categories, collections });
+        if (nextHtml !== html) {
+          this.bodyHtml.set(nextHtml);
+          this.measureReadingProgressSoon();
+        }
+      }
+    });
+  }
+
+  private applyEmbedData(
+    html: string,
+    data: { products: Record<string, Product | null>; categories: Category[]; collections: FeaturedCollection[] }
+  ): string {
+    const w = this.document?.defaultView;
+    if (!w?.DOMParser) return html;
+    const doc = new w.DOMParser().parseFromString(html, 'text/html');
+    const embeds = Array.from(doc.body.querySelectorAll('.blog-embed[data-embed-type][data-embed-slug]')) as HTMLElement[];
+    if (!embeds.length) return html;
+
+    const categoryBySlug = new Map<string, Category>();
+    for (const c of data.categories || []) {
+      if (c?.slug) categoryBySlug.set(c.slug, c);
+    }
+    const collectionBySlug = new Map<string, FeaturedCollection>();
+    for (const c of data.collections || []) {
+      if (c?.slug) collectionBySlug.set(c.slug, c);
+    }
+
+    const buildPrice = (product: Product): { primary: string; secondary?: string } => {
+      const currency = product.currency || '';
+      const base = typeof product.base_price === 'number' && Number.isFinite(product.base_price) ? product.base_price : 0;
+      const sale = typeof product.sale_price === 'number' && Number.isFinite(product.sale_price) ? product.sale_price : null;
+      if (sale !== null && sale < base) {
+        return { primary: `${sale.toFixed(2)} ${currency}`, secondary: `${base.toFixed(2)} ${currency}` };
+      }
+      return { primary: `${base.toFixed(2)} ${currency}` };
+    };
+
+    const buildThumb = (src: string, alt: string): HTMLImageElement => {
+      const img = doc.createElement('img');
+      img.src = src;
+      img.alt = alt;
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.className = 'blog-embed-thumb';
+      return img;
+    };
+
+    for (const el of embeds) {
+      const type = (el.getAttribute('data-embed-type') || '').toLowerCase();
+      const slug = (el.getAttribute('data-embed-slug') || '').trim();
+      if (!type || !slug) continue;
+
+      while (el.firstChild) el.removeChild(el.firstChild);
+
+      if (type === 'product') {
+        const product = data.products?.[slug] ?? null;
+        if (!product) {
+          el.textContent = this.translate.instant('blog.post.embed.notFoundProduct');
+          continue;
+        }
+        const card = doc.createElement('a');
+        card.href = `/products/${encodeURIComponent(product.slug)}`;
+        card.setAttribute('data-router-link', `/products/${encodeURIComponent(product.slug)}`);
+        card.className = 'blog-embed-card';
+
+        const media = doc.createElement('div');
+        media.className = 'blog-embed-media';
+        const imgUrl = product.images?.[0]?.url || 'assets/placeholder/product-placeholder.svg';
+        media.appendChild(buildThumb(imgUrl, product.name || 'Product'));
+
+        const content = doc.createElement('div');
+        content.className = 'blog-embed-content';
+        const title = doc.createElement('div');
+        title.className = 'blog-embed-title';
+        title.textContent = product.name || product.slug;
+        const price = buildPrice(product);
+        const priceWrap = doc.createElement('div');
+        priceWrap.className = 'blog-embed-price';
+        const primary = doc.createElement('span');
+        primary.textContent = price.primary;
+        priceWrap.appendChild(primary);
+        if (price.secondary) {
+          const secondary = doc.createElement('span');
+          secondary.className = 'blog-embed-price-secondary';
+          secondary.textContent = price.secondary;
+          priceWrap.appendChild(secondary);
+        }
+
+        content.appendChild(title);
+        content.appendChild(priceWrap);
+        const desc = (product.short_description || '').trim();
+        if (desc) {
+          const p = doc.createElement('p');
+          p.className = 'blog-embed-desc';
+          p.textContent = desc;
+          content.appendChild(p);
+        }
+        card.appendChild(media);
+        card.appendChild(content);
+        el.appendChild(card);
+        continue;
+      }
+
+      if (type === 'category') {
+        const category = categoryBySlug.get(slug);
+        if (!category) {
+          el.textContent = this.translate.instant('blog.post.embed.notFoundCategory');
+          continue;
+        }
+        const card = doc.createElement('a');
+        card.href = `/shop/${encodeURIComponent(category.slug)}`;
+        card.setAttribute('data-router-link', `/shop/${encodeURIComponent(category.slug)}`);
+        card.className = 'blog-embed-card';
+
+        const media = doc.createElement('div');
+        media.className = 'blog-embed-media';
+        const imgUrl = category.thumbnail_url || category.banner_url || 'assets/placeholder/product-placeholder.svg';
+        media.appendChild(buildThumb(imgUrl, category.name || category.slug));
+
+        const content = doc.createElement('div');
+        content.className = 'blog-embed-content';
+        const title = doc.createElement('div');
+        title.className = 'blog-embed-title';
+        title.textContent = category.name || category.slug;
+        const kind = doc.createElement('div');
+        kind.className = 'blog-embed-kind';
+        kind.textContent = this.translate.instant('blog.post.embed.categoryLabel');
+        content.appendChild(kind);
+        content.appendChild(title);
+
+        card.appendChild(media);
+        card.appendChild(content);
+        el.appendChild(card);
+        continue;
+      }
+
+      if (type === 'collection') {
+        const collection = collectionBySlug.get(slug);
+        if (!collection) {
+          el.textContent = this.translate.instant('blog.post.embed.notFoundCollection');
+          continue;
+        }
+
+        const wrapper = doc.createElement('div');
+        wrapper.className = 'blog-embed-collection';
+
+        const header = doc.createElement('div');
+        header.className = 'blog-embed-collection-header';
+        const kind = doc.createElement('div');
+        kind.className = 'blog-embed-kind';
+        kind.textContent = this.translate.instant('blog.post.embed.collectionLabel');
+        const title = doc.createElement('div');
+        title.className = 'blog-embed-title';
+        title.textContent = collection.name || collection.slug;
+        header.appendChild(kind);
+        header.appendChild(title);
+
+        if (collection.description) {
+          const desc = doc.createElement('p');
+          desc.className = 'blog-embed-desc';
+          desc.textContent = collection.description;
+          header.appendChild(desc);
+        }
+
+        const grid = doc.createElement('div');
+        grid.className = 'blog-embed-collection-grid';
+        for (const product of (collection.products || []).slice(0, 6)) {
+          const item = doc.createElement('a');
+          item.href = `/products/${encodeURIComponent(product.slug)}`;
+          item.setAttribute('data-router-link', `/products/${encodeURIComponent(product.slug)}`);
+          item.className = 'blog-embed-collection-item';
+          const imgUrl = product.images?.[0]?.url || 'assets/placeholder/product-placeholder.svg';
+          item.appendChild(buildThumb(imgUrl, product.name || product.slug));
+          const name = doc.createElement('span');
+          name.className = 'blog-embed-collection-name';
+          name.textContent = product.name || product.slug;
+          item.appendChild(name);
+          grid.appendChild(item);
+        }
+
+        wrapper.appendChild(header);
+        wrapper.appendChild(grid);
+        el.appendChild(wrapper);
+      }
+    }
+
+    return doc.body.innerHTML;
   }
 
   private slugifyHeading(value: string): string {

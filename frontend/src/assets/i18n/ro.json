@@ -858,6 +858,17 @@
         "note": "Notă",
         "warning": "Atenție"
       },
+      "embed": {
+        "categoryLabel": "Categorie",
+        "collectionLabel": "Colecție",
+        "notFoundProduct": "Produs indisponibil.",
+        "notFoundCategory": "Categoria nu a fost găsită.",
+        "notFoundCollection": "Colecția nu a fost găsită."
+      },
+      "author": {
+        "title": "Despre autor",
+        "moreFrom": "Mai multe de la {{author}}"
+      },
       "code": {
         "copy": "Copiază",
         "wrap": "Împachetează",
@@ -2599,12 +2610,22 @@
         "richEditor": "Editor bogat",
         "livePreview": "Previzualizare live",
         "previewEmpty": "Nimic de previzualizat încă.",
-        "toolbarTip": "Sfat: Folosește bara de instrumente pentru a formata markdown și a insera imagini (încărcările merg în imaginile de conținut ale articolului). Layout-ul imaginilor folosește token-ul din titlul imaginii: \"wide\", \"left\", \"right\", \"gallery\" (ex: ![alt](url \"wide\"))."
+        "toolbarTip": "Sfat: Folosește bara de instrumente pentru a formata markdown și a insera imagini (încărcările merg în imaginile de conținut ale articolului). Layout-ul imaginilor folosește token-ul din titlul imaginii: \"wide\", \"left\", \"right\", \"gallery\" (ex: ![alt](url \"wide\")). Inserări: {{product:slug}}, {{category:slug}}, {{collection:slug}}."
       },
       "toolbar": {
         "link": "Link",
         "code": "Cod",
+        "product": "Produs",
+        "category": "Categorie",
+        "collection": "Colecție",
         "list": "Listă"
+      },
+      "embeds": {
+        "prompt": {
+          "product": "Introdu slug-ul produsului (ex. nume-produs):",
+          "category": "Introdu slug-ul categoriei (ex. ceramica):",
+          "collection": "Introdu slug-ul colecției (ex. favorite-atelier):"
+        }
       },
       "images": {
         "title": "Imagini",

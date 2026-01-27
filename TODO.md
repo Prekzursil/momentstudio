@@ -448,9 +448,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Blog editor: image layout hints – Document supported image title hints (`"wide"`, `"left"`, `"right"`, `"gallery"`) and add quick-insert helpers in the editor UI.
 - [x] Blog post: code blocks – Syntax highlighting + “Copy” button + line wrapping toggle.
 - [x] Blog post: callout blocks – Support “Tip/Note/Warning” callouts with icons and theme-aware styling.
-- [ ] Blog post: embedded product cards – Allow inserting product/category/collection cards inside posts (shoppable content).
-- [ ] Blog post: author card – Author bio + avatar + links, plus “More from this author”.
-- [ ] Blog post: print-friendly styles – Clean print stylesheet (no nav, readable typography, proper image sizing).
+- [x] Blog post: embedded product cards – Allow inserting product/category/collection cards inside posts (shoppable content).
+- [x] Blog post: author card – Author bio + avatar + links, plus “More from this author”.
+- [x] Blog post: print-friendly styles – Clean print stylesheet (no nav, readable typography, proper image sizing).
 - [ ] Blog post: comments UX – Pagination + sorting (newest/oldest/top) and improved empty/loading states.
 - [ ] Blog comments: spam controls – Rate limits + link limits + optional CAPTCHA on comment submit.
 - [ ] Blog: newsletter subscribe – Inline subscribe block and optional “subscribe to comments” on a post.
