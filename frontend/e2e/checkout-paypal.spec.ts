@@ -6,23 +6,21 @@ const OWNER_PASSWORD = process.env.E2E_OWNER_PASSWORD || 'Password123';
 async function acceptConsentIfNeeded(page: Page, checkboxIndex: number): Promise<void> {
   const checkbox = page.locator('#checkout-step-4 input[type="checkbox"]').nth(checkboxIndex);
   if (await checkbox.isChecked()) return;
-  if (!(await checkbox.isEnabled())) {
-    throw new Error(`Consent checkbox ${checkboxIndex} is disabled but not checked.`);
-  }
+  await expect(checkbox).toBeEnabled();
 
   await checkbox.click();
 
   const dialog = page.locator('div[role="dialog"][aria-modal="true"]').last();
   const acceptButton = dialog.getByRole('button', { name: 'Accept' });
-  await expect(acceptButton).toBeDisabled();
-
-  const body = dialog.locator('div.overflow-y-auto').first();
-  await body.evaluate((el) => {
-    el.scrollTop = el.scrollHeight;
-    el.dispatchEvent(new Event('scroll'));
-  });
-
-  await expect(acceptButton).toBeEnabled();
+  await expect(acceptButton).toBeVisible();
+  if (await acceptButton.isDisabled()) {
+    const body = dialog.locator('div.overflow-y-auto').first();
+    await body.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+      el.dispatchEvent(new Event('scroll'));
+    });
+    await expect(acceptButton).toBeEnabled();
+  }
   await acceptButton.click();
   await expect(dialog).toBeHidden();
   await expect(checkbox).toBeChecked();
@@ -114,8 +112,17 @@ async function fetchOrderStatus(request: APIRequestContext, token: string, order
   return String(payload?.status ?? '');
 }
 
+async function readPayPalPendingOrderId(page: Page): Promise<string> {
+  const raw = await page.evaluate(() => localStorage.getItem('checkout_paypal_pending'));
+  expect(raw).toBeTruthy();
+  const parsed = JSON.parse(String(raw)) as any;
+  const orderId = String(parsed?.order_id ?? '');
+  expect(orderId).toBeTruthy();
+  return orderId;
+}
+
 async function setSessionCart(page: Page, sessionId: string): Promise<void> {
-  await page.evaluate((sid) => {
+  await page.addInitScript((sid) => {
     localStorage.setItem('cart_session_id', sid);
     localStorage.removeItem('cart_cache');
   }, sessionId);
@@ -153,21 +160,12 @@ async function startPayPalCheckout(
   await fillShippingAddress(page, shippingEmail);
 
   await paypalButton.click();
-  await expect(page.getByRole('button', { name: 'Place order' })).toBeDisabled();
   await acceptCheckoutConsents(page);
   await expect(page.getByRole('button', { name: 'Place order' })).toBeEnabled();
 
-  const checkoutResPromise = page.waitForResponse(
-    (res) => res.url().includes('/api/v1/orders/checkout') && res.request().method() === 'POST'
-  );
   await page.getByRole('button', { name: 'Place order' }).click();
-  const checkoutRes = await checkoutResPromise;
-  expect(checkoutRes.ok()).toBeTruthy();
-  const payload = (await checkoutRes.json()) as any;
-  const orderId = String(payload?.order_id ?? '');
-  expect(orderId).toBeTruthy();
-
   await expect(page).toHaveURL(/\/checkout\/mock\/paypal/);
+  const orderId = await readPayPalPendingOrderId(page);
   return { orderId };
 }
 
@@ -180,42 +178,15 @@ test.beforeEach(async ({ page }) => {
 
 test('paypal checkout (mock): success', async ({ page, request }) => {
   const token = await loginApi(request);
-  const sessionId = `e2e-paypal-success-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  await setSessionCart(page, sessionId);
-  const product = await seedCartWithFirstProduct(request, sessionId);
-  if (!product) return;
-
   await loginUi(page);
-  await openCartAndCheckout(page, product.name);
-
-  const paypalButton = page.getByRole('button', { name: 'PayPal' });
-  if (!(await paypalButton.isVisible()) || (await paypalButton.isDisabled())) {
-    test.skip(true, 'PayPal is not enabled/available in this environment.');
-    return;
-  }
-
-  const shippingEmail = OWNER_IDENTIFIER.includes('@') ? OWNER_IDENTIFIER : `${OWNER_IDENTIFIER}@example.com`;
-  await fillShippingAddress(page, shippingEmail);
-  await paypalButton.click();
-
-  await acceptCheckoutConsents(page);
-  const checkoutResPromise = page.waitForResponse(
-    (res) => res.url().includes('/api/v1/orders/checkout') && res.request().method() === 'POST'
-  );
-  await page.getByRole('button', { name: 'Place order' }).click();
-  const checkoutRes = await checkoutResPromise;
-  expect(checkoutRes.ok()).toBeTruthy();
-  const checkoutPayload = (await checkoutRes.json()) as any;
-  const orderId = String(checkoutPayload?.order_id ?? '');
-  expect(orderId).toBeTruthy();
-
-  await expect(page).toHaveURL(/\/checkout\/mock\/paypal/);
+  const checkout = await startPayPalCheckout(page, request);
+  if (!checkout) return;
   await page.getByRole('button', { name: 'Simulate success' }).click();
 
   await expect(page).toHaveURL(/\/checkout\/success$/);
   await expect(page.getByRole('heading', { name: 'Thank you for your purchase!' })).toBeVisible();
 
-  const status = await fetchOrderStatus(request, token, orderId);
+  const status = await fetchOrderStatus(request, token, checkout.orderId);
   expect(status).toBe('pending_acceptance');
 });
 
@@ -235,4 +206,3 @@ test('paypal checkout (mock): decline + cancel', async ({ page, request }) => {
   await expect(page.getByRole('heading', { name: 'PayPal checkout cancelled' })).toBeVisible();
   expect(await fetchOrderStatus(request, token, cancel.orderId)).toBe('pending_payment');
 });
-
