@@ -26,6 +26,11 @@ export interface BlogPostListResponse {
   meta: PaginationMeta;
 }
 
+export interface BlogPostNeighbors {
+  previous?: BlogPostListItem | null;
+  next?: BlogPostListItem | null;
+}
+
 export interface BlogPreviewTokenResponse {
   token: string;
   expires_at: string;
@@ -172,6 +177,10 @@ export class BlogService {
 
   getPost(slug: string, lang?: string): Observable<BlogPost> {
     return this.api.get<BlogPost>(`/blog/posts/${slug}`, { lang });
+  }
+
+  getNeighbors(slug: string, lang?: string): Observable<BlogPostNeighbors> {
+    return this.api.get<BlogPostNeighbors>(`/blog/posts/${slug}/neighbors`, { lang });
   }
 
   getPreviewPost(slug: string, token: string, lang?: string): Observable<BlogPost> {

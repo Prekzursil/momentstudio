@@ -23,6 +23,11 @@ class BlogPostListResponse(BaseModel):
     meta: PaginationMeta
 
 
+class BlogPostNeighbors(BaseModel):
+    previous: BlogPostListItem | None = None
+    next: BlogPostListItem | None = None
+
+
 class BlogPreviewTokenResponse(BaseModel):
     token: str
     expires_at: datetime

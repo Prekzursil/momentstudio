@@ -10,7 +10,7 @@ import { appConfig } from '../../core/app-config';
 import { AuthService } from '../../core/auth.service';
 import { MarkdownService } from '../../core/markdown.service';
 import { ToastService } from '../../core/toast.service';
-import { BlogComment, BlogPost, BlogService } from '../../core/blog.service';
+import { BlogComment, BlogPost, BlogPostListItem, BlogService } from '../../core/blog.service';
 import { ContainerComponent } from '../../layout/container.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
@@ -151,6 +151,75 @@ import { formatIdentity } from '../../shared/user-identity';
           </aside>
         </div>
       </div>
+
+      <section *ngIf="neighbors().previous || neighbors().next" class="grid gap-3">
+        <div class="grid gap-3 sm:grid-cols-2">
+          <a
+            *ngIf="neighbors().previous as prev"
+            [routerLink]="['/blog', prev.slug]"
+            class="group block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:shadow-none"
+          >
+            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+              ← {{ 'blog.post.previousPost' | translate }}
+            </p>
+            <p class="pt-1 text-base font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-50 dark:group-hover:text-indigo-300">
+              {{ prev.title }}
+            </p>
+          </a>
+          <a
+            *ngIf="neighbors().next as next"
+            [routerLink]="['/blog', next.slug]"
+            class="group block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:shadow-none"
+          >
+            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400 text-right">
+              {{ 'blog.post.nextPost' | translate }} →
+            </p>
+            <p class="pt-1 text-base font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-50 dark:group-hover:text-indigo-300 text-right">
+              {{ next.title }}
+            </p>
+          </a>
+        </div>
+      </section>
+
+      <section *ngIf="relatedPosts().length" class="grid gap-3">
+        <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.post.relatedTitle' | translate }}</h2>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <a *ngFor="let related of relatedPosts()" [routerLink]="['/blog', related.slug]" class="group block">
+            <div class="h-full transition-transform duration-200 ease-out group-hover:-translate-y-0.5">
+              <app-card class="h-full">
+                <div class="grid gap-3">
+                  <div
+                    *ngIf="related.cover_image_url"
+                    class="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800"
+                  >
+                    <img
+                      [src]="related.cover_image_url"
+                      [alt]="related.title"
+                      class="w-full aspect-[16/9] object-cover"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </div>
+                  <div class="grid gap-1">
+                    <p class="text-sm text-slate-500 dark:text-slate-400" *ngIf="related.published_at">
+                      {{ related.published_at | date: 'mediumDate' }}
+                      <ng-container *ngIf="related.reading_time_minutes">
+                        · {{ 'blog.minutesRead' | translate : { minutes: related.reading_time_minutes } }}
+                      </ng-container>
+                    </p>
+                    <h3 class="text-lg font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-50 dark:group-hover:text-indigo-300">
+                      {{ related.title }}
+                    </h3>
+                    <p class="text-sm text-slate-600 dark:text-slate-300 line-clamp-3">
+                      {{ related.excerpt }}
+                    </p>
+                  </div>
+                </div>
+              </app-card>
+            </div>
+          </a>
+        </div>
+      </section>
 
       <section class="grid gap-3">
         <div class="flex items-center justify-between gap-4">
@@ -354,6 +423,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   bodyHtml = signal<string>('');
   toc = signal<Array<{ id: string; title: string; level: 2 | 3 }>>([]);
   activeHeadingId = signal<string | null>(null);
+  neighbors = signal<{ previous: BlogPostListItem | null; next: BlogPostListItem | null }>({ previous: null, next: null });
+  relatedPosts = signal<BlogPostListItem[]>([]);
 
   comments = signal<BlogComment[]>([]);
   loadingComments = signal<boolean>(true);
@@ -428,6 +499,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     this.showBackToTop.set(false);
     this.toc.set([]);
     this.activeHeadingId.set(null);
+    this.neighbors.set({ previous: null, next: null });
+    this.relatedPosts.set([]);
     this.scrollStartY = 0;
     this.scrollEndY = 1;
     this.tocHeadingEls = [];
@@ -452,6 +525,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         ];
         this.setMetaTags(post);
         this.measureReadingProgressSoon();
+        this.loadNeighbors(lang);
+        this.loadRelatedPosts(lang, post);
         this.loadComments();
       },
       error: () => {
@@ -459,6 +534,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.bodyHtml.set('');
         this.toc.set([]);
         this.activeHeadingId.set(null);
+        this.neighbors.set({ previous: null, next: null });
+        this.relatedPosts.set([]);
         this.loadingPost.set(false);
         this.hasPostError.set(true);
         this.setErrorMetaTags();
@@ -467,6 +544,60 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.comments.set([]);
       }
     });
+  }
+
+  private loadNeighbors(lang: string): void {
+    if (!this.slug) return;
+    this.blog.getNeighbors(this.slug, lang).subscribe({
+      next: (resp) => {
+        this.neighbors.set({ previous: resp.previous ?? null, next: resp.next ?? null });
+      },
+      error: () => {
+        this.neighbors.set({ previous: null, next: null });
+      }
+    });
+  }
+
+  private loadRelatedPosts(lang: string, post: BlogPost): void {
+    const series = (post.series || '').trim().toLowerCase();
+    const tagSet = new Set((post.tags || []).map((t) => t.toLowerCase()));
+    if (!series && tagSet.size === 0) {
+      this.relatedPosts.set([]);
+      return;
+    }
+    this.blog
+      .listPosts({
+        lang,
+        page: 1,
+        limit: 50,
+        sort: 'newest'
+      })
+      .subscribe({
+        next: (resp) => {
+          const scored = resp.items
+            .filter((item) => item.slug !== post.slug)
+            .map((item) => {
+              let score = 0;
+              if (series && item.series && item.series.toLowerCase() === series) score += 10;
+              const sharedTags = (item.tags || []).reduce((acc, t) => acc + (tagSet.has(t.toLowerCase()) ? 1 : 0), 0);
+              score += sharedTags;
+              return { item, score };
+            })
+            .filter((row) => row.score > 0)
+            .sort((a, b) => {
+              if (b.score !== a.score) return b.score - a.score;
+              const aTs = a.item.published_at ? Date.parse(a.item.published_at) : 0;
+              const bTs = b.item.published_at ? Date.parse(b.item.published_at) : 0;
+              return bTs - aTs;
+            })
+            .slice(0, 6)
+            .map((row) => row.item);
+          this.relatedPosts.set(scored);
+        },
+        error: () => {
+          this.relatedPosts.set([]);
+        }
+      });
   }
 
   scrollToTop(): void {

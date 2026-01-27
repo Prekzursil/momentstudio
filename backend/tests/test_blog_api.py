@@ -179,6 +179,16 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     )
     assert create2.status_code == 201, create2.text
 
+    neighbors_first = client.get("/api/v1/blog/posts/first-post/neighbors", params={"lang": "en"})
+    assert neighbors_first.status_code == 200, neighbors_first.text
+    assert neighbors_first.json()["previous"]["slug"] == "second-post"
+    assert neighbors_first.json()["next"] is None
+
+    neighbors_second = client.get("/api/v1/blog/posts/second-post/neighbors", params={"lang": "en"})
+    assert neighbors_second.status_code == 200, neighbors_second.text
+    assert neighbors_second.json()["previous"] is None
+    assert neighbors_second.json()["next"]["slug"] == "first-post"
+
     filtered_tag = client.get("/api/v1/blog/posts", params={"lang": "en", "tag": "ceramics"})
     assert filtered_tag.status_code == 200, filtered_tag.text
     assert filtered_tag.json()["meta"]["total_items"] == 1

@@ -440,8 +440,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Blog post: reading progress – Add a top progress bar and “Back to top” affordance.
 - [x] Blog post: table of contents – Auto-generate TOC from headings with scroll-spy and anchor links.
 - [x] Blog post: heading permalinks – Add link icons on headings for easy sharing of sections.
-- [ ] Blog post: next/previous nav – Add “Next post / Previous post” navigation at the bottom.
-- [ ] Blog post: related posts – Show related posts by tags/series with thumbnails.
+- [x] Blog post: next/previous nav – Add “Next post / Previous post” navigation at the bottom.
+- [x] Blog post: related posts – Show related posts by tags/series with thumbnails.
 - [ ] Blog post: share bar – Add share buttons (copy link + WhatsApp/Facebook) with accessible labels.
 - [ ] Blog post: inline image lightbox – Click in-article images to open a gallery/lightbox with captions.
 - [ ] Blog post: rich image layouts – Support wide/left/right aligned images and multi-image galleries in content.

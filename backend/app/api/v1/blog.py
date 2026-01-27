@@ -27,6 +27,7 @@ from app.schemas.blog import (
     BlogCommentRead,
     BlogMyCommentListResponse,
     BlogMyCommentRead,
+    BlogPostNeighbors,
     BlogPostListResponse,
     BlogPostRead,
     BlogPreviewTokenResponse,
@@ -204,6 +205,22 @@ async def get_blog_post(
     except Exception:
         await session.rollback()
     return BlogPostRead.model_validate(payload)
+
+
+@router.get("/posts/{slug}/neighbors", response_model=BlogPostNeighbors)
+async def get_blog_post_neighbors(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+) -> BlogPostNeighbors:
+    block = await blog_service.get_published_post(session, slug=slug, lang=None)
+    if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    previous_post, next_post = await blog_service.get_post_neighbors(session, slug=slug, lang=lang)
+    return BlogPostNeighbors(
+        previous=blog_service.to_list_item(previous_post, lang=lang) if previous_post else None,
+        next=blog_service.to_list_item(next_post, lang=lang) if next_post else None,
+    )
 
 
 @router.get("/posts/{slug}/preview", response_model=BlogPostRead)

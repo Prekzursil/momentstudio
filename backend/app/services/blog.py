@@ -327,6 +327,58 @@ async def get_published_post(
     return block
 
 
+async def get_post_neighbors(
+    session: AsyncSession,
+    *,
+    slug: str,
+    lang: str | None,
+) -> tuple[ContentBlock | None, ContentBlock | None]:
+    current = await get_published_post(session, slug=slug, lang=None)
+    if not current:
+        return None, None
+    current_ts = current.published_at or current.created_at
+
+    now = datetime.now(timezone.utc)
+    sort_ts = func.coalesce(ContentBlock.published_at, ContentBlock.created_at)
+    filters = (
+        ContentBlock.key.like(f"{BLOG_KEY_PREFIX}%"),
+        ContentBlock.status == ContentStatus.published,
+        or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
+        or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
+        ContentBlock.id != current.id,
+    )
+
+    options = [selectinload(ContentBlock.images), selectinload(ContentBlock.author)]
+    if lang:
+        options.append(selectinload(ContentBlock.translations))
+
+    newer_query = (
+        select(ContentBlock)
+        .options(*options)
+        .where(*filters, sort_ts > current_ts)
+        .order_by(sort_ts.asc(), ContentBlock.id.asc())
+        .limit(1)
+    )
+    older_query = (
+        select(ContentBlock)
+        .options(*options)
+        .where(*filters, sort_ts < current_ts)
+        .order_by(sort_ts.desc(), ContentBlock.id.desc())
+        .limit(1)
+    )
+
+    newer_res = await session.execute(newer_query)
+    older_res = await session.execute(older_query)
+    newer = newer_res.scalar_one_or_none()
+    older = older_res.scalar_one_or_none()
+    if lang:
+        if newer:
+            _apply_translation(newer, lang)
+        if older:
+            _apply_translation(older, lang)
+    return newer, older
+
+
 def to_list_item(block: ContentBlock, *, lang: str | None = None) -> dict:
     meta = getattr(block, "meta", None) or {}
     cover = _meta_cover_image_url(meta)
