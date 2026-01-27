@@ -191,6 +191,16 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
         <div class="grid md:grid-cols-[1.35fr_1fr]">
           <div class="relative min-h-[220px] md:min-h-[360px] bg-slate-100 dark:bg-slate-800">
             <img
+              *ngIf="thumbUrl(heroPost.cover_image_url) as thumb"
+              [src]="thumb"
+              [alt]="heroPost.title"
+              class="absolute inset-0 h-full w-full object-cover blur-xl scale-110 opacity-80"
+              [style.object-position]="focalPosition(heroPost.cover_focal_x, heroPost.cover_focal_y)"
+              (error)="markThumbFailed(thumb)"
+              loading="lazy"
+              decoding="async"
+            />
+            <img
               *ngIf="heroPost.cover_image_url"
               [src]="heroPost.cover_image_url"
               [alt]="heroPost.title"
@@ -268,9 +278,19 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
 	                  class="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800"
 	                >
                   <img
+                    *ngIf="thumbUrl(post.cover_image_url) as thumb"
+                    [src]="thumb"
+                    [alt]="post.title"
+                    class="absolute inset-0 h-full w-full object-cover blur-xl scale-110 opacity-80"
+                    [style.object-position]="focalPosition(post.cover_focal_x, post.cover_focal_y)"
+                    (error)="markThumbFailed(thumb)"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <img
                     [src]="post.cover_image_url"
                     [alt]="post.title"
-                    class="w-full aspect-[16/9] object-cover transition-opacity duration-300"
+                    class="relative w-full aspect-[16/9] object-cover transition-opacity duration-300"
                     [style.object-position]="focalPosition(post.cover_focal_x, post.cover_focal_y)"
                     [class.opacity-0]="!isImageLoaded(post.cover_image_url)"
                     (load)="markImageLoaded(post.cover_image_url)"
@@ -362,6 +382,7 @@ export class BlogListComponent implements OnInit, OnDestroy {
   seriesQuery = '';
   sort: BlogSort = 'newest';
   private readonly loadedImages = new Set<string>();
+  private readonly failedThumbs = new Set<string>();
 
   private sub?: Subscription;
   private langSub?: Subscription;
@@ -651,6 +672,25 @@ export class BlogListComponent implements OnInit, OnDestroy {
   isImageLoaded(src: string | null | undefined): boolean {
     if (!src) return true;
     return this.loadedImages.has(src);
+  }
+
+  thumbUrl(src: string | null | undefined): string | null {
+    const raw = String(src || '').trim();
+    if (!raw || !raw.startsWith('/media/')) return null;
+    const base = raw.split('?')[0].split('#')[0];
+    const dot = base.lastIndexOf('.');
+    const slash = base.lastIndexOf('/');
+    if (dot <= slash) return null;
+    const thumb = `${base.slice(0, dot)}-sm${base.slice(dot)}`;
+    if (this.failedThumbs.has(thumb)) return null;
+    return thumb;
+  }
+
+  markThumbFailed(src: string | null | undefined): void {
+    const raw = String(src || '').trim();
+    if (!raw) return;
+    const base = raw.split('?')[0].split('#')[0];
+    this.failedThumbs.add(base);
   }
 
   hasActiveFilters(): boolean {

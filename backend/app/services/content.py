@@ -505,7 +505,10 @@ async def upsert_block(
 
 async def add_image(session: AsyncSession, block: ContentBlock, file, actor_id: UUID | None = None) -> ContentBlock:
     path, filename = storage.save_upload(
-        file, allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif"), max_bytes=5 * 1024 * 1024
+        file,
+        allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif"),
+        max_bytes=5 * 1024 * 1024,
+        generate_thumbnails=True,
     )
     next_sort = (max([img.sort_order for img in block.images], default=0) or 0) + 1
     image = ContentImage(content_block_id=block.id, url=path, alt_text=filename, sort_order=next_sort)
