@@ -2708,6 +2708,15 @@
         "fixed": "Textul alternativ a fost actualizat",
         "confirmPublishAnyway": "Acest articol are {{count}} imagini fără text alternativ relevant. Publici oricum?"
       },
+      "writing": {
+        "title": "Instrumente de scriere",
+        "words": "Cuvinte: {{count}}",
+        "estimate": "Timp estimat de citire: {{minutes}} min",
+        "applyEstimate": "Folosește estimarea",
+        "applied": "Timpul de citire a fost setat la {{minutes}} min.",
+        "outline": "Cuprins",
+        "outlineEmpty": "Nu au fost găsite titluri încă."
+      },
       "preview": {
         "title": "Link previzualizare",
         "expires": "Expiră",

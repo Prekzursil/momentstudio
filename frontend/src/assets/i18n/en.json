@@ -2708,6 +2708,15 @@
         "fixed": "Alt text updated",
         "confirmPublishAnyway": "This post has {{count}} image(s) without meaningful alt text. Publish anyway?"
       },
+      "writing": {
+        "title": "Writing aids",
+        "words": "Words: {{count}}",
+        "estimate": "Estimated reading time: {{minutes}} min",
+        "applyEstimate": "Use estimate",
+        "applied": "Reading time set to {{minutes}} min.",
+        "outline": "Outline",
+        "outlineEmpty": "No headings found yet."
+      },
       "preview": {
         "title": "Preview link",
         "expires": "Expires",

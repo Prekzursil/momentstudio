@@ -3910,7 +3910,9 @@ class CmsDraftManager<T> {
                   </span>
                 </label>
                 <div class="grid gap-2 md:col-span-2">
-                  <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="grid gap-3 lg:grid-cols-[1fr_280px]">
+                    <div class="grid gap-2">
+                      <div class="flex flex-wrap items-center justify-between gap-2">
                     <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ 'adminUi.blog.fields.body' | translate }}</p>
                     <div class="flex flex-wrap items-center gap-3">
                       <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
@@ -4105,6 +4107,43 @@ class CmsDraftManager<T> {
                     </div>
                     </div>
                   </ng-template>
+                    </div>
+
+                    <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-800 dark:bg-slate-950/30">
+                      <ng-container *ngIf="blogWritingAids() as aids">
+                        <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.blog.writing.title' | translate }}
+                        </p>
+                        <div class="mt-2 grid gap-3">
+                          <div class="grid gap-1">
+                            <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                              {{ 'adminUi.blog.writing.words' | translate: { count: aids.words } }}
+                            </p>
+                            <p class="text-xs text-slate-600 dark:text-slate-300">
+                              {{ 'adminUi.blog.writing.estimate' | translate: { minutes: aids.minutes || 0 } }}
+                            </p>
+                            <app-button
+                              size="sm"
+                              variant="ghost"
+                              [label]="'adminUi.blog.writing.applyEstimate' | translate"
+                              [disabled]="!aids.minutes"
+                              (action)="applyBlogReadingTimeEstimate()"
+                            ></app-button>
+                          </div>
+
+                          <div class="grid gap-1">
+                            <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">{{ 'adminUi.blog.writing.outline' | translate }}</p>
+                            <p *ngIf="!aids.headings.length" class="text-xs text-slate-500 dark:text-slate-400">
+                              {{ 'adminUi.blog.writing.outlineEmpty' | translate }}
+                            </p>
+                            <div *ngFor="let h of aids.headings" class="truncate text-slate-700 dark:text-slate-200" [style.paddingLeft.px]="(h.level - 1) * 8">
+                              {{ h.text }}
+                            </div>
+                          </div>
+                        </div>
+                      </ng-container>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -7346,6 +7385,61 @@ export class AdminComponent implements OnInit, OnDestroy {
     }
     out += markdown.slice(lastIndex);
     this.blogForm.body_markdown = out;
+  }
+
+  blogWritingAids(): { words: number; minutes: number; headings: Array<{ level: number; text: string }> } {
+    const markdown = this.blogForm.body_markdown || '';
+    const words = this.countMarkdownWords(markdown);
+    const minutes = words ? Math.max(1, Math.ceil(words / 200)) : 0;
+    return { words, minutes, headings: this.extractMarkdownHeadings(markdown) };
+  }
+
+  applyBlogReadingTimeEstimate(): void {
+    const aids = this.blogWritingAids();
+    if (!aids.minutes) return;
+    this.blogForm.reading_time_minutes = String(aids.minutes);
+    this.toast.info(this.t('adminUi.blog.writing.applied', { minutes: aids.minutes }));
+  }
+
+  private countMarkdownWords(markdown: string): number {
+    const cleaned = String(markdown || '')
+      .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/`[^`]*`/g, ' ')
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/[#>*_~`-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const matches = cleaned.match(/[\p{L}\p{N}]+/gu);
+    return matches?.length ?? 0;
+  }
+
+  private extractMarkdownHeadings(markdown: string): Array<{ level: number; text: string }> {
+    const lines = String(markdown || '').split('\n');
+    const out: Array<{ level: number; text: string }> = [];
+    let inCode = false;
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (line.startsWith('```')) {
+        inCode = !inCode;
+        continue;
+      }
+      if (inCode) continue;
+      const match = /^(#{1,6})\s+(.+)$/.exec(line);
+      if (!match) continue;
+      const level = match[1].length;
+      if (level > 3) continue;
+      const text = match[2]
+        .replace(/\s+#+\s*$/, '')
+        .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        .trim();
+      if (!text) continue;
+      out.push({ level, text });
+      if (out.length >= 40) break;
+    }
+    return out;
   }
 
   blogCoverPreviewUrl(): string | null {
